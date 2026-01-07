@@ -448,40 +448,39 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
         </div>
       )}
 
-      <div className={embedded ? "space-y-6" : "max-w-6xl mx-auto px-6 py-6 space-y-6"}>
+      <div className={embedded ? "space-y-4 sm:space-y-6" : "max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6"}>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-card shadow-sm border p-1 h-auto">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          <TabsList className="bg-card shadow-sm border p-1 h-auto w-full flex">
             <TabsTrigger 
               value="ativos" 
-              className="data-[state=active]:bg-primary data-[state=active]:text-white px-6 py-3 text-base"
+              className="data-[state=active]:bg-primary data-[state=active]:text-white flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
               data-testid="tab-casos-ativos"
             >
-              <Gavel className="w-5 h-5 mr-2" />
-              Casos Ativos ({totals.count})
+              <Gavel className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
+              Ativos ({totals.count})
             </TabsTrigger>
             <TabsTrigger 
               value="recuperados" 
-              className="data-[state=active]:bg-green-600 data-[state=active]:text-white px-6 py-3 text-base"
+              className="data-[state=active]:bg-green-600 data-[state=active]:text-white flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
               data-testid="tab-recuperados"
             >
-              <Trophy className="w-5 h-5 mr-2" />
+              <Trophy className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
               Recuperados ({recuperadosStats.clientesRecuperados})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="ativos" className="space-y-6 mt-0">
+          <TabsContent value="ativos" className="space-y-4 sm:space-y-6 mt-0">
             {/* Métricas Principais */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              <Card className="bg-gradient-to-br from-red-500 to-red-600 shadow-lg">
-                <CardContent className="pt-5 pb-4">
-                  <div className="text-white">
-                    <div className="flex items-center justify-between mb-2">
-                      <DollarSign className="h-5 w-5 opacity-80" />
-                      <Flame className="h-4 w-4 opacity-60" />
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
+              <Card className="bg-gradient-to-br from-red-500 to-red-600 shadow-lg col-span-3 sm:col-span-1">
+                <CardContent className="pt-4 pb-3 px-4 sm:px-6">
+                  <div className="text-white flex sm:block items-center justify-between">
+                    <div className="flex items-center gap-2 sm:mb-2">
+                      <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 opacity-80" />
+                      <p className="text-red-100 text-xs font-medium uppercase tracking-wide">Valor Total</p>
                     </div>
-                    <p className="text-red-100 text-xs font-medium uppercase tracking-wide">Valor Total</p>
-                    <p className="text-2xl font-bold mt-1" data-testid="text-total-value">
+                    <p className="text-lg sm:text-2xl font-bold sm:mt-1" data-testid="text-total-value">
                       {formatCurrency(totals.total)}
                     </p>
                   </div>
@@ -489,14 +488,14 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
               </Card>
 
               <Card className="bg-gradient-to-br from-orange-500 to-orange-600 shadow-lg">
-                <CardContent className="pt-5 pb-4">
+                <CardContent className="pt-4 pb-3 px-4 sm:px-6">
                   <div className="text-white">
-                    <div className="flex items-center justify-between mb-2">
-                      <AlertTriangle className="h-5 w-5 opacity-80" />
-                      <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">{formatPercent(totals.percentUrgente, 0)}</span>
+                    <div className="flex items-center justify-between mb-1 sm:mb-2">
+                      <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 opacity-80" />
+                      <span className="text-xs bg-white/20 px-1.5 sm:px-2 py-0.5 rounded-full">{formatPercent(totals.percentUrgente, 0)}</span>
                     </div>
-                    <p className="text-orange-100 text-xs font-medium uppercase tracking-wide">Urgentes (+90d)</p>
-                    <p className="text-3xl font-bold mt-1" data-testid="text-urgent-cases">
+                    <p className="text-orange-100 text-xs font-medium uppercase tracking-wide">Urgentes</p>
+                    <p className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1" data-testid="text-urgent-cases">
                       {totals.urgentes}
                     </p>
                   </div>
@@ -504,13 +503,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
               </Card>
 
               <Card className="bg-gradient-to-br from-amber-400 to-amber-500 shadow-lg">
-                <CardContent className="pt-5 pb-4">
+                <CardContent className="pt-4 pb-3 px-4 sm:px-6">
                   <div className="text-white">
-                    <div className="flex items-center justify-between mb-2">
-                      <Clock className="h-5 w-5 opacity-80" />
+                    <div className="flex items-center justify-between mb-1 sm:mb-2">
+                      <Clock className="h-4 w-4 sm:h-5 sm:w-5 opacity-80" />
                     </div>
                     <p className="text-amber-100 text-xs font-medium uppercase tracking-wide">Sem Ação</p>
-                    <p className="text-3xl font-bold mt-1" data-testid="text-no-action">
+                    <p className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1" data-testid="text-no-action">
                       {totals.semAcao}
                     </p>
                   </div>
@@ -518,37 +517,37 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
               </Card>
 
               <Card className="shadow-sm">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Receipt className="h-5 w-5 text-muted-foreground" />
+                <CardContent className="pt-4 pb-3 px-4 sm:px-6">
+                  <div className="flex items-center justify-between mb-1 sm:mb-2">
+                    <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Ticket Médio</p>
-                  <p className="text-2xl font-bold mt-1" data-testid="text-ticket-medio">
+                  <p className="text-base sm:text-2xl font-bold mt-0.5 sm:mt-1" data-testid="text-ticket-medio">
                     {formatCurrency(totals.ticketMedio)}
                   </p>
                 </CardContent>
               </Card>
 
               <Card className="shadow-sm">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Timer className="h-5 w-5 text-muted-foreground" />
+                <CardContent className="pt-4 pb-3 px-4 sm:px-6">
+                  <div className="flex items-center justify-between mb-1 sm:mb-2">
+                    <Timer className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Dias Médio</p>
-                  <p className="text-3xl font-bold mt-1" data-testid="text-dias-medio">
+                  <p className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1" data-testid="text-dias-medio">
                     {Math.round(totals.diasMedio)}
-                    <span className="text-sm font-normal text-muted-foreground ml-1">dias</span>
+                    <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-0.5 sm:ml-1">d</span>
                   </p>
                 </CardContent>
               </Card>
 
               <Card className="shadow-sm">
-                <CardContent className="pt-5 pb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Users className="h-5 w-5 text-muted-foreground" />
+                <CardContent className="pt-4 pb-3 px-4 sm:px-6">
+                  <div className="flex items-center justify-between mb-1 sm:mb-2">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   </div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total Casos</p>
-                  <p className="text-3xl font-bold mt-1" data-testid="text-total-casos">
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total</p>
+                  <p className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1" data-testid="text-total-casos">
                     {totals.count}
                   </p>
                 </CardContent>
@@ -556,26 +555,26 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
             </div>
 
             {/* Gráficos e Distribuição */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
               {/* Gráfico de Urgência */}
               <Card className="shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-muted-foreground" />
+                <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6">
+                  <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                     Distribuição por Urgência
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4">
-                    <div className="w-32 h-32">
+                <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-20 h-20 sm:w-32 sm:h-32 shrink-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <RechartsPie>
                           <Pie
                             data={totals.distribuicaoUrgencia}
                             cx="50%"
                             cy="50%"
-                            innerRadius={25}
-                            outerRadius={50}
+                            innerRadius={15}
+                            outerRadius={35}
                             dataKey="value"
                             strokeWidth={2}
                             stroke="hsl(var(--card))"
@@ -587,14 +586,14 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         </RechartsPie>
                       </ResponsiveContainer>
                     </div>
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1 space-y-1 sm:space-y-2">
                       {totals.distribuicaoUrgencia.map((item) => (
                         <div key={item.name} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="text-sm text-muted-foreground">{item.name}</span>
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-xs sm:text-sm text-muted-foreground">{item.name}</span>
                           </div>
-                          <span className="font-semibold">{item.value}</span>
+                          <span className="font-semibold text-sm sm:text-base">{item.value}</span>
                         </div>
                       ))}
                     </div>
@@ -604,23 +603,23 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
               {/* Gráfico de Procedimentos */}
               <Card className="shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-semibold flex items-center gap-2">
-                    <PieChart className="h-5 w-5 text-muted-foreground" />
+                <CardHeader className="pb-1 sm:pb-2 px-3 sm:px-6">
+                  <CardTitle className="text-sm sm:text-base font-semibold flex items-center gap-2">
+                    <PieChart className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                     Distribuição por Ação
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4">
-                    <div className="w-32 h-32">
+                <CardContent className="px-3 sm:px-6 pb-3 sm:pb-6">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-20 h-20 sm:w-32 sm:h-32 shrink-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <RechartsPie>
                           <Pie
                             data={totals.distribuicaoProcedimento}
                             cx="50%"
                             cy="50%"
-                            innerRadius={25}
-                            outerRadius={50}
+                            innerRadius={15}
+                            outerRadius={35}
                             dataKey="value"
                             strokeWidth={2}
                             stroke="hsl(var(--card))"
@@ -632,14 +631,14 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         </RechartsPie>
                       </ResponsiveContainer>
                     </div>
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1 space-y-1 sm:space-y-2">
                       {totals.distribuicaoProcedimento.map((item) => (
                         <div key={item.name} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="text-sm text-muted-foreground">{item.name}</span>
+                          <div className="flex items-center gap-1.5 sm:gap-2">
+                            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-xs sm:text-sm text-muted-foreground">{item.name}</span>
                           </div>
-                          <span className="font-semibold">{item.value}</span>
+                          <span className="font-semibold text-sm sm:text-base">{item.value}</span>
                         </div>
                       ))}
                     </div>
@@ -650,56 +649,56 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
             {/* Barra de Progresso Visual - Urgência */}
             <Card className="shadow-sm">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-4 mb-3">
-                  <Activity className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium">Panorama de Urgência</span>
+              <CardContent className="py-3 sm:py-4">
+                <div className="flex items-center gap-2 sm:gap-4 mb-3">
+                  <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
+                  <span className="font-medium text-sm sm:text-base">Panorama de Urgência</span>
                 </div>
                 <div className="flex h-4 rounded-full overflow-hidden bg-muted">
                   {totals.urgentes > 0 && (
                     <div 
-                      className="bg-red-500 flex items-center justify-center text-[10px] font-bold text-white"
+                      className="bg-red-500"
                       style={{ width: `${(totals.urgentes / totals.count) * 100}%` }}
                       title={`Urgente: ${totals.urgentes}`}
                     />
                   )}
                   {totals.atencao > 0 && (
                     <div 
-                      className="bg-orange-500 flex items-center justify-center text-[10px] font-bold text-white"
+                      className="bg-orange-500"
                       style={{ width: `${(totals.atencao / totals.count) * 100}%` }}
                       title={`Atenção: ${totals.atencao}`}
                     />
                   )}
                   {totals.moderado > 0 && (
                     <div 
-                      className="bg-amber-400 flex items-center justify-center text-[10px] font-bold text-white"
+                      className="bg-amber-400"
                       style={{ width: `${(totals.moderado / totals.count) * 100}%` }}
                       title={`Moderado: ${totals.moderado}`}
                     />
                   )}
                   {totals.recente > 0 && (
                     <div 
-                      className="bg-slate-400 dark:bg-slate-500 flex items-center justify-center text-[10px] font-bold text-slate-800 dark:text-slate-100"
+                      className="bg-slate-400 dark:bg-slate-500"
                       style={{ width: `${(totals.recente / totals.count) * 100}%` }}
                       title={`Recente: ${totals.recente}`}
                     />
                   )}
                 </div>
-                <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                <div className="grid grid-cols-2 sm:flex sm:justify-between gap-1 sm:gap-0 mt-2 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-red-500 rounded-full" />
+                    <div className="w-2 h-2 bg-red-500 rounded-full shrink-0" />
                     <span>Urgente ({totals.urgentes})</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full" />
+                    <div className="w-2 h-2 bg-orange-500 rounded-full shrink-0" />
                     <span>Atenção ({totals.atencao})</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-amber-400 rounded-full" />
+                    <div className="w-2 h-2 bg-amber-400 rounded-full shrink-0" />
                     <span>Moderado ({totals.moderado})</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full" />
+                    <div className="w-2 h-2 bg-slate-400 dark:bg-slate-500 rounded-full shrink-0" />
                     <span>Recente ({totals.recente})</span>
                   </div>
                 </div>
@@ -708,20 +707,20 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
             {/* Filtros */}
             <Card className="shadow-sm">
-              <CardContent className="py-4">
-                <div className="flex flex-col md:flex-row gap-4">
+              <CardContent className="py-3 sm:py-4">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                   <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                     <Input
                       placeholder="Buscar por nome ou empresa..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 h-12 text-base"
+                      className="pl-9 sm:pl-10 h-10 sm:h-12 text-sm sm:text-base"
                       data-testid="input-search"
                     />
                   </div>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full md:w-[220px] h-12" data-testid="filter-status">
+                    <SelectTrigger className="w-full sm:w-[200px] md:w-[220px] h-10 sm:h-12" data-testid="filter-status">
                       <SelectValue placeholder="Filtrar por ação" />
                     </SelectTrigger>
                     <SelectContent>
@@ -768,93 +767,99 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                   }`}
                   data-testid={`card-client-${index}`}
                 >
-                  <CardContent className="py-5">
-                    {/* Linha Principal */}
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                      
-                      {/* Info do Cliente */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-3">
-                          <Badge className={`${urgency.color} ${urgency.textColor} text-xs font-bold px-2 py-1 shrink-0`}>
-                            {urgency.level}
-                          </Badge>
-                          <div className="min-w-0">
-                            <h3 className="text-lg font-semibold truncate" data-testid={`text-client-name-${index}`}>
-                              {item.cliente.nomeCliente}
-                            </h3>
-                            <p className="text-muted-foreground text-sm truncate">
-                              {item.cliente.empresa}
+                  <CardContent className="py-4 sm:py-5">
+                    {/* Layout Principal Responsivo */}
+                    <div className="space-y-4">
+                      {/* Linha 1: Info do Cliente + Valores */}
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+                        {/* Info do Cliente */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            <Badge className={`${urgency.color} ${urgency.textColor} text-xs font-bold px-2 py-0.5 sm:py-1 shrink-0`}>
+                              {urgency.level}
+                            </Badge>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-base sm:text-lg font-semibold truncate" data-testid={`text-client-name-${index}`}>
+                                {item.cliente.nomeCliente}
+                              </h3>
+                              <p className="text-muted-foreground text-xs sm:text-sm truncate">
+                                {item.cliente.empresa}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Valor e Dias - Grid responsivo */}
+                        <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 lg:gap-8 mt-2 sm:mt-0">
+                          <div className="text-left sm:text-center">
+                            <p className="text-lg sm:text-2xl font-bold text-red-500" data-testid={`text-value-${index}`}>
+                              {formatCurrency(item.cliente.valorTotal)}
                             </p>
+                            <p className="text-xs text-muted-foreground">
+                              {item.cliente.quantidadeParcelas} parcela{item.cliente.quantidadeParcelas !== 1 && 's'}
+                            </p>
+                          </div>
+                          {item.contexto?.valorAcordado != null && item.contexto.valorAcordado > 0 && (
+                            <div className="text-center">
+                              <p className="text-lg sm:text-2xl font-bold text-green-600" data-testid={`text-valor-pago-${index}`}>
+                                {formatCurrency(item.contexto.valorAcordado)}
+                              </p>
+                              <p className="text-xs text-green-500 font-medium">recebido</p>
+                            </div>
+                          )}
+                          <div className="text-right sm:text-center min-w-[60px] sm:min-w-[80px]">
+                            <p className="text-lg sm:text-2xl font-bold">
+                              {item.cliente.diasAtrasoMax}
+                            </p>
+                            <p className="text-xs text-muted-foreground">dias atraso</p>
                           </div>
                         </div>
                       </div>
 
-                      {/* Valor e Dias */}
-                      <div className="flex items-center gap-6 lg:gap-8">
-                        <div className="text-center">
-                          <p className="text-2xl font-bold text-red-500" data-testid={`text-value-${index}`}>
-                            {formatCurrency(item.cliente.valorTotal)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.cliente.quantidadeParcelas} parcela{item.cliente.quantidadeParcelas !== 1 && 's'}
-                          </p>
-                        </div>
-                        {item.contexto?.valorAcordado != null && item.contexto.valorAcordado > 0 && (
-                          <div className="text-center">
-                            <p className="text-2xl font-bold text-green-600" data-testid={`text-valor-pago-${index}`}>
-                              {formatCurrency(item.contexto.valorAcordado)}
-                            </p>
-                            <p className="text-xs text-green-500 font-medium">recebido</p>
-                          </div>
-                        )}
-                        <div className="text-center min-w-[80px]">
-                          <p className="text-2xl font-bold">
-                            {item.cliente.diasAtrasoMax}
-                          </p>
-                          <p className="text-xs text-muted-foreground">dias atraso</p>
-                        </div>
-                      </div>
-
-                      {/* Status e Ações */}
-                      <div className="flex items-center gap-3 flex-wrap">
+                      {/* Linha 2: Badges de Status */}
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         {procedimento ? (
-                          <Badge className={`${procedimento.color} border text-sm px-3 py-1.5`}>
-                            {ProcIcon && <ProcIcon className="h-4 w-4 mr-1.5" />}
+                          <Badge className={`${procedimento.color} border text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5`}>
+                            {ProcIcon && <ProcIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />}
                             {procedimento.label}
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="border-dashed border-2 text-slate-400 px-3 py-1.5">
+                          <Badge variant="outline" className="border-dashed border-2 text-slate-400 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5">
                             Sem ação
                           </Badge>
                         )}
                         {suggestedProc && item.needsEscalation && (
                           <Badge 
-                            className="bg-yellow-100 text-yellow-800 border border-yellow-400 text-sm px-3 py-1.5 animate-pulse"
+                            className="bg-yellow-100 text-yellow-800 border border-yellow-400 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 animate-pulse"
                             data-testid={`badge-escalation-${index}`}
                           >
-                            <Zap className="h-4 w-4 mr-1.5" />
+                            <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
                             Sugestão: {suggestedProc.label}
                           </Badge>
                         )}
                         {status && (
-                          <Badge className={`${status.color} border text-sm px-3 py-1.5`}>
-                            {StatusIcon && <StatusIcon className="h-4 w-4 mr-1.5" />}
+                          <Badge className={`${status.color} border text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5`}>
+                            {StatusIcon && <StatusIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />}
                             {status.label}
                           </Badge>
                         )}
-                        
+                      </div>
+
+                      {/* Linha 3: Botões de Ação - Grid em mobile */}
+                      <div className="flex flex-wrap items-center gap-2">
                         {(() => {
                           const whatsappNumber = formatPhoneForWhatsApp(item.cliente.telefone);
                           if (whatsappNumber) {
                             return (
                               <Button 
-                                size="lg"
-                                className="bg-green-600 hover:bg-green-700 text-white font-medium"
+                                size="default"
+                                className="bg-green-600 hover:bg-green-700 text-white font-medium flex-1 sm:flex-none min-w-[100px]"
                                 onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
                                 data-testid={`button-whatsapp-${index}`}
                               >
-                                <SiWhatsapp className="h-4 w-4 mr-2" />
-                                WhatsApp
+                                <SiWhatsapp className="h-4 w-4 mr-1.5 sm:mr-2" />
+                                <span className="hidden xs:inline">WhatsApp</span>
+                                <span className="xs:hidden">Zap</span>
                               </Button>
                             );
                           }
@@ -862,18 +867,19 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         })()}
                         
                         <Button 
-                          size="lg"
-                          className="bg-primary hover:bg-primary/90 text-white font-medium"
+                          size="default"
+                          className="bg-primary hover:bg-primary/90 text-white font-medium flex-1 sm:flex-none min-w-[100px]"
                           onClick={() => openEditModal(item)}
                           data-testid={`button-edit-${index}`}
                         >
-                          <Edit3 className="h-4 w-4 mr-2" />
+                          <Edit3 className="h-4 w-4 mr-1.5 sm:mr-2" />
                           Atualizar
                         </Button>
 
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="ml-auto sm:ml-0"
                           onClick={() => setExpandedClient(isExpanded ? null : item.cliente.idCliente)}
                           data-testid={`button-expand-${index}`}
                         >
@@ -884,64 +890,64 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
                     {/* Área Expandida */}
                     {isExpanded && (
-                      <div className="mt-6 pt-6 border-t border-border space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border space-y-4 sm:space-y-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                           
                           {/* Informações do Cliente */}
-                          <div className="bg-muted rounded-xl p-4">
-                            <h4 className="font-semibold flex items-center gap-2 mb-3">
-                              <Building2 className="h-4 w-4" />
+                          <div className="bg-muted rounded-lg sm:rounded-xl p-3 sm:p-4">
+                            <h4 className="font-semibold flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
+                              <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
                               Dados do Cliente
                             </h4>
-                            <div className="space-y-2 text-sm">
+                            <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                               {item.cliente.telefone && (
                                 <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Phone className="h-4 w-4" />
-                                  <span>{item.cliente.telefone}</span>
+                                  <Phone className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                  <span className="truncate">{item.cliente.telefone}</span>
                                 </div>
                               )}
                               {item.cliente.responsavel && (
                                 <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Users className="h-4 w-4" />
-                                  <span>Responsável: {item.cliente.responsavel}</span>
+                                  <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                  <span className="truncate">Responsável: {item.cliente.responsavel}</span>
                                 </div>
                               )}
                               {item.cliente.cnpj && (
-                                <p className="text-muted-foreground">CNPJ: {item.cliente.cnpj}</p>
+                                <p className="text-muted-foreground truncate">CNPJ: {item.cliente.cnpj}</p>
                               )}
                             </div>
                           </div>
 
                           {/* Contexto do CS */}
-                          <div className="bg-amber-500/10 dark:bg-amber-500/20 rounded-xl p-4">
-                            <h4 className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-3">
-                              <AlertTriangle className="h-4 w-4" />
+                          <div className="bg-amber-500/10 dark:bg-amber-500/20 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                            <h4 className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
+                              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
                               Observações do CS
                             </h4>
-                            <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+                            <p className="text-xs sm:text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
                               {item.contexto?.contexto || "Sem observações registradas"}
                             </p>
                           </div>
 
                           {/* Contexto Jurídico */}
-                          <div className="bg-primary/5 rounded-xl p-4">
-                            <h4 className="font-semibold text-primary flex items-center gap-2 mb-3">
-                              <Scale className="h-4 w-4" />
+                          <div className="bg-primary/5 rounded-lg sm:rounded-xl p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
+                            <h4 className="font-semibold text-primary flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
+                              <Scale className="h-3 w-3 sm:h-4 sm:w-4" />
                               Anotações Jurídicas
                             </h4>
                             {item.contexto?.contextoJuridico ? (
                               <>
-                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
                                   {item.contexto.contextoJuridico}
                                 </p>
                                 {item.contexto.atualizadoJuridicoPor && (
-                                  <p className="text-xs text-muted-foreground mt-3 pt-2 border-t border-border">
+                                  <p className="text-xs text-muted-foreground mt-2 sm:mt-3 pt-2 border-t border-border">
                                     Por {item.contexto.atualizadoJuridicoPor} em {formatDate(item.contexto.atualizadoJuridicoEm)}
                                   </p>
                                 )}
                               </>
                             ) : (
-                              <p className="text-sm text-muted-foreground italic">
+                              <p className="text-xs sm:text-sm text-muted-foreground italic">
                                 Nenhuma anotação ainda
                               </p>
                             )}
@@ -949,35 +955,35 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         </div>
 
                         {/* Parcelas */}
-                        <div className="bg-card rounded-xl border border-border">
-                          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                            <h4 className="font-semibold flex items-center gap-2">
-                              <FileText className="h-4 w-4" />
+                        <div className="bg-card rounded-lg sm:rounded-xl border border-border">
+                          <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border flex items-center justify-between">
+                            <h4 className="font-semibold flex items-center gap-2 text-sm sm:text-base">
+                              <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
                               Parcelas em Atraso
                             </h4>
-                            <Badge variant="secondary">{item.parcelas.length}</Badge>
+                            <Badge variant="secondary" className="text-xs">{item.parcelas.length}</Badge>
                           </div>
-                          <div className="max-h-[200px] overflow-y-auto">
+                          <div className="max-h-[150px] sm:max-h-[200px] overflow-y-auto">
                             {item.parcelas.map((parcela, pIndex) => (
                               <div 
                                 key={parcela.id}
-                                className="px-4 py-3 border-b border-border last:border-0 flex items-center justify-between hover:bg-muted/50"
+                                className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border last:border-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between hover:bg-muted/50"
                                 data-testid={`row-parcela-${index}-${pIndex}`}
                               >
                                 <div className="flex-1 min-w-0">
-                                  <p className="font-medium truncate">{parcela.descricao}</p>
-                                  <p className="text-sm text-muted-foreground">
+                                  <p className="font-medium truncate text-sm">{parcela.descricao}</p>
+                                  <p className="text-xs sm:text-sm text-muted-foreground">
                                     Venceu em {formatDate(parcela.dataVencimento)}
                                   </p>
                                 </div>
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2 sm:gap-4 justify-between sm:justify-end">
                                   <Badge 
                                     variant={parcela.diasAtraso > 90 ? "destructive" : "secondary"}
-                                    className="font-mono"
+                                    className="font-mono text-xs"
                                   >
                                     {parcela.diasAtraso}d
                                   </Badge>
-                                  <p className="font-bold text-red-500 min-w-[100px] text-right">
+                                  <p className="font-bold text-red-500 min-w-[80px] sm:min-w-[100px] text-right text-sm">
                                     {formatCurrency(parcela.naoPago)}
                                   </p>
                                   {parcela.urlCobranca && (
