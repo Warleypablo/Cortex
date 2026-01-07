@@ -9953,12 +9953,13 @@ export class DbStorage implements IStorage {
           p.categoria_id,
           p.categoria_nome,
           p.data_quitacao,
+          v.id as venda_id,
           iv.nome as item_nome,
           LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm,
           iv.valor as item_valor
         FROM caz_parcelas p
         INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        INNER JOIN caz_itensvenda iv ON iv.id = v.id
+        INNER JOIN caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
