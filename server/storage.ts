@@ -10187,14 +10187,15 @@ export class DbStorage implements IStorage {
         console.log(`[ContribuicaoOperador] Salário NÃO encontrado para ${operador}`);
       }
       
-      // Buscar CX associado ao operador através dos contratos
+      // Buscar CX associado ao operador através dos contratos (CX está em cup_clientes.responsavel)
       try {
         const cxResult = await db.execute(sql`
-          SELECT DISTINCT ct.cx
+          SELECT DISTINCT cl.responsavel as cx
           FROM cup_contratos ct
+          JOIN cup_clientes cl ON ct.cliente_id = cl.id
           WHERE TRIM(ct.responsavel) = ${operador}
-            AND ct.cx IS NOT NULL AND TRIM(ct.cx) != ''
-          ORDER BY ct.cx
+            AND cl.responsavel IS NOT NULL AND TRIM(cl.responsavel) != ''
+          ORDER BY cl.responsavel
           LIMIT 1
         `);
         
