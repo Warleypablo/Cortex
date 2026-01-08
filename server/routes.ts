@@ -4498,6 +4498,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST - Enviar contrato de colaborador para assinatura via Assinafy
+  app.post("/api/juridico/colaboradores-contrato/:id/enviar-assinatura", async (req, res) => {
+    const colaboradorId = parseInt(req.params.id);
+    
+    try {
+      console.log(`[assinafy-colab] Iniciando envio para assinatura - Colaborador ID: ${colaboradorId}`);
+      
+      // 1. Buscar configuração do Assinafy
+      const configResult = await db.execute(sql`
+        SELECT account_id, api_key, api_url FROM staging.assinafy_config WHERE ativo = true LIMIT 1
+      `);
+      
+      if (configResult.rows.length === 0) {
+        return res.status(500).json({ error: "Configuração do Assinafy não encontrada" });
+      }
+      
+      const config = configResult.rows[0] as { account_id: string; api_key: string; api_url: string };
+      
+      // 2. Buscar dados do colaborador
+      const colaboradorResult = await db.execute(sql`
+        SELECT id, nome, cpf, cnpj, endereco, estado, cargo, setor, admissao::text as admissao,
+               COALESCE(email_pessoal, email_turbo) as email
+        FROM rh_pessoal
+        WHERE id = ${colaboradorId}
+      `);
+      
+      if (colaboradorResult.rows.length === 0) {
+        return res.status(404).json({ error: "Colaborador não encontrado" });
+      }
+      
+      const colaborador = colaboradorResult.rows[0] as any;
+      
+      if (!colaborador.email) {
+        return res.status(400).json({ error: "Colaborador não possui email cadastrado. Cadastre o email antes de enviar para assinatura." });
+      }
+      
+      console.log(`[assinafy-colab] Signatário: ${colaborador.nome} (${colaborador.email})`);
+      
+      // 3. Gerar PDF do contrato
+      const dataAtual = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+      const dataAdmissao = colaborador.admissao ? new Date(colaborador.admissao).toLocaleDateString('pt-BR') : 'a definir';
+      
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      
+      const pdfPromise = new Promise<Buffer>((resolve) => {
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+      });
+
+      // Header
+      doc.fontSize(16).font('Helvetica-Bold').text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
+      doc.moveDown(2);
+
+      // Partes
+      doc.fontSize(11).font('Helvetica-Bold').text('Entre as partes:');
+      doc.moveDown(0.5);
+      doc.font('Helvetica').text('CONTRATANTE: TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 42.100.292/0001-84, com sede na Av. Joao Baptista Parra, 633 - Ed. Enseada Office - Sala 1301 - Enseada do Suá, Vitória/ES.');
+      doc.moveDown(0.5);
+      doc.text(`CONTRATADO(A): ${colaborador.nome}, inscrito(a) no CPF/CNPJ sob o nº ${colaborador.cnpj || colaborador.cpf || 'Não informado'}, residente e domiciliado(a) em ${colaborador.endereco || 'Não informado'}, ${colaborador.estado || ''}.`);
+      doc.moveDown(1.5);
+
+      const clausulas = [
+        { titulo: 'CLÁUSULA PRIMEIRA - DO OBJETO', texto: `O presente contrato tem por objeto a prestação de serviços de ${colaborador.cargo || 'Prestador de Serviços'} pelo CONTRATADO(A) à CONTRATANTE.` },
+        { titulo: 'CLÁUSULA SEGUNDA - DO PRAZO', texto: `O presente contrato terá início em ${dataAdmissao} e vigorará por prazo indeterminado.` },
+        { titulo: 'CLÁUSULA TERCEIRA - DA REMUNERAÇÃO', texto: 'A remuneração será definida em instrumento apartado.' },
+        { titulo: 'CLÁUSULA QUARTA - DAS OBRIGAÇÕES', texto: 'O CONTRATADO(A) compromete-se a executar os serviços com zelo e manter sigilo sobre informações confidenciais.' },
+        { titulo: 'CLÁUSULA QUINTA - DA CONFIDENCIALIDADE', texto: 'O CONTRATADO(A) compromete-se a manter absoluto sigilo sobre todas as informações a que tiver acesso.' },
+        { titulo: 'CLÁUSULA SEXTA - DO FORO', texto: 'As partes elegem o foro da Comarca de Vitória/ES.' },
+      ];
+
+      for (const clausula of clausulas) {
+        doc.font('Helvetica-Bold').text(clausula.titulo);
+        doc.font('Helvetica').text(clausula.texto);
+        doc.moveDown(1);
+      }
+
+      doc.moveDown(1);
+      doc.text(`Local e Data: Vitória/ES, ${dataAtual}`);
+      doc.moveDown(3);
+      doc.text('___________________________________', { align: 'center' });
+      doc.text('TURBO PARTNERS LTDA', { align: 'center' });
+      doc.moveDown(3);
+      doc.text('___________________________________', { align: 'center' });
+      doc.text(colaborador.nome, { align: 'center' });
+
+      doc.end();
+      
+      const pdfBuffer = await pdfPromise;
+      console.log(`[assinafy-colab] PDF gerado: ${pdfBuffer.length} bytes`);
+      
+      // 4. Upload do PDF para Assinafy
+      const FormData = (await import('form-data')).default;
+      const formData = new FormData();
+      formData.append('file', pdfBuffer, {
+        filename: `contrato_colaborador_${colaboradorId}.pdf`,
+        contentType: 'application/pdf'
+      });
+      
+      const uploadUrl = `${config.api_url}/accounts/${config.account_id}/documents`;
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': config.api_key,
+          ...formData.getHeaders()
+        },
+        body: formData.getBuffer()
+      });
+      
+      const uploadResult = await uploadResponse.json() as any;
+      
+      if (uploadResult.status !== 200 && !uploadResult.id) {
+        console.error('[assinafy-colab] Erro no upload:', uploadResult);
+        return res.status(500).json({ error: "Erro ao fazer upload do documento", details: uploadResult.message });
+      }
+      
+      const documentId = uploadResult.id || uploadResult.data?.id;
+      console.log(`[assinafy-colab] Documento criado: ${documentId}`);
+      
+      // 5. Buscar ou criar signatários
+      const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
+      
+      const socioResponsavel = {
+        nome: "Rodrigo Queiroz Santos",
+        email: "rodrigo.queiroz@turbopartners.com.br"
+      };
+      
+      const getOrCreateSigner = async (nome: string, email: string): Promise<string> => {
+        const searchUrl = `${signerUrl}?search=${encodeURIComponent(email)}`;
+        const searchResponse = await fetch(searchUrl, {
+          method: 'GET',
+          headers: { 'X-Api-Key': config.api_key }
+        });
+        
+        const searchResult = await searchResponse.json() as any;
+        
+        if (searchResult.status === 200 && searchResult.data && Array.isArray(searchResult.data)) {
+          const existingSigner = searchResult.data.find((s: any) => 
+            s.email?.toLowerCase() === email.toLowerCase()
+          );
+          if (existingSigner) return existingSigner.id;
+        }
+        
+        const signerResponse = await fetch(signerUrl, {
+          method: 'POST',
+          headers: {
+            'X-Api-Key': config.api_key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ full_name: nome, email: email })
+        });
+        
+        const signerResult = await signerResponse.json() as any;
+        return signerResult.data?.id || signerResult.id;
+      };
+      
+      const colaboradorSignerId = await getOrCreateSigner(colaborador.nome, colaborador.email);
+      const socioSignerId = await getOrCreateSigner(socioResponsavel.nome, socioResponsavel.email);
+      
+      // 6. Vincular signatários ao documento e enviar
+      const linkUrl = `${config.api_url}/accounts/${config.account_id}/documents/${documentId}/signers`;
+      
+      for (const signerId of [colaboradorSignerId, socioSignerId]) {
+        await fetch(linkUrl, {
+          method: 'POST',
+          headers: {
+            'X-Api-Key': config.api_key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ signer_id: signerId })
+        });
+      }
+      
+      // 7. Enviar documento para assinatura
+      const sendUrl = `${config.api_url}/accounts/${config.account_id}/documents/${documentId}/send`;
+      const sendResponse = await fetch(sendUrl, {
+        method: 'POST',
+        headers: { 'X-Api-Key': config.api_key }
+      });
+      
+      const sendResult = await sendResponse.json() as any;
+      console.log(`[assinafy-colab] Documento enviado:`, sendResult);
+      
+      res.json({ 
+        success: true, 
+        documentId, 
+        emailEnviado: colaborador.email,
+        message: "Contrato enviado para assinatura com sucesso"
+      });
+      
+    } catch (error) {
+      console.error("[assinafy-colab] Erro:", error);
+      res.status(500).json({ error: "Erro ao enviar para assinatura" });
+    }
+  });
+
   // POST - Gerar PDF de contrato de colaborador
   app.post("/api/juridico/colaboradores-contrato/pdf", async (req, res) => {
     try {
