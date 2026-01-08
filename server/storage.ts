@@ -10404,6 +10404,49 @@ export class DbStorage implements IStorage {
       }
     };
   }
+
+  // ==================== CONTRATOS COLABORADORES ====================
+  async getColaboradoresParaContrato(): Promise<{
+    id: number;
+    nome: string;
+    cpf: string | null;
+    cnpj: string | null;
+    endereco: string | null;
+    estado: string | null;
+    cargo: string | null;
+    setor: string | null;
+    admissao: string | null;
+  }[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        id,
+        nome,
+        cpf,
+        cnpj,
+        endereco,
+        estado,
+        cargo,
+        setor,
+        admissao::text as admissao
+      FROM rh_pessoal
+      WHERE status = 'Ativo'
+        AND nome IS NOT NULL
+        AND TRIM(nome) != ''
+      ORDER BY nome
+    `);
+    
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      nome: row.nome,
+      cpf: row.cpf,
+      cnpj: row.cnpj,
+      endereco: row.endereco,
+      estado: row.estado,
+      cargo: row.cargo,
+      setor: row.setor,
+      admissao: row.admissao,
+    }));
+  }
 }
 
 export const storage = new DbStorage();
