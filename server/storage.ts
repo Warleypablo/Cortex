@@ -10417,6 +10417,7 @@ export class DbStorage implements IStorage {
     setor: string | null;
     admissao: string | null;
     email: string | null;
+    salario: string | null;
   }[]> {
     const result = await db.execute(sql`
       SELECT 
@@ -10429,7 +10430,8 @@ export class DbStorage implements IStorage {
         cargo,
         setor,
         admissao::text as admissao,
-        COALESCE(email_pessoal, email_turbo) as email
+        COALESCE(email_pessoal, email_turbo) as email,
+        salario::text as salario
       FROM rh_pessoal
       WHERE status = 'Ativo'
         AND nome IS NOT NULL
@@ -10448,6 +10450,7 @@ export class DbStorage implements IStorage {
       setor: row.setor,
       admissao: row.admissao,
       email: row.email,
+      salario: row.salario,
     }));
   }
 }
