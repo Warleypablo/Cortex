@@ -91,7 +91,7 @@ CONTRATADO(A)
 `;
 
 export default function ContratosColaboradores() {
-  useSetPageInfo({ title: "Contratos Colaboradores", subtitle: "Geração de contratos para colaboradores" });
+  useSetPageInfo("Contratos Colaboradores", "Geração de contratos para colaboradores");
   usePageTitle("Contratos Colaboradores | Turbo Cortex");
 
   const [searchTerm, setSearchTerm] = useState("");
