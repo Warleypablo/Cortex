@@ -4795,10 +4795,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(0.3);
       doc.text('13.10. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.');
       doc.moveDown(0.3);
-      doc.text('13.11. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato.');
+      doc.text('13.11. Para fins de prova e, por derradeiro, para dirimir quaisquer dúvidas, controvérsias ou litígios oriundos do presente CONTRATO, tanto para procedimento judicial quanto arbitral ou de mediação, valerá a versão digital da via de cada Parte, com a devida certificação da plataforma digital utilizada para a assinatura eletrônica deste CONTRATO.');
       doc.moveDown(0.3);
-      doc.text('13.12. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.');
-      doc.moveDown(0.8);
+      doc.text('13.12. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato, com renúncia expressa a qualquer outro, por mais privilegiado que seja.');
+      doc.moveDown(0.3);
+      doc.text('13.13. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.');
+      doc.moveDown(1);
 
       doc.text('As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Contrato emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil.');
       doc.moveDown(0.5);
@@ -4807,11 +4809,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Assinaturas
       doc.fontSize(10).text(`Vitória, ${dataAtual}.`);
-      doc.moveDown(3);
+      doc.moveDown(2);
       doc.text('____________________________________________________', { align: 'center' });
       doc.font('Helvetica-Bold').text('TURBO PARTNERS LTDA', { align: 'center' });
       doc.font('Helvetica').text('CONTRATANTE', { align: 'center' });
-      doc.moveDown(3);
+      doc.moveDown(2);
       doc.text('____________________________________________________', { align: 'center' });
       doc.font('Helvetica-Bold').text(colaborador.nome.toUpperCase(), { align: 'center' });
       doc.font('Helvetica').text('CONTRATADO(A)', { align: 'center' });
@@ -5224,10 +5226,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(0.3);
       doc.text('13.10. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.');
       doc.moveDown(0.3);
-      doc.text('13.11. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato.');
+      doc.text('13.11. Para fins de prova e, por derradeiro, para dirimir quaisquer dúvidas, controvérsias ou litígios oriundos do presente CONTRATO, tanto para procedimento judicial quanto arbitral ou de mediação, valerá a versão digital da via de cada Parte, com a devida certificação da plataforma digital utilizada para a assinatura eletrônica deste CONTRATO.');
       doc.moveDown(0.3);
-      doc.text('13.12. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.');
-      doc.moveDown(0.8);
+      doc.text('13.12. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato, com renúncia expressa a qualquer outro, por mais privilegiado que seja.');
+      doc.moveDown(0.3);
+      doc.text('13.13. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.');
+      doc.moveDown(1);
 
       doc.text('As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Contrato emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil.');
       doc.moveDown(0.5);
@@ -5236,11 +5240,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Assinaturas
       doc.fontSize(10).text(`Vitória, ${dataAtual}.`);
-      doc.moveDown(3);
+      doc.moveDown(2);
       doc.text('____________________________________________________', { align: 'center' });
       doc.font('Helvetica-Bold').text('TURBO PARTNERS LTDA', { align: 'center' });
       doc.font('Helvetica').text('CONTRATANTE', { align: 'center' });
-      doc.moveDown(3);
+      doc.moveDown(2);
       doc.text('____________________________________________________', { align: 'center' });
       doc.font('Helvetica-Bold').text(nome.toUpperCase(), { align: 'center' });
       doc.font('Helvetica').text('CONTRATADO(A)', { align: 'center' });
