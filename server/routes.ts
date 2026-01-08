@@ -4729,6 +4729,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "UI/UX": {
           titulo: "UI/UX",
           escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "JURÍDICO": {
+          titulo: "JURÍDICO",
+          escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "JURIDICO": {
+          titulo: "JURÍDICO",
+          escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
@@ -5355,6 +5363,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "UI/UX": {
           titulo: "UI/UX",
           escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "JURÍDICO": {
+          titulo: "JURÍDICO",
+          escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "JURIDICO": {
+          titulo: "JURÍDICO",
+          escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
