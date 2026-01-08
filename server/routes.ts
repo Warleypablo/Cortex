@@ -4487,6 +4487,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== JURÍDICO - Contratos Colaboradores ====================
+  app.get("/api/juridico/colaboradores-contrato", async (req, res) => {
+    try {
+      const colaboradores = await storage.getColaboradoresParaContrato();
+      res.json({ colaboradores });
+    } catch (error) {
+      console.error("[api] Error fetching colaboradores para contrato:", error);
+      res.status(500).json({ error: "Failed to fetch colaboradores" });
+    }
+  });
+
   // ==================== JURÍDICO - Regras de Escalonamento ====================
   // Note: Table creation and seeding is handled by ensureEscalationRulesTable() above
 
