@@ -4984,9 +4984,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CLÁUSULA DÉCIMA PRIMEIRA
       doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS');
       doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço.');
+      doc.font('Helvetica').fontSize(9).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço, comprometendo-se a: não utilizar as informações confidenciais a que tiver acesso pelo período de 05 (cinco) anos, para gerar benefício próprio exclusivo e/ou unilateral, presente ou futuro, ou para o uso de terceiros; não efetuar nenhuma gravação ou cópia da documentação confidencial a que tiver acesso; não apropriar-se para si ou para outrem de material confidencial e/ou sigiloso da tecnologia que venha a ser disponível e; não repassar o conhecimento das informações confidenciais, responsabilizando-se por todas as pessoas que vierem a ter acesso às informações, por seu intermédio, e obrigando-se, assim, a reparar a ocorrência de qualquer dano e/ou prejuízo oriundo de uma eventual quebra de sigilo das informações fornecidas.');
       doc.moveDown(0.3);
       doc.text('Parágrafo Primeiro. As partes se comprometem a não utilizar os dados pessoais que tiverem acesso para fins distintos da relação estabelecida, sendo vedada a transmissão para terceiros.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Segundo. As partes se comprometem em manter os compromissos acima, mesmo após o término da relação contratual, pelo período de 5 (cinco) anos.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Terceiro. As partes declaram que qualquer conduta incompatível com as disposições acima será considerada uma grave violação deste contrato e será considerado motivo de justa causa para a rescisão imediata, sem prejuízo da adoção das medidas legalmente cabíveis.');
       doc.moveDown(0.8);
 
       // CLÁUSULA DÉCIMA SEGUNDA
@@ -5555,9 +5559,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CLÁUSULA DÉCIMA PRIMEIRA
       doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS');
       doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço.');
+      doc.font('Helvetica').fontSize(9).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço, comprometendo-se a: não utilizar as informações confidenciais a que tiver acesso pelo período de 05 (cinco) anos, para gerar benefício próprio exclusivo e/ou unilateral, presente ou futuro, ou para o uso de terceiros; não efetuar nenhuma gravação ou cópia da documentação confidencial a que tiver acesso; não apropriar-se para si ou para outrem de material confidencial e/ou sigiloso da tecnologia que venha a ser disponível e; não repassar o conhecimento das informações confidenciais, responsabilizando-se por todas as pessoas que vierem a ter acesso às informações, por seu intermédio, e obrigando-se, assim, a reparar a ocorrência de qualquer dano e/ou prejuízo oriundo de uma eventual quebra de sigilo das informações fornecidas.');
       doc.moveDown(0.3);
       doc.text('Parágrafo Primeiro. As partes se comprometem a não utilizar os dados pessoais que tiverem acesso para fins distintos da relação estabelecida, sendo vedada a transmissão para terceiros.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Segundo. As partes se comprometem em manter os compromissos acima, mesmo após o término da relação contratual, pelo período de 5 (cinco) anos.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Terceiro. As partes declaram que qualquer conduta incompatível com as disposições acima será considerada uma grave violação deste contrato e será considerado motivo de justa causa para a rescisão imediata, sem prejuízo da adoção das medidas legalmente cabíveis.');
       doc.moveDown(0.8);
 
       // CLÁUSULA DÉCIMA SEGUNDA
