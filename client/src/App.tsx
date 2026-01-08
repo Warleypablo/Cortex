@@ -226,7 +226,7 @@ function ProtectedRouter() {
       
       {/* Jurídico */}
       <Route path="/juridico/clientes">{() => <ProtectedRoute path="/juridico/clientes" component={DashboardInadimplencia} />}</Route>
-      <Route path="/juridico/contratos-colaboradores">{() => <ProtectedRoute path="/juridico/contratos-colaboradores" component={ContratosColaboradores} />}</Route>
+      <Route path="/juridico/contratos-colaborador">{() => <ProtectedRoute path="/juridico/contratos-colaborador" component={ContratosColaboradores} />}</Route>
       
       {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
