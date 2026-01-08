@@ -4645,7 +4645,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 3. Gerar PDF do contrato com template completo
       const dataAtual = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
-      const dataInicioDate = colaborador.admissao ? new Date(colaborador.admissao) : new Date();
+      // Data de início é SEMPRE hoje, data fim é 6 meses depois
+      const dataInicioDate = new Date();
       const dataInicio = dataInicioDate.toLocaleDateString('pt-BR');
       const dataFimDate = new Date(dataInicioDate);
       dataFimDate.setMonth(dataFimDate.getMonth() + 6);
@@ -5185,8 +5186,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Nome é obrigatório" });
       }
 
-      // Calcular datas
-      const dataInicioDate = dataAdmissao ? new Date(dataAdmissao.split('/').reverse().join('-')) : new Date();
+      // Calcular datas - Data de início é SEMPRE hoje, data fim é 6 meses depois
+      const dataInicioDate = new Date();
       const dataInicio = dataInicioDate.toLocaleDateString('pt-BR');
       const dataFimDate = new Date(dataInicioDate);
       dataFimDate.setMonth(dataFimDate.getMonth() + 6);
