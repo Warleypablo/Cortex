@@ -4709,6 +4709,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "PRODUCT OWNER": {
           titulo: "PRODUCT OWNER",
           escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "INSIDE SALES": {
+          titulo: "INSIDE SALES",
+          escopo: "realização de reuniões, apresentação de propostas e fechamento, gerir pipeline de vendas, construir relacionamento com clientes, atualizar o CRM, participar de reuniões internas, cumprimento de metas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
@@ -5315,6 +5319,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "PRODUCT OWNER": {
           titulo: "PRODUCT OWNER",
           escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "INSIDE SALES": {
+          titulo: "INSIDE SALES",
+          escopo: "realização de reuniões, apresentação de propostas e fechamento, gerir pipeline de vendas, construir relacionamento com clientes, atualizar o CRM, participar de reuniões internas, cumprimento de metas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
