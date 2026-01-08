@@ -4721,6 +4721,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "G&G": {
           titulo: "G&G",
           escopo: "conduzir processos de recrutamento e seleção do início ao fim para diferentes áreas da empresa, alinhar perfis com gestores, entendendo necessidades técnicas e comportamentais das vagas, criar e publicar anúncios de vagas em portais, redes sociais e plataformas especializadas, realizar triagem de currículos, entrevistas por competências e dinâmicas de grupo, aplicar testes comportamentais e técnicos, quando necessário, gerar relatórios de indicadores (tempo de contratação, fontes de recrutamento, etc), sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "UIUX": {
+          titulo: "UI/UX",
+          escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "UI/UX": {
+          titulo: "UI/UX",
+          escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
@@ -5339,6 +5347,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "G&G": {
           titulo: "G&G",
           escopo: "conduzir processos de recrutamento e seleção do início ao fim para diferentes áreas da empresa, alinhar perfis com gestores, entendendo necessidades técnicas e comportamentais das vagas, criar e publicar anúncios de vagas em portais, redes sociais e plataformas especializadas, realizar triagem de currículos, entrevistas por competências e dinâmicas de grupo, aplicar testes comportamentais e técnicos, quando necessário, gerar relatórios de indicadores (tempo de contratação, fontes de recrutamento, etc), sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "UIUX": {
+          titulo: "UI/UX",
+          escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "UI/UX": {
+          titulo: "UI/UX",
+          escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
