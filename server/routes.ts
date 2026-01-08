@@ -4717,6 +4717,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "ANALISTA DE DADOS": {
           titulo: "ANALISTA DE DADOS",
           escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, trabalhar em estreita colaboração com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "G&G": {
+          titulo: "G&G",
+          escopo: "conduzir processos de recrutamento e seleção do início ao fim para diferentes áreas da empresa, alinhar perfis com gestores, entendendo necessidades técnicas e comportamentais das vagas, criar e publicar anúncios de vagas em portais, redes sociais e plataformas especializadas, realizar triagem de currículos, entrevistas por competências e dinâmicas de grupo, aplicar testes comportamentais e técnicos, quando necessário, gerar relatórios de indicadores (tempo de contratação, fontes de recrutamento, etc), sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
@@ -5331,6 +5335,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "ANALISTA DE DADOS": {
           titulo: "ANALISTA DE DADOS",
           escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, trabalhar em estreita colaboração com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "G&G": {
+          titulo: "G&G",
+          escopo: "conduzir processos de recrutamento e seleção do início ao fim para diferentes áreas da empresa, alinhar perfis com gestores, entendendo necessidades técnicas e comportamentais das vagas, criar e publicar anúncios de vagas em portais, redes sociais e plataformas especializadas, realizar triagem de currículos, entrevistas por competências e dinâmicas de grupo, aplicar testes comportamentais e técnicos, quando necessário, gerar relatórios de indicadores (tempo de contratação, fontes de recrutamento, etc), sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
