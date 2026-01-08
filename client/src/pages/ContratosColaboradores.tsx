@@ -156,18 +156,43 @@ export default function ContratosColaboradores() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownloadPDF = async () => {
     if (!selectedColaborador) return;
-    const conteudo = gerarContrato(selectedColaborador);
-    const blob = new Blob([conteudo], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Contrato_${selectedColaborador.nome.replace(/\s+/g, "_")}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    
+    const dataAtual = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+    const dataAdmissao = selectedColaborador.admissao
+      ? format(new Date(selectedColaborador.admissao), "dd/MM/yyyy", { locale: ptBR })
+      : "a definir";
+
+    try {
+      const response = await fetch("/api/juridico/colaboradores-contrato/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nome: selectedColaborador.nome,
+          cpfCnpj: selectedColaborador.cnpj || selectedColaborador.cpf,
+          endereco: selectedColaborador.endereco,
+          estado: selectedColaborador.estado,
+          cargo: selectedColaborador.cargo,
+          dataAdmissao,
+          dataAtual,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Erro ao gerar PDF");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Contrato_${selectedColaborador.nome.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Erro ao baixar PDF:", error);
+    }
   };
 
   if (isLoading) {
@@ -271,11 +296,11 @@ export default function ContratosColaboradores() {
                   </Button>
                   <Button
                     size="sm"
-                    onClick={handleDownload}
+                    onClick={handleDownloadPDF}
                     data-testid="button-download-contrato"
                   >
                     <Download className="h-4 w-4 mr-1" />
-                    Baixar
+                    Baixar PDF
                   </Button>
                 </div>
               )}
