@@ -1,18 +1,13 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   FileText,
   Search,
@@ -22,6 +17,8 @@ import {
   Download,
   Eye,
   Printer,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -36,6 +33,7 @@ interface Colaborador {
   cargo: string | null;
   setor: string | null;
   admissao: string | null;
+  email: string | null;
 }
 
 const CLAUSULAS_CONTRATO = `
@@ -93,6 +91,7 @@ CONTRATADO(A)
 export default function ContratosColaboradores() {
   useSetPageInfo("Contratos Colaboradores", "Geração de contratos para colaboradores");
   usePageTitle("Contratos Colaboradores | Turbo Cortex");
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedColaborador, setSelectedColaborador] = useState<Colaborador | null>(null);
@@ -103,6 +102,25 @@ export default function ContratosColaboradores() {
   });
 
   const colaboradores = data?.colaboradores || [];
+
+  const enviarAssinaturaMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest('POST', `/api/juridico/colaboradores-contrato/${id}/enviar-assinatura`);
+    },
+    onSuccess: (data: { emailEnviado?: string }) => {
+      toast({ 
+        title: "Contrato enviado para assinatura", 
+        description: data.emailEnviado ? `Email enviado para: ${data.emailEnviado}` : "Contrato enviado com sucesso"
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro ao enviar para assinatura", 
+        description: error.message || "Verifique se o colaborador possui email cadastrado",
+        variant: "destructive"
+      });
+    },
+  });
 
   const filteredColaboradores = useMemo(() => {
     if (!searchTerm) return colaboradores;
@@ -296,11 +314,26 @@ export default function ContratosColaboradores() {
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
                     onClick={handleDownloadPDF}
                     data-testid="button-download-contrato"
                   >
                     <Download className="h-4 w-4 mr-1" />
                     Baixar PDF
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => enviarAssinaturaMutation.mutate(selectedColaborador.id)}
+                    disabled={enviarAssinaturaMutation.isPending || !selectedColaborador.email}
+                    data-testid="button-enviar-assinatura"
+                    title={!selectedColaborador.email ? "Colaborador não possui email cadastrado" : "Enviar para assinatura via Assinafy"}
+                  >
+                    {enviarAssinaturaMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-1" />
+                    )}
+                    Enviar para Assinatura
                   </Button>
                 </div>
               )}
