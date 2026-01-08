@@ -3741,20 +3741,12 @@ export class DbStorage implements IStorage {
       };
     }
 
-    // Buscar MRR do snapshot (estado atual)
+    // Buscar MRR diretamente da tabela cup_contratos (dados em tempo real)
     const mrrQuery = await db.execute(sql`
       SELECT 
-        COALESCE(SUM(
-          CASE 
-            WHEN status IN ('ativo', 'onboarding', 'triagem')
-              AND valorr IS NOT NULL
-              AND valorr > 0
-            THEN valorr::numeric
-            ELSE 0 
-          END
-        ), 0) as mrr
-      FROM ${schema.cupDataHist}
-      WHERE data_snapshot = ${dataUltimoSnapshot}::timestamp
+        COALESCE(SUM(valorr), 0) as mrr
+      FROM cup_contratos
+      WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
     
     // Buscar métricas de transição da tabela cup_contratos (eventos, não estado)
