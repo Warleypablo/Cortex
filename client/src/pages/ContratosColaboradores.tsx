@@ -466,13 +466,11 @@ export default function ContratosColaboradores() {
   const gerarContrato = (colaborador: Colaborador) => {
     const dataAtual = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
     
-    // Data de início (admissão ou data atual)
-    const dataInicio = colaborador.admissao
-      ? format(new Date(colaborador.admissao), "dd/MM/yyyy", { locale: ptBR })
-      : format(new Date(), "dd/MM/yyyy", { locale: ptBR });
+    // Data de início é sempre a data atual (hoje)
+    const dataInicioDate = new Date();
+    const dataInicio = format(dataInicioDate, "dd/MM/yyyy", { locale: ptBR });
     
     // Data fim (6 meses após início)
-    const dataInicioDate = colaborador.admissao ? new Date(colaborador.admissao) : new Date();
     const dataFimDate = new Date(dataInicioDate);
     dataFimDate.setMonth(dataFimDate.getMonth() + 6);
     const dataFim = format(dataFimDate, "dd/MM/yyyy", { locale: ptBR });
