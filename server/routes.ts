@@ -4697,6 +4697,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "BDR": {
           titulo: "ANALISTA DE PRÉ-VENDAS",
           escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "FINANCEIRO": {
+          titulo: "FINANCEIRO",
+          escopo: "planejamento e controle financeiro, interpretação de relatórios, avaliação e consultoria, controle de custos, análise de riscos, acompanhamento de resultados, criar, acompanhar e medir indicadores, contas a pagar, contas a receber, emissão de nota fiscal, lançamentos financeiros, elaboração de relatórios gerenciais, acompanhamento de processos operacionais, dentre outras atividades financeiras não listadas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
