@@ -4657,29 +4657,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const colaboradorSignerId = await getOrCreateSigner(colaborador.nome, colaborador.email);
       const socioSignerId = await getOrCreateSigner(socioResponsavel.nome, socioResponsavel.email);
       
-      // 6. Vincular signatários ao documento e enviar
-      const linkUrl = `${config.api_url}/accounts/${config.account_id}/documents/${documentId}/signers`;
+      const signerIds = [colaboradorSignerId, socioSignerId];
+      console.log(`[assinafy-colab] Signatários: Colaborador=${colaboradorSignerId}, Sócio=${socioSignerId}`);
       
-      for (const signerId of [colaboradorSignerId, socioSignerId]) {
-        await fetch(linkUrl, {
-          method: 'POST',
-          headers: {
-            'X-Api-Key': config.api_key,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ signer_id: signerId })
+      // 6. Aguardar documento estar pronto (polling)
+      const statusUrl = `${config.api_url}/documents/${documentId}`;
+      let documentReady = false;
+      
+      for (let attempt = 1; attempt <= 30; attempt++) {
+        const statusResponse = await fetch(statusUrl, {
+          method: 'GET',
+          headers: { 'X-Api-Key': config.api_key }
         });
+        const statusResult = await statusResponse.json() as any;
+        const currentStatus = statusResult.data?.status || statusResult.status;
+        
+        if (attempt === 1 || attempt % 5 === 0) {
+          console.log(`[assinafy-colab] Status (tentativa ${attempt}/30): ${currentStatus}`);
+        }
+        
+        if (currentStatus !== 'metadata_processing' && currentStatus !== 'processing') {
+          console.log(`[assinafy-colab] Documento pronto! Status: ${currentStatus}`);
+          documentReady = true;
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
-      // 7. Enviar documento para assinatura
-      const sendUrl = `${config.api_url}/accounts/${config.account_id}/documents/${documentId}/send`;
-      const sendResponse = await fetch(sendUrl, {
+      if (!documentReady) {
+        return res.status(500).json({ error: "Documento ainda em processamento", documentId });
+      }
+      
+      // 7. Enviar para assinatura usando assignments
+      const assignmentUrl = `${config.api_url}/documents/${documentId}/assignments`;
+      const assignmentResponse = await fetch(assignmentUrl, {
         method: 'POST',
-        headers: { 'X-Api-Key': config.api_key }
+        headers: {
+          'X-Api-Key': config.api_key,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          method: 'virtual',
+          signerIds: signerIds
+        })
       });
       
-      const sendResult = await sendResponse.json() as any;
-      console.log(`[assinafy-colab] Documento enviado:`, sendResult);
+      const assignmentResult = await assignmentResponse.json() as any;
+      console.log(`[assinafy-colab] Assignment result:`, assignmentResult);
+      
+      if (assignmentResult.status !== 200 && assignmentResult.status !== 201) {
+        return res.status(500).json({ error: "Erro ao enviar para assinatura", details: assignmentResult.message });
+      }
+      
+      console.log(`[assinafy-colab] Contrato enviado para assinatura com sucesso`);
       
       res.json({ 
         success: true, 
