@@ -46,11 +46,86 @@ const ESCOPOS_POR_CARGO: Record<string, { titulo: string; escopo: string }> = {
     titulo: "ANALISTA DE CX",
     escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
   },
-  // Adicionar novos cargos aqui conforme necessário
-  // "DESIGNER": {
-  //   titulo: "DESIGNER",
-  //   escopo: "desenvolver peças gráficas, layouts e materiais visuais..."
-  // },
+  "ANALISTA DE COMUNICAÇÃO": {
+    titulo: "ANALISTA DE COMUNICAÇÃO",
+    escopo: "gestão de redes sociais; produção e programação de conteúdo; elaboração de relatórios analíticos; planejamento de pautas e calendários editoriais; gestão de comunidades digitais; monitoramento de tendências e oportunidades de conteúdo; pesquisa de mercado para embasar estratégias de comunicação; acompanhamento de métricas e indicadores de performance, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "COMUNICAÇÃO": {
+    titulo: "ANALISTA DE COMUNICAÇÃO",
+    escopo: "gestão de redes sociais; produção e programação de conteúdo; elaboração de relatórios analíticos; planejamento de pautas e calendários editoriais; gestão de comunidades digitais; monitoramento de tendências e oportunidades de conteúdo; pesquisa de mercado para embasar estratégias de comunicação; acompanhamento de métricas e indicadores de performance, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "SOCIAL MEDIA": {
+    titulo: "ANALISTA DE COMUNICAÇÃO",
+    escopo: "gestão de redes sociais; produção e programação de conteúdo; elaboração de relatórios analíticos; planejamento de pautas e calendários editoriais; gestão de comunidades digitais; monitoramento de tendências e oportunidades de conteúdo; pesquisa de mercado para embasar estratégias de comunicação; acompanhamento de métricas e indicadores de performance, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "G&G": {
+    titulo: "ANALISTA DE GENTE E GESTÃO",
+    escopo: "recrutamento e seleção de talentos; condução de processos seletivos e entrevistas; acompanhamento de colaboradores; implementação de políticas de gestão de pessoas; desenvolvimento de programas de treinamento e capacitação; análise de clima organizacional; gestão de indicadores de RH; apoio à cultura organizacional, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "GENTE E GESTÃO": {
+    titulo: "ANALISTA DE GENTE E GESTÃO",
+    escopo: "recrutamento e seleção de talentos; condução de processos seletivos e entrevistas; acompanhamento de colaboradores; implementação de políticas de gestão de pessoas; desenvolvimento de programas de treinamento e capacitação; análise de clima organizacional; gestão de indicadores de RH; apoio à cultura organizacional, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "RH": {
+    titulo: "ANALISTA DE GENTE E GESTÃO",
+    escopo: "recrutamento e seleção de talentos; condução de processos seletivos e entrevistas; acompanhamento de colaboradores; implementação de políticas de gestão de pessoas; desenvolvimento de programas de treinamento e capacitação; análise de clima organizacional; gestão de indicadores de RH; apoio à cultura organizacional, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "VIDEOMAKER": {
+    titulo: "VIDEOMAKER",
+    escopo: "produção e edição de vídeos institucionais e publicitários; captação de imagens e áudio; pós-produção e tratamento de conteúdo audiovisual; criação de motion graphics e animações; gestão de equipamentos audiovisuais; planejamento de produções; entrega de materiais em formatos adequados para diferentes plataformas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "VIDEO": {
+    titulo: "VIDEOMAKER",
+    escopo: "produção e edição de vídeos institucionais e publicitários; captação de imagens e áudio; pós-produção e tratamento de conteúdo audiovisual; criação de motion graphics e animações; gestão de equipamentos audiovisuais; planejamento de produções; entrega de materiais em formatos adequados para diferentes plataformas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "EDITOR": {
+    titulo: "VIDEOMAKER",
+    escopo: "produção e edição de vídeos institucionais e publicitários; captação de imagens e áudio; pós-produção e tratamento de conteúdo audiovisual; criação de motion graphics e animações; gestão de equipamentos audiovisuais; planejamento de produções; entrega de materiais em formatos adequados para diferentes plataformas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "DESIGNER": {
+    titulo: "DESIGNER",
+    escopo: "criação de peças gráficas para campanhas digitais e offline; desenvolvimento de identidades visuais; produção de materiais para redes sociais; elaboração de layouts para landing pages e e-mails marketing; criação de apresentações corporativas; adaptação de materiais para diferentes formatos e plataformas; manutenção da consistência visual da marca, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "DESIGN": {
+    titulo: "DESIGNER",
+    escopo: "criação de peças gráficas para campanhas digitais e offline; desenvolvimento de identidades visuais; produção de materiais para redes sociais; elaboração de layouts para landing pages e e-mails marketing; criação de apresentações corporativas; adaptação de materiais para diferentes formatos e plataformas; manutenção da consistência visual da marca, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "DIRETOR DE ARTE": {
+    titulo: "DESIGNER",
+    escopo: "criação de peças gráficas para campanhas digitais e offline; desenvolvimento de identidades visuais; produção de materiais para redes sociais; elaboração de layouts para landing pages e e-mails marketing; criação de apresentações corporativas; adaptação de materiais para diferentes formatos e plataformas; manutenção da consistência visual da marca, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "GESTOR DE PERFORMANCE": {
+    titulo: "GESTOR DE PERFORMANCE",
+    escopo: "planejamento e execução de campanhas de mídia paga (Google Ads, Meta Ads, LinkedIn Ads e outras plataformas); análise de métricas e KPIs de performance; otimização contínua de campanhas; gestão de orçamento de mídia; elaboração de relatórios de resultados; testes A/B e experimentação; acompanhamento de conversões e funil de vendas; implementação de tags e pixels de rastreamento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "PERFORMANCE": {
+    titulo: "GESTOR DE PERFORMANCE",
+    escopo: "planejamento e execução de campanhas de mídia paga (Google Ads, Meta Ads, LinkedIn Ads e outras plataformas); análise de métricas e KPIs de performance; otimização contínua de campanhas; gestão de orçamento de mídia; elaboração de relatórios de resultados; testes A/B e experimentação; acompanhamento de conversões e funil de vendas; implementação de tags e pixels de rastreamento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "MÍDIA": {
+    titulo: "GESTOR DE PERFORMANCE",
+    escopo: "planejamento e execução de campanhas de mídia paga (Google Ads, Meta Ads, LinkedIn Ads e outras plataformas); análise de métricas e KPIs de performance; otimização contínua de campanhas; gestão de orçamento de mídia; elaboração de relatórios de resultados; testes A/B e experimentação; acompanhamento de conversões e funil de vendas; implementação de tags e pixels de rastreamento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "TRAFEGO": {
+    titulo: "GESTOR DE PERFORMANCE",
+    escopo: "planejamento e execução de campanhas de mídia paga (Google Ads, Meta Ads, LinkedIn Ads e outras plataformas); análise de métricas e KPIs de performance; otimização contínua de campanhas; gestão de orçamento de mídia; elaboração de relatórios de resultados; testes A/B e experimentação; acompanhamento de conversões e funil de vendas; implementação de tags e pixels de rastreamento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "TRÁFEGO": {
+    titulo: "GESTOR DE PERFORMANCE",
+    escopo: "planejamento e execução de campanhas de mídia paga (Google Ads, Meta Ads, LinkedIn Ads e outras plataformas); análise de métricas e KPIs de performance; otimização contínua de campanhas; gestão de orçamento de mídia; elaboração de relatórios de resultados; testes A/B e experimentação; acompanhamento de conversões e funil de vendas; implementação de tags e pixels de rastreamento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "PRÉ-VENDAS": {
+    titulo: "ESPECIALISTA EM PRÉ-VENDAS",
+    escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "SDR": {
+    titulo: "ESPECIALISTA EM PRÉ-VENDAS",
+    escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "BDR": {
+    titulo: "ESPECIALISTA EM PRÉ-VENDAS",
+    escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
 };
 
 // Função para obter escopo baseado no cargo
@@ -81,7 +156,7 @@ Pelo presente instrumento particular, e na melhor forma de direito, as partes a 
 
 CONTRATANTE: TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Rodrigo Queiroz Santos;
 
-CONTRATADA: {{NOME}}, pessoa jurídica de direito privado, inscrita no CPF sob o n° {{CPF_CNPJ}}, com sede na {{ENDERECO}}{{ESTADO_COMPLEMENTO}}.
+CONTRATADA: {{QUALIFICACAO_CONTRATADA}}
 
 Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:
 
@@ -349,12 +424,38 @@ export default function ContratosColaboradores() {
     
     // Estado como complemento (se existir)
     const estadoComplemento = colaborador.estado ? `, ${colaborador.estado}` : "";
+    
+    // Detectar se é pessoa física (CPF) ou jurídica (CNPJ)
+    const gerarQualificacaoContratada = (): string => {
+      const cnpjLimpo = (colaborador.cnpj || '').replace(/\D/g, '');
+      const cpfLimpo = (colaborador.cpf || '').replace(/\D/g, '');
+      const nome = colaborador.nome || 'Não informado';
+      const endereco = colaborador.endereco || 'Não informado';
+      const estado = colaborador.estado ? `, ${colaborador.estado}` : '';
+      
+      // Se tem CNPJ válido (14 dígitos), é pessoa jurídica
+      if (cnpjLimpo.length === 14) {
+        const cnpjFormatado = colaborador.cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+        if (cpfLimpo.length === 11) {
+          const cpfFormatado = colaborador.cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+          return `${nome}, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}, representada por seu responsável legal portador do CPF n° ${cpfFormatado}, com sede na ${endereco}${estado}.`;
+        }
+        return `${nome}, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}, com sede na ${endereco}${estado}.`;
+      }
+      
+      // Se tem CPF válido (11 dígitos), é pessoa física
+      if (cpfLimpo.length === 11) {
+        const cpfFormatado = colaborador.cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        return `${nome}, pessoa física, inscrita no CPF sob o n° ${cpfFormatado}, residente na ${endereco}${estado}.`;
+      }
+      
+      // Fallback
+      const docDisponivel = colaborador.cnpj || colaborador.cpf || 'Não informado';
+      return `${nome}, inscrita no documento n° ${docDisponivel}, com endereço na ${endereco}${estado}.`;
+    };
 
     return CLAUSULAS_CONTRATO
-      .replace(/\{\{NOME\}\}/g, colaborador.nome || "")
-      .replace(/\{\{CPF_CNPJ\}\}/g, colaborador.cnpj || colaborador.cpf || "Não informado")
-      .replace(/\{\{ENDERECO\}\}/g, colaborador.endereco || "Não informado")
-      .replace(/\{\{ESTADO_COMPLEMENTO\}\}/g, estadoComplemento)
+      .replace(/\{\{QUALIFICACAO_CONTRATADA\}\}/g, gerarQualificacaoContratada())
       .replace(/\{\{CARGO_TITULO\}\}/g, cargoTitulo)
       .replace(/\{\{ESCOPO_CARGO\}\}/g, escopoCargo)
       .replace(/\{\{DATA_INICIO\}\}/g, dataInicio)

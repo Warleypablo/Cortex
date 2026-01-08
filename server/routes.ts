@@ -4648,7 +4648,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Rodrigo Queiroz Santos;');
       doc.moveDown(0.5);
       doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
-      doc.font('Helvetica').text(`${colaborador.nome}, inscrita no CPF sob o n° ${colaborador.cnpj || colaborador.cpf || 'Não informado'}, com sede na ${colaborador.endereco || 'Não informado'}${colaborador.estado ? ', ' + colaborador.estado : ''}.`);
+      
+      // Detectar se é pessoa física (CPF) ou jurídica (CNPJ)
+      const detectarTipoDocumento = (cpf: string | null, cnpj: string | null): { tipo: 'pf' | 'pj'; texto: string } => {
+        const cnpjLimpo = (cnpj || '').replace(/\D/g, '');
+        const cpfLimpo = (cpf || '').replace(/\D/g, '');
+        
+        // Se tem CNPJ válido (14 dígitos), é pessoa jurídica
+        if (cnpjLimpo.length === 14) {
+          const cnpjFormatado = cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+          if (cpfLimpo.length === 11) {
+            const cpfFormatado = cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+            return { 
+              tipo: 'pj', 
+              texto: `pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}, representada por seu responsável legal portador do CPF n° ${cpfFormatado}` 
+            };
+          }
+          return { tipo: 'pj', texto: `pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}` };
+        }
+        
+        // Se tem CPF válido (11 dígitos), é pessoa física
+        if (cpfLimpo.length === 11) {
+          const cpfFormatado = cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+          return { tipo: 'pf', texto: `pessoa física, inscrita no CPF sob o n° ${cpfFormatado}` };
+        }
+        
+        // Fallback: usar o que tiver
+        const docDisponivel = cnpj || cpf || 'Não informado';
+        return { tipo: 'pf', texto: `inscrita no documento n° ${docDisponivel}` };
+      };
+      
+      const docInfo = detectarTipoDocumento(colaborador.cpf, colaborador.cnpj);
+      const localTexto = docInfo.tipo === 'pj' ? 'com sede na' : 'residente na';
+      
+      doc.font('Helvetica').text(`${colaborador.nome}, ${docInfo.texto}, ${localTexto} ${colaborador.endereco || 'Não informado'}${colaborador.estado ? ', ' + colaborador.estado : ''}.`);
       doc.moveDown(0.8);
       doc.text('Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:');
       doc.moveDown(1);
@@ -5135,7 +5168,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Rodrigo Queiroz Santos;');
       doc.moveDown(0.5);
       doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
-      doc.font('Helvetica').text(`${nome}, inscrita no CPF sob o n° ${cpfCnpj || 'Não informado'}, com sede na ${endereco || 'Não informado'}${estado ? ', ' + estado : ''}.`);
+      
+      // Detectar se é pessoa física (CPF) ou jurídica (CNPJ)
+      const detectarTipoDoc = (docValue: string | null): { tipo: 'pf' | 'pj'; texto: string } => {
+        const docLimpo = (docValue || '').replace(/\D/g, '');
+        
+        // Se tem 14 dígitos, é CNPJ (pessoa jurídica)
+        if (docLimpo.length === 14) {
+          const cnpjFormatado = docValue || docLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+          return { tipo: 'pj', texto: `pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}` };
+        }
+        
+        // Se tem 11 dígitos, é CPF (pessoa física)
+        if (docLimpo.length === 11) {
+          const cpfFormatado = docValue || docLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+          return { tipo: 'pf', texto: `pessoa física, inscrita no CPF sob o n° ${cpfFormatado}` };
+        }
+        
+        // Fallback
+        return { tipo: 'pf', texto: `inscrita no documento n° ${docValue || 'Não informado'}` };
+      };
+      
+      const docInfoDownload = detectarTipoDoc(cpfCnpj);
+      const localTextoDownload = docInfoDownload.tipo === 'pj' ? 'com sede na' : 'residente na';
+      
+      doc.font('Helvetica').text(`${nome}, ${docInfoDownload.texto}, ${localTextoDownload} ${endereco || 'Não informado'}${estado ? ', ' + estado : ''}.`);
       doc.moveDown(0.8);
       doc.text('Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:');
       doc.moveDown(1);
