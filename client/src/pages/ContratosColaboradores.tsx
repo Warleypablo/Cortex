@@ -425,7 +425,7 @@ export default function ContratosColaboradores() {
     // Estado como complemento (se existir)
     const estadoComplemento = colaborador.estado ? `, ${colaborador.estado}` : "";
     
-    // Detectar se é pessoa física (CPF) ou jurídica (CNPJ)
+    // Detectar se é pessoa física (CPF) ou jurídica (CNPJ) e formatar qualificação
     const gerarQualificacaoContratada = (): string => {
       const cnpjLimpo = (colaborador.cnpj || '').replace(/\D/g, '');
       const cpfLimpo = (colaborador.cpf || '').replace(/\D/g, '');
@@ -433,25 +433,32 @@ export default function ContratosColaboradores() {
       const endereco = colaborador.endereco || 'Não informado';
       const estado = colaborador.estado ? `, ${colaborador.estado}` : '';
       
-      // Se tem CNPJ válido (14 dígitos), é pessoa jurídica
-      if (cnpjLimpo.length === 14) {
-        const cnpjFormatado = colaborador.cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-        if (cpfLimpo.length === 11) {
-          const cpfFormatado = colaborador.cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-          return `${nome}, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}, representada por seu responsável legal portador do CPF n° ${cpfFormatado}, com sede na ${endereco}${estado}.`;
+      // Formatar CNPJ se existir
+      const cnpjFormatado = cnpjLimpo.length === 14 
+        ? (colaborador.cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))
+        : null;
+      
+      // Formatar CPF se existir
+      const cpfFormatado = cpfLimpo.length === 11 
+        ? (colaborador.cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'))
+        : null;
+      
+      // Se tem CNPJ válido (pessoa jurídica)
+      if (cnpjFormatado) {
+        if (cpfFormatado) {
+          // Modelo completo: CNPJ + endereço + CPF
+          return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${endereco}${estado}, devidamente registrado no CPF ${cpfFormatado}.`;
         }
-        return `${nome}, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}, com sede na ${endereco}${estado}.`;
+        return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${endereco}${estado}.`;
       }
       
-      // Se tem CPF válido (11 dígitos), é pessoa física
-      if (cpfLimpo.length === 11) {
-        const cpfFormatado = colaborador.cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+      // Se tem apenas CPF (pessoa física)
+      if (cpfFormatado) {
         return `${nome}, pessoa física, inscrita no CPF sob o n° ${cpfFormatado}, residente na ${endereco}${estado}.`;
       }
       
       // Fallback
-      const docDisponivel = colaborador.cnpj || colaborador.cpf || 'Não informado';
-      return `${nome}, inscrita no documento n° ${docDisponivel}, com endereço na ${endereco}${estado}.`;
+      return `${nome}, com endereço na ${endereco}${estado}.`;
     };
 
     return CLAUSULAS_CONTRATO
@@ -503,7 +510,8 @@ export default function ContratosColaboradores() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nome: selectedColaborador.nome,
-          cpfCnpj: selectedColaborador.cnpj || selectedColaborador.cpf,
+          cpf: selectedColaborador.cpf,
+          cnpj: selectedColaborador.cnpj,
           endereco: selectedColaborador.endereco,
           estado: selectedColaborador.estado,
           cargo: selectedColaborador.cargo,
