@@ -38,6 +38,7 @@ interface Colaborador {
   setor: string | null;
   admissao: string | null;
   email: string | null;
+  salario: string | null;
 }
 
 interface ContratoStatus {
@@ -573,6 +574,7 @@ export default function ContratosColaboradores() {
           cargo: selectedColaborador.cargo,
           dataAdmissao,
           dataAtual,
+          salario: selectedColaborador.salario,
         }),
       });
 

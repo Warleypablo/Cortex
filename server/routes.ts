@@ -4626,7 +4626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 2. Buscar dados do colaborador
       const colaboradorResult = await db.execute(sql`
         SELECT id, nome, cpf, cnpj, endereco, estado, cargo, setor, admissao::text as admissao,
-               COALESCE(email_pessoal, email_turbo) as email
+               COALESCE(email_pessoal, email_turbo) as email, salario
         FROM rh_pessoal
         WHERE id = ${colaboradorId}
       `);
@@ -4723,6 +4723,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       console.log(`[assinafy-colab] Cargo original: "${cargoOriginal}", Upper: "${cargoUpper}", Titulo encontrado: "${escopoInfo.titulo}"`);
+      
+      // Formatar salário para exibição no contrato
+      const salarioNumerico = parseFloat((colaborador.salario || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+      const salarioFormatado = salarioNumerico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       
       const doc = new PDFDocument({ margin: 60, size: 'A4' });
       const chunks: Buffer[] = [];
@@ -4827,7 +4831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CLÁUSULA TERCEIRA
       doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
       doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração conforme acordado entre as partes, enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.');
+      doc.font('Helvetica').fontSize(9).text(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração mensal de ${salarioFormatado} (${salarioNumerico > 0 ? 'valor bruto' : 'conforme acordado entre as partes'}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`);
       doc.moveDown(0.3);
       doc.text('Parágrafo Primeiro. Os valores que resultarem do disposto nesta cláusula constituem os únicos valores/créditos devidos pela CONTRATANTE ao CONTRATADO em razão do presente contrato, eximindo-se a CONTRATANTE de responder por quaisquer outros valores que sejam cobrados pelo CONTRATADO.');
       doc.moveDown(0.3);
@@ -5180,7 +5184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST - Gerar PDF de contrato de colaborador (download direto)
   app.post("/api/juridico/colaboradores-contrato/pdf", async (req, res) => {
     try {
-      const { nome, cpf, cnpj, endereco, estado, cargo, dataAdmissao, dataAtual } = req.body;
+      const { nome, cpf, cnpj, endereco, estado, cargo, dataAdmissao, dataAtual, salario } = req.body;
 
       if (!nome) {
         return res.status(400).json({ error: "Nome é obrigatório" });
@@ -5192,6 +5196,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dataFimDate = new Date(dataInicioDate);
       dataFimDate.setMonth(dataFimDate.getMonth() + 6);
       const dataFim = dataFimDate.toLocaleDateString('pt-BR');
+      
+      // Formatar salário para exibição no contrato
+      const salarioNumerico = parseFloat((salario || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+      const salarioFormatado = salarioNumerico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       
       // Mapeamento de escopos por cargo
       const escoposPorCargo: Record<string, { titulo: string; escopo: string }> = {
@@ -5370,7 +5378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CLÁUSULA TERCEIRA
       doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
       doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração conforme acordado entre as partes, enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.');
+      doc.font('Helvetica').fontSize(9).text(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração mensal de ${salarioFormatado} (${salarioNumerico > 0 ? 'valor bruto' : 'conforme acordado entre as partes'}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`);
       doc.moveDown(0.3);
       doc.text('Parágrafo Primeiro. Os valores que resultarem do disposto nesta cláusula constituem os únicos valores/créditos devidos pela CONTRATANTE ao CONTRATADO em razão do presente contrato, eximindo-se a CONTRATANTE de responder por quaisquer outros valores que sejam cobrados pelo CONTRATADO.');
       doc.moveDown(0.3);
