@@ -4536,9 +4536,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[assinafy-colab] Signatário: ${colaborador.nome} (${colaborador.email})`);
       
-      // 3. Gerar PDF do contrato
-      const dataAtual = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-      const dataAdmissao = colaborador.admissao ? new Date(colaborador.admissao).toLocaleDateString('pt-BR') : 'a definir';
+      // 3. Gerar PDF do contrato com template completo
+      const dataAtual = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+      const dataInicioDate = colaborador.admissao ? new Date(colaborador.admissao) : new Date();
+      const dataInicio = dataInicioDate.toLocaleDateString('pt-BR');
+      const dataFimDate = new Date(dataInicioDate);
+      dataFimDate.setMonth(dataFimDate.getMonth() + 6);
+      const dataFim = dataFimDate.toLocaleDateString('pt-BR');
+      
+      // Mapeamento de escopos por cargo
+      const escoposPorCargo: Record<string, { titulo: string; escopo: string }> = {
+        "ANALISTA DE CX": {
+          titulo: "ANALISTA DE CX",
+          escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "CXCS": {
+          titulo: "ANALISTA DE CX",
+          escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        }
+      };
+      
+      const cargoUpper = (colaborador.cargo || '').toUpperCase().trim();
+      const escopoInfo = escoposPorCargo[cargoUpper] || { 
+        titulo: colaborador.cargo || 'PRESTADOR DE SERVIÇOS', 
+        escopo: 'prestar serviços conforme acordado entre as partes, respeitando as diretrizes técnicas e operacionais da CONTRATANTE' 
+      };
       
       const doc = new PDFDocument({ margin: 50, size: 'A4' });
       const chunks: Buffer[] = [];
@@ -4549,40 +4571,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Header
-      doc.fontSize(16).font('Helvetica-Bold').text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
-      doc.moveDown(2);
-
-      // Partes
-      doc.fontSize(11).font('Helvetica-Bold').text('Entre as partes:');
-      doc.moveDown(0.5);
-      doc.font('Helvetica').text('CONTRATANTE: TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 42.100.292/0001-84, com sede na Av. Joao Baptista Parra, 633 - Ed. Enseada Office - Sala 1301 - Enseada do Suá, Vitória/ES.');
-      doc.moveDown(0.5);
-      doc.text(`CONTRATADO(A): ${colaborador.nome}, inscrito(a) no CPF/CNPJ sob o nº ${colaborador.cnpj || colaborador.cpf || 'Não informado'}, residente e domiciliado(a) em ${colaborador.endereco || 'Não informado'}, ${colaborador.estado || ''}.`);
+      doc.fontSize(14).font('Helvetica-Bold').text('CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
       doc.moveDown(1.5);
 
-      const clausulas = [
-        { titulo: 'CLÁUSULA PRIMEIRA - DO OBJETO', texto: `O presente contrato tem por objeto a prestação de serviços de ${colaborador.cargo || 'Prestador de Serviços'} pelo CONTRATADO(A) à CONTRATANTE.` },
-        { titulo: 'CLÁUSULA SEGUNDA - DO PRAZO', texto: `O presente contrato terá início em ${dataAdmissao} e vigorará por prazo indeterminado.` },
-        { titulo: 'CLÁUSULA TERCEIRA - DA REMUNERAÇÃO', texto: 'A remuneração será definida em instrumento apartado.' },
-        { titulo: 'CLÁUSULA QUARTA - DAS OBRIGAÇÕES', texto: 'O CONTRATADO(A) compromete-se a executar os serviços com zelo e manter sigilo sobre informações confidenciais.' },
-        { titulo: 'CLÁUSULA QUINTA - DA CONFIDENCIALIDADE', texto: 'O CONTRATADO(A) compromete-se a manter absoluto sigilo sobre todas as informações a que tiver acesso.' },
-        { titulo: 'CLÁUSULA SEXTA - DO FORO', texto: 'As partes elegem o foro da Comarca de Vitória/ES.' },
-      ];
-
-      for (const clausula of clausulas) {
-        doc.font('Helvetica-Bold').text(clausula.titulo);
-        doc.font('Helvetica').text(clausula.texto);
-        doc.moveDown(1);
-      }
-
+      // Partes
+      doc.fontSize(10).font('Helvetica').text('Pelo presente instrumento particular, e na melhor forma de direito, as partes a seguir qualificadas:');
+      doc.moveDown(0.5);
+      doc.font('Helvetica-Bold').text('CONTRATANTE: ', { continued: true });
+      doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Rodrigo Queiroz Santos;');
+      doc.moveDown(0.5);
+      doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
+      doc.font('Helvetica').text(`${colaborador.nome}, inscrita no CPF sob o n° ${colaborador.cnpj || colaborador.cpf || 'Não informado'}, com sede na ${colaborador.endereco || 'Não informado'}${colaborador.estado ? ', ' + colaborador.estado : ''}.`);
+      doc.moveDown(0.5);
+      doc.text('Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:');
       doc.moveDown(1);
-      doc.text(`Local e Data: Vitória/ES, ${dataAtual}`);
-      doc.moveDown(3);
-      doc.text('___________________________________', { align: 'center' });
-      doc.text('TURBO PARTNERS LTDA', { align: 'center' });
-      doc.moveDown(3);
-      doc.text('___________________________________', { align: 'center' });
-      doc.text(colaborador.nome, { align: 'center' });
+
+      // CLÁUSULA PRIMEIRA
+      doc.font('Helvetica-Bold').text('CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text(`1.1. O CONTRATADO prestará serviços como ${escopoInfo.titulo}. Para isso, deverá designar pessoa legalmente certificada e habilitada para a execução dos serviços.`);
+      doc.moveDown(0.3);
+      doc.text(`1.1.1. Os serviços serão prestados por pessoa previamente indicada pelo CONTRATADO e compreendem, de modo exemplificativo, as seguintes atribuições: ${escopoInfo.escopo}`);
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horária do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.');
+      doc.moveDown(1);
+
+      // CLÁUSULA SEGUNDA
+      doc.font('Helvetica-Bold').text('CLÁUSULA SEGUNDA – DO PRAZO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text(`2.1 – O presente contrato tem prazo de 6 (seis) meses, com início em ${dataInicio} e fim em ${dataFim}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes.`);
+      doc.moveDown(1);
+
+      // CLÁUSULA TERCEIRA
+      doc.font('Helvetica-Bold').text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração conforme acordado entre as partes.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Segundo. Até o 25° (vigésimo quinto) dia do mês subsequente à prestação dos serviços, a CONTRATANTE providenciará o pagamento da CONTRATADA.');
+      doc.moveDown(1);
+
+      // CLÁUSULA QUARTA
+      doc.font('Helvetica-Bold').text('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CONTRATADO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('4.1 - São obrigações do CONTRATADO: I. Prestar os serviços contratados com qualidade; II. Fornecer as notas fiscais; III. Arcar com despesas tributárias; IV. Cumprir determinações legais; V. Manter sigilo por 5 anos.');
+      doc.moveDown(1);
+
+      // CLÁUSULA QUINTA
+      doc.font('Helvetica-Bold').text('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATANTE');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('5.1 - São obrigações da CONTRATANTE: I. Fornecer informações necessárias; II. Efetuar pagamentos conforme contrato.');
+      doc.moveDown(1);
+
+      // CLÁUSULA SEXTA
+      doc.font('Helvetica-Bold').text('CLÁUSULA SEXTA – DA RESCISÃO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('6.1. O presente contrato poderá ser rescindido, a qualquer tempo, por qualquer das partes, mediante comunicação prévia de 30 dias.');
+      doc.moveDown(1);
+
+      // CLÁUSULA SÉTIMA
+      doc.font('Helvetica-Bold').text('CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('7.1. Não se estabelece, por força do presente contrato, nenhum vínculo empregatício entre as partes.');
+      doc.moveDown(1);
+
+      // CLÁUSULA OITAVA
+      doc.font('Helvetica-Bold').text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('8.1. As partes concordam em manter sigilo sobre informações confidenciais por 5 anos após o término do contrato. Multa de R$50.000,00 por descumprimento.');
+      doc.moveDown(1);
+
+      // CLÁUSULAS FINAIS
+      doc.font('Helvetica-Bold').text('CLÁUSULA DÉCIMA TERCEIRA – DISPOSIÇÕES GERAIS');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('13.3. Fica eleito o Foro da Comarca de Vitória/ES para dirimir eventuais questões oriundas deste contrato.');
+      doc.moveDown(1);
+
+      // Assinaturas
+      doc.moveDown(1);
+      doc.text(`Vitória, ${dataAtual}.`);
+      doc.moveDown(2);
+      doc.text('____________________________________________________', { align: 'center' });
+      doc.text('TURBO PARTNERS LTDA - CONTRATANTE', { align: 'center' });
+      doc.moveDown(2);
+      doc.text('____________________________________________________', { align: 'center' });
+      doc.text(`${colaborador.nome} - CONTRATADO(A)`, { align: 'center' });
 
       doc.end();
       
@@ -4733,6 +4805,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Nome é obrigatório" });
       }
 
+      // Calcular datas
+      const dataInicioDate = dataAdmissao ? new Date(dataAdmissao.split('/').reverse().join('-')) : new Date();
+      const dataInicio = dataInicioDate.toLocaleDateString('pt-BR');
+      const dataFimDate = new Date(dataInicioDate);
+      dataFimDate.setMonth(dataFimDate.getMonth() + 6);
+      const dataFim = dataFimDate.toLocaleDateString('pt-BR');
+      
+      // Mapeamento de escopos por cargo
+      const escoposPorCargo: Record<string, { titulo: string; escopo: string }> = {
+        "ANALISTA DE CX": {
+          titulo: "ANALISTA DE CX",
+          escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "CXCS": {
+          titulo: "ANALISTA DE CX",
+          escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        }
+      };
+      
+      const cargoUpper = (cargo || '').toUpperCase().trim();
+      const escopoInfo = escoposPorCargo[cargoUpper] || { 
+        titulo: cargo || 'PRESTADOR DE SERVIÇOS', 
+        escopo: 'prestar serviços conforme acordado entre as partes, respeitando as diretrizes técnicas e operacionais da CONTRATANTE' 
+      };
+
       const doc = new PDFDocument({ margin: 50, size: 'A4' });
       const chunks: Buffer[] = [];
 
@@ -4745,48 +4842,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Header
-      doc.fontSize(16).font('Helvetica-Bold').text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
-      doc.moveDown(2);
-
-      // Partes
-      doc.fontSize(11).font('Helvetica-Bold').text('Entre as partes:');
-      doc.moveDown(0.5);
-      doc.font('Helvetica').text('CONTRATANTE: TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 00.000.000/0001-00, com sede na Rua Example, 123, São Paulo/SP.');
-      doc.moveDown(0.5);
-      doc.text(`CONTRATADO(A): ${nome}, inscrito(a) no CPF/CNPJ sob o nº ${cpfCnpj || 'Não informado'}, residente e domiciliado(a) em ${endereco || 'Não informado'}, ${estado || ''}.`);
+      doc.fontSize(14).font('Helvetica-Bold').text('CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
       doc.moveDown(1.5);
 
-      // Cláusulas
-      const clausulas = [
-        { titulo: 'CLÁUSULA PRIMEIRA - DO OBJETO', texto: `O presente contrato tem por objeto a prestação de serviços de ${cargo || 'Prestador de Serviços'} pelo CONTRATADO(A) à CONTRATANTE, conforme especificações a serem definidas em comum acordo entre as partes.` },
-        { titulo: 'CLÁUSULA SEGUNDA - DO PRAZO', texto: `O presente contrato terá início em ${dataAdmissao || 'a definir'} e vigorará por prazo indeterminado, podendo ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias.` },
-        { titulo: 'CLÁUSULA TERCEIRA - DA REMUNERAÇÃO', texto: 'A remuneração pelos serviços prestados será definida em instrumento apartado, devendo ser paga até o 5º (quinto) dia útil do mês subsequente ao da prestação dos serviços.' },
-        { titulo: 'CLÁUSULA QUARTA - DAS OBRIGAÇÕES DO CONTRATADO', texto: 'O CONTRATADO(A) compromete-se a:\na) Executar os serviços com zelo, diligência e pontualidade;\nb) Manter sigilo sobre informações confidenciais da CONTRATANTE;\nc) Comunicar imediatamente qualquer impedimento na execução dos serviços.' },
-        { titulo: 'CLÁUSULA QUINTA - DAS OBRIGAÇÕES DA CONTRATANTE', texto: 'A CONTRATANTE compromete-se a:\na) Fornecer as informações e recursos necessários para a execução dos serviços;\nb) Efetuar o pagamento da remuneração nos prazos acordados;\nc) Respeitar a autonomia técnica do CONTRATADO(A).' },
-        { titulo: 'CLÁUSULA SEXTA - DA CONFIDENCIALIDADE', texto: 'O CONTRATADO(A) compromete-se a manter absoluto sigilo sobre todas as informações a que tiver acesso durante a vigência deste contrato, sob pena de responsabilização civil e criminal.' },
-        { titulo: 'CLÁUSULA SÉTIMA - DO FORO', texto: 'As partes elegem o foro da Comarca de São Paulo/SP para dirimir quaisquer questões oriundas do presente contrato.' },
-      ];
-
-      for (const clausula of clausulas) {
-        doc.font('Helvetica-Bold').text(clausula.titulo);
-        doc.font('Helvetica').text(clausula.texto);
-        doc.moveDown(1);
-      }
-
+      // Partes
+      doc.fontSize(10).font('Helvetica').text('Pelo presente instrumento particular, e na melhor forma de direito, as partes a seguir qualificadas:');
+      doc.moveDown(0.5);
+      doc.font('Helvetica-Bold').text('CONTRATANTE: ', { continued: true });
+      doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Rodrigo Queiroz Santos;');
+      doc.moveDown(0.5);
+      doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
+      doc.font('Helvetica').text(`${nome}, inscrita no CPF sob o n° ${cpfCnpj || 'Não informado'}, com sede na ${endereco || 'Não informado'}${estado ? ', ' + estado : ''}.`);
+      doc.moveDown(0.5);
+      doc.text('Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:');
       doc.moveDown(1);
-      doc.text('E, por estarem assim justos e contratados, firmam o presente instrumento em 2 (duas) vias de igual teor e forma.');
+
+      // CLÁUSULA PRIMEIRA
+      doc.font('Helvetica-Bold').text('CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text(`1.1. O CONTRATADO prestará serviços como ${escopoInfo.titulo}. Para isso, deverá designar pessoa legalmente certificada e habilitada para a execução dos serviços.`);
+      doc.moveDown(0.3);
+      doc.text(`1.1.1. Os serviços serão prestados por pessoa previamente indicada pelo CONTRATADO e compreendem, de modo exemplificativo, as seguintes atribuições: ${escopoInfo.escopo}`);
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horária do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.');
       doc.moveDown(1);
-      doc.text(`Local e Data: São Paulo, ${dataAtual}`);
-      doc.moveDown(3);
+
+      // CLÁUSULA SEGUNDA
+      doc.font('Helvetica-Bold').text('CLÁUSULA SEGUNDA – DO PRAZO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text(`2.1 – O presente contrato tem prazo de 6 (seis) meses, com início em ${dataInicio} e fim em ${dataFim}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes.`);
+      doc.moveDown(1);
+
+      // CLÁUSULA TERCEIRA
+      doc.font('Helvetica-Bold').text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração conforme acordado entre as partes.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Segundo. Até o 25° (vigésimo quinto) dia do mês subsequente à prestação dos serviços, a CONTRATANTE providenciará o pagamento da CONTRATADA.');
+      doc.moveDown(1);
+
+      // CLÁUSULA QUARTA
+      doc.font('Helvetica-Bold').text('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CONTRATADO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('4.1 - São obrigações do CONTRATADO: I. Prestar os serviços contratados com qualidade; II. Fornecer as notas fiscais; III. Arcar com despesas tributárias; IV. Cumprir determinações legais; V. Manter sigilo por 5 anos.');
+      doc.moveDown(1);
+
+      // CLÁUSULA QUINTA
+      doc.font('Helvetica-Bold').text('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATANTE');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('5.1 - São obrigações da CONTRATANTE: I. Fornecer informações necessárias; II. Efetuar pagamentos conforme contrato.');
+      doc.moveDown(1);
+
+      // CLÁUSULA SEXTA
+      doc.font('Helvetica-Bold').text('CLÁUSULA SEXTA – DA RESCISÃO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('6.1. O presente contrato poderá ser rescindido, a qualquer tempo, por qualquer das partes, mediante comunicação prévia de 30 dias.');
+      doc.moveDown(1);
+
+      // CLÁUSULA SÉTIMA
+      doc.font('Helvetica-Bold').text('CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('7.1. Não se estabelece, por força do presente contrato, nenhum vínculo empregatício entre as partes.');
+      doc.moveDown(1);
+
+      // CLÁUSULA OITAVA
+      doc.font('Helvetica-Bold').text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('8.1. As partes concordam em manter sigilo sobre informações confidenciais por 5 anos após o término do contrato. Multa de R$50.000,00 por descumprimento.');
+      doc.moveDown(1);
+
+      // CLÁUSULAS FINAIS
+      doc.font('Helvetica-Bold').text('CLÁUSULA DÉCIMA TERCEIRA – DISPOSIÇÕES GERAIS');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('13.3. Fica eleito o Foro da Comarca de Vitória/ES para dirimir eventuais questões oriundas deste contrato.');
+      doc.moveDown(1);
 
       // Assinaturas
-      doc.text('___________________________________', { align: 'center' });
-      doc.text('TURBO PARTNERS LTDA', { align: 'center' });
-      doc.text('CONTRATANTE', { align: 'center' });
-      doc.moveDown(3);
-      doc.text('___________________________________', { align: 'center' });
-      doc.text(nome, { align: 'center' });
-      doc.text('CONTRATADO(A)', { align: 'center' });
+      doc.moveDown(1);
+      doc.text(`Vitória, ${dataAtual}.`);
+      doc.moveDown(2);
+      doc.text('____________________________________________________', { align: 'center' });
+      doc.text('TURBO PARTNERS LTDA - CONTRATANTE', { align: 'center' });
+      doc.moveDown(2);
+      doc.text('____________________________________________________', { align: 'center' });
+      doc.text(`${nome} - CONTRATADO(A)`, { align: 'center' });
 
       doc.end();
     } catch (error) {
