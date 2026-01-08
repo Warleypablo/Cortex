@@ -4649,39 +4649,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(0.5);
       doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
       
-      // Detectar se é pessoa física (CPF) ou jurídica (CNPJ)
-      const detectarTipoDocumento = (cpf: string | null, cnpj: string | null): { tipo: 'pf' | 'pj'; texto: string } => {
-        const cnpjLimpo = (cnpj || '').replace(/\D/g, '');
-        const cpfLimpo = (cpf || '').replace(/\D/g, '');
+      // Detectar se é pessoa física (CPF) ou jurídica (CNPJ) e formatar qualificação
+      const gerarQualificacaoContratada = (): string => {
+        const cnpjLimpo = (colaborador.cnpj || '').replace(/\D/g, '');
+        const cpfLimpo = (colaborador.cpf || '').replace(/\D/g, '');
+        const nome = colaborador.nome || 'Não informado';
+        const endereco = colaborador.endereco || 'Não informado';
+        const estado = colaborador.estado ? `, ${colaborador.estado}` : '';
         
-        // Se tem CNPJ válido (14 dígitos), é pessoa jurídica
-        if (cnpjLimpo.length === 14) {
-          const cnpjFormatado = cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-          if (cpfLimpo.length === 11) {
-            const cpfFormatado = cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-            return { 
-              tipo: 'pj', 
-              texto: `pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}, representada por seu responsável legal portador do CPF n° ${cpfFormatado}` 
-            };
+        // Formatar CNPJ se existir
+        const cnpjFormatado = cnpjLimpo.length === 14 
+          ? (colaborador.cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))
+          : null;
+        
+        // Formatar CPF se existir
+        const cpfFormatado = cpfLimpo.length === 11 
+          ? (colaborador.cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'))
+          : null;
+        
+        // Se tem CNPJ válido (pessoa jurídica)
+        if (cnpjFormatado) {
+          if (cpfFormatado) {
+            // Modelo completo: CNPJ + endereço + CPF
+            return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${endereco}${estado}, devidamente registrado no CPF ${cpfFormatado}.`;
           }
-          return { tipo: 'pj', texto: `pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}` };
+          return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${endereco}${estado}.`;
         }
         
-        // Se tem CPF válido (11 dígitos), é pessoa física
-        if (cpfLimpo.length === 11) {
-          const cpfFormatado = cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-          return { tipo: 'pf', texto: `pessoa física, inscrita no CPF sob o n° ${cpfFormatado}` };
+        // Se tem apenas CPF (pessoa física)
+        if (cpfFormatado) {
+          return `${nome}, pessoa física, inscrita no CPF sob o n° ${cpfFormatado}, residente na ${endereco}${estado}.`;
         }
         
-        // Fallback: usar o que tiver
-        const docDisponivel = cnpj || cpf || 'Não informado';
-        return { tipo: 'pf', texto: `inscrita no documento n° ${docDisponivel}` };
+        // Fallback
+        return `${nome}, com endereço na ${endereco}${estado}.`;
       };
       
-      const docInfo = detectarTipoDocumento(colaborador.cpf, colaborador.cnpj);
-      const localTexto = docInfo.tipo === 'pj' ? 'com sede na' : 'residente na';
-      
-      doc.font('Helvetica').text(`${colaborador.nome}, ${docInfo.texto}, ${localTexto} ${colaborador.endereco || 'Não informado'}${colaborador.estado ? ', ' + colaborador.estado : ''}.`);
+      doc.font('Helvetica').text(gerarQualificacaoContratada());
       doc.moveDown(0.8);
       doc.text('Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:');
       doc.moveDown(1);
@@ -5048,7 +5052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST - Gerar PDF de contrato de colaborador (download direto)
   app.post("/api/juridico/colaboradores-contrato/pdf", async (req, res) => {
     try {
-      const { nome, cpfCnpj, endereco, estado, cargo, dataAdmissao, dataAtual } = req.body;
+      const { nome, cpf, cnpj, endereco, estado, cargo, dataAdmissao, dataAtual } = req.body;
 
       if (!nome) {
         return res.status(400).json({ error: "Nome é obrigatório" });
@@ -5169,30 +5173,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(0.5);
       doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
       
-      // Detectar se é pessoa física (CPF) ou jurídica (CNPJ)
-      const detectarTipoDoc = (docValue: string | null): { tipo: 'pf' | 'pj'; texto: string } => {
-        const docLimpo = (docValue || '').replace(/\D/g, '');
+      // Detectar se é pessoa física (CPF) ou jurídica (CNPJ) e formatar qualificação
+      const gerarQualificacaoDownload = (): string => {
+        const cnpjLimpo = (cnpj || '').replace(/\D/g, '');
+        const cpfLimpo = (cpf || '').replace(/\D/g, '');
+        const enderecoFormatado = endereco || 'Não informado';
+        const estadoFormatado = estado ? `, ${estado}` : '';
         
-        // Se tem 14 dígitos, é CNPJ (pessoa jurídica)
-        if (docLimpo.length === 14) {
-          const cnpjFormatado = docValue || docLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
-          return { tipo: 'pj', texto: `pessoa jurídica de direito privado, inscrita no CNPJ sob o n° ${cnpjFormatado}` };
+        // Formatar CNPJ se existir
+        const cnpjFormatado = cnpjLimpo.length === 14 
+          ? (cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))
+          : null;
+        
+        // Formatar CPF se existir
+        const cpfFormatado = cpfLimpo.length === 11 
+          ? (cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'))
+          : null;
+        
+        // Se tem CNPJ válido (pessoa jurídica)
+        if (cnpjFormatado) {
+          if (cpfFormatado) {
+            // Modelo completo: CNPJ + endereço + CPF
+            return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${enderecoFormatado}${estadoFormatado}, devidamente registrado no CPF ${cpfFormatado}.`;
+          }
+          return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${enderecoFormatado}${estadoFormatado}.`;
         }
         
-        // Se tem 11 dígitos, é CPF (pessoa física)
-        if (docLimpo.length === 11) {
-          const cpfFormatado = docValue || docLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-          return { tipo: 'pf', texto: `pessoa física, inscrita no CPF sob o n° ${cpfFormatado}` };
+        // Se tem apenas CPF (pessoa física)
+        if (cpfFormatado) {
+          return `${nome}, pessoa física, inscrita no CPF sob o n° ${cpfFormatado}, residente na ${enderecoFormatado}${estadoFormatado}.`;
         }
         
         // Fallback
-        return { tipo: 'pf', texto: `inscrita no documento n° ${docValue || 'Não informado'}` };
+        return `${nome}, com endereço na ${enderecoFormatado}${estadoFormatado}.`;
       };
       
-      const docInfoDownload = detectarTipoDoc(cpfCnpj);
-      const localTextoDownload = docInfoDownload.tipo === 'pj' ? 'com sede na' : 'residente na';
-      
-      doc.font('Helvetica').text(`${nome}, ${docInfoDownload.texto}, ${localTextoDownload} ${endereco || 'Não informado'}${estado ? ', ' + estado : ''}.`);
+      doc.font('Helvetica').text(gerarQualificacaoDownload());
       doc.moveDown(0.8);
       doc.text('Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:');
       doc.moveDown(1);
