@@ -99,7 +99,7 @@ export default function ContratosColaboradores() {
   const [showPreview, setShowPreview] = useState(false);
 
   const { data, isLoading } = useQuery<{ colaboradores: Colaborador[] }>({
-    queryKey: ["/api/juridico/colaboradores-contratos"],
+    queryKey: ["/api/juridico/colaboradores-contrato"],
   });
 
   const colaboradores = data?.colaboradores || [];
