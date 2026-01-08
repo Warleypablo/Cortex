@@ -5095,10 +5095,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 5. Buscar ou criar signatários
       const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
       
-      const socioResponsavel = {
-        nome: "Rodrigo Queiroz Santos",
-        email: "rodrigo.queiroz@turbopartners.com.br"
-      };
+      const sociosResponsaveis = [
+        { nome: "Rodrigo Queiroz Santos", email: "rodrigo.queiroz@turbopartners.com.br" },
+        { nome: "Victor Peixoto", email: "victor.peixoto@turbopartners.com.br" },
+        { nome: "Andre Musso", email: "andre.musso@turbopartners.com.br" }
+      ];
       
       const getOrCreateSigner = async (nome: string, email: string): Promise<string> => {
         const searchUrl = `${signerUrl}?search=${encodeURIComponent(email)}`;
@@ -5130,10 +5131,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const colaboradorSignerId = await getOrCreateSigner(colaborador.nome, colaborador.email);
-      const socioSignerId = await getOrCreateSigner(socioResponsavel.nome, socioResponsavel.email);
       
-      const signerIds = [colaboradorSignerId, socioSignerId];
-      console.log(`[assinafy-colab] Signatários: Colaborador=${colaboradorSignerId}, Sócio=${socioSignerId}`);
+      // Criar signatários para todos os sócios
+      const sociosSignerIds: string[] = [];
+      for (const socio of sociosResponsaveis) {
+        const signerId = await getOrCreateSigner(socio.nome, socio.email);
+        sociosSignerIds.push(signerId);
+      }
+      
+      const signerIds = [colaboradorSignerId, ...sociosSignerIds];
+      console.log(`[assinafy-colab] Signatários: Colaborador=${colaboradorSignerId}, Sócios=${sociosSignerIds.join(', ')}`);
       
       // 6. Aguardar documento estar pronto (polling) - precisa chegar em metadata_ready
       const statusUrl = `${config.api_url}/documents/${documentId}`;
