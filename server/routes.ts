@@ -4592,11 +4592,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
       
-      const cargoUpper = (colaborador.cargo || '').toUpperCase().trim();
-      const escopoInfo = escoposPorCargo[cargoUpper] || { 
+      const cargoOriginal = colaborador.cargo || '';
+      const cargoUpper = cargoOriginal.toUpperCase().trim();
+      
+      // Função para encontrar escopo com matching flexível
+      const findEscopo = (cargo: string): { titulo: string; escopo: string } | undefined => {
+        // Tenta match direto
+        if (escoposPorCargo[cargo]) return escoposPorCargo[cargo];
+        
+        // Tenta match parcial (se o cargo contém a chave ou vice-versa)
+        for (const [key, value] of Object.entries(escoposPorCargo)) {
+          if (cargo.includes(key) || key.includes(cargo)) {
+            return value;
+          }
+        }
+        return undefined;
+      };
+      
+      const escopoInfo = findEscopo(cargoUpper) || { 
         titulo: colaborador.cargo || 'PRESTADOR DE SERVIÇOS', 
         escopo: 'prestar serviços conforme acordado entre as partes, respeitando as diretrizes técnicas e operacionais da CONTRATANTE' 
       };
+      
+      console.log(`[assinafy-colab] Cargo original: "${cargoOriginal}", Upper: "${cargoUpper}", Titulo encontrado: "${escopoInfo.titulo}"`);
       
       const doc = new PDFDocument({ margin: 60, size: 'A4' });
       const chunks: Buffer[] = [];
@@ -5058,11 +5076,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
       
-      const cargoUpper = (cargo || '').toUpperCase().trim();
-      const escopoInfo = escoposPorCargo[cargoUpper] || { 
+      const cargoOriginal = cargo || '';
+      const cargoUpper = cargoOriginal.toUpperCase().trim();
+      
+      // Função para encontrar escopo com matching flexível
+      const findEscopo = (cargoParam: string): { titulo: string; escopo: string } | undefined => {
+        // Tenta match direto
+        if (escoposPorCargo[cargoParam]) return escoposPorCargo[cargoParam];
+        
+        // Tenta match parcial (se o cargo contém a chave ou vice-versa)
+        for (const [key, value] of Object.entries(escoposPorCargo)) {
+          if (cargoParam.includes(key) || key.includes(cargoParam)) {
+            return value;
+          }
+        }
+        return undefined;
+      };
+      
+      const escopoInfo = findEscopo(cargoUpper) || { 
         titulo: cargo || 'PRESTADOR DE SERVIÇOS', 
         escopo: 'prestar serviços conforme acordado entre as partes, respeitando as diretrizes técnicas e operacionais da CONTRATANTE' 
       };
+      
+      console.log(`[pdf-download] Cargo original: "${cargoOriginal}", Upper: "${cargoUpper}", Titulo encontrado: "${escopoInfo.titulo}"`);
 
       const doc = new PDFDocument({ margin: 60, size: 'A4' });
       const chunks: Buffer[] = [];
