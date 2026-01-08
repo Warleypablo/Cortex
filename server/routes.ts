@@ -4701,6 +4701,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "FINANCEIRO": {
           titulo: "FINANCEIRO",
           escopo: "planejamento e controle financeiro, interpretação de relatórios, avaliação e consultoria, controle de custos, análise de riscos, acompanhamento de resultados, criar, acompanhar e medir indicadores, contas a pagar, contas a receber, emissão de nota fiscal, lançamentos financeiros, elaboração de relatórios gerenciais, acompanhamento de processos operacionais, dentre outras atividades financeiras não listadas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "PO": {
+          titulo: "PRODUCT OWNER",
+          escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "PRODUCT OWNER": {
+          titulo: "PRODUCT OWNER",
+          escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
@@ -5299,6 +5307,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "FINANCEIRO": {
           titulo: "FINANCEIRO",
           escopo: "planejamento e controle financeiro, interpretação de relatórios, avaliação e consultoria, controle de custos, análise de riscos, acompanhamento de resultados, criar, acompanhar e medir indicadores, contas a pagar, contas a receber, emissão de nota fiscal, lançamentos financeiros, elaboração de relatórios gerenciais, acompanhamento de processos operacionais, dentre outras atividades financeiras não listadas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "PO": {
+          titulo: "PRODUCT OWNER",
+          escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "PRODUCT OWNER": {
+          titulo: "PRODUCT OWNER",
+          escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
