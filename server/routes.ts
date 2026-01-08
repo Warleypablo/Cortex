@@ -5092,9 +5092,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const signerIds = [colaboradorSignerId, socioSignerId];
       console.log(`[assinafy-colab] Signatários: Colaborador=${colaboradorSignerId}, Sócio=${socioSignerId}`);
       
-      // 6. Aguardar documento estar pronto (polling)
+      // 6. Aguardar documento estar pronto (polling) - precisa chegar em metadata_ready
       const statusUrl = `${config.api_url}/documents/${documentId}`;
       let documentReady = false;
+      let lastStatus = '';
       
       for (let attempt = 1; attempt <= 30; attempt++) {
         const statusResponse = await fetch(statusUrl, {
@@ -5103,21 +5104,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         const statusResult = await statusResponse.json() as any;
         const currentStatus = statusResult.data?.status || statusResult.status;
+        lastStatus = currentStatus;
         
         if (attempt === 1 || attempt % 5 === 0) {
           console.log(`[assinafy-colab] Status (tentativa ${attempt}/30): ${currentStatus}`);
         }
         
-        if (currentStatus !== 'metadata_processing' && currentStatus !== 'processing') {
+        // Documento precisa estar em metadata_ready para criar assignment
+        if (currentStatus === 'metadata_ready') {
           console.log(`[assinafy-colab] Documento pronto! Status: ${currentStatus}`);
           documentReady = true;
           break;
         }
+        
+        // Se chegou em um status de erro, parar
+        if (currentStatus === 'failed' || currentStatus === 'error') {
+          console.error(`[assinafy-colab] Documento com erro: ${currentStatus}`);
+          return res.status(500).json({ error: "Documento falhou no processamento", documentId, status: currentStatus });
+        }
+        
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
       if (!documentReady) {
-        return res.status(500).json({ error: "Documento ainda em processamento", documentId });
+        console.error(`[assinafy-colab] Timeout aguardando metadata_ready. Último status: ${lastStatus}`);
+        return res.status(500).json({ error: `Documento não ficou pronto (status: ${lastStatus}). Tente novamente.`, documentId });
       }
       
       // 7. Enviar para assinatura usando assignments
