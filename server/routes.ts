@@ -4713,6 +4713,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "INSIDE SALES": {
           titulo: "INSIDE SALES",
           escopo: "realização de reuniões, apresentação de propostas e fechamento, gerir pipeline de vendas, construir relacionamento com clientes, atualizar o CRM, participar de reuniões internas, cumprimento de metas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "ANALISTA DE DADOS": {
+          titulo: "ANALISTA DE DADOS",
+          escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, trabalhar em estreita colaboração com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
@@ -5323,6 +5327,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "INSIDE SALES": {
           titulo: "INSIDE SALES",
           escopo: "realização de reuniões, apresentação de propostas e fechamento, gerir pipeline de vendas, construir relacionamento com clientes, atualizar o CRM, participar de reuniões internas, cumprimento de metas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "ANALISTA DE DADOS": {
+          titulo: "ANALISTA DE DADOS",
+          escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, trabalhar em estreita colaboração com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
