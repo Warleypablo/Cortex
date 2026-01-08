@@ -4488,6 +4488,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== JURÍDICO - Contratos Colaboradores ====================
+  
+  // Inicializar tabela de status de contratos de colaboradores
+  let contratosColabStatusTableInitialized = false;
+  async function ensureContratosColabStatusTable() {
+    if (contratosColabStatusTableInitialized) return;
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS staging.contratos_colaboradores_status (
+          id SERIAL PRIMARY KEY,
+          colaborador_id INTEGER NOT NULL,
+          colaborador_nome VARCHAR(255) NOT NULL,
+          colaborador_email VARCHAR(255),
+          documento_id VARCHAR(255),
+          status VARCHAR(50) NOT NULL DEFAULT 'Enviado para assinatura',
+          data_envio TIMESTAMP DEFAULT NOW(),
+          data_assinatura TIMESTAMP,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      contratosColabStatusTableInitialized = true;
+      console.log("[database] Contratos colaboradores status table initialized");
+    } catch (error) {
+      console.error("[database] Error initializing contratos_colaboradores_status table:", error);
+    }
+  }
+  
   app.get("/api/juridico/colaboradores-contrato", async (req, res) => {
     try {
       const colaboradores = await storage.getColaboradoresParaContrato();
@@ -4495,6 +4522,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching colaboradores para contrato:", error);
       res.status(500).json({ error: "Failed to fetch colaboradores" });
+    }
+  });
+  
+  // GET - Listar status de todos os contratos de colaboradores
+  app.get("/api/juridico/colaboradores-contrato/status", async (req, res) => {
+    try {
+      await ensureContratosColabStatusTable();
+      
+      const result = await db.execute(sql`
+        SELECT * FROM staging.contratos_colaboradores_status 
+        ORDER BY data_envio DESC
+      `);
+      
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching contratos status:", error);
+      res.status(500).json({ error: "Failed to fetch contratos status" });
+    }
+  });
+  
+  // GET - Status de contrato de um colaborador específico
+  app.get("/api/juridico/colaboradores-contrato/:id/status", async (req, res) => {
+    try {
+      await ensureContratosColabStatusTable();
+      const colaboradorId = parseInt(req.params.id);
+      
+      const result = await db.execute(sql`
+        SELECT * FROM staging.contratos_colaboradores_status 
+        WHERE colaborador_id = ${colaboradorId}
+        ORDER BY data_envio DESC
+        LIMIT 1
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.json({ status: null });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error fetching contrato status:", error);
+      res.status(500).json({ error: "Failed to fetch contrato status" });
+    }
+  });
+  
+  // PATCH - Atualizar status de contrato (para marcar como assinado manualmente)
+  app.patch("/api/juridico/colaboradores-contrato/:id/status", async (req, res) => {
+    try {
+      await ensureContratosColabStatusTable();
+      const colaboradorId = parseInt(req.params.id);
+      const { status } = req.body;
+      
+      if (!status) {
+        return res.status(400).json({ error: "Status é obrigatório" });
+      }
+      
+      const dataAssinatura = status === 'Assinado' ? sql`NOW()` : sql`NULL`;
+      
+      const result = await db.execute(sql`
+        UPDATE staging.contratos_colaboradores_status 
+        SET status = ${status}, 
+            data_assinatura = ${dataAssinatura},
+            updated_at = NOW()
+        WHERE colaborador_id = ${colaboradorId}
+        AND id = (
+          SELECT id FROM staging.contratos_colaboradores_status 
+          WHERE colaborador_id = ${colaboradorId}
+          ORDER BY data_envio DESC
+          LIMIT 1
+        )
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating contrato status:", error);
+      res.status(500).json({ error: "Failed to update contrato status" });
     }
   });
 
@@ -5035,6 +5142,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`[assinafy-colab] Contrato enviado para assinatura com sucesso`);
+      
+      // 8. Salvar status do contrato na tabela de controle
+      await ensureContratosColabStatusTable();
+      await db.execute(sql`
+        INSERT INTO staging.contratos_colaboradores_status 
+        (colaborador_id, colaborador_nome, colaborador_email, documento_id, status, data_envio)
+        VALUES (${colaboradorId}, ${colaborador.nome}, ${colaborador.email}, ${documentId}, 'Enviado para assinatura', NOW())
+      `);
+      console.log(`[assinafy-colab] Status salvo: Enviado para assinatura`);
       
       res.json({ 
         success: true, 
