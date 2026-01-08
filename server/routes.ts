@@ -4918,13 +4918,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CLÁUSULA OITAVA
       doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE E DIREITO DE IMAGEM');
       doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('8.1. As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato. As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.');
+      doc.font('Helvetica').fontSize(9).text('8.1. As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato, o que inclui, mas não se limita a: todos e quaisquer dados, relatórios, análises, estudos, pesquisas, interpretações, previsões/estimativas, registros, materiais e quaisquer outros elementos que contenham informações referentes aos negócios objeto deste contrato, aos membros envolvidos e aos investidores, assim como dados pessoais nos termos da legislação vigente (Lei Geral de Proteção de Dados - LGPD). As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.');
       doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Para os propósitos, serão consideradas "informações confidenciais" todas e quaisquer informações e/ou dados de natureza confidencial (incluindo, sem limitação, os termos e condições deste contrato e todos os segredos e/ou informações operacionais, econômicas e técnicas, bem como demais informações comerciais ou "know-how").');
+      doc.text('Parágrafo Primeiro. Para os propósitos, serão consideradas "informações confidenciais" todas e quaisquer informações e/ou dados de natureza confidencial (incluindo, sem limitação, os termos e condições deste contrato e todos os segredos e/ou informações operacionais, econômicas e técnicas, bem como demais informações comerciais ou "know-how") que tenham sido direta ou indiretamente fornecidos ou divulgados por uma das partes à outra sob ou em função deste contrato, a qualquer título e por qualquer modo, que não sejam, ou não venham a ser, de conhecimento público, que não por culpa imputável à parte receptora.');
       doc.moveDown(0.3);
-      doc.font('Helvetica-Bold').text('Parágrafo Segundo. O descumprimento da presente cláusula enseja o pagamento, por parte da CONTRATADA ao CONTRATANTE, de multa não compensatória fixada em R$50.000,00 (cinquenta mil reais).');
+      doc.text('Parágrafo Segundo. Caso alguma das partes venha a ser legalmente obrigada a revelar qualquer informação confidencial, por qualquer juízo ou autoridade governamental competente, essa deverá notificar a contrária de tal ordem, para que possa adotar medidas cabíveis para resguardar os seus direitos ou dispensar a parte que cumprir as obrigações dispostas neste acordo.');
       doc.moveDown(0.3);
-      doc.font('Helvetica').text('8.2. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ao objeto deste contrato.');
+      doc.text('Parágrafo Terceiro. A CONTRATADA não poderá, em nenhuma hipótese, fazer qualquer outro uso, realizar qualquer outro negócio ou celebrar qualquer outro contrato relacionado, direta ou indiretamente, às Informações Confidenciais.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Quarto. Todas as Informações Confidenciais devem ser mantidas e tratadas como estritamente confidenciais e não poderão ser reveladas a qualquer terceiro, de forma alguma, no todo ou em parte, bem como não poderão ser utilizadas para qualquer finalidade que não esteja única e exclusivamente relacionada aos Serviços.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Quinto. Sem prejuízo de outras obrigações, a CONTRATADA se compromete desde logo a:');
+      doc.text('1. Não divulgar quaisquer Informações Confidenciais a quaisquer terceiros;');
+      doc.text('2. Utilizar quaisquer Informações Confidenciais exclusivamente para a execução da prestação dos serviços;');
+      doc.text('3. Não analisar, providenciar análise, derivar ou sintetizar qualquer informação recebida da CONTRATANTE sem autorização prévia e fora dos limites da execução de seu trabalho.');
+      doc.moveDown(0.3);
+      doc.font('Helvetica-Bold').text('Parágrafo Sexto. O descumprimento da presente cláusula enseja o pagamento, por parte da CONTRATADA ao CONTRATANTE, de multa não compensatória fixada em R$50.000,00 (cinquenta mil reais).');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('8.2. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ao objeto deste contrato, em quaisquer meios físicos ou digitais, sem limitação territorial ou temporal, inclusive após o término da relação contratual, sem que disso decorra direito a remuneração adicional.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo único. A utilização ora autorizada não implica exclusividade, vínculo empregatício ou societário, comprometendo-se a CONTRATANTE a utilizar a imagem do CONTRATADO de forma ética e compatível com a finalidade profissional pactuada.');
       doc.moveDown(0.8);
 
       // CLÁUSULA NONA
@@ -5464,13 +5477,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // CLÁUSULA OITAVA
       doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE E DIREITO DE IMAGEM');
       doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('8.1. As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato. As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.');
+      doc.font('Helvetica').fontSize(9).text('8.1. As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato, o que inclui, mas não se limita a: todos e quaisquer dados, relatórios, análises, estudos, pesquisas, interpretações, previsões/estimativas, registros, materiais e quaisquer outros elementos que contenham informações referentes aos negócios objeto deste contrato, aos membros envolvidos e aos investidores, assim como dados pessoais nos termos da legislação vigente (Lei Geral de Proteção de Dados - LGPD). As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.');
       doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Para os propósitos, serão consideradas "informações confidenciais" todas e quaisquer informações e/ou dados de natureza confidencial (incluindo, sem limitação, os termos e condições deste contrato e todos os segredos e/ou informações operacionais, econômicas e técnicas, bem como demais informações comerciais ou "know-how").');
+      doc.text('Parágrafo Primeiro. Para os propósitos, serão consideradas "informações confidenciais" todas e quaisquer informações e/ou dados de natureza confidencial (incluindo, sem limitação, os termos e condições deste contrato e todos os segredos e/ou informações operacionais, econômicas e técnicas, bem como demais informações comerciais ou "know-how") que tenham sido direta ou indiretamente fornecidos ou divulgados por uma das partes à outra sob ou em função deste contrato, a qualquer título e por qualquer modo, que não sejam, ou não venham a ser, de conhecimento público, que não por culpa imputável à parte receptora.');
       doc.moveDown(0.3);
-      doc.font('Helvetica-Bold').text('Parágrafo Segundo. O descumprimento da presente cláusula enseja o pagamento, por parte da CONTRATADA ao CONTRATANTE, de multa não compensatória fixada em R$50.000,00 (cinquenta mil reais).');
+      doc.text('Parágrafo Segundo. Caso alguma das partes venha a ser legalmente obrigada a revelar qualquer informação confidencial, por qualquer juízo ou autoridade governamental competente, essa deverá notificar a contrária de tal ordem, para que possa adotar medidas cabíveis para resguardar os seus direitos ou dispensar a parte que cumprir as obrigações dispostas neste acordo.');
       doc.moveDown(0.3);
-      doc.font('Helvetica').text('8.2. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ao objeto deste contrato.');
+      doc.text('Parágrafo Terceiro. A CONTRATADA não poderá, em nenhuma hipótese, fazer qualquer outro uso, realizar qualquer outro negócio ou celebrar qualquer outro contrato relacionado, direta ou indiretamente, às Informações Confidenciais.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Quarto. Todas as Informações Confidenciais devem ser mantidas e tratadas como estritamente confidenciais e não poderão ser reveladas a qualquer terceiro, de forma alguma, no todo ou em parte, bem como não poderão ser utilizadas para qualquer finalidade que não esteja única e exclusivamente relacionada aos Serviços.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo Quinto. Sem prejuízo de outras obrigações, a CONTRATADA se compromete desde logo a:');
+      doc.text('1. Não divulgar quaisquer Informações Confidenciais a quaisquer terceiros;');
+      doc.text('2. Utilizar quaisquer Informações Confidenciais exclusivamente para a execução da prestação dos serviços;');
+      doc.text('3. Não analisar, providenciar análise, derivar ou sintetizar qualquer informação recebida da CONTRATANTE sem autorização prévia e fora dos limites da execução de seu trabalho.');
+      doc.moveDown(0.3);
+      doc.font('Helvetica-Bold').text('Parágrafo Sexto. O descumprimento da presente cláusula enseja o pagamento, por parte da CONTRATADA ao CONTRATANTE, de multa não compensatória fixada em R$50.000,00 (cinquenta mil reais).');
+      doc.moveDown(0.3);
+      doc.font('Helvetica').text('8.2. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ao objeto deste contrato, em quaisquer meios físicos ou digitais, sem limitação territorial ou temporal, inclusive após o término da relação contratual, sem que disso decorra direito a remuneração adicional.');
+      doc.moveDown(0.3);
+      doc.text('Parágrafo único. A utilização ora autorizada não implica exclusividade, vínculo empregatício ou societário, comprometendo-se a CONTRATANTE a utilizar a imagem do CONTRATADO de forma ética e compatível com a finalidade profissional pactuada.');
       doc.moveDown(0.8);
 
       // CLÁUSULA NONA
