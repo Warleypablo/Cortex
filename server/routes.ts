@@ -4498,6 +4498,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST - Gerar PDF de contrato de colaborador
+  app.post("/api/juridico/colaboradores-contrato/pdf", async (req, res) => {
+    try {
+      const { nome, cpfCnpj, endereco, estado, cargo, dataAdmissao, dataAtual } = req.body;
+
+      if (!nome) {
+        return res.status(400).json({ error: "Nome é obrigatório" });
+      }
+
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
+      const chunks: Buffer[] = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(chunks);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="Contrato_${nome.replace(/\s+/g, '_')}.pdf"`);
+        res.send(pdfBuffer);
+      });
+
+      // Header
+      doc.fontSize(16).font('Helvetica-Bold').text('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
+      doc.moveDown(2);
+
+      // Partes
+      doc.fontSize(11).font('Helvetica-Bold').text('Entre as partes:');
+      doc.moveDown(0.5);
+      doc.font('Helvetica').text('CONTRATANTE: TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 00.000.000/0001-00, com sede na Rua Example, 123, São Paulo/SP.');
+      doc.moveDown(0.5);
+      doc.text(`CONTRATADO(A): ${nome}, inscrito(a) no CPF/CNPJ sob o nº ${cpfCnpj || 'Não informado'}, residente e domiciliado(a) em ${endereco || 'Não informado'}, ${estado || ''}.`);
+      doc.moveDown(1.5);
+
+      // Cláusulas
+      const clausulas = [
+        { titulo: 'CLÁUSULA PRIMEIRA - DO OBJETO', texto: `O presente contrato tem por objeto a prestação de serviços de ${cargo || 'Prestador de Serviços'} pelo CONTRATADO(A) à CONTRATANTE, conforme especificações a serem definidas em comum acordo entre as partes.` },
+        { titulo: 'CLÁUSULA SEGUNDA - DO PRAZO', texto: `O presente contrato terá início em ${dataAdmissao || 'a definir'} e vigorará por prazo indeterminado, podendo ser rescindido por qualquer das partes mediante aviso prévio de 30 (trinta) dias.` },
+        { titulo: 'CLÁUSULA TERCEIRA - DA REMUNERAÇÃO', texto: 'A remuneração pelos serviços prestados será definida em instrumento apartado, devendo ser paga até o 5º (quinto) dia útil do mês subsequente ao da prestação dos serviços.' },
+        { titulo: 'CLÁUSULA QUARTA - DAS OBRIGAÇÕES DO CONTRATADO', texto: 'O CONTRATADO(A) compromete-se a:\na) Executar os serviços com zelo, diligência e pontualidade;\nb) Manter sigilo sobre informações confidenciais da CONTRATANTE;\nc) Comunicar imediatamente qualquer impedimento na execução dos serviços.' },
+        { titulo: 'CLÁUSULA QUINTA - DAS OBRIGAÇÕES DA CONTRATANTE', texto: 'A CONTRATANTE compromete-se a:\na) Fornecer as informações e recursos necessários para a execução dos serviços;\nb) Efetuar o pagamento da remuneração nos prazos acordados;\nc) Respeitar a autonomia técnica do CONTRATADO(A).' },
+        { titulo: 'CLÁUSULA SEXTA - DA CONFIDENCIALIDADE', texto: 'O CONTRATADO(A) compromete-se a manter absoluto sigilo sobre todas as informações a que tiver acesso durante a vigência deste contrato, sob pena de responsabilização civil e criminal.' },
+        { titulo: 'CLÁUSULA SÉTIMA - DO FORO', texto: 'As partes elegem o foro da Comarca de São Paulo/SP para dirimir quaisquer questões oriundas do presente contrato.' },
+      ];
+
+      for (const clausula of clausulas) {
+        doc.font('Helvetica-Bold').text(clausula.titulo);
+        doc.font('Helvetica').text(clausula.texto);
+        doc.moveDown(1);
+      }
+
+      doc.moveDown(1);
+      doc.text('E, por estarem assim justos e contratados, firmam o presente instrumento em 2 (duas) vias de igual teor e forma.');
+      doc.moveDown(1);
+      doc.text(`Local e Data: São Paulo, ${dataAtual}`);
+      doc.moveDown(3);
+
+      // Assinaturas
+      doc.text('___________________________________', { align: 'center' });
+      doc.text('TURBO PARTNERS LTDA', { align: 'center' });
+      doc.text('CONTRATANTE', { align: 'center' });
+      doc.moveDown(3);
+      doc.text('___________________________________', { align: 'center' });
+      doc.text(nome, { align: 'center' });
+      doc.text('CONTRATADO(A)', { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      console.error("[api] Error generating contract PDF:", error);
+      res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  });
+
   // ==================== JURÍDICO - Regras de Escalonamento ====================
   // Note: Table creation and seeding is handled by ensureEscalationRulesTable() above
 
