@@ -4553,6 +4553,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "CXCS": {
           titulo: "ANALISTA DE CX",
           escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "ANALISTA DE COMUNICAÇÃO": {
+          titulo: "ANALISTA DE COMUNICAÇÃO",
+          escopo: "roteirizar vídeos UGC que sejam autênticos, criativos e impactantes para as marcas que trabalhamos; colaborar com as equipes de Social Media e Performance para garantir que o conteúdo gerado não apenas engaje, mas também converta de forma eficaz; criar copy criativa que se destaque e gere conversões reais, aplicando técnicas de storytelling para gerar conexão genuína com o público; estar sempre atualizado sobre novas tendências e formatos de vídeo, garantindo que seus conteúdos não fiquem para trás; colaborar com grandes marcas, entendendo suas necessidades e entregando resultados concretos, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "G&G": {
+          titulo: "ANALISTA DE GENTE E GESTÃO",
+          escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "GENTE E GESTÃO": {
+          titulo: "ANALISTA DE GENTE E GESTÃO",
+          escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "VIDEOMAKER": {
+          titulo: "VIDEOMAKER",
+          escopo: "editar vídeos corporativos, institucionais e de marketing, aplicando técnicas de edição para criar conteúdo impactante e engajador; implementar efeitos visuais, transições e tratamentos de imagem para elevar a qualidade do material produzido; revisar o trabalho com base no feedback do solicitante; garantir a entrega de vídeos finalizados dentro dos prazos e padrões de qualidade estabelecidos; trazer iniciativas externas de aprimoramento e atualização com base no mercado de edição, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "DESIGNER": {
+          titulo: "DESIGNER",
+          escopo: "desenvolvimento de logotipos, materiais gráficos e layouts para campanhas, incluindo redes sociais, e-mail marketing e peças publicitárias; criação e otimização de peças gráficas para plataformas digitais (site, e-commerce, redes sociais, etc.); colaborar com as equipes de marketing e comunicação para entender as necessidades de design e desenvolver soluções criativas que atendam às demandas; manter-se atualizado sobre as últimas tendências e ferramentas de design e edição de vídeos, com foco na criação de conteúdo visual impactante; elaborar apresentações para reuniões internas e externas, com layout atrativo e condizente com a identidade visual da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "GESTOR DE PERFORMANCE": {
+          titulo: "GESTOR DE PERFORMANCE",
+          escopo: "construir campanhas e atuar de forma tática na otimização de mídias; acompanhamento da jornada do cliente junto ao time de CX/CS; auxiliar na criação, implementação e otimização de campanhas em Google Ads e Meta Ads; desenvolver análises rotineiras para identificar padrões de otimização e reportar insights aos stakeholders; monitorar a performance das campanhas e gerar relatórios para análise; colaborar com a equipe para desenvolver estratégias que aumentem a eficácia das campanhas; acompanhar tendências do mercado e aplicar boas práticas em campanhas digitais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "PRÉ-VENDAS": {
+          titulo: "ANALISTA DE PRÉ-VENDAS",
+          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "SDR": {
+          titulo: "ANALISTA DE PRÉ-VENDAS",
+          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "BDR": {
+          titulo: "ANALISTA DE PRÉ-VENDAS",
+          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
@@ -4983,6 +5019,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "CXCS": {
           titulo: "ANALISTA DE CX",
           escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "ANALISTA DE COMUNICAÇÃO": {
+          titulo: "ANALISTA DE COMUNICAÇÃO",
+          escopo: "roteirizar vídeos UGC que sejam autênticos, criativos e impactantes para as marcas que trabalhamos; colaborar com as equipes de Social Media e Performance para garantir que o conteúdo gerado não apenas engaje, mas também converta de forma eficaz; criar copy criativa que se destaque e gere conversões reais, aplicando técnicas de storytelling para gerar conexão genuína com o público; estar sempre atualizado sobre novas tendências e formatos de vídeo, garantindo que seus conteúdos não fiquem para trás; colaborar com grandes marcas, entendendo suas necessidades e entregando resultados concretos, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "G&G": {
+          titulo: "ANALISTA DE GENTE E GESTÃO",
+          escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "GENTE E GESTÃO": {
+          titulo: "ANALISTA DE GENTE E GESTÃO",
+          escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "VIDEOMAKER": {
+          titulo: "VIDEOMAKER",
+          escopo: "editar vídeos corporativos, institucionais e de marketing, aplicando técnicas de edição para criar conteúdo impactante e engajador; implementar efeitos visuais, transições e tratamentos de imagem para elevar a qualidade do material produzido; revisar o trabalho com base no feedback do solicitante; garantir a entrega de vídeos finalizados dentro dos prazos e padrões de qualidade estabelecidos; trazer iniciativas externas de aprimoramento e atualização com base no mercado de edição, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "DESIGNER": {
+          titulo: "DESIGNER",
+          escopo: "desenvolvimento de logotipos, materiais gráficos e layouts para campanhas, incluindo redes sociais, e-mail marketing e peças publicitárias; criação e otimização de peças gráficas para plataformas digitais (site, e-commerce, redes sociais, etc.); colaborar com as equipes de marketing e comunicação para entender as necessidades de design e desenvolver soluções criativas que atendam às demandas; manter-se atualizado sobre as últimas tendências e ferramentas de design e edição de vídeos, com foco na criação de conteúdo visual impactante; elaborar apresentações para reuniões internas e externas, com layout atrativo e condizente com a identidade visual da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "GESTOR DE PERFORMANCE": {
+          titulo: "GESTOR DE PERFORMANCE",
+          escopo: "construir campanhas e atuar de forma tática na otimização de mídias; acompanhamento da jornada do cliente junto ao time de CX/CS; auxiliar na criação, implementação e otimização de campanhas em Google Ads e Meta Ads; desenvolver análises rotineiras para identificar padrões de otimização e reportar insights aos stakeholders; monitorar a performance das campanhas e gerar relatórios para análise; colaborar com a equipe para desenvolver estratégias que aumentem a eficácia das campanhas; acompanhar tendências do mercado e aplicar boas práticas em campanhas digitais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "PRÉ-VENDAS": {
+          titulo: "ANALISTA DE PRÉ-VENDAS",
+          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "SDR": {
+          titulo: "ANALISTA DE PRÉ-VENDAS",
+          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "BDR": {
+          titulo: "ANALISTA DE PRÉ-VENDAS",
+          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
         }
       };
       
