@@ -4994,15 +4994,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(0.8);
 
       // CLÁUSULA DÉCIMA SEGUNDA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS');
+      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE');
       doc.moveDown(0.3);
       doc.font('Helvetica').fontSize(9).text('12.1. A CONTRATANTE poderá disponibilizar, em regime de comodato, um computador de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.');
       doc.moveDown(0.3);
-      doc.text('12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado.');
+      doc.text('12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado, abstendo-se de utilizá-lo para fins pessoais, atividades não relacionadas ao presente contrato, ou por terceiros.');
       doc.moveDown(0.3);
-      doc.text('12.3. A CONTRATADA será responsável integral por qualquer dano, perda, extravio, furto, roubo ou mau uso do equipamento.');
+      doc.text('12.3. A CONTRATADA será responsável integral por qualquer dano, perda, extravio, furto, roubo ou mau uso do equipamento, independentemente de culpa, obrigando-se a arcar com os custos de reparação ou substituição integral do bem, conforme orçamento técnico indicado pela CONTRATANTE.');
       doc.moveDown(0.3);
-      doc.text('12.4. O equipamento deverá ser devolvido à CONTRATANTE no ato de rescisão do contrato, em perfeito estado de funcionamento e conservação.');
+      doc.text('12.4. Em caso de dano parcial, a CONTRATADA deverá restituir à CONTRATANTE o valor referente ao reparo, no prazo máximo de 30 (trinta) dias após a notificação escrita.');
+      doc.moveDown(0.3);
+      doc.text('12.5. Em caso de perda total, extravio, furto ou roubo, a CONTRATADA deverá indenizar a CONTRATANTE com base no valor de mercado atualizado do bem à época do evento, conforme cotação de revendedor autorizado ou nota fiscal de aquisição, o que for mais benéfico à CONTRATANTE.');
+      doc.moveDown(0.3);
+      doc.text('12.6. O equipamento deverá ser devolvido à CONTRATANTE no ato de rescisão do contrato, em perfeito estado de funcionamento e conservação, ressalvado o desgaste natural decorrente do uso regular.');
+      doc.moveDown(0.3);
+      doc.text('12.7. A CONTRATANTE poderá, a qualquer tempo, solicitar a devolução imediata do equipamento, cabendo à CONTRATADA o cumprimento imediato da solicitação.');
+      doc.moveDown(0.3);
+      doc.text('12.8. O inadimplemento das obrigações previstas nesta cláusula autoriza a CONTRATANTE a reter valores devidos à CONTRATADA até o limite da indenização cabível, sem prejuízo das demais medidas legais e contratuais aplicáveis.');
       doc.moveDown(0.8);
 
       // CLÁUSULA DÉCIMA TERCEIRA
@@ -5569,15 +5577,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       doc.moveDown(0.8);
 
       // CLÁUSULA DÉCIMA SEGUNDA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS');
+      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE');
       doc.moveDown(0.3);
       doc.font('Helvetica').fontSize(9).text('12.1. A CONTRATANTE poderá disponibilizar, em regime de comodato, um computador de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.');
       doc.moveDown(0.3);
-      doc.text('12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado.');
+      doc.text('12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado, abstendo-se de utilizá-lo para fins pessoais, atividades não relacionadas ao presente contrato, ou por terceiros.');
       doc.moveDown(0.3);
-      doc.text('12.3. A CONTRATADA será responsável integral por qualquer dano, perda, extravio, furto, roubo ou mau uso do equipamento.');
+      doc.text('12.3. A CONTRATADA será responsável integral por qualquer dano, perda, extravio, furto, roubo ou mau uso do equipamento, independentemente de culpa, obrigando-se a arcar com os custos de reparação ou substituição integral do bem, conforme orçamento técnico indicado pela CONTRATANTE.');
       doc.moveDown(0.3);
-      doc.text('12.4. O equipamento deverá ser devolvido à CONTRATANTE no ato de rescisão do contrato, em perfeito estado de funcionamento e conservação.');
+      doc.text('12.4. Em caso de dano parcial, a CONTRATADA deverá restituir à CONTRATANTE o valor referente ao reparo, no prazo máximo de 30 (trinta) dias após a notificação escrita.');
+      doc.moveDown(0.3);
+      doc.text('12.5. Em caso de perda total, extravio, furto ou roubo, a CONTRATADA deverá indenizar a CONTRATANTE com base no valor de mercado atualizado do bem à época do evento, conforme cotação de revendedor autorizado ou nota fiscal de aquisição, o que for mais benéfico à CONTRATANTE.');
+      doc.moveDown(0.3);
+      doc.text('12.6. O equipamento deverá ser devolvido à CONTRATANTE no ato de rescisão do contrato, em perfeito estado de funcionamento e conservação, ressalvado o desgaste natural decorrente do uso regular.');
+      doc.moveDown(0.3);
+      doc.text('12.7. A CONTRATANTE poderá, a qualquer tempo, solicitar a devolução imediata do equipamento, cabendo à CONTRATADA o cumprimento imediato da solicitação.');
+      doc.moveDown(0.3);
+      doc.text('12.8. O inadimplemento das obrigações previstas nesta cláusula autoriza a CONTRATANTE a reter valores devidos à CONTRATADA até o limite da indenização cabível, sem prejuízo das demais medidas legais e contratuais aplicáveis.');
       doc.moveDown(0.8);
 
       // CLÁUSULA DÉCIMA TERCEIRA
