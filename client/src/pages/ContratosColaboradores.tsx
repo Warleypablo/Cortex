@@ -19,7 +19,11 @@ import {
   Printer,
   Send,
   Loader2,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -34,6 +38,17 @@ interface Colaborador {
   setor: string | null;
   admissao: string | null;
   email: string | null;
+}
+
+interface ContratoStatus {
+  id: number;
+  colaborador_id: number;
+  colaborador_nome: string;
+  colaborador_email: string | null;
+  documento_id: string | null;
+  status: string;
+  data_envio: string;
+  data_assinatura: string | null;
 }
 
 // Mapeamento de escopos por cargo - cada cargo tem seu escopo específico para cláusulas 1.1 e 1.1.1
@@ -374,6 +389,24 @@ export default function ContratosColaboradores() {
 
   const colaboradores = data?.colaboradores || [];
 
+  // Query para buscar status dos contratos
+  const { data: statusData } = useQuery<ContratoStatus[]>({
+    queryKey: ["/api/juridico/colaboradores-contrato/status"],
+  });
+
+  // Mapa de status por colaborador_id (pega o mais recente)
+  const statusPorColaborador = useMemo(() => {
+    const map = new Map<number, ContratoStatus>();
+    if (statusData) {
+      for (const status of statusData) {
+        if (!map.has(status.colaborador_id)) {
+          map.set(status.colaborador_id, status);
+        }
+      }
+    }
+    return map;
+  }, [statusData]);
+
   const enviarAssinaturaMutation = useMutation({
     mutationFn: async (id: number) => {
       return await apiRequest('POST', `/api/juridico/colaboradores-contrato/${id}/enviar-assinatura`);
@@ -383,11 +416,36 @@ export default function ContratosColaboradores() {
         title: "Contrato enviado para assinatura", 
         description: data.emailEnviado ? `Email enviado para: ${data.emailEnviado}` : "Contrato enviado com sucesso"
       });
+      // Invalidar cache de status
+      queryClient.invalidateQueries({ queryKey: ["/api/juridico/colaboradores-contrato/status"] });
     },
     onError: (error: any) => {
       toast({ 
         title: "Erro ao enviar para assinatura", 
         description: error.message || "Verifique se o colaborador possui email cadastrado",
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Mutação para marcar contrato como assinado
+  const marcarAssinadoMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest('PATCH', `/api/juridico/colaboradores-contrato/${id}/status`, {
+        status: 'Assinado'
+      });
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Status atualizado", 
+        description: "Contrato marcado como assinado"
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/juridico/colaboradores-contrato/status"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro ao atualizar status", 
+        description: error.message || "Não foi possível atualizar o status",
         variant: "destructive"
       });
     },
@@ -584,34 +642,68 @@ export default function ContratosColaboradores() {
                   Nenhum colaborador encontrado
                 </p>
               ) : (
-                filteredColaboradores.map((colaborador) => (
-                  <div
-                    key={colaborador.id}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors hover-elevate ${
-                      selectedColaborador?.id === colaborador.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border"
-                    }`}
-                    onClick={() => {
-                      setSelectedColaborador(colaborador);
-                      setShowPreview(true);
-                    }}
-                    data-testid={`card-colaborador-${colaborador.id}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{colaborador.nome}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {colaborador.cargo || "Cargo não informado"}
-                        </p>
-                      </div>
-                      <div className="text-right text-sm text-muted-foreground">
-                        <p>{colaborador.cnpj || colaborador.cpf || "-"}</p>
-                        <p>{colaborador.setor || "-"}</p>
+                filteredColaboradores.map((colaborador) => {
+                  const contratoStatus = statusPorColaborador.get(colaborador.id);
+                  
+                  // Renderizar badge baseado no status real
+                  const renderStatusBadge = () => {
+                    if (!contratoStatus) return null;
+                    
+                    if (contratoStatus.status === 'Assinado') {
+                      return (
+                        <Badge className="text-xs bg-green-600 hover:bg-green-700">
+                          <CheckCircle2 className="w-3 h-3 mr-1" /> Assinado
+                        </Badge>
+                      );
+                    }
+                    
+                    if (contratoStatus.status === 'Enviado para assinatura') {
+                      return (
+                        <Badge variant="secondary" className="text-xs bg-amber-500 hover:bg-amber-600 text-white">
+                          <Clock className="w-3 h-3 mr-1" /> Enviado
+                        </Badge>
+                      );
+                    }
+                    
+                    // Fallback para outros status desconhecidos
+                    return (
+                      <Badge variant="outline" className="text-xs">
+                        {contratoStatus.status}
+                      </Badge>
+                    );
+                  };
+                  
+                  return (
+                    <div
+                      key={colaborador.id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors hover-elevate ${
+                        selectedColaborador?.id === colaborador.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border"
+                      }`}
+                      onClick={() => {
+                        setSelectedColaborador(colaborador);
+                        setShowPreview(true);
+                      }}
+                      data-testid={`card-colaborador-${colaborador.id}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{colaborador.nome}</p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {colaborador.cargo || "Cargo não informado"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          {renderStatusBadge()}
+                          <span className="text-xs text-muted-foreground">
+                            {colaborador.setor || "-"}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                }))
               )}
             </div>
           </CardContent>
@@ -658,6 +750,24 @@ export default function ContratosColaboradores() {
                     )}
                     Enviar para Assinatura
                   </Button>
+                  {/* Botão para marcar como assinado (só aparece se já foi enviado) */}
+                  {statusPorColaborador.get(selectedColaborador.id)?.status === 'Enviado para assinatura' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-green-500 text-green-600 hover:bg-green-50"
+                      onClick={() => marcarAssinadoMutation.mutate(selectedColaborador.id)}
+                      disabled={marcarAssinadoMutation.isPending}
+                      data-testid="button-marcar-assinado"
+                    >
+                      {marcarAssinadoMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                      )}
+                      Marcar como Assinado
+                    </Button>
+                  )}
                 </div>
               )}
             </CardTitle>
