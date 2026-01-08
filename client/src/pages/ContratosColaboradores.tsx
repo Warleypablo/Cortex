@@ -703,7 +703,7 @@ export default function ContratosColaboradores() {
                       </div>
                     </div>
                   );
-                }))
+                })
               )}
             </div>
           </CardContent>
