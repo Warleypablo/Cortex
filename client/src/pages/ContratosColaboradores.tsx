@@ -242,9 +242,29 @@ CLÁUSULA DÉCIMA TERCEIRA – DAS DISPOSIÇÕES GERAIS
 
 13.2. O presente contrato é celebrado em caráter irrevogável e irretratável, obrigando as Partes e seus sucessores.
 
-13.3. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato.
+13.3. A tolerância das Partes com relação a inadimplemento ou não cumprimento de qualquer obrigação, cláusula, termo ou condição ora estabelecida não constitui precedente, renúncia a obrigações, emenda ou renovação do contrato, e sim mera liberalidade.
 
-As Partes neste ato declaram que é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital.
+13.4. A declaração de nulidade ou anulação de qualquer dos dispositivos contidos neste instrumento não invalidará suas demais disposições, as quais permanecerão em pleno vigor.
+
+13.5. Não se estabelece, por força deste instrumento, qualquer forma de sociedade, associação, agência, consórcio, participação societária, ou responsabilidade solidária entre as partes.
+
+13.6. O objeto deste contrato não visa proporcionar nenhuma espécie de vantagem fiscal, trabalhista ou previdenciária a qualquer Parte ou a terceiros, e não implica vínculo empregatício entre uma das partes e os funcionários/prepostos da outra, ficando a cargo de cada uma delas a responsabilidade referente aos encargos sociais, tributários, previdenciários e trabalhistas de seus respectivos colaboradores.
+
+13.7. Os tributos (impostos, taxas, emolumentos, contribuições fiscais e parafiscais) que sejam devidos em decorrência direta ou indireta do presente contrato ou de sua execução, serão de exclusiva responsabilidade do contribuinte, conforme definido na norma tributária, autorizadas as retenções legais, sem direito a reembolso.
+
+13.8. O presente CONTRATO é o instrumento que regula todos os direitos e obrigações acordadas entre as Partes, substituindo todo e qualquer CONTRATO ou entendimento previamente realizado pelas Partes.
+
+13.9. Toda e qualquer modificação deste CONTRATO somente poderá ocorrer mediante aditamento, o qual deverá observar, obrigatoriamente, a forma escrita.
+
+13.10. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.
+
+13.11. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato.
+
+13.12. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.
+
+As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Contrato emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil.
+
+Em testemunho do quê, as PARTES assinaram este Memorando em 3 (três) vias contendo os mesmos termos e condições, conjuntamente com 2 (duas) testemunhas.
 
 
 Vitória, {{DATA_ATUAL}}.
