@@ -132,7 +132,8 @@ export interface VisaoGeralMetricas {
   aquisicaoPontualTech: number;
   receitaPontualEntregue: number;
   valorEntreguePontual: number;
-  valorAquisicaoPontual: number;
+  clientesUnicos: number;
+  ticketMedio: number;
   churn: number;
   pausados: number;
 }
@@ -3735,7 +3736,8 @@ export class DbStorage implements IStorage {
         aquisicaoPontualTech: 0,
         receitaPontualEntregue: 0,
         valorEntreguePontual: 0,
-        valorAquisicaoPontual: 0,
+        clientesUnicos: 0,
+        ticketMedio: 0,
         churn: 0,
         pausados: 0,
       };
@@ -3764,44 +3766,6 @@ export class DbStorage implements IStorage {
             ELSE 0 
           END
         ), 0) as aquisicao_mrr,
-        
-        -- Aquisição Pontual: valor_p dos contratos criados no período
-        COALESCE(SUM(
-          CASE 
-            WHEN data_inicio >= ${inicioMes}
-              AND data_inicio <= ${fimMes}
-              AND valorp IS NOT NULL
-              AND valorp > 0
-            THEN valorp::numeric
-            ELSE 0 
-          END
-        ), 0) as aquisicao_pontual,
-        
-        -- Aquisição Pontual Commerce: valor_p dos contratos de Commerce criados no período
-        COALESCE(SUM(
-          CASE 
-            WHEN data_inicio >= ${inicioMes}
-              AND data_inicio <= ${fimMes}
-              AND valorp IS NOT NULL
-              AND valorp > 0
-              AND (LOWER(squad) LIKE '%commerce%' OR LOWER(squad) LIKE '%ecommerce%' OR LOWER(squad) LIKE '%e-commerce%')
-            THEN valorp::numeric
-            ELSE 0 
-          END
-        ), 0) as aquisicao_pontual_commerce,
-        
-        -- Aquisição Pontual Tech: valor_p dos contratos de Tech criados no período
-        COALESCE(SUM(
-          CASE 
-            WHEN data_inicio >= ${inicioMes}
-              AND data_inicio <= ${fimMes}
-              AND valorp IS NOT NULL
-              AND valorp > 0
-              AND (LOWER(squad) LIKE '%tech%' OR LOWER(squad) LIKE '%tecnologia%' OR LOWER(squad) LIKE '%dev%')
-            THEN valorp::numeric
-            ELSE 0 
-          END
-        ), 0) as aquisicao_pontual_tech,
         
         -- Churn: contratos encerrados no período
         COALESCE(SUM(
@@ -3840,10 +3804,11 @@ export class DbStorage implements IStorage {
           END
         ), 0) as receita_pontual_entregue,
         
-        -- Valor Entregue Pontual: soma de valorp de TODOS os contratos com status = 'entregue'
+        -- Valor Entregue Pontual: soma de valorp com data_pontual_entregue no ano atual
         COALESCE(SUM(
           CASE 
-            WHEN LOWER(status) = 'entregue'
+            WHEN data_pontual_entregue IS NOT NULL
+              AND EXTRACT(YEAR FROM data_pontual_entregue) = EXTRACT(YEAR FROM CURRENT_DATE)
               AND valorp IS NOT NULL
               AND valorp > 0
             THEN valorp::numeric
@@ -3851,45 +3816,54 @@ export class DbStorage implements IStorage {
           END
         ), 0) as valor_entregue_pontual,
         
-        -- Valor Aquisição Pontual: soma de valorp de contratos com status = 'entregue' E data_inicio no mês atual
-        COALESCE(SUM(
-          CASE 
-            WHEN LOWER(status) = 'entregue'
-              AND data_inicio >= ${inicioMes}
-              AND data_inicio <= ${fimMes}
-              AND valorp IS NOT NULL
-              AND valorp > 0
-            THEN valorp::numeric
-            ELSE 0 
+        -- Clientes únicos (CNPJs) para cálculo do ticket médio
+        COUNT(DISTINCT CASE 
+            WHEN status IN ('ativo', 'onboarding', 'triagem')
+              AND cnpj IS NOT NULL
+            THEN cnpj
+            ELSE NULL 
           END
-        ), 0) as valor_aquisicao_pontual
+        ) as clientes_unicos
       FROM ${schema.cupContratos}
+    `);
+
+    // Query para Aquisição Pontual - usando crm_deal igual à área comercial
+    const aquisicaoPontualQuery = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(valor_pontual), 0) as aquisicao_pontual_crm
+      FROM crm_deal
+      WHERE stage_name = 'Negócio Ganho'
+        AND data_fechamento >= ${inicioMes}
+        AND data_fechamento <= ${fimMes}
+        AND valor_pontual IS NOT NULL
+        AND valor_pontual > 0
     `);
 
     const mrrRow = mrrQuery.rows[0] as any;
     const transRow = transicoesQuery.rows[0] as any;
+    const aquisicaoPontualRow = aquisicaoPontualQuery.rows[0] as any;
 
     const mrr = parseFloat(mrrRow.mrr || '0');
     const aquisicaoMrr = parseFloat(transRow.aquisicao_mrr || '0');
-    const aquisicaoPontual = parseFloat(transRow.aquisicao_pontual || '0');
-    const aquisicaoPontualCommerce = parseFloat(transRow.aquisicao_pontual_commerce || '0');
-    const aquisicaoPontualTech = parseFloat(transRow.aquisicao_pontual_tech || '0');
+    const aquisicaoPontual = parseFloat(aquisicaoPontualRow.aquisicao_pontual_crm || '0');
     const churn = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
     const receitaPontualEntregue = parseFloat(transRow.receita_pontual_entregue || '0');
     const valorEntreguePontual = parseFloat(transRow.valor_entregue_pontual || '0');
-    const valorAquisicaoPontual = parseFloat(transRow.valor_aquisicao_pontual || '0');
+    const clientesUnicos = parseInt(transRow.clientes_unicos || '0');
+    const ticketMedio = clientesUnicos > 0 ? mrr / clientesUnicos : 0;
 
     return {
       receitaTotal: mrr + aquisicaoPontual,
       mrr,
       aquisicaoMrr,
       aquisicaoPontual,
-      aquisicaoPontualCommerce,
-      aquisicaoPontualTech,
+      aquisicaoPontualCommerce: 0,
+      aquisicaoPontualTech: 0,
       receitaPontualEntregue,
       valorEntreguePontual,
-      valorAquisicaoPontual,
+      clientesUnicos,
+      ticketMedio,
       churn,
       pausados,
     };
