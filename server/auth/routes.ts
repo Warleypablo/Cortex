@@ -33,6 +33,7 @@ router.get("/auth/google", (req, res, next) => {
   console.log("🚀 Iniciando autenticação Google OAuth...");
   passport.authenticate("google", {
     scope: ["profile", "email"],
+    prompt: "select_account",
   })(req, res, next);
 });
 
@@ -86,7 +87,15 @@ router.post("/auth/logout", (req, res) => {
     if (err) {
       return res.status(500).json({ message: "Logout failed" });
     }
-    res.json({ message: "Logged out successfully" });
+    // Destroi a sessão completamente para evitar cache de login
+    req.session.destroy((destroyErr) => {
+      if (destroyErr) {
+        console.error("Erro ao destruir sessão:", destroyErr);
+      }
+      // Limpa o cookie de sessão
+      res.clearCookie('connect.sid', { path: '/' });
+      res.json({ message: "Logged out successfully" });
+    });
   });
 });
 
