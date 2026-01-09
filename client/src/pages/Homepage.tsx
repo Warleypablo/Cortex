@@ -455,7 +455,8 @@ function DashboardAdmin() {
     aquisicaoPontualCommerce: number;
     aquisicaoPontualTech: number;
     valorEntreguePontual: number;
-    valorAquisicaoPontual: number;
+    clientesUnicos: number;
+    ticketMedio: number;
     churn: number;
     pausados: number;
   }>({
@@ -500,15 +501,15 @@ function DashboardAdmin() {
   const aquisicaoPontualCommerce = visaoGeralData?.aquisicaoPontualCommerce || 0;
   const aquisicaoPontualTech = visaoGeralData?.aquisicaoPontualTech || 0;
   const valorEntreguePontual = visaoGeralData?.valorEntreguePontual || 0;
-  const valorAquisicaoPontual = visaoGeralData?.valorAquisicaoPontual || 0;
+  const clientesUnicos = visaoGeralData?.clientesUnicos || 0;
+  const ticketMedio = visaoGeralData?.ticketMedio || 0;
   const churn = visaoGeralData?.churn || 0;
   
   const churnPercent = mrrTotal > 0 ? (churn / mrrTotal) * 100 : 0;
   
   // Dados globais da empresa (todos os contratos/clientes ativos)
   const empresaContratosAtivos = homeOverview?.empresaContratosAtivos || 0;
-  const empresaClientesAtivos = homeOverview?.empresaClientesAtivos || 0;
-  const ticketMedio = empresaClientesAtivos > 0 ? mrrTotal / empresaClientesAtivos : 0;
+  const empresaClientesAtivos = clientesUnicos || homeOverview?.empresaClientesAtivos || 0;
   const mrrVariacao = homeOverview?.mrrVariacao || 0;
   const ticketMedioVariacao = homeOverview?.ticketMedioVariacao || 0;
 
@@ -556,11 +557,11 @@ function DashboardAdmin() {
     },
     {
       title: "Aquisição Pontual",
-      subtitle: "Novos pontuais entregues no mês",
-      value: formatCurrency(valorAquisicaoPontual),
+      subtitle: "Vendas pontuais fechadas no mês",
+      value: formatCurrency(aquisicaoPontual),
       icon: Target,
       badge: undefined,
-      href: "/visao-geral",
+      href: "/dashboard/comercial/closers",
     },
     {
       title: "Churn",
