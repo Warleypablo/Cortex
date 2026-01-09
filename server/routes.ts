@@ -4737,6 +4737,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "JURIDICO": {
           titulo: "JURÍDICO",
           escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "DESENVOLVEDOR": {
+          titulo: "DESENVOLVEDOR",
+          escopo: "prestar à CONTRATANTE serviços técnicos especializados de desenvolvimento de software voltados a e-commerces na plataforma Shopify, abrangendo, de forma ampla e não exaustiva, a criação, customização, manutenção, correção, evolução e otimização de lojas virtuais, temas, funcionalidades, integrações, automações, APIs e aplicações relacionadas, bem como suporte técnico, ajustes de performance, segurança, conformidade técnica e boas práticas de desenvolvimento, de acordo com as demandas definidas pela CONTRATANTE, utilizando-se das tecnologias, recursos e padrões aplicáveis ao ecossistema Shopify, comprometendo-se a executar os serviços com diligência, qualidade técnica e observância às normas legais e contratuais vigentes"
         }
       };
       
@@ -5371,6 +5375,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         "JURIDICO": {
           titulo: "JURÍDICO",
           escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+        },
+        "DESENVOLVEDOR": {
+          titulo: "DESENVOLVEDOR",
+          escopo: "prestar à CONTRATANTE serviços técnicos especializados de desenvolvimento de software voltados a e-commerces na plataforma Shopify, abrangendo, de forma ampla e não exaustiva, a criação, customização, manutenção, correção, evolução e otimização de lojas virtuais, temas, funcionalidades, integrações, automações, APIs e aplicações relacionadas, bem como suporte técnico, ajustes de performance, segurança, conformidade técnica e boas práticas de desenvolvimento, de acordo com as demandas definidas pela CONTRATANTE, utilizando-se das tecnologias, recursos e padrões aplicáveis ao ecossistema Shopify, comprometendo-se a executar os serviços com diligência, qualidade técnica e observância às normas legais e contratuais vigentes"
         }
       };
       
