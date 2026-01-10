@@ -9855,24 +9855,35 @@ export class DbStorage implements IStorage {
   }> {
     const dataFimComHora = `${dataFim} 23:59:59`;
     
-    // Lista de operadores: usa mesma lógica híbrida (match direto + fallback)
+    // Lista de operadores: usa valor da PARCELA (não itens) + atribuição via CNPJ -> cup_contratos
+    // CORRIGIDO v4: Não usa mais caz_itensvenda que não tem FK para vendas
     const operadoresResult = await db.execute(sql`
-      WITH contratos_servico AS (
+      WITH parcelas_receita AS (
         SELECT 
-          REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
-          ct.responsavel,
-          LOWER(TRIM(REGEXP_REPLACE(ct.servico, '\s+', ' ', 'g'))) as servico_norm,
-          ct.id_subtask
-        FROM cup_contratos ct
-        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
-        WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
-          AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
-          AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
+          p.id as parcela_id,
+          p.id_cliente,
+          p.valor_pago,
+          p.categoria_nome
+        FROM caz_parcelas p
+        WHERE p.status = 'QUITADO'
+          AND p.tipo_evento = 'RECEITA'
+          AND p.data_quitacao >= ${dataInicio}::date
+          AND p.data_quitacao <= ${dataFimComHora}::timestamp
+          AND p.valor_pago IS NOT NULL
+          AND p.valor_pago::numeric > 0
+      ),
+      parcelas_com_cliente AS (
+        SELECT 
+          pr.*,
+          caz.nome as cliente_nome,
+          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+        FROM parcelas_receita pr
+        LEFT JOIN caz_clientes caz ON TRIM(pr.id_cliente::text) = TRIM(caz.ids::text)
       ),
       contrato_mais_recente AS (
         SELECT DISTINCT ON (cnpj_limpo)
           cnpj_limpo,
-          responsavel as fallback_responsavel
+          responsavel
         FROM (
           SELECT 
             REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
@@ -9885,68 +9896,13 @@ export class DbStorage implements IStorage {
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
-      itens_vendidos AS (
-        SELECT 
-          p.id as parcela_id,
-          p.id_cliente,
-          LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm
-        FROM caz_parcelas p
-        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
-        WHERE p.status = 'QUITADO'
-          AND p.tipo_evento = 'RECEITA'
-          AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFimComHora}::timestamp
-          AND iv.valor IS NOT NULL
-          AND iv.valor::numeric > 0
-      ),
-      itens_com_cliente AS (
-        SELECT 
-          iv.*,
-          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-        FROM itens_vendidos iv
-        LEFT JOIN caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
-      ),
-      itens_ranked AS (
-        SELECT 
-          ic.*,
-          cs.responsavel,
-          CASE
-            WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 90
-            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 85
-            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 70
-            ELSE 0
-          END as match_score,
-          ROW_NUMBER() OVER (
-            PARTITION BY ic.parcela_id, ic.item_nome_norm
-            ORDER BY 
-              CASE
-                WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 90
-                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 85
-                WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 70
-                ELSE 0
-              END DESC,
-              cs.id_subtask DESC NULLS LAST
-          ) as rn
-        FROM itens_com_cliente ic
-        LEFT JOIN contratos_servico cs ON ic.cnpj_limpo = cs.cnpj_limpo
-      ),
       operadores_finais AS (
         SELECT DISTINCT
-          CASE 
-            WHEN ir.match_score >= 70 THEN ir.responsavel
-            WHEN cmr.fallback_responsavel IS NOT NULL THEN cmr.fallback_responsavel
-            ELSE NULL
-          END as operador
-        FROM itens_ranked ir
-        LEFT JOIN contrato_mais_recente cmr ON ir.cnpj_limpo = cmr.cnpj_limpo
-        WHERE ir.rn = 1
+          COALESCE(cmr.responsavel, 'Sem Operador') as operador
+        FROM parcelas_com_cliente pc
+        LEFT JOIN contrato_mais_recente cmr ON pc.cnpj_limpo = cmr.cnpj_limpo
       )
-      SELECT COALESCE(NULLIF(TRIM(operador), ''), 'Sem Operador') as operador 
-      FROM operadores_finais 
-      ORDER BY operador
+      SELECT operador FROM operadores_finais ORDER BY operador
     `);
     
     const operadores = operadoresResult.rows.map((r: any) => r.operador);
@@ -9956,33 +9912,42 @@ export class DbStorage implements IStorage {
       ? sql`AND COALESCE(NULLIF(TRIM(responsavel_final), ''), 'Sem Operador') = ${operador}`
       : sql``;
     
-    // Query CORRIGIDA v3: Usa valor do ITEM + FALLBACK para contrato mais recente
-    // Se item não faz match direto, usa operador do contrato mais recente do cliente
+    // Query CORRIGIDA v4: Usa VALOR_PAGO da PARCELA diretamente (não caz_itensvenda)
+    // Atribuição ao operador via CNPJ do cliente -> cup_contratos.responsavel
     // Isso garante 100% de cobertura sem perder receita
     const receitasResult = await db.execute(sql`
-      WITH contratos_servico AS (
+      WITH parcelas_receita AS (
         SELECT 
-          REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
-          ct.responsavel,
-          ct.servico,
-          LOWER(TRIM(REGEXP_REPLACE(ct.servico, '\s+', ' ', 'g'))) as servico_norm,
-          ct.id_subtask
-        FROM cup_contratos ct
-        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
-        WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
-          AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
-          AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
+          p.id as parcela_id,
+          p.id_cliente,
+          p.categoria_id,
+          p.categoria_nome,
+          p.descricao as servico_nome,
+          p.valor_pago::numeric as valor
+        FROM caz_parcelas p
+        WHERE p.status = 'QUITADO'
+          AND p.tipo_evento = 'RECEITA'
+          AND p.data_quitacao >= ${dataInicio}::date
+          AND p.data_quitacao <= ${dataFimComHora}::timestamp
+          AND p.valor_pago IS NOT NULL
+          AND p.valor_pago::numeric > 0
+      ),
+      parcelas_com_cliente AS (
+        SELECT 
+          pr.*,
+          caz.nome as cliente_nome,
+          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+        FROM parcelas_receita pr
+        LEFT JOIN caz_clientes caz ON TRIM(pr.id_cliente::text) = TRIM(caz.ids::text)
       ),
       contrato_mais_recente AS (
         SELECT DISTINCT ON (cnpj_limpo)
           cnpj_limpo,
-          responsavel as fallback_responsavel,
-          servico as fallback_servico
+          responsavel
         FROM (
           SELECT 
             REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
             ct.responsavel,
-            ct.servico,
             ct.id_subtask
           FROM cup_contratos ct
           INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
@@ -9991,96 +9956,17 @@ export class DbStorage implements IStorage {
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
-      itens_vendidos AS (
-        SELECT 
-          p.id as parcela_id,
-          p.id_cliente,
-          p.categoria_id,
-          p.categoria_nome,
-          iv.nome as item_nome,
-          LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm,
-          iv.valor::numeric as item_valor
-        FROM caz_parcelas p
-        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
-        WHERE p.status = 'QUITADO'
-          AND p.tipo_evento = 'RECEITA'
-          AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFimComHora}::timestamp
-          AND iv.valor IS NOT NULL
-          AND iv.valor::numeric > 0
-      ),
-      itens_com_cliente AS (
-        SELECT 
-          iv.*,
-          caz.nome as cliente_nome,
-          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-        FROM itens_vendidos iv
-        LEFT JOIN caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
-      ),
-      itens_ranked AS (
-        SELECT 
-          ic.*,
-          cs.responsavel,
-          cs.servico as servico_contrato,
-          CASE
-            WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 90
-            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 85
-            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 70
-            ELSE 0
-          END as match_score,
-          ROW_NUMBER() OVER (
-            PARTITION BY ic.parcela_id, ic.item_nome
-            ORDER BY 
-              CASE
-                WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 90
-                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 85
-                WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 70
-                ELSE 0
-              END DESC,
-              cs.id_subtask DESC NULLS LAST
-          ) as rn
-        FROM itens_com_cliente ic
-        LEFT JOIN contratos_servico cs ON ic.cnpj_limpo = cs.cnpj_limpo
-      ),
-      match_result AS (
-        SELECT 
-          ir.categoria_id,
-          ir.categoria_nome,
-          ir.cliente_nome,
-          ir.item_nome,
-          ir.item_valor,
-          ir.parcela_id,
-          ir.cnpj_limpo,
-          ir.match_score,
-          ir.servico_contrato,
-          ir.responsavel,
-          cmr.fallback_responsavel,
-          cmr.fallback_servico
-        FROM itens_ranked ir
-        LEFT JOIN contrato_mais_recente cmr ON ir.cnpj_limpo = cmr.cnpj_limpo
-        WHERE ir.rn = 1
-      ),
       resultado_final AS (
         SELECT 
-          categoria_id,
-          categoria_nome,
-          cliente_nome,
-          item_valor,
-          parcela_id,
-          CASE 
-            WHEN match_score >= 70 THEN servico_contrato
-            WHEN fallback_servico IS NOT NULL THEN item_nome
-            ELSE item_nome
-          END as servico_nome,
-          CASE 
-            WHEN match_score >= 70 THEN responsavel
-            WHEN fallback_responsavel IS NOT NULL THEN fallback_responsavel
-            ELSE NULL
-          END as responsavel_final
-        FROM match_result
+          pc.categoria_id,
+          pc.categoria_nome,
+          pc.cliente_nome,
+          pc.valor,
+          pc.parcela_id,
+          pc.servico_nome,
+          COALESCE(cmr.responsavel, 'Sem Operador') as responsavel_final
+        FROM parcelas_com_cliente pc
+        LEFT JOIN contrato_mais_recente cmr ON pc.cnpj_limpo = cmr.cnpj_limpo
       )
       SELECT 
         COALESCE(categoria_id, 'SEM_CATEGORIA') as categoria_id,
@@ -10088,7 +9974,7 @@ export class DbStorage implements IStorage {
         COALESCE(cliente_nome, 'Cliente não identificado') as cliente_nome,
         COALESCE(servico_nome, 'Serviço não identificado') as servico_nome,
         COALESCE(NULLIF(TRIM(responsavel_final), ''), 'Sem Operador') as responsavel,
-        SUM(item_valor) as valor_total,
+        SUM(valor) as valor_total,
         COUNT(DISTINCT parcela_id) as quantidade_parcelas
       FROM resultado_final
       WHERE 1=1
