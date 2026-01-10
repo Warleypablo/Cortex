@@ -983,6 +983,30 @@ export type FinanceiroContaBancaria = {
   empresa: string;
 };
 
+export type MargemClienteItem = {
+  cnpj: string;
+  nomeCliente: string;
+  receita: number;
+  despesaSalarioRateado: number;
+  despesaFreelancers: number;
+  despesaOperacional: number;
+  despesaTotal: number;
+  margem: number;
+  margemPercentual: number;
+};
+
+export type MargemClienteResumo = {
+  totalClientes: number;
+  totalReceita: number;
+  totalDespesaSalarios: number;
+  totalDespesaFreelancers: number;
+  totalDespesaOperacional: number;
+  totalDespesa: number;
+  totalMargem: number;
+  margemMediaPercentual: number;
+  clientes: MargemClienteItem[];
+};
+
 // OKR 2026 Tables
 export const metricTargetsMonthly = pgTable("metric_targets_monthly", {
   id: serial("id").primaryKey(),
