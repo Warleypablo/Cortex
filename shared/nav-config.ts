@@ -23,6 +23,7 @@ export const PERMISSION_KEYS = {
     AUDITORIA: 'fin.auditoria',
     CONTRIBUICAO_COLABORADOR: 'fin.contribuicao_colaborador',
     CONTRIBUICAO_OPERADOR: 'fin.contribuicao_operador',
+    MARGEM_CLIENTE: 'fin.margem_cliente',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -170,6 +171,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/auditoria-sistemas': PERMISSION_KEYS.FIN.AUDITORIA,
   '/dashboard/contribuicao-colaborador': PERMISSION_KEYS.FIN.CONTRIBUICAO_COLABORADOR,
   '/dashboard/contribuicao-operador': PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR,
+  '/dashboard/margem-cliente': PERMISSION_KEYS.FIN.MARGEM_CLIENTE,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/retencao': PERMISSION_KEYS.GESTAO.RETENCAO,
@@ -326,6 +328,7 @@ export const NAV_CONFIG = {
         { title: 'Auditoria de Sistemas', url: '/dashboard/auditoria-sistemas', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.FIN.AUDITORIA },
         { title: 'Contribuição por Colaborador', url: '/dashboard/contribuicao-colaborador', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_COLABORADOR },
         { title: 'Contribuição por Operador', url: '/dashboard/contribuicao-operador', icon: 'UserCog', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR },
+        { title: 'Margem por Cliente', url: '/dashboard/margem-cliente', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.FIN.MARGEM_CLIENTE },
       ],
     },
     {
