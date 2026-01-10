@@ -1,11 +1,11 @@
 /**
  * Maintenance Window Module
- * Blocks database operations during the daily sync window (13:00-14:00 BRT)
+ * Blocks database operations during the daily sync window (12:00-13:00 BRT)
  */
 
-const MAINTENANCE_START_HOUR = 13;
+const MAINTENANCE_START_HOUR = 12;
 const MAINTENANCE_START_MINUTE = 0;
-const MAINTENANCE_END_HOUR = 14;
+const MAINTENANCE_END_HOUR = 13;
 const MAINTENANCE_END_MINUTE = 0;
 const TIMEZONE = "America/Sao_Paulo";
 
