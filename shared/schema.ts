@@ -983,6 +983,12 @@ export type FinanceiroContaBancaria = {
   empresa: string;
 };
 
+export type MargemDetalhe = {
+  descricao: string;
+  valor: number;
+  categoria?: string;
+};
+
 export type MargemClienteItem = {
   cnpj: string;
   nomeCliente: string;
@@ -993,6 +999,8 @@ export type MargemClienteItem = {
   despesaTotal: number;
   margem: number;
   margemPercentual: number;
+  receitaDetalhes: MargemDetalhe[];
+  freelancerDetalhes: MargemDetalhe[];
 };
 
 export type MargemClienteResumo = {
