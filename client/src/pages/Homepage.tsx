@@ -894,6 +894,12 @@ function DashboardFinanceiro() {
             href="/dashboard/dfc"
             icon={<BarChart3 className="w-5 h-5" />}
           />
+          <QuickLinkCard
+            title="Margem por Cliente"
+            description="Rentabilidade por cliente"
+            href="/dashboard/margem-cliente"
+            icon={<TrendingUp className="w-5 h-5" />}
+          />
         </div>
       </div>
     </div>

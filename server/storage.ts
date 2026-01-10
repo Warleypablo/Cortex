@@ -10419,6 +10419,141 @@ export class DbStorage implements IStorage {
       salario: row.salario,
     }));
   }
+
+  // ==================== MARGEM POR CLIENTE ====================
+  async getMargemPorCliente(mesAno?: string): Promise<import("@shared/schema").MargemClienteResumo> {
+    const hoje = new Date();
+    let mesAtual: string;
+    
+    if (mesAno) {
+      mesAtual = mesAno;
+    } else {
+      mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    const result = await db.execute(sql`
+      WITH clientes_ativos AS (
+        SELECT 
+          REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+          nome,
+          cnpj as cnpj_original
+        FROM cup_clientes
+        WHERE LOWER(status) = 'ativo'
+          AND cnpj IS NOT NULL 
+          AND TRIM(cnpj) != ''
+      ),
+      total_clientes AS (
+        SELECT COUNT(*) as total FROM clientes_ativos
+      ),
+      salarios_ativos AS (
+        SELECT COALESCE(SUM(salario::numeric), 0) as total_salarios
+        FROM rh_pessoal
+        WHERE status = 'Ativo'
+      ),
+      salario_rateado AS (
+        SELECT 
+          CASE 
+            WHEN tc.total > 0 THEN sa.total_salarios / tc.total
+            ELSE 0
+          END as valor_rateado
+        FROM salarios_ativos sa, total_clientes tc
+      ),
+      receitas_cliente AS (
+        SELECT 
+          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
+          COALESCE(SUM(p.valor_pago::numeric), 0) as receita
+        FROM caz_parcelas p
+        LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        WHERE p.tipo_evento = 'RECEITA'
+          AND p.status = 'QUITADO'
+          AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
+        GROUP BY REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '')
+      ),
+      despesas_freelancer AS (
+        SELECT 
+          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
+          COALESCE(SUM(p.valor_pago::numeric), 0) as despesa
+        FROM caz_parcelas p
+        LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        WHERE p.tipo_evento = 'DESPESA'
+          AND p.status = 'QUITADO'
+          AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
+          AND caz.cnpj IS NOT NULL
+        GROUP BY REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '')
+      ),
+      despesas_operacionais AS (
+        SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
+        FROM caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status = 'QUITADO'
+          AND TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = ${mesAtual}
+          AND categoria_nome LIKE '6%'
+      ),
+      despesa_op_rateada AS (
+        SELECT 
+          CASE 
+            WHEN tc.total > 0 THEN dop.total / tc.total
+            ELSE 0
+          END as valor_rateado
+        FROM despesas_operacionais dop, total_clientes tc
+      )
+      SELECT 
+        ca.cnpj_original as cnpj,
+        ca.nome as nome_cliente,
+        COALESCE(rc.receita, 0) as receita,
+        sr.valor_rateado as despesa_salario,
+        COALESCE(df.despesa, 0) as despesa_freelancer,
+        dor.valor_rateado as despesa_operacional
+      FROM clientes_ativos ca
+      CROSS JOIN salario_rateado sr
+      CROSS JOIN despesa_op_rateada dor
+      LEFT JOIN receitas_cliente rc ON ca.cnpj_limpo = rc.cnpj_limpo
+      LEFT JOIN despesas_freelancer df ON ca.cnpj_limpo = df.cnpj_limpo
+      ORDER BY COALESCE(rc.receita, 0) DESC
+    `);
+
+    const clientes = (result.rows as any[]).map(row => {
+      const receita = parseFloat(row.receita || '0');
+      const despesaSalario = parseFloat(row.despesa_salario || '0');
+      const despesaFreelancer = parseFloat(row.despesa_freelancer || '0');
+      const despesaOperacional = parseFloat(row.despesa_operacional || '0');
+      const despesaTotal = despesaSalario + despesaFreelancer + despesaOperacional;
+      const margem = receita - despesaTotal;
+      const margemPercentual = receita > 0 ? (margem / receita) * 100 : 0;
+
+      return {
+        cnpj: row.cnpj || '',
+        nomeCliente: row.nome_cliente || 'Sem nome',
+        receita,
+        despesaSalarioRateado: despesaSalario,
+        despesaFreelancers: despesaFreelancer,
+        despesaOperacional,
+        despesaTotal,
+        margem,
+        margemPercentual
+      };
+    });
+
+    const totalReceita = clientes.reduce((acc, c) => acc + c.receita, 0);
+    const totalDespesaSalarios = clientes.reduce((acc, c) => acc + c.despesaSalarioRateado, 0);
+    const totalDespesaFreelancers = clientes.reduce((acc, c) => acc + c.despesaFreelancers, 0);
+    const totalDespesaOperacional = clientes.reduce((acc, c) => acc + c.despesaOperacional, 0);
+    const totalDespesa = totalDespesaSalarios + totalDespesaFreelancers + totalDespesaOperacional;
+    const totalMargem = totalReceita - totalDespesa;
+    const margemMediaPercentual = totalReceita > 0 ? (totalMargem / totalReceita) * 100 : 0;
+
+    return {
+      totalClientes: clientes.length,
+      totalReceita,
+      totalDespesaSalarios,
+      totalDespesaFreelancers,
+      totalDespesaOperacional,
+      totalDespesa,
+      totalMargem,
+      margemMediaPercentual,
+      clientes
+    };
+  }
 }
 
 export const storage = new DbStorage();
