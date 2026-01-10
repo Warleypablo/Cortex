@@ -127,78 +127,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/debug-itensvenda-schema", async (req, res) => {
     try {
-      const schemaResult = await db.execute(sql`
-        SELECT column_name, data_type, is_nullable
-        FROM information_schema.columns 
-        WHERE table_name = 'caz_itensvenda'
-        ORDER BY ordinal_position
+      // Venda 7775 dados
+      const venda7775 = await db.execute(sql`
+        SELECT * FROM caz_vendas WHERE numero = 7775 LIMIT 1
       `);
       
-      const vendasSchema = await db.execute(sql`
-        SELECT column_name, data_type, is_nullable
-        FROM information_schema.columns 
-        WHERE table_name = 'caz_vendas'
-        ORDER BY ordinal_position
+      // Tentar encontrar itens que correspondem à venda 7775 pelo id da venda
+      const venda7775Id = (venda7775.rows[0] as any)?.id;
+      
+      // Verificar se existe relação em caz_itensvenda pelo id_item == venda.id
+      const itensVendaPorId = venda7775Id ? await db.execute(sql`
+        SELECT * FROM caz_itensvenda WHERE id_item::text = ${venda7775Id}::text LIMIT 10
+      `) : { rows: [] };
+      
+      // Verificar se existe relação em caz_itensvenda pelo id == venda.id  
+      const itensVendaPorIdPrincipal = venda7775Id ? await db.execute(sql`
+        SELECT * FROM caz_itensvenda WHERE id::text = ${venda7775Id}::text LIMIT 10
+      `) : { rows: [] };
+      
+      // Buscar itens com nome "Social Media" (um dos itens da venda 7775)
+      const itensSocialMedia = await db.execute(sql`
+        SELECT * FROM caz_itensvenda WHERE LOWER(nome) LIKE '%social media%' LIMIT 5
       `);
       
-      const parcelasSchema = await db.execute(sql`
-        SELECT column_name, data_type, is_nullable
+      // Verificar se existem tabelas com FK venda
+      const tabelasComVenda = await db.execute(sql`
+        SELECT table_name, column_name, data_type
         FROM information_schema.columns 
-        WHERE table_name = 'caz_parcelas'
-        ORDER BY ordinal_position
-      `);
-      
-      // Check for any table with venda_id or similar FK
-      const allTables = await db.execute(sql`
-        SELECT table_name, column_name 
-        FROM information_schema.columns 
-        WHERE table_name LIKE 'caz%' 
-          AND (column_name LIKE '%venda%' OR column_name LIKE '%item%')
+        WHERE column_name LIKE '%venda%' AND table_name LIKE 'caz%'
         ORDER BY table_name, column_name
       `);
       
-      // Teste: como parcelas se conectam a receitas?
-      const parcelaSample = await db.execute(sql`
-        SELECT p.id, p.descricao, p.status, p.tipo_evento, p.categoria_nome
-        FROM caz_parcelas p
-        WHERE p.status = 'QUITADO' AND p.tipo_evento = 'RECEITA'
-        LIMIT 5
-      `);
-      
-      // Check caz_vendasbyid structure
-      const vendasbyidSchema = await db.execute(sql`
-        SELECT column_name, data_type, is_nullable
-        FROM information_schema.columns 
-        WHERE table_name = 'caz_vendasbyid'
-        ORDER BY ordinal_position
-      `);
-      
-      // Sample from vendasbyid
-      const vendasbyidSample = await db.execute(sql`
-        SELECT * FROM caz_vendasbyid LIMIT 3
-      `);
-      
-      // Test: how do itensvenda actually relate? Check if id_item relates to something
-      const testeRelacao = await db.execute(sql`
+      // Total de vendas vs itens
+      const stats = await db.execute(sql`
         SELECT 
-          v.id as venda_id, 
-          v.numero as venda_numero,
-          v.total as venda_total,
-          v.itens as venda_itens_desc
-        FROM caz_vendas v
-        WHERE v.numero = 4635
-        LIMIT 1
+          (SELECT COUNT(*) FROM caz_vendas) as total_vendas,
+          (SELECT COUNT(*) FROM caz_itensvenda) as total_itens,
+          (SELECT COUNT(DISTINCT id_item) FROM caz_itensvenda) as itens_distintos
       `);
       
       res.json({
-        caz_itensvenda_columns: schemaResult.rows,
-        caz_vendas_columns: vendasSchema.rows,
-        caz_parcelas_columns: parcelasSchema.rows,
-        all_venda_related_columns: allTables.rows,
-        parcela_samples: parcelaSample.rows,
-        caz_vendasbyid_columns: vendasbyidSchema.rows,
-        vendasbyid_sample: vendasbyidSample.rows,
-        venda_4635: testeRelacao.rows
+        venda_7775: venda7775.rows,
+        venda_7775_id: venda7775Id,
+        itens_por_id_item: itensVendaPorId.rows,
+        itens_por_id_principal: itensVendaPorIdPrincipal.rows,
+        itens_social_media: itensSocialMedia.rows,
+        tabelas_com_venda: tabelasComVenda.rows,
+        stats: stats.rows
       });
     } catch (error) {
       console.error("[debug] Error:", error);
