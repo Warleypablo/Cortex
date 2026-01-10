@@ -2380,6 +2380,150 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Exportar colaboradores em Excel
+  app.get("/api/colaboradores/exportar-excel", async (req, res) => {
+    try {
+      const XLSX = await import("xlsx");
+      
+      // Busca todos os colaboradores diretamente da tabela rh_pessoal
+      const result = await db.execute(sql`
+        SELECT 
+          id,
+          nome,
+          email_turbo,
+          email_pessoal,
+          telefone,
+          cpf,
+          rg,
+          data_nascimento,
+          genero,
+          pcd,
+          estado_civil,
+          nacionalidade,
+          cep,
+          rua,
+          numero,
+          complemento,
+          bairro,
+          cidade,
+          estado,
+          pais,
+          banco,
+          agencia,
+          conta,
+          tipo_conta,
+          pix,
+          data_admissao,
+          data_demissao,
+          cargo,
+          nivel,
+          setor,
+          squad,
+          salario,
+          tipo_contrato,
+          carga_horaria,
+          cnpj_mei,
+          razao_social_mei,
+          status,
+          observacoes,
+          created_at,
+          updated_at,
+          url_foto,
+          ultima_alteracao_cargo,
+          ultimo_aumento
+        FROM rh_pessoal
+        ORDER BY nome
+      `);
+      
+      const colaboradores = result.rows as any[];
+      
+      // Define os nomes das colunas em português
+      const headers = [
+        "ID", "Nome", "Email Turbo", "Email Pessoal", "Telefone", "CPF", "RG",
+        "Data Nascimento", "Gênero", "PCD", "Estado Civil", "Nacionalidade",
+        "CEP", "Rua", "Número", "Complemento", "Bairro", "Cidade", "Estado", "País",
+        "Banco", "Agência", "Conta", "Tipo Conta", "PIX",
+        "Data Admissão", "Data Demissão", "Cargo", "Nível", "Setor", "Squad",
+        "Salário", "Tipo Contrato", "Carga Horária", "CNPJ MEI", "Razão Social MEI",
+        "Status", "Observações", "Criado em", "Atualizado em", "URL Foto",
+        "Última Alteração Cargo", "Último Aumento"
+      ];
+      
+      // Mapeia os dados para formato de array
+      const data = colaboradores.map(c => [
+        c.id,
+        c.nome,
+        c.email_turbo,
+        c.email_pessoal,
+        c.telefone,
+        c.cpf,
+        c.rg,
+        c.data_nascimento ? new Date(c.data_nascimento).toLocaleDateString('pt-BR') : '',
+        c.genero,
+        c.pcd ? 'Sim' : 'Não',
+        c.estado_civil,
+        c.nacionalidade,
+        c.cep,
+        c.rua,
+        c.numero,
+        c.complemento,
+        c.bairro,
+        c.cidade,
+        c.estado,
+        c.pais,
+        c.banco,
+        c.agencia,
+        c.conta,
+        c.tipo_conta,
+        c.pix,
+        c.data_admissao ? new Date(c.data_admissao).toLocaleDateString('pt-BR') : '',
+        c.data_demissao ? new Date(c.data_demissao).toLocaleDateString('pt-BR') : '',
+        c.cargo,
+        c.nivel,
+        c.setor,
+        c.squad,
+        c.salario,
+        c.tipo_contrato,
+        c.carga_horaria,
+        c.cnpj_mei,
+        c.razao_social_mei,
+        c.status,
+        c.observacoes,
+        c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '',
+        c.updated_at ? new Date(c.updated_at).toLocaleDateString('pt-BR') : '',
+        c.url_foto,
+        c.ultima_alteracao_cargo ? new Date(c.ultima_alteracao_cargo).toLocaleDateString('pt-BR') : '',
+        c.ultimo_aumento ? new Date(c.ultimo_aumento).toLocaleDateString('pt-BR') : ''
+      ]);
+      
+      // Adiciona headers no início
+      data.unshift(headers);
+      
+      // Cria a planilha
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      
+      // Define largura das colunas
+      ws['!cols'] = headers.map(() => ({ wch: 20 }));
+      
+      // Cria o workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Colaboradores");
+      
+      // Gera o buffer do Excel
+      const excelBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+      
+      // Define headers de resposta para download
+      const dataAtual = new Date().toISOString().split('T')[0];
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename=colaboradores_${dataAtual}.xlsx`);
+      res.send(excelBuffer);
+      
+    } catch (error) {
+      console.error("[api] Error exporting colaboradores:", error);
+      res.status(500).json({ error: "Falha ao exportar colaboradores" });
+    }
+  });
+
   app.get("/api/colaboradores/by-user/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
