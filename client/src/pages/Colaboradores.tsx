@@ -16,6 +16,12 @@ type ColaboradorComPatrimonios = Colaborador & {
 };
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { z } from "zod";
@@ -2445,16 +2451,22 @@ export default function Colaboradores() {
                   Análise
                 </Button>
               </Link>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  window.open('/api/colaboradores/exportar-excel', '_blank');
-                }}
-                data-testid="button-exportar-colaboradores"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Exportar Excel
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" data-testid="button-exportar-colaboradores">
+                    <Download className="w-4 h-4 mr-2" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => window.open('/api/colaboradores/exportar-excel', '_blank')}>
+                    Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.open('/api/colaboradores/exportar-excel?formato=csv', '_blank')}>
+                    CSV (.csv)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <AddColaboradorDialog />
             </div>
           </div>

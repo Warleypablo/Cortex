@@ -2380,57 +2380,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Exportar colaboradores em Excel
+  // Exportar colaboradores em Excel ou CSV
   app.get("/api/colaboradores/exportar-excel", async (req, res) => {
     try {
+      const formato = req.query.formato as string || 'xlsx';
       const XLSX = await import("xlsx");
       
-      // Busca todos os colaboradores diretamente da tabela rh_pessoal
+      // Busca todos os colaboradores diretamente da tabela rh_pessoal (colunas reais)
       const result = await db.execute(sql`
         SELECT 
           id,
+          status,
           nome,
-          email_turbo,
-          email_pessoal,
-          telefone,
           cpf,
-          rg,
-          data_nascimento,
-          genero,
-          pcd,
-          estado_civil,
-          nacionalidade,
-          cep,
-          rua,
-          numero,
-          complemento,
-          bairro,
-          cidade,
+          endereco,
           estado,
-          pais,
-          banco,
-          agencia,
-          conta,
-          tipo_conta,
-          pix,
-          data_admissao,
-          data_demissao,
-          cargo,
-          nivel,
+          telefone,
+          aniversario,
+          admissao,
+          demissao,
+          tipo_demissao,
+          motivo_demissao,
+          proporcional,
+          proporcional_caju,
           setor,
           squad,
+          cargo,
+          nivel,
+          pix,
+          cnpj,
+          email_turbo,
+          email_pessoal,
+          meses_de_turbo,
+          ultimo_aumento,
+          meses_ult_aumento,
           salario,
-          tipo_contrato,
-          carga_horaria,
-          cnpj_mei,
-          razao_social_mei,
-          status,
-          observacoes,
-          created_at,
-          updated_at,
-          url_foto,
-          ultima_alteracao_cargo,
-          ultimo_aumento
+          user_id
         FROM rh_pessoal
         ORDER BY nome
       `);
@@ -2439,61 +2424,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Define os nomes das colunas em português
       const headers = [
-        "ID", "Nome", "Email Turbo", "Email Pessoal", "Telefone", "CPF", "RG",
-        "Data Nascimento", "Gênero", "PCD", "Estado Civil", "Nacionalidade",
-        "CEP", "Rua", "Número", "Complemento", "Bairro", "Cidade", "Estado", "País",
-        "Banco", "Agência", "Conta", "Tipo Conta", "PIX",
-        "Data Admissão", "Data Demissão", "Cargo", "Nível", "Setor", "Squad",
-        "Salário", "Tipo Contrato", "Carga Horária", "CNPJ MEI", "Razão Social MEI",
-        "Status", "Observações", "Criado em", "Atualizado em", "URL Foto",
-        "Última Alteração Cargo", "Último Aumento"
+        "ID", "Status", "Nome", "CPF", "Endereço", "Estado", "Telefone",
+        "Aniversário", "Admissão", "Demissão", "Tipo Demissão", "Motivo Demissão",
+        "Proporcional", "Proporcional Caju", "Setor", "Squad", "Cargo", "Nível",
+        "PIX", "CNPJ", "Email Turbo", "Email Pessoal", "Meses de Turbo",
+        "Último Aumento", "Meses Últ. Aumento", "Salário", "User ID"
       ];
       
       // Mapeia os dados para formato de array
       const data = colaboradores.map(c => [
         c.id,
+        c.status,
         c.nome,
-        c.email_turbo,
-        c.email_pessoal,
-        c.telefone,
         c.cpf,
-        c.rg,
-        c.data_nascimento ? new Date(c.data_nascimento).toLocaleDateString('pt-BR') : '',
-        c.genero,
-        c.pcd ? 'Sim' : 'Não',
-        c.estado_civil,
-        c.nacionalidade,
-        c.cep,
-        c.rua,
-        c.numero,
-        c.complemento,
-        c.bairro,
-        c.cidade,
+        c.endereco,
         c.estado,
-        c.pais,
-        c.banco,
-        c.agencia,
-        c.conta,
-        c.tipo_conta,
-        c.pix,
-        c.data_admissao ? new Date(c.data_admissao).toLocaleDateString('pt-BR') : '',
-        c.data_demissao ? new Date(c.data_demissao).toLocaleDateString('pt-BR') : '',
-        c.cargo,
-        c.nivel,
+        c.telefone,
+        c.aniversario ? new Date(c.aniversario).toLocaleDateString('pt-BR') : '',
+        c.admissao ? new Date(c.admissao).toLocaleDateString('pt-BR') : '',
+        c.demissao ? new Date(c.demissao).toLocaleDateString('pt-BR') : '',
+        c.tipo_demissao,
+        c.motivo_demissao,
+        c.proporcional,
+        c.proporcional_caju,
         c.setor,
         c.squad,
+        c.cargo,
+        c.nivel,
+        c.pix,
+        c.cnpj,
+        c.email_turbo,
+        c.email_pessoal,
+        c.meses_de_turbo,
+        c.ultimo_aumento ? new Date(c.ultimo_aumento).toLocaleDateString('pt-BR') : '',
+        c.meses_ult_aumento,
         c.salario,
-        c.tipo_contrato,
-        c.carga_horaria,
-        c.cnpj_mei,
-        c.razao_social_mei,
-        c.status,
-        c.observacoes,
-        c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '',
-        c.updated_at ? new Date(c.updated_at).toLocaleDateString('pt-BR') : '',
-        c.url_foto,
-        c.ultima_alteracao_cargo ? new Date(c.ultima_alteracao_cargo).toLocaleDateString('pt-BR') : '',
-        c.ultimo_aumento ? new Date(c.ultimo_aumento).toLocaleDateString('pt-BR') : ''
+        c.user_id
       ]);
       
       // Adiciona headers no início
@@ -2509,14 +2475,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Colaboradores");
       
-      // Gera o buffer do Excel
-      const excelBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-      
-      // Define headers de resposta para download
       const dataAtual = new Date().toISOString().split('T')[0];
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename=colaboradores_${dataAtual}.xlsx`);
-      res.send(excelBuffer);
+      
+      if (formato === 'csv') {
+        // Gera CSV
+        const csvContent = XLSX.utils.sheet_to_csv(ws, { FS: ';' });
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=colaboradores_${dataAtual}.csv`);
+        res.send('\uFEFF' + csvContent); // BOM para UTF-8 no Excel
+      } else {
+        // Gera Excel
+        const excelBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=colaboradores_${dataAtual}.xlsx`);
+        res.send(excelBuffer);
+      }
       
     } catch (error) {
       console.error("[api] Error exporting colaboradores:", error);
