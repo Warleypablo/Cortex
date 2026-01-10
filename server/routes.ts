@@ -125,6 +125,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/debug-itensvenda-schema", async (req, res) => {
+    try {
+      const schemaResult = await db.execute(sql`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns 
+        WHERE table_name = 'caz_itensvenda'
+        ORDER BY ordinal_position
+      `);
+      
+      const vendasSchema = await db.execute(sql`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns 
+        WHERE table_name = 'caz_vendas'
+        ORDER BY ordinal_position
+      `);
+      
+      const parcelasSchema = await db.execute(sql`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns 
+        WHERE table_name = 'caz_parcelas'
+        ORDER BY ordinal_position
+      `);
+      
+      // Check for any table with venda_id or similar FK
+      const allTables = await db.execute(sql`
+        SELECT table_name, column_name 
+        FROM information_schema.columns 
+        WHERE table_name LIKE 'caz%' 
+          AND (column_name LIKE '%venda%' OR column_name LIKE '%item%')
+        ORDER BY table_name, column_name
+      `);
+      
+      // Teste: como parcelas se conectam a receitas?
+      const parcelaSample = await db.execute(sql`
+        SELECT p.id, p.descricao, p.status, p.tipo_evento, p.categoria_nome
+        FROM caz_parcelas p
+        WHERE p.status = 'QUITADO' AND p.tipo_evento = 'RECEITA'
+        LIMIT 5
+      `);
+      
+      // Check caz_vendasbyid structure
+      const vendasbyidSchema = await db.execute(sql`
+        SELECT column_name, data_type, is_nullable
+        FROM information_schema.columns 
+        WHERE table_name = 'caz_vendasbyid'
+        ORDER BY ordinal_position
+      `);
+      
+      // Sample from vendasbyid
+      const vendasbyidSample = await db.execute(sql`
+        SELECT * FROM caz_vendasbyid LIMIT 3
+      `);
+      
+      // Test: how do itensvenda actually relate? Check if id_item relates to something
+      const testeRelacao = await db.execute(sql`
+        SELECT 
+          v.id as venda_id, 
+          v.numero as venda_numero,
+          v.total as venda_total,
+          v.itens as venda_itens_desc
+        FROM caz_vendas v
+        WHERE v.numero = 4635
+        LIMIT 1
+      `);
+      
+      res.json({
+        caz_itensvenda_columns: schemaResult.rows,
+        caz_vendas_columns: vendasSchema.rows,
+        caz_parcelas_columns: parcelasSchema.rows,
+        all_venda_related_columns: allTables.rows,
+        parcela_samples: parcelaSample.rows,
+        caz_vendasbyid_columns: vendasbyidSchema.rows,
+        vendasbyid_sample: vendasbyidSample.rows,
+        venda_4635: testeRelacao.rows
+      });
+    } catch (error) {
+      console.error("[debug] Error:", error);
+      res.status(500).json({ error: String(error) });
+    }
+  });
+
   app.get("/debug-colaboradores-count", async (req, res) => {
     try {
       const colaboradores = await storage.getColaboradores();
