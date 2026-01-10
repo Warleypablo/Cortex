@@ -79,6 +79,7 @@ const AdminHealth = lazy(() => import("@/pages/AdminHealth"));
 const AdminOverrides = lazy(() => import("@/pages/AdminOverrides"));
 const Sugestoes = lazy(() => import("@/pages/Sugestoes"));
 const ContratosModule = lazy(() => import("@/pages/ContratosModule"));
+const MargemCliente = lazy(() => import("@/pages/MargemCliente"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -193,6 +194,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
       <Route path="/dashboard/contribuicao-colaborador">{() => <ProtectedRoute path="/dashboard/contribuicao-colaborador" component={ContribuicaoColaborador} />}</Route>
       <Route path="/dashboard/contribuicao-operador">{() => <ProtectedRoute path="/dashboard/contribuicao-operador" component={ContribuicaoOperador} />}</Route>
+      <Route path="/dashboard/margem-cliente">{() => <ProtectedRoute path="/dashboard/margem-cliente" component={MargemCliente} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}
