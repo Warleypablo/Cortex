@@ -5,7 +5,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import type { Colaborador, InsertColaborador } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown, Info, TrendingUp, TrendingDown, Banknote } from "lucide-react";
+import { Search, Mail, Phone, Calendar, Briefcase, Award, Loader2, MapPin, Building2, CreditCard, Plus, Pencil, Trash2, BarChart3, Package, Users, Filter, X, UserPlus, UserMinus, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown, ArrowUpDown, Info, TrendingUp, TrendingDown, Banknote, Download } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Link, useLocation } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -2445,6 +2445,16 @@ export default function Colaboradores() {
                   Análise
                 </Button>
               </Link>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  window.open('/api/colaboradores/exportar-excel', '_blank');
+                }}
+                data-testid="button-exportar-colaboradores"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Exportar Excel
+              </Button>
               <AddColaboradorDialog />
             </div>
           </div>
