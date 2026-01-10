@@ -125,62 +125,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/debug-itensvenda-schema", async (req, res) => {
-    try {
-      // Venda 7775 dados
-      const venda7775 = await db.execute(sql`
-        SELECT * FROM caz_vendas WHERE numero = 7775 LIMIT 1
-      `);
-      
-      // Tentar encontrar itens que correspondem à venda 7775 pelo id da venda
-      const venda7775Id = (venda7775.rows[0] as any)?.id;
-      
-      // Verificar se existe relação em caz_itensvenda pelo id_item == venda.id
-      const itensVendaPorId = venda7775Id ? await db.execute(sql`
-        SELECT * FROM caz_itensvenda WHERE id_item::text = ${venda7775Id}::text LIMIT 10
-      `) : { rows: [] };
-      
-      // Verificar se existe relação em caz_itensvenda pelo id == venda.id  
-      const itensVendaPorIdPrincipal = venda7775Id ? await db.execute(sql`
-        SELECT * FROM caz_itensvenda WHERE id::text = ${venda7775Id}::text LIMIT 10
-      `) : { rows: [] };
-      
-      // Buscar itens com nome "Social Media" (um dos itens da venda 7775)
-      const itensSocialMedia = await db.execute(sql`
-        SELECT * FROM caz_itensvenda WHERE LOWER(nome) LIKE '%social media%' LIMIT 5
-      `);
-      
-      // Verificar se existem tabelas com FK venda
-      const tabelasComVenda = await db.execute(sql`
-        SELECT table_name, column_name, data_type
-        FROM information_schema.columns 
-        WHERE column_name LIKE '%venda%' AND table_name LIKE 'caz%'
-        ORDER BY table_name, column_name
-      `);
-      
-      // Total de vendas vs itens
-      const stats = await db.execute(sql`
-        SELECT 
-          (SELECT COUNT(*) FROM caz_vendas) as total_vendas,
-          (SELECT COUNT(*) FROM caz_itensvenda) as total_itens,
-          (SELECT COUNT(DISTINCT id_item) FROM caz_itensvenda) as itens_distintos
-      `);
-      
-      res.json({
-        venda_7775: venda7775.rows,
-        venda_7775_id: venda7775Id,
-        itens_por_id_item: itensVendaPorId.rows,
-        itens_por_id_principal: itensVendaPorIdPrincipal.rows,
-        itens_social_media: itensSocialMedia.rows,
-        tabelas_com_venda: tabelasComVenda.rows,
-        stats: stats.rows
-      });
-    } catch (error) {
-      console.error("[debug] Error:", error);
-      res.status(500).json({ error: String(error) });
-    }
-  });
-
   app.get("/debug-colaboradores-count", async (req, res) => {
     try {
       const colaboradores = await storage.getColaboradores();
