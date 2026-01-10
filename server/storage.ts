@@ -10478,7 +10478,8 @@ export class DbStorage implements IStorage {
         WHERE p.tipo_evento = 'DESPESA'
           AND p.status = 'QUITADO'
           AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
-          AND caz.cnpj IS NOT NULL
+          AND p.id_cliente IS NOT NULL
+          AND TRIM(p.id_cliente::text) != ''
         GROUP BY REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '')
       ),
       despesas_operacionais AS (
@@ -10487,7 +10488,7 @@ export class DbStorage implements IStorage {
         WHERE tipo_evento = 'DESPESA'
           AND status = 'QUITADO'
           AND TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = ${mesAtual}
-          AND categoria_nome LIKE '6%'
+          AND (id_cliente IS NULL OR TRIM(id_cliente::text) = '')
       ),
       despesa_op_rateada AS (
         SELECT 
@@ -10512,7 +10513,66 @@ export class DbStorage implements IStorage {
       ORDER BY COALESCE(rc.receita, 0) DESC
     `);
 
+    const receitaDetalhesResult = await db.execute(sql`
+      SELECT 
+        REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
+        p.descricao,
+        p.categoria_nome,
+        p.valor_pago::numeric as valor
+      FROM caz_parcelas p
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      WHERE p.tipo_evento = 'RECEITA'
+        AND p.status = 'QUITADO'
+        AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
+        AND caz.cnpj IS NOT NULL
+      ORDER BY p.valor_pago::numeric DESC
+    `);
+
+    const freelancerDetalhesResult = await db.execute(sql`
+      SELECT 
+        REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
+        p.descricao,
+        p.categoria_nome,
+        p.valor_pago::numeric as valor
+      FROM caz_parcelas p
+      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      WHERE p.tipo_evento = 'DESPESA'
+        AND p.status = 'QUITADO'
+        AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
+        AND p.id_cliente IS NOT NULL
+        AND TRIM(p.id_cliente::text) != ''
+        AND caz.cnpj IS NOT NULL
+      ORDER BY p.valor_pago::numeric DESC
+    `);
+
+    const receitaDetalhesByCnpj = new Map<string, { descricao: string; valor: number; categoria?: string }[]>();
+    for (const row of receitaDetalhesResult.rows as any[]) {
+      const cnpj = row.cnpj_limpo || '';
+      if (!receitaDetalhesByCnpj.has(cnpj)) {
+        receitaDetalhesByCnpj.set(cnpj, []);
+      }
+      receitaDetalhesByCnpj.get(cnpj)!.push({
+        descricao: row.descricao || 'Sem descrição',
+        valor: parseFloat(row.valor || '0'),
+        categoria: row.categoria_nome || undefined
+      });
+    }
+
+    const freelancerDetalhesByCnpj = new Map<string, { descricao: string; valor: number; categoria?: string }[]>();
+    for (const row of freelancerDetalhesResult.rows as any[]) {
+      const cnpj = row.cnpj_limpo || '';
+      if (!freelancerDetalhesByCnpj.has(cnpj)) {
+        freelancerDetalhesByCnpj.set(cnpj, []);
+      }
+      freelancerDetalhesByCnpj.get(cnpj)!.push({
+        descricao: row.descricao || 'Sem descrição',
+        valor: parseFloat(row.valor || '0'),
+        categoria: row.categoria_nome || undefined
+      });
+    }
+
     const clientes = (result.rows as any[]).map(row => {
+      const cnpjLimpo = row.cnpj ? row.cnpj.replace(/[.\-\/]/g, '') : '';
       const receita = parseFloat(row.receita || '0');
       const despesaSalario = parseFloat(row.despesa_salario || '0');
       const despesaFreelancer = parseFloat(row.despesa_freelancer || '0');
@@ -10530,7 +10590,9 @@ export class DbStorage implements IStorage {
         despesaOperacional,
         despesaTotal,
         margem,
-        margemPercentual
+        margemPercentual,
+        receitaDetalhes: receitaDetalhesByCnpj.get(cnpjLimpo) || [],
+        freelancerDetalhes: freelancerDetalhesByCnpj.get(cnpjLimpo) || []
       };
     });
 

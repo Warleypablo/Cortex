@@ -9,9 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
-  Loader2, TrendingUp, TrendingDown, DollarSign, Users, Percent, 
-  Building2, Search, ArrowUpDown, ChevronUp, ChevronDown
+  TrendingDown, DollarSign, Users, Percent, 
+  Building2, Search, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MargemClienteResumo, MargemClienteItem } from "@shared/schema";
@@ -28,6 +29,7 @@ export default function MargemCliente() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>('receita');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery<MargemClienteResumo>({
     queryKey: ["/api/financeiro/margem-clientes", mesAno],
@@ -57,6 +59,18 @@ export default function MargemCliente() {
       setSortField(field);
       setSortDirection('desc');
     }
+  };
+
+  const toggleRow = (cnpj: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(cnpj)) {
+        next.delete(cnpj);
+      } else {
+        next.add(cnpj);
+      }
+      return next;
+    });
   };
 
   const filteredAndSortedClientes = useMemo(() => {
@@ -212,6 +226,7 @@ export default function MargemCliente() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8"></TableHead>
                   <TableHead>
                     <Button 
                       variant="ghost" 
@@ -270,44 +285,112 @@ export default function MargemCliente() {
               <TableBody>
                 {filteredAndSortedClientes.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       {searchTerm ? 'Nenhum cliente encontrado' : 'Nenhum dado disponível'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAndSortedClientes.map((cliente, idx) => (
-                    <TableRow key={cliente.cnpj || idx} data-testid={`row-cliente-${idx}`}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{cliente.nomeCliente}</div>
-                          <div className="text-xs text-muted-foreground">{cliente.cnpj}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-green-600">
-                        {formatCurrency(cliente.receita)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatCurrency(cliente.despesaSalarioRateado)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatCurrency(cliente.despesaFreelancers)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatCurrency(cliente.despesaOperacional)}
-                      </TableCell>
-                      <TableCell className="text-right font-medium text-red-600">
-                        {formatCurrency(cliente.despesaTotal)}
-                      </TableCell>
-                      <TableCell className={`text-right font-bold ${cliente.margem >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatCurrency(cliente.margem)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Badge variant={cliente.margemPercentual >= 0 ? 'default' : 'destructive'}>
-                          {formatPercent(cliente.margemPercentual)}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredAndSortedClientes.map((cliente, idx) => {
+                    const rowKey = `${cliente.cnpj}-${idx}`;
+                    const isExpanded = expandedRows.has(rowKey);
+                    const hasDetails = (cliente.receitaDetalhes?.length > 0) || (cliente.freelancerDetalhes?.length > 0);
+                    
+                    return (
+                      <Collapsible key={rowKey} open={isExpanded} onOpenChange={() => toggleRow(rowKey)} asChild>
+                        <>
+                          <TableRow data-testid={`row-cliente-${idx}`} className={hasDetails ? 'cursor-pointer hover:bg-muted/50' : ''}>
+                            <TableCell className="w-8 p-2">
+                              {hasDetails && (
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`button-expand-${idx}`}>
+                                    <ChevronRight className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                  </Button>
+                                </CollapsibleTrigger>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{cliente.nomeCliente}</div>
+                                <div className="text-xs text-muted-foreground">{cliente.cnpj}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-green-600">
+                              {formatCurrency(cliente.receita)}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {formatCurrency(cliente.despesaSalarioRateado)}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {formatCurrency(cliente.despesaFreelancers)}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {formatCurrency(cliente.despesaOperacional)}
+                            </TableCell>
+                            <TableCell className="text-right font-medium text-red-600">
+                              {formatCurrency(cliente.despesaTotal)}
+                            </TableCell>
+                            <TableCell className={`text-right font-bold ${cliente.margem >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              {formatCurrency(cliente.margem)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant={cliente.margemPercentual >= 0 ? 'default' : 'destructive'}>
+                                {formatPercent(cliente.margemPercentual)}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                          <CollapsibleContent asChild>
+                            <TableRow className="bg-muted/30">
+                              <TableCell colSpan={9} className="p-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {cliente.receitaDetalhes?.length > 0 && (
+                                    <div>
+                                      <h4 className="font-semibold text-green-600 mb-2 flex items-center gap-2">
+                                        <DollarSign className="h-4 w-4" />
+                                        Detalhes de Receita ({cliente.receitaDetalhes.length})
+                                      </h4>
+                                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                                        {cliente.receitaDetalhes.map((d, i) => (
+                                          <div key={i} className="flex justify-between text-sm border-b border-border/50 py-1">
+                                            <span className="truncate max-w-[70%]" title={d.descricao}>
+                                              {d.descricao}
+                                            </span>
+                                            <span className="font-medium text-green-600">{formatCurrency(d.valor)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {cliente.freelancerDetalhes?.length > 0 && (
+                                    <div>
+                                      <h4 className="font-semibold text-red-600 mb-2 flex items-center gap-2">
+                                        <TrendingDown className="h-4 w-4" />
+                                        Detalhes de Freelancers ({cliente.freelancerDetalhes.length})
+                                      </h4>
+                                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                                        {cliente.freelancerDetalhes.map((d, i) => (
+                                          <div key={i} className="flex justify-between text-sm border-b border-border/50 py-1">
+                                            <span className="truncate max-w-[70%]" title={d.descricao}>
+                                              {d.descricao}
+                                            </span>
+                                            <span className="font-medium text-red-600">{formatCurrency(d.valor)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {!cliente.receitaDetalhes?.length && !cliente.freelancerDetalhes?.length && (
+                                    <div className="text-muted-foreground text-sm col-span-2">
+                                      Sem detalhes disponíveis para este cliente
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          </CollapsibleContent>
+                        </>
+                      </Collapsible>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
