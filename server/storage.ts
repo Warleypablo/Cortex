@@ -9892,7 +9892,7 @@ export class DbStorage implements IStorage {
           LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm
         FROM caz_parcelas p
         INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id_venda = v.id
+        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
@@ -10002,7 +10002,7 @@ export class DbStorage implements IStorage {
           iv.valor::numeric as item_valor
         FROM caz_parcelas p
         INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id_venda = v.id
+        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
