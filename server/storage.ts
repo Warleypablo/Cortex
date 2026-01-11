@@ -387,6 +387,22 @@ export interface IStorage {
       quantidadeClientes: number;
     };
   }>;
+  
+  // Contribuição por Squad - Estilo DFC
+  getContribuicaoSquadDfc(dataInicio: string, dataFim: string, squad?: string): Promise<{
+    squads: string[];
+    receitas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[];
+    totais: {
+      receitaTotal: number;
+      quantidadeParcelas: number;
+      quantidadeContratos: number;
+    };
+  }>;
 }
 
 // GEG Dashboard Extended Types
@@ -10542,6 +10558,450 @@ export class DbStorage implements IStorage {
         receitaTotal,
         despesaTotal,
         resultado,
+        quantidadeParcelas: totalParcelas,
+        quantidadeContratos: totalContratos
+      }
+    };
+  }
+
+  // Contribuição por Squad - Receitas atribuídas por squad do contrato
+  async getContribuicaoSquadDfc(dataInicio: string, dataFim: string, squad?: string): Promise<{
+    squads: string[];
+    receitas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[];
+    totais: {
+      receitaTotal: number;
+      quantidadeParcelas: number;
+      quantidadeContratos: number;
+    };
+  }> {
+    const dataFimComHora = `${dataFim} 23:59:59`;
+    
+    // Lista de squads com receitas no período
+    const squadsResult = await db.execute(sql`
+      WITH contratos_squad AS (
+        SELECT 
+          REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+          ct.squad,
+          ct.servico as servico_original,
+          LOWER(TRIM(REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              TRANSLATE(
+                COALESCE(ct.servico, ''),
+                'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
+              ),
+              '[^a-zA-Z0-9\s]', '', 'g'
+            ),
+            '\s+', ' ', 'g'
+          ))) as servico_norm,
+          ct.id_subtask
+        FROM cup_contratos ct
+        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+        WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+          AND ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
+      ),
+      contrato_mais_recente AS (
+        SELECT DISTINCT ON (cnpj_limpo)
+          cnpj_limpo,
+          squad as fallback_squad
+        FROM (
+          SELECT 
+            REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            ct.squad,
+            ct.id_subtask
+          FROM cup_contratos ct
+          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+            AND ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
+        ) sub
+        ORDER BY cnpj_limpo, id_subtask DESC
+      ),
+      itens_vendidos AS (
+        SELECT 
+          p.id as parcela_id,
+          p.id_cliente,
+          iv.nome as item_nome_original,
+          LOWER(TRIM(REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              TRANSLATE(
+                COALESCE(iv.nome, ''),
+                'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
+              ),
+              '[^a-zA-Z0-9\s]', '', 'g'
+            ),
+            '\s+', ' ', 'g'
+          ))) as item_nome_norm
+        FROM caz_parcelas p
+        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
+        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
+        WHERE p.status = 'QUITADO'
+          AND p.tipo_evento = 'RECEITA'
+          AND p.data_quitacao >= ${dataInicio}::date
+          AND p.data_quitacao <= ${dataFimComHora}::timestamp
+          AND iv.valor IS NOT NULL
+          AND iv.valor::numeric > 0
+      ),
+      itens_com_cliente AS (
+        SELECT 
+          iv.*,
+          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+        FROM itens_vendidos iv
+        LEFT JOIN caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
+      ),
+      itens_ranked AS (
+        SELECT 
+          ic.*,
+          cs.squad,
+          cs.servico_norm,
+          CASE
+            WHEN cs.servico_norm = ic.item_nome_norm THEN 100
+            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
+            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
+            WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
+              AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
+            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
+              AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
+              AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
+            WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
+              OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
+              OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
+              OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
+              OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
+              OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
+              OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
+              THEN 70
+            WHEN EXISTS (
+              SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
+              WHERE LENGTH(s_token) >= 4 
+                AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
+                AND ic.item_nome_norm LIKE '%' || s_token || '%'
+            ) THEN 60
+            ELSE 0
+          END as match_score,
+          ROW_NUMBER() OVER (
+            PARTITION BY ic.parcela_id, ic.item_nome_norm
+            ORDER BY 
+              CASE
+                WHEN cs.servico_norm = ic.item_nome_norm THEN 100
+                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
+                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
+                ELSE 0
+              END DESC,
+              cs.id_subtask DESC NULLS LAST
+          ) as rn
+        FROM itens_com_cliente ic
+        LEFT JOIN contratos_squad cs ON ic.cnpj_limpo = cs.cnpj_limpo
+      ),
+      squads_finais AS (
+        SELECT DISTINCT
+          CASE 
+            WHEN ir.match_score >= 50 THEN ir.squad
+            WHEN cmr.fallback_squad IS NOT NULL THEN cmr.fallback_squad
+            ELSE NULL
+          END as squad
+        FROM itens_ranked ir
+        LEFT JOIN contrato_mais_recente cmr ON ir.cnpj_limpo = cmr.cnpj_limpo
+        WHERE ir.rn = 1
+      )
+      SELECT COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad 
+      FROM squads_finais 
+      ORDER BY squad
+    `);
+    
+    const squads = squadsResult.rows.map((r: any) => r.squad);
+    
+    const squadFilter = squad && squad !== 'todos' 
+      ? sql`AND COALESCE(NULLIF(TRIM(squad_final), ''), 'Sem Squad') = ${squad}`
+      : sql``;
+    
+    // Query para buscar receitas agrupadas por squad
+    const receitasResult = await db.execute(sql`
+      WITH contratos_squad AS (
+        SELECT 
+          REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+          ct.squad,
+          ct.servico,
+          LOWER(TRIM(REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              TRANSLATE(
+                COALESCE(ct.servico, ''),
+                'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
+              ),
+              '[^a-zA-Z0-9\s]', '', 'g'
+            ),
+            '\s+', ' ', 'g'
+          ))) as servico_norm,
+          ct.id_subtask
+        FROM cup_contratos ct
+        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+        WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+          AND ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
+      ),
+      contrato_mais_recente AS (
+        SELECT DISTINCT ON (cnpj_limpo)
+          cnpj_limpo,
+          squad as fallback_squad,
+          servico as fallback_servico
+        FROM (
+          SELECT 
+            REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
+            ct.squad,
+            ct.servico,
+            ct.id_subtask
+          FROM cup_contratos ct
+          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+            AND ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
+        ) sub
+        ORDER BY cnpj_limpo, id_subtask DESC
+      ),
+      itens_vendidos AS (
+        SELECT 
+          p.id as parcela_id,
+          p.id_cliente,
+          p.categoria_id,
+          p.categoria_nome,
+          iv.nome as item_nome,
+          LOWER(TRIM(REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              TRANSLATE(
+                COALESCE(iv.nome, ''),
+                'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
+              ),
+              '[^a-zA-Z0-9\s]', '', 'g'
+            ),
+            '\s+', ' ', 'g'
+          ))) as item_nome_norm,
+          iv.valor::numeric as item_valor
+        FROM caz_parcelas p
+        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
+        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
+        WHERE p.status = 'QUITADO'
+          AND p.tipo_evento = 'RECEITA'
+          AND p.data_quitacao >= ${dataInicio}::date
+          AND p.data_quitacao <= ${dataFimComHora}::timestamp
+          AND iv.valor IS NOT NULL
+          AND iv.valor::numeric > 0
+      ),
+      itens_com_cliente AS (
+        SELECT 
+          iv.*,
+          caz.nome as cliente_nome,
+          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+        FROM itens_vendidos iv
+        LEFT JOIN caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
+      ),
+      itens_ranked AS (
+        SELECT 
+          ic.*,
+          cs.squad,
+          cs.servico as servico_contrato,
+          cs.servico_norm,
+          CASE
+            WHEN cs.servico_norm = ic.item_nome_norm THEN 100
+            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
+            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
+            WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
+              AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
+            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
+              AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
+              AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
+            WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
+              OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
+              OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
+              OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
+              OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
+              OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
+              OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
+              THEN 70
+            WHEN EXISTS (
+              SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
+              WHERE LENGTH(s_token) >= 4 
+                AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
+                AND ic.item_nome_norm LIKE '%' || s_token || '%'
+            ) THEN 60
+            ELSE 0
+          END as match_score,
+          ROW_NUMBER() OVER (
+            PARTITION BY ic.parcela_id, ic.item_nome
+            ORDER BY 
+              CASE
+                WHEN cs.servico_norm = ic.item_nome_norm THEN 100
+                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
+                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
+                ELSE 0
+              END DESC,
+              cs.id_subtask DESC NULLS LAST
+          ) as rn
+        FROM itens_com_cliente ic
+        LEFT JOIN contratos_squad cs ON ic.cnpj_limpo = cs.cnpj_limpo
+      ),
+      match_result AS (
+        SELECT 
+          ir.categoria_id,
+          ir.categoria_nome,
+          ir.cliente_nome,
+          ir.item_nome,
+          ir.item_valor,
+          ir.parcela_id,
+          ir.cnpj_limpo,
+          ir.match_score,
+          ir.servico_contrato,
+          ir.squad,
+          cmr.fallback_squad,
+          cmr.fallback_servico
+        FROM itens_ranked ir
+        LEFT JOIN contrato_mais_recente cmr ON ir.cnpj_limpo = cmr.cnpj_limpo
+        WHERE ir.rn = 1
+      ),
+      resultado_final AS (
+        SELECT 
+          categoria_id,
+          categoria_nome,
+          cliente_nome,
+          item_valor,
+          parcela_id,
+          CASE 
+            WHEN match_score >= 50 THEN servico_contrato
+            WHEN fallback_servico IS NOT NULL THEN item_nome
+            ELSE item_nome
+          END as servico_nome,
+          CASE 
+            WHEN match_score >= 50 THEN squad
+            WHEN fallback_squad IS NOT NULL THEN fallback_squad
+            ELSE NULL
+          END as squad_final
+        FROM match_result
+      )
+      SELECT 
+        COALESCE(categoria_id, 'SEM_CATEGORIA') as categoria_id,
+        COALESCE(categoria_nome, 'Sem Categoria') as categoria_nome,
+        COALESCE(cliente_nome, 'Cliente não identificado') as cliente_nome,
+        COALESCE(servico_nome, 'Serviço não identificado') as servico_nome,
+        COALESCE(NULLIF(TRIM(squad_final), ''), 'Sem Squad') as squad,
+        SUM(item_valor) as valor_total,
+        COUNT(DISTINCT parcela_id) as quantidade_parcelas
+      FROM resultado_final
+      WHERE 1=1
+        ${squadFilter}
+      GROUP BY categoria_id, categoria_nome, cliente_nome, servico_nome, squad_final
+      ORDER BY categoria_id, valor_total DESC
+    `);
+    
+    const receitas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[] = [];
+    
+    let receitaTotal = 0;
+    let totalParcelas = 0;
+    let totalContratos = 0;
+    
+    type ServicoInfo = { valor: number; squad: string };
+    type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
+    type CategoriaInfo = { nome: string; valorTotal: number; clientes: Map<string, ClienteInfo> };
+    
+    const categoriaMap = new Map<string, CategoriaInfo>();
+    
+    for (const row of receitasResult.rows as any[]) {
+      const categoriaId = row.categoria_id || 'SEM_CATEGORIA';
+      const categoriaNome = row.categoria_nome || 'Sem Categoria';
+      const clienteNome = row.cliente_nome || 'Cliente não identificado';
+      const servicoNome = row.servico_nome || 'Serviço não identificado';
+      const squadNome = row.squad || 'Sem Squad';
+      const valor = Number(row.valor_total) || 0;
+      const parcelas = Number(row.quantidade_parcelas) || 0;
+      
+      if (!categoriaMap.has(categoriaId)) {
+        categoriaMap.set(categoriaId, {
+          nome: categoriaNome,
+          valorTotal: 0,
+          clientes: new Map()
+        });
+      }
+      
+      const cat = categoriaMap.get(categoriaId)!;
+      cat.valorTotal += valor;
+      
+      if (!cat.clientes.has(clienteNome)) {
+        cat.clientes.set(clienteNome, {
+          valorTotal: 0,
+          servicos: new Map()
+        });
+      }
+      
+      const cliente = cat.clientes.get(clienteNome)!;
+      cliente.valorTotal += valor;
+      
+      const chaveServico = `${servicoNome}|${squadNome}`;
+      const servicoAtual = cliente.servicos.get(chaveServico);
+      if (servicoAtual) {
+        servicoAtual.valor += valor;
+      } else {
+        cliente.servicos.set(chaveServico, { valor, squad: squadNome });
+      }
+      
+      receitaTotal += valor;
+      totalParcelas += parcelas;
+    }
+    
+    for (const cat of Array.from(categoriaMap.values())) {
+      for (const cliente of Array.from(cat.clientes.values())) {
+        totalContratos += cliente.servicos.size;
+      }
+    }
+    
+    for (const [categoriaId, cat] of Array.from(categoriaMap.entries())) {
+      receitas.push({
+        categoriaId,
+        categoriaNome: cat.nome,
+        valor: cat.valorTotal,
+        nivel: 1
+      });
+      
+      const clientesOrdenados = Array.from(cat.clientes.entries())
+        .sort((a, b) => b[1].valorTotal - a[1].valorTotal);
+      
+      for (const [clienteNome, clienteInfo] of clientesOrdenados) {
+        const clienteId = `${categoriaId}.${clienteNome.substring(0, 30).replace(/\./g, '_')}`;
+        receitas.push({
+          categoriaId: clienteId,
+          categoriaNome: clienteNome,
+          valor: clienteInfo.valorTotal,
+          nivel: 2
+        });
+        
+        const servicosOrdenados = Array.from(clienteInfo.servicos.entries())
+          .sort((a, b) => b[1].valor - a[1].valor);
+        
+        for (const [chaveServico, servicoInfo] of servicosOrdenados) {
+          const servicoNome = chaveServico.split('|')[0];
+          const servicoId = `${clienteId}.${servicoNome.substring(0, 20).replace(/\./g, '_')}`;
+          receitas.push({
+            categoriaId: servicoId,
+            categoriaNome: `${servicoNome} (${servicoInfo.squad})`,
+            valor: servicoInfo.valor,
+            nivel: 3
+          });
+        }
+      }
+    }
+    
+    return {
+      squads,
+      receitas,
+      totais: {
+        receitaTotal,
         quantidadeParcelas: totalParcelas,
         quantidadeContratos: totalContratos
       }
