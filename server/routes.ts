@@ -4486,8 +4486,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
   
-  // Initialize table on startup
+  // Ensure tipo_inadimplencia column exists in inadimplencia_contextos table
+  async function ensureTipoInadimplenciaColumn() {
+    try {
+      // Add column if not exists
+      await db.execute(sql`
+        ALTER TABLE inadimplencia_contextos 
+        ADD COLUMN IF NOT EXISTS tipo_inadimplencia TEXT DEFAULT NULL
+      `);
+      console.log("[juridico] tipo_inadimplencia column ensured");
+    } catch (error) {
+      console.log("[juridico] Warning: Could not add tipo_inadimplencia column:", (error as Error).message);
+    }
+  }
+  
+  // Initialize tables on startup
   ensureEscalationRulesTable();
+  ensureTipoInadimplenciaColumn();
   
   // Jurídico - Listar clientes inadimplentes + clientes com histórico jurídico (mesmo após pagamento)
   app.get("/api/juridico/clientes", async (req, res) => {
@@ -4502,8 +4517,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const clientesFiltrados = clientesData.clientes.filter(c => c.diasAtrasoMax > 3);
       const todosIds = clientesFiltrados.map(c => c.idCliente);
       
+      // 2.5. Buscar clientes com histórico jurídico (acordos/recuperados) que não estão mais inadimplentes
+      const clientesComHistoricoJuridico = await storage.getClientesComContextoJuridico();
+      const idsHistoricoNaoInadimplentes = clientesComHistoricoJuridico.filter(id => !todosIds.includes(id));
+      
+      // Buscar todos os IDs para contextos (inadimplentes + históricos)
+      const todosIdsParaContextos = [...todosIds, ...idsHistoricoNaoInadimplentes];
+      
       // 3. Buscar contextos jurídicos
-      const contextos = await storage.getInadimplenciaContextos(todosIds);
+      const contextos = await storage.getInadimplenciaContextos(todosIdsParaContextos);
       
       // 4. Buscar regras de escalonamento (handle table not existing gracefully)
       let escalationRules: Array<{
@@ -4553,13 +4575,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'baixa': 5
       };
       
-      // 4. Buscar parcelas em paralelo
+      // 4. Buscar parcelas em paralelo para clientes inadimplentes
       const parcelasPromises = clientesFiltrados.map(cliente => 
         storage.getInadimplenciaDetalheParcelas(cliente.idCliente, dataInicio, dataFim)
       );
       const parcelasResults = await Promise.all(parcelasPromises);
       
-      // 5. Montar resposta com sugestão de escalonamento
+      // 5. Montar resposta com sugestão de escalonamento para clientes inadimplentes
       const clientesComDados = clientesFiltrados.map((cliente, index) => {
         const contexto = contextos[cliente.idCliente] || {};
         const suggestion = getSuggestedProcedimento(cliente.diasAtrasoMax);
@@ -4583,9 +4605,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       });
       
-      console.log("[api] Juridico clientes - Total:", clientesFiltrados.length);
+      // 6. Adicionar clientes históricos (acordos/recuperados que já pagaram)
+      // Esses clientes têm contexto jurídico mas não estão mais inadimplentes
+      const clientesHistoricos: typeof clientesComDados = [];
+      for (const clienteId of idsHistoricoNaoInadimplentes) {
+        const contexto = contextos[clienteId] || {};
+        // Só incluir se tiver procedimento de acordo ou baixa concluída (são os "recuperados")
+        const isRecuperado = contexto.procedimentoJuridico === 'acordo' || 
+          (contexto.statusJuridico === 'concluido' && contexto.procedimentoJuridico === 'baixa');
+        
+        if (isRecuperado) {
+          // Criar objeto cliente mínimo para exibição
+          clientesHistoricos.push({
+            cliente: {
+              idCliente: clienteId,
+              nomeCliente: contexto.contextoJuridico?.split('\n')[0] || `Cliente ${clienteId}`,
+              valorTotal: contexto.valorAcordado || 0,
+              quantidadeParcelas: 0,
+              parcelaMaisAntiga: '',
+              diasAtrasoMax: 0,
+              empresa: '',
+              cnpj: null,
+              statusClickup: null,
+              responsavel: null,
+              cluster: null,
+              servicos: null,
+              telefone: null,
+            },
+            contexto,
+            parcelas: [],
+            isHistorico: true,
+            suggestedProcedimento: null,
+            needsEscalation: false,
+          });
+        }
+      }
       
-      res.json({ clientes: clientesComDados });
+      const todosClientes = [...clientesComDados, ...clientesHistoricos];
+      
+      console.log("[api] Juridico clientes - Inadimplentes:", clientesFiltrados.length, "Históricos:", clientesHistoricos.length);
+      
+      res.json({ clientes: todosClientes });
     } catch (error) {
       console.error("[api] Error fetching juridico clientes:", error);
       res.status(500).json({ error: "Failed to fetch juridico clientes" });
@@ -4595,7 +4655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/juridico/clientes/:clienteId/contexto", async (req, res) => {
     try {
       const { clienteId } = req.params;
-      const { contextoJuridico, procedimentoJuridico, statusJuridico, valorAcordado } = req.body;
+      const { contextoJuridico, procedimentoJuridico, statusJuridico, valorAcordado, tipoInadimplencia } = req.body;
       
       const user = (req as any).user;
       const atualizadoPor = user?.name || user?.googleId || 'Sistema';
@@ -4606,6 +4666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         procedimentoJuridico,
         statusJuridico,
         valorAcordado: valorAcordado != null ? parseFloat(valorAcordado) : undefined,
+        tipoInadimplencia,
         atualizadoPor,
       });
       

@@ -219,10 +219,10 @@ export interface IStorage {
   getGegMasContratacoes(squad: string, setor: string, nivel: string, cargo: string): Promise<GegMasContratacoes>;
   getGegPessoasPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<GegPessoasPorSetor[]>;
   getGegCustoPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<{ setor: string; custoTotal: number; totalColaboradores: number }[]>;
-  getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>>;
-  getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null } | null>;
+  getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null }>>;
+  getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null } | null>;
   upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
-  upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>;
+  upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; tipoInadimplencia?: string; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; tipoInadimplencia: string | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>;
   getGegDemissoesPorTipo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDemissoesPorTipo[]>;
   getGegUltimasDemissoes(squad: string, setor: string, nivel: string, cargo: string, limit?: number): Promise<{ id: number; nome: string; cargo: string | null; squad: string | null; dataDesligamento: string; tempoDeEmpresa: number }[]>;
   getGegHeadcountPorTenure(squad: string, setor: string, nivel: string, cargo: string): Promise<GegHeadcountPorTenure[]>;
@@ -8073,7 +8073,7 @@ export class DbStorage implements IStorage {
     const escapedIds = clienteIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
     const result = await db.execute(sql.raw(`SELECT * FROM inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
     
-    const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }> = {};
+    const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null }> = {};
     for (const row of result.rows as any[]) {
       contextos[row.cliente_id] = {
         contexto: row.contexto || null,
@@ -8089,12 +8089,13 @@ export class DbStorage implements IStorage {
         valorAcordado: row.valor_acordado ? parseFloat(row.valor_acordado) : null,
         atualizadoJuridicoPor: row.atualizado_juridico_por || null,
         atualizadoJuridicoEm: row.atualizado_juridico_em || null,
+        tipoInadimplencia: row.tipo_inadimplencia || null,
       };
     }
     return contextos;
   }
 
-  async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null } | null> {
+  async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null } | null> {
     const escapedId = clienteId.replace(/'/g, "''");
     const result = await db.execute(sql.raw(`SELECT * FROM inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
     
@@ -8114,6 +8115,7 @@ export class DbStorage implements IStorage {
       valorAcordado: row.valor_acordado ? parseFloat(row.valor_acordado) : null,
       atualizadoJuridicoPor: row.atualizado_juridico_por || null,
       atualizadoJuridicoEm: row.atualizado_juridico_em || null,
+      tipoInadimplencia: row.tipo_inadimplencia || null,
     };
   }
 
@@ -8152,11 +8154,12 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }> {
+  async upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; tipoInadimplencia?: string; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; tipoInadimplencia: string | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }> {
     const escapedClienteId = data.clienteId.replace(/'/g, "''");
     const escapedContexto = (data.contextoJuridico || '').replace(/'/g, "''");
     const escapedProcedimento = (data.procedimentoJuridico || '').replace(/'/g, "''");
     const escapedStatus = (data.statusJuridico || '').replace(/'/g, "''");
+    const escapedTipoInadimplencia = (data.tipoInadimplencia || '').replace(/'/g, "''");
     const escapedAtualizadoPor = data.atualizadoPor.replace(/'/g, "''");
     const valorAcordadoSql = data.valorAcordado != null ? data.valorAcordado.toString() : 'NULL';
     
@@ -8167,10 +8170,11 @@ export class DbStorage implements IStorage {
         procedimento_juridico = NULLIF('${escapedProcedimento}', ''),
         status_juridico = NULLIF('${escapedStatus}', ''),
         valor_acordado = ${valorAcordadoSql},
+        tipo_inadimplencia = NULLIF('${escapedTipoInadimplencia}', ''),
         atualizado_juridico_por = '${escapedAtualizadoPor}',
         atualizado_juridico_em = NOW()
       WHERE cliente_id = '${escapedClienteId}'
-      RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, atualizado_juridico_por, atualizado_juridico_em
+      RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, tipo_inadimplencia, atualizado_juridico_por, atualizado_juridico_em
     `));
     
     // Se não existe, insere um novo registro com valores padrão para campos obrigatórios
@@ -8186,6 +8190,7 @@ export class DbStorage implements IStorage {
           procedimento_juridico, 
           status_juridico, 
           valor_acordado, 
+          tipo_inadimplencia,
           atualizado_juridico_por, 
           atualizado_juridico_em,
           atualizado_por,
@@ -8200,6 +8205,7 @@ export class DbStorage implements IStorage {
           NULLIF('${escapedProcedimento}', ''),
           NULLIF('${escapedStatus}', ''),
           ${valorAcordadoSql},
+          NULLIF('${escapedTipoInadimplencia}', ''),
           '${escapedAtualizadoPor}',
           NOW(),
           '${escapedAtualizadoPor}',
@@ -8210,9 +8216,10 @@ export class DbStorage implements IStorage {
           procedimento_juridico = EXCLUDED.procedimento_juridico,
           status_juridico = EXCLUDED.status_juridico,
           valor_acordado = EXCLUDED.valor_acordado,
+          tipo_inadimplencia = EXCLUDED.tipo_inadimplencia,
           atualizado_juridico_por = EXCLUDED.atualizado_juridico_por,
           atualizado_juridico_em = EXCLUDED.atualizado_juridico_em
-        RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, atualizado_juridico_por, atualizado_juridico_em
+        RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, tipo_inadimplencia, atualizado_juridico_por, atualizado_juridico_em
       `));
     }
     
@@ -8222,6 +8229,7 @@ export class DbStorage implements IStorage {
       procedimentoJuridico: row.procedimento_juridico,
       statusJuridico: row.status_juridico,
       valorAcordado: row.valor_acordado ? parseFloat(row.valor_acordado) : null,
+      tipoInadimplencia: row.tipo_inadimplencia || null,
       atualizadoJuridicoPor: row.atualizado_juridico_por,
       atualizadoJuridicoEm: row.atualizado_juridico_em,
     };
