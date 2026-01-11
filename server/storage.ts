@@ -9850,13 +9850,27 @@ export class DbStorage implements IStorage {
   }> {
     const dataFimComHora = `${dataFim} 23:59:59`;
     
-    // Lista de operadores: usa mesma lógica híbrida (match direto + fallback)
+    // Lista de operadores: usa lógica híbrida com matching robusto de serviços
+    // Normalização agressiva: lowercase, remove acentos (transliteração), remove pontuação, colapsa espaços
+    // Matching por tokens em comum + substring + fallback para contrato mais recente
     const operadoresResult = await db.execute(sql`
       WITH contratos_servico AS (
         SELECT 
           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
           ct.responsavel,
-          LOWER(TRIM(REGEXP_REPLACE(ct.servico, '\s+', ' ', 'g'))) as servico_norm,
+          ct.servico as servico_original,
+          -- Normalização robusta: lowercase, remove acentos comuns, remove pontuação, colapsa espaços
+          LOWER(TRIM(REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              TRANSLATE(
+                COALESCE(ct.servico, ''),
+                'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
+              ),
+              '[^a-zA-Z0-9\s]', '', 'g'
+            ),
+            '\s+', ' ', 'g'
+          ))) as servico_norm,
           ct.id_subtask
         FROM cup_contratos ct
         INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
@@ -9884,7 +9898,19 @@ export class DbStorage implements IStorage {
         SELECT 
           p.id as parcela_id,
           p.id_cliente,
-          LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm
+          iv.nome as item_nome_original,
+          -- Mesma normalização robusta para itens de venda
+          LOWER(TRIM(REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              TRANSLATE(
+                COALESCE(iv.nome, ''),
+                'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
+              ),
+              '[^a-zA-Z0-9\s]', '', 'g'
+            ),
+            '\s+', ' ', 'g'
+          ))) as item_nome_norm
         FROM caz_parcelas p
         INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
         LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
@@ -9906,11 +9932,48 @@ export class DbStorage implements IStorage {
         SELECT 
           ic.*,
           cs.responsavel,
+          cs.servico_norm,
+          -- Score de matching robusto com múltiplos critérios
           CASE
+            -- Match exato após normalização
             WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 90
-            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 85
-            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 70
+            -- Um contém o outro (substring)
+            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
+            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
+            -- Primeiro token significativo igual (ex: "gestao" em "gestao trafego" e "gestao de trafego pago")
+            WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
+              AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
+            -- Dois primeiros tokens iguais (comparados separadamente)
+            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
+              AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
+              AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
+            -- Token principal aparece em ambos (palavras-chave comuns do negócio)
+            WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
+              OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
+              OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
+              OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
+              OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
+              OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
+              OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
+              OR (ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%')
+              OR (ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%')
+              OR (ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%')
+              OR (ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%')
+              OR (ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%')
+              OR (ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%')
+              OR (ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%')
+              OR (ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%')
+              OR (ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%')
+              OR (ic.item_nome_norm LIKE '%inside%' AND cs.servico_norm LIKE '%inside%')
+              OR (ic.item_nome_norm LIKE '%sales%' AND cs.servico_norm LIKE '%sales%')
+              THEN 70
+            -- Qualquer palavra de 4+ caracteres em comum (excluindo preposições)
+            WHEN EXISTS (
+              SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
+              WHERE LENGTH(s_token) >= 4 
+                AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
+                AND ic.item_nome_norm LIKE '%' || s_token || '%'
+            ) THEN 60
             ELSE 0
           END as match_score,
           ROW_NUMBER() OVER (
@@ -9918,9 +9981,38 @@ export class DbStorage implements IStorage {
             ORDER BY 
               CASE
                 WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 90
-                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 85
-                WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 70
+                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
+                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
+                WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
+                  AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
+                WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
+                  AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
+                  AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
+                WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
+                  OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
+                  OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
+                  OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
+                  OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
+                  OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
+                  OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
+                  OR (ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%')
+                  OR (ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%')
+                  OR (ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%')
+                  OR (ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%')
+                  OR (ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%')
+                  OR (ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%')
+                  OR (ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%')
+                  OR (ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%')
+                  OR (ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%')
+                  OR (ic.item_nome_norm LIKE '%inside%' AND cs.servico_norm LIKE '%inside%')
+                  OR (ic.item_nome_norm LIKE '%sales%' AND cs.servico_norm LIKE '%sales%')
+                  THEN 70
+                WHEN EXISTS (
+                  SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
+                  WHERE LENGTH(s_token) >= 4 
+                    AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
+                    AND ic.item_nome_norm LIKE '%' || s_token || '%'
+                ) THEN 60
                 ELSE 0
               END DESC,
               cs.id_subtask DESC NULLS LAST
@@ -9931,7 +10023,8 @@ export class DbStorage implements IStorage {
       operadores_finais AS (
         SELECT DISTINCT
           CASE 
-            WHEN ir.match_score >= 70 THEN ir.responsavel
+            -- Threshold reduzido para 50 para capturar mais matches válidos
+            WHEN ir.match_score >= 50 THEN ir.responsavel
             WHEN cmr.fallback_responsavel IS NOT NULL THEN cmr.fallback_responsavel
             ELSE NULL
           END as operador
@@ -9951,8 +10044,8 @@ export class DbStorage implements IStorage {
       ? sql`AND COALESCE(NULLIF(TRIM(responsavel_final), ''), 'Sem Operador') = ${operador}`
       : sql``;
     
-    // Query CORRIGIDA v3: Usa valor do ITEM + FALLBACK para contrato mais recente
-    // Se item não faz match direto, usa operador do contrato mais recente do cliente
+    // Query CORRIGIDA v4: Matching robusto de serviços com normalização e tokens
+    // Usa valor do ITEM + FALLBACK para contrato mais recente
     // Isso garante 100% de cobertura sem perder receita
     const receitasResult = await db.execute(sql`
       WITH contratos_servico AS (
@@ -9960,7 +10053,18 @@ export class DbStorage implements IStorage {
           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
           ct.responsavel,
           ct.servico,
-          LOWER(TRIM(REGEXP_REPLACE(ct.servico, '\s+', ' ', 'g'))) as servico_norm,
+          -- Normalização robusta: lowercase, remove acentos, remove pontuação, colapsa espaços
+          LOWER(TRIM(REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              TRANSLATE(
+                COALESCE(ct.servico, ''),
+                'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
+              ),
+              '[^a-zA-Z0-9\s]', '', 'g'
+            ),
+            '\s+', ' ', 'g'
+          ))) as servico_norm,
           ct.id_subtask
         FROM cup_contratos ct
         INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
@@ -9993,7 +10097,18 @@ export class DbStorage implements IStorage {
           p.categoria_id,
           p.categoria_nome,
           iv.nome as item_nome,
-          LOWER(TRIM(REGEXP_REPLACE(COALESCE(iv.nome, ''), '\s+', ' ', 'g'))) as item_nome_norm,
+          -- Mesma normalização robusta para itens de venda
+          LOWER(TRIM(REGEXP_REPLACE(
+            REGEXP_REPLACE(
+              TRANSLATE(
+                COALESCE(iv.nome, ''),
+                'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
+                'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
+              ),
+              '[^a-zA-Z0-9\s]', '', 'g'
+            ),
+            '\s+', ' ', 'g'
+          ))) as item_nome_norm,
           iv.valor::numeric as item_valor
         FROM caz_parcelas p
         INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
@@ -10018,11 +10133,48 @@ export class DbStorage implements IStorage {
           ic.*,
           cs.responsavel,
           cs.servico as servico_contrato,
+          cs.servico_norm,
+          -- Score de matching robusto com múltiplos critérios
           CASE
+            -- Match exato após normalização
             WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 90
-            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 85
-            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 70
+            -- Um contém o outro (substring)
+            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
+            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
+            -- Primeiro token significativo igual
+            WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
+              AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
+            -- Dois primeiros tokens iguais (comparados separadamente)
+            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
+              AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
+              AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
+            -- Token principal do negócio aparece em ambos
+            WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
+              OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
+              OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
+              OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
+              OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
+              OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
+              OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
+              OR (ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%')
+              OR (ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%')
+              OR (ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%')
+              OR (ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%')
+              OR (ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%')
+              OR (ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%')
+              OR (ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%')
+              OR (ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%')
+              OR (ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%')
+              OR (ic.item_nome_norm LIKE '%inside%' AND cs.servico_norm LIKE '%inside%')
+              OR (ic.item_nome_norm LIKE '%sales%' AND cs.servico_norm LIKE '%sales%')
+              THEN 70
+            -- Qualquer palavra de 4+ caracteres em comum
+            WHEN EXISTS (
+              SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
+              WHERE LENGTH(s_token) >= 4 
+                AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
+                AND ic.item_nome_norm LIKE '%' || s_token || '%'
+            ) THEN 60
             ELSE 0
           END as match_score,
           ROW_NUMBER() OVER (
@@ -10030,9 +10182,38 @@ export class DbStorage implements IStorage {
             ORDER BY 
               CASE
                 WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 90
-                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 85
-                WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 70
+                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
+                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
+                WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
+                  AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
+                WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
+                  AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
+                  AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
+                WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
+                  OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
+                  OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
+                  OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
+                  OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
+                  OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
+                  OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
+                  OR (ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%')
+                  OR (ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%')
+                  OR (ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%')
+                  OR (ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%')
+                  OR (ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%')
+                  OR (ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%')
+                  OR (ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%')
+                  OR (ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%')
+                  OR (ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%')
+                  OR (ic.item_nome_norm LIKE '%inside%' AND cs.servico_norm LIKE '%inside%')
+                  OR (ic.item_nome_norm LIKE '%sales%' AND cs.servico_norm LIKE '%sales%')
+                  THEN 70
+                WHEN EXISTS (
+                  SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
+                  WHERE LENGTH(s_token) >= 4 
+                    AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
+                    AND ic.item_nome_norm LIKE '%' || s_token || '%'
+                ) THEN 60
                 ELSE 0
               END DESC,
               cs.id_subtask DESC NULLS LAST
@@ -10066,12 +10247,13 @@ export class DbStorage implements IStorage {
           item_valor,
           parcela_id,
           CASE 
-            WHEN match_score >= 70 THEN servico_contrato
+            -- Threshold reduzido para 50 para capturar mais matches
+            WHEN match_score >= 50 THEN servico_contrato
             WHEN fallback_servico IS NOT NULL THEN item_nome
             ELSE item_nome
           END as servico_nome,
           CASE 
-            WHEN match_score >= 70 THEN responsavel
+            WHEN match_score >= 50 THEN responsavel
             WHEN fallback_responsavel IS NOT NULL THEN fallback_responsavel
             ELSE NULL
           END as responsavel_final
