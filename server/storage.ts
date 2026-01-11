@@ -9913,7 +9913,7 @@ export class DbStorage implements IStorage {
           ))) as item_nome_norm
         FROM caz_parcelas p
         INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id_venda = v.id
+        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
@@ -10096,12 +10096,12 @@ export class DbStorage implements IStorage {
           p.id_cliente,
           p.categoria_id,
           p.categoria_nome,
-          iv.nome as item_nome,
+          COALESCE(iv.nome, p.descricao) as item_nome,
           -- Mesma normalização robusta para itens de venda
           LOWER(TRIM(REGEXP_REPLACE(
             REGEXP_REPLACE(
               TRANSLATE(
-                COALESCE(iv.nome, ''),
+                COALESCE(iv.nome, p.descricao, ''),
                 'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ',
                 'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'
               ),
@@ -10109,16 +10109,16 @@ export class DbStorage implements IStorage {
             ),
             '\s+', ' ', 'g'
           ))) as item_nome_norm,
-          iv.valor::numeric as item_valor
+          p.valor_pago::numeric as item_valor
         FROM caz_parcelas p
-        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id_venda = v.id
+        LEFT JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
+        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
           AND p.data_quitacao <= ${dataFimComHora}::timestamp
-          AND iv.valor IS NOT NULL
-          AND iv.valor::numeric > 0
+          AND p.valor_pago IS NOT NULL
+          AND p.valor_pago::numeric > 0
       ),
       itens_com_cliente AS (
         SELECT 
