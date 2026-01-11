@@ -10421,14 +10421,19 @@ export class DbStorage implements IStorage {
   }
 
   // ==================== MARGEM POR CLIENTE ====================
-  async getMargemPorCliente(mesAno?: string): Promise<import("@shared/schema").MargemClienteResumo> {
+  async getMargemPorCliente(dataInicio?: string, dataFim?: string): Promise<import("@shared/schema").MargemClienteResumo> {
     const hoje = new Date();
-    let mesAtual: string;
+    let startDate: string;
+    let endDate: string;
     
-    if (mesAno) {
-      mesAtual = mesAno;
+    if (dataInicio && dataFim) {
+      startDate = dataInicio;
+      endDate = dataFim;
     } else {
-      mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+      const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+      startDate = primeiroDia.toISOString().split('T')[0];
+      endDate = ultimoDia.toISOString().split('T')[0];
     }
 
     const result = await db.execute(sql`
@@ -10466,7 +10471,7 @@ export class DbStorage implements IStorage {
         LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
         WHERE p.tipo_evento = 'RECEITA'
           AND p.status = 'QUITADO'
-          AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
+          AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
         GROUP BY REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '')
       ),
       despesas_freelancer AS (
@@ -10477,7 +10482,7 @@ export class DbStorage implements IStorage {
         LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
         WHERE p.tipo_evento = 'DESPESA'
           AND p.status = 'QUITADO'
-          AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
+          AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
           AND p.id_cliente IS NOT NULL
           AND TRIM(p.id_cliente::text) != ''
         GROUP BY REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '')
@@ -10487,7 +10492,7 @@ export class DbStorage implements IStorage {
         FROM caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status = 'QUITADO'
-          AND TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = ${mesAtual}
+          AND data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
           AND (id_cliente IS NULL OR TRIM(id_cliente::text) = '')
       ),
       despesa_op_rateada AS (
@@ -10523,7 +10528,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
       WHERE p.tipo_evento = 'RECEITA'
         AND p.status = 'QUITADO'
-        AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
+        AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
         AND caz.cnpj IS NOT NULL
       ORDER BY p.valor_pago::numeric DESC
     `);
@@ -10538,7 +10543,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
       WHERE p.tipo_evento = 'DESPESA'
         AND p.status = 'QUITADO'
-        AND TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM') = ${mesAtual}
+        AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
         AND p.id_cliente IS NOT NULL
         AND TRIM(p.id_cliente::text) != ''
         AND caz.cnpj IS NOT NULL
@@ -10559,10 +10564,6 @@ export class DbStorage implements IStorage {
     }
 
     const freelancerDetalhesByCnpj = new Map<string, { descricao: string; valor: number; categoria?: string }[]>();
-    console.log('[MargemCliente] Freelancer detalhes rows:', freelancerDetalhesResult.rows.length);
-    if (freelancerDetalhesResult.rows.length > 0) {
-      console.log('[MargemCliente] Sample freelancer row:', JSON.stringify(freelancerDetalhesResult.rows[0]));
-    }
     for (const row of freelancerDetalhesResult.rows as any[]) {
       const cnpj = row.cnpj_limpo || '';
       if (!freelancerDetalhesByCnpj.has(cnpj)) {
@@ -10574,7 +10575,6 @@ export class DbStorage implements IStorage {
         categoria: row.categoria_nome || undefined
       });
     }
-    console.log('[MargemCliente] Freelancer detalhes by CNPJ count:', freelancerDetalhesByCnpj.size);
 
     const clientes = (result.rows as any[]).map(row => {
       const cnpjLimpo = row.cnpj ? row.cnpj.replace(/[.\-\/]/g, '') : '';
