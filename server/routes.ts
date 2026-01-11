@@ -3865,8 +3865,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/financeiro/margem-clientes", async (req, res) => {
     try {
-      const mesAno = req.query.mesAno as string | undefined;
-      const data = await storage.getMargemPorCliente(mesAno);
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const data = await storage.getMargemPorCliente(dataInicio, dataFim);
       res.json(data);
     } catch (error) {
       console.error("[api] Error fetching margem por cliente:", error);

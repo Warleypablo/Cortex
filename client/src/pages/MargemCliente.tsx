@@ -4,14 +4,14 @@ import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   TrendingDown, DollarSign, Users, Percent, 
-  Building2, Search, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight
+  Building2, Search, ArrowUpDown, ChevronUp, ChevronDown, ChevronRight, Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MargemClienteResumo, MargemClienteItem } from "@shared/schema";
@@ -19,37 +19,44 @@ import type { MargemClienteResumo, MargemClienteItem } from "@shared/schema";
 type SortField = 'nomeCliente' | 'receita' | 'despesaTotal' | 'margem' | 'margemPercentual';
 type SortDirection = 'asc' | 'desc';
 
+function getDefaultDates() {
+  const hoje = new Date();
+  const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+  
+  const formatDate = (d: Date) => {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  return {
+    inicio: formatDate(primeiroDia),
+    fim: formatDate(ultimoDia)
+  };
+}
+
 export default function MargemCliente() {
   usePageTitle("Margem por Cliente");
   useSetPageInfo("Margem por Cliente", "Análise de margem e rentabilidade por cliente");
   
-  const hoje = new Date();
-  const [mesAno, setMesAno] = useState(`${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`);
+  const defaultDates = getDefaultDates();
+  const [dataInicio, setDataInicio] = useState(defaultDates.inicio);
+  const [dataFim, setDataFim] = useState(defaultDates.fim);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>('receita');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useQuery<MargemClienteResumo>({
-    queryKey: ["/api/financeiro/margem-clientes", mesAno],
+    queryKey: ["/api/financeiro/margem-clientes", dataInicio, dataFim],
     queryFn: async () => {
-      const response = await fetch(`/api/financeiro/margem-clientes?mesAno=${mesAno}`);
+      const response = await fetch(`/api/financeiro/margem-clientes?dataInicio=${dataInicio}&dataFim=${dataFim}`);
       if (!response.ok) throw new Error('Failed to fetch margem por cliente');
       return response.json();
     },
   });
-
-  const mesesOpcoes = useMemo(() => {
-    const opcoes = [];
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-      const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      const label = `${mesesNomes[d.getMonth()]}/${d.getFullYear()}`;
-      opcoes.push({ value, label });
-    }
-    return opcoes;
-  }, []);
 
   const handleSort = (field: SortField) => {
     setExpandedRows(new Set());
@@ -130,16 +137,35 @@ export default function MargemCliente() {
           <h1 className="text-2xl font-bold">Margem por Cliente</h1>
           <p className="text-muted-foreground">Análise de rentabilidade por cliente ativo</p>
         </div>
-        <Select value={mesAno} onValueChange={setMesAno}>
-          <SelectTrigger className="w-[180px]" data-testid="select-mes-ano">
-            <SelectValue placeholder="Selecione o mês" />
-          </SelectTrigger>
-          <SelectContent>
-            {mesesOpcoes.map(m => (
-              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="data-inicio" className="text-sm text-muted-foreground whitespace-nowrap">
+              <Calendar className="h-4 w-4 inline mr-1" />
+              De:
+            </Label>
+            <Input
+              id="data-inicio"
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="w-[160px]"
+              data-testid="input-data-inicio"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Label htmlFor="data-fim" className="text-sm text-muted-foreground whitespace-nowrap">
+              Até:
+            </Label>
+            <Input
+              id="data-fim"
+              type="date"
+              value={dataFim}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="w-[160px]"
+              data-testid="input-data-fim"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
