@@ -31,6 +31,7 @@ import {
   DollarSign,
   Search,
   AlertTriangle,
+  AlertCircle,
   Phone,
   Building2,
   Edit3,
@@ -96,6 +97,7 @@ interface Contexto {
   procedimentoJuridico: string | null;
   statusJuridico: string | null;
   valorAcordado: number | null;
+  tipoInadimplencia: string | null;
   atualizadoJuridicoPor: string | null;
   atualizadoJuridicoEm: string | null;
 }
@@ -174,6 +176,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
     procedimentoJuridico: "",
     statusJuridico: "",
     valorAcordado: "",
+    tipoInadimplencia: "",
   });
   const { toast } = useToast();
   
@@ -186,12 +189,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { clienteId: string; contextoJuridico: string; procedimentoJuridico: string; statusJuridico: string; valorAcordado?: number }) => {
+    mutationFn: async (data: { clienteId: string; contextoJuridico: string; procedimentoJuridico: string; statusJuridico: string; valorAcordado?: number; tipoInadimplencia?: string }) => {
       return apiRequest("PUT", `/api/juridico/clientes/${data.clienteId}/contexto`, {
         contextoJuridico: data.contextoJuridico,
         procedimentoJuridico: data.procedimentoJuridico,
         statusJuridico: data.statusJuridico,
         valorAcordado: data.valorAcordado,
+        tipoInadimplencia: data.tipoInadimplencia,
       });
     },
     onSuccess: () => {
@@ -367,6 +371,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
       procedimentoJuridico: cliente.contexto?.procedimentoJuridico || "",
       statusJuridico: cliente.contexto?.statusJuridico || "",
       valorAcordado: cliente.contexto?.valorAcordado?.toString() || "",
+      tipoInadimplencia: cliente.contexto?.tipoInadimplencia || "",
     });
   };
 
@@ -391,6 +396,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
       procedimentoJuridico: editForm.procedimentoJuridico,
       statusJuridico: editForm.statusJuridico,
       valorAcordado: valorNum,
+      tipoInadimplencia: editForm.tipoInadimplencia || undefined,
     });
   };
 
@@ -844,6 +850,12 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                             {status.label}
                           </Badge>
                         )}
+                        {item.contexto?.tipoInadimplencia === 'erro_operacional' && (
+                          <Badge className="bg-purple-100 text-purple-700 border border-purple-200 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5" data-testid={`badge-erro-operacional-${index}`}>
+                            <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+                            Erro Operacional
+                          </Badge>
+                        )}
                       </div>
 
                       {/* Linha 3: Botões de Ação - Grid em mobile */}
@@ -1274,6 +1286,38 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                   );
                 })}
               </div>
+            </div>
+
+            {/* Tipo de Inadimplência */}
+            <div className="space-y-3">
+              <label className="text-base font-semibold">
+                Tipo de inadimplência
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={editForm.tipoInadimplencia === "inadimplencia_real" ? "default" : "outline"}
+                  className="h-auto py-3 justify-start"
+                  onClick={() => setEditForm({ ...editForm, tipoInadimplencia: "inadimplencia_real" })}
+                  data-testid="button-tipo-inadimplencia-real"
+                >
+                  <AlertCircle className="h-5 w-5 mr-2" />
+                  Inadimplência Real
+                </Button>
+                <Button
+                  type="button"
+                  variant={editForm.tipoInadimplencia === "erro_operacional" ? "default" : "outline"}
+                  className="h-auto py-3 justify-start"
+                  onClick={() => setEditForm({ ...editForm, tipoInadimplencia: "erro_operacional" })}
+                  data-testid="button-tipo-erro-operacional"
+                >
+                  <AlertTriangle className="h-5 w-5 mr-2" />
+                  Erro Operacional
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Erro operacional: falha no sistema, cobrança indevida ou erro interno
+              </p>
             </div>
 
             {/* Valor Recebido */}
