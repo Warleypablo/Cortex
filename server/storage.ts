@@ -3804,18 +3804,6 @@ export class DbStorage implements IStorage {
           END
         ), 0) as receita_pontual_entregue,
         
-        -- Valor Entregue Pontual: soma de valorp com data_pontual_entregue no ano atual
-        COALESCE(SUM(
-          CASE 
-            WHEN data_pontual_entregue IS NOT NULL
-              AND EXTRACT(YEAR FROM data_pontual_entregue) = EXTRACT(YEAR FROM CURRENT_DATE)
-              AND valorp IS NOT NULL
-              AND valorp > 0
-            THEN valorp::numeric
-            ELSE 0 
-          END
-        ), 0) as valor_entregue_pontual,
-        
         -- Clientes únicos (CNPJs) para cálculo do ticket médio
         COUNT(DISTINCT CASE 
             WHEN status IN ('ativo', 'onboarding', 'triagem')
@@ -3849,7 +3837,6 @@ export class DbStorage implements IStorage {
     const churn = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
     const receitaPontualEntregue = parseFloat(transRow.receita_pontual_entregue || '0');
-    const valorEntreguePontual = parseFloat(transRow.valor_entregue_pontual || '0');
     const clientesUnicos = parseInt(transRow.clientes_unicos || '0');
     const ticketMedio = clientesUnicos > 0 ? mrr / clientesUnicos : 0;
 
@@ -3861,7 +3848,7 @@ export class DbStorage implements IStorage {
       aquisicaoPontualCommerce: 0,
       aquisicaoPontualTech: 0,
       receitaPontualEntregue,
-      valorEntreguePontual,
+      valorEntreguePontual: 0,
       clientesUnicos,
       ticketMedio,
       churn,
