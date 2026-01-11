@@ -387,6 +387,31 @@ export interface IStorage {
       quantidadeClientes: number;
     };
   }>;
+  
+  // Contribuição por Operador (responsável do contrato)
+  getSquadsContribuicao(): Promise<string[]>;
+  getContribuicaoOperadorDfc(dataInicio: string, dataFim: string, operador?: string, squad?: string): Promise<{
+    operadores: string[];
+    receitas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[];
+    despesas: {
+      categoriaId: string;
+      categoriaNome: string;
+      valor: number;
+      nivel: number;
+    }[];
+    totais: {
+      receitaTotal: number;
+      despesaTotal: number;
+      resultado: number;
+      quantidadeParcelas: number;
+      quantidadeContratos: number;
+    };
+  }>;
 }
 
 // GEG Dashboard Extended Types
@@ -9821,12 +9846,23 @@ export class DbStorage implements IStorage {
     };
   }
 
+  // Lista de squads únicos para filtro de Contribuição por Operador
+  async getSquadsContribuicao(): Promise<string[]> {
+    const result = await db.execute(sql`
+      SELECT DISTINCT squad 
+      FROM cup_contratos 
+      WHERE squad IS NOT NULL AND TRIM(squad) != ''
+      ORDER BY squad
+    `);
+    return result.rows.map((r: any) => r.squad);
+  }
+
   // Contribuição por Operador (responsável do CONTRATO, não do cliente) - Estilo DFC
   // Diferença do Colaborador: usa cup_contratos.responsavel (gestor do contrato)
   // Colaborador usa cup_clientes.responsavel (CX que gerencia o cliente)
   // CORRIGIDO v2: Usa valor do ITEM de venda (não da parcela) para atribuição precisa por serviço
   // Itens sem match de contrato vão para "Sem Operador" (não são descartados)
-  async getContribuicaoOperadorDfc(dataInicio: string, dataFim: string, operador?: string): Promise<{
+  async getContribuicaoOperadorDfc(dataInicio: string, dataFim: string, operador?: string, squad?: string): Promise<{
     operadores: string[];
     receitas: {
       categoriaId: string;
@@ -9877,6 +9913,7 @@ export class DbStorage implements IStorage {
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
+          ${squad && squad !== 'todos' ? sql`AND ct.squad = ${squad}` : sql``}
       ),
       contrato_mais_recente AS (
         SELECT DISTINCT ON (cnpj_limpo)
@@ -9891,6 +9928,7 @@ export class DbStorage implements IStorage {
           INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
           WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
+            ${squad && squad !== 'todos' ? sql`AND ct.squad = ${squad}` : sql``}
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
@@ -10071,6 +10109,7 @@ export class DbStorage implements IStorage {
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
+          ${squad && squad !== 'todos' ? sql`AND ct.squad = ${squad}` : sql``}
       ),
       contrato_mais_recente AS (
         SELECT DISTINCT ON (cnpj_limpo)
@@ -10087,6 +10126,7 @@ export class DbStorage implements IStorage {
           INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
           WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
+            ${squad && squad !== 'todos' ? sql`AND ct.squad = ${squad}` : sql``}
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
