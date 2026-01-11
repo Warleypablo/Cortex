@@ -10542,19 +10542,40 @@ export class DbStorage implements IStorage {
       ORDER BY COALESCE(rc.receita, 0) DESC
     `);
 
+    // Buscar detalhes de receita com nomes dos serviços de caz_itensvenda
+    // Descrição pode ser "Venda XXXX" ou "X/Y - Venda XXXX"
+    // Precisamos extrair o número e cruzar com caz_vendas.numero
     const receitaDetalhesResult = await db.execute(sql`
+      WITH parcelas_receita AS (
+        SELECT 
+          p.id,
+          p.descricao,
+          p.categoria_nome,
+          p.valor_pago::numeric as valor,
+          p.id_cliente,
+          -- Extrai o número da venda: "Venda 12345" ou "1/3 - Venda 12345" -> "12345"
+          TRIM(
+            REGEXP_REPLACE(
+              REGEXP_REPLACE(p.descricao, '^[0-9]+/[0-9]+\\s*-\\s*', ''),
+              '^Venda\\s+', ''
+            )
+          ) as numero_venda_extraido
+        FROM caz_parcelas p
+        WHERE p.tipo_evento = 'RECEITA'
+          AND p.status = 'QUITADO'
+          AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
+      )
       SELECT 
         REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
-        p.descricao,
-        p.categoria_nome,
-        p.valor_pago::numeric as valor
-      FROM caz_parcelas p
-      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      WHERE p.tipo_evento = 'RECEITA'
-        AND p.status = 'QUITADO'
-        AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
-        AND caz.cnpj IS NOT NULL
-      ORDER BY p.valor_pago::numeric DESC
+        COALESCE(iv.nome, pr.descricao) as descricao,
+        pr.categoria_nome,
+        COALESCE(iv.valor::numeric, pr.valor) as valor
+      FROM parcelas_receita pr
+      LEFT JOIN caz_clientes caz ON TRIM(pr.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN caz_vendas v ON TRIM(v.numero::text) = TRIM(pr.numero_venda_extraido)
+      LEFT JOIN caz_itensvenda iv ON iv.id_venda::text = v.id::text
+      WHERE caz.cnpj IS NOT NULL
+      ORDER BY COALESCE(iv.valor::numeric, pr.valor) DESC
     `);
 
     const freelancerDetalhesResult = await db.execute(sql`
