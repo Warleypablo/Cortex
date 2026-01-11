@@ -3804,11 +3804,11 @@ export class DbStorage implements IStorage {
           END
         ), 0) as receita_pontual_entregue,
         
-        -- Clientes únicos (CNPJs) para cálculo do ticket médio
+        -- Clientes únicos (id_task) para cálculo do ticket médio
         COUNT(DISTINCT CASE 
             WHEN status IN ('ativo', 'onboarding', 'triagem')
-              AND cnpj IS NOT NULL
-            THEN cnpj
+              AND id_task IS NOT NULL
+            THEN id_task
             ELSE NULL 
           END
         ) as clientes_unicos
