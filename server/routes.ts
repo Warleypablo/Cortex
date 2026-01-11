@@ -7748,6 +7748,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contribuição por Squad - Receitas atribuídas por squad do contrato
+  app.get("/api/contribuicao-squad/dfc", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string;
+      const dataFim = req.query.dataFim as string;
+      const squad = req.query.squad as string | undefined;
+      
+      if (!dataInicio || !dataFim) {
+        return res.status(400).json({ error: "Parâmetros dataInicio e dataFim são obrigatórios" });
+      }
+      
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+        return res.status(400).json({ error: "Formato inválido. Esperado: YYYY-MM-DD" });
+      }
+      
+      const data = await storage.getContribuicaoSquadDfc(dataInicio, dataFim, squad);
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching contribuição squad DFC:", error);
+      res.status(500).json({ error: "Falha ao buscar dados de contribuição squad DFC" });
+    }
+  });
+
   // ========================================
   // CASES DE SUCESSO CHAT API ENDPOINT
   // ========================================
