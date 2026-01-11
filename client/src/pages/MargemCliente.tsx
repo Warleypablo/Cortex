@@ -383,23 +383,29 @@ export default function MargemCliente() {
                             </Badge>
                           </TableCell>
                         </TableRow>
-                        {isExpanded && (
+                        {isExpanded && (() => {
+                          const lucroBruto = cliente.receita - cliente.despesaFreelancers;
+                          const custosIndiretos = cliente.despesaOperacional + cliente.despesaSalarioRateado;
+                          const lucroLiquido = lucroBruto - custosIndiretos;
+                          
+                          return (
                           <TableRow className="bg-muted/20 hover:bg-muted/20">
                             <TableCell colSpan={9} className="p-4">
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Seção de Receitas */}
+                              <div className="space-y-4 max-w-4xl mx-auto">
+                                
+                                {/* (+) RECEITAS */}
                                 <div className="rounded-lg border-2 border-green-500/30 bg-green-500/5 p-4">
                                   <div className="flex items-center justify-between mb-3 pb-2 border-b border-green-500/20">
                                     <h4 className="font-bold text-green-600 flex items-center gap-2">
                                       <DollarSign className="h-5 w-5" />
-                                      RECEITAS
+                                      (+) RECEITAS
                                     </h4>
                                     <Badge variant="default" className="bg-green-600">
                                       {formatCurrency(cliente.receita)}
                                     </Badge>
                                   </div>
                                   {cliente.receitaDetalhes?.length > 0 ? (
-                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-2">
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
                                       {cliente.receitaDetalhes.map((d, i) => (
                                         <div key={i} className="flex justify-between items-center text-sm bg-green-500/10 rounded px-3 py-2">
                                           <span className="truncate max-w-[65%] text-foreground" title={d.descricao}>
@@ -412,37 +418,79 @@ export default function MargemCliente() {
                                       ))}
                                     </div>
                                   ) : (
-                                    <div className="text-muted-foreground text-sm italic py-4 text-center">
+                                    <div className="text-muted-foreground text-sm italic py-2 text-center">
                                       Sem detalhes de receita disponíveis
                                     </div>
                                   )}
                                 </div>
 
-                                {/* Seção de Despesas */}
+                                {/* (-) CUSTOS DIRETOS */}
+                                <div className="rounded-lg border-2 border-orange-500/30 bg-orange-500/5 p-4">
+                                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-orange-500/20">
+                                    <h4 className="font-bold text-orange-600 flex items-center gap-2">
+                                      <TrendingDown className="h-5 w-5" />
+                                      (-) CUSTOS DIRETOS
+                                    </h4>
+                                    <Badge className="bg-orange-600">
+                                      {formatCurrency(cliente.despesaFreelancers)}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-2">
+                                    {cliente.despesaFreelancers > 0 ? (
+                                      <div className="bg-orange-500/10 rounded px-3 py-2">
+                                        <div className="flex justify-between items-center text-sm mb-2">
+                                          <span className="text-foreground font-medium">Freelancers</span>
+                                          <span className="font-semibold text-orange-600">
+                                            {formatCurrency(cliente.despesaFreelancers)}
+                                          </span>
+                                        </div>
+                                        {cliente.freelancerDetalhes?.length > 0 && (
+                                          <div className="border-t border-orange-500/20 pt-2 mt-2 space-y-1 max-h-32 overflow-y-auto">
+                                            {cliente.freelancerDetalhes.map((d, i) => (
+                                              <div key={i} className="flex justify-between items-center text-xs pl-3 text-muted-foreground">
+                                                <span className="truncate max-w-[60%]" title={d.descricao}>
+                                                  • {d.descricao}
+                                                </span>
+                                                <span className="text-orange-500 whitespace-nowrap">
+                                                  {formatCurrency(d.valor)}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="text-muted-foreground text-sm italic py-2 text-center">
+                                        Sem custos diretos
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* (=) LUCRO BRUTO */}
+                                <div className={`rounded-lg border-2 p-3 ${lucroBruto >= 0 ? 'border-blue-500/30 bg-blue-500/10' : 'border-red-500/30 bg-red-500/10'}`}>
+                                  <div className="flex items-center justify-between">
+                                    <h4 className={`font-bold flex items-center gap-2 ${lucroBruto >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                      (=) LUCRO BRUTO
+                                    </h4>
+                                    <span className={`font-bold text-lg ${lucroBruto >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                                      {formatCurrency(lucroBruto)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* (-) CUSTOS INDIRETOS */}
                                 <div className="rounded-lg border-2 border-red-500/30 bg-red-500/5 p-4">
                                   <div className="flex items-center justify-between mb-3 pb-2 border-b border-red-500/20">
                                     <h4 className="font-bold text-red-600 flex items-center gap-2">
                                       <TrendingDown className="h-5 w-5" />
-                                      DESPESAS
+                                      (-) CUSTOS INDIRETOS
                                     </h4>
                                     <Badge variant="destructive">
-                                      {formatCurrency(cliente.despesaTotal)}
+                                      {formatCurrency(custosIndiretos)}
                                     </Badge>
                                   </div>
-                                  <div className="space-y-3 max-h-56 overflow-y-auto pr-2">
-                                    {/* Salário Rateado */}
-                                    {cliente.despesaSalarioRateado > 0 && (
-                                      <div className="bg-red-500/10 rounded px-3 py-2">
-                                        <div className="flex justify-between items-center text-sm">
-                                          <span className="text-foreground font-medium">Salário Rateado (Time)</span>
-                                          <span className="font-semibold text-red-600">
-                                            {formatCurrency(cliente.despesaSalarioRateado)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
-                                    
-                                    {/* Operacional */}
+                                  <div className="space-y-2">
                                     {cliente.despesaOperacional > 0 && (
                                       <div className="bg-red-500/10 rounded px-3 py-2">
                                         <div className="flex justify-between items-center text-sm">
@@ -453,59 +501,46 @@ export default function MargemCliente() {
                                         </div>
                                       </div>
                                     )}
-
-                                    {/* Freelancers - com detalhes */}
-                                    {cliente.despesaFreelancers > 0 && (
+                                    {cliente.despesaSalarioRateado > 0 && (
                                       <div className="bg-red-500/10 rounded px-3 py-2">
-                                        <div className="flex justify-between items-center text-sm mb-2">
-                                          <span className="text-foreground font-medium">Freelancers</span>
+                                        <div className="flex justify-between items-center text-sm">
+                                          <span className="text-foreground font-medium">Salário Rateado (Time)</span>
                                           <span className="font-semibold text-red-600">
-                                            {formatCurrency(cliente.despesaFreelancers)}
+                                            {formatCurrency(cliente.despesaSalarioRateado)}
                                           </span>
                                         </div>
-                                        {cliente.freelancerDetalhes?.length > 0 && (
-                                          <div className="border-t border-red-500/20 pt-2 mt-2 space-y-1">
-                                            {cliente.freelancerDetalhes.map((d, i) => (
-                                              <div key={i} className="flex justify-between items-center text-xs pl-3 text-muted-foreground">
-                                                <span className="truncate max-w-[60%]" title={d.descricao}>
-                                                  • {d.descricao}
-                                                </span>
-                                                <span className="text-red-500 whitespace-nowrap">
-                                                  {formatCurrency(d.valor)}
-                                                </span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
                                       </div>
                                     )}
-
-                                    {cliente.despesaTotal === 0 && (
-                                      <div className="text-muted-foreground text-sm italic py-4 text-center">
-                                        Sem despesas registradas
+                                    {custosIndiretos === 0 && (
+                                      <div className="text-muted-foreground text-sm italic py-2 text-center">
+                                        Sem custos indiretos
                                       </div>
                                     )}
                                   </div>
                                 </div>
-                              </div>
 
-                              {/* Resumo da Margem */}
-                              <div className="mt-4 pt-4 border-t border-border flex items-center justify-end gap-6 text-sm">
-                                <span className="text-muted-foreground">
-                                  Receita: <span className="text-green-600 font-semibold">{formatCurrency(cliente.receita)}</span>
-                                </span>
-                                <span className="text-muted-foreground">
-                                  − Despesas: <span className="text-red-600 font-semibold">{formatCurrency(cliente.despesaTotal)}</span>
-                                </span>
-                                <span className="text-muted-foreground">
-                                  = Margem: <span className={`font-bold ${cliente.margem >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {formatCurrency(cliente.margem)} ({formatPercent(cliente.margemPercentual)})
-                                  </span>
-                                </span>
+                                {/* (=) LUCRO LÍQUIDO */}
+                                <div className={`rounded-lg border-2 p-4 ${lucroLiquido >= 0 ? 'border-green-500/50 bg-green-500/15' : 'border-red-500/50 bg-red-500/15'}`}>
+                                  <div className="flex items-center justify-between">
+                                    <h4 className={`font-bold text-lg flex items-center gap-2 ${lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      (=) LUCRO LÍQUIDO
+                                    </h4>
+                                    <div className="flex items-center gap-3">
+                                      <span className={`font-bold text-xl ${lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(lucroLiquido)}
+                                      </span>
+                                      <Badge variant={lucroLiquido >= 0 ? 'default' : 'destructive'} className={lucroLiquido >= 0 ? 'bg-green-600' : ''}>
+                                        {formatPercent(cliente.margemPercentual)}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </div>
+
                               </div>
                             </TableCell>
                           </TableRow>
-                        )}
+                        );
+                        })()}
                       </Fragment>
                     );
                   })
