@@ -42,12 +42,52 @@ export default function MargemCliente() {
   useSetPageInfo("Margem por Cliente", "Análise de margem e rentabilidade por cliente");
   
   const defaultDates = getDefaultDates();
+  // Estados "confirmados" usados na query
   const [dataInicio, setDataInicio] = useState(defaultDates.inicio);
   const [dataFim, setDataFim] = useState(defaultDates.fim);
+  // Estados "pendentes" para os inputs (atualizam em tempo real)
+  const [inputInicio, setInputInicio] = useState(defaultDates.inicio);
+  const [inputFim, setInputFim] = useState(defaultDates.fim);
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>('receita');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  // Valida se a data está completa (YYYY-MM-DD = 10 caracteres)
+  const isValidDate = (dateStr: string) => {
+    if (dateStr.length !== 10) return false;
+    const date = new Date(dateStr);
+    return !isNaN(date.getTime());
+  };
+
+  // Aplica as datas quando completas
+  const handleInicioChange = (value: string) => {
+    setInputInicio(value);
+    if (isValidDate(value)) {
+      setDataInicio(value);
+    }
+  };
+
+  const handleFimChange = (value: string) => {
+    setInputFim(value);
+    if (isValidDate(value)) {
+      setDataFim(value);
+    }
+  };
+
+  // Ao sair do campo, força a atualização se a data for válida
+  const handleBlurInicio = () => {
+    if (isValidDate(inputInicio)) {
+      setDataInicio(inputInicio);
+    }
+  };
+
+  const handleBlurFim = () => {
+    if (isValidDate(inputFim)) {
+      setDataFim(inputFim);
+    }
+  };
 
   const { data, isLoading } = useQuery<MargemClienteResumo>({
     queryKey: ["/api/financeiro/margem-clientes", dataInicio, dataFim],
@@ -146,8 +186,9 @@ export default function MargemCliente() {
             <Input
               id="data-inicio"
               type="date"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
+              value={inputInicio}
+              onChange={(e) => handleInicioChange(e.target.value)}
+              onBlur={handleBlurInicio}
               className="w-[160px]"
               data-testid="input-data-inicio"
             />
@@ -159,8 +200,9 @@ export default function MargemCliente() {
             <Input
               id="data-fim"
               type="date"
-              value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
+              value={inputFim}
+              onChange={(e) => handleFimChange(e.target.value)}
+              onBlur={handleBlurFim}
               className="w-[160px]"
               data-testid="input-data-fim"
             />
