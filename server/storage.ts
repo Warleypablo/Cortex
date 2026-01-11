@@ -9932,11 +9932,12 @@ export class DbStorage implements IStorage {
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
-      itens_vendidos AS (
+      itens_vendidos_raw AS (
         SELECT 
           p.id as parcela_id,
           p.id_cliente,
           iv.nome as item_nome_original,
+          iv.valor::numeric as item_valor,
           -- Mesma normalização robusta para itens de venda
           LOWER(TRIM(REGEXP_REPLACE(
             REGEXP_REPLACE(
@@ -9959,6 +9960,13 @@ export class DbStorage implements IStorage {
           AND iv.valor IS NOT NULL
           AND iv.valor::numeric > 0
       ),
+      itens_vendidos AS (
+        -- Criar ID único por item para evitar agrupamento incorreto
+        SELECT 
+          ROW_NUMBER() OVER (ORDER BY parcela_id, item_nome_original, item_valor) as item_uid,
+          *
+        FROM itens_vendidos_raw
+      ),
       cnpjs_do_squad AS (
         -- Lista CNPJs que TÊM contrato no squad selecionado (se filtrado)
         SELECT DISTINCT REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo
@@ -9980,88 +9988,53 @@ export class DbStorage implements IStorage {
           ic.*,
           cs.responsavel,
           cs.servico_norm,
-          -- Score de matching robusto com múltiplos critérios
-          CASE
-            -- Match exato após normalização
-            WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-            -- Um contém o outro (substring)
-            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
-            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
-            -- Primeiro token significativo igual (ex: "gestao" em "gestao trafego" e "gestao de trafego pago")
-            WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
-              AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
-            -- Dois primeiros tokens iguais (comparados separadamente)
-            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
-              AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
-              AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
-            -- Token principal aparece em ambos (palavras-chave comuns do negócio)
-            WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
-              OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
-              OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
-              OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
-              OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
-              OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
-              OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
-              OR (ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%')
-              OR (ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%')
-              OR (ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%')
-              OR (ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%')
-              OR (ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%')
-              OR (ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%')
-              OR (ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%')
-              OR (ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%')
-              OR (ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%')
-              OR (ic.item_nome_norm LIKE '%inside%' AND cs.servico_norm LIKE '%inside%')
-              OR (ic.item_nome_norm LIKE '%sales%' AND cs.servico_norm LIKE '%sales%')
-              THEN 70
-            -- Qualquer palavra de 4+ caracteres em comum (excluindo preposições)
-            WHEN EXISTS (
-              SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
-              WHERE LENGTH(s_token) >= 4 
-                AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
-                AND ic.item_nome_norm LIKE '%' || s_token || '%'
-            ) THEN 60
-            ELSE 0
-          END as match_score,
+          -- Score de matching com PRIORIDADE para tokens ESPECÍFICOS sobre genéricos
+          (
+            CASE WHEN cs.servico_norm = ic.item_nome_norm THEN 100 ELSE 0 END +
+            CASE WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' OR ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 30 ELSE 0 END +
+            -- Tokens ESPECÍFICOS - alta pontuação
+            CASE WHEN ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%' THEN 80 ELSE 0 END +
+            -- Tokens GENÉRICOS - baixa pontuação
+            CASE WHEN ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%' THEN 40 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%' THEN 40 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%' THEN 40 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%' THEN 40 ELSE 0 END
+          ) as match_score,
           ROW_NUMBER() OVER (
-            PARTITION BY ic.parcela_id, ic.item_nome_norm
+            -- Usar item_uid como chave única para garantir segregação correta
+            PARTITION BY ic.item_uid
             ORDER BY 
-              CASE
-                WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
-                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
-                WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
-                  AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
-                WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
-                  AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
-                  AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
-                WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
-                  OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
-                  OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
-                  OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
-                  OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
-                  OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
-                  OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
-                  OR (ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%')
-                  OR (ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%')
-                  OR (ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%')
-                  OR (ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%')
-                  OR (ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%')
-                  OR (ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%')
-                  OR (ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%')
-                  OR (ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%')
-                  OR (ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%')
-                  OR (ic.item_nome_norm LIKE '%inside%' AND cs.servico_norm LIKE '%inside%')
-                  OR (ic.item_nome_norm LIKE '%sales%' AND cs.servico_norm LIKE '%sales%')
-                  THEN 70
-                WHEN EXISTS (
-                  SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
-                  WHERE LENGTH(s_token) >= 4 
-                    AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
-                    AND ic.item_nome_norm LIKE '%' || s_token || '%'
-                ) THEN 60
-                ELSE 0
-              END DESC,
+              (
+                CASE WHEN cs.servico_norm = ic.item_nome_norm THEN 100 ELSE 0 END +
+                CASE WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' OR ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 30 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%' THEN 40 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%' THEN 40 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%' THEN 40 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%' THEN 40 ELSE 0 END
+              ) DESC,
               cs.id_subtask DESC NULLS LAST
           ) as rn
         FROM itens_com_cliente ic
@@ -10139,7 +10112,7 @@ export class DbStorage implements IStorage {
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
-      itens_vendidos AS (
+      itens_vendidos_raw AS (
         SELECT 
           p.id as parcela_id,
           p.id_cliente,
@@ -10169,6 +10142,13 @@ export class DbStorage implements IStorage {
           AND iv.valor IS NOT NULL
           AND iv.valor::numeric > 0
       ),
+      itens_vendidos AS (
+        -- Criar ID único por item para evitar agrupamento incorreto
+        SELECT 
+          ROW_NUMBER() OVER (ORDER BY parcela_id, item_nome, item_valor) as item_uid,
+          *
+        FROM itens_vendidos_raw
+      ),
       cnpjs_do_squad AS (
         -- Lista CNPJs que TÊM contrato no squad selecionado (se filtrado)
         SELECT DISTINCT REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo
@@ -10192,88 +10172,55 @@ export class DbStorage implements IStorage {
           cs.responsavel,
           cs.servico as servico_contrato,
           cs.servico_norm,
-          -- Score de matching robusto com múltiplos critérios
-          CASE
-            -- Match exato após normalização
-            WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-            -- Um contém o outro (substring)
-            WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
-            WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
-            -- Primeiro token significativo igual
-            WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
-              AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
-            -- Dois primeiros tokens iguais (comparados separadamente)
-            WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
-              AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
-              AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
-            -- Token principal do negócio aparece em ambos
-            WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
-              OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
-              OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
-              OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
-              OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
-              OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
-              OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
-              OR (ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%')
-              OR (ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%')
-              OR (ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%')
-              OR (ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%')
-              OR (ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%')
-              OR (ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%')
-              OR (ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%')
-              OR (ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%')
-              OR (ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%')
-              OR (ic.item_nome_norm LIKE '%inside%' AND cs.servico_norm LIKE '%inside%')
-              OR (ic.item_nome_norm LIKE '%sales%' AND cs.servico_norm LIKE '%sales%')
-              THEN 70
-            -- Qualquer palavra de 4+ caracteres em comum
-            WHEN EXISTS (
-              SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
-              WHERE LENGTH(s_token) >= 4 
-                AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
-                AND ic.item_nome_norm LIKE '%' || s_token || '%'
-            ) THEN 60
-            ELSE 0
-          END as match_score,
+          -- Score de matching com PRIORIDADE para tokens ESPECÍFICOS sobre genéricos
+          -- Tokens específicos (80+ pts): trafego, performance, social, ads, meta, google, crm, inbound, outbound, sdr, closer
+          -- Tokens genéricos (40 pts): gestao, marketing, vendas, comercial
+          (
+            CASE WHEN cs.servico_norm = ic.item_nome_norm THEN 100 ELSE 0 END +
+            CASE WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' OR ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 30 ELSE 0 END +
+            -- Tokens ESPECÍFICOS - alta pontuação
+            CASE WHEN ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%' THEN 80 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%' THEN 80 ELSE 0 END +
+            -- Tokens GENÉRICOS - baixa pontuação (não devem decidir sozinhos)
+            CASE WHEN ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%' THEN 40 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%' THEN 40 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%' THEN 40 ELSE 0 END +
+            CASE WHEN ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%' THEN 40 ELSE 0 END
+          ) as match_score,
           ROW_NUMBER() OVER (
-            PARTITION BY ic.parcela_id, ic.item_nome
+            -- Usar item_uid como chave única para garantir segregação correta
+            PARTITION BY ic.item_uid
             ORDER BY 
-              CASE
-                WHEN cs.servico_norm = ic.item_nome_norm THEN 100
-                WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' THEN 95
-                WHEN ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 90
-                WHEN LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 3 
-                  AND SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1) THEN 80
-                WHEN SPLIT_PART(cs.servico_norm, ' ', 1) = SPLIT_PART(ic.item_nome_norm, ' ', 1)
-                  AND SPLIT_PART(cs.servico_norm, ' ', 2) = SPLIT_PART(ic.item_nome_norm, ' ', 2)
-                  AND LENGTH(SPLIT_PART(cs.servico_norm, ' ', 1)) > 2 THEN 85
-                WHEN (ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%')
-                  OR (ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%')
-                  OR (ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%')
-                  OR (ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%')
-                  OR (ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%')
-                  OR (ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%')
-                  OR (ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%')
-                  OR (ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%')
-                  OR (ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%')
-                  OR (ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%')
-                  OR (ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%')
-                  OR (ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%')
-                  OR (ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%')
-                  OR (ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%')
-                  OR (ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%')
-                  OR (ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%')
-                  OR (ic.item_nome_norm LIKE '%inside%' AND cs.servico_norm LIKE '%inside%')
-                  OR (ic.item_nome_norm LIKE '%sales%' AND cs.servico_norm LIKE '%sales%')
-                  THEN 70
-                WHEN EXISTS (
-                  SELECT 1 FROM unnest(string_to_array(cs.servico_norm, ' ')) AS s_token
-                  WHERE LENGTH(s_token) >= 4 
-                    AND s_token NOT IN ('para', 'como', 'mais', 'pela', 'pelo', 'esta', 'esse', 'essa', 'cada', 'todo', 'toda')
-                    AND ic.item_nome_norm LIKE '%' || s_token || '%'
-                ) THEN 60
-                ELSE 0
-              END DESC,
+              (
+                CASE WHEN cs.servico_norm = ic.item_nome_norm THEN 100 ELSE 0 END +
+                CASE WHEN cs.servico_norm LIKE '%' || ic.item_nome_norm || '%' OR ic.item_nome_norm LIKE '%' || cs.servico_norm || '%' THEN 30 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%trafego%' AND cs.servico_norm LIKE '%trafego%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%performance%' AND cs.servico_norm LIKE '%performance%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%social%' AND cs.servico_norm LIKE '%social%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%ads%' AND cs.servico_norm LIKE '%ads%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%meta%' AND cs.servico_norm LIKE '%meta%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%google%' AND cs.servico_norm LIKE '%google%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%crm%' AND cs.servico_norm LIKE '%crm%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%inbound%' AND cs.servico_norm LIKE '%inbound%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%outbound%' AND cs.servico_norm LIKE '%outbound%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%sdr%' AND cs.servico_norm LIKE '%sdr%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%closer%' AND cs.servico_norm LIKE '%closer%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%growth%' AND cs.servico_norm LIKE '%growth%' THEN 80 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%gestao%' AND cs.servico_norm LIKE '%gestao%' THEN 40 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%marketing%' AND cs.servico_norm LIKE '%marketing%' THEN 40 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%vendas%' AND cs.servico_norm LIKE '%vendas%' THEN 40 ELSE 0 END +
+                CASE WHEN ic.item_nome_norm LIKE '%comercial%' AND cs.servico_norm LIKE '%comercial%' THEN 40 ELSE 0 END
+              ) DESC,
               cs.id_subtask DESC NULLS LAST
           ) as rn
         FROM itens_com_cliente ic
