@@ -404,50 +404,124 @@ export default function MargemCliente() {
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
-                          <TableRow className="bg-muted/30">
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
                             <TableCell colSpan={9} className="p-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {cliente.receitaDetalhes?.length > 0 && (
-                                  <div>
-                                    <h4 className="font-semibold text-green-600 mb-2 flex items-center gap-2">
-                                      <DollarSign className="h-4 w-4" />
-                                      Detalhes de Receita ({cliente.receitaDetalhes.length})
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Seção de Receitas */}
+                                <div className="rounded-lg border-2 border-green-500/30 bg-green-500/5 p-4">
+                                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-green-500/20">
+                                    <h4 className="font-bold text-green-600 flex items-center gap-2">
+                                      <DollarSign className="h-5 w-5" />
+                                      RECEITAS
                                     </h4>
-                                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                                    <Badge variant="default" className="bg-green-600">
+                                      {formatCurrency(cliente.receita)}
+                                    </Badge>
+                                  </div>
+                                  {cliente.receitaDetalhes?.length > 0 ? (
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-2">
                                       {cliente.receitaDetalhes.map((d, i) => (
-                                        <div key={i} className="flex justify-between text-sm border-b border-border/50 py-1">
-                                          <span className="truncate max-w-[70%]" title={d.descricao}>
+                                        <div key={i} className="flex justify-between items-center text-sm bg-green-500/10 rounded px-3 py-2">
+                                          <span className="truncate max-w-[65%] text-foreground" title={d.descricao}>
                                             {d.descricao}
                                           </span>
-                                          <span className="font-medium text-green-600">{formatCurrency(d.valor)}</span>
+                                          <span className="font-semibold text-green-600 whitespace-nowrap">
+                                            {formatCurrency(d.valor)}
+                                          </span>
                                         </div>
                                       ))}
                                     </div>
-                                  </div>
-                                )}
-                                {cliente.freelancerDetalhes?.length > 0 && (
-                                  <div>
-                                    <h4 className="font-semibold text-red-600 mb-2 flex items-center gap-2">
-                                      <TrendingDown className="h-4 w-4" />
-                                      Detalhes de Freelancers ({cliente.freelancerDetalhes.length})
+                                  ) : (
+                                    <div className="text-muted-foreground text-sm italic py-4 text-center">
+                                      Sem detalhes de receita disponíveis
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Seção de Despesas */}
+                                <div className="rounded-lg border-2 border-red-500/30 bg-red-500/5 p-4">
+                                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-red-500/20">
+                                    <h4 className="font-bold text-red-600 flex items-center gap-2">
+                                      <TrendingDown className="h-5 w-5" />
+                                      DESPESAS
                                     </h4>
-                                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                                      {cliente.freelancerDetalhes.map((d, i) => (
-                                        <div key={i} className="flex justify-between text-sm border-b border-border/50 py-1">
-                                          <span className="truncate max-w-[70%]" title={d.descricao}>
-                                            {d.descricao}
+                                    <Badge variant="destructive">
+                                      {formatCurrency(cliente.despesaTotal)}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-3 max-h-56 overflow-y-auto pr-2">
+                                    {/* Salário Rateado */}
+                                    {cliente.despesaSalarioRateado > 0 && (
+                                      <div className="bg-red-500/10 rounded px-3 py-2">
+                                        <div className="flex justify-between items-center text-sm">
+                                          <span className="text-foreground font-medium">Salário Rateado (Time)</span>
+                                          <span className="font-semibold text-red-600">
+                                            {formatCurrency(cliente.despesaSalarioRateado)}
                                           </span>
-                                          <span className="font-medium text-red-600">{formatCurrency(d.valor)}</span>
                                         </div>
-                                      ))}
-                                    </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Operacional */}
+                                    {cliente.despesaOperacional > 0 && (
+                                      <div className="bg-red-500/10 rounded px-3 py-2">
+                                        <div className="flex justify-between items-center text-sm">
+                                          <span className="text-foreground font-medium">Despesas Operacionais</span>
+                                          <span className="font-semibold text-red-600">
+                                            {formatCurrency(cliente.despesaOperacional)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Freelancers - com detalhes */}
+                                    {cliente.despesaFreelancers > 0 && (
+                                      <div className="bg-red-500/10 rounded px-3 py-2">
+                                        <div className="flex justify-between items-center text-sm mb-2">
+                                          <span className="text-foreground font-medium">Freelancers</span>
+                                          <span className="font-semibold text-red-600">
+                                            {formatCurrency(cliente.despesaFreelancers)}
+                                          </span>
+                                        </div>
+                                        {cliente.freelancerDetalhes?.length > 0 && (
+                                          <div className="border-t border-red-500/20 pt-2 mt-2 space-y-1">
+                                            {cliente.freelancerDetalhes.map((d, i) => (
+                                              <div key={i} className="flex justify-between items-center text-xs pl-3 text-muted-foreground">
+                                                <span className="truncate max-w-[60%]" title={d.descricao}>
+                                                  • {d.descricao}
+                                                </span>
+                                                <span className="text-red-500 whitespace-nowrap">
+                                                  {formatCurrency(d.valor)}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {cliente.despesaTotal === 0 && (
+                                      <div className="text-muted-foreground text-sm italic py-4 text-center">
+                                        Sem despesas registradas
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                                {!cliente.receitaDetalhes?.length && !cliente.freelancerDetalhes?.length && (
-                                  <div className="text-muted-foreground text-sm col-span-2">
-                                    Sem detalhes disponíveis para este cliente
-                                  </div>
-                                )}
+                                </div>
+                              </div>
+
+                              {/* Resumo da Margem */}
+                              <div className="mt-4 pt-4 border-t border-border flex items-center justify-end gap-6 text-sm">
+                                <span className="text-muted-foreground">
+                                  Receita: <span className="text-green-600 font-semibold">{formatCurrency(cliente.receita)}</span>
+                                </span>
+                                <span className="text-muted-foreground">
+                                  − Despesas: <span className="text-red-600 font-semibold">{formatCurrency(cliente.despesaTotal)}</span>
+                                </span>
+                                <span className="text-muted-foreground">
+                                  = Margem: <span className={`font-bold ${cliente.margem >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(cliente.margem)} ({formatPercent(cliente.margemPercentual)})
+                                  </span>
+                                </span>
                               </div>
                             </TableCell>
                           </TableRow>
