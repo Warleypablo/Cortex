@@ -9959,12 +9959,21 @@ export class DbStorage implements IStorage {
           AND iv.valor IS NOT NULL
           AND iv.valor::numeric > 0
       ),
+      cnpjs_do_squad AS (
+        -- Lista CNPJs que TÊM contrato no squad selecionado (se filtrado)
+        SELECT DISTINCT REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo
+        FROM cup_contratos ct
+        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+        WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+        ${squad && squad !== 'todos' ? sql`AND ct.squad = ${squad}` : sql``}
+      ),
       itens_com_cliente AS (
         SELECT 
           iv.*,
           REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
         FROM itens_vendidos iv
         LEFT JOIN caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
+        ${squad && squad !== 'todos' ? sql`WHERE REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') IN (SELECT cnpj_limpo FROM cnpjs_do_squad)` : sql``}
       ),
       itens_ranked AS (
         SELECT 
@@ -10160,6 +10169,14 @@ export class DbStorage implements IStorage {
           AND iv.valor IS NOT NULL
           AND iv.valor::numeric > 0
       ),
+      cnpjs_do_squad AS (
+        -- Lista CNPJs que TÊM contrato no squad selecionado (se filtrado)
+        SELECT DISTINCT REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo
+        FROM cup_contratos ct
+        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+        WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+        ${squad && squad !== 'todos' ? sql`AND ct.squad = ${squad}` : sql``}
+      ),
       itens_com_cliente AS (
         SELECT 
           iv.*,
@@ -10167,6 +10184,7 @@ export class DbStorage implements IStorage {
           REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
         FROM itens_vendidos iv
         LEFT JOIN caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
+        ${squad && squad !== 'todos' ? sql`WHERE REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') IN (SELECT cnpj_limpo FROM cnpjs_do_squad)` : sql``}
       ),
       itens_ranked AS (
         SELECT 
