@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -296,8 +296,8 @@ export default function MargemCliente() {
                     const hasDetails = (cliente.receitaDetalhes?.length > 0) || (cliente.freelancerDetalhes?.length > 0);
                     
                     return (
-                      <>
-                        <TableRow key={`main-${rowKey}`} data-testid={`row-cliente-${idx}`} className={hasDetails ? 'cursor-pointer hover:bg-muted/50' : ''} onClick={() => hasDetails && toggleRow(rowKey)}>
+                      <Fragment key={rowKey}>
+                        <TableRow data-testid={`row-cliente-${idx}`} className={hasDetails ? 'cursor-pointer hover:bg-muted/50' : ''} onClick={() => hasDetails && toggleRow(rowKey)}>
                           <TableCell className="w-8 p-2">
                             {hasDetails && (
                               <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`button-expand-${idx}`} onClick={(e) => { e.stopPropagation(); toggleRow(rowKey); }}>
@@ -336,7 +336,7 @@ export default function MargemCliente() {
                           </TableCell>
                         </TableRow>
                         {isExpanded && (
-                          <TableRow key={`details-${rowKey}`} className="bg-muted/30">
+                          <TableRow className="bg-muted/30">
                             <TableCell colSpan={9} className="p-4">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {cliente.receitaDetalhes?.length > 0 && (
@@ -384,7 +384,7 @@ export default function MargemCliente() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     );
                   })
                 )}
