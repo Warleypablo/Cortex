@@ -7731,7 +7731,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dataInicio = req.query.dataInicio as string;
       const dataFim = req.query.dataFim as string;
       const operador = req.query.operador as string | undefined;
-      const squad = req.query.squad as string | undefined;
       
       if (!dataInicio || !dataFim) {
         return res.status(400).json({ error: "Parâmetros dataInicio e dataFim são obrigatórios" });
@@ -7741,22 +7740,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Formato inválido. Esperado: YYYY-MM-DD" });
       }
       
-      const data = await storage.getContribuicaoOperadorDfc(dataInicio, dataFim, operador, squad);
+      const data = await storage.getContribuicaoOperadorDfc(dataInicio, dataFim, operador);
       res.json(data);
     } catch (error) {
       console.error("[api] Error fetching contribuição operador DFC:", error);
       res.status(500).json({ error: "Falha ao buscar dados de contribuição operador DFC" });
-    }
-  });
-  
-  // Lista de squads únicos para filtro de Contribuição por Operador
-  app.get("/api/contribuicao-operador/squads", async (req, res) => {
-    try {
-      const squads = await storage.getSquadsContribuicao();
-      res.json(squads);
-    } catch (error) {
-      console.error("[api] Error fetching squads:", error);
-      res.status(500).json({ error: "Falha ao buscar squads" });
     }
   });
 
