@@ -10573,7 +10573,7 @@ export class DbStorage implements IStorage {
       FROM parcelas_receita pr
       LEFT JOIN caz_clientes caz ON TRIM(pr.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN caz_vendas v ON TRIM(v.numero::text) = TRIM(pr.numero_venda_extraido)
-      LEFT JOIN caz_itensvenda iv ON iv.id_venda::text = v.id::text
+      LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
       WHERE caz.cnpj IS NOT NULL
       ORDER BY COALESCE(iv.valor::numeric, pr.valor) DESC
     `);
