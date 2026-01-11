@@ -10559,6 +10559,10 @@ export class DbStorage implements IStorage {
     }
 
     const freelancerDetalhesByCnpj = new Map<string, { descricao: string; valor: number; categoria?: string }[]>();
+    console.log('[MargemCliente] Freelancer detalhes rows:', freelancerDetalhesResult.rows.length);
+    if (freelancerDetalhesResult.rows.length > 0) {
+      console.log('[MargemCliente] Sample freelancer row:', JSON.stringify(freelancerDetalhesResult.rows[0]));
+    }
     for (const row of freelancerDetalhesResult.rows as any[]) {
       const cnpj = row.cnpj_limpo || '';
       if (!freelancerDetalhesByCnpj.has(cnpj)) {
@@ -10570,6 +10574,7 @@ export class DbStorage implements IStorage {
         categoria: row.categoria_nome || undefined
       });
     }
+    console.log('[MargemCliente] Freelancer detalhes by CNPJ count:', freelancerDetalhesByCnpj.size);
 
     const clientes = (result.rows as any[]).map(row => {
       const cnpjLimpo = row.cnpj ? row.cnpj.replace(/[.\-\/]/g, '') : '';
