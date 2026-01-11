@@ -47,7 +47,6 @@ Preferred communication style: Simple, everyday language.
 -   **Server**: Express.js with TypeScript.
 -   **API**: RESTful API using Drizzle ORM for PostgreSQL.
 -   **Security**: Drizzle `sql` template literals and `sql.join()` for SQL injection prevention.
--   **Maintenance Window**: Daily sync window (13:00-14:30 BRT) blocks API requests to prevent data inconsistency during database updates. Configured in `server/maintenance.ts`. Can be bypassed with `SKIP_MAINTENANCE_WINDOW=true` env var.
 
 ### Data Storage Solutions
 

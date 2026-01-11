@@ -9,45 +9,12 @@ import { Pool } from "pg";
 import { initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
-import { isMaintenanceWindow, getMaintenanceResponse, getMaintenanceStatus } from "./maintenance";
-
 const app = express();
 
 app.set("trust proxy", 1);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Maintenance status endpoint (always available)
-app.get("/api/maintenance/status", (req, res) => {
-  res.json(getMaintenanceStatus());
-});
-
-// Maintenance window middleware - blocks database operations during sync
-const MAINTENANCE_ALLOWLIST = [
-  "/api/maintenance/status",
-  "/api/auth",
-  "/health",
-];
-
-app.use((req, res, next) => {
-  // Skip maintenance check for allowlisted paths
-  if (MAINTENANCE_ALLOWLIST.some(path => req.path.startsWith(path))) {
-    return next();
-  }
-
-  // Skip for non-API routes (frontend assets)
-  if (!req.path.startsWith("/api")) {
-    return next();
-  }
-
-  // Check if in maintenance window
-  if (isMaintenanceWindow()) {
-    return res.status(503).json(getMaintenanceResponse());
-  }
-
-  next();
-});
 
 function createSessionStore() {
   // Use Google Cloud SQL for sessions if available
