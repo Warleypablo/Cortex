@@ -10474,18 +10474,42 @@ export class DbStorage implements IStorage {
           AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
         GROUP BY REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '')
       ),
-      despesas_freelancer AS (
+      parcelas_freelancer AS (
         SELECT 
-          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
-          COALESCE(SUM(p.valor_pago::numeric), 0) as despesa
+          p.id,
+          p.descricao,
+          p.valor_pago::numeric as valor,
+          TRIM(substring(p.descricao from '\\[([^\\]]+)\\]')) as cliente_nome_extraido
         FROM caz_parcelas p
-        LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
         WHERE p.tipo_evento = 'DESPESA'
           AND p.status = 'QUITADO'
           AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
-          AND p.id_cliente IS NOT NULL
-          AND TRIM(p.id_cliente::text) != ''
-        GROUP BY REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '')
+          AND p.descricao LIKE '%[%]%'
+      ),
+      freelancer_com_cliente AS (
+        SELECT 
+          pf.id,
+          pf.descricao,
+          pf.valor,
+          pf.cliente_nome_extraido,
+          REPLACE(REPLACE(REPLACE(COALESCE(cup.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+        FROM parcelas_freelancer pf
+        LEFT JOIN LATERAL (
+          SELECT cnpj FROM cup_clientes 
+          WHERE LOWER(nome) = LOWER(pf.cliente_nome_extraido)
+             OR LOWER(nome) LIKE LOWER('%' || pf.cliente_nome_extraido || '%')
+          ORDER BY 
+            CASE WHEN LOWER(nome) = LOWER(pf.cliente_nome_extraido) THEN 0 ELSE 1 END
+          LIMIT 1
+        ) cup ON TRUE
+      ),
+      despesas_freelancer AS (
+        SELECT 
+          cnpj_limpo,
+          COALESCE(SUM(valor), 0) as despesa
+        FROM freelancer_com_cliente
+        WHERE cnpj_limpo IS NOT NULL AND cnpj_limpo != ''
+        GROUP BY cnpj_limpo
       ),
       despesas_operacionais AS (
         SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
@@ -10534,20 +10558,35 @@ export class DbStorage implements IStorage {
     `);
 
     const freelancerDetalhesResult = await db.execute(sql`
+      WITH parcelas_freela AS (
+        SELECT 
+          p.id,
+          p.descricao,
+          p.categoria_nome,
+          p.valor_pago::numeric as valor,
+          TRIM(substring(p.descricao from '\\[([^\\]]+)\\]')) as cliente_nome_extraido
+        FROM caz_parcelas p
+        WHERE p.tipo_evento = 'DESPESA'
+          AND p.status = 'QUITADO'
+          AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
+          AND p.descricao LIKE '%[%]%'
+      )
       SELECT 
-        REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
-        p.descricao,
-        p.categoria_nome,
-        p.valor_pago::numeric as valor
-      FROM caz_parcelas p
-      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      WHERE p.tipo_evento = 'DESPESA'
-        AND p.status = 'QUITADO'
-        AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
-        AND p.id_cliente IS NOT NULL
-        AND TRIM(p.id_cliente::text) != ''
-        AND caz.cnpj IS NOT NULL
-      ORDER BY p.valor_pago::numeric DESC
+        REPLACE(REPLACE(REPLACE(COALESCE(cup.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
+        pf.descricao,
+        pf.categoria_nome,
+        pf.valor
+      FROM parcelas_freela pf
+      LEFT JOIN LATERAL (
+        SELECT cnpj FROM cup_clientes 
+        WHERE LOWER(nome) = LOWER(pf.cliente_nome_extraido)
+           OR LOWER(nome) LIKE LOWER('%' || pf.cliente_nome_extraido || '%')
+        ORDER BY 
+          CASE WHEN LOWER(nome) = LOWER(pf.cliente_nome_extraido) THEN 0 ELSE 1 END
+        LIMIT 1
+      ) cup ON TRUE
+      WHERE cup.cnpj IS NOT NULL
+      ORDER BY pf.valor DESC
     `);
 
     const receitaDetalhesByCnpj = new Map<string, { descricao: string; valor: number; categoria?: string }[]>();
