@@ -47,6 +47,7 @@ export default function ContribuicaoOperador() {
   const hoje = new Date();
   const [anoSelecionado, setAnoSelecionado] = useState(hoje.getFullYear());
   const [operadorSelecionado, setOperadorSelecionado] = useState<string>("todos");
+  const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(["RECEITAS"]));
   
   const meses = useMemo(() => {
@@ -66,6 +67,10 @@ export default function ContribuicaoOperador() {
   
   const anos = Array.from({ length: 5 }, (_, i) => hoje.getFullYear() - i);
   
+  const { data: squadsData } = useQuery<string[]>({
+    queryKey: ["/api/contribuicao-operador/squads"],
+  });
+  
   const { data: operadoresData, isLoading: loadingOperadores } = useQuery<string[]>({
     queryKey: ["/api/contribuicao-operador/dfc/operadores", anoSelecionado],
     queryFn: async () => {
@@ -81,7 +86,7 @@ export default function ContribuicaoOperador() {
   });
 
   const { data: monthlyResults, isLoading } = useQuery<MonthlyData[]>({
-    queryKey: ["/api/contribuicao-operador/dfc/monthly", anoSelecionado, operadorSelecionado],
+    queryKey: ["/api/contribuicao-operador/dfc/monthly", anoSelecionado, operadorSelecionado, squadSelecionado],
     queryFn: async () => {
       const results: MonthlyData[] = [];
       
@@ -93,6 +98,9 @@ export default function ContribuicaoOperador() {
           });
           if (operadorSelecionado !== "todos") {
             params.append("operador", operadorSelecionado);
+          }
+          if (squadSelecionado !== "todos") {
+            params.append("squad", squadSelecionado);
           }
           
           const response = await fetch(`/api/contribuicao-operador/dfc?${params.toString()}`, {
@@ -233,6 +241,23 @@ export default function ContribuicaoOperador() {
         </div>
         
         <div className="flex items-center gap-2">
+          <Select 
+            value={squadSelecionado} 
+            onValueChange={setSquadSelecionado}
+          >
+            <SelectTrigger className="w-[160px]" data-testid="select-squad">
+              <SelectValue placeholder="Todos os squads" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os squads</SelectItem>
+              {squadsData?.map((squad) => (
+                <SelectItem key={squad} value={squad}>
+                  {squad}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
           <Select 
             value={operadorSelecionado} 
             onValueChange={setOperadorSelecionado}
