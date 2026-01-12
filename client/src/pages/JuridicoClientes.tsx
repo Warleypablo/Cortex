@@ -364,17 +364,27 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
     };
   }, [clientes, clientesPreNegociados, activeTab]);
 
+  // Clientes de erro operacional (adicionados manualmente)
+  const clientesErroOperacionalManuais = useMemo(() => [
+    { nome: "Fantasma de Opera", valor: 8000 },
+    { nome: "GPA Suplementos", valor: 8400 },
+    { nome: "Hubstage", valor: 18046 },
+    { nome: "WInstage", valor: 9200 },
+  ], []);
+
   // Estatísticas de erros operacionais
   const errosOperacionaisStats = useMemo(() => {
     const errosOperacionais = clientes.filter(c => c.contexto?.tipoInadimplencia === 'erro_operacional');
-    const totalValor = errosOperacionais.reduce((acc, c) => acc + c.cliente.valorTotal, 0);
+    const totalValorSistema = errosOperacionais.reduce((acc, c) => acc + c.cliente.valorTotal, 0);
+    const totalValorManuais = clientesErroOperacionalManuais.reduce((acc, c) => acc + c.valor, 0);
     
     return {
-      count: errosOperacionais.length,
-      valorTotal: totalValor,
+      count: errosOperacionais.length + clientesErroOperacionalManuais.length,
+      valorTotal: totalValorSistema + totalValorManuais,
       lista: errosOperacionais,
+      listaManuais: clientesErroOperacionalManuais,
     };
-  }, [clientes]);
+  }, [clientes, clientesErroOperacionalManuais]);
 
   const openEditModal = (cliente: ClienteJuridico) => {
     setEditingCliente(cliente);
@@ -1314,55 +1324,74 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {errosOperacionaisStats.lista.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                    <p className="text-lg font-medium">Nenhum erro operacional registrado</p>
-                    <p className="text-sm mt-1">
-                      Classifique clientes como "Erro Operacional" no modal de edição para que apareçam aqui
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {errosOperacionaisStats.lista.map((item) => (
-                      <div 
-                        key={item.cliente.idCliente}
-                        className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800"
-                        data-testid={`row-erro-${item.cliente.idCliente}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="p-2 bg-amber-200 dark:bg-amber-800 rounded-lg">
-                            <AlertTriangle className="h-5 w-5 text-amber-700 dark:text-amber-300" />
-                          </div>
-                          <div>
-                            <p className="font-semibold">{item.cliente.nomeCliente}</p>
-                            <p className="text-xs text-muted-foreground">{item.cliente.empresa}</p>
-                          </div>
+                <div className="space-y-3">
+                  {/* Clientes do sistema classificados como erro operacional */}
+                  {errosOperacionaisStats.lista.map((item) => (
+                    <div 
+                      key={item.cliente.idCliente}
+                      className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800"
+                      data-testid={`row-erro-${item.cliente.idCliente}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-2 bg-amber-200 dark:bg-amber-800 rounded-lg">
+                          <AlertTriangle className="h-5 w-5 text-amber-700 dark:text-amber-300" />
                         </div>
-                        <div className="flex items-center gap-6 flex-wrap">
-                          {item.contexto?.procedimentoJuridico && (
-                            <Badge className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
-                              {PROCEDIMENTOS.find(p => p.value === item.contexto?.procedimentoJuridico)?.label || item.contexto.procedimentoJuridico}
-                            </Badge>
-                          )}
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Valor</p>
-                            <p className="font-bold text-amber-600 dark:text-amber-400">{formatCurrency(item.cliente.valorTotal)}</p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => openEditModal(item)}
-                            data-testid={`button-edit-erro-${item.cliente.idCliente}`}
-                          >
-                            <Edit3 className="h-4 w-4 mr-1" />
-                            Editar
-                          </Button>
+                        <div>
+                          <p className="font-semibold">{item.cliente.nomeCliente}</p>
+                          <p className="text-xs text-muted-foreground">{item.cliente.empresa}</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className="flex items-center gap-6 flex-wrap">
+                        {item.contexto?.procedimentoJuridico && (
+                          <Badge className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                            {PROCEDIMENTOS.find(p => p.value === item.contexto?.procedimentoJuridico)?.label || item.contexto.procedimentoJuridico}
+                          </Badge>
+                        )}
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Valor</p>
+                          <p className="font-bold text-amber-600 dark:text-amber-400">{formatCurrency(item.cliente.valorTotal)}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEditModal(item)}
+                          data-testid={`button-edit-erro-${item.cliente.idCliente}`}
+                        >
+                          <Edit3 className="h-4 w-4 mr-1" />
+                          Editar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Clientes manuais de erro operacional */}
+                  {errosOperacionaisStats.listaManuais.map((item, index) => (
+                    <div 
+                      key={`manual-erro-${index}`}
+                      className="flex items-center justify-between p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800"
+                      data-testid={`row-erro-manual-${index}`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-2 bg-orange-200 dark:bg-orange-800 rounded-lg">
+                          <AlertTriangle className="h-5 w-5 text-orange-700 dark:text-orange-300" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{item.nome}</p>
+                          <p className="text-xs text-orange-600 dark:text-orange-400">Registro manual</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6 flex-wrap">
+                        <Badge className="bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700">
+                          Erro Operacional
+                        </Badge>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Valor</p>
+                          <p className="font-bold text-orange-600 dark:text-orange-400">{formatCurrency(item.valor)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
