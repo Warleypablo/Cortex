@@ -1806,8 +1806,8 @@ export default function JuridicoClientes({
         open={!!editingCliente}
         onOpenChange={() => setEditingCliente(null)}
       >
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-3 bg-primary/10 rounded-xl">
                 <Scale className="h-6 w-6 text-primary" />
@@ -1821,7 +1821,7 @@ export default function JuridicoClientes({
             </div>
           </DialogHeader>
 
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-4 overflow-y-auto flex-1">
             {/* Tipo de Ação */}
             <div className="space-y-3">
               <label className="text-base font-semibold">
@@ -1987,7 +1987,7 @@ export default function JuridicoClientes({
             )}
           </div>
 
-          <DialogFooter className="gap-3">
+          <DialogFooter className="gap-3 flex-shrink-0 pt-4 border-t">
             <Button
               variant="outline"
               size="lg"
