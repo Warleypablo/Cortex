@@ -4778,6 +4778,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE tipo_inadimplencia = 'erro_operacional'
       `);
       
+      // Remover registros manuais antigos duplicados (Fantasma de Opera, GPA Suplementos, Hubstage, Winstage)
+      await db.execute(sql`
+        DELETE FROM inadimplencia_contextos 
+        WHERE cliente_id IN ('erro_fantasma_opera', 'erro_gpa_suplementos', 'erro_hubstage', 'erro_winstage')
+           OR contexto_juridico LIKE '%Registro manual%'
+           OR (UPPER(contexto_juridico) LIKE '%FANTASMA%' AND cliente_id LIKE 'erro_%')
+           OR (UPPER(contexto_juridico) LIKE '%HUBSTAGE%')
+           OR (UPPER(contexto_juridico) LIKE '%WINSTAGE%' AND cliente_id LIKE 'erro_%')
+      `);
+      
       // Lista completa de clientes de erro operacional com valores corretos (apenas do print)
       const clientesErroOperacional = [
         { nome: 'NOODROPS', valor: 7200 },
