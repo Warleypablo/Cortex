@@ -4749,6 +4749,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Executar na inicialização
   ensureManualRecoveredClients();
 
+  // Função para atualizar valor_acordado de clientes específicos pelo nome
+  async function updateClienteValorAcordadoByName() {
+    try {
+      // Atualizar GO COFFEE com valor R$ 3.283
+      await db.execute(sql`
+        UPDATE inadimplencia_contextos ic
+        SET valor_acordado = 3283
+        FROM caz_clientes c
+        WHERE ic.cliente_id = c.id::text
+          AND UPPER(c.nome) LIKE '%GO COFFEE%'
+      `);
+      console.log("[juridico] Valor acordado atualizado para GO COFFEE: R$ 3.283");
+    } catch (error) {
+      console.warn("[juridico] Erro ao atualizar valor acordado:", (error as Error).message);
+    }
+  }
+  
+  // Executar na inicialização
+  updateClienteValorAcordadoByName();
+
   // Função para inserir clientes de erro operacional manualmente na inicialização
   async function ensureManualErroOperacionalClients() {
     try {
