@@ -4607,6 +4607,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 6. Adicionar clientes históricos (acordos/recuperados que já pagaram)
       // Esses clientes têm contexto jurídico mas não estão mais inadimplentes
+      
+      // Buscar nomes reais dos clientes históricos
+      const nomesClientesHistoricos: Record<string, { nome: string; empresa: string }> = {};
+      if (idsHistoricoNaoInadimplentes.length > 0) {
+        const escapedIds = idsHistoricoNaoInadimplentes.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
+        const nomesResult = await db.execute(sql.raw(`
+          SELECT DISTINCT ON (TRIM(ids::text))
+            TRIM(ids::text) as id_cliente,
+            nome,
+            COALESCE(empresa, '') as empresa
+          FROM caz_clientes
+          WHERE ids IS NOT NULL AND TRIM(ids::text) IN (${escapedIds})
+          ORDER BY TRIM(ids::text)
+        `));
+        for (const row of nomesResult.rows as any[]) {
+          nomesClientesHistoricos[row.id_cliente] = { nome: row.nome || '', empresa: row.empresa || '' };
+        }
+      }
+      
       const clientesHistoricos: typeof clientesComDados = [];
       for (const clienteId of idsHistoricoNaoInadimplentes) {
         const contexto = contextos[clienteId] || {};
@@ -4615,16 +4634,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           (contexto.statusJuridico === 'concluido' && contexto.procedimentoJuridico === 'baixa');
         
         if (isRecuperado) {
+          // Buscar nome real do cliente
+          const clienteInfo = nomesClientesHistoricos[clienteId];
+          const nomeReal = clienteInfo?.nome || `Cliente ${clienteId}`;
+          const empresaReal = clienteInfo?.empresa || '';
+          
           // Criar objeto cliente mínimo para exibição
           clientesHistoricos.push({
             cliente: {
               idCliente: clienteId,
-              nomeCliente: contexto.contextoJuridico?.split('\n')[0] || `Cliente ${clienteId}`,
+              nomeCliente: nomeReal,
               valorTotal: contexto.valorAcordado || 0,
               quantidadeParcelas: 0,
               parcelaMaisAntiga: '',
               diasAtrasoMax: 0,
-              empresa: '',
+              empresa: empresaReal,
               cnpj: null,
               statusClickup: null,
               responsavel: null,
