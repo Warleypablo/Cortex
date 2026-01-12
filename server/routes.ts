@@ -552,7 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api", isAuthenticated);
   
-  app.get("/api/debug/users", isAdmin, async (req, res) => {
+  app.get("/api/debug/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const users = await getAllUsers();
       const allKeys = await listAllKeys();
@@ -591,7 +591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users/:userId/permissions", isAdmin, async (req, res) => {
+  app.post("/api/users/:userId/permissions", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
       const { allowedRoutes } = req.body;
@@ -613,7 +613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users/:userId/role", isAdmin, async (req, res) => {
+  app.post("/api/users/:userId/role", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
       const { role } = req.body;
@@ -635,7 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/users", isAdmin, async (req, res) => {
+  app.post("/api/auth/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { name, email, role, allowedRoutes } = req.body;
 
