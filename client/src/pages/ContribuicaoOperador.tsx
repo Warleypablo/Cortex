@@ -159,9 +159,29 @@ export default function ContribuicaoOperador() {
       categoriesByLevel.push({ ...cat, parentId });
     });
     
+    // Ordenar hierarquicamente: filhos aparecem logo após o pai
     categoriesByLevel.sort((a, b) => {
-      if (a.nivel !== b.nivel) return a.nivel - b.nivel;
-      return a.id.localeCompare(b.id);
+      // Compara os IDs de forma que filhos venham logo após seus pais
+      // Ex: "03.01.01" < "03.01.01.CLIENTE" < "03.01.01.CLIENTE.SERVICO" < "03.01.02"
+      const partsA = a.id.split(".");
+      const partsB = b.id.split(".");
+      
+      // Compara parte por parte
+      const minLen = Math.min(partsA.length, partsB.length);
+      for (let i = 0; i < minLen; i++) {
+        if (partsA[i] !== partsB[i]) {
+          // Tenta comparar como número primeiro
+          const numA = parseFloat(partsA[i]);
+          const numB = parseFloat(partsB[i]);
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB;
+          }
+          return partsA[i].localeCompare(partsB[i]);
+        }
+      }
+      
+      // Se todos os prefixos são iguais, o mais curto vem primeiro (pai antes do filho)
+      return partsA.length - partsB.length;
     });
 
     const despesasCategories = [
