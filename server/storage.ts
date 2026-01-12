@@ -9868,13 +9868,10 @@ export class DbStorage implements IStorage {
   }> {
     const dataFimComHora = `${dataFim} 23:59:59`;
     
-    // Constrói filtro de squad para queries
-    const squadFilterSql = squad && squad !== 'todos' 
-      ? sql`AND COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') = ${squad}`
+    // Filtro de squad para agregar na query final (não nos CTEs)
+    const squadFinalFilter = squad && squad !== 'todos' 
+      ? sql`AND COALESCE(NULLIF(TRIM(squad_final), ''), 'Sem Squad') = ${squad}`
       : sql``;
-    
-    // Flag para verificar se há filtro de squad ativo
-    const hasSquadFilter = squad && squad !== 'todos';
     
     // Lista de squads disponíveis
     const squadsResult = await db.execute(sql`
@@ -9894,6 +9891,7 @@ export class DbStorage implements IStorage {
           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
           ct.responsavel,
           ct.servico as servico_original,
+          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad,
           -- Normalização robusta: lowercase, remove acentos comuns, remove pontuação, colapsa espaços
           LOWER(TRIM(REGEXP_REPLACE(
             REGEXP_REPLACE(
@@ -9912,22 +9910,22 @@ export class DbStorage implements IStorage {
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
-          ${squadFilterSql}
       ),
       contrato_mais_recente AS (
         SELECT DISTINCT ON (cnpj_limpo)
           cnpj_limpo,
-          responsavel as fallback_responsavel
+          responsavel as fallback_responsavel,
+          squad as fallback_squad
         FROM (
           SELECT 
             REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
             ct.responsavel,
+            COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad,
             ct.id_subtask
           FROM cup_contratos ct
           INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
           WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
-            ${squadFilterSql}
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
@@ -9970,6 +9968,7 @@ export class DbStorage implements IStorage {
           ic.*,
           cs.responsavel,
           cs.servico_norm,
+          cs.squad,
           -- Score de matching robusto com múltiplos critérios
           CASE
             -- Match exato após normalização
@@ -10064,7 +10063,12 @@ export class DbStorage implements IStorage {
             WHEN ir.match_score >= 50 THEN ir.responsavel
             WHEN cmr.fallback_responsavel IS NOT NULL THEN cmr.fallback_responsavel
             ELSE NULL
-          END as operador
+          END as operador,
+          CASE 
+            WHEN ir.match_score >= 50 THEN ir.squad
+            WHEN cmr.fallback_squad IS NOT NULL THEN cmr.fallback_squad
+            ELSE 'Sem Squad'
+          END as squad_final
         FROM itens_ranked ir
         LEFT JOIN contrato_mais_recente cmr ON ir.cnpj_limpo = cmr.cnpj_limpo
         WHERE ir.rn = 1
@@ -10072,6 +10076,8 @@ export class DbStorage implements IStorage {
       )
       SELECT COALESCE(NULLIF(TRIM(operador), ''), 'Sem Operador') as operador 
       FROM operadores_finais 
+      WHERE 1=1
+        ${squadFinalFilter}
       ORDER BY operador
     `);
     
@@ -10091,6 +10097,7 @@ export class DbStorage implements IStorage {
           REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
           ct.responsavel,
           ct.servico,
+          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad,
           -- Normalização robusta: lowercase, remove acentos, remove pontuação, colapsa espaços
           LOWER(TRIM(REGEXP_REPLACE(
             REGEXP_REPLACE(
@@ -10109,24 +10116,24 @@ export class DbStorage implements IStorage {
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
-          ${squadFilterSql}
       ),
       contrato_mais_recente AS (
         SELECT DISTINCT ON (cnpj_limpo)
           cnpj_limpo,
           responsavel as fallback_responsavel,
-          servico as fallback_servico
+          servico as fallback_servico,
+          squad as fallback_squad
         FROM (
           SELECT 
             REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
             ct.responsavel,
             ct.servico,
+            COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad,
             ct.id_subtask
           FROM cup_contratos ct
           INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
           WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
-            ${squadFilterSql}
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
@@ -10174,6 +10181,7 @@ export class DbStorage implements IStorage {
           cs.responsavel,
           cs.servico as servico_contrato,
           cs.servico_norm,
+          cs.squad,
           -- Score de matching robusto com múltiplos critérios
           CASE
             -- Match exato após normalização
@@ -10273,8 +10281,10 @@ export class DbStorage implements IStorage {
           ir.match_score,
           ir.servico_contrato,
           ir.responsavel,
+          ir.squad,
           cmr.fallback_responsavel,
-          cmr.fallback_servico
+          cmr.fallback_servico,
+          cmr.fallback_squad
         FROM itens_ranked ir
         LEFT JOIN contrato_mais_recente cmr ON ir.cnpj_limpo = cmr.cnpj_limpo
         WHERE ir.rn = 1
@@ -10296,7 +10306,12 @@ export class DbStorage implements IStorage {
             WHEN match_score >= 50 THEN responsavel
             WHEN fallback_responsavel IS NOT NULL THEN fallback_responsavel
             ELSE NULL
-          END as responsavel_final
+          END as responsavel_final,
+          CASE 
+            WHEN match_score >= 50 THEN squad
+            WHEN fallback_squad IS NOT NULL THEN fallback_squad
+            ELSE 'Sem Squad'
+          END as squad_final
         FROM match_result
       )
       SELECT 
@@ -10310,6 +10325,7 @@ export class DbStorage implements IStorage {
       FROM resultado_final
       WHERE 1=1
         ${operadorFilter}
+        ${squadFinalFilter}
       GROUP BY categoria_id, categoria_nome, cliente_nome, servico_nome, responsavel_final
       ORDER BY categoria_id, valor_total DESC
     `);
