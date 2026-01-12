@@ -4769,34 +4769,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Executar na inicialização
   updateClienteValorAcordadoByName();
 
-  // Função para inserir clientes de erro operacional manualmente na inicialização
-  async function ensureManualErroOperacionalClients() {
+  // Função para limpar clientes de erro operacional manuais duplicados e corrigir nomes
+  async function cleanupErroOperacionalClients() {
     try {
-      const clientesErroOperacional = [
-        { id: 'erro_fantasma_opera', nome: 'Fantasma de Opera', valor: 8000 },
-        { id: 'erro_gpa_suplementos', nome: 'GPA Suplementos', valor: 8400 },
-        { id: 'erro_hubstage', nome: 'Hubstage', valor: 18046 },
-        { id: 'erro_winstage', nome: 'WInstage', valor: 9200 },
-      ];
+      // Remover registros manuais duplicados (já existem os reais no banco)
+      await db.execute(sql`
+        DELETE FROM inadimplencia_contextos 
+        WHERE cliente_id IN ('erro_fantasma_opera', 'erro_gpa_suplementos', 'erro_hubstage', 'erro_winstage')
+      `);
       
-      for (const cliente of clientesErroOperacional) {
-        await db.execute(sql`
-          INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por, tipo_inadimplencia)
-          VALUES (${cliente.id}, 'baixa', 'concluido', ${cliente.valor}, ${cliente.nome + ' - Erro operacional'}, 'erro_operacional', 'Classificado como erro operacional', 'Sistema', 'erro_operacional')
-          ON CONFLICT (cliente_id) DO UPDATE SET
-            tipo_inadimplencia = 'erro_operacional',
-            contexto_juridico = EXCLUDED.contexto_juridico
-        `);
-      }
+      // Corrigir nome de Hubstage para Hubsage
+      await db.execute(sql`
+        UPDATE inadimplencia_contextos 
+        SET contexto_juridico = REPLACE(contexto_juridico, 'Hubstage', 'Hubsage')
+        WHERE contexto_juridico LIKE '%Hubstage%'
+      `);
       
-      console.log("[juridico] Clientes erro operacional inseridos:", clientesErroOperacional.length);
+      console.log("[juridico] Clientes erro operacional duplicados removidos e nomes corrigidos");
     } catch (error) {
-      console.warn("[juridico] Erro ao inserir clientes erro operacional:", (error as Error).message);
+      console.warn("[juridico] Erro ao limpar clientes erro operacional:", (error as Error).message);
     }
   }
   
   // Executar na inicialização
-  ensureManualErroOperacionalClients();
+  cleanupErroOperacionalClients();
 
   // ==================== JURÍDICO - Contratos Colaboradores ====================
   
