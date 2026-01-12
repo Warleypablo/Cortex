@@ -4772,51 +4772,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Função para corrigir nomes e adicionar clientes de erro operacional
   async function setupErroOperacionalClients() {
     try {
-      // Remover todos os registros de erro operacional antigos para reconstruir
+      // Remover TODOS os registros de erro operacional (antigos com prefixo e novos)
       await db.execute(sql`
         DELETE FROM inadimplencia_contextos 
-        WHERE cliente_id LIKE 'erro_%'
+        WHERE tipo_inadimplencia = 'erro_operacional'
       `);
       
-      // Corrigir nome de Hubstage para Hubsage em caz_clientes
-      await db.execute(sql`
-        UPDATE caz_clientes 
-        SET nome = REPLACE(nome, 'Hubstage', 'Hubsage')
-        WHERE nome LIKE '%Hubstage%'
-      `);
-      
-      // Lista completa de clientes de erro operacional com valores corretos
+      // Lista completa de clientes de erro operacional com valores corretos (apenas do print)
       const clientesErroOperacional = [
-        { id: 'erro_noodrops', nome: 'NOODROPS', valor: 7200 },
-        { id: 'erro_gota_tropicana', nome: 'GOTA TROPICANA', valor: 2000 },
-        { id: 'erro_fantasma_opera', nome: 'FANTASMA DA OPERA', valor: 7958.04 },
-        { id: 'erro_fs_company', nome: 'FS COMPANY', valor: 2000 },
-        { id: 'erro_vitoria_ternos', nome: 'VITÓRIA TERNOS', valor: 5994 },
-        { id: 'erro_chama_27', nome: 'CHAMA 27', valor: 8199.44 },
-        { id: 'erro_gpa_suplementos', nome: 'GPA SUPLEMENTOS', valor: 8366.60 },
-        { id: 'erro_peliculas_facil', nome: 'PELICULAS FACIL', valor: 12805 },
-        { id: 'erro_hubsage', nome: 'HUBSAGE DISTRIBUIDORA', valor: 0 },
-        { id: 'erro_quiproco', nome: 'QUIPROCO ROUPARIA E VERBAL LTDA', valor: 1997 },
-        { id: 'erro_winstage', nome: 'WINSTAGE', valor: 6100 },
-        { id: 'erro_smart_mini', nome: 'SMART MINI', valor: 2167 },
-        { id: 'erro_rafaela_macedo', nome: 'RAFAELA MACEDO DE JESUS', valor: 6000 },
-        { id: 'erro_delicious_healthy', nome: 'DELICIOUS HEALTHY ALIMENTACAO', valor: 6148.86 },
-        { id: 'erro_maxcar', nome: 'MAXCAR MOBILIDADE', valor: 2997 },
-        { id: 'erro_brisa_comercio', nome: 'BRISA COMÉRCIO', valor: 3997 },
-        { id: 'erro_life_gom', nome: 'LIFE GOM', valor: 8997 },
-        { id: 'erro_fantasma_opera_2', nome: 'FANTASMA DA OPERA', valor: 7958 },
-        { id: 'erro_ms_creative', nome: 'MS CREATIVE', valor: 2997 },
-        { id: 'erro_loops_nutrition', nome: 'LOOPS NUTRITION', valor: 3442.58 },
+        { nome: 'NOODROPS', valor: 7200 },
+        { nome: 'GOTA TROPICANA', valor: 2000 },
+        { nome: 'FANTASMA DA OPERA', valor: 7958.04 },
+        { nome: 'FS COMPANY', valor: 2000 },
+        { nome: 'VITÓRIA TERNOS', valor: 5994 },
+        { nome: 'CHAMA 27', valor: 8199.44 },
+        { nome: 'GPA SUPLEMENTOS', valor: 8366.60 },
+        { nome: 'PELICULAS FACIL', valor: 12805 },
+        { nome: 'HUBSAGE DISTRIBUIDORA', valor: 0 },
+        { nome: 'QUIPROCO ROUPARIA E VERBAL LTDA', valor: 1997 },
+        { nome: 'WINSTAGE', valor: 6100 },
+        { nome: 'SMART MINI', valor: 2167 },
+        { nome: 'RAFAELA MACEDO DE JESUS', valor: 6000 },
+        { nome: 'DELICIOUS HEALTHY ALIMENTACAO', valor: 6148.86 },
+        { nome: 'MAXCAR MOBILIDADE', valor: 2997 },
+        { nome: 'BRISA COMÉRCIO', valor: 3997 },
+        { nome: 'LIFE GOM', valor: 8997 },
+        { nome: 'MS CREATIVE', valor: 2997 },
+        { nome: 'LOOPS NUTRITION', valor: 3442.58 },
       ];
       
       for (const cliente of clientesErroOperacional) {
         await db.execute(sql`
           INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por, tipo_inadimplencia)
-          VALUES (${cliente.id}, 'baixa', 'concluido', ${cliente.valor}, ${cliente.nome + ' - Erro operacional'}, 'erro_operacional', 'Classificado como erro operacional', 'Sistema', 'erro_operacional')
+          VALUES (${cliente.nome}, 'baixa', 'concluido', ${cliente.valor}, ${cliente.nome}, 'erro_operacional', 'Classificado como erro operacional', 'Sistema', 'erro_operacional')
           ON CONFLICT (cliente_id) DO UPDATE SET
             tipo_inadimplencia = 'erro_operacional',
             valor_acordado = ${cliente.valor},
-            contexto_juridico = ${cliente.nome + ' - Erro operacional'}
+            contexto_juridico = ${cliente.nome}
         `);
       }
       
