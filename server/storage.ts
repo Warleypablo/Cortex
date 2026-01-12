@@ -7692,7 +7692,7 @@ export class DbStorage implements IStorage {
     if (ordenarPor === 'diasAtraso') {
       orderByClause = 'parcelas.dias_atraso_max DESC';
     } else if (ordenarPor === 'nome') {
-      orderByClause = 'COALESCE(cliente_info.nome_clickup, parcelas.nome_cliente) ASC';
+      orderByClause = 'COALESCE(cliente_info.nome_clickup, caz.nome_caz) ASC';
     }
     
     // Query refatorada com CTEs separadas para evitar duplicação de valores
@@ -7703,7 +7703,6 @@ export class DbStorage implements IStorage {
         -- CTE 1: Agregar dados de parcelas por cliente (SEM JOINS - evita duplicação)
         SELECT 
           cp.id_cliente,
-          MAX(cp.descricao) as nome_cliente,
           COALESCE(SUM(cp.nao_pago::numeric), 0) as valor_total,
           COUNT(*) as quantidade_parcelas,
           MIN(cp.data_vencimento) as parcela_mais_antiga,
@@ -7719,6 +7718,15 @@ export class DbStorage implements IStorage {
           ${whereDataFim}
         GROUP BY cp.id_cliente
         HAVING COALESCE(SUM(cp.nao_pago::numeric), 0) > 0
+      ),
+      cliente_caz AS (
+        -- CTE para buscar nome do cliente da tabela caz_clientes
+        SELECT DISTINCT ON (TRIM(ids::text))
+          TRIM(ids::text) as id_cliente,
+          nome as nome_caz
+        FROM caz_clientes
+        WHERE ids IS NOT NULL
+        ORDER BY TRIM(ids::text)
       ),
       cliente_metadata AS (
         -- CTE 2: Dados do cliente (caz_clientes + cup_clientes) - uma linha por cliente
@@ -7749,7 +7757,7 @@ export class DbStorage implements IStorage {
       )
       SELECT 
         parcelas.id_cliente,
-        parcelas.nome_cliente,
+        caz.nome_caz as nome_cliente,
         parcelas.valor_total,
         parcelas.quantidade_parcelas,
         parcelas.parcela_mais_antiga,
@@ -7763,6 +7771,7 @@ export class DbStorage implements IStorage {
         contratos.servicos,
         cliente_info.telefone
       FROM parcelas_agregadas parcelas
+      LEFT JOIN cliente_caz caz ON TRIM(parcelas.id_cliente::text) = caz.id_cliente
       LEFT JOIN cliente_metadata cliente_info ON TRIM(parcelas.id_cliente::text) = cliente_info.id_cliente
       LEFT JOIN contratos_agregados contratos ON TRIM(cliente_info.task_id::text) = contratos.task_id
       ORDER BY ${orderByClause}
