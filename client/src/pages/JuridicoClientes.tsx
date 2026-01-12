@@ -430,9 +430,10 @@ export default function JuridicoClientes({
 
   const recuperadosStats = useMemo(() => {
     // Considera como recuperado apenas se procedimento = "acordo" (negociado)
-    // Não exibir clientes com status "baixa"
+    // Não exibir clientes com status "baixa" ou com valor R$ 0
     const isRecuperado = (c: ClienteJuridico) =>
-      c.contexto?.procedimentoJuridico === "acordo";
+      c.contexto?.procedimentoJuridico === "acordo" &&
+      (c.contexto?.valorAcordado || 0) > 0;
 
     if (activeTab !== "recuperados") {
       const recuperadosSistemaCount = clientes.filter(isRecuperado).length;
