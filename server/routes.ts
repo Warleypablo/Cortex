@@ -4636,7 +4636,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (isRecuperado) {
           // Buscar nome real do cliente
           const clienteInfo = nomesClientesHistoricos[clienteId];
-          const nomeReal = clienteInfo?.nome || `Cliente ${clienteId}`;
+          // Para clientes manuais (prefixo "manual_"), extrair nome do contexto
+          let nomeReal = clienteInfo?.nome;
+          if (!nomeReal && clienteId.startsWith('manual_')) {
+            // Extrair nome do contexto: "Nome - Cliente recuperado manualmente"
+            nomeReal = contexto.contextoJuridico?.split(' - ')[0] || clienteId.replace('manual_', '').replace(/_/g, ' ');
+          } else if (!nomeReal) {
+            nomeReal = `Cliente ${clienteId}`;
+          }
           const empresaReal = clienteInfo?.empresa || '';
           
           // Criar objeto cliente mínimo para exibição
@@ -4702,6 +4709,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to update contexto juridico" });
     }
   });
+
+  // Função para inserir clientes recuperados manualmente na inicialização
+  async function ensureManualRecoveredClients() {
+    try {
+      const clientesManuais = [
+        { id: 'manual_show_room', nome: 'Show Room', valor: 1967 },
+        { id: 'manual_advocacia_morais', nome: 'Advocacia Morais', valor: 1997 },
+        { id: 'manual_reset', nome: 'Reset', valor: 3000 },
+        { id: 'manual_nativa', nome: 'Nativa', valor: 5000 },
+        { id: 'manual_kingly', nome: 'Kingly', valor: 1998 },
+        { id: 'manual_fast_lab', nome: 'Fast Lab', valor: 1058 },
+        { id: 'manual_ouvi_dizer', nome: 'Ouvi Dizer', valor: 2700 },
+        { id: 'manual_hortencia', nome: 'Hortencia', valor: 4500 },
+        { id: 'manual_rivers', nome: 'Rivers', valor: 1875 },
+        { id: 'manual_manafix', nome: 'Manafix', valor: 2019.38 },
+        { id: 'manual_agro_nutri', nome: 'Agro Nutri', valor: 2955 },
+        { id: 'manual_brisa', nome: 'Brisa', valor: 689 },
+      ];
+      
+      for (const cliente of clientesManuais) {
+        await db.execute(sql`
+          INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por)
+          VALUES (${cliente.id}, 'acordo', 'concluido', ${cliente.valor}, ${cliente.nome + ' - Cliente recuperado manualmente'}, 'acordo_manual', 'Cliente recuperado com acordo', 'Sistema')
+          ON CONFLICT (cliente_id) DO UPDATE SET
+            procedimento_juridico = 'acordo',
+            status_juridico = 'concluido',
+            valor_acordado = EXCLUDED.valor_acordado,
+            contexto_juridico = EXCLUDED.contexto_juridico
+        `);
+      }
+      
+      console.log("[juridico] Clientes recuperados manuais inseridos:", clientesManuais.length);
+    } catch (error) {
+      console.warn("[juridico] Erro ao inserir clientes recuperados manuais:", (error as Error).message);
+    }
+  }
+  
+  // Executar na inicialização
+  ensureManualRecoveredClients();
 
   // ==================== JURÍDICO - Contratos Colaboradores ====================
   
