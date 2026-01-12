@@ -4772,20 +4772,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Função para corrigir nomes e adicionar clientes de erro operacional
   async function setupErroOperacionalClients() {
     try {
-      // Remover TODOS os registros de erro operacional (antigos com prefixo e novos)
+      // Remover TODOS os registros de erro operacional (antigos e novos, incluindo os com NULL)
       await db.execute(sql`
         DELETE FROM inadimplencia_contextos 
         WHERE tipo_inadimplencia = 'erro_operacional'
-      `);
-      
-      // Remover registros manuais antigos duplicados (Fantasma de Opera, GPA Suplementos, Hubstage, Winstage)
-      await db.execute(sql`
-        DELETE FROM inadimplencia_contextos 
-        WHERE cliente_id IN ('erro_fantasma_opera', 'erro_gpa_suplementos', 'erro_hubstage', 'erro_winstage')
-           OR contexto_juridico LIKE '%Registro manual%'
-           OR (UPPER(contexto_juridico) LIKE '%FANTASMA%' AND cliente_id LIKE 'erro_%')
-           OR (UPPER(contexto_juridico) LIKE '%HUBSTAGE%')
-           OR (UPPER(contexto_juridico) LIKE '%WINSTAGE%' AND cliente_id LIKE 'erro_%')
+           OR cliente_id LIKE 'erro_%'
+           OR contexto_juridico ILIKE '%Registro manual%'
+           OR contexto_juridico ILIKE '%Fantasma%'
+           OR contexto_juridico ILIKE '%Hubstage%'
+           OR contexto_juridico ILIKE '%GPA Suplementos%'
+           OR contexto_juridico ILIKE '%Winstage%'
       `);
       
       // Lista completa de clientes de erro operacional com valores corretos (apenas do print)
