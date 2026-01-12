@@ -4769,30 +4769,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Executar na inicialização
   updateClienteValorAcordadoByName();
 
-  // Função para limpar clientes de erro operacional manuais duplicados e corrigir nomes
-  async function cleanupErroOperacionalClients() {
+  // Função para corrigir nomes e adicionar clientes de erro operacional
+  async function setupErroOperacionalClients() {
     try {
-      // Remover registros manuais duplicados (já existem os reais no banco)
+      // Remover registros manuais duplicados antigos
       await db.execute(sql`
         DELETE FROM inadimplencia_contextos 
         WHERE cliente_id IN ('erro_fantasma_opera', 'erro_gpa_suplementos', 'erro_hubstage', 'erro_winstage')
       `);
       
-      // Corrigir nome de Hubstage para Hubsage
+      // Corrigir nome de Hubstage para Hubsage em caz_clientes
+      await db.execute(sql`
+        UPDATE caz_clientes 
+        SET nome = REPLACE(nome, 'Hubstage', 'Hubsage')
+        WHERE nome LIKE '%Hubstage%'
+      `);
+      
+      // Corrigir nome em inadimplencia_contextos também
       await db.execute(sql`
         UPDATE inadimplencia_contextos 
         SET contexto_juridico = REPLACE(contexto_juridico, 'Hubstage', 'Hubsage')
         WHERE contexto_juridico LIKE '%Hubstage%'
       `);
       
-      console.log("[juridico] Clientes erro operacional duplicados removidos e nomes corrigidos");
+      // Adicionar FS Company como erro operacional
+      await db.execute(sql`
+        INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por, tipo_inadimplencia)
+        VALUES ('erro_fs_company', 'baixa', 'concluido', 3147, 'FS Company - Erro operacional', 'erro_operacional', 'Classificado como erro operacional', 'Sistema', 'erro_operacional')
+        ON CONFLICT (cliente_id) DO UPDATE SET
+          tipo_inadimplencia = 'erro_operacional',
+          valor_acordado = 3147,
+          contexto_juridico = 'FS Company - Erro operacional'
+      `);
+      
+      console.log("[juridico] Clientes erro operacional configurados e nomes corrigidos");
     } catch (error) {
-      console.warn("[juridico] Erro ao limpar clientes erro operacional:", (error as Error).message);
+      console.warn("[juridico] Erro ao configurar clientes erro operacional:", (error as Error).message);
     }
   }
   
   // Executar na inicialização
-  cleanupErroOperacionalClients();
+  setupErroOperacionalClients();
 
   // ==================== JURÍDICO - Contratos Colaboradores ====================
   
