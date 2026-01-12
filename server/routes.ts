@@ -7726,11 +7726,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contribuição por Operador (responsável do contrato) - Estilo DFC
+  // Aceita filtro por squad para agrupar operadores
   app.get("/api/contribuicao-operador/dfc", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string;
       const dataFim = req.query.dataFim as string;
       const operador = req.query.operador as string | undefined;
+      const squad = req.query.squad as string | undefined;
       
       if (!dataInicio || !dataFim) {
         return res.status(400).json({ error: "Parâmetros dataInicio e dataFim são obrigatórios" });
@@ -7740,7 +7742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Formato inválido. Esperado: YYYY-MM-DD" });
       }
       
-      const data = await storage.getContribuicaoOperadorDfc(dataInicio, dataFim, operador);
+      const data = await storage.getContribuicaoOperadorDfc(dataInicio, dataFim, operador, squad);
       res.json(data);
     } catch (error) {
       console.error("[api] Error fetching contribuição operador DFC:", error);
