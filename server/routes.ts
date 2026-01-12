@@ -4772,10 +4772,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Função para corrigir nomes e adicionar clientes de erro operacional
   async function setupErroOperacionalClients() {
     try {
-      // Remover registros manuais duplicados antigos
+      // Remover todos os registros de erro operacional antigos para reconstruir
       await db.execute(sql`
         DELETE FROM inadimplencia_contextos 
-        WHERE cliente_id IN ('erro_fantasma_opera', 'erro_gpa_suplementos', 'erro_hubstage', 'erro_winstage')
+        WHERE cliente_id LIKE 'erro_%'
       `);
       
       // Corrigir nome de Hubstage para Hubsage em caz_clientes
@@ -4785,24 +4785,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE nome LIKE '%Hubstage%'
       `);
       
-      // Corrigir nome em inadimplencia_contextos também
-      await db.execute(sql`
-        UPDATE inadimplencia_contextos 
-        SET contexto_juridico = REPLACE(contexto_juridico, 'Hubstage', 'Hubsage')
-        WHERE contexto_juridico LIKE '%Hubstage%'
-      `);
+      // Lista completa de clientes de erro operacional com valores corretos
+      const clientesErroOperacional = [
+        { id: 'erro_noodrops', nome: 'NOODROPS', valor: 7200 },
+        { id: 'erro_gota_tropicana', nome: 'GOTA TROPICANA', valor: 2000 },
+        { id: 'erro_fantasma_opera', nome: 'FANTASMA DA OPERA', valor: 7958.04 },
+        { id: 'erro_fs_company', nome: 'FS COMPANY', valor: 2000 },
+        { id: 'erro_vitoria_ternos', nome: 'VITÓRIA TERNOS', valor: 5994 },
+        { id: 'erro_chama_27', nome: 'CHAMA 27', valor: 8199.44 },
+        { id: 'erro_gpa_suplementos', nome: 'GPA SUPLEMENTOS', valor: 8366.60 },
+        { id: 'erro_peliculas_facil', nome: 'PELICULAS FACIL', valor: 12805 },
+        { id: 'erro_hubsage', nome: 'HUBSAGE DISTRIBUIDORA', valor: 0 },
+        { id: 'erro_quiproco', nome: 'QUIPROCO ROUPARIA E VERBAL LTDA', valor: 1997 },
+        { id: 'erro_winstage', nome: 'WINSTAGE', valor: 6100 },
+        { id: 'erro_smart_mini', nome: 'SMART MINI', valor: 2167 },
+        { id: 'erro_rafaela_macedo', nome: 'RAFAELA MACEDO DE JESUS', valor: 6000 },
+        { id: 'erro_delicious_healthy', nome: 'DELICIOUS HEALTHY ALIMENTACAO', valor: 6148.86 },
+        { id: 'erro_maxcar', nome: 'MAXCAR MOBILIDADE', valor: 2997 },
+        { id: 'erro_brisa_comercio', nome: 'BRISA COMÉRCIO', valor: 3997 },
+        { id: 'erro_life_gom', nome: 'LIFE GOM', valor: 8997 },
+        { id: 'erro_fantasma_opera_2', nome: 'FANTASMA DA OPERA', valor: 7958 },
+        { id: 'erro_ms_creative', nome: 'MS CREATIVE', valor: 2997 },
+        { id: 'erro_loops_nutrition', nome: 'LOOPS NUTRITION', valor: 3442.58 },
+      ];
       
-      // Adicionar FS Company como erro operacional
-      await db.execute(sql`
-        INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por, tipo_inadimplencia)
-        VALUES ('erro_fs_company', 'baixa', 'concluido', 3147, 'FS Company - Erro operacional', 'erro_operacional', 'Classificado como erro operacional', 'Sistema', 'erro_operacional')
-        ON CONFLICT (cliente_id) DO UPDATE SET
-          tipo_inadimplencia = 'erro_operacional',
-          valor_acordado = 3147,
-          contexto_juridico = 'FS Company - Erro operacional'
-      `);
+      for (const cliente of clientesErroOperacional) {
+        await db.execute(sql`
+          INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por, tipo_inadimplencia)
+          VALUES (${cliente.id}, 'baixa', 'concluido', ${cliente.valor}, ${cliente.nome + ' - Erro operacional'}, 'erro_operacional', 'Classificado como erro operacional', 'Sistema', 'erro_operacional')
+          ON CONFLICT (cliente_id) DO UPDATE SET
+            tipo_inadimplencia = 'erro_operacional',
+            valor_acordado = ${cliente.valor},
+            contexto_juridico = ${cliente.nome + ' - Erro operacional'}
+        `);
+      }
       
-      console.log("[juridico] Clientes erro operacional configurados e nomes corrigidos");
+      console.log("[juridico] Clientes erro operacional configurados:", clientesErroOperacional.length);
     } catch (error) {
       console.warn("[juridico] Erro ao configurar clientes erro operacional:", (error as Error).message);
     }
