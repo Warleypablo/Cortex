@@ -4749,6 +4749,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Executar na inicialização
   ensureManualRecoveredClients();
 
+  // Função para inserir clientes de erro operacional manualmente na inicialização
+  async function ensureManualErroOperacionalClients() {
+    try {
+      const clientesErroOperacional = [
+        { id: 'erro_fantasma_opera', nome: 'Fantasma de Opera', valor: 8000 },
+        { id: 'erro_gpa_suplementos', nome: 'GPA Suplementos', valor: 8400 },
+        { id: 'erro_hubstage', nome: 'Hubstage', valor: 18046 },
+        { id: 'erro_winstage', nome: 'WInstage', valor: 9200 },
+      ];
+      
+      for (const cliente of clientesErroOperacional) {
+        await db.execute(sql`
+          INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por, tipo_inadimplencia)
+          VALUES (${cliente.id}, 'baixa', 'concluido', ${cliente.valor}, ${cliente.nome + ' - Erro operacional'}, 'erro_operacional', 'Classificado como erro operacional', 'Sistema', 'erro_operacional')
+          ON CONFLICT (cliente_id) DO UPDATE SET
+            tipo_inadimplencia = 'erro_operacional',
+            contexto_juridico = EXCLUDED.contexto_juridico
+        `);
+      }
+      
+      console.log("[juridico] Clientes erro operacional inseridos:", clientesErroOperacional.length);
+    } catch (error) {
+      console.warn("[juridico] Erro ao inserir clientes erro operacional:", (error as Error).message);
+    }
+  }
+  
+  // Executar na inicialização
+  ensureManualErroOperacionalClients();
+
   // ==================== JURÍDICO - Contratos Colaboradores ====================
   
   // Inicializar tabela de status de contratos de colaboradores
