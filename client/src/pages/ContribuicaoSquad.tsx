@@ -201,11 +201,11 @@ export default function ContribuicaoSquad() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="p-4 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Contribuição por Squad</h1>
-          <p className="text-muted-foreground">Receitas por produto/serviço e período (squad do contrato)</p>
+          <h1 className="text-xl font-bold" data-testid="text-page-title">Contribuição por Squad</h1>
+          <p className="text-sm text-muted-foreground">Receitas por produto/serviço e período (squad do contrato)</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -213,7 +213,7 @@ export default function ContribuicaoSquad() {
             value={squadSelecionado} 
             onValueChange={setSquadSelecionado}
           >
-            <SelectTrigger className="w-[200px]" data-testid="select-squad">
+            <SelectTrigger className="w-[180px]" data-testid="select-squad">
               <SelectValue placeholder="Todos os squads" />
             </SelectTrigger>
             <SelectContent>
@@ -230,7 +230,7 @@ export default function ContribuicaoSquad() {
             value={anoSelecionado.toString()} 
             onValueChange={(val) => setAnoSelecionado(parseInt(val))}
           >
-            <SelectTrigger className="w-[100px]" data-testid="select-ano">
+            <SelectTrigger className="w-[90px]" data-testid="select-ano">
               <SelectValue placeholder="Ano" />
             </SelectTrigger>
             <SelectContent>
@@ -244,80 +244,80 @@ export default function ContribuicaoSquad() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita Total do Ano</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 py-2 pb-1">
+            <CardTitle className="text-xs font-medium">Receita Total do Ano</CardTitle>
+            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-3 pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-6 w-28" />
             ) : (
-              <div className="text-2xl font-bold text-emerald-500" data-testid="text-receita-total">
+              <div className="text-xl font-bold text-emerald-500" data-testid="text-receita-total">
                 {formatCurrencyNoDecimals(totalReceitas)}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-0.5">
               {squadSelecionado === "todos" ? "Todos os squads" : squadSelecionado}
             </p>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Squads</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 py-2 pb-1">
+            <CardTitle className="text-xs font-medium">Squads</CardTitle>
+            <Users className="h-3.5 w-3.5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-3 pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-6 w-16" />
             ) : (
-              <div className="text-2xl font-bold" data-testid="text-squads">
+              <div className="text-xl font-bold" data-testid="text-squads">
                 {squadSelecionado === "todos" 
                   ? (squadsData?.length || 0) 
                   : "1"}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-0.5">
               {squadSelecionado === "todos" ? "Com faturamento no período" : "Filtro aplicado"}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Contratos Ativos</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 py-2 pb-1">
+            <CardTitle className="text-xs font-medium">Contratos Ativos</CardTitle>
+            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-3 pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-6 w-16" />
             ) : (
-              <div className="text-2xl font-bold" data-testid="text-contratos">
+              <div className="text-xl font-bold" data-testid="text-contratos">
                 {totalContratos}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-0.5">
               Relacionados às parcelas
             </p>
           </CardContent>
         </Card>
         
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Média Mensal</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 py-2 pb-1">
+            <CardTitle className="text-xs font-medium">Média Mensal</CardTitle>
+            <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 pb-3 pt-0">
             {isLoading ? (
-              <Skeleton className="h-8 w-24" />
+              <Skeleton className="h-6 w-20" />
             ) : (
-              <div className="text-2xl font-bold" data-testid="text-media-mensal">
+              <div className="text-xl font-bold" data-testid="text-media-mensal">
                 {formatCurrencyNoDecimals(totalReceitas / 12)}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[10px] text-muted-foreground mt-0.5">
               Receita média por mês
             </p>
           </CardContent>
@@ -325,13 +325,13 @@ export default function ContribuicaoSquad() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <CirclePlus className="h-5 w-5 text-emerald-500" />
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <CirclePlus className="h-4 w-4 text-emerald-500" />
             Receitas por Squad - Produto/Serviço
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {isLoading ? (
             <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
@@ -340,13 +340,13 @@ export default function ContribuicaoSquad() {
             </div>
           ) : (
             <ScrollArea className="w-full">
-              <div className="min-w-[1200px]">
-                <div className="grid border-b border-border" style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}>
-                  <div className="p-3 font-semibold text-sm bg-muted/50 sticky left-0 z-10">
+              <div className="min-w-[1024px]">
+                <div className="grid border-b border-border" style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}>
+                  <div className="px-2 py-1.5 font-semibold text-xs bg-muted/50 sticky left-0 z-10">
                     Produto/Serviço
                   </div>
                   {hierarchicalData.monthColumns.map((col) => (
-                    <div key={col.mes} className="p-3 font-semibold text-sm text-right bg-muted/50">
+                    <div key={col.mes} className="px-2 py-1.5 font-semibold text-xs text-right bg-muted/50">
                       {formatMesLabel(col.mesLabel)}
                     </div>
                   ))}
@@ -354,21 +354,21 @@ export default function ContribuicaoSquad() {
 
                 <div 
                   className="grid border-b-2 border-emerald-500/50 bg-emerald-500/10 cursor-pointer hover-elevate"
-                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
                   onClick={() => toggleExpand("RECEITAS")}
                   data-testid="row-receitas-total"
                 >
-                  <div className="p-3 font-bold text-emerald-500 flex items-center gap-2 sticky left-0 z-10 bg-emerald-500/10">
+                  <div className="px-2 py-1.5 font-bold text-sm text-emerald-500 flex items-center gap-1.5 sticky left-0 z-10 bg-emerald-500/10">
                     {expanded.has("RECEITAS") ? (
-                      <ChevronDown className="h-4 w-4" />
+                      <ChevronDown className="h-3.5 w-3.5" />
                     ) : (
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-3.5 w-3.5" />
                     )}
-                    <CirclePlus className="h-4 w-4" />
+                    <CirclePlus className="h-3.5 w-3.5" />
                     Receitas
                   </div>
                   {hierarchicalData.monthColumns.map((col) => (
-                    <div key={col.mes} className="p-3 text-right font-bold text-emerald-500">
+                    <div key={col.mes} className="px-2 py-1.5 text-right text-sm font-bold text-emerald-500">
                       {formatCurrencyNoDecimals(col.receitaTotal)}
                     </div>
                   ))}
@@ -390,25 +390,25 @@ export default function ContribuicaoSquad() {
                         "grid border-b border-border/50 hover-elevate",
                         hasChildren && "cursor-pointer"
                       )}
-                      style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                      style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
                       onClick={() => hasChildren && toggleExpand(category.id)}
                       data-testid={`row-categoria-${category.id}`}
                     >
                       <div 
-                        className="p-3 flex items-center gap-2 sticky left-0 z-10 bg-background"
-                        style={{ paddingLeft: `${12 + (indentLevel * 16)}px` }}
+                        className="px-2 py-1 flex items-center gap-1.5 sticky left-0 z-10 bg-background"
+                        style={{ paddingLeft: `${8 + (indentLevel * 12)}px` }}
                       >
                         {hasChildren ? (
                           isExpanded ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                           ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                           )
                         ) : (
-                          <span className="w-4" />
+                          <span className="w-3.5" />
                         )}
                         <span className={cn(
-                          "text-sm",
+                          "text-xs",
                           indentLevel === 1 && "font-semibold"
                         )}>
                           {category.nome}
@@ -417,7 +417,7 @@ export default function ContribuicaoSquad() {
                       {hierarchicalData.monthColumns.map((col) => {
                         const valor = col.valorPorCategoria.get(category.id) || 0;
                         return (
-                          <div key={col.mes} className="p-3 text-right text-sm">
+                          <div key={col.mes} className="px-2 py-1 text-right text-xs">
                             {valor > 0 ? formatCurrencyNoDecimals(valor) : "-"}
                           </div>
                         );
