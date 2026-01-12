@@ -62,7 +62,18 @@ import {
   Timer,
   Receipt,
 } from "lucide-react";
-import { PieChart as RechartsPie, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import {
+  PieChart as RechartsPie,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
 import { SiWhatsapp } from "react-icons/si";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -122,7 +133,6 @@ interface ClienteJuridico {
   needsEscalation?: boolean;
 }
 
-
 const formatDate = (date: string | null) => {
   if (!date) return "-";
   try {
@@ -134,43 +144,95 @@ const formatDate = (date: string | null) => {
 
 const formatPhoneForWhatsApp = (phone: string | null): string | null => {
   if (!phone) return null;
-  let cleaned = phone.replace(/\D/g, '');
-  if (cleaned.startsWith('0')) {
+  let cleaned = phone.replace(/\D/g, "");
+  if (cleaned.startsWith("0")) {
     cleaned = cleaned.substring(1);
   }
-  if (cleaned.length >= 10 && !cleaned.startsWith('55')) {
-    cleaned = '55' + cleaned;
+  if (cleaned.length >= 10 && !cleaned.startsWith("55")) {
+    cleaned = "55" + cleaned;
   }
   return cleaned.length >= 12 ? cleaned : null;
 };
 
 const PROCEDIMENTOS = [
-  { value: "notificacao", label: "Notificação", icon: Send, color: "bg-blue-100 text-blue-700 border-blue-200" },
-  { value: "protesto", label: "Protesto", icon: FileWarning, color: "bg-orange-100 text-orange-700 border-orange-200" },
-  { value: "acao_judicial", label: "Ação Judicial", icon: Gavel, color: "bg-red-100 text-red-700 border-red-200" },
-  { value: "acordo", label: "Acordo", icon: Handshake, color: "bg-green-100 text-green-700 border-green-200" },
-  { value: "baixa", label: "Baixa", icon: XCircle, color: "bg-gray-100 text-gray-600 border-gray-200" },
+  {
+    value: "notificacao",
+    label: "Notificação",
+    icon: Send,
+    color: "bg-blue-100 text-blue-700 border-blue-200",
+  },
+  {
+    value: "protesto",
+    label: "Protesto",
+    icon: FileWarning,
+    color: "bg-orange-100 text-orange-700 border-orange-200",
+  },
+  {
+    value: "acao_judicial",
+    label: "Ação Judicial",
+    icon: Gavel,
+    color: "bg-red-100 text-red-700 border-red-200",
+  },
+  {
+    value: "acordo",
+    label: "Acordo",
+    icon: Handshake,
+    color: "bg-green-100 text-green-700 border-green-200",
+  },
+  {
+    value: "baixa",
+    label: "Baixa",
+    icon: XCircle,
+    color: "bg-gray-100 text-gray-600 border-gray-200",
+  },
 ];
 
 const STATUS_JURIDICO = [
-  { value: "pendente", label: "Aguardando", color: "bg-amber-100 text-amber-700 border-amber-200", icon: Clock },
-  { value: "em_andamento", label: "Em Andamento", color: "bg-blue-100 text-blue-700 border-blue-200", icon: TrendingUp },
-  { value: "concluido", label: "Concluído", color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle2 },
-  { value: "cancelado", label: "Cancelado", color: "bg-gray-100 text-gray-600 border-gray-200", icon: XCircle },
+  {
+    value: "pendente",
+    label: "Aguardando",
+    color: "bg-amber-100 text-amber-700 border-amber-200",
+    icon: Clock,
+  },
+  {
+    value: "em_andamento",
+    label: "Em Andamento",
+    color: "bg-blue-100 text-blue-700 border-blue-200",
+    icon: TrendingUp,
+  },
+  {
+    value: "concluido",
+    label: "Concluído",
+    color: "bg-green-100 text-green-700 border-green-200",
+    icon: CheckCircle2,
+  },
+  {
+    value: "cancelado",
+    label: "Cancelado",
+    color: "bg-gray-100 text-gray-600 border-gray-200",
+    icon: XCircle,
+  },
 ];
 
 interface JuridicoClientesProps {
   embedded?: boolean;
 }
 
-export default function JuridicoClientes({ embedded = false }: JuridicoClientesProps) {
+export default function JuridicoClientes({
+  embedded = false,
+}: JuridicoClientesProps) {
   usePageTitle(embedded ? "" : "Jurídico");
-  useSetPageInfo(embedded ? "" : "Cobrança Jurídica", embedded ? "" : "Gestão de clientes inadimplentes");
+  useSetPageInfo(
+    embedded ? "" : "Cobrança Jurídica",
+    embedded ? "" : "Gestão de clientes inadimplentes",
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<string>("ativos");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
-  const [editingCliente, setEditingCliente] = useState<ClienteJuridico | null>(null);
+  const [editingCliente, setEditingCliente] = useState<ClienteJuridico | null>(
+    null,
+  );
   const [editForm, setEditForm] = useState({
     contextoJuridico: "",
     procedimentoJuridico: "",
@@ -179,7 +241,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
     tipoInadimplencia: "",
   });
   const { toast } = useToast();
-  
+
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const deferredStatusFilter = useDeferredValue(statusFilter);
 
@@ -189,14 +251,25 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { clienteId: string; contextoJuridico: string; procedimentoJuridico: string; statusJuridico: string; valorAcordado?: number; tipoInadimplencia?: string }) => {
-      return apiRequest("PUT", `/api/juridico/clientes/${data.clienteId}/contexto`, {
-        contextoJuridico: data.contextoJuridico,
-        procedimentoJuridico: data.procedimentoJuridico,
-        statusJuridico: data.statusJuridico,
-        valorAcordado: data.valorAcordado,
-        tipoInadimplencia: data.tipoInadimplencia,
-      });
+    mutationFn: async (data: {
+      clienteId: string;
+      contextoJuridico: string;
+      procedimentoJuridico: string;
+      statusJuridico: string;
+      valorAcordado?: number;
+      tipoInadimplencia?: string;
+    }) => {
+      return apiRequest(
+        "PUT",
+        `/api/juridico/clientes/${data.clienteId}/contexto`,
+        {
+          contextoJuridico: data.contextoJuridico,
+          procedimentoJuridico: data.procedimentoJuridico,
+          statusJuridico: data.statusJuridico,
+          valorAcordado: data.valorAcordado,
+          tipoInadimplencia: data.tipoInadimplencia,
+        },
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/juridico/clientes"] });
@@ -212,7 +285,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
   const { sortedClientes, totals } = useMemo(() => {
     const searchLower = deferredSearchTerm.toLowerCase();
-    
+
     const filtered = clientes.filter((item) => {
       const matchesSearch =
         deferredSearchTerm === "" ||
@@ -221,170 +294,228 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
       const matchesStatus =
         deferredStatusFilter === "all" ||
-        (deferredStatusFilter === "pendente" && !item.contexto?.procedimentoJuridico) ||
+        (deferredStatusFilter === "pendente" &&
+          !item.contexto?.procedimentoJuridico) ||
         item.contexto?.procedimentoJuridico === deferredStatusFilter;
 
       return matchesSearch && matchesStatus;
     });
 
-    const sorted = filtered.sort((a, b) => b.cliente.diasAtrasoMax - a.cliente.diasAtrasoMax);
+    const sorted = filtered.sort(
+      (a, b) => b.cliente.diasAtrasoMax - a.cliente.diasAtrasoMax,
+    );
 
-    const stats = filtered.reduce((acc, c) => {
-      const dias = c.cliente.diasAtrasoMax;
-      const proc = c.contexto?.procedimentoJuridico || 'sem_acao';
-      
-      acc.total += c.cliente.valorTotal;
-      acc.totalDias += dias;
-      
-      if (dias > 90) acc.urgentes++;
-      else if (dias > 60) acc.atencao++;
-      else if (dias > 30) acc.moderado++;
-      else acc.recente++;
-      
-      acc.porProcedimento[proc] = (acc.porProcedimento[proc] || 0) + 1;
-      
-      return acc;
-    }, {
-      total: 0,
-      totalDias: 0,
-      urgentes: 0,
-      atencao: 0,
-      moderado: 0,
-      recente: 0,
-      porProcedimento: {} as Record<string, number>
-    });
-    
+    const stats = filtered.reduce(
+      (acc, c) => {
+        const dias = c.cliente.diasAtrasoMax;
+        const proc = c.contexto?.procedimentoJuridico || "sem_acao";
+
+        acc.total += c.cliente.valorTotal;
+        acc.totalDias += dias;
+
+        if (dias > 90) acc.urgentes++;
+        else if (dias > 60) acc.atencao++;
+        else if (dias > 30) acc.moderado++;
+        else acc.recente++;
+
+        acc.porProcedimento[proc] = (acc.porProcedimento[proc] || 0) + 1;
+
+        return acc;
+      },
+      {
+        total: 0,
+        totalDias: 0,
+        urgentes: 0,
+        atencao: 0,
+        moderado: 0,
+        recente: 0,
+        porProcedimento: {} as Record<string, number>,
+      },
+    );
+
     const count = filtered.length;
-    const semAcao = stats.porProcedimento['sem_acao'] || 0;
+    const semAcao = stats.porProcedimento["sem_acao"] || 0;
     const ticketMedio = count > 0 ? stats.total / count : 0;
     const diasMedio = count > 0 ? stats.totalDias / count : 0;
     const percentUrgente = count > 0 ? (stats.urgentes / count) * 100 : 0;
-    
+
     const porProcedimento = stats.porProcedimento;
-    
+
     const distribuicaoUrgencia = [
-      { name: 'Urgente (+90d)', value: stats.urgentes, color: '#ef4444' },
-      { name: 'Atenção (60-90d)', value: stats.atencao, color: '#f97316' },
-      { name: 'Moderado (30-60d)', value: stats.moderado, color: '#fbbf24' },
-      { name: 'Recente (-30d)', value: stats.recente, color: '#94a3b8' },
-    ].filter(d => d.value > 0);
-    
+      { name: "Urgente (+90d)", value: stats.urgentes, color: "#ef4444" },
+      { name: "Atenção (60-90d)", value: stats.atencao, color: "#f97316" },
+      { name: "Moderado (30-60d)", value: stats.moderado, color: "#fbbf24" },
+      { name: "Recente (-30d)", value: stats.recente, color: "#94a3b8" },
+    ].filter((d) => d.value > 0);
+
     const distribuicaoProcedimento = [
-      { name: 'Sem Ação', value: porProcedimento['sem_acao'], color: '#d1d5db' },
-      { name: 'Notificação', value: porProcedimento['notificacao'], color: '#3b82f6' },
-      { name: 'Protesto', value: porProcedimento['protesto'], color: '#f97316' },
-      { name: 'Ação Judicial', value: porProcedimento['acao_judicial'], color: '#ef4444' },
-      { name: 'Acordo', value: porProcedimento['acordo'], color: '#22c55e' },
-      { name: 'Baixa', value: porProcedimento['baixa'], color: '#6b7280' },
-    ].filter(d => d.value > 0);
-    
-    return { 
+      {
+        name: "Sem Ação",
+        value: porProcedimento["sem_acao"],
+        color: "#d1d5db",
+      },
+      {
+        name: "Notificação",
+        value: porProcedimento["notificacao"],
+        color: "#3b82f6",
+      },
+      {
+        name: "Protesto",
+        value: porProcedimento["protesto"],
+        color: "#f97316",
+      },
+      {
+        name: "Ação Judicial",
+        value: porProcedimento["acao_judicial"],
+        color: "#ef4444",
+      },
+      { name: "Acordo", value: porProcedimento["acordo"], color: "#22c55e" },
+      { name: "Baixa", value: porProcedimento["baixa"], color: "#6b7280" },
+    ].filter((d) => d.value > 0);
+
+    return {
       sortedClientes: sorted,
       totals: {
-        total: stats.total, 
-        count, 
-        urgentes: stats.urgentes, 
+        total: stats.total,
+        count,
+        urgentes: stats.urgentes,
         atencao: stats.atencao,
         moderado: stats.moderado,
         recente: stats.recente,
-        semAcao, 
-        ticketMedio, 
-        diasMedio, 
+        semAcao,
+        ticketMedio,
+        diasMedio,
         percentUrgente,
         porProcedimento,
         distribuicaoUrgencia,
-        distribuicaoProcedimento
-      }
+        distribuicaoProcedimento,
+      },
     };
   }, [clientes, deferredSearchTerm, deferredStatusFilter]);
 
   // Clientes pré-negociados (recuperados antes do registro no sistema jurídico)
-  const clientesPreNegociados = useMemo(() => [
-    { nome: "GC BY ME", valorOriginal: 3447.50, valorRecuperado: 3447.50 },
-    { nome: "100% Voce Industria e Comércio", valorOriginal: 3997.00, valorRecuperado: 3997.00 },
-    { nome: "Livraria Nossa Senhora Aparecida", valorOriginal: 3697.00, valorRecuperado: 3697.00 },
-    { nome: "COPPINI Empreendimentos Digitais LTDA", valorOriginal: 2209.70, valorRecuperado: 2209.70 },
-    { nome: "FLOREST", valorOriginal: 3997.00, valorRecuperado: 3997.00 },
-    { nome: "GO COFFE", valorOriginal: 3283.00, valorRecuperado: 3283.00 },
-    { nome: "GOLIK", valorOriginal: 2800.00, valorRecuperado: 1500.00 },
-    { nome: "100% CIFRAS", valorOriginal: 882.83, valorRecuperado: 882.83 },
-    { nome: "VOLTA VIBE", valorOriginal: 1000.00, valorRecuperado: 1000.00 },
-    { nome: "CHOCOLATERIA BRASIL", valorOriginal: 6987.59, valorRecuperado: 6987.59 },
-    { nome: "MALOCA", valorOriginal: 2510.89, valorRecuperado: 2510.89 },
-    { nome: "AYURVÈDIKA", valorOriginal: 4000.00, valorRecuperado: 4000.00 },
-  ], []);
+  const clientesPreNegociados = useMemo(
+    () => [
+      { nome: "GC BY ME", valorOriginal: 3447.5, valorRecuperado: 3447.5 },
+      {
+        nome: "100% Voce Industria e Comércio",
+        valorOriginal: 3997.0,
+        valorRecuperado: 3997.0,
+      },
+      {
+        nome: "Livraria Nossa Senhora Aparecida",
+        valorOriginal: 3697.0,
+        valorRecuperado: 3697.0,
+      },
+      {
+        nome: "COPPINI Empreendimentos Digitais LTDA",
+        valorOriginal: 2209.7,
+        valorRecuperado: 2209.7,
+      },
+      { nome: "FLOREST", valorOriginal: 3997.0, valorRecuperado: 3997.0 },
+      { nome: "GO COFFE", valorOriginal: 3283.0, valorRecuperado: 3283.0 },
+      { nome: "GOLIK", valorOriginal: 2800.0, valorRecuperado: 1500.0 },
+      { nome: "100% CIFRAS", valorOriginal: 882.83, valorRecuperado: 882.83 },
+      { nome: "VOLTA VIBE", valorOriginal: 1000.0, valorRecuperado: 1000.0 },
+      {
+        nome: "CHOCOLATERIA BRASIL",
+        valorOriginal: 6987.59,
+        valorRecuperado: 6987.59,
+      },
+      { nome: "MALOCA", valorOriginal: 2510.89, valorRecuperado: 2510.89 },
+      { nome: "AYURVÈDIKA", valorOriginal: 4000.0, valorRecuperado: 4000.0 },
+    ],
+    [],
+  );
 
   const recuperadosStats = useMemo(() => {
     // Considera como recuperado se:
     // 1. Procedimento = "acordo" (negociado) com qualquer status, OU
     // 2. Status = "concluido" com procedimento "baixa"
-    const isRecuperado = (c: ClienteJuridico) => 
-      c.contexto?.procedimentoJuridico === 'acordo' || 
-      (c.contexto?.statusJuridico === 'concluido' && c.contexto?.procedimentoJuridico === 'baixa');
-    
-    if (activeTab !== 'recuperados') {
+    const isRecuperado = (c: ClienteJuridico) =>
+      c.contexto?.procedimentoJuridico === "acordo" ||
+      (c.contexto?.statusJuridico === "concluido" &&
+        c.contexto?.procedimentoJuridico === "baixa");
+
+    if (activeTab !== "recuperados") {
       const recuperadosSistemaCount = clientes.filter(isRecuperado).length;
-      return { 
-        clientesRecuperados: recuperadosSistemaCount + clientesPreNegociados.length, 
-        valorNegociado: 0, 
-        valorOriginal: 0, 
-        taxaRecuperacao: 0, 
-        porProcedimento: { acordo: 0, baixa: 0 }, 
+      return {
+        clientesRecuperados:
+          recuperadosSistemaCount + clientesPreNegociados.length,
+        valorNegociado: 0,
+        valorOriginal: 0,
+        taxaRecuperacao: 0,
+        porProcedimento: { acordo: 0, baixa: 0 },
         lista: [] as ClienteJuridico[],
-        listaPreNegociados: clientesPreNegociados
+        listaPreNegociados: clientesPreNegociados,
       };
     }
-    
+
     const recuperadosSistema = clientes.filter(isRecuperado);
-    
-    const totalRecuperados = recuperadosSistema.length + clientesPreNegociados.length;
-    const valorNegociadoSistema = recuperadosSistema.reduce((acc, c) => acc + (c.contexto?.valorAcordado || 0), 0);
-    const valorOriginalSistema = recuperadosSistema.reduce((acc, c) => acc + c.cliente.valorTotal, 0);
-    
-    const valorPreNegociado = clientesPreNegociados.reduce((acc, c) => acc + c.valorRecuperado, 0);
-    const valorOriginalPre = clientesPreNegociados.reduce((acc, c) => acc + c.valorOriginal, 0);
-    
+
+    const totalRecuperados =
+      recuperadosSistema.length + clientesPreNegociados.length;
+    const valorNegociadoSistema = recuperadosSistema.reduce(
+      (acc, c) => acc + (c.contexto?.valorAcordado || 0),
+      0,
+    );
+    const valorOriginalSistema = recuperadosSistema.reduce(
+      (acc, c) => acc + c.cliente.valorTotal,
+      0,
+    );
+
+    const valorPreNegociado = clientesPreNegociados.reduce(
+      (acc, c) => acc + c.valorRecuperado,
+      0,
+    );
+    const valorOriginalPre = clientesPreNegociados.reduce(
+      (acc, c) => acc + c.valorOriginal,
+      0,
+    );
+
     const valorNegociado = valorNegociadoSistema + valorPreNegociado;
     const valorOriginal = valorOriginalSistema + valorOriginalPre;
-    const taxaRecuperacao = valorOriginal > 0 ? (valorNegociado / valorOriginal) * 100 : 0;
-    
+    const taxaRecuperacao =
+      valorOriginal > 0 ? (valorNegociado / valorOriginal) * 100 : 0;
+
     const porProcedimento = {
-      acordo: recuperadosSistema.filter(c => c.contexto?.procedimentoJuridico === 'acordo').length + clientesPreNegociados.length,
-      baixa: recuperadosSistema.filter(c => c.contexto?.procedimentoJuridico === 'baixa').length,
+      acordo:
+        recuperadosSistema.filter(
+          (c) => c.contexto?.procedimentoJuridico === "acordo",
+        ).length + clientesPreNegociados.length,
+      baixa: recuperadosSistema.filter(
+        (c) => c.contexto?.procedimentoJuridico === "baixa",
+      ).length,
     };
-    
-    return { 
-      clientesRecuperados: totalRecuperados, 
-      valorNegociado, 
-      valorOriginal, 
-      taxaRecuperacao, 
-      porProcedimento, 
+
+    return {
+      clientesRecuperados: totalRecuperados,
+      valorNegociado,
+      valorOriginal,
+      taxaRecuperacao,
+      porProcedimento,
       lista: recuperadosSistema,
-      listaPreNegociados: clientesPreNegociados
+      listaPreNegociados: clientesPreNegociados,
     };
   }, [clientes, clientesPreNegociados, activeTab]);
 
-  // Clientes de erro operacional (adicionados manualmente)
-  const clientesErroOperacionalManuais = useMemo(() => [
-    { nome: "Fantasma de Opera", valor: 8000 },
-    { nome: "GPA Suplementos", valor: 8400 },
-    { nome: "Hubstage", valor: 18046 },
-    { nome: "WInstage", valor: 9200 },
-  ], []);
-
   // Estatísticas de erros operacionais
   const errosOperacionaisStats = useMemo(() => {
-    const errosOperacionais = clientes.filter(c => c.contexto?.tipoInadimplencia === 'erro_operacional');
-    const totalValorSistema = errosOperacionais.reduce((acc, c) => acc + c.cliente.valorTotal, 0);
-    const totalValorManuais = clientesErroOperacionalManuais.reduce((acc, c) => acc + c.valor, 0);
-    
+    const errosOperacionais = clientes.filter(
+      (c) => c.contexto?.tipoInadimplencia === "erro_operacional",
+    );
+    const totalValorSistema = errosOperacionais.reduce(
+      (acc, c) => acc + c.cliente.valorTotal,
+      0,
+    );
+
     return {
-      count: errosOperacionais.length + clientesErroOperacionalManuais.length,
-      valorTotal: totalValorSistema + totalValorManuais,
+      count: errosOperacionais.length,
+      valorTotal: totalValorSistema,
       lista: errosOperacionais,
-      listaManuais: clientesErroOperacionalManuais,
+      listaManuais: [] as { nome: string; valor: number }[],
     };
-  }, [clientes, clientesErroOperacionalManuais]);
+  }, [clientes]);
 
   const openEditModal = (cliente: ClienteJuridico) => {
     setEditingCliente(cliente);
@@ -398,12 +529,15 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
   };
 
   const parseBRLCurrency = (value: string): number | undefined => {
-    if (!value || value.trim() === '') return undefined;
+    if (!value || value.trim() === "") return undefined;
     // Remove R$, spaces, and handle both formats: 1.234,56 (BRL) and 1234.56 (US)
-    let cleaned = value.replace(/R\$\s*/gi, '').replace(/\s/g, '').trim();
+    let cleaned = value
+      .replace(/R\$\s*/gi, "")
+      .replace(/\s/g, "")
+      .trim();
     // If has comma, assume BRL format (1.234,56)
-    if (cleaned.includes(',')) {
-      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    if (cleaned.includes(",")) {
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
     }
     const num = parseFloat(cleaned);
     return isNaN(num) ? undefined : num;
@@ -424,19 +558,34 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
 
   const getProcedimentoInfo = (value: string | null) => {
     if (!value) return null;
-    return PROCEDIMENTOS.find(p => p.value === value);
+    return PROCEDIMENTOS.find((p) => p.value === value);
   };
 
   const getStatusInfo = (value: string | null) => {
     if (!value) return null;
-    return STATUS_JURIDICO.find(s => s.value === value);
+    return STATUS_JURIDICO.find((s) => s.value === value);
   };
 
   const getUrgencyLevel = (dias: number) => {
-    if (dias > 90) return { level: "URGENTE", color: "bg-red-500", textColor: "text-white" };
-    if (dias > 60) return { level: "ATENÇÃO", color: "bg-orange-500", textColor: "text-white" };
-    if (dias > 30) return { level: "MODERADO", color: "bg-amber-400", textColor: "text-amber-900" };
-    return { level: "RECENTE", color: "bg-slate-300", textColor: "text-slate-700" };
+    if (dias > 90)
+      return { level: "URGENTE", color: "bg-red-500", textColor: "text-white" };
+    if (dias > 60)
+      return {
+        level: "ATENÇÃO",
+        color: "bg-orange-500",
+        textColor: "text-white",
+      };
+    if (dias > 30)
+      return {
+        level: "MODERADO",
+        color: "bg-amber-400",
+        textColor: "text-amber-900",
+      };
+    return {
+      level: "RECENTE",
+      color: "bg-slate-300",
+      textColor: "text-slate-700",
+    };
   };
 
   if (isLoading) {
@@ -469,7 +618,8 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
               </div>
               <div>
                 <p className="text-muted-foreground">
-                  {totals.count} cliente{totals.count !== 1 && 's'} • {formatCurrency(totals.total)} em aberto
+                  {totals.count} cliente{totals.count !== 1 && "s"} •{" "}
+                  {formatCurrency(totals.total)} em aberto
                 </p>
               </div>
             </div>
@@ -477,28 +627,37 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
         </div>
       )}
 
-      <div className={embedded ? "space-y-4 sm:space-y-6" : "max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6"}>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+      <div
+        className={
+          embedded
+            ? "space-y-4 sm:space-y-6"
+            : "max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6"
+        }
+      >
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-4 sm:space-y-6"
+        >
           <TabsList className="bg-card shadow-sm border p-1 h-auto w-full flex">
-            <TabsTrigger 
-              value="ativos" 
+            <TabsTrigger
+              value="ativos"
               className="data-[state=active]:bg-primary data-[state=active]:text-white flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
               data-testid="tab-casos-ativos"
             >
               <Gavel className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
               Ativos ({totals.count})
             </TabsTrigger>
-            <TabsTrigger 
-              value="recuperados" 
+            <TabsTrigger
+              value="recuperados"
               className="data-[state=active]:bg-green-600 data-[state=active]:text-white flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
               data-testid="tab-recuperados"
             >
               <Trophy className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
               Recuperados ({recuperadosStats.clientesRecuperados})
             </TabsTrigger>
-            <TabsTrigger 
-              value="erro_operacional" 
+            <TabsTrigger
+              value="erro_operacional"
               className="data-[state=active]:bg-amber-600 data-[state=active]:text-white flex-1 sm:flex-none px-3 sm:px-6 py-2 sm:py-3 text-sm sm:text-base"
               data-testid="tab-erro-operacional"
             >
@@ -515,9 +674,14 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                   <div className="text-white flex sm:block items-center justify-between">
                     <div className="flex items-center gap-2 sm:mb-2">
                       <DollarSign className="h-4 w-4 sm:h-5 sm:w-5 opacity-80" />
-                      <p className="text-red-100 text-xs font-medium uppercase tracking-wide">Valor Total</p>
+                      <p className="text-red-100 text-xs font-medium uppercase tracking-wide">
+                        Valor Total
+                      </p>
                     </div>
-                    <p className="text-lg sm:text-2xl font-bold sm:mt-1" data-testid="text-total-value">
+                    <p
+                      className="text-lg sm:text-2xl font-bold sm:mt-1"
+                      data-testid="text-total-value"
+                    >
                       {formatCurrency(totals.total)}
                     </p>
                   </div>
@@ -529,10 +693,17 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                   <div className="text-white">
                     <div className="flex items-center justify-between mb-1 sm:mb-2">
                       <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 opacity-80" />
-                      <span className="text-xs bg-white/20 px-1.5 sm:px-2 py-0.5 rounded-full">{formatPercent(totals.percentUrgente, 0)}</span>
+                      <span className="text-xs bg-white/20 px-1.5 sm:px-2 py-0.5 rounded-full">
+                        {formatPercent(totals.percentUrgente, 0)}
+                      </span>
                     </div>
-                    <p className="text-orange-100 text-xs font-medium uppercase tracking-wide">Urgentes</p>
-                    <p className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1" data-testid="text-urgent-cases">
+                    <p className="text-orange-100 text-xs font-medium uppercase tracking-wide">
+                      Urgentes
+                    </p>
+                    <p
+                      className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1"
+                      data-testid="text-urgent-cases"
+                    >
                       {totals.urgentes}
                     </p>
                   </div>
@@ -545,8 +716,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                     <div className="flex items-center justify-between mb-1 sm:mb-2">
                       <Clock className="h-4 w-4 sm:h-5 sm:w-5 opacity-80" />
                     </div>
-                    <p className="text-amber-100 text-xs font-medium uppercase tracking-wide">Sem Ação</p>
-                    <p className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1" data-testid="text-no-action">
+                    <p className="text-amber-100 text-xs font-medium uppercase tracking-wide">
+                      Sem Ação
+                    </p>
+                    <p
+                      className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1"
+                      data-testid="text-no-action"
+                    >
                       {totals.semAcao}
                     </p>
                   </div>
@@ -558,8 +734,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                   <div className="flex items-center justify-between mb-1 sm:mb-2">
                     <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   </div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Ticket Médio</p>
-                  <p className="text-base sm:text-2xl font-bold mt-0.5 sm:mt-1" data-testid="text-ticket-medio">
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    Ticket Médio
+                  </p>
+                  <p
+                    className="text-base sm:text-2xl font-bold mt-0.5 sm:mt-1"
+                    data-testid="text-ticket-medio"
+                  >
                     {formatCurrency(totals.ticketMedio)}
                   </p>
                 </CardContent>
@@ -570,10 +751,17 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                   <div className="flex items-center justify-between mb-1 sm:mb-2">
                     <Timer className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   </div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Dias Médio</p>
-                  <p className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1" data-testid="text-dias-medio">
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    Dias Médio
+                  </p>
+                  <p
+                    className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1"
+                    data-testid="text-dias-medio"
+                  >
                     {Math.round(totals.diasMedio)}
-                    <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-0.5 sm:ml-1">d</span>
+                    <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-0.5 sm:ml-1">
+                      d
+                    </span>
                   </p>
                 </CardContent>
               </Card>
@@ -583,8 +771,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                   <div className="flex items-center justify-between mb-1 sm:mb-2">
                     <Users className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                   </div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total</p>
-                  <p className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1" data-testid="text-total-casos">
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+                    Total
+                  </p>
+                  <p
+                    className="text-xl sm:text-3xl font-bold mt-0.5 sm:mt-1"
+                    data-testid="text-total-casos"
+                  >
                     {totals.count}
                   </p>
                 </CardContent>
@@ -625,12 +818,22 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                     </div>
                     <div className="flex-1 space-y-1 sm:space-y-2">
                       {totals.distribuicaoUrgencia.map((item) => (
-                        <div key={item.name} className="flex items-center justify-between">
+                        <div
+                          key={item.name}
+                          className="flex items-center justify-between"
+                        >
                           <div className="flex items-center gap-1.5 sm:gap-2">
-                            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                            <span className="text-xs sm:text-sm text-muted-foreground">{item.name}</span>
+                            <div
+                              className="w-2 h-2 sm:w-3 sm:h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="text-xs sm:text-sm text-muted-foreground">
+                              {item.name}
+                            </span>
                           </div>
-                          <span className="font-semibold text-sm sm:text-base">{item.value}</span>
+                          <span className="font-semibold text-sm sm:text-base">
+                            {item.value}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -661,21 +864,36 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                             strokeWidth={2}
                             stroke="hsl(var(--card))"
                           >
-                            {totals.distribuicaoProcedimento.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
+                            {totals.distribuicaoProcedimento.map(
+                              (entry, index) => (
+                                <Cell
+                                  key={`cell-${index}`}
+                                  fill={entry.color}
+                                />
+                              ),
+                            )}
                           </Pie>
                         </RechartsPie>
                       </ResponsiveContainer>
                     </div>
                     <div className="flex-1 space-y-1 sm:space-y-2">
                       {totals.distribuicaoProcedimento.map((item) => (
-                        <div key={item.name} className="flex items-center justify-between">
+                        <div
+                          key={item.name}
+                          className="flex items-center justify-between"
+                        >
                           <div className="flex items-center gap-1.5 sm:gap-2">
-                            <div className="w-2 h-2 sm:w-3 sm:h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                            <span className="text-xs sm:text-sm text-muted-foreground">{item.name}</span>
+                            <div
+                              className="w-2 h-2 sm:w-3 sm:h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: item.color }}
+                            />
+                            <span className="text-xs sm:text-sm text-muted-foreground">
+                              {item.name}
+                            </span>
                           </div>
-                          <span className="font-semibold text-sm sm:text-base">{item.value}</span>
+                          <span className="font-semibold text-sm sm:text-base">
+                            {item.value}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -689,34 +907,44 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
               <CardContent className="py-3 sm:py-4">
                 <div className="flex items-center gap-2 sm:gap-4 mb-3">
                   <Activity className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
-                  <span className="font-medium text-sm sm:text-base">Panorama de Urgência</span>
+                  <span className="font-medium text-sm sm:text-base">
+                    Panorama de Urgência
+                  </span>
                 </div>
                 <div className="flex h-4 rounded-full overflow-hidden bg-muted">
                   {totals.urgentes > 0 && (
-                    <div 
+                    <div
                       className="bg-red-500"
-                      style={{ width: `${(totals.urgentes / totals.count) * 100}%` }}
+                      style={{
+                        width: `${(totals.urgentes / totals.count) * 100}%`,
+                      }}
                       title={`Urgente: ${totals.urgentes}`}
                     />
                   )}
                   {totals.atencao > 0 && (
-                    <div 
+                    <div
                       className="bg-orange-500"
-                      style={{ width: `${(totals.atencao / totals.count) * 100}%` }}
+                      style={{
+                        width: `${(totals.atencao / totals.count) * 100}%`,
+                      }}
                       title={`Atenção: ${totals.atencao}`}
                     />
                   )}
                   {totals.moderado > 0 && (
-                    <div 
+                    <div
                       className="bg-amber-400"
-                      style={{ width: `${(totals.moderado / totals.count) * 100}%` }}
+                      style={{
+                        width: `${(totals.moderado / totals.count) * 100}%`,
+                      }}
                       title={`Moderado: ${totals.moderado}`}
                     />
                   )}
                   {totals.recente > 0 && (
-                    <div 
+                    <div
                       className="bg-slate-400 dark:bg-slate-500"
-                      style={{ width: `${(totals.recente / totals.count) * 100}%` }}
+                      style={{
+                        width: `${(totals.recente / totals.count) * 100}%`,
+                      }}
                       title={`Recente: ${totals.recente}`}
                     />
                   )}
@@ -757,14 +985,21 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                     />
                   </div>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full sm:w-[200px] md:w-[220px] h-10 sm:h-12" data-testid="filter-status">
+                    <SelectTrigger
+                      className="w-full sm:w-[200px] md:w-[220px] h-10 sm:h-12"
+                      data-testid="filter-status"
+                    >
                       <SelectValue placeholder="Filtrar por ação" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos os casos</SelectItem>
-                      <SelectItem value="pendente">Sem ação definida</SelectItem>
+                      <SelectItem value="pendente">
+                        Sem ação definida
+                      </SelectItem>
                       {PROCEDIMENTOS.map((p) => (
-                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -778,278 +1013,359 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                 <CardContent className="py-16 text-center">
                   <Scale className="h-16 w-16 mx-auto text-muted-foreground/30 mb-4" />
                   <p className="text-xl font-medium">Nenhum caso encontrado</p>
-                  <p className="text-muted-foreground mt-1">Tente mudar os filtros de busca</p>
+                  <p className="text-muted-foreground mt-1">
+                    Tente mudar os filtros de busca
+                  </p>
                 </CardContent>
               </Card>
             ) : (
               <div className="space-y-4">
-            {sortedClientes.map((item, index) => {
-              const urgency = getUrgencyLevel(item.cliente.diasAtrasoMax);
-              const procedimento = getProcedimentoInfo(item.contexto?.procedimentoJuridico);
-              const suggestedProc = getProcedimentoInfo(item.suggestedProcedimento);
-              const status = getStatusInfo(item.contexto?.statusJuridico);
-              const isExpanded = expandedClient === item.cliente.idCliente;
-              const ProcIcon = procedimento?.icon;
-              const StatusIcon = status?.icon;
-              const SuggestedIcon = suggestedProc?.icon;
+                {sortedClientes.map((item, index) => {
+                  const urgency = getUrgencyLevel(item.cliente.diasAtrasoMax);
+                  const procedimento = getProcedimentoInfo(
+                    item.contexto?.procedimentoJuridico,
+                  );
+                  const suggestedProc = getProcedimentoInfo(
+                    item.suggestedProcedimento,
+                  );
+                  const status = getStatusInfo(item.contexto?.statusJuridico);
+                  const isExpanded = expandedClient === item.cliente.idCliente;
+                  const ProcIcon = procedimento?.icon;
+                  const StatusIcon = status?.icon;
+                  const SuggestedIcon = suggestedProc?.icon;
 
-              return (
-                <Card 
-                  key={item.cliente.idCliente} 
-                  className={`shadow-sm hover:shadow-md transition-all ${
-                    item.needsEscalation ? 'ring-2 ring-yellow-400 ring-offset-2 dark:ring-offset-background' : ''
-                  } ${
-                    item.cliente.diasAtrasoMax > 90 ? 'border-l-4 border-l-red-500' : 
-                    item.cliente.diasAtrasoMax > 60 ? 'border-l-4 border-l-orange-400' : ''
-                  }`}
-                  data-testid={`card-client-${index}`}
-                >
-                  <CardContent className="py-4 sm:py-5">
-                    {/* Layout Principal Responsivo */}
-                    <div className="space-y-4">
-                      {/* Linha 1: Info do Cliente + Valores */}
-                      <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
-                        {/* Info do Cliente */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-2 sm:gap-3">
-                            <Badge className={`${urgency.color} ${urgency.textColor} text-xs font-bold px-2 py-0.5 sm:py-1 shrink-0`}>
-                              {urgency.level}
-                            </Badge>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-base sm:text-lg font-semibold truncate" data-testid={`text-client-name-${index}`}>
-                                {item.cliente.nomeCliente}
-                              </h3>
-                              <p className="text-muted-foreground text-xs sm:text-sm truncate">
-                                {item.cliente.empresa}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Valor e Dias - Grid responsivo */}
-                        <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 lg:gap-8 mt-2 sm:mt-0">
-                          <div className="text-left sm:text-center">
-                            <p className="text-lg sm:text-2xl font-bold text-red-500" data-testid={`text-value-${index}`}>
-                              {formatCurrency(item.cliente.valorTotal)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {item.cliente.quantidadeParcelas} parcela{item.cliente.quantidadeParcelas !== 1 && 's'}
-                            </p>
-                          </div>
-                          {item.contexto?.valorAcordado != null && item.contexto.valorAcordado > 0 && (
-                            <div className="text-center">
-                              <p className="text-lg sm:text-2xl font-bold text-green-600" data-testid={`text-valor-pago-${index}`}>
-                                {formatCurrency(item.contexto.valorAcordado)}
-                              </p>
-                              <p className="text-xs text-green-500 font-medium">recebido</p>
-                            </div>
-                          )}
-                          <div className="text-right sm:text-center min-w-[60px] sm:min-w-[80px]">
-                            <p className="text-lg sm:text-2xl font-bold">
-                              {item.cliente.diasAtrasoMax}
-                            </p>
-                            <p className="text-xs text-muted-foreground">dias atraso</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Linha 2: Badges de Status */}
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        {procedimento ? (
-                          <Badge className={`${procedimento.color} border text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5`}>
-                            {ProcIcon && <ProcIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />}
-                            {procedimento.label}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-dashed border-2 text-slate-400 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5">
-                            Sem ação
-                          </Badge>
-                        )}
-                        {suggestedProc && item.needsEscalation && (
-                          <Badge 
-                            className="bg-yellow-100 text-yellow-800 border border-yellow-400 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 animate-pulse"
-                            data-testid={`badge-escalation-${index}`}
-                          >
-                            <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
-                            Sugestão: {suggestedProc.label}
-                          </Badge>
-                        )}
-                        {status && (
-                          <Badge className={`${status.color} border text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5`}>
-                            {StatusIcon && <StatusIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />}
-                            {status.label}
-                          </Badge>
-                        )}
-                        {item.contexto?.tipoInadimplencia === 'erro_operacional' && (
-                          <Badge className="bg-purple-100 text-purple-700 border border-purple-200 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5" data-testid={`badge-erro-operacional-${index}`}>
-                            <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
-                            Erro Operacional
-                          </Badge>
-                        )}
-                      </div>
-
-                      {/* Linha 3: Botões de Ação - Grid em mobile */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {(() => {
-                          const whatsappNumber = formatPhoneForWhatsApp(item.cliente.telefone);
-                          if (whatsappNumber) {
-                            return (
-                              <Button 
-                                size="default"
-                                className="bg-green-600 hover:bg-green-700 text-white font-medium flex-1 sm:flex-none min-w-[100px]"
-                                onClick={() => window.open(`https://wa.me/${whatsappNumber}`, '_blank')}
-                                data-testid={`button-whatsapp-${index}`}
-                              >
-                                <SiWhatsapp className="h-4 w-4 mr-1.5 sm:mr-2" />
-                                <span className="hidden xs:inline">WhatsApp</span>
-                                <span className="xs:hidden">Zap</span>
-                              </Button>
-                            );
-                          }
-                          return null;
-                        })()}
-                        
-                        <Button 
-                          size="default"
-                          className="bg-primary hover:bg-primary/90 text-white font-medium flex-1 sm:flex-none min-w-[100px]"
-                          onClick={() => openEditModal(item)}
-                          data-testid={`button-edit-${index}`}
-                        >
-                          <Edit3 className="h-4 w-4 mr-1.5 sm:mr-2" />
-                          Atualizar
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="ml-auto sm:ml-0"
-                          onClick={() => setExpandedClient(isExpanded ? null : item.cliente.idCliente)}
-                          data-testid={`button-expand-${index}`}
-                        >
-                          {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Área Expandida */}
-                    {isExpanded && (
-                      <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border space-y-4 sm:space-y-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                          
-                          {/* Informações do Cliente */}
-                          <div className="bg-muted rounded-lg sm:rounded-xl p-3 sm:p-4">
-                            <h4 className="font-semibold flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
-                              <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              Dados do Cliente
-                            </h4>
-                            <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
-                              {item.cliente.telefone && (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Phone className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                                  <span className="truncate">{item.cliente.telefone}</span>
-                                </div>
-                              )}
-                              {item.cliente.responsavel && (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                                  <span className="truncate">Responsável: {item.cliente.responsavel}</span>
-                                </div>
-                              )}
-                              {item.cliente.cnpj && (
-                                <p className="text-muted-foreground truncate">CNPJ: {item.cliente.cnpj}</p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Contexto do CS */}
-                          <div className="bg-amber-500/10 dark:bg-amber-500/20 rounded-lg sm:rounded-xl p-3 sm:p-4">
-                            <h4 className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
-                              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
-                              Observações do CS
-                            </h4>
-                            <p className="text-xs sm:text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
-                              {item.contexto?.contexto || "Sem observações registradas"}
-                            </p>
-                          </div>
-
-                          {/* Contexto Jurídico */}
-                          <div className="bg-primary/5 rounded-lg sm:rounded-xl p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
-                            <h4 className="font-semibold text-primary flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
-                              <Scale className="h-3 w-3 sm:h-4 sm:w-4" />
-                              Anotações Jurídicas
-                            </h4>
-                            {item.contexto?.contextoJuridico ? (
-                              <>
-                                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                                  {item.contexto.contextoJuridico}
-                                </p>
-                                {item.contexto.atualizadoJuridicoPor && (
-                                  <p className="text-xs text-muted-foreground mt-2 sm:mt-3 pt-2 border-t border-border">
-                                    Por {item.contexto.atualizadoJuridicoPor} em {formatDate(item.contexto.atualizadoJuridicoEm)}
+                  return (
+                    <Card
+                      key={item.cliente.idCliente}
+                      className={`shadow-sm hover:shadow-md transition-all ${
+                        item.needsEscalation
+                          ? "ring-2 ring-yellow-400 ring-offset-2 dark:ring-offset-background"
+                          : ""
+                      } ${
+                        item.cliente.diasAtrasoMax > 90
+                          ? "border-l-4 border-l-red-500"
+                          : item.cliente.diasAtrasoMax > 60
+                            ? "border-l-4 border-l-orange-400"
+                            : ""
+                      }`}
+                      data-testid={`card-client-${index}`}
+                    >
+                      <CardContent className="py-4 sm:py-5">
+                        {/* Layout Principal Responsivo */}
+                        <div className="space-y-4">
+                          {/* Linha 1: Info do Cliente + Valores */}
+                          <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+                            {/* Info do Cliente */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start gap-2 sm:gap-3">
+                                <Badge
+                                  className={`${urgency.color} ${urgency.textColor} text-xs font-bold px-2 py-0.5 sm:py-1 shrink-0`}
+                                >
+                                  {urgency.level}
+                                </Badge>
+                                <div className="min-w-0 flex-1">
+                                  <h3
+                                    className="text-base sm:text-lg font-semibold truncate"
+                                    data-testid={`text-client-name-${index}`}
+                                  >
+                                    {item.cliente.nomeCliente}
+                                  </h3>
+                                  <p className="text-muted-foreground text-xs sm:text-sm truncate">
+                                    {item.cliente.empresa}
                                   </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Valor e Dias - Grid responsivo */}
+                            <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 lg:gap-8 mt-2 sm:mt-0">
+                              <div className="text-left sm:text-center">
+                                <p
+                                  className="text-lg sm:text-2xl font-bold text-red-500"
+                                  data-testid={`text-value-${index}`}
+                                >
+                                  {formatCurrency(item.cliente.valorTotal)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {item.cliente.quantidadeParcelas} parcela
+                                  {item.cliente.quantidadeParcelas !== 1 && "s"}
+                                </p>
+                              </div>
+                              {item.contexto?.valorAcordado != null &&
+                                item.contexto.valorAcordado > 0 && (
+                                  <div className="text-center">
+                                    <p
+                                      className="text-lg sm:text-2xl font-bold text-green-600"
+                                      data-testid={`text-valor-pago-${index}`}
+                                    >
+                                      {formatCurrency(
+                                        item.contexto.valorAcordado,
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-green-500 font-medium">
+                                      recebido
+                                    </p>
+                                  </div>
                                 )}
-                              </>
+                              <div className="text-right sm:text-center min-w-[60px] sm:min-w-[80px]">
+                                <p className="text-lg sm:text-2xl font-bold">
+                                  {item.cliente.diasAtrasoMax}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  dias atraso
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Linha 2: Badges de Status */}
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                            {procedimento ? (
+                              <Badge
+                                className={`${procedimento.color} border text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5`}
+                              >
+                                {ProcIcon && (
+                                  <ProcIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+                                )}
+                                {procedimento.label}
+                              </Badge>
                             ) : (
-                              <p className="text-xs sm:text-sm text-muted-foreground italic">
-                                Nenhuma anotação ainda
-                              </p>
+                              <Badge
+                                variant="outline"
+                                className="border-dashed border-2 text-slate-400 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5"
+                              >
+                                Sem ação
+                              </Badge>
+                            )}
+                            {suggestedProc && item.needsEscalation && (
+                              <Badge
+                                className="bg-yellow-100 text-yellow-800 border border-yellow-400 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5 animate-pulse"
+                                data-testid={`badge-escalation-${index}`}
+                              >
+                                <Zap className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+                                Sugestão: {suggestedProc.label}
+                              </Badge>
+                            )}
+                            {status && (
+                              <Badge
+                                className={`${status.color} border text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5`}
+                              >
+                                {StatusIcon && (
+                                  <StatusIcon className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+                                )}
+                                {status.label}
+                              </Badge>
+                            )}
+                            {item.contexto?.tipoInadimplencia ===
+                              "erro_operacional" && (
+                              <Badge
+                                className="bg-purple-100 text-purple-700 border border-purple-200 text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-1.5"
+                                data-testid={`badge-erro-operacional-${index}`}
+                              >
+                                <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
+                                Erro Operacional
+                              </Badge>
                             )}
                           </div>
+
+                          {/* Linha 3: Botões de Ação - Grid em mobile */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(() => {
+                              const whatsappNumber = formatPhoneForWhatsApp(
+                                item.cliente.telefone,
+                              );
+                              if (whatsappNumber) {
+                                return (
+                                  <Button
+                                    size="default"
+                                    className="bg-green-600 hover:bg-green-700 text-white font-medium flex-1 sm:flex-none min-w-[100px]"
+                                    onClick={() =>
+                                      window.open(
+                                        `https://wa.me/${whatsappNumber}`,
+                                        "_blank",
+                                      )
+                                    }
+                                    data-testid={`button-whatsapp-${index}`}
+                                  >
+                                    <SiWhatsapp className="h-4 w-4 mr-1.5 sm:mr-2" />
+                                    <span className="hidden xs:inline">
+                                      WhatsApp
+                                    </span>
+                                    <span className="xs:hidden">Zap</span>
+                                  </Button>
+                                );
+                              }
+                              return null;
+                            })()}
+
+                            <Button
+                              size="default"
+                              className="bg-primary hover:bg-primary/90 text-white font-medium flex-1 sm:flex-none min-w-[100px]"
+                              onClick={() => openEditModal(item)}
+                              data-testid={`button-edit-${index}`}
+                            >
+                              <Edit3 className="h-4 w-4 mr-1.5 sm:mr-2" />
+                              Atualizar
+                            </Button>
+
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="ml-auto sm:ml-0"
+                              onClick={() =>
+                                setExpandedClient(
+                                  isExpanded ? null : item.cliente.idCliente,
+                                )
+                              }
+                              data-testid={`button-expand-${index}`}
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
 
-                        {/* Parcelas */}
-                        <div className="bg-card rounded-lg sm:rounded-xl border border-border">
-                          <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border flex items-center justify-between">
-                            <h4 className="font-semibold flex items-center gap-2 text-sm sm:text-base">
-                              <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
-                              Parcelas em Atraso
-                            </h4>
-                            <Badge variant="secondary" className="text-xs">{item.parcelas.length}</Badge>
-                          </div>
-                          <div className="max-h-[150px] sm:max-h-[200px] overflow-y-auto">
-                            {item.parcelas.map((parcela, pIndex) => (
-                              <div 
-                                key={parcela.id}
-                                className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border last:border-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between hover:bg-muted/50"
-                                data-testid={`row-parcela-${index}-${pIndex}`}
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium truncate text-sm">{parcela.descricao}</p>
-                                  <p className="text-xs sm:text-sm text-muted-foreground">
-                                    Venceu em {formatDate(parcela.dataVencimento)}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-2 sm:gap-4 justify-between sm:justify-end">
-                                  <Badge 
-                                    variant={parcela.diasAtraso > 90 ? "destructive" : "secondary"}
-                                    className="font-mono text-xs"
-                                  >
-                                    {parcela.diasAtraso}d
-                                  </Badge>
-                                  <p className="font-bold text-red-500 min-w-[80px] sm:min-w-[100px] text-right text-sm">
-                                    {formatCurrency(parcela.naoPago)}
-                                  </p>
-                                  {parcela.urlCobranca && (
-                                    <a
-                                      href={parcela.urlCobranca}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:text-primary/80"
-                                    >
-                                      <ExternalLink className="h-4 w-4" />
-                                    </a>
+                        {/* Área Expandida */}
+                        {isExpanded && (
+                          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border space-y-4 sm:space-y-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                              {/* Informações do Cliente */}
+                              <div className="bg-muted rounded-lg sm:rounded-xl p-3 sm:p-4">
+                                <h4 className="font-semibold flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
+                                  <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  Dados do Cliente
+                                </h4>
+                                <div className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
+                                  {item.cliente.telefone && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <Phone className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                      <span className="truncate">
+                                        {item.cliente.telefone}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {item.cliente.responsavel && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <Users className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                                      <span className="truncate">
+                                        Responsável: {item.cliente.responsavel}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {item.cliente.cnpj && (
+                                    <p className="text-muted-foreground truncate">
+                                      CNPJ: {item.cliente.cnpj}
+                                    </p>
                                   )}
                                 </div>
                               </div>
-                            ))}
+
+                              {/* Contexto do CS */}
+                              <div className="bg-amber-500/10 dark:bg-amber-500/20 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                                <h4 className="font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
+                                  <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  Observações do CS
+                                </h4>
+                                <p className="text-xs sm:text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+                                  {item.contexto?.contexto ||
+                                    "Sem observações registradas"}
+                                </p>
+                              </div>
+
+                              {/* Contexto Jurídico */}
+                              <div className="bg-primary/5 rounded-lg sm:rounded-xl p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
+                                <h4 className="font-semibold text-primary flex items-center gap-2 mb-2 sm:mb-3 text-sm sm:text-base">
+                                  <Scale className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  Anotações Jurídicas
+                                </h4>
+                                {item.contexto?.contextoJuridico ? (
+                                  <>
+                                    <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                                      {item.contexto.contextoJuridico}
+                                    </p>
+                                    {item.contexto.atualizadoJuridicoPor && (
+                                      <p className="text-xs text-muted-foreground mt-2 sm:mt-3 pt-2 border-t border-border">
+                                        Por{" "}
+                                        {item.contexto.atualizadoJuridicoPor} em{" "}
+                                        {formatDate(
+                                          item.contexto.atualizadoJuridicoEm,
+                                        )}
+                                      </p>
+                                    )}
+                                  </>
+                                ) : (
+                                  <p className="text-xs sm:text-sm text-muted-foreground italic">
+                                    Nenhuma anotação ainda
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Parcelas */}
+                            <div className="bg-card rounded-lg sm:rounded-xl border border-border">
+                              <div className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border flex items-center justify-between">
+                                <h4 className="font-semibold flex items-center gap-2 text-sm sm:text-base">
+                                  <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  Parcelas em Atraso
+                                </h4>
+                                <Badge variant="secondary" className="text-xs">
+                                  {item.parcelas.length}
+                                </Badge>
+                              </div>
+                              <div className="max-h-[150px] sm:max-h-[200px] overflow-y-auto">
+                                {item.parcelas.map((parcela, pIndex) => (
+                                  <div
+                                    key={parcela.id}
+                                    className="px-3 sm:px-4 py-2 sm:py-3 border-b border-border last:border-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-0 sm:justify-between hover:bg-muted/50"
+                                    data-testid={`row-parcela-${index}-${pIndex}`}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium truncate text-sm">
+                                        {parcela.descricao}
+                                      </p>
+                                      <p className="text-xs sm:text-sm text-muted-foreground">
+                                        Venceu em{" "}
+                                        {formatDate(parcela.dataVencimento)}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 sm:gap-4 justify-between sm:justify-end">
+                                      <Badge
+                                        variant={
+                                          parcela.diasAtraso > 90
+                                            ? "destructive"
+                                            : "secondary"
+                                        }
+                                        className="font-mono text-xs"
+                                      >
+                                        {parcela.diasAtraso}d
+                                      </Badge>
+                                      <p className="font-bold text-red-500 min-w-[80px] sm:min-w-[100px] text-right text-sm">
+                                        {formatCurrency(parcela.naoPago)}
+                                      </p>
+                                      {parcela.urlCobranca && (
+                                        <a
+                                          href={parcela.urlCobranca}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-primary hover:text-primary/80"
+                                        >
+                                          <ExternalLink className="h-4 w-4" />
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-              })}
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -1064,8 +1380,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                       <Trophy className="h-8 w-8 text-green-600 dark:text-green-500" />
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-sm font-medium">Clientes Recuperados</p>
-                      <p className="text-3xl font-bold text-green-600 dark:text-green-500" data-testid="text-clientes-recuperados">
+                      <p className="text-muted-foreground text-sm font-medium">
+                        Clientes Recuperados
+                      </p>
+                      <p
+                        className="text-3xl font-bold text-green-600 dark:text-green-500"
+                        data-testid="text-clientes-recuperados"
+                      >
                         {recuperadosStats.clientesRecuperados}
                       </p>
                     </div>
@@ -1080,8 +1401,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                       <Wallet className="h-8 w-8 text-emerald-600 dark:text-emerald-500" />
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-sm font-medium">Valor Recuperado</p>
-                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-500" data-testid="text-valor-recuperado">
+                      <p className="text-muted-foreground text-sm font-medium">
+                        Valor Recuperado
+                      </p>
+                      <p
+                        className="text-2xl font-bold text-emerald-600 dark:text-emerald-500"
+                        data-testid="text-valor-recuperado"
+                      >
                         {formatCurrency(recuperadosStats.valorNegociado)}
                       </p>
                     </div>
@@ -1096,8 +1422,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                       <Target className="h-8 w-8 text-blue-600 dark:text-blue-500" />
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-sm font-medium">Valor Original</p>
-                      <p className="text-2xl font-bold text-blue-600 dark:text-blue-500" data-testid="text-valor-original">
+                      <p className="text-muted-foreground text-sm font-medium">
+                        Valor Original
+                      </p>
+                      <p
+                        className="text-2xl font-bold text-blue-600 dark:text-blue-500"
+                        data-testid="text-valor-original"
+                      >
                         {formatCurrency(recuperadosStats.valorOriginal)}
                       </p>
                     </div>
@@ -1112,8 +1443,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                       <TrendingUp className="h-8 w-8 text-purple-600 dark:text-purple-500" />
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-sm font-medium">Taxa de Recuperação</p>
-                      <p className="text-3xl font-bold text-purple-600 dark:text-purple-500" data-testid="text-taxa-recuperacao">
+                      <p className="text-muted-foreground text-sm font-medium">
+                        Taxa de Recuperação
+                      </p>
+                      <p
+                        className="text-3xl font-bold text-purple-600 dark:text-purple-500"
+                        data-testid="text-taxa-recuperacao"
+                      >
                         {formatPercent(recuperadosStats.taxaRecuperacao)}
                       </p>
                     </div>
@@ -1132,8 +1468,12 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         <Handshake className="h-6 w-6 text-green-600 dark:text-green-500" />
                       </div>
                       <div>
-                        <p className="text-muted-foreground text-sm">Acordos Fechados</p>
-                        <p className="text-2xl font-bold text-green-600 dark:text-green-500">{recuperadosStats.porProcedimento.acordo}</p>
+                        <p className="text-muted-foreground text-sm">
+                          Acordos Fechados
+                        </p>
+                        <p className="text-2xl font-bold text-green-600 dark:text-green-500">
+                          {recuperadosStats.porProcedimento.acordo}
+                        </p>
                       </div>
                     </div>
                     <Badge className="bg-green-500/10 dark:bg-green-500/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700 text-lg px-4 py-1">
@@ -1151,8 +1491,12 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         <XCircle className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="text-muted-foreground text-sm">Baixas Realizadas</p>
-                        <p className="text-2xl font-bold">{recuperadosStats.porProcedimento.baixa}</p>
+                        <p className="text-muted-foreground text-sm">
+                          Baixas Realizadas
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {recuperadosStats.porProcedimento.baixa}
+                        </p>
                       </div>
                     </div>
                     <Badge variant="secondary" className="text-lg px-4 py-1">
@@ -1175,9 +1519,11 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                 <div className="space-y-3">
                   {/* Clientes do sistema */}
                   {recuperadosStats.lista.map((item, index) => {
-                    const procInfo = getProcedimentoInfo(item.contexto?.procedimentoJuridico);
+                    const procInfo = getProcedimentoInfo(
+                      item.contexto?.procedimentoJuridico,
+                    );
                     return (
-                      <div 
+                      <div
                         key={item.cliente.idCliente}
                         className="flex items-center justify-between p-4 bg-green-500/10 dark:bg-green-500/20 rounded-xl border border-green-200 dark:border-green-800"
                         data-testid={`row-recuperado-${index}`}
@@ -1187,8 +1533,12 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                             <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-500" />
                           </div>
                           <div>
-                            <p className="font-semibold">{item.cliente.nomeCliente}</p>
-                            <p className="text-sm text-muted-foreground">{item.cliente.empresa}</p>
+                            <p className="font-semibold">
+                              {item.cliente.nomeCliente}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {item.cliente.empresa}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-6 flex-wrap">
@@ -1198,21 +1548,31 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                             </Badge>
                           )}
                           <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Valor Original</p>
-                            <p className="font-medium">{formatCurrency(item.cliente.valorTotal)}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Valor Original
+                            </p>
+                            <p className="font-medium">
+                              {formatCurrency(item.cliente.valorTotal)}
+                            </p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Valor Recuperado</p>
-                            <p className="font-bold text-green-600 dark:text-green-500">{formatCurrency(item.contexto?.valorAcordado || 0)}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Valor Recuperado
+                            </p>
+                            <p className="font-bold text-green-600 dark:text-green-500">
+                              {formatCurrency(
+                                item.contexto?.valorAcordado || 0,
+                              )}
+                            </p>
                           </div>
                         </div>
                       </div>
                     );
                   })}
-                  
+
                   {/* Clientes pré-negociados (históricos) */}
                   {recuperadosStats.listaPreNegociados.map((item, index) => (
-                    <div 
+                    <div
                       key={`pre-${index}`}
                       className="flex items-center justify-between p-4 bg-emerald-500/10 dark:bg-emerald-500/20 rounded-xl border border-emerald-200 dark:border-emerald-800"
                       data-testid={`row-pre-negociado-${index}`}
@@ -1223,7 +1583,9 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         </div>
                         <div>
                           <p className="font-semibold">{item.nome}</p>
-                          <p className="text-xs text-emerald-600 dark:text-emerald-400">Negociado antes do registro</p>
+                          <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                            Negociado antes do registro
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-6 flex-wrap">
@@ -1231,12 +1593,20 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                           Acordo
                         </Badge>
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Valor Original</p>
-                          <p className="font-medium">{formatCurrency(item.valorOriginal)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Valor Original
+                          </p>
+                          <p className="font-medium">
+                            {formatCurrency(item.valorOriginal)}
+                          </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Valor Recuperado</p>
-                          <p className="font-bold text-emerald-600 dark:text-emerald-500">{formatCurrency(item.valorRecuperado)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Valor Recuperado
+                          </p>
+                          <p className="font-bold text-emerald-600 dark:text-emerald-500">
+                            {formatCurrency(item.valorRecuperado)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1258,7 +1628,10 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                     </div>
                     <div>
                       <p className="text-amber-100 text-sm">Total de Casos</p>
-                      <p className="text-3xl font-bold text-white" data-testid="text-erro-count">
+                      <p
+                        className="text-3xl font-bold text-white"
+                        data-testid="text-erro-count"
+                      >
                         {errosOperacionaisStats.count}
                       </p>
                     </div>
@@ -1273,8 +1646,13 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                       <DollarSign className="h-6 w-6 text-amber-600 dark:text-amber-400" />
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-sm">Valor Total Afetado</p>
-                      <p className="text-2xl font-bold" data-testid="text-erro-valor">
+                      <p className="text-muted-foreground text-sm">
+                        Valor Total Afetado
+                      </p>
+                      <p
+                        className="text-2xl font-bold"
+                        data-testid="text-erro-valor"
+                      >
                         {formatCurrency(errosOperacionaisStats.valorTotal)}
                       </p>
                     </div>
@@ -1289,9 +1667,19 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                       <Activity className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-sm">Ticket Médio</p>
-                      <p className="text-2xl font-bold" data-testid="text-erro-ticket">
-                        {formatCurrency(errosOperacionaisStats.count > 0 ? errosOperacionaisStats.valorTotal / errosOperacionaisStats.count : 0)}
+                      <p className="text-muted-foreground text-sm">
+                        Ticket Médio
+                      </p>
+                      <p
+                        className="text-2xl font-bold"
+                        data-testid="text-erro-ticket"
+                      >
+                        {formatCurrency(
+                          errosOperacionaisStats.count > 0
+                            ? errosOperacionaisStats.valorTotal /
+                                errosOperacionaisStats.count
+                            : 0,
+                        )}
                       </p>
                     </div>
                   </div>
@@ -1305,10 +1693,14 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="font-medium text-amber-800 dark:text-amber-300">O que são Erros Operacionais?</p>
+                    <p className="font-medium text-amber-800 dark:text-amber-300">
+                      O que são Erros Operacionais?
+                    </p>
                     <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                      São casos de inadimplência causados por falhas internas, como cobranças indevidas, erros no sistema, 
-                      cancelamentos não processados ou falhas de comunicação. Estes casos não representam inadimplência real do cliente.
+                      São casos de inadimplência causados por falhas internas,
+                      como cobranças indevidas, erros no sistema, cancelamentos
+                      não processados ou falhas de comunicação. Estes casos não
+                      representam inadimplência real do cliente.
                     </p>
                   </div>
                 </div>
@@ -1327,7 +1719,7 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                 <div className="space-y-3">
                   {/* Clientes do sistema classificados como erro operacional */}
                   {errosOperacionaisStats.lista.map((item) => (
-                    <div 
+                    <div
                       key={item.cliente.idCliente}
                       className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800"
                       data-testid={`row-erro-${item.cliente.idCliente}`}
@@ -1337,19 +1729,28 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                           <AlertTriangle className="h-5 w-5 text-amber-700 dark:text-amber-300" />
                         </div>
                         <div>
-                          <p className="font-semibold">{item.cliente.nomeCliente}</p>
-                          <p className="text-xs text-muted-foreground">{item.cliente.empresa}</p>
+                          <p className="font-semibold">
+                            {item.cliente.nomeCliente}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.cliente.empresa}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-6 flex-wrap">
                         {item.contexto?.procedimentoJuridico && (
                           <Badge className="bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
-                            {PROCEDIMENTOS.find(p => p.value === item.contexto?.procedimentoJuridico)?.label || item.contexto.procedimentoJuridico}
+                            {PROCEDIMENTOS.find(
+                              (p) =>
+                                p.value === item.contexto?.procedimentoJuridico,
+                            )?.label || item.contexto.procedimentoJuridico}
                           </Badge>
                         )}
                         <div className="text-right">
                           <p className="text-sm text-muted-foreground">Valor</p>
-                          <p className="font-bold text-amber-600 dark:text-amber-400">{formatCurrency(item.cliente.valorTotal)}</p>
+                          <p className="font-bold text-amber-600 dark:text-amber-400">
+                            {formatCurrency(item.cliente.valorTotal)}
+                          </p>
                         </div>
                         <Button
                           size="sm"
@@ -1363,10 +1764,10 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                       </div>
                     </div>
                   ))}
-                  
+
                   {/* Clientes manuais de erro operacional */}
                   {errosOperacionaisStats.listaManuais.map((item, index) => (
-                    <div 
+                    <div
                       key={`manual-erro-${index}`}
                       className="flex items-center justify-between p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-800"
                       data-testid={`row-erro-manual-${index}`}
@@ -1377,7 +1778,9 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         </div>
                         <div>
                           <p className="font-semibold">{item.nome}</p>
-                          <p className="text-xs text-orange-600 dark:text-orange-400">Registro manual</p>
+                          <p className="text-xs text-orange-600 dark:text-orange-400">
+                            Registro manual
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-6 flex-wrap">
@@ -1386,7 +1789,9 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                         </Badge>
                         <div className="text-right">
                           <p className="text-sm text-muted-foreground">Valor</p>
-                          <p className="font-bold text-orange-600 dark:text-orange-400">{formatCurrency(item.valor)}</p>
+                          <p className="font-bold text-orange-600 dark:text-orange-400">
+                            {formatCurrency(item.valor)}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -1399,7 +1804,10 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
       </div>
 
       {/* Modal de Edição - Simples e Grande */}
-      <Dialog open={!!editingCliente} onOpenChange={() => setEditingCliente(null)}>
+      <Dialog
+        open={!!editingCliente}
+        onOpenChange={() => setEditingCliente(null)}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <div className="flex items-center gap-3 mb-2">
@@ -1424,14 +1832,20 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
               <div className="grid grid-cols-2 gap-2">
                 {PROCEDIMENTOS.map((proc) => {
                   const Icon = proc.icon;
-                  const isSelected = editForm.procedimentoJuridico === proc.value;
+                  const isSelected =
+                    editForm.procedimentoJuridico === proc.value;
                   return (
                     <Button
                       key={proc.value}
                       type="button"
                       variant={isSelected ? "default" : "outline"}
                       className="h-auto py-3 justify-start"
-                      onClick={() => setEditForm({ ...editForm, procedimentoJuridico: proc.value })}
+                      onClick={() =>
+                        setEditForm({
+                          ...editForm,
+                          procedimentoJuridico: proc.value,
+                        })
+                      }
                       data-testid={`button-proc-${proc.value}`}
                     >
                       <Icon className="h-5 w-5 mr-2" />
@@ -1457,7 +1871,12 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                       type="button"
                       variant={isSelected ? "default" : "outline"}
                       className="h-auto py-3 justify-start"
-                      onClick={() => setEditForm({ ...editForm, statusJuridico: status.value })}
+                      onClick={() =>
+                        setEditForm({
+                          ...editForm,
+                          statusJuridico: status.value,
+                        })
+                      }
                       data-testid={`button-status-${status.value}`}
                     >
                       <Icon className="h-5 w-5 mr-2" />
@@ -1476,9 +1895,18 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  variant={editForm.tipoInadimplencia === "inadimplencia_real" ? "default" : "outline"}
+                  variant={
+                    editForm.tipoInadimplencia === "inadimplencia_real"
+                      ? "default"
+                      : "outline"
+                  }
                   className="h-auto py-3 justify-start"
-                  onClick={() => setEditForm({ ...editForm, tipoInadimplencia: "inadimplencia_real" })}
+                  onClick={() =>
+                    setEditForm({
+                      ...editForm,
+                      tipoInadimplencia: "inadimplencia_real",
+                    })
+                  }
                   data-testid="button-tipo-inadimplencia-real"
                 >
                   <AlertCircle className="h-5 w-5 mr-2" />
@@ -1486,9 +1914,18 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                 </Button>
                 <Button
                   type="button"
-                  variant={editForm.tipoInadimplencia === "erro_operacional" ? "default" : "outline"}
+                  variant={
+                    editForm.tipoInadimplencia === "erro_operacional"
+                      ? "default"
+                      : "outline"
+                  }
                   className="h-auto py-3 justify-start"
-                  onClick={() => setEditForm({ ...editForm, tipoInadimplencia: "erro_operacional" })}
+                  onClick={() =>
+                    setEditForm({
+                      ...editForm,
+                      tipoInadimplencia: "erro_operacional",
+                    })
+                  }
                   data-testid="button-tipo-erro-operacional"
                 >
                   <AlertTriangle className="h-5 w-5 mr-2" />
@@ -1496,7 +1933,8 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Erro operacional: falha no sistema, cobrança indevida ou erro interno
+                Erro operacional: falha no sistema, cobrança indevida ou erro
+                interno
               </p>
             </div>
 
@@ -1506,12 +1944,16 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
                 Valor pago pelo cliente (após negociação)
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">R$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+                  R$
+                </span>
                 <Input
                   type="text"
                   placeholder="0,00"
                   value={editForm.valorAcordado}
-                  onChange={(e) => setEditForm({ ...editForm, valorAcordado: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, valorAcordado: e.target.value })
+                  }
                   className="pl-10 h-12 text-lg font-semibold"
                   data-testid="input-valor-acordado"
                 />
@@ -1529,7 +1971,9 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
               <Textarea
                 placeholder="Descreva o andamento do caso, acordos, protocolos..."
                 value={editForm.contextoJuridico}
-                onChange={(e) => setEditForm({ ...editForm, contextoJuridico: e.target.value })}
+                onChange={(e) =>
+                  setEditForm({ ...editForm, contextoJuridico: e.target.value })
+                }
                 className="min-h-[120px] text-base resize-none"
                 data-testid="textarea-contexto"
               />
@@ -1538,7 +1982,8 @@ export default function JuridicoClientes({ embedded = false }: JuridicoClientesP
             {editingCliente?.contexto?.atualizadoJuridicoPor && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
                 <Calendar className="h-4 w-4" />
-                Última atualização por {editingCliente.contexto.atualizadoJuridicoPor} em{" "}
+                Última atualização por{" "}
+                {editingCliente.contexto.atualizadoJuridicoPor} em{" "}
                 {formatDate(editingCliente.contexto.atualizadoJuridicoEm)}
               </div>
             )}
