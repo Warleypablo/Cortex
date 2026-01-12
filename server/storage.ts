@@ -10869,8 +10869,8 @@ export class DbStorage implements IStorage {
         SELECT 
           rp.id,
           rp.nome,
-          COALESCE(rp.salario, 0)::numeric as salario,
-          COALESCE(rp.squad, 'Sem Squad') as squad_rh
+          COALESCE(rp.salario::numeric, 0::numeric) as salario,
+          COALESCE(rp.squad::text, 'Sem Squad') as squad_rh
         FROM rh_pessoal rp
         WHERE rp.status = 'Ativo'
           AND rp.salario IS NOT NULL
