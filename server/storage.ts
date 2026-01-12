@@ -3888,6 +3888,13 @@ export class DbStorage implements IStorage {
       meses.push(`${ano}-${String(mes).padStart(2, '0')}`);
     }
 
+    // Buscar o último snapshot global disponível (para usar no mês atual se não houver snapshot)
+    const ultimoSnapshotGlobalQuery = await db.execute(sql`
+      SELECT MAX(data_snapshot) as data_ultimo_snapshot
+      FROM ${schema.cupDataHist}
+    `);
+    const ultimoSnapshotGlobal = (ultimoSnapshotGlobalQuery.rows[0] as any)?.data_ultimo_snapshot;
+
     // Para cada mês, buscar MRR e Receita Pontual Entregue
     const resultado: import("@shared/schema").MrrEvolucaoMensal[] = [];
     
@@ -3926,10 +3933,23 @@ export class DbStorage implements IStorage {
 
       const mrrRow = mrrQuery.rows[0] as any;
       const pontualRow = pontualQuery.rows[0] as any;
-      
-      // Adiciona o mês mesmo se não houver snapshot (para mostrar os 12 meses)
-      const mrr = mrrRow?.data_ultimo_snapshot ? parseFloat(mrrRow.mrr || '0') : 0;
       const receitaPontualEntregue = parseFloat(pontualRow?.receita_pontual || '0');
+      
+      // Se não houver snapshot para o mês e for o último mês (mês atual), usa o último snapshot global
+      let mrr = 0;
+      if (mrrRow?.data_ultimo_snapshot) {
+        mrr = parseFloat(mrrRow.mrr || '0');
+      } else if (mes === mesAnoFim && ultimoSnapshotGlobal) {
+        // Para o mês atual sem snapshot, buscar MRR do último snapshot global
+        const mrrAtualQuery = await db.execute(sql`
+          SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
+          FROM ${schema.cupDataHist}
+          WHERE data_snapshot = ${ultimoSnapshotGlobal}::timestamp
+            AND status IN ('ativo', 'onboarding', 'triagem')
+        `);
+        const mrrAtualRow = mrrAtualQuery.rows[0] as any;
+        mrr = parseFloat(mrrAtualRow?.mrr || '0');
+      }
       
       resultado.push({
         mes,
@@ -5356,6 +5376,15 @@ export class DbStorage implements IStorage {
       `);
 
       dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+      
+      // Se não houver snapshot para o mês solicitado, usa o último disponível
+      if (!dataUltimoSnapshot) {
+        const ultimoSnapshotGlobal = await db.execute(sql`
+          SELECT MAX(data_snapshot) as data_ultimo_snapshot
+          FROM ${schema.cupDataHist}
+        `);
+        dataUltimoSnapshot = (ultimoSnapshotGlobal.rows[0] as any)?.data_ultimo_snapshot;
+      }
     } else {
       const ultimoSnapshotQuery = await db.execute(sql`
         SELECT MAX(data_snapshot) as data_ultimo_snapshot
@@ -5409,6 +5438,15 @@ export class DbStorage implements IStorage {
       `);
 
       dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
+      
+      // Se não houver snapshot para o mês solicitado, usa o último disponível
+      if (!dataUltimoSnapshot) {
+        const ultimoSnapshotGlobal = await db.execute(sql`
+          SELECT MAX(data_snapshot) as data_ultimo_snapshot
+          FROM ${schema.cupDataHist}
+        `);
+        dataUltimoSnapshot = (ultimoSnapshotGlobal.rows[0] as any)?.data_ultimo_snapshot;
+      }
     } else {
       const ultimoSnapshotQuery = await db.execute(sql`
         SELECT MAX(data_snapshot) as data_ultimo_snapshot
