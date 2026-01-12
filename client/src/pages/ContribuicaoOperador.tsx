@@ -19,8 +19,16 @@ interface ContribuicaoSquadData {
     valor: number;
     nivel: number;
   }[];
+  despesas: {
+    categoriaId: string;
+    categoriaNome: string;
+    valor: number;
+    nivel: number;
+  }[];
   totais: {
     receitaTotal: number;
+    despesaTotal: number;
+    resultado: number;
     quantidadeParcelas: number;
     quantidadeContratos: number;
   };
@@ -116,9 +124,10 @@ export default function ContribuicaoOperador() {
   });
 
   const hierarchicalData = useMemo(() => {
-    if (!monthlyResults) return { categories: [], monthColumns: [] };
+    if (!monthlyResults) return { categories: [], despesas: [], monthColumns: [] };
     
     const allCategoriesMap = new Map<string, { id: string; nome: string; nivel: number }>();
+    const allDespesasMap = new Map<string, { id: string; nome: string; nivel: number }>();
     
     for (const monthData of monthlyResults) {
       if (monthData.data?.receitas) {
@@ -128,6 +137,17 @@ export default function ContribuicaoOperador() {
               id: receita.categoriaId,
               nome: receita.categoriaNome,
               nivel: receita.nivel
+            });
+          }
+        }
+      }
+      if (monthData.data?.despesas) {
+        for (const despesa of monthData.data.despesas) {
+          if (!allDespesasMap.has(despesa.categoriaId)) {
+            allDespesasMap.set(despesa.categoriaId, {
+              id: despesa.categoriaId,
+              nome: despesa.categoriaNome,
+              nivel: despesa.nivel
             });
           }
         }
@@ -144,16 +164,12 @@ export default function ContribuicaoOperador() {
     
     // Ordenar hierarquicamente: filhos aparecem logo após o pai
     categoriesByLevel.sort((a, b) => {
-      // Compara os IDs de forma que filhos venham logo após seus pais
-      // Ex: "03.01.01" < "03.01.01.CLIENTE" < "03.01.01.CLIENTE.SERVICO" < "03.01.02"
       const partsA = a.id.split(".");
       const partsB = b.id.split(".");
       
-      // Compara parte por parte
       const minLen = Math.min(partsA.length, partsB.length);
       for (let i = 0; i < minLen; i++) {
         if (partsA[i] !== partsB[i]) {
-          // Tenta comparar como número primeiro
           const numA = parseFloat(partsA[i]);
           const numB = parseFloat(partsB[i]);
           if (!isNaN(numA) && !isNaN(numB)) {
@@ -163,15 +179,27 @@ export default function ContribuicaoOperador() {
         }
       }
       
-      // Se todos os prefixos são iguais, o mais curto vem primeiro (pai antes do filho)
       return partsA.length - partsB.length;
     });
+
+    const despesasByLevel: { id: string; nome: string; nivel: number; parentId: string | null }[] = [];
+    
+    Array.from(allDespesasMap.entries()).forEach(([id, cat]) => {
+      const parts = id.split(".");
+      const parentId = parts.length > 1 ? parts.slice(0, -1).join(".") : null;
+      despesasByLevel.push({ ...cat, parentId });
+    });
+    
+    despesasByLevel.sort((a, b) => b.nivel - a.nivel || a.nome.localeCompare(b.nome));
 
     const monthColumns = monthlyResults.map(m => ({
       mes: m.mes,
       mesLabel: m.mesLabel,
       valorPorCategoria: new Map<string, number>(),
-      receitaTotal: m.data?.totais?.receitaTotal || 0
+      valorPorDespesa: new Map<string, number>(),
+      receitaTotal: m.data?.totais?.receitaTotal || 0,
+      despesaTotal: m.data?.totais?.despesaTotal || 0,
+      resultado: m.data?.totais?.resultado || 0
     }));
     
     for (let i = 0; i < monthlyResults.length; i++) {
@@ -181,10 +209,16 @@ export default function ContribuicaoOperador() {
           monthColumns[i].valorPorCategoria.set(receita.categoriaId, receita.valor);
         }
       }
+      if (monthData.data?.despesas) {
+        for (const despesa of monthData.data.despesas) {
+          monthColumns[i].valorPorDespesa.set(despesa.categoriaId, despesa.valor);
+        }
+      }
     }
     
     return {
       categories: categoriesByLevel,
+      despesas: despesasByLevel,
       monthColumns
     };
   }, [monthlyResults]);
@@ -450,6 +484,82 @@ export default function ContribuicaoOperador() {
                     </div>
                   );
                 })}
+
+                <div 
+                  className="grid border-b-2 border-red-500/50 bg-red-500/10 cursor-pointer hover-elevate mt-4"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  onClick={() => toggleExpand("DESPESAS")}
+                  data-testid="row-despesas-total"
+                >
+                  <div className="p-3 font-bold text-red-500 flex items-center gap-2 sticky left-0 z-10 bg-red-500/10">
+                    {expanded.has("DESPESAS") ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <CircleMinus className="h-4 w-4" />
+                    Despesas (Salários)
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => (
+                    <div key={col.mes} className="p-3 text-right font-bold text-red-500">
+                      {formatCurrencyNoDecimals(col.despesaTotal)}
+                    </div>
+                  ))}
+                </div>
+
+                {expanded.has("DESPESAS") && hierarchicalData.despesas.map((despesa) => {
+                  if (despesa.nivel === 1) return null;
+                  
+                  return (
+                    <div 
+                      key={despesa.id}
+                      className="grid border-b border-border/50 hover-elevate"
+                      style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                      data-testid={`row-despesa-${despesa.id}`}
+                    >
+                      <div 
+                        className="p-3 flex items-center gap-2 sticky left-0 z-10 bg-background"
+                        style={{ paddingLeft: '28px' }}
+                      >
+                        <span className="w-4" />
+                        <span className="text-sm">{despesa.nome}</span>
+                      </div>
+                      {hierarchicalData.monthColumns.map((col) => {
+                        const valor = col.valorPorDespesa.get(despesa.id) || 0;
+                        return (
+                          <div key={col.mes} className="p-3 text-right text-sm text-red-400">
+                            {valor > 0 ? formatCurrencyNoDecimals(valor) : "-"}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+
+                <div 
+                  className="grid border-t-2 border-primary/50 bg-primary/10 mt-4"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  data-testid="row-resultado"
+                >
+                  <div className="p-3 font-bold text-primary flex items-center gap-2 sticky left-0 z-10 bg-primary/10">
+                    <TrendingUp className="h-4 w-4" />
+                    Resultado
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => {
+                    const isPositive = col.resultado >= 0;
+                    return (
+                      <div 
+                        key={col.mes} 
+                        className={cn(
+                          "p-3 text-right font-bold",
+                          isPositive ? "text-emerald-500" : "text-red-500"
+                        )}
+                      >
+                        {formatCurrencyNoDecimals(col.resultado)}
+                      </div>
+                    );
+                  })}
+                </div>
 
               </div>
               <ScrollBar orientation="horizontal" />
