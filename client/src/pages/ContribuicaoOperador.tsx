@@ -11,8 +11,7 @@ import { ChevronRight, ChevronDown, DollarSign, Users, TrendingUp, CirclePlus, C
 import { format, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-interface ContribuicaoOperadorData {
-  operadores: string[];
+interface ContribuicaoSquadData {
   squads: string[];
   receitas: {
     categoriaId: string;
@@ -20,16 +19,8 @@ interface ContribuicaoOperadorData {
     valor: number;
     nivel: number;
   }[];
-  despesas: {
-    categoriaId: string;
-    categoriaNome: string;
-    valor: number;
-    nivel: number;
-  }[];
   totais: {
     receitaTotal: number;
-    despesaTotal: number;
-    resultado: number;
     quantidadeParcelas: number;
     quantidadeContratos: number;
   };
@@ -38,17 +29,16 @@ interface ContribuicaoOperadorData {
 interface MonthlyData {
   mes: string;
   mesLabel: string;
-  data: ContribuicaoOperadorData | null;
+  data: ContribuicaoSquadData | null;
 }
 
 export default function ContribuicaoOperador() {
-  usePageTitle("Contribuição por Operador");
-  useSetPageInfo("Contribuição por Operador", "DFC do operador - Receitas atribuídas por responsável de contrato");
+  usePageTitle("Contribuição por Squad");
+  useSetPageInfo("Contribuição por Squad", "Receitas atribuídas por squad do contrato");
   
   const hoje = new Date();
   const [anoSelecionado, setAnoSelecionado] = useState(hoje.getFullYear());
   const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
-  const [operadorSelecionado, setOperadorSelecionado] = useState<string>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(["RECEITAS"]));
   
   const meses = useMemo(() => {
@@ -68,31 +58,27 @@ export default function ContribuicaoOperador() {
   
   const anos = Array.from({ length: 5 }, (_, i) => hoje.getFullYear() - i);
   
-  const { data: filterData, isLoading: loadingFilters } = useQuery<{ operadores: string[]; squads: string[] }>({
-    queryKey: ["/api/contribuicao-operador/dfc/filters", anoSelecionado, squadSelecionado],
+  const { data: filterData, isLoading: loadingFilters } = useQuery<{ squads: string[] }>({
+    queryKey: ["/api/contribuicao-squad/dfc/filters", anoSelecionado],
     queryFn: async () => {
       const dataInicio = `${anoSelecionado}-01-01`;
       const dataFim = `${anoSelecionado}-12-31`;
       const params = new URLSearchParams({ dataInicio, dataFim });
-      if (squadSelecionado !== "todos") {
-        params.append("squad", squadSelecionado);
-      }
-      const response = await fetch(`/api/contribuicao-operador/dfc?${params.toString()}`, {
+      const response = await fetch(`/api/contribuicao-squad/dfc?${params.toString()}`, {
         credentials: "include"
       });
       if (!response.ok) throw new Error("Falha ao buscar filtros");
       const data = await response.json();
-      return { operadores: data.operadores || [], squads: data.squads || [] };
+      return { squads: data.squads || [] };
     },
   });
   
   const handleSquadChange = (value: string) => {
     setSquadSelecionado(value);
-    setOperadorSelecionado("todos");
   };
 
   const { data: monthlyResults, isLoading } = useQuery<MonthlyData[]>({
-    queryKey: ["/api/contribuicao-operador/dfc/monthly", anoSelecionado, operadorSelecionado, squadSelecionado],
+    queryKey: ["/api/contribuicao-squad/dfc/monthly", anoSelecionado, squadSelecionado],
     queryFn: async () => {
       const results: MonthlyData[] = [];
       
@@ -102,14 +88,11 @@ export default function ContribuicaoOperador() {
             dataInicio: mes.dataInicio,
             dataFim: mes.dataFim
           });
-          if (operadorSelecionado !== "todos") {
-            params.append("operador", operadorSelecionado);
-          }
           if (squadSelecionado !== "todos") {
             params.append("squad", squadSelecionado);
           }
           
-          const response = await fetch(`/api/contribuicao-operador/dfc?${params.toString()}`, {
+          const response = await fetch(`/api/contribuicao-squad/dfc?${params.toString()}`, {
             credentials: "include"
           });
           
@@ -133,7 +116,7 @@ export default function ContribuicaoOperador() {
   });
 
   const hierarchicalData = useMemo(() => {
-    if (!monthlyResults) return { categories: [], despesas: [], monthColumns: [] };
+    if (!monthlyResults) return { categories: [], monthColumns: [] };
     
     const allCategoriesMap = new Map<string, { id: string; nome: string; nivel: number }>();
     
@@ -184,21 +167,11 @@ export default function ContribuicaoOperador() {
       return partsA.length - partsB.length;
     });
 
-    const despesasCategories = [
-      { id: 'DESP.01', nome: 'Salário do Operador', nivel: 2 },
-      { id: 'DESP.02', nome: 'Salário do CX', nivel: 2 },
-      { id: 'DESP.03', nome: 'Salário do Líder', nivel: 2 },
-      { id: 'DESP.04', nome: 'Impostos (16%)', nivel: 2 }
-    ];
-    
     const monthColumns = monthlyResults.map(m => ({
       mes: m.mes,
       mesLabel: m.mesLabel,
       valorPorCategoria: new Map<string, number>(),
-      valorPorDespesa: new Map<string, number>(),
-      receitaTotal: m.data?.totais?.receitaTotal || 0,
-      despesaTotal: m.data?.totais?.despesaTotal || 0,
-      resultado: m.data?.totais?.resultado || 0
+      receitaTotal: m.data?.totais?.receitaTotal || 0
     }));
     
     for (let i = 0; i < monthlyResults.length; i++) {
@@ -208,16 +181,10 @@ export default function ContribuicaoOperador() {
           monthColumns[i].valorPorCategoria.set(receita.categoriaId, receita.valor);
         }
       }
-      if (monthData.data?.despesas) {
-        for (const despesa of monthData.data.despesas) {
-          monthColumns[i].valorPorDespesa.set(despesa.categoriaId, despesa.valor);
-        }
-      }
     }
     
     return {
       categories: categoriesByLevel,
-      despesas: despesasCategories,
       monthColumns
     };
   }, [monthlyResults]);
@@ -262,8 +229,8 @@ export default function ContribuicaoOperador() {
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Contribuição por Operador</h1>
-          <p className="text-muted-foreground">DFC do operador - Receitas por produto/serviço e período (responsável do contrato)</p>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Contribuição por Squad</h1>
+          <p className="text-muted-foreground">Receitas por squad do contrato - baseado em parcelas quitadas</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -279,23 +246,6 @@ export default function ContribuicaoOperador() {
               {filterData?.squads?.map((sq) => (
                 <SelectItem key={sq} value={sq}>
                   {sq}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select 
-            value={operadorSelecionado} 
-            onValueChange={setOperadorSelecionado}
-          >
-            <SelectTrigger className="w-[180px]" data-testid="select-operador">
-              <SelectValue placeholder="Todos os operadores" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os operadores</SelectItem>
-              {filterData?.operadores?.map((op) => (
-                <SelectItem key={op} value={op}>
-                  {op}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -319,7 +269,7 @@ export default function ContribuicaoOperador() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Receita Total do Ano</CardTitle>
@@ -334,28 +284,28 @@ export default function ContribuicaoOperador() {
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {operadorSelecionado === "todos" ? "Todos os operadores" : operadorSelecionado}
+              {squadSelecionado === "todos" ? "Todos os squads" : squadSelecionado}
             </p>
           </CardContent>
         </Card>
         
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Operadores</CardTitle>
+            <CardTitle className="text-sm font-medium">Squads</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold" data-testid="text-operadores">
-                {operadorSelecionado === "todos" 
-                  ? (filterData?.operadores?.length || 0) 
+              <div className="text-2xl font-bold" data-testid="text-squads">
+                {squadSelecionado === "todos" 
+                  ? (filterData?.squads?.length || 0) 
                   : "1"}
               </div>
             )}
             <p className="text-xs text-muted-foreground mt-1">
-              {operadorSelecionado === "todos" ? "Com faturamento no período" : "Filtro aplicado"}
+              {squadSelecionado === "todos" ? "Com faturamento no período" : "Filtro aplicado"}
             </p>
           </CardContent>
         </Card>
@@ -501,77 +451,6 @@ export default function ContribuicaoOperador() {
                   );
                 })}
 
-                <div 
-                  className="grid border-b-2 border-red-500/50 bg-red-500/10 cursor-pointer hover-elevate mt-4"
-                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                  onClick={() => toggleExpand("DESPESAS")}
-                  data-testid="row-despesas-total"
-                >
-                  <div className="p-3 font-bold text-red-500 flex items-center gap-2 sticky left-0 z-10 bg-red-500/10">
-                    {expanded.has("DESPESAS") ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                    <CircleMinus className="h-4 w-4" />
-                    Despesas
-                  </div>
-                  {hierarchicalData.monthColumns.map((col) => (
-                    <div key={col.mes} className="p-3 text-right font-bold text-red-500">
-                      {formatCurrencyNoDecimals(col.despesaTotal)}
-                    </div>
-                  ))}
-                </div>
-
-                {expanded.has("DESPESAS") && hierarchicalData.despesas.map((despesa) => (
-                  <div 
-                    key={despesa.id}
-                    className="grid border-b border-border/50 hover-elevate"
-                    style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                    data-testid={`row-despesa-${despesa.id}`}
-                  >
-                    <div 
-                      className="p-3 flex items-center gap-2 sticky left-0 z-10 bg-background"
-                      style={{ paddingLeft: '28px' }}
-                    >
-                      <span className="w-4" />
-                      <span className="text-sm">{despesa.nome}</span>
-                    </div>
-                    {hierarchicalData.monthColumns.map((col) => {
-                      const valor = col.valorPorDespesa.get(despesa.id) || 0;
-                      return (
-                        <div key={col.mes} className="p-3 text-right text-sm text-red-400">
-                          {valor > 0 ? formatCurrencyNoDecimals(valor) : "-"}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-
-                <div 
-                  className="grid border-t-2 border-primary/50 bg-primary/10 mt-4"
-                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                  data-testid="row-resultado"
-                >
-                  <div className="p-3 font-bold text-primary flex items-center gap-2 sticky left-0 z-10 bg-primary/10">
-                    <TrendingUp className="h-4 w-4" />
-                    Resultado
-                  </div>
-                  {hierarchicalData.monthColumns.map((col) => {
-                    const isPositive = col.resultado >= 0;
-                    return (
-                      <div 
-                        key={col.mes} 
-                        className={cn(
-                          "p-3 text-right font-bold",
-                          isPositive ? "text-emerald-500" : "text-red-500"
-                        )}
-                      >
-                        {formatCurrencyNoDecimals(col.resultado)}
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
