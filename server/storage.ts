@@ -9873,6 +9873,29 @@ export class DbStorage implements IStorage {
       ? sql`AND COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') = ${squad}`
       : sql``;
     
+    // Filtro para limitar itens vendidos apenas a clientes do squad selecionado
+    const hasSquadFilter = squad && squad !== 'todos';
+    // Versão para usar em CTEs com alias ic_cnpj_limpo
+    const cnpjSquadFilterSql = hasSquadFilter
+      ? sql`AND ic_cnpj_limpo IN (
+          SELECT REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '')
+          FROM cup_contratos ct
+          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+            AND COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') = ${squad}
+        )`
+      : sql``;
+    // Versão para usar diretamente com cnpj_limpo
+    const cnpjSquadFilterDirectSql = hasSquadFilter
+      ? sql`AND cnpj_limpo IN (
+          SELECT REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '')
+          FROM cup_contratos ct
+          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
+            AND COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') = ${squad}
+        )`
+      : sql``;
+    
     // Lista de squads disponíveis
     const squadsResult = await db.execute(sql`
       SELECT DISTINCT COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad
@@ -10056,6 +10079,7 @@ export class DbStorage implements IStorage {
       ),
       operadores_finais AS (
         SELECT DISTINCT
+          ir.cnpj_limpo,
           CASE 
             -- Threshold reduzido para 50 para capturar mais matches válidos
             WHEN ir.match_score >= 50 THEN ir.responsavel
@@ -10065,9 +10089,15 @@ export class DbStorage implements IStorage {
         FROM itens_ranked ir
         LEFT JOIN contrato_mais_recente cmr ON ir.cnpj_limpo = cmr.cnpj_limpo
         WHERE ir.rn = 1
+      ),
+      operadores_filtrados AS (
+        SELECT DISTINCT operador, cnpj_limpo as ic_cnpj_limpo
+        FROM operadores_finais
+        WHERE 1=1
+          ${cnpjSquadFilterSql}
       )
       SELECT COALESCE(NULLIF(TRIM(operador), ''), 'Sem Operador') as operador 
-      FROM operadores_finais 
+      FROM operadores_filtrados 
       ORDER BY operador
     `);
     
@@ -10274,6 +10304,7 @@ export class DbStorage implements IStorage {
         FROM itens_ranked ir
         LEFT JOIN contrato_mais_recente cmr ON ir.cnpj_limpo = cmr.cnpj_limpo
         WHERE ir.rn = 1
+          ${cnpjSquadFilterDirectSql}
       ),
       resultado_final AS (
         SELECT 
