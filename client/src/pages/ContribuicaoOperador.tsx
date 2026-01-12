@@ -13,6 +13,7 @@ import { ptBR } from "date-fns/locale";
 
 interface ContribuicaoOperadorData {
   operadores: string[];
+  squads: string[];
   receitas: {
     categoriaId: string;
     categoriaNome: string;
@@ -46,6 +47,7 @@ export default function ContribuicaoOperador() {
   
   const hoje = new Date();
   const [anoSelecionado, setAnoSelecionado] = useState(hoje.getFullYear());
+  const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
   const [operadorSelecionado, setOperadorSelecionado] = useState<string>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(["RECEITAS"]));
   
@@ -66,22 +68,31 @@ export default function ContribuicaoOperador() {
   
   const anos = Array.from({ length: 5 }, (_, i) => hoje.getFullYear() - i);
   
-  const { data: operadoresData, isLoading: loadingOperadores } = useQuery<string[]>({
-    queryKey: ["/api/contribuicao-operador/dfc/operadores", anoSelecionado],
+  const { data: filterData, isLoading: loadingFilters } = useQuery<{ operadores: string[]; squads: string[] }>({
+    queryKey: ["/api/contribuicao-operador/dfc/filters", anoSelecionado, squadSelecionado],
     queryFn: async () => {
       const dataInicio = `${anoSelecionado}-01-01`;
       const dataFim = `${anoSelecionado}-12-31`;
-      const response = await fetch(`/api/contribuicao-operador/dfc?dataInicio=${dataInicio}&dataFim=${dataFim}`, {
+      const params = new URLSearchParams({ dataInicio, dataFim });
+      if (squadSelecionado !== "todos") {
+        params.append("squad", squadSelecionado);
+      }
+      const response = await fetch(`/api/contribuicao-operador/dfc?${params.toString()}`, {
         credentials: "include"
       });
-      if (!response.ok) throw new Error("Falha ao buscar operadores");
+      if (!response.ok) throw new Error("Falha ao buscar filtros");
       const data = await response.json();
-      return data.operadores || [];
+      return { operadores: data.operadores || [], squads: data.squads || [] };
     },
   });
+  
+  const handleSquadChange = (value: string) => {
+    setSquadSelecionado(value);
+    setOperadorSelecionado("todos");
+  };
 
   const { data: monthlyResults, isLoading } = useQuery<MonthlyData[]>({
-    queryKey: ["/api/contribuicao-operador/dfc/monthly", anoSelecionado, operadorSelecionado],
+    queryKey: ["/api/contribuicao-operador/dfc/monthly", anoSelecionado, operadorSelecionado, squadSelecionado],
     queryFn: async () => {
       const results: MonthlyData[] = [];
       
@@ -93,6 +104,9 @@ export default function ContribuicaoOperador() {
           });
           if (operadorSelecionado !== "todos") {
             params.append("operador", operadorSelecionado);
+          }
+          if (squadSelecionado !== "todos") {
+            params.append("squad", squadSelecionado);
           }
           
           const response = await fetch(`/api/contribuicao-operador/dfc?${params.toString()}`, {
@@ -234,15 +248,32 @@ export default function ContribuicaoOperador() {
         
         <div className="flex items-center gap-2">
           <Select 
+            value={squadSelecionado} 
+            onValueChange={handleSquadChange}
+          >
+            <SelectTrigger className="w-[180px]" data-testid="select-squad">
+              <SelectValue placeholder="Todos os squads" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os squads</SelectItem>
+              {filterData?.squads?.map((sq) => (
+                <SelectItem key={sq} value={sq}>
+                  {sq}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select 
             value={operadorSelecionado} 
             onValueChange={setOperadorSelecionado}
           >
-            <SelectTrigger className="w-[200px]" data-testid="select-operador">
+            <SelectTrigger className="w-[180px]" data-testid="select-operador">
               <SelectValue placeholder="Todos os operadores" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os operadores</SelectItem>
-              {operadoresData?.map((op) => (
+              {filterData?.operadores?.map((op) => (
                 <SelectItem key={op} value={op}>
                   {op}
                 </SelectItem>
@@ -299,7 +330,7 @@ export default function ContribuicaoOperador() {
             ) : (
               <div className="text-2xl font-bold" data-testid="text-operadores">
                 {operadorSelecionado === "todos" 
-                  ? (operadoresData?.length || 0) 
+                  ? (filterData?.operadores?.length || 0) 
                   : "1"}
               </div>
             )}

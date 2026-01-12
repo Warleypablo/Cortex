@@ -9842,8 +9842,10 @@ export class DbStorage implements IStorage {
   // Colaborador usa cup_clientes.responsavel (CX que gerencia o cliente)
   // CORRIGIDO v2: Usa valor do ITEM de venda (não da parcela) para atribuição precisa por serviço
   // Itens sem match de contrato vão para "Sem Operador" (não são descartados)
-  async getContribuicaoOperadorDfc(dataInicio: string, dataFim: string, operador?: string): Promise<{
+  // v3: Aceita filtro por squad para agrupar operadores
+  async getContribuicaoOperadorDfc(dataInicio: string, dataFim: string, operador?: string, squad?: string): Promise<{
     operadores: string[];
+    squads: string[];
     receitas: {
       categoriaId: string;
       categoriaNome: string;
@@ -9865,6 +9867,20 @@ export class DbStorage implements IStorage {
     };
   }> {
     const dataFimComHora = `${dataFim} 23:59:59`;
+    
+    // Constrói filtro de squad para queries
+    const squadFilterSql = squad && squad !== 'todos' 
+      ? sql`AND COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') = ${squad}`
+      : sql``;
+    
+    // Lista de squads disponíveis
+    const squadsResult = await db.execute(sql`
+      SELECT DISTINCT COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad
+      FROM cup_contratos
+      WHERE responsavel IS NOT NULL AND TRIM(responsavel) != ''
+      ORDER BY squad
+    `);
+    const squads = squadsResult.rows.map((r: any) => r.squad);
     
     // Lista de operadores: usa lógica híbrida com matching robusto de serviços
     // Normalização agressiva: lowercase, remove acentos (transliteração), remove pontuação, colapsa espaços
@@ -9893,6 +9909,7 @@ export class DbStorage implements IStorage {
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
+          ${squadFilterSql}
       ),
       contrato_mais_recente AS (
         SELECT DISTINCT ON (cnpj_limpo)
@@ -9907,6 +9924,7 @@ export class DbStorage implements IStorage {
           INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
           WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
+            ${squadFilterSql}
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
@@ -10087,6 +10105,7 @@ export class DbStorage implements IStorage {
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
+          ${squadFilterSql}
       ),
       contrato_mais_recente AS (
         SELECT DISTINCT ON (cnpj_limpo)
@@ -10103,6 +10122,7 @@ export class DbStorage implements IStorage {
           INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
           WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
+            ${squadFilterSql}
         ) sub
         ORDER BY cnpj_limpo, id_subtask DESC
       ),
@@ -10552,6 +10572,7 @@ export class DbStorage implements IStorage {
     
     return {
       operadores,
+      squads,
       receitas,
       despesas,
       totais: {
