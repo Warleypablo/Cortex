@@ -8250,11 +8250,18 @@ export class DbStorage implements IStorage {
   async getClientesComContextoJuridico(): Promise<string[]> {
     try {
       // Query sem valor_acordado para compatibilidade com produção
+      // Filtrar registros manuais antigos que não deveriam aparecer
       const result = await db.execute(sql.raw(`
         SELECT cliente_id FROM inadimplencia_contextos 
-        WHERE contexto_juridico IS NOT NULL 
+        WHERE (contexto_juridico IS NOT NULL 
            OR procedimento_juridico IS NOT NULL 
-           OR status_juridico IS NOT NULL
+           OR status_juridico IS NOT NULL)
+          AND contexto_juridico NOT ILIKE '%Registro manual%'
+          AND cliente_id NOT IN ('erro_fantasma_opera', 'erro_gpa_suplementos', 'erro_hubstage', 'erro_winstage')
+          AND cliente_id NOT ILIKE 'Fantasma de Opera'
+          AND cliente_id NOT ILIKE 'GPA Suplementos'
+          AND cliente_id NOT ILIKE 'Hubstage'
+          AND cliente_id NOT ILIKE 'Winstage'
       `));
       return (result.rows as any[]).map(r => r.cliente_id);
     } catch (error) {
