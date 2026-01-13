@@ -190,7 +190,23 @@ export default function ContribuicaoOperador() {
       despesasByLevel.push({ ...cat, parentId });
     });
     
-    despesasByLevel.sort((a, b) => b.nivel - a.nivel || a.nome.localeCompare(b.nome));
+    // Ordenar hierarquicamente: pai primeiro, depois filhos ordenados por valor
+    despesasByLevel.sort((a, b) => {
+      const partsA = a.id.split(".");
+      const partsB = b.id.split(".");
+      
+      const minLen = Math.min(partsA.length, partsB.length);
+      for (let i = 0; i < minLen; i++) {
+        if (partsA[i] !== partsB[i]) {
+          // Salários antes de Impostos
+          if (partsA[i] === 'SALARIOS' && partsB[i] === 'IMPOSTOS') return -1;
+          if (partsA[i] === 'IMPOSTOS' && partsB[i] === 'SALARIOS') return 1;
+          return partsA[i].localeCompare(partsB[i]);
+        }
+      }
+      
+      return partsA.length - partsB.length;
+    });
 
     const monthColumns = monthlyResults.map(m => ({
       mes: m.mes,
@@ -498,7 +514,7 @@ export default function ContribuicaoOperador() {
                       <ChevronRight className="h-4 w-4" />
                     )}
                     <CircleMinus className="h-4 w-4" />
-                    Despesas (Salários)
+                    Despesas
                   </div>
                   {hierarchicalData.monthColumns.map((col) => (
                     <div key={col.mes} className="p-3 text-right font-bold text-red-500">
@@ -508,26 +524,53 @@ export default function ContribuicaoOperador() {
                 </div>
 
                 {expanded.has("DESPESAS") && hierarchicalData.despesas.map((despesa) => {
-                  if (despesa.nivel === 1) return null;
+                  const isLevel1 = despesa.nivel === 1;
+                  const hasChildren = hierarchicalData.despesas.some(d => d.parentId === despesa.id);
+                  const isExpanded = expanded.has(despesa.id);
+                  
+                  // Para nível 2+, só mostrar se o pai estiver expandido
+                  if (!isLevel1 && despesa.parentId && !expanded.has(despesa.parentId)) {
+                    return null;
+                  }
+                  
+                  const indentLevel = despesa.id.split(".").length - 1;
                   
                   return (
                     <div 
                       key={despesa.id}
-                      className="grid border-b border-border/50 hover-elevate"
+                      className={cn(
+                        "grid border-b border-border/50 hover-elevate",
+                        hasChildren && "cursor-pointer"
+                      )}
                       style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                      onClick={() => hasChildren && toggleExpand(despesa.id)}
                       data-testid={`row-despesa-${despesa.id}`}
                     >
                       <div 
                         className="p-3 flex items-center gap-2 sticky left-0 z-10 bg-background"
-                        style={{ paddingLeft: '28px' }}
+                        style={{ paddingLeft: `${12 + (indentLevel * 16)}px` }}
                       >
-                        <span className="w-4" />
-                        <span className="text-sm">{despesa.nome}</span>
+                        {hasChildren ? (
+                          isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )
+                        ) : (
+                          <span className="w-4" />
+                        )}
+                        <span className={cn(
+                          "text-sm",
+                          isLevel1 && "font-semibold"
+                        )}>{despesa.nome}</span>
                       </div>
                       {hierarchicalData.monthColumns.map((col) => {
                         const valor = col.valorPorDespesa.get(despesa.id) || 0;
                         return (
-                          <div key={col.mes} className="p-3 text-right text-sm text-red-400">
+                          <div key={col.mes} className={cn(
+                            "p-3 text-right text-sm",
+                            isLevel1 ? "text-red-500 font-medium" : "text-red-400"
+                          )}>
                             {valor > 0 ? formatCurrencyNoDecimals(valor) : "-"}
                           </div>
                         );
