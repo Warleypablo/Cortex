@@ -11017,7 +11017,6 @@ export class DbStorage implements IStorage {
     // Buscar freelancers do período selecionado, cruzando com rh_pessoal para obter squad
     const freelaResult = await db.execute(sql`
       SELECT 
-        f.id,
         f.responsavel,
         f.valor_projeto,
         f.data_pagamento,
@@ -11045,19 +11044,21 @@ export class DbStorage implements IStorage {
       ORDER BY f.valor_projeto::numeric DESC
     `);
     
-    // Agrupar freelancers por id
-    const freelasPorId = new Map<number, { id: number; responsavel: string; valor: number }>();
+    // Agrupar freelancers por responsavel
+    const freelasPorResponsavel = new Map<string, { responsavel: string; valor: number }>();
     let freelaTotal = 0;
     
     for (const row of freelaResult.rows as any[]) {
-      const id = Number(row.id);
       const responsavel = row.responsavel || 'Não identificado';
       const valor = Number(row.valor_projeto) || 0;
       
-      if (!freelasPorId.has(id)) {
-        freelasPorId.set(id, { id, responsavel, valor });
-        freelaTotal += valor;
+      const existing = freelasPorResponsavel.get(responsavel);
+      if (existing) {
+        existing.valor += valor;
+      } else {
+        freelasPorResponsavel.set(responsavel, { responsavel, valor });
       }
+      freelaTotal += valor;
     }
     
     // Montar array de despesas
@@ -11109,12 +11110,14 @@ export class DbStorage implements IStorage {
     });
     
     // Listar cada freelancer como subcategoria
-    const freelasOrdenados = Array.from(freelasPorId.values())
+    const freelasOrdenados = Array.from(freelasPorResponsavel.values())
       .sort((a, b) => b.valor - a.valor);
     
+    let freelaIndex = 0;
     for (const freela of freelasOrdenados) {
+      freelaIndex++;
       despesas.push({
-        categoriaId: `DESP.FREELANCERS.${freela.id}`,
+        categoriaId: `DESP.FREELANCERS.${freelaIndex}`,
         categoriaNome: freela.responsavel,
         valor: freela.valor,
         nivel: 2
