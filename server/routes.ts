@@ -9745,16 +9745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/closers/detail", async (req, res) => {
     try {
-      const { 
-        closerId, 
-        dataInicio, 
-        dataFim,
-        // Filtros independentes como no Dashboard
-        dataReuniaoInicio,
-        dataReuniaoFim,
-        dataFechamentoInicio,
-        dataFechamentoFim
-      } = req.query;
+      const { closerId, dataInicio, dataFim } = req.query;
 
       if (!closerId) {
         return res.status(400).json({ error: "closerId is required" });
@@ -9770,81 +9761,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const closerInfo = closerResult.rows[0] as any;
 
-      // Determinar datas para fechamento (usa independentes se disponíveis, senão usa dataInicio/dataFim)
-      const fechamentoInicio = dataFechamentoInicio || dataInicio;
-      const fechamentoFim = dataFechamentoFim || dataFim;
-      
-      // Determinar datas para reuniões (usa independentes se disponíveis, senão usa dataInicio/dataFim)
-      const reuniaoInicio = dataReuniaoInicio || dataInicio;
-      const reuniaoFim = dataReuniaoFim || dataFim;
+      // Usa data_fechamento como referência principal para filtros de data
+      const dateConditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) {
+        dateConditions.push(sql`d.data_fechamento >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        dateConditions.push(sql`d.data_fechamento <= ${dataFim}`);
+      }
 
-      // Condições para fechamento (negócios ganhos, valores, etc)
-      const fechamentoConditions: ReturnType<typeof sql>[] = [];
-      if (fechamentoInicio) {
-        fechamentoConditions.push(sql`d.data_fechamento >= ${fechamentoInicio}`);
-      }
-      if (fechamentoFim) {
-        fechamentoConditions.push(sql`d.data_fechamento <= ${fechamentoFim}`);
-      }
-      const fechamentoWhereClause = fechamentoConditions.length > 0 
-        ? sql`AND ${sql.join(fechamentoConditions, sql` AND `)}` 
+      const dateWhereClause = dateConditions.length > 0 
+        ? sql`AND ${sql.join(dateConditions, sql` AND `)}` 
         : sql``;
 
-      // Query principal para negócios (filtrada por data_fechamento)
-      const negociosResult = await db.execute(sql`
+      const metricsResult = await db.execute(sql`
         SELECT 
           COUNT(*) as total_negocios,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos,
           COUNT(CASE WHEN d.stage_name IN ('Negócio perdido', 'Negócio Perdido', 'Perdido', 'Descartado', 'Descartado/sem fit') THEN 1 END) as negocios_perdidos,
           COUNT(CASE WHEN d.stage_name NOT IN ('Negócio Ganho', 'Negócio perdido', 'Negócio Perdido', 'Perdido', 'Descartado', 'Descartado/sem fit') THEN 1 END) as negocios_em_andamento,
+          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente END), 0) as valor_recorrente,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual END), 0) as valor_pontual,
-          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' AND COALESCE(d.valor_recorrente, 0) > 0 THEN 1 END) as negocios_recorrentes,
-          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' AND COALESCE(d.valor_pontual, 0) > 0 THEN 1 END) as negocios_pontuais,
           MIN(d.data_fechamento) as primeiro_negocio,
           MAX(d.data_fechamento) as ultimo_negocio
         FROM crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
           AND d.data_fechamento IS NOT NULL
-        ${fechamentoWhereClause}
+        ${dateWhereClause}
       `);
 
-      // Query separada para reuniões (filtrada por data_reuniao_realizada)
-      const reunioesConditions: ReturnType<typeof sql>[] = [];
-      reunioesConditions.push(sql`d.data_reuniao_realizada IS NOT NULL`);
-      if (reuniaoInicio) {
-        reunioesConditions.push(sql`d.data_reuniao_realizada >= ${reuniaoInicio}`);
-      }
-      if (reuniaoFim) {
-        reunioesConditions.push(sql`d.data_reuniao_realizada <= ${reuniaoFim}`);
-      }
-      const reunioesWhereClause = sql`AND ${sql.join(reunioesConditions, sql` AND `)}`;
-
-      const reunioesResult = await db.execute(sql`
-        SELECT COUNT(*) as reunioes_realizadas
-        FROM crm_deal d
-        WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
-        ${reunioesWhereClause}
-      `);
-
-      const row = negociosResult.rows[0] as any;
-      const rowReunioes = reunioesResult.rows[0] as any;
+      const row = metricsResult.rows[0] as any;
       
       const totalNegocios = parseInt(row.total_negocios) || 0;
       const negociosGanhos = parseInt(row.negocios_ganhos) || 0;
       const negociosPerdidos = parseInt(row.negocios_perdidos) || 0;
       const negociosEmAndamento = parseInt(row.negocios_em_andamento) || 0;
-      const reunioesRealizadas = parseInt(rowReunioes.reunioes_realizadas) || 0;
+      const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
       const valorRecorrente = parseFloat(row.valor_recorrente) || 0;
       const valorPontual = parseFloat(row.valor_pontual) || 0;
-      const negociosRecorrentes = parseInt(row.negocios_recorrentes) || 0;
-      const negociosPontuais = parseInt(row.negocios_pontuais) || 0;
       const valorTotal = valorRecorrente + valorPontual;
       const taxaConversao = reunioesRealizadas > 0 ? (negociosGanhos / reunioesRealizadas) * 100 : 0;
       const ticketMedio = negociosGanhos > 0 ? valorTotal / negociosGanhos : 0;
-      // Ticket médio separado por tipo: divide pelo número de negócios COM cada tipo de valor
-      const ticketMedioRecorrente = negociosRecorrentes > 0 ? valorRecorrente / negociosRecorrentes : 0;
-      const ticketMedioPontual = negociosPontuais > 0 ? valorPontual / negociosPontuais : 0;
+      const ticketMedioRecorrente = negociosGanhos > 0 ? valorRecorrente / negociosGanhos : 0;
+      const ticketMedioPontual = negociosGanhos > 0 ? valorPontual / negociosGanhos : 0;
 
       const primeiroNegocio = row.primeiro_negocio;
       const ultimoNegocio = row.ultimo_negocio;
@@ -9867,8 +9827,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         negociosPerdidos,
         negociosEmAndamento,
         totalNegocios,
-        negociosRecorrentes,
-        negociosPontuais,
         reunioesRealizadas,
         taxaConversao,
         valorRecorrente,
