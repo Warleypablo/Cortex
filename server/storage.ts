@@ -11045,6 +11045,7 @@ export class DbStorage implements IStorage {
     `);
     
     // Agrupar freelancers por responsavel
+    console.log('[contribuicao] Freelancers query result:', freelaResult.rows.length, 'rows, dataInicio:', dataInicio, 'dataFim:', dataFim);
     const freelasPorResponsavel = new Map<string, { responsavel: string; valor: number }>();
     let freelaTotal = 0;
     
