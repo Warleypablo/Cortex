@@ -11003,6 +11003,17 @@ export class DbStorage implements IStorage {
       }
     }
     
+    // Buscar média salarial de CXCS ativos
+    const cxcsResult = await db.execute(sql`
+      SELECT AVG(salario::numeric) as media_cxcs
+      FROM rh_pessoal
+      WHERE UPPER(TRIM(cargo)) = 'CXCS'
+        AND UPPER(TRIM(status)) = 'ATIVO'
+        AND salario IS NOT NULL
+        AND salario::numeric > 0
+    `);
+    const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
+    
     // Montar array de despesas
     const despesas: {
       categoriaId: string;
@@ -11035,6 +11046,14 @@ export class DbStorage implements IStorage {
       });
     }
     
+    // Adicionar linha de CXCS (média salarial)
+    despesas.push({
+      categoriaId: 'DESP.CXCS',
+      categoriaNome: 'CXCS (Média)',
+      valor: mediaCxcs,
+      nivel: 1
+    });
+    
     // Adicionar linha de impostos (18% da receita)
     despesas.push({
       categoriaId: 'DESP.IMPOSTOS',
@@ -11043,8 +11062,8 @@ export class DbStorage implements IStorage {
       nivel: 1
     });
     
-    // Despesa total agora inclui salários + impostos
-    const despesaTotalComImpostos = despesaTotal + impostos;
+    // Despesa total agora inclui salários + CXCS + impostos
+    const despesaTotalComImpostos = despesaTotal + mediaCxcs + impostos;
     
     const resultado = receitaTotal - despesaTotalComImpostos;
     
