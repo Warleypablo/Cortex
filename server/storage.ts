@@ -11015,11 +11015,25 @@ export class DbStorage implements IStorage {
     const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
     
     // Buscar freelancers do período selecionado, cruzando com rh_pessoal para obter squad
-    // O valor está em custom_fields->>'Valor', não em valor_projeto
+    // O valor está em custom_fields->>'Valor' formatado como "R$ 2.500,00"
+    // Precisa limpar formatação: remover R$, pontos de milhar, e trocar vírgula por ponto
     const freelaResult = await db.execute(sql`
       SELECT 
         f.responsavel,
-        COALESCE(f.valor_projeto::numeric, (f.custom_fields->>'Valor')::numeric, 0) as valor,
+        COALESCE(
+          f.valor_projeto::numeric,
+          NULLIF(
+            REPLACE(
+              REPLACE(
+                REGEXP_REPLACE(f.custom_fields->>'Valor', '[^0-9,.]', '', 'g'),
+                '.', ''
+              ),
+              ',', '.'
+            ),
+            ''
+          )::numeric,
+          0
+        ) as valor,
         f.data_pagamento,
         COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
       FROM cup_freelas f
