@@ -286,7 +286,21 @@ export default function JuridicoClientes({
   const { sortedClientes, totals } = useMemo(() => {
     const searchLower = deferredSearchTerm.toLowerCase();
 
+    // Função para verificar se um caso está "concluído" (resolvido)
+    const isCasoConcluido = (item: ClienteJuridico) => {
+      const ctx = item.contexto;
+      // Caso concluído se: status = concluído, OU tem acordo com valor > 0, OU é baixa, OU é erro operacional
+      if (ctx?.statusJuridico === 'concluido') return true;
+      if (ctx?.procedimentoJuridico === 'acordo' && (ctx?.valorAcordado || 0) > 0) return true;
+      if (ctx?.procedimentoJuridico === 'baixa') return true;
+      if (ctx?.tipoInadimplencia === 'erro_operacional') return true;
+      return false;
+    };
+
     const filtered = clientes.filter((item) => {
+      // Excluir casos concluídos da aba "ativos"
+      if (isCasoConcluido(item)) return false;
+
       const matchesSearch =
         deferredSearchTerm === "" ||
         item.cliente.nomeCliente.toLowerCase().includes(searchLower) ||
