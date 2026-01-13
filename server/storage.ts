@@ -11014,7 +11014,7 @@ export class DbStorage implements IStorage {
     `);
     const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
     
-    // Buscar freelancers do mês/ano selecionado, cruzando com rh_pessoal para obter squad
+    // Buscar freelancers do período selecionado, cruzando com rh_pessoal para obter squad
     const freelaResult = await db.execute(sql`
       SELECT 
         f.id,
@@ -11024,8 +11024,8 @@ export class DbStorage implements IStorage {
         COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
       FROM cup_freelas f
       LEFT JOIN rh_pessoal rp ON LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
-      WHERE EXTRACT(MONTH FROM f.data_pagamento) = ${mes}
-        AND EXTRACT(YEAR FROM f.data_pagamento) = ${ano}
+      WHERE f.data_pagamento >= ${dataInicio}::date
+        AND f.data_pagamento <= ${dataFimComHora}::timestamp
         AND f.valor_projeto IS NOT NULL
         AND f.valor_projeto::numeric > 0
         AND (
