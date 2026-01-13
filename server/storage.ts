@@ -11015,10 +11015,11 @@ export class DbStorage implements IStorage {
     const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
     
     // Buscar freelancers do período selecionado, cruzando com rh_pessoal para obter squad
+    // O valor está em custom_fields->>'Valor', não em valor_projeto
     const freelaResult = await db.execute(sql`
       SELECT 
         f.responsavel,
-        f.valor_projeto,
+        COALESCE(f.valor_projeto::numeric, (f.custom_fields->>'Valor')::numeric, 0) as valor,
         f.data_pagamento,
         COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
       FROM cup_freelas f
@@ -11048,7 +11049,7 @@ export class DbStorage implements IStorage {
     
     for (const row of freelaResult.rows as any[]) {
       const responsavel = row.responsavel || 'Não identificado';
-      const valor = Number(row.valor_projeto) || 0;
+      const valor = Number(row.valor) || 0;
       
       const existing = freelasPorResponsavel.get(responsavel);
       if (existing) {
