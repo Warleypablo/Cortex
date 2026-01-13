@@ -85,8 +85,6 @@ interface CloserDetailMetrics {
   negociosPerdidos: number;
   negociosEmAndamento: number;
   totalNegocios: number;
-  negociosRecorrentes: number;
-  negociosPontuais: number;
   reunioesRealizadas: number;
   taxaConversao: number;
   valorRecorrente: number;
@@ -609,7 +607,7 @@ export default function DetailClosers() {
                 value={metrics.valorRecorrente}
                 icon={Repeat}
                 color="violet"
-                subtitle={`Ticket médio: ${formatCurrency(metrics.ticketMedioRecorrente)} (${metrics.negociosRecorrentes || 0} contratos)`}
+                subtitle={`Ticket médio: ${formatCurrency(metrics.ticketMedioRecorrente)}`}
                 delay={0}
                 isCurrency
               />
@@ -618,7 +616,7 @@ export default function DetailClosers() {
                 value={metrics.valorPontual}
                 icon={Banknote}
                 color="cyan"
-                subtitle={`Ticket médio: ${formatCurrency(metrics.ticketMedioPontual)} (${metrics.negociosPontuais || 0} contratos)`}
+                subtitle={`Ticket médio: ${formatCurrency(metrics.ticketMedioPontual)}`}
                 delay={0.1}
                 isCurrency
               />

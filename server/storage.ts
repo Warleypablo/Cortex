@@ -10697,7 +10697,7 @@ export class DbStorage implements IStorage {
   // caz_clientes -> cup_clientes (via cnpj = cnpj)
   // cup_clientes -> cup_contratos (via task_id = id_task)
   // Agregar por squad de cup_contratos
-  // Despesas = soma dos salarios ativos do rh_pessoal associados aos responsaveis do contrato
+  // Despesas = soma dos salarios ativos do rh_pessoal por squad
   async getContribuicaoSquadDfc(dataInicio: string, dataFim: string, squad?: string): Promise<{
     squads: string[];
     receitas: {
@@ -10928,68 +10928,11 @@ export class DbStorage implements IStorage {
       }
     }
 
-    // Query para calcular despesas (salarios ativos por responsavel do contrato)
+    // Query para calcular despesas (salarios ativos do squad)
     const salarioSquadFilterValue = squad && squad !== 'todos' ? squad : null;
-    const accentFrom =
-      '\u00e1\u00e0\u00e2\u00e3\u00e4\u00e9\u00e8\u00ea\u00eb\u00ed\u00ec\u00ee\u00ef\u00f3\u00f2\u00f4\u00f5\u00f6\u00fa\u00f9\u00fb\u00fc\u00e7\u00c1\u00c0\u00c2\u00c3\u00c4\u00c9\u00c8\u00ca\u00cb\u00cd\u00cc\u00ce\u00cf\u00d3\u00d2\u00d4\u00d5\u00d6\u00da\u00d9\u00db\u00dc\u00c7';
-    const accentTo = 'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC';
     
     const salarioResult = await db.execute(sql`
-      WITH responsaveis_raw AS (
-        SELECT DISTINCT 
-          ct.responsavel,
-          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad
-        FROM cup_contratos ct
-        WHERE ct.responsavel IS NOT NULL 
-          AND TRIM(ct.responsavel) != ''
-          AND LOWER(TRIM(ct.status)) IN ('em andamento', 'ativo')
-      ),
-      responsaveis_norm AS (
-        SELECT
-          responsavel,
-          squad,
-          TRIM(REGEXP_REPLACE(
-            LOWER(REGEXP_REPLACE(
-              TRANSLATE(TRIM(responsavel), ${accentFrom}, ${accentTo}),
-              '[^[:alnum:][:space:]]',
-              ' ',
-              'g'
-            )),
-            '[[:space:]]+',
-            ' ',
-            'g'
-          )) as responsavel_norm,
-          TRIM(REGEXP_REPLACE(
-            LOWER(REGEXP_REPLACE(
-              TRANSLATE(TRIM(squad), ${accentFrom}, ${accentTo}),
-              '[^[:alnum:][:space:]]',
-              ' ',
-              'g'
-            )),
-            '[[:space:]]+',
-            ' ',
-            'g'
-          )) as squad_norm
-        FROM responsaveis_raw
-      ),
-      responsaveis_tokens AS (
-        SELECT
-          responsavel,
-          squad,
-          responsavel_norm,
-          squad_norm,
-          NULLIF(SPLIT_PART(responsavel_norm, ' ', 1), '') as resp_primeiro,
-          NULLIF(
-            SPLIT_PART(
-              responsavel_norm,
-              ' ',
-              array_length(string_to_array(responsavel_norm, ' '), 1)
-            ),
-            ''
-          ) as resp_ultimo
-        FROM responsaveis_norm
-      ),
-      colaboradores_norm AS (
+      WITH salarios_normalizados AS (
         SELECT 
           rp.id,
           rp.nome as colaborador_nome,
@@ -11016,66 +10959,33 @@ export class DbStorage implements IStorage {
                 REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'),
                 ''
               )::numeric
-          END as salario,
-          TRIM(REGEXP_REPLACE(
-            LOWER(REGEXP_REPLACE(
-              TRANSLATE(TRIM(rp.nome), ${accentFrom}, ${accentTo}),
-              '[^[:alnum:][:space:]]',
-              ' ',
-              'g'
-            )),
-            '[[:space:]]+',
-            ' ',
-            'g'
-          )) as nome_norm
+          END as salario
         FROM rh_pessoal rp
-      ),
-      match_responsavel_colaborador AS (
-        SELECT DISTINCT ON (c.id)
-          r.squad as squad_contrato,
-          c.id,
-          c.colaborador_nome,
-          c.salario
-        FROM responsaveis_tokens r
-        JOIN colaboradores_norm c
-          ON r.responsavel_norm != ''
-          AND (
-            c.nome_norm LIKE '%' || r.responsavel_norm || '%'
-            OR (
-              COALESCE(LENGTH(r.resp_primeiro), 0) >= 2
-              AND c.nome_norm LIKE '%' || r.resp_primeiro || '%'
-              AND (
-                r.resp_ultimo IS NULL
-                OR c.nome_norm LIKE '%' || r.resp_ultimo || '%'
-              )
-            )
-          )
-        WHERE c.status_norm LIKE 'ativo%'
-          AND c.salario IS NOT NULL
-          AND c.salario > 0
-          AND (
-            ${salarioSquadFilterValue}::text IS NULL
-            OR r.squad_norm = TRIM(REGEXP_REPLACE(
-              LOWER(REGEXP_REPLACE(
-                TRANSLATE(COALESCE(${salarioSquadFilterValue}, ''), ${accentFrom}, ${accentTo}),
-                '[^[:alnum:][:space:]]',
-                ' ',
-                'g'
-              )),
-              '[[:space:]]+',
-              ' ',
-              'g'
-            ))
-          )
-        ORDER BY c.id, r.squad
       )
       SELECT 
-        squad_contrato as squad,
+        id,
         colaborador_nome,
         salario,
-        id
-      FROM match_responsavel_colaborador
-      ORDER BY squad_contrato, colaborador_nome
+        squad
+      FROM salarios_normalizados
+      WHERE status_norm = 'ativo'
+        AND salario IS NOT NULL
+        AND salario > 0
+        AND (
+          ${salarioSquadFilterValue}::text IS NULL
+          OR REGEXP_REPLACE(
+            LOWER(COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')),
+            '[^[:alnum:]]',
+            '',
+            'g'
+          ) = REGEXP_REPLACE(
+            LOWER(COALESCE(${salarioSquadFilterValue}, '')),
+            '[^[:alnum:]]',
+            '',
+            'g'
+          )
+        )
+      ORDER BY squad, colaborador_nome
     `);
     
     // Agrupar salarios por colaborador
