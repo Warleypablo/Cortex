@@ -438,6 +438,7 @@ export default function JuridicoClientes({
       },
       { nome: "MALOCA", valorOriginal: 2510.89, valorRecuperado: 2510.89 },
       { nome: "AYURVÈDIKA", valorOriginal: 4000.0, valorRecuperado: 4000.0 },
+      { nome: "COCUS INDUSTRIA E COMÉRCIO LTDA", valorOriginal: 3996.0, valorRecuperado: 3996.0 },
     ],
     [],
   );
