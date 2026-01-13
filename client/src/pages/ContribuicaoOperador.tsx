@@ -190,11 +190,12 @@ export default function ContribuicaoOperador() {
       despesasByLevel.push({ ...cat, parentId });
     });
     
-    // Ordenar hierarquicamente: Salários > CXCS > Impostos
+    // Ordenar hierarquicamente: Salários > CXCS > Freelancers > Impostos
     const despesaOrder: Record<string, number> = {
       'SALARIOS': 1,
       'CXCS': 2,
-      'IMPOSTOS': 3
+      'FREELANCERS': 3,
+      'IMPOSTOS': 4
     };
     
     despesasByLevel.sort((a, b) => {
