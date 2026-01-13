@@ -11014,6 +11014,52 @@ export class DbStorage implements IStorage {
     `);
     const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
     
+    // Buscar freelancers do mês/ano selecionado, cruzando com rh_pessoal para obter squad
+    const freelaResult = await db.execute(sql`
+      SELECT 
+        f.id,
+        f.responsavel,
+        f.valor_projeto,
+        f.data_pagamento,
+        COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
+      FROM cup_freelas f
+      LEFT JOIN rh_pessoal rp ON LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
+      WHERE EXTRACT(MONTH FROM f.data_pagamento) = ${mes}
+        AND EXTRACT(YEAR FROM f.data_pagamento) = ${ano}
+        AND f.valor_projeto IS NOT NULL
+        AND f.valor_projeto::numeric > 0
+        AND (
+          ${salarioSquadFilterValue}::text IS NULL
+          OR REGEXP_REPLACE(
+            LOWER(COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad')),
+            '[^[:alnum:]]',
+            '',
+            'g'
+          ) = REGEXP_REPLACE(
+            LOWER(COALESCE(${salarioSquadFilterValue}, '')),
+            '[^[:alnum:]]',
+            '',
+            'g'
+          )
+        )
+      ORDER BY f.valor_projeto::numeric DESC
+    `);
+    
+    // Agrupar freelancers por id
+    const freelasPorId = new Map<number, { id: number; responsavel: string; valor: number }>();
+    let freelaTotal = 0;
+    
+    for (const row of freelaResult.rows as any[]) {
+      const id = Number(row.id);
+      const responsavel = row.responsavel || 'Não identificado';
+      const valor = Number(row.valor_projeto) || 0;
+      
+      if (!freelasPorId.has(id)) {
+        freelasPorId.set(id, { id, responsavel, valor });
+        freelaTotal += valor;
+      }
+    }
+    
     // Montar array de despesas
     const despesas: {
       categoriaId: string;
@@ -11054,6 +11100,27 @@ export class DbStorage implements IStorage {
       nivel: 1
     });
     
+    // Adicionar linha de Freelancers como categoria principal
+    despesas.push({
+      categoriaId: 'DESP.FREELANCERS',
+      categoriaNome: 'Freelancers',
+      valor: freelaTotal,
+      nivel: 1
+    });
+    
+    // Listar cada freelancer como subcategoria
+    const freelasOrdenados = Array.from(freelasPorId.values())
+      .sort((a, b) => b.valor - a.valor);
+    
+    for (const freela of freelasOrdenados) {
+      despesas.push({
+        categoriaId: `DESP.FREELANCERS.${freela.id}`,
+        categoriaNome: freela.responsavel,
+        valor: freela.valor,
+        nivel: 2
+      });
+    }
+    
     // Adicionar linha de impostos (18% da receita)
     despesas.push({
       categoriaId: 'DESP.IMPOSTOS',
@@ -11062,8 +11129,8 @@ export class DbStorage implements IStorage {
       nivel: 1
     });
     
-    // Despesa total agora inclui salários + CXCS + impostos
-    const despesaTotalComImpostos = despesaTotal + mediaCxcs + impostos;
+    // Despesa total agora inclui salários + CXCS + freelancers + impostos
+    const despesaTotalComImpostos = despesaTotal + mediaCxcs + freelaTotal + impostos;
     
     const resultado = receitaTotal - despesaTotalComImpostos;
     
