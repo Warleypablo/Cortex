@@ -10932,19 +10932,49 @@ export class DbStorage implements IStorage {
     const salarioSquadFilterValue = squad && squad !== 'todos' ? squad : null;
     
     const salarioResult = await db.execute(sql`
+      WITH salarios_normalizados AS (
+        SELECT 
+          rp.id,
+          rp.nome as colaborador_nome,
+          COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
+          LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
+          CASE
+            WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
+            WHEN rp.salario::text LIKE '%,%' THEN
+              NULLIF(
+                REPLACE(
+                  REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'),
+                  ',',
+                  '.'
+                ),
+                ''
+              )::numeric
+            WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
+              NULLIF(
+                REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'),
+                ''
+              )::numeric
+            ELSE
+              NULLIF(
+                REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'),
+                ''
+              )::numeric
+          END as salario
+        FROM rh_pessoal rp
+      )
       SELECT 
-        rp.id,
-        rp.nome as colaborador_nome,
-        COALESCE(rp.salario::numeric, 0::numeric) as salario,
-        COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
-      FROM rh_pessoal rp
-      WHERE LOWER(rp.status) = 'ativo'
-        AND rp.salario IS NOT NULL
-        AND rp.salario::numeric > 0
+        id,
+        colaborador_nome,
+        salario,
+        squad
+      FROM salarios_normalizados
+      WHERE status_norm = 'ativo'
+        AND salario IS NOT NULL
+        AND salario > 0
         AND (
           ${salarioSquadFilterValue}::text IS NULL
           OR REGEXP_REPLACE(
-            LOWER(COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad')),
+            LOWER(COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')),
             '[^[:alnum:]]',
             '',
             'g'
