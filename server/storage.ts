@@ -10928,64 +10928,80 @@ export class DbStorage implements IStorage {
       }
     }
     
-    // Query para calcular despesas (salários de TODOS os colaboradores do squad)
-    // Relaciona cup_contratos.squad com rh_pessoal.squad usando canonical key (texto antes do ' - ')
-    const squadFilter = squad && squad !== 'todos' ? squad.trim() : null;
+    // Query para calcular despesas (salários dos colaboradores do squad)
+    // Join responsavel do contrato com nome em rh_pessoal usando LIKE
+    const salarioSquadFilterValue = squad && squad !== 'todos' ? squad : null;
     
-    const salarioResult = squadFilter
-      ? await db.execute(sql`
-          WITH canonical_squad AS (
-            SELECT DISTINCT split_part(UPPER(TRIM(c.squad)), ' - ', 1) AS canonical_key
-            FROM cup_contratos c
-            WHERE c.squad IS NOT NULL
-              AND TRIM(c.squad) <> ''
-              AND split_part(UPPER(TRIM(c.squad)), ' - ', 1) = split_part(UPPER(TRIM(${squadFilter})), ' - ', 1)
-          )
-          SELECT
-            rp.id,
-            rp.nome AS colaborador_nome,
-            COALESCE(rp.salario::numeric, 0::numeric) AS salario,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') AS squad
-          FROM rh_pessoal rp
-          WHERE rp.status = 'Ativo'
-            AND rp.salario IS NOT NULL
-            AND rp.salario::numeric > 0
-            AND split_part(UPPER(TRIM(COALESCE(rp.squad, ''))), ' - ', 1) IN (SELECT canonical_key FROM canonical_squad)
-          ORDER BY rp.nome
-        `)
-      : await db.execute(sql`
-          SELECT
-            rp.id,
-            rp.nome AS colaborador_nome,
-            COALESCE(rp.salario::numeric, 0::numeric) AS salario,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') AS squad
-          FROM rh_pessoal rp
-          WHERE rp.status = 'Ativo'
-            AND rp.salario IS NOT NULL
-            AND rp.salario::numeric > 0
-          ORDER BY rp.squad, rp.nome
-        `);
+    const salarioResult = await db.execute(sql`
+      WITH responsaveis_unicos AS (
+        SELECT DISTINCT 
+          ct.responsavel,
+          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad
+        FROM cup_contratos ct
+        WHERE ct.responsavel IS NOT NULL 
+          AND TRIM(ct.responsavel) != ''
+          AND ct.status IN ('Em Andamento', 'Em andamento', 'Ativo', 'ativo')
+          AND (${salarioSquadFilterValue}::text IS NULL OR COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') = ${salarioSquadFilterValue})
+      ),
+      colaboradores_ativos AS (
+        SELECT 
+          rp.id,
+          rp.nome,
+          COALESCE(rp.salario::numeric, 0::numeric) as salario,
+          COALESCE(rp.squad::text, 'Sem Squad') as squad_rh
+        FROM rh_pessoal rp
+        WHERE rp.status = 'Ativo'
+          AND rp.salario IS NOT NULL
+          AND rp.salario::numeric > 0
+      ),
+      match_responsavel_colaborador AS (
+        SELECT DISTINCT ON (ca.id)
+          ru.squad as squad_contrato,
+          ca.nome as colaborador_nome,
+          ca.salario
+        FROM responsaveis_unicos ru
+        INNER JOIN colaboradores_ativos ca 
+          ON UPPER(TRIM(ru.responsavel)) LIKE '%' || UPPER(TRIM(SPLIT_PART(ca.nome, ' ', 1))) || '%'
+          AND UPPER(TRIM(ru.responsavel)) LIKE '%' || UPPER(TRIM(
+            CASE 
+              WHEN POSITION(' ' IN ca.nome) > 0 
+              THEN SPLIT_PART(ca.nome, ' ', 
+                array_length(string_to_array(ca.nome, ' '), 1)
+              )
+              ELSE ''
+            END
+          )) || '%'
+        ORDER BY ca.id, ru.squad
+      )
+      SELECT 
+        squad_contrato as squad,
+        colaborador_nome,
+        salario
+      FROM match_responsavel_colaborador
+      ORDER BY squad_contrato, colaborador_nome
+    `);
     
-    // Montar array de despesas diretamente dos resultados
+    // Agrupar salários por squad
+    const salariosPorColaborador = new Map<string, { nome: string; salario: number }>();
+    let despesaTotal = 0;
+    
+    for (const row of salarioResult.rows as any[]) {
+      const nome = row.colaborador_nome;
+      const salario = Number(row.salario) || 0;
+      
+      if (!salariosPorColaborador.has(nome)) {
+        salariosPorColaborador.set(nome, { nome, salario });
+        despesaTotal += salario;
+      }
+    }
+    
+    // Montar array de despesas
     const despesas: {
       categoriaId: string;
       categoriaNome: string;
       valor: number;
       nivel: number;
     }[] = [];
-    
-    let despesaTotal = 0;
-    const colaboradoresList: { id: number; nome: string; salario: number }[] = [];
-    
-    for (const row of salarioResult.rows as any[]) {
-      const salario = Number(row.salario) || 0;
-      colaboradoresList.push({
-        id: row.id,
-        nome: row.colaborador_nome,
-        salario
-      });
-      despesaTotal += salario;
-    }
     
     // Total de salários como categoria principal
     despesas.push({
@@ -10996,11 +11012,12 @@ export class DbStorage implements IStorage {
     });
     
     // Listar cada colaborador como subcategoria
-    const colabsOrdenados = colaboradoresList.sort((a, b) => b.salario - a.salario);
+    const colabsOrdenados = Array.from(salariosPorColaborador.values())
+      .sort((a, b) => b.salario - a.salario);
     
     for (const colab of colabsOrdenados) {
       despesas.push({
-        categoriaId: `DESP.SALARIOS.${colab.id}`,
+        categoriaId: `DESP.SALARIOS.${colab.nome.substring(0, 20).replace(/\./g, '_').replace(/\s/g, '_')}`,
         categoriaNome: colab.nome,
         valor: colab.salario,
         nivel: 2
