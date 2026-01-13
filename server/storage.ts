@@ -11061,6 +11061,8 @@ export class DbStorage implements IStorage {
     const freelasPorResponsavel = new Map<string, { responsavel: string; valor: number }>();
     let freelaTotal = 0;
     
+    console.log('[freelas] Total rows:', freelaResult.rows.length, 'Primeiro:', freelaResult.rows[0]);
+    
     for (const row of freelaResult.rows as any[]) {
       const responsavel = row.responsavel || 'Não identificado';
       const valor = Number(row.valor) || 0;
