@@ -5485,7 +5485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sociosResponsaveis = [
         { nome: "Rodrigo Queiroz Santos", email: "rodrigo.queiroz@turbopartners.com.br" },
         { nome: "Victor Peixoto", email: "victor.peixoto@turbopartners.com.br" },
-        { nome: "Andre Musso", email: "andre.musso@turbopartners.com.br" }
+        { nome: "Julia Viana", email: "julia.viana@turbopartners.com.br" }
       ];
       
       const getOrCreateSigner = async (nome: string, email: string): Promise<string> => {
