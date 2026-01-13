@@ -10928,57 +10928,22 @@ export class DbStorage implements IStorage {
       }
     }
     
-    // Query para calcular despesas (salários dos colaboradores do squad)
-    // Join responsavel do contrato com nome em rh_pessoal usando LIKE
+    // Query para calcular despesas (salários de TODOS os colaboradores do squad)
+    // Busca diretamente colaboradores ativos do squad na tabela rh_pessoal
     const salarioSquadFilterValue = squad && squad !== 'todos' ? squad : null;
     
     const salarioResult = await db.execute(sql`
-      WITH responsaveis_unicos AS (
-        SELECT DISTINCT 
-          ct.responsavel,
-          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad
-        FROM cup_contratos ct
-        WHERE ct.responsavel IS NOT NULL 
-          AND TRIM(ct.responsavel) != ''
-          AND ct.status IN ('Em Andamento', 'Em andamento', 'Ativo', 'ativo')
-          AND (${salarioSquadFilterValue}::text IS NULL OR COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') = ${salarioSquadFilterValue})
-      ),
-      colaboradores_ativos AS (
-        SELECT 
-          rp.id,
-          rp.nome,
-          COALESCE(rp.salario::numeric, 0::numeric) as salario,
-          COALESCE(rp.squad::text, 'Sem Squad') as squad_rh
-        FROM rh_pessoal rp
-        WHERE rp.status = 'Ativo'
-          AND rp.salario IS NOT NULL
-          AND rp.salario::numeric > 0
-      ),
-      match_responsavel_colaborador AS (
-        SELECT DISTINCT ON (ca.id)
-          ru.squad as squad_contrato,
-          ca.nome as colaborador_nome,
-          ca.salario
-        FROM responsaveis_unicos ru
-        INNER JOIN colaboradores_ativos ca 
-          ON UPPER(TRIM(ru.responsavel)) LIKE '%' || UPPER(TRIM(SPLIT_PART(ca.nome, ' ', 1))) || '%'
-          AND UPPER(TRIM(ru.responsavel)) LIKE '%' || UPPER(TRIM(
-            CASE 
-              WHEN POSITION(' ' IN ca.nome) > 0 
-              THEN SPLIT_PART(ca.nome, ' ', 
-                array_length(string_to_array(ca.nome, ' '), 1)
-              )
-              ELSE ''
-            END
-          )) || '%'
-        ORDER BY ca.id, ru.squad
-      )
       SELECT 
-        squad_contrato as squad,
-        colaborador_nome,
-        salario
-      FROM match_responsavel_colaborador
-      ORDER BY squad_contrato, colaborador_nome
+        rp.id,
+        rp.nome as colaborador_nome,
+        COALESCE(rp.salario::numeric, 0::numeric) as salario,
+        COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
+      FROM rh_pessoal rp
+      WHERE rp.status = 'Ativo'
+        AND rp.salario IS NOT NULL
+        AND rp.salario::numeric > 0
+        AND (${salarioSquadFilterValue}::text IS NULL OR COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') = ${salarioSquadFilterValue})
+      ORDER BY rp.squad, rp.nome
     `);
     
     // Agrupar salários por squad
