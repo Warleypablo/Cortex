@@ -10941,7 +10941,20 @@ export class DbStorage implements IStorage {
       WHERE LOWER(rp.status) = 'ativo'
         AND rp.salario IS NOT NULL
         AND rp.salario::numeric > 0
-        AND (${salarioSquadFilterValue}::text IS NULL OR COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') = ${salarioSquadFilterValue})
+        AND (
+          ${salarioSquadFilterValue}::text IS NULL
+          OR REGEXP_REPLACE(
+            LOWER(COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad')),
+            '[^[:alnum:]]',
+            '',
+            'g'
+          ) = REGEXP_REPLACE(
+            LOWER(COALESCE(${salarioSquadFilterValue}, '')),
+            '[^[:alnum:]]',
+            '',
+            'g'
+          )
+        )
       ORDER BY squad, colaborador_nome
     `);
     
