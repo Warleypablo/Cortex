@@ -4805,6 +4805,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { nome: 'LIFE GOM', valor: 8997 },
         { nome: 'MS CREATIVE', valor: 2997 },
         { nome: 'LOOPS NUTRITION', valor: 3442.58 },
+        { nome: 'LÍVERE', valor: 8366 },
+        { nome: 'VENAMORE', valor: 15000 },
+        { nome: 'AMAZON MIX', valor: 5116 },
       ];
       
       for (const cliente of clientesErroOperacional) {
