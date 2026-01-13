@@ -11020,6 +11020,8 @@ export class DbStorage implements IStorage {
     const freelaResult = await db.execute(sql`
       SELECT 
         f.responsavel,
+        f.valor_projeto as valor_projeto_raw,
+        f.custom_fields->>'Valor' as valor_custom_raw,
         COALESCE(
           f.valor_projeto::numeric,
           NULLIF(
@@ -11054,7 +11056,7 @@ export class DbStorage implements IStorage {
             'g'
           )
         )
-      ORDER BY f.valor_projeto::numeric DESC
+      ORDER BY COALESCE(f.valor_projeto::numeric, 0) DESC
     `);
     
     // Agrupar freelancers por responsavel
