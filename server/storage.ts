@@ -11011,10 +11011,13 @@ export class DbStorage implements IStorage {
       nivel: number;
     }[] = [];
     
+    // Calcular impostos (18% da receita)
+    const impostos = receitaTotal * 0.18;
+    
     // Total de salários como categoria principal
     despesas.push({
       categoriaId: 'DESP.SALARIOS',
-      categoriaNome: 'Salários do Squad',
+      categoriaNome: 'Salários',
       valor: despesaTotal,
       nivel: 1
     });
@@ -11032,7 +11035,18 @@ export class DbStorage implements IStorage {
       });
     }
     
-    const resultado = receitaTotal - despesaTotal;
+    // Adicionar linha de impostos (18% da receita)
+    despesas.push({
+      categoriaId: 'DESP.IMPOSTOS',
+      categoriaNome: 'Impostos (18%)',
+      valor: impostos,
+      nivel: 1
+    });
+    
+    // Despesa total agora inclui salários + impostos
+    const despesaTotalComImpostos = despesaTotal + impostos;
+    
+    const resultado = receitaTotal - despesaTotalComImpostos;
     
     return {
       squads,
@@ -11040,7 +11054,7 @@ export class DbStorage implements IStorage {
       despesas,
       totais: {
         receitaTotal,
-        despesaTotal,
+        despesaTotal: despesaTotalComImpostos,
         resultado,
         quantidadeParcelas: totalParcelas,
         quantidadeContratos: totalContratos
