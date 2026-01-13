@@ -3935,17 +3935,18 @@ export class DbStorage implements IStorage {
       const pontualRow = pontualQuery.rows[0] as any;
       const receitaPontualEntregue = parseFloat(pontualRow?.receita_pontual || '0');
       
-      // Se não houver snapshot para o mês e for o último mês (mês atual), usa o último snapshot global
+      // Se não houver snapshot para o mês e for o último mês (mês atual), buscar MRR atual em tempo real
       let mrr = 0;
       if (mrrRow?.data_ultimo_snapshot) {
         mrr = parseFloat(mrrRow.mrr || '0');
-      } else if (mes === mesAnoFim && ultimoSnapshotGlobal) {
-        // Para o mês atual sem snapshot, buscar MRR do último snapshot global
+      } else if (mes === mesAnoFim) {
+        // Para o mês atual sem snapshot, buscar MRR em tempo real da tabela de contratos
         const mrrAtualQuery = await db.execute(sql`
           SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
-          FROM ${schema.cupDataHist}
-          WHERE data_snapshot = ${ultimoSnapshotGlobal}::timestamp
-            AND status IN ('ativo', 'onboarding', 'triagem')
+          FROM ${schema.cupContratos}
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND valorr IS NOT NULL
+            AND valorr > 0
         `);
         const mrrAtualRow = mrrAtualQuery.rows[0] as any;
         mrr = parseFloat(mrrAtualRow?.mrr || '0');
@@ -5362,6 +5363,7 @@ export class DbStorage implements IStorage {
 
   async getTopResponsaveis(limit: number = 5, mesAno?: string): Promise<{ nome: string; mrr: number; posicao: number }[]> {
     let dataUltimoSnapshot: any = null;
+    let usarDadosAtuais = false;
 
     if (mesAno) {
       const [ano, mes] = mesAno.split('-').map(Number);
@@ -5377,13 +5379,9 @@ export class DbStorage implements IStorage {
 
       dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
       
-      // Se não houver snapshot para o mês solicitado, usa o último disponível
+      // Se não houver snapshot para o mês solicitado, usar dados em tempo real
       if (!dataUltimoSnapshot) {
-        const ultimoSnapshotGlobal = await db.execute(sql`
-          SELECT MAX(data_snapshot) as data_ultimo_snapshot
-          FROM ${schema.cupDataHist}
-        `);
-        dataUltimoSnapshot = (ultimoSnapshotGlobal.rows[0] as any)?.data_ultimo_snapshot;
+        usarDadosAtuais = true;
       }
     } else {
       const ultimoSnapshotQuery = await db.execute(sql`
@@ -5394,8 +5392,29 @@ export class DbStorage implements IStorage {
       dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
     }
 
-    if (!dataUltimoSnapshot) {
-      return [];
+    // Se não houver snapshot e precisar usar dados atuais
+    if (usarDadosAtuais || !dataUltimoSnapshot) {
+      const resultados = await db.execute(sql`
+        SELECT 
+          responsavel as nome,
+          COALESCE(SUM(valorr::numeric), 0) as mrr
+        FROM ${schema.cupContratos}
+        WHERE responsavel IS NOT NULL 
+          AND responsavel != ''
+          AND valorr IS NOT NULL
+          AND valorr > 0
+          AND status IN ('ativo', 'onboarding', 'triagem')
+        GROUP BY responsavel
+        HAVING COALESCE(SUM(valorr::numeric), 0) > 0
+        ORDER BY mrr DESC
+        LIMIT ${limit}
+      `);
+
+      return resultados.rows.map((row, index) => ({
+        nome: row.nome as string,
+        mrr: parseFloat(row.mrr as string || '0'),
+        posicao: index + 1,
+      }));
     }
 
     const resultados = await db.execute(sql`
@@ -5424,6 +5443,7 @@ export class DbStorage implements IStorage {
 
   async getTopSquads(limit: number = 4, mesAno?: string): Promise<{ squad: string; mrr: number; posicao: number }[]> {
     let dataUltimoSnapshot: any = null;
+    let usarDadosAtuais = false;
 
     if (mesAno) {
       const [ano, mes] = mesAno.split('-').map(Number);
@@ -5439,13 +5459,9 @@ export class DbStorage implements IStorage {
 
       dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
       
-      // Se não houver snapshot para o mês solicitado, usa o último disponível
+      // Se não houver snapshot para o mês solicitado, usar dados em tempo real
       if (!dataUltimoSnapshot) {
-        const ultimoSnapshotGlobal = await db.execute(sql`
-          SELECT MAX(data_snapshot) as data_ultimo_snapshot
-          FROM ${schema.cupDataHist}
-        `);
-        dataUltimoSnapshot = (ultimoSnapshotGlobal.rows[0] as any)?.data_ultimo_snapshot;
+        usarDadosAtuais = true;
       }
     } else {
       const ultimoSnapshotQuery = await db.execute(sql`
@@ -5456,8 +5472,29 @@ export class DbStorage implements IStorage {
       dataUltimoSnapshot = (ultimoSnapshotQuery.rows[0] as any)?.data_ultimo_snapshot;
     }
 
-    if (!dataUltimoSnapshot) {
-      return [];
+    // Se não houver snapshot e precisar usar dados atuais
+    if (usarDadosAtuais || !dataUltimoSnapshot) {
+      const resultados = await db.execute(sql`
+        SELECT 
+          squad,
+          COALESCE(SUM(valorr::numeric), 0) as mrr
+        FROM ${schema.cupContratos}
+        WHERE squad IS NOT NULL 
+          AND squad != ''
+          AND valorr IS NOT NULL
+          AND valorr > 0
+          AND status IN ('ativo', 'onboarding', 'triagem')
+        GROUP BY squad
+        HAVING COALESCE(SUM(valorr::numeric), 0) > 0
+        ORDER BY mrr DESC
+        LIMIT ${limit}
+      `);
+
+      return resultados.rows.map((row, index) => ({
+        squad: row.squad as string,
+        mrr: parseFloat(row.mrr as string || '0'),
+        posicao: index + 1,
+      }));
     }
 
     const resultados = await db.execute(sql`
