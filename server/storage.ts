@@ -10930,7 +10930,8 @@ export class DbStorage implements IStorage {
     
     // Query para calcular despesas (salários de TODOS os colaboradores do squad)
     // Busca diretamente colaboradores ativos do squad na tabela rh_pessoal
-    const salarioSquadFilterValue = squad && squad !== 'todos' ? squad : null;
+    // Usa UPPER para comparação case-insensitive
+    const salarioSquadFilterValue = squad && squad !== 'todos' ? squad.toUpperCase().trim() : null;
     
     const salarioResult = await db.execute(sql`
       SELECT 
@@ -10942,7 +10943,11 @@ export class DbStorage implements IStorage {
       WHERE rp.status = 'Ativo'
         AND rp.salario IS NOT NULL
         AND rp.salario::numeric > 0
-        AND (${salarioSquadFilterValue}::text IS NULL OR COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') = ${salarioSquadFilterValue})
+        AND (
+          ${salarioSquadFilterValue}::text IS NULL 
+          OR UPPER(TRIM(COALESCE(rp.squad, ''))) = ${salarioSquadFilterValue}
+          OR (${salarioSquadFilterValue} = 'SEM SQUAD' AND (rp.squad IS NULL OR TRIM(rp.squad) = ''))
+        )
       ORDER BY rp.squad, rp.nome
     `);
     
