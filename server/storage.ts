@@ -11044,8 +11044,15 @@ export class DbStorage implements IStorage {
       ORDER BY f.valor_projeto::numeric DESC
     `);
     
+    // Log para debug - verificar dados disponíveis na tabela
+    const freelaCheckResult = await db.execute(sql`
+      SELECT COUNT(*) as total, MIN(data_pagamento) as min_data, MAX(data_pagamento) as max_data 
+      FROM cup_freelas 
+      WHERE valor_projeto IS NOT NULL AND valor_projeto::numeric > 0
+    `);
+    console.log('[contribuicao] Freelancers check:', freelaCheckResult.rows[0], 'query result:', freelaResult.rows.length, 'rows, dataInicio:', dataInicio, 'dataFim:', dataFim);
+    
     // Agrupar freelancers por responsavel
-    console.log('[contribuicao] Freelancers query result:', freelaResult.rows.length, 'rows, dataInicio:', dataInicio, 'dataFim:', dataFim);
     const freelasPorResponsavel = new Map<string, { responsavel: string; valor: number }>();
     let freelaTotal = 0;
     
