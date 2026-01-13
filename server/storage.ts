@@ -10936,7 +10936,17 @@ export class DbStorage implements IStorage {
       WITH responsaveis_unicos AS (
         SELECT DISTINCT 
           ct.responsavel,
-          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad
+          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad,
+          LOWER(TRIM(SPLIT_PART(ct.responsavel, ' ', 1))) as responsavel_nome,
+          LOWER(TRIM(
+            CASE 
+              WHEN POSITION(' ' IN ct.responsavel) > 0 
+              THEN SPLIT_PART(ct.responsavel, ' ', 
+                array_length(string_to_array(ct.responsavel, ' '), 1)
+              )
+              ELSE ''
+            END
+          )) as responsavel_sobrenome
         FROM cup_contratos ct
         WHERE ct.responsavel IS NOT NULL 
           AND TRIM(ct.responsavel) != ''
@@ -10961,16 +10971,11 @@ export class DbStorage implements IStorage {
           ca.salario
         FROM responsaveis_unicos ru
         INNER JOIN colaboradores_ativos ca 
-          ON UPPER(TRIM(ru.responsavel)) LIKE '%' || UPPER(TRIM(SPLIT_PART(ca.nome, ' ', 1))) || '%'
-          AND UPPER(TRIM(ru.responsavel)) LIKE '%' || UPPER(TRIM(
-            CASE 
-              WHEN POSITION(' ' IN ca.nome) > 0 
-              THEN SPLIT_PART(ca.nome, ' ', 
-                array_length(string_to_array(ca.nome, ' '), 1)
-              )
-              ELSE ''
-            END
-          )) || '%'
+          ON LOWER(TRIM(ca.nome)) LIKE '%' || ru.responsavel_nome || '%'
+          AND (
+            ru.responsavel_sobrenome = ''
+            OR LOWER(TRIM(ca.nome)) LIKE '%' || ru.responsavel_sobrenome || '%'
+          )
         ORDER BY ca.id, ru.squad
       )
       SELECT 
