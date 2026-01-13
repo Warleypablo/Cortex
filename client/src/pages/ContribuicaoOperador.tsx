@@ -190,7 +190,13 @@ export default function ContribuicaoOperador() {
       despesasByLevel.push({ ...cat, parentId });
     });
     
-    // Ordenar hierarquicamente: pai primeiro, depois filhos ordenados por valor
+    // Ordenar hierarquicamente: Salários > CXCS > Impostos
+    const despesaOrder: Record<string, number> = {
+      'SALARIOS': 1,
+      'CXCS': 2,
+      'IMPOSTOS': 3
+    };
+    
     despesasByLevel.sort((a, b) => {
       const partsA = a.id.split(".");
       const partsB = b.id.split(".");
@@ -198,9 +204,9 @@ export default function ContribuicaoOperador() {
       const minLen = Math.min(partsA.length, partsB.length);
       for (let i = 0; i < minLen; i++) {
         if (partsA[i] !== partsB[i]) {
-          // Salários antes de Impostos
-          if (partsA[i] === 'SALARIOS' && partsB[i] === 'IMPOSTOS') return -1;
-          if (partsA[i] === 'IMPOSTOS' && partsB[i] === 'SALARIOS') return 1;
+          const orderA = despesaOrder[partsA[i]] || 99;
+          const orderB = despesaOrder[partsB[i]] || 99;
+          if (orderA !== orderB) return orderA - orderB;
           return partsA[i].localeCompare(partsB[i]);
         }
       }
