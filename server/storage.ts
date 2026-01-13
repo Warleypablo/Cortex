@@ -10697,7 +10697,7 @@ export class DbStorage implements IStorage {
   // caz_clientes -> cup_clientes (via cnpj = cnpj)
   // cup_clientes -> cup_contratos (via task_id = id_task)
   // Agregar por squad de cup_contratos
-  // Despesas = soma dos salários dos colaboradores do squad (join via responsavel LIKE nome)
+  // Despesas = soma dos salarios ativos do rh_pessoal por squad
   async getContribuicaoSquadDfc(dataInicio: string, dataFim: string, squad?: string): Promise<{
     squads: string[];
     receitas: {
@@ -10927,75 +10927,35 @@ export class DbStorage implements IStorage {
         }
       }
     }
-    
-    // Query para calcular despesas (salários dos colaboradores do squad)
-    // Join responsavel do contrato com nome em rh_pessoal usando LIKE
+
+    // Query para calcular despesas (salarios ativos do squad)
     const salarioSquadFilterValue = squad && squad !== 'todos' ? squad : null;
     
     const salarioResult = await db.execute(sql`
-      WITH responsaveis_unicos AS (
-        SELECT DISTINCT 
-          ct.responsavel,
-          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad,
-          LOWER(TRIM(SPLIT_PART(ct.responsavel, ' ', 1))) as responsavel_nome,
-          LOWER(TRIM(
-            CASE 
-              WHEN POSITION(' ' IN ct.responsavel) > 0 
-              THEN SPLIT_PART(ct.responsavel, ' ', 
-                array_length(string_to_array(ct.responsavel, ' '), 1)
-              )
-              ELSE ''
-            END
-          )) as responsavel_sobrenome
-        FROM cup_contratos ct
-        WHERE ct.responsavel IS NOT NULL 
-          AND TRIM(ct.responsavel) != ''
-          AND ct.status IN ('Em Andamento', 'Em andamento', 'Ativo', 'ativo')
-          AND (${salarioSquadFilterValue}::text IS NULL OR COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') = ${salarioSquadFilterValue})
-      ),
-      colaboradores_ativos AS (
-        SELECT 
-          rp.id,
-          rp.nome,
-          COALESCE(rp.salario::numeric, 0::numeric) as salario,
-          COALESCE(rp.squad::text, 'Sem Squad') as squad_rh
-        FROM rh_pessoal rp
-        WHERE rp.status = 'Ativo'
-          AND rp.salario IS NOT NULL
-          AND rp.salario::numeric > 0
-      ),
-      match_responsavel_colaborador AS (
-        SELECT DISTINCT ON (ca.id)
-          ru.squad as squad_contrato,
-          ca.nome as colaborador_nome,
-          ca.salario
-        FROM responsaveis_unicos ru
-        INNER JOIN colaboradores_ativos ca 
-          ON LOWER(TRIM(ca.nome)) LIKE '%' || ru.responsavel_nome || '%'
-          AND (
-            ru.responsavel_sobrenome = ''
-            OR LOWER(TRIM(ca.nome)) LIKE '%' || ru.responsavel_sobrenome || '%'
-          )
-        ORDER BY ca.id, ru.squad
-      )
       SELECT 
-        squad_contrato as squad,
-        colaborador_nome,
-        salario
-      FROM match_responsavel_colaborador
-      ORDER BY squad_contrato, colaborador_nome
+        rp.id,
+        rp.nome as colaborador_nome,
+        COALESCE(rp.salario::numeric, 0::numeric) as salario,
+        COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
+      FROM rh_pessoal rp
+      WHERE LOWER(rp.status) = 'ativo'
+        AND rp.salario IS NOT NULL
+        AND rp.salario::numeric > 0
+        AND (${salarioSquadFilterValue}::text IS NULL OR COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') = ${salarioSquadFilterValue})
+      ORDER BY squad, colaborador_nome
     `);
     
-    // Agrupar salários por squad
-    const salariosPorColaborador = new Map<string, { nome: string; salario: number }>();
+    // Agrupar salarios por colaborador
+    const salariosPorColaborador = new Map<number, { id: number; nome: string; salario: number }>();
     let despesaTotal = 0;
     
     for (const row of salarioResult.rows as any[]) {
+      const id = Number(row.id);
       const nome = row.colaborador_nome;
       const salario = Number(row.salario) || 0;
       
-      if (!salariosPorColaborador.has(nome)) {
-        salariosPorColaborador.set(nome, { nome, salario });
+      if (!salariosPorColaborador.has(id)) {
+        salariosPorColaborador.set(id, { id, nome, salario });
         despesaTotal += salario;
       }
     }
@@ -11022,7 +10982,7 @@ export class DbStorage implements IStorage {
     
     for (const colab of colabsOrdenados) {
       despesas.push({
-        categoriaId: `DESP.SALARIOS.${colab.nome.substring(0, 20).replace(/\./g, '_').replace(/\s/g, '_')}`,
+        categoriaId: `DESP.SALARIOS.${colab.id}`,
         categoriaNome: colab.nome,
         valor: colab.salario,
         nivel: 2
