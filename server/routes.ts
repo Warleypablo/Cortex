@@ -15630,14 +15630,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT * FROM pagamentos_parcelas
           UNION ALL
           SELECT * FROM pagamentos_pagar
+        ),
+        -- Deduplicar por mês/ano e valor (arredondar para evitar diferenças de centavos)
+        pagamentos_com_rank AS (
+          SELECT 
+            t.*,
+            EXTRACT(MONTH FROM COALESCE(t.data_pagamento, t.data_vencimento))::int as mes_referencia,
+            EXTRACT(YEAR FROM COALESCE(t.data_pagamento, t.data_vencimento))::int as ano_referencia,
+            'pendente' as nf_status,
+            ROW_NUMBER() OVER (
+              PARTITION BY 
+                EXTRACT(MONTH FROM COALESCE(t.data_pagamento, t.data_vencimento)),
+                EXTRACT(YEAR FROM COALESCE(t.data_pagamento, t.data_vencimento)),
+                ROUND(CAST(t.valor_bruto AS numeric), 0)
+              ORDER BY 
+                CASE WHEN t.fonte = 'parcelas' THEN 1 ELSE 2 END,
+                t.data_pagamento DESC NULLS LAST
+            ) as rn
+          FROM todos_pagamentos t
         )
         SELECT 
-          t.*,
-          EXTRACT(MONTH FROM COALESCE(t.data_pagamento, t.data_vencimento))::int as mes_referencia,
-          EXTRACT(YEAR FROM COALESCE(t.data_pagamento, t.data_vencimento))::int as ano_referencia,
-          'pendente' as nf_status
-        FROM todos_pagamentos t
-        ORDER BY COALESCE(t.data_pagamento, t.data_vencimento) DESC
+          id, descricao, valor_bruto, data_pagamento, data_vencimento, 
+          status, categoria_nome, fonte, mes_referencia, ano_referencia, nf_status
+        FROM pagamentos_com_rank
+        WHERE rn = 1
+        ORDER BY COALESCE(data_pagamento, data_vencimento) DESC
       `);
       
       console.log(`[rh-pagamentos] Encontrados ${result.rows.length} pagamentos`);
