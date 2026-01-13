@@ -11025,8 +11025,6 @@ export class DbStorage implements IStorage {
       LEFT JOIN rh_pessoal rp ON LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
       WHERE f.data_pagamento >= ${dataInicio}::date
         AND f.data_pagamento <= ${dataFimComHora}::timestamp
-        AND f.valor_projeto IS NOT NULL
-        AND f.valor_projeto::numeric > 0
         AND (
           ${salarioSquadFilterValue}::text IS NULL
           OR REGEXP_REPLACE(
