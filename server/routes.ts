@@ -4955,13 +4955,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       console.log(`[assinafy-colab] Iniciando envio para assinatura - Colaborador ID: ${colaboradorId}`);
       
-      // 1. Buscar configuração do Assinafy
+      // 1. Buscar configuração do Assinafy para colaboradores
       const configResult = await db.execute(sql`
-        SELECT account_id, api_key, api_url FROM staging.assinafy_config WHERE ativo = true LIMIT 1
+        SELECT account_id, api_key, api_url FROM staging.assinafy_config WHERE ativo = true AND tipo = 'colaboradores' LIMIT 1
       `);
       
       if (configResult.rows.length === 0) {
-        return res.status(500).json({ error: "Configuração do Assinafy não encontrada" });
+        return res.status(500).json({ error: "Configuração do Assinafy para colaboradores não encontrada" });
       }
       
       const config = configResult.rows[0] as { account_id: string; api_key: string; api_url: string };
