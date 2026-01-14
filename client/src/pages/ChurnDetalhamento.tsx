@@ -171,16 +171,15 @@ const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
   iconBg: string;
   children: React.ReactNode;
 }) => (
-  <div className="relative rounded-xl bg-white dark:bg-gradient-to-b dark:from-zinc-800/50 dark:to-zinc-900/50 border border-gray-100 dark:border-zinc-800/50 shadow-lg overflow-hidden">
-    <div className="absolute inset-0 bg-gradient-to-br from-gray-50/50 via-transparent to-transparent dark:from-zinc-800/20" />
+  <div className="relative rounded-xl bg-card border border-border shadow-lg overflow-hidden">
     <div className="relative p-5">
       <div className="flex items-center gap-3 mb-4">
         <div className={`p-2 rounded-lg ${iconBg} shadow-md`}>
           <Icon className="h-4 w-4 text-white" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-zinc-100">{title}</h3>
-          <p className="text-xs text-gray-500 dark:text-zinc-500">{subtitle}</p>
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
       </div>
       {children}
@@ -700,7 +699,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
           ) : churnPorMes.length === 0 ? (
-            <div className="h-[200px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -714,14 +713,16 @@ export default function ChurnDetalhamento() {
                 </defs>
                 <XAxis 
                   dataKey="mes" 
-                  tick={{ fontSize: 10, fill: '#6b7280' }} 
-                  axisLine={{ stroke: '#e5e7eb' }}
-                  tickLine={false}
-                />
-                <YAxis 
-                  tick={{ fontSize: 10, fill: '#6b7280' }} 
+                  tick={{ fontSize: 10 }} 
                   axisLine={false}
                   tickLine={false}
+                  className="fill-muted-foreground"
+                />
+                <YAxis 
+                  tick={{ fontSize: 10 }} 
+                  axisLine={false}
+                  tickLine={false}
+                  className="fill-muted-foreground"
                 />
                 <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
                 <Bar dataKey="count" fill="url(#barGradient)" radius={[4, 4, 0, 0]} name="Quantidade" />
@@ -739,7 +740,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
           ) : distribuicaoPorProduto.length === 0 ? (
-            <div className="h-[200px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -754,7 +755,7 @@ export default function ChurnDetalhamento() {
                     cy="50%"
                     outerRadius={75}
                     strokeWidth={2}
-                    stroke="#ffffff"
+                    stroke="hsl(var(--card))"
                   >
                     {distribuicaoPorProduto.map((entry, index) => (
                       <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
@@ -771,13 +772,13 @@ export default function ChurnDetalhamento() {
                         className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
                         style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
                       />
-                      <span className="truncate text-gray-600 dark:text-zinc-400">{item.fullName}</span>
+                      <span className="truncate text-muted-foreground">{item.fullName}</span>
                     </div>
-                    <span className="font-semibold text-gray-900 dark:text-zinc-200 tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    <span className="font-semibold text-foreground tabular-nums">{item.percentual.toFixed(0)}%</span>
                   </div>
                 ))}
                 {distribuicaoPorProduto.length > 5 && (
-                  <p className="text-[10px] text-gray-400 dark:text-zinc-600 pt-1">
+                  <p className="text-[10px] text-muted-foreground pt-1">
                     +{distribuicaoPorProduto.length - 5} outros
                   </p>
                 )}
@@ -797,7 +798,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorSquad.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -805,17 +806,19 @@ export default function ChurnDetalhamento() {
               <BarChart data={distribuicaoPorSquad} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
                 <XAxis 
                   type="number" 
-                  tick={{ fontSize: 10, fill: '#6b7280' }} 
+                  tick={{ fontSize: 10 }} 
                   axisLine={false}
                   tickLine={false}
+                  className="fill-muted-foreground"
                 />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
-                  tick={{ fontSize: 10, fill: '#6b7280' }} 
+                  tick={{ fontSize: 10 }} 
                   width={80}
                   axisLine={false}
                   tickLine={false}
+                  className="fill-muted-foreground"
                 />
                 <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
                 <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Quantidade">
@@ -837,7 +840,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorLifetime.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -853,7 +856,7 @@ export default function ChurnDetalhamento() {
                     innerRadius={40}
                     outerRadius={65}
                     strokeWidth={2}
-                    stroke="#ffffff"
+                    stroke="hsl(var(--card))"
                   >
                     {distribuicaoPorLifetime.map((entry, index) => (
                       <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
@@ -870,9 +873,9 @@ export default function ChurnDetalhamento() {
                         className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
                         style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
                       />
-                      <span className="text-gray-600 dark:text-zinc-400">{item.name}</span>
+                      <span className="text-muted-foreground">{item.name}</span>
                     </div>
-                    <span className="font-semibold text-gray-900 dark:text-zinc-200 tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    <span className="font-semibold text-foreground tabular-nums">{item.percentual.toFixed(0)}%</span>
                   </div>
                 ))}
               </div>
@@ -889,7 +892,7 @@ export default function ChurnDetalhamento() {
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
           ) : distribuicaoPorResponsavel.length === 0 ? (
-            <div className="h-[180px] flex items-center justify-center text-gray-400 dark:text-zinc-500 text-sm">
+            <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
               Nenhum dado disponível
             </div>
           ) : (
@@ -903,17 +906,19 @@ export default function ChurnDetalhamento() {
                 </defs>
                 <XAxis 
                   type="number" 
-                  tick={{ fontSize: 10, fill: '#6b7280' }}
+                  tick={{ fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
+                  className="fill-muted-foreground"
                 />
                 <YAxis 
                   type="category" 
                   dataKey="name" 
-                  tick={{ fontSize: 10, fill: '#6b7280' }} 
+                  tick={{ fontSize: 10 }} 
                   width={70}
                   axisLine={false}
                   tickLine={false}
+                  className="fill-muted-foreground"
                 />
                 <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
                 <Bar dataKey="count" fill="url(#blueBarGradient)" radius={[0, 4, 4, 0]} name="Quantidade" />
