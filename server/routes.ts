@@ -7708,6 +7708,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ltvTotal = churnContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
       const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
       
+      // Calculate MRR ativo do mês anterior para calcular percentual de churn
+      // Primeiro, determinar o período de referência (mês anterior ao início do período de análise)
+      let refDate: Date;
+      if (startDate) {
+        refDate = new Date(startDate);
+        refDate.setMonth(refDate.getMonth() - 1);
+        refDate.setDate(1); // Primeiro dia do mês anterior
+      } else {
+        // Se não tem data específica, usa o mês passado
+        refDate = new Date();
+        refDate.setMonth(refDate.getMonth() - 1);
+        refDate.setDate(1);
+      }
+      
+      // Último dia do mês de referência
+      const refEndDate = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0);
+      const refDateStr = refEndDate.toISOString().split('T')[0];
+      
+      // Buscar MRR ativo no final do mês anterior (contratos ativos naquela data)
+      const mrrAtivoResult = await db.execute(sql`
+        SELECT 
+          COALESCE(squad, 'Não especificado') as squad,
+          COALESCE(SUM(valorr), 0) as mrr_ativo
+        FROM cup_contratos
+        WHERE (
+          LOWER(TRIM(status)) LIKE '%ativo%'
+          OR LOWER(TRIM(status)) = 'ativo'
+          OR LOWER(TRIM(status)) LIKE '%implantação%'
+          OR LOWER(TRIM(status)) LIKE '%running%'
+        )
+        AND data_inicio IS NOT NULL
+        AND data_inicio <= ${refDateStr}::date
+        AND (data_encerramento IS NULL OR data_encerramento > ${refDateStr}::date)
+        AND (data_pausa IS NULL OR data_pausa > ${refDateStr}::date)
+        GROUP BY COALESCE(squad, 'Não especificado')
+      `);
+      
+      // Calcular MRR ativo total e por squad
+      const mrrAtivoPorSquad: Record<string, number> = {};
+      let mrrAtivoTotal = 0;
+      
+      for (const row of mrrAtivoResult.rows as any[]) {
+        const squadName = row.squad || 'Não especificado';
+        const mrr = Number(row.mrr_ativo) || 0;
+        mrrAtivoPorSquad[squadName] = mrr;
+        mrrAtivoTotal += mrr;
+      }
+      
+      // Calcular MRR perdido por squad (apenas churn, não pausado)
+      const mrrPerdidoPorSquad: Record<string, number> = {};
+      for (const contrato of churnContratos) {
+        const squadName = contrato.squad || 'Não especificado';
+        mrrPerdidoPorSquad[squadName] = (mrrPerdidoPorSquad[squadName] || 0) + contrato.valorr;
+      }
+      
+      // Calcular percentual de churn geral e por squad
+      const churnPercentualGeral = mrrAtivoTotal > 0 ? (mrrPerdidoChurn / mrrAtivoTotal) * 100 : 0;
+      
+      const churnPercentualPorSquad: { squad: string; mrr_ativo: number; mrr_perdido: number; percentual: number }[] = [];
+      
+      // Incluir todos os squads que tem MRR ativo ou perdido
+      const allSquadNames = Array.from(new Set([...Object.keys(mrrAtivoPorSquad), ...Object.keys(mrrPerdidoPorSquad)]));
+      
+      for (const squadName of allSquadNames) {
+        const mrrAtivo = mrrAtivoPorSquad[squadName] || 0;
+        const mrrPerdido = mrrPerdidoPorSquad[squadName] || 0;
+        const percentual = mrrAtivo > 0 ? (mrrPerdido / mrrAtivo) * 100 : 0;
+        
+        churnPercentualPorSquad.push({
+          squad: squadName,
+          mrr_ativo: mrrAtivo,
+          mrr_perdido: mrrPerdido,
+          percentual: percentual,
+        });
+      }
+      
+      // Ordenar por percentual de churn (maior primeiro)
+      churnPercentualPorSquad.sort((a, b) => b.percentual - a.percentual);
+      
       res.json({
         contratos: allContratos,
         metricas: {
@@ -7717,6 +7796,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           mrr_pausado: mrrPerdidoPausado,
           ltv_total: ltvTotal,
           lt_medio: ltMedio,
+          mrr_ativo_ref: mrrAtivoTotal,
+          churn_percentual: churnPercentualGeral,
+          churn_por_squad: churnPercentualPorSquad,
+          periodo_referencia: refDateStr,
         },
         filtros: {
           squads,
