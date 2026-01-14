@@ -11119,7 +11119,7 @@ export class DbStorage implements IStorage {
       categoriaId: 'DESP.BENEFICIOS',
       categoriaNome: 'Beneficios (CAJU)',
       valor: beneficiosTotal,
-      nivel: 2
+      nivel: 1
     });
     
     // Adicionar linha de CXCS (média salarial)
