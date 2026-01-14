@@ -116,13 +116,13 @@ const CHART_COLORS = {
 };
 
 const PALETTE = [
-  "#f87171", "#fb923c", "#fbbf24", "#4ade80", "#2dd4bf",
-  "#60a5fa", "#a78bfa", "#f472b6", "#818cf8", "#a3e635"
+  "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
+  "#ec4899", "#6366f1", "#14b8a6", "#f97316", "#84cc16"
 ];
 
 const REFINED_COLORS = [
-  "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e",
-  "#14b8a6", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899"
+  "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
+  "#ec4899", "#6366f1", "#14b8a6", "#f97316", "#84cc16"
 ];
 
 const formatCurrencyNoDecimals = (value: number) => {
@@ -159,20 +159,20 @@ const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, shadowColor
   gradient: string;
   shadowColor: string;
 }) => (
-  <div className={`relative group overflow-visible rounded-xl ${gradient} p-[1px] shadow-lg hover:shadow-xl transition-all duration-300`} style={{ boxShadow: `0 4px 20px -4px ${shadowColor}` }}>
-    <div className="relative bg-white dark:bg-zinc-950/90 backdrop-blur-xl rounded-xl p-4 h-full">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-widest">
+  <Card className="relative overflow-hidden border-border/50 hover:border-border transition-colors">
+    <CardContent className="p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           {title}
         </span>
-        <div className={`p-1.5 rounded-lg ${gradient}`}>
-          <Icon className="h-3.5 w-3.5 text-white" />
+        <div className={`p-1.5 rounded-md ${gradient}`}>
+          <Icon className="h-3 w-3 text-white" />
         </div>
       </div>
-      <div className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mb-1">{value}</div>
-      <p className="text-[10px] text-gray-500 dark:text-zinc-500">{subtitle}</p>
-    </div>
-  </div>
+      <div className="text-xl font-bold text-foreground tracking-tight">{value}</div>
+      <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>
+    </CardContent>
+  </Card>
 );
 
 const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
@@ -182,10 +182,10 @@ const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
   iconBg: string;
   children: React.ReactNode;
 }) => (
-  <div className="relative rounded-xl bg-card border border-border shadow-lg overflow-hidden">
-    <div className="relative p-5">
+  <Card className="border-border/50">
+    <CardContent className="p-5">
       <div className="flex items-center gap-3 mb-4">
-        <div className={`p-2 rounded-lg ${iconBg} shadow-md`}>
+        <div className={`p-2 rounded-md ${iconBg}`}>
           <Icon className="h-4 w-4 text-white" />
         </div>
         <div>
@@ -194,8 +194,8 @@ const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
         </div>
       </div>
       {children}
-    </div>
-  </div>
+    </CardContent>
+  </Card>
 );
 
 export default function ChurnDetalhamento() {
@@ -780,7 +780,7 @@ export default function ChurnDetalhamento() {
           title="Churn por Mês"
           subtitle="Evolução mensal de contratos encerrados"
           icon={BarChart3}
-          iconBg="bg-gradient-to-r from-red-500 to-rose-600"
+          iconBg="bg-gradient-to-r from-orange-500 to-amber-500"
         >
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
@@ -793,8 +793,8 @@ export default function ChurnDetalhamento() {
               <BarChart data={churnPorMes} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ef4444" stopOpacity={1}/>
-                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0.7}/>
+                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.9}/>
+                    <stop offset="100%" stopColor="#ea580c" stopOpacity={0.7}/>
                   </linearGradient>
                 </defs>
                 <XAxis 
@@ -821,7 +821,7 @@ export default function ChurnDetalhamento() {
           title="Distribuição por Produto"
           subtitle="Percentual de churn por produto"
           icon={PieChart}
-          iconBg="bg-gradient-to-r from-orange-500 to-amber-600"
+          iconBg="bg-gradient-to-r from-blue-500 to-indigo-500"
         >
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
@@ -879,7 +879,7 @@ export default function ChurnDetalhamento() {
           title="Churn por Squad"
           subtitle="Quantidade por squad"
           icon={Users}
-          iconBg="bg-gradient-to-r from-violet-500 to-purple-600"
+          iconBg="bg-gradient-to-r from-emerald-500 to-teal-500"
         >
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
@@ -921,7 +921,7 @@ export default function ChurnDetalhamento() {
           title="Distribuição por Lifetime"
           subtitle="Tempo de permanência"
           icon={Clock}
-          iconBg="bg-gradient-to-r from-amber-500 to-yellow-600"
+          iconBg="bg-gradient-to-r from-violet-500 to-purple-500"
         >
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
@@ -973,7 +973,7 @@ export default function ChurnDetalhamento() {
           title="Churn por Responsável"
           subtitle="Top 6 responsáveis"
           icon={Users}
-          iconBg="bg-gradient-to-r from-blue-500 to-cyan-600"
+          iconBg="bg-gradient-to-r from-cyan-500 to-blue-500"
         >
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
