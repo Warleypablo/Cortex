@@ -11078,6 +11078,11 @@ export class DbStorage implements IStorage {
       freelaTotal += valor;
     }
     
+    const salarioTotal = despesaTotal;
+    const beneficioPorColaborador = 400;
+    const beneficiosTotal = salariosPorColaborador.size * beneficioPorColaborador;
+    const despesaTotalSalarios = salarioTotal + beneficiosTotal;
+
     // Montar array de despesas
     const despesas: {
       categoriaId: string;
@@ -11092,8 +11097,8 @@ export class DbStorage implements IStorage {
     // Total de salários como categoria principal
     despesas.push({
       categoriaId: 'DESP.SALARIOS',
-      categoriaNome: 'Salários',
-      valor: despesaTotal,
+      categoriaNome: 'Salarios',
+      valor: salarioTotal,
       nivel: 1
     });
     
@@ -11109,6 +11114,13 @@ export class DbStorage implements IStorage {
         nivel: 2
       });
     }
+
+    despesas.push({
+      categoriaId: 'DESP.BENEFICIOS',
+      categoriaNome: 'Beneficios (CAJU)',
+      valor: beneficiosTotal,
+      nivel: 1
+    });
     
     // Adicionar linha de CXCS (média salarial)
     despesas.push({
@@ -11150,7 +11162,7 @@ export class DbStorage implements IStorage {
     });
     
     // Despesa total agora inclui salários + CXCS + freelancers + impostos
-    const despesaTotalComImpostos = despesaTotal + mediaCxcs + freelaTotal + impostos;
+    const despesaTotalComImpostos = despesaTotalSalarios + mediaCxcs + freelaTotal + impostos;
     
     const resultado = receitaTotal - despesaTotalComImpostos;
     
