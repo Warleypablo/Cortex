@@ -78,6 +78,13 @@ interface ChurnContract {
   ltv: number;
 }
 
+interface ChurnPorSquad {
+  squad: string;
+  mrr_ativo: number;
+  mrr_perdido: number;
+  percentual: number;
+}
+
 interface ChurnDetalhamentoData {
   contratos: ChurnContract[];
   metricas: {
@@ -87,6 +94,10 @@ interface ChurnDetalhamentoData {
     mrr_pausado: number;
     ltv_total: number;
     lt_medio: number;
+    mrr_ativo_ref?: number;
+    churn_percentual?: number;
+    churn_por_squad?: ChurnPorSquad[];
+    periodo_referencia?: string;
   };
   filtros: {
     squads: string[];
@@ -688,6 +699,81 @@ export default function ChurnDetalhamento() {
           </>
         )}
       </div>
+
+      {/* Seção de Percentual de Churn */}
+      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
+        <Card className="border-2 border-red-200 dark:border-red-900/40 bg-gradient-to-br from-red-50/50 to-orange-50/30 dark:from-red-950/20 dark:to-orange-950/10">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 shadow-lg">
+                  <Percent className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Taxa de Churn</CardTitle>
+                  <CardDescription>
+                    MRR perdido ÷ MRR base ({data.metricas.periodo_referencia ? format(parseISO(data.metricas.periodo_referencia), "MMM/yyyy", { locale: ptBR }) : "mês anterior"})
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-bold text-red-600 dark:text-red-400">
+                  {(data.metricas.churn_percentual || 0).toFixed(2)}%
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {formatCurrency(data.metricas.mrr_perdido)} de {formatCurrency(data.metricas.mrr_ativo_ref || 0)}
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm font-medium text-muted-foreground">
+                <span>Churn por Squad</span>
+                <span>% do MRR</span>
+              </div>
+              <div className="space-y-2">
+                {(data.metricas.churn_por_squad || []).slice(0, 6).map((squad, index) => (
+                  <div 
+                    key={squad.squad} 
+                    className="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-zinc-900/30"
+                  >
+                    <div 
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: REFINED_COLORS[index % REFINED_COLORS.length] }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium truncate">{squad.squad}</span>
+                        <span className={`text-sm font-bold tabular-nums ${
+                          squad.percentual >= 5 ? 'text-red-600 dark:text-red-400' : 
+                          squad.percentual >= 2 ? 'text-orange-600 dark:text-orange-400' : 
+                          'text-emerald-600 dark:text-emerald-400'
+                        }`}>
+                          {squad.percentual.toFixed(2)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span>Perdido: {formatCurrency(squad.mrr_perdido)}</span>
+                        <span>Base: {formatCurrency(squad.mrr_ativo)}</span>
+                      </div>
+                      <Progress 
+                        value={Math.min(squad.percentual * 10, 100)} 
+                        className="h-1.5 mt-1"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {(data.metricas.churn_por_squad || []).length > 6 && (
+                <p className="text-xs text-muted-foreground text-center pt-1">
+                  +{(data.metricas.churn_por_squad || []).length - 6} outros squads
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TechChartCard
