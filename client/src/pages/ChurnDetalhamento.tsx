@@ -330,6 +330,42 @@ export default function ChurnDetalhamento() {
     };
   }, [filteredContratos]);
 
+  const filteredChurnPorSquad = useMemo(() => {
+    if (filteredContratos.length === 0 || !data?.metricas?.churn_por_squad) return [];
+    
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+    if (churnContratos.length === 0) return [];
+    
+    const squadData: Record<string, { mrr_perdido: number; mrr_base: number }> = {};
+    
+    churnContratos.forEach(c => {
+      const squad = c.squad || "Não especificado";
+      if (!squadData[squad]) {
+        const originalSquadData = data.metricas.churn_por_squad?.find(s => s.squad === squad);
+        squadData[squad] = { 
+          mrr_perdido: 0, 
+          mrr_base: originalSquadData?.mrr_ativo || 0 
+        };
+      }
+      squadData[squad].mrr_perdido += c.valorr || 0;
+    });
+    
+    return Object.entries(squadData)
+      .map(([squad, info]) => ({
+        squad,
+        mrr_perdido: info.mrr_perdido,
+        mrr_ativo: info.mrr_base,
+        percentual: info.mrr_base > 0 ? (info.mrr_perdido / info.mrr_base) * 100 : 0
+      }))
+      .sort((a, b) => b.percentual - a.percentual);
+  }, [filteredContratos, data?.metricas?.churn_por_squad]);
+
+  const filteredTaxaChurn = useMemo(() => {
+    const mrrBase = data?.metricas?.mrr_ativo_ref || 0;
+    const mrrPerdido = filteredMetricas.mrr_perdido;
+    return mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
+  }, [filteredMetricas.mrr_perdido, data?.metricas?.mrr_ativo_ref]);
+
   const distribuicaoPorSquad = useMemo(() => {
     if (filteredContratos.length === 0) return [];
     
@@ -434,11 +470,14 @@ export default function ChurnDetalhamento() {
   const churnPorMes = useMemo(() => {
     if (filteredContratos.length === 0) return [];
     
-    const meses: Record<string, { count: number; mrr: number }> = {};
+    const meses: Record<string, { count: number; mrr: number; sortKey: string }> = {};
     filteredContratos.forEach(c => {
-      if (!c.data_encerramento) return;
-      const mes = format(parseISO(c.data_encerramento), "MMM/yy", { locale: ptBR });
-      if (!meses[mes]) meses[mes] = { count: 0, mrr: 0 };
+      const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
+      if (!refDate) return;
+      const parsedDate = parseISO(refDate);
+      const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
+      const sortKey = format(parsedDate, "yyyy-MM");
+      if (!meses[mes]) meses[mes] = { count: 0, mrr: 0, sortKey };
       meses[mes].count++;
       meses[mes].mrr += c.valorr || 0;
     });
@@ -447,8 +486,10 @@ export default function ChurnDetalhamento() {
       .map(([mes, data]) => ({
         mes,
         count: data.count,
-        mrr: data.mrr
+        mrr: data.mrr,
+        sortKey: data.sortKey
       }))
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .slice(-12);
   }, [filteredContratos]);
 
@@ -700,8 +741,8 @@ export default function ChurnDetalhamento() {
         )}
       </div>
 
-      {/* Seção de Percentual de Churn */}
-      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
+      {/* Seção de Percentual de Churn - agora usa dados filtrados */}
+      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && filteredMetricas.mrr_perdido > 0 && (
         <Card className="border-2 border-red-200 dark:border-red-900/40 bg-gradient-to-br from-red-50/50 to-orange-50/30 dark:from-red-950/20 dark:to-orange-950/10">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -718,10 +759,10 @@ export default function ChurnDetalhamento() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-                  {(data.metricas.churn_percentual || 0).toFixed(2)}%
+                  {filteredTaxaChurn.toFixed(2)}%
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {formatCurrency(data.metricas.mrr_perdido)} de {formatCurrency(data.metricas.mrr_ativo_ref || 0)}
+                  {formatCurrency(filteredMetricas.mrr_perdido)} de {formatCurrency(data.metricas.mrr_ativo_ref || 0)}
                 </div>
               </div>
             </div>
@@ -733,7 +774,7 @@ export default function ChurnDetalhamento() {
                 <span>% do MRR</span>
               </div>
               <div className="space-y-2">
-                {(data.metricas.churn_por_squad || []).slice(0, 6).map((squad, index) => (
+                {filteredChurnPorSquad.slice(0, 6).map((squad, index) => (
                   <div 
                     key={squad.squad} 
                     className="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-zinc-900/30"
@@ -765,9 +806,9 @@ export default function ChurnDetalhamento() {
                   </div>
                 ))}
               </div>
-              {(data.metricas.churn_por_squad || []).length > 6 && (
+              {filteredChurnPorSquad.length > 6 && (
                 <p className="text-xs text-muted-foreground text-center pt-1">
-                  +{(data.metricas.churn_por_squad || []).length - 6} outros squads
+                  +{filteredChurnPorSquad.length - 6} outros squads
                 </p>
               )}
             </div>
