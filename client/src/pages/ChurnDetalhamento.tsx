@@ -691,6 +691,14 @@ export default function ChurnDetalhamento() {
               shadowColor="rgba(249,115,22,0.25)"
             />
             <TechKpiCard
+              title="Taxa de Churn"
+              value={`${(data?.metricas?.churn_percentual || 0).toFixed(2)}%`}
+              subtitle={`de ${formatCurrencyNoDecimals(data?.metricas?.mrr_ativo_ref || 0)}`}
+              icon={Percent}
+              gradient="bg-gradient-to-r from-rose-500 to-pink-600"
+              shadowColor="rgba(244,63,94,0.25)"
+            />
+            <TechKpiCard
               title="Total Pausados"
               value={filteredMetricas.total_pausados.toString()}
               subtitle="contratos pausados"

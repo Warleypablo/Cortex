@@ -7600,6 +7600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get churned/encerrados contracts - same logic as Home dashboard
       // Home counts ALL contracts with data_encerramento in period (regardless of status)
+      // Exclude irrelevant squads: turbo interno, squad x
       const churnResult = await db.execute(sql`
         SELECT 
           c.id_task as id,
@@ -7627,10 +7628,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE c.data_encerramento IS NOT NULL
           AND c.valorr IS NOT NULL
           AND c.valorr > 0
+          AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
           AND ${churnDateFilter}
       `);
       
-      // Get paused contracts - simply all contracts where data_pausa is not null
+      // Get paused contracts - exclude irrelevant squads
       const pausaResult = await db.execute(sql`
         SELECT 
           c.*,
@@ -7639,6 +7641,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM cup_contratos c
         LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
         WHERE c.data_pausa IS NOT NULL
+          AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
           AND ${pausaDateFilter}
       `);
       
@@ -7725,6 +7728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const refDateStr = refEndDate.toISOString().split('T')[0];
       
       // Buscar MRR ativo no final do mês anterior (contratos ativos naquela data)
+      // Excluir squads irrelevantes: turbo interno, squad x
       const mrrAtivoResult = await db.execute(sql`
         SELECT 
           COALESCE(squad, 'Não especificado') as squad,
@@ -7740,6 +7744,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         AND data_inicio <= ${refDateStr}::date
         AND (data_encerramento IS NULL OR data_encerramento > ${refDateStr}::date)
         AND (data_pausa IS NULL OR data_pausa > ${refDateStr}::date)
+        AND LOWER(COALESCE(squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
         GROUP BY COALESCE(squad, 'Não especificado')
       `);
       
