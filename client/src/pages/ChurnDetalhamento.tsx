@@ -215,9 +215,12 @@ export default function ChurnDetalhamento() {
   const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
 
   const { data, isLoading, error } = useQuery<ChurnDetalhamentoData>({
-    queryKey: ["/api/analytics/churn-detalhamento", "all"],
+    queryKey: ["/api/analytics/churn-detalhamento", dataInicio, dataFim],
     queryFn: async () => {
-      const res = await fetch(`/api/analytics/churn-detalhamento?meses=all`);
+      const params = new URLSearchParams();
+      if (dataInicio) params.set("startDate", dataInicio);
+      if (dataFim) params.set("endDate", dataFim);
+      const res = await fetch(`/api/analytics/churn-detalhamento?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch churn data");
       return res.json();
     },
@@ -741,8 +744,8 @@ export default function ChurnDetalhamento() {
         )}
       </div>
 
-      {/* Seção de Percentual de Churn - agora usa dados filtrados */}
-      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && filteredMetricas.mrr_perdido > 0 && (
+      {/* Seção de Percentual de Churn - usa dados da API (já vem filtrado pelo período) */}
+      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && data.metricas.mrr_perdido > 0 && (
         <Card className="border-2 border-red-200 dark:border-red-900/40 bg-gradient-to-br from-red-50/50 to-orange-50/30 dark:from-red-950/20 dark:to-orange-950/10">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -759,10 +762,10 @@ export default function ChurnDetalhamento() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-                  {filteredTaxaChurn.toFixed(2)}%
+                  {(data.metricas.churn_percentual || 0).toFixed(2)}%
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {formatCurrency(filteredMetricas.mrr_perdido)} de {formatCurrency(data.metricas.mrr_ativo_ref || 0)}
+                  {formatCurrency(data.metricas.mrr_perdido)} de {formatCurrency(data.metricas.mrr_ativo_ref || 0)}
                 </div>
               </div>
             </div>
@@ -774,7 +777,7 @@ export default function ChurnDetalhamento() {
                 <span>% do MRR</span>
               </div>
               <div className="space-y-2">
-                {filteredChurnPorSquad.slice(0, 6).map((squad, index) => (
+                {(data.metricas.churn_por_squad || []).slice(0, 6).map((squad, index) => (
                   <div 
                     key={squad.squad} 
                     className="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-zinc-900/30"
@@ -806,9 +809,9 @@ export default function ChurnDetalhamento() {
                   </div>
                 ))}
               </div>
-              {filteredChurnPorSquad.length > 6 && (
+              {(data.metricas.churn_por_squad || []).length > 6 && (
                 <p className="text-xs text-muted-foreground text-center pt-1">
-                  +{filteredChurnPorSquad.length - 6} outros squads
+                  +{(data.metricas.churn_por_squad || []).length - 6} outros squads
                 </p>
               )}
             </div>
