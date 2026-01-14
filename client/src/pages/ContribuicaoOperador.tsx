@@ -611,35 +611,6 @@ export default function ContribuicaoOperador() {
                   })}
                 </div>
 
-                <div 
-                  className="grid bg-primary/5"
-                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                  data-testid="row-percentual-contribuicao"
-                >
-                  <div className="p-3 font-semibold text-primary/80 flex items-center gap-2 sticky left-0 z-10 bg-primary/5 pl-8">
-                    % Contribuição
-                  </div>
-                  {hierarchicalData.monthColumns.map((col) => {
-                    const percentual = col.receitaTotal > 0 
-                      ? (col.resultado / col.receitaTotal) * 100 
-                      : 0;
-                    const isPositive = percentual >= 0;
-                    return (
-                      <div 
-                        key={col.mes} 
-                        className={cn(
-                          "p-3 text-right font-semibold",
-                          isPositive ? "text-emerald-500" : "text-red-500"
-                        )}
-                      >
-                        {col.receitaTotal > 0 
-                          ? `${percentual.toFixed(1)}%` 
-                          : "-"}
-                      </div>
-                    );
-                  })}
-                </div>
-
               </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
