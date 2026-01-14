@@ -7598,7 +7598,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         pausaDateFilter = sql`c.data_pausa >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
       }
       
-      // Get churned/encerrados contracts (filter by status containing churn or encerrado)
+      // Get churned/encerrados contracts - same logic as Home dashboard
+      // Home counts ALL contracts with data_encerramento in period (regardless of status)
       const churnResult = await db.execute(sql`
         SELECT 
           c.id_task as id,
@@ -7624,11 +7625,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM cup_contratos c
         LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
         WHERE c.data_encerramento IS NOT NULL
-          AND (
-            LOWER(TRIM(c.status)) LIKE '%churn%' 
-            OR LOWER(TRIM(c.status)) LIKE '%encerrad%'
-            OR LOWER(TRIM(c.status)) LIKE '%cancelad%'
-          )
+          AND c.valorr IS NOT NULL
+          AND c.valorr > 0
           AND ${churnDateFilter}
       `);
       
