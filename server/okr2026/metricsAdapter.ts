@@ -105,17 +105,11 @@ function getQuarterTarget(krId: string): number {
 
 export async function getMrrAtivo(): Promise<number> {
   try {
+    // Usa cup_contratos diretamente (dados em tempo real) - mesma lógica da Home
     const result = await db.execute(sql`
-      WITH ultimo_snapshot AS (
-        SELECT MAX(data_snapshot) as data_ultimo
-        FROM cup_data_hist
-      )
-      SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
-      FROM cup_data_hist h
-      JOIN ultimo_snapshot us ON h.data_snapshot = us.data_ultimo
+      SELECT COALESCE(SUM(valorr), 0) as mrr
+      FROM cup_contratos
       WHERE status IN ('ativo', 'onboarding', 'triagem')
-        AND valorr IS NOT NULL
-        AND valorr > 0
     `);
     return parseFloat((result.rows[0] as any)?.mrr || "0");
   } catch (error) {
