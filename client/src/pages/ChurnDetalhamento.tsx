@@ -784,8 +784,8 @@ export default function ChurnDetalhamento() {
                 <span>Churn por Squad</span>
                 <span>% do MRR</span>
               </div>
-              <div className="space-y-2">
-                {(data.metricas.churn_por_squad || []).slice(0, 6).map((squad, index) => (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {(data.metricas.churn_por_squad || []).map((squad, index) => (
                   <div 
                     key={squad.squad} 
                     className="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-zinc-900/30"
@@ -817,11 +817,6 @@ export default function ChurnDetalhamento() {
                   </div>
                 ))}
               </div>
-              {(data.metricas.churn_por_squad || []).length > 6 && (
-                <p className="text-xs text-muted-foreground text-center pt-1">
-                  +{(data.metricas.churn_por_squad || []).length - 6} outros squads
-                </p>
-              )}
             </div>
           </CardContent>
         </Card>
