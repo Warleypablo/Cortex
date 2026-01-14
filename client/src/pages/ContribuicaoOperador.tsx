@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { formatCurrencyNoDecimals, cn } from "@/lib/utils";
+import { formatCurrencyNoDecimals, formatPercent, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -606,6 +606,32 @@ export default function ContribuicaoOperador() {
                         )}
                       >
                         {formatCurrencyNoDecimals(col.resultado)}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div
+                  className="grid border-t border-border/50 bg-muted/30"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  data-testid="row-contribuicao-percentual"
+                >
+                  <div className="p-3 font-semibold text-muted-foreground sticky left-0 z-10 bg-muted/30">
+                    Contribuição (%)
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => {
+                    const percent = col.receitaTotal > 0 ? (col.resultado / col.receitaTotal) * 100 : 0;
+                    const hasReceita = col.receitaTotal > 0;
+                    const isPositive = percent >= 0;
+                    return (
+                      <div
+                        key={col.mes}
+                        className={cn(
+                          "p-3 text-right font-semibold text-sm",
+                          hasReceita ? (isPositive ? "text-emerald-600" : "text-red-600") : "text-muted-foreground"
+                        )}
+                      >
+                        {hasReceita ? formatPercent(percent, 1) : "-"}
                       </div>
                     );
                   })}
