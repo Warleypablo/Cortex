@@ -228,7 +228,7 @@ function ProtectedRouter() {
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
       <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
       <Route path="/growth/performance-plataformas">{() => <ProtectedRoute path="/growth/performance-plataformas" component={PerformancePlataformas} />}</Route>
-      <Route path="/growth/autoreport">{() => <ProtectedRoute path="/growth/autoreport" component={AutoReport} />}</Route>
+      <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
       
       {/* Jurídico */}
       <Route path="/juridico/clientes">{() => <ProtectedRoute path="/juridico/clientes" component={DashboardInadimplencia} />}</Route>
