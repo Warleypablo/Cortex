@@ -1,4 +1,5 @@
 import { getDriveClient } from './credentials';
+import { Readable } from 'stream';
 
 export interface UploadResult {
   fileId: string;
@@ -65,7 +66,6 @@ function extractFolderId(input: string): string {
 }
 
 function bufferToStream(buffer: Buffer): NodeJS.ReadableStream {
-  const { Readable } = require('stream');
   const readable = new Readable();
   readable._read = () => {};
   readable.push(buffer);
