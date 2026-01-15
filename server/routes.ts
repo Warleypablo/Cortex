@@ -16033,6 +16033,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== AUTO REPORT ROUTES ==========
+  const autoreport = await import('./autoreport/index');
+
+  app.get("/api/autoreport/clientes", isAuthenticated, async (req, res) => {
+    try {
+      const clientes = await autoreport.listarClientes();
+      res.json(clientes);
+    } catch (error: any) {
+      console.error("[autoreport] Error fetching clientes:", error);
+      res.status(500).json({ error: error.message || "Erro ao buscar clientes" });
+    }
+  });
+
+  app.post("/api/autoreport/gerar", isAuthenticated, async (req, res) => {
+    try {
+      const { cliente } = req.body;
+      if (!cliente) {
+        return res.status(400).json({ error: "Cliente é obrigatório" });
+      }
+      const job = await autoreport.gerarRelatorio(cliente);
+      res.json(job);
+    } catch (error: any) {
+      console.error("[autoreport] Error generating report:", error);
+      res.status(500).json({ error: error.message || "Erro ao gerar relatório" });
+    }
+  });
+
+  app.post("/api/autoreport/gerar-lote", isAuthenticated, async (req, res) => {
+    try {
+      const { clientes } = req.body;
+      if (!clientes || !Array.isArray(clientes)) {
+        return res.status(400).json({ error: "Lista de clientes é obrigatória" });
+      }
+      const jobs = await autoreport.gerarRelatoriosEmLote(clientes);
+      res.json(jobs);
+    } catch (error: any) {
+      console.error("[autoreport] Error generating batch reports:", error);
+      res.status(500).json({ error: error.message || "Erro ao gerar relatórios em lote" });
+    }
+  });
+
+  app.get("/api/autoreport/jobs", isAuthenticated, async (req, res) => {
+    try {
+      const jobs = autoreport.getAllJobs();
+      res.json(jobs);
+    } catch (error: any) {
+      console.error("[autoreport] Error fetching jobs:", error);
+      res.status(500).json({ error: error.message || "Erro ao buscar jobs" });
+    }
+  });
+
+  app.get("/api/autoreport/jobs/:jobId", isAuthenticated, async (req, res) => {
+    try {
+      const job = autoreport.getJobStatus(req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job não encontrado" });
+      }
+      res.json(job);
+    } catch (error: any) {
+      console.error("[autoreport] Error fetching job:", error);
+      res.status(500).json({ error: error.message || "Erro ao buscar job" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
