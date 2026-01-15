@@ -21,6 +21,7 @@ import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
+import * as autoreport from "./autoreport/index";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== 'admin') {
@@ -16034,8 +16035,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== AUTO REPORT ROUTES ==========
-  const autoreport = await import('./autoreport/index');
-
   app.get("/api/autoreport/clientes", isAuthenticated, async (req, res) => {
     try {
       const clientes = await autoreport.listarClientes();
