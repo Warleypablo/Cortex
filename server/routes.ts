@@ -16096,6 +16096,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/autoreport/download/:jobId", isAuthenticated, async (req, res) => {
+    try {
+      const jobId = decodeURIComponent(req.params.jobId);
+      const pdfData = autoreport.getPdfBuffer(jobId);
+      
+      if (!pdfData) {
+        return res.status(404).json({ error: "PDF não encontrado ou expirado" });
+      }
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${pdfData.fileName}"`);
+      res.setHeader('Content-Length', pdfData.buffer.length);
+      res.send(pdfData.buffer);
+    } catch (error: any) {
+      console.error("[autoreport] Error downloading PDF:", error);
+      res.status(500).json({ error: error.message || "Erro ao baixar PDF" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);

@@ -3,7 +3,6 @@ import { getMetricasGA4 } from './ga4';
 import { getMetricasGoogleAds } from './googleAds';
 import { getMetricasMetaAds } from './metaAds';
 import { generatePdfReport } from './pdf';
-import { uploadPdfToDrive, getFolderIdFromUrl } from './drive';
 import type { 
   AutoReportCliente, 
   AutoReportJob, 
@@ -14,6 +13,22 @@ import type {
 } from './types';
 
 const activeJobs: Map<string, AutoReportJob> = new Map();
+const pdfBuffers: Map<string, { buffer: Buffer; fileName: string; createdAt: Date }> = new Map();
+
+export function getPdfBuffer(jobId: string): { buffer: Buffer; fileName: string } | null {
+  const data = pdfBuffers.get(jobId);
+  if (!data) return null;
+  return { buffer: data.buffer, fileName: data.fileName };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [jobId, data] of pdfBuffers.entries()) {
+    if (now - data.createdAt.getTime() > 30 * 60 * 1000) {
+      pdfBuffers.delete(jobId);
+    }
+  }
+}, 5 * 60 * 1000);
 
 function calcularPeriodoSemanal(): { atual: PeriodoReferencia; anterior: PeriodoReferencia } {
   const hoje = new Date();
@@ -91,22 +106,22 @@ export async function gerarRelatorio(cliente: AutoReportCliente): Promise<AutoRe
       metaAds,
     });
 
-    console.log(`[AutoReport] PDF gerado: ${fileName}. Fazendo upload...`);
+    console.log(`[AutoReport] PDF gerado: ${fileName}`);
 
-    const folderId = await getFolderIdFromUrl(cliente.linkPasta) || process.env.RELATORIO_FOLDER_ID;
-    
-    const { fileId, fileUrl } = await uploadPdfToDrive(buffer, fileName, folderId || undefined);
+    pdfBuffers.set(jobId, { buffer, fileName, createdAt: new Date() });
+
+    const downloadUrl = `/api/autoreport/download/${encodeURIComponent(jobId)}`;
 
     const agora = new Date().toLocaleString('pt-BR');
     await updateClienteStatus(cliente.rowIndex, 'CONCLUÍDO', agora);
 
     job.status = 'concluido';
-    job.presentationId = fileId;
-    job.presentationUrl = fileUrl;
+    job.downloadUrl = downloadUrl;
+    job.fileName = fileName;
     job.concluidoEm = new Date();
     activeJobs.set(jobId, job);
 
-    console.log(`[AutoReport] Relatório PDF enviado: ${fileUrl}`);
+    console.log(`[AutoReport] Relatório pronto para download: ${downloadUrl}`);
 
     return job;
 

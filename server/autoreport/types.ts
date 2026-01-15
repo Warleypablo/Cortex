@@ -93,6 +93,8 @@ export interface AutoReportJob {
   mensagem?: string;
   presentationId?: string;
   presentationUrl?: string;
+  downloadUrl?: string;
+  fileName?: string;
   criadoEm: Date;
   concluidoEm?: Date;
 }
