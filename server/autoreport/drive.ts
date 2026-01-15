@@ -31,11 +31,33 @@ export async function uploadPdfToDrive(
     body: bufferToStream(buffer),
   };
 
-  const response = await drive.files.create({
-    requestBody: fileMetadata,
-    media: media,
-    fields: 'id, webViewLink, name',
-  });
+  let response;
+  
+  try {
+    response = await drive.files.create({
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id, webViewLink, name',
+    });
+  } catch (error: any) {
+    if (error.code === 404 && fileMetadata.parents) {
+      console.log(`[AutoReport Drive] Folder not accessible, uploading to root...`);
+      delete fileMetadata.parents;
+      
+      const retryMedia = {
+        mimeType: 'application/pdf',
+        body: bufferToStream(buffer),
+      };
+      
+      response = await drive.files.create({
+        requestBody: fileMetadata,
+        media: retryMedia,
+        fields: 'id, webViewLink, name',
+      });
+    } else {
+      throw error;
+    }
+  }
 
   const fileId = response.data.id || '';
   const webViewLink = response.data.webViewLink || '';
