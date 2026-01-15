@@ -1524,3 +1524,30 @@ export async function initializeDfcSnapshotsTable(): Promise<void> {
     console.error('[database] Error initializing DFC Snapshots table:', error);
   }
 }
+
+export async function initializeSalesGoalsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.sales_goals (
+        id SERIAL PRIMARY KEY,
+        goal_type VARCHAR(50) NOT NULL,
+        goal_key VARCHAR(100) NOT NULL,
+        goal_value NUMERIC(15,2) NOT NULL,
+        period_month INTEGER,
+        period_year INTEGER,
+        updated_by VARCHAR(255),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(goal_type, goal_key, period_month, period_year)
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_sales_goals_type_key 
+      ON staging.sales_goals(goal_type, goal_key)
+    `);
+    
+    console.log('[database] Sales Goals table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing Sales Goals table:', error);
+  }
+}
