@@ -94,7 +94,7 @@ function generateReportHtml(data: ReportData): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Relatório - ${data.cliente.cliente}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -103,9 +103,9 @@ function generateReportHtml(data: ReportData): string {
     }
     
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f8fafc;
-      color: #1e293b;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0a0a0a;
+      color: #ffffff;
       line-height: 1.5;
     }
     
@@ -113,7 +113,7 @@ function generateReportHtml(data: ReportData): string {
       width: 210mm;
       min-height: 297mm;
       padding: 0;
-      background: white;
+      background: #0a0a0a;
       page-break-after: always;
       position: relative;
       overflow: hidden;
@@ -125,7 +125,7 @@ function generateReportHtml(data: ReportData): string {
     
     /* Cover Page */
     .cover {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      background: linear-gradient(160deg, #0a0a0a 0%, #111111 40%, #0a0a0a 100%);
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -136,25 +136,37 @@ function generateReportHtml(data: ReportData): string {
       position: absolute;
       top: 0;
       left: 0;
-      width: 8px;
+      width: 6px;
       height: 100%;
-      background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+      background: linear-gradient(180deg, #FF6B00 0%, #FF8C33 50%, #FF6B00 100%);
     }
     
     .cover-pattern {
       position: absolute;
       top: 0;
       right: 0;
-      width: 50%;
+      width: 60%;
       height: 100%;
-      background: radial-gradient(circle at 80% 20%, rgba(249, 115, 22, 0.1) 0%, transparent 50%),
-                  radial-gradient(circle at 60% 80%, rgba(249, 115, 22, 0.05) 0%, transparent 40%);
+      background: 
+        radial-gradient(ellipse at 90% 10%, rgba(255, 107, 0, 0.15) 0%, transparent 40%),
+        radial-gradient(ellipse at 70% 90%, rgba(255, 107, 0, 0.08) 0%, transparent 35%),
+        radial-gradient(ellipse at 50% 50%, rgba(255, 140, 51, 0.05) 0%, transparent 50%);
+    }
+    
+    .cover-glow {
+      position: absolute;
+      top: 30%;
+      right: 10%;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(255, 107, 0, 0.2) 0%, transparent 70%);
+      filter: blur(60px);
     }
     
     .cover-content {
       position: relative;
       z-index: 1;
-      padding: 60px 50px;
+      padding: 70px 55px;
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -162,53 +174,60 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .logo {
-      margin-bottom: 60px;
+      margin-bottom: 80px;
     }
     
     .logo-text {
-      font-size: 42px;
+      font-size: 48px;
       font-weight: 800;
-      letter-spacing: -1px;
+      letter-spacing: -2px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
     
     .logo-turbo {
-      color: #f97316;
+      color: #FF6B00;
+      text-shadow: 0 0 40px rgba(255, 107, 0, 0.4);
     }
     
     .logo-partners {
       color: white;
-      margin-left: 10px;
+      font-weight: 600;
     }
     
     .cover-divider {
-      width: 80px;
-      height: 4px;
-      background: linear-gradient(90deg, #f97316, #ea580c);
-      margin: 30px 0;
-      border-radius: 2px;
+      width: 100px;
+      height: 5px;
+      background: linear-gradient(90deg, #FF6B00, #FF8C33, #FF6B00);
+      margin: 40px 0;
+      border-radius: 3px;
+      box-shadow: 0 0 20px rgba(255, 107, 0, 0.5);
     }
     
     .cover-subtitle {
-      font-size: 13px;
-      font-weight: 500;
-      color: #f97316;
+      font-size: 14px;
+      font-weight: 600;
+      color: #FF6B00;
       text-transform: uppercase;
-      letter-spacing: 3px;
-      margin-bottom: 20px;
+      letter-spacing: 4px;
+      margin-bottom: 16px;
     }
     
     .cover-title {
-      font-size: 36px;
+      font-size: 42px;
       font-weight: 700;
       color: white;
-      line-height: 1.2;
+      line-height: 1.15;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
     }
     
     .cover-footer {
       position: relative;
       z-index: 1;
-      padding: 40px 50px;
-      background: rgba(0, 0, 0, 0.2);
+      padding: 45px 55px;
+      background: linear-gradient(90deg, rgba(255, 107, 0, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
+      border-top: 1px solid rgba(255, 107, 0, 0.2);
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
@@ -216,7 +235,7 @@ function generateReportHtml(data: ReportData): string {
     
     .cover-info {
       display: flex;
-      gap: 50px;
+      gap: 60px;
     }
     
     .info-block {
@@ -225,15 +244,15 @@ function generateReportHtml(data: ReportData): string {
     
     .info-label {
       font-size: 10px;
-      font-weight: 500;
-      color: #94a3b8;
+      font-weight: 600;
+      color: #FF6B00;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 6px;
+      letter-spacing: 1.5px;
+      margin-bottom: 8px;
     }
     
     .info-value {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 600;
       color: white;
     }
@@ -241,12 +260,14 @@ function generateReportHtml(data: ReportData): string {
     /* Content Pages */
     .content-page {
       padding: 0;
+      background: #0a0a0a;
     }
     
     .page-header {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      padding: 30px 40px;
+      background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
+      padding: 35px 45px;
       position: relative;
+      border-bottom: 1px solid rgba(255, 107, 0, 0.2);
     }
     
     .header-accent {
@@ -254,57 +275,61 @@ function generateReportHtml(data: ReportData): string {
       bottom: 0;
       left: 0;
       right: 0;
-      height: 4px;
+      height: 3px;
     }
     
-    .header-accent.orange { background: linear-gradient(90deg, #f97316, #ea580c); }
-    .header-accent.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
-    .header-accent.meta { background: linear-gradient(90deg, #0ea5e9, #0284c7); }
+    .header-accent.orange { background: linear-gradient(90deg, #FF6B00, #FF8C33); }
+    .header-accent.blue { background: linear-gradient(90deg, #4285F4, #5A95F5); }
+    .header-accent.meta { background: linear-gradient(90deg, #0084FF, #00A3FF); }
     
     .page-title {
-      font-size: 26px;
+      font-size: 28px;
       font-weight: 700;
       color: white;
+      letter-spacing: -0.5px;
     }
     
     .page-brand {
       font-size: 11px;
-      font-weight: 500;
-      color: #64748b;
+      font-weight: 600;
+      color: #FF6B00;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
     }
     
     .page-content {
-      padding: 30px 40px;
+      padding: 35px 45px;
     }
     
     .section {
-      margin-bottom: 30px;
+      margin-bottom: 32px;
     }
     
     .section-title {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
-      color: #0f172a;
-      margin-bottom: 16px;
+      color: #FF6B00;
+      margin-bottom: 18px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
     
     .section-title::after {
       content: '';
       flex: 1;
       height: 1px;
-      background: #e2e8f0;
+      background: linear-gradient(90deg, rgba(255, 107, 0, 0.3) 0%, transparent 100%);
     }
     
     /* Metric Cards */
     .metrics-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
+      gap: 14px;
       margin-bottom: 24px;
     }
     
@@ -313,30 +338,45 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .metric-card {
-      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-      border: 1px solid #e2e8f0;
+      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 12px;
       padding: 18px;
       position: relative;
       overflow: hidden;
     }
     
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255, 107, 0, 0.3), transparent);
+    }
+    
     .metric-card.highlight {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      background: linear-gradient(135deg, #FF6B00 0%, #CC5500 100%);
       border: none;
     }
     
-    .metric-card.highlight .metric-label,
+    .metric-card.highlight .metric-label {
+      color: rgba(255, 255, 255, 0.9);
+    }
+    
     .metric-card.highlight .metric-value {
       color: white;
     }
     
     .metric-card.google {
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
+      border: none;
     }
     
     .metric-card.meta {
-      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+      background: linear-gradient(135deg, #0084FF 0%, #0066CC 100%);
+      border: none;
     }
     
     .metric-card.google .metric-label,
@@ -347,121 +387,145 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .metric-label {
-      font-size: 11px;
-      font-weight: 500;
-      color: #64748b;
+      font-size: 10px;
+      font-weight: 600;
+      color: #888888;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
     
     .metric-value {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 700;
-      color: #0f172a;
+      color: white;
     }
     
     .metric-change {
       font-size: 12px;
       font-weight: 600;
-      margin-top: 6px;
+      margin-top: 8px;
       display: flex;
       align-items: center;
       gap: 4px;
     }
     
-    .metric-change.positive { color: #22c55e; }
-    .metric-change.negative { color: #ef4444; }
+    .metric-change.positive { color: #4ADE80; }
+    .metric-change.negative { color: #F87171; }
     
     /* Hero Stats */
     .hero-stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      margin-bottom: 30px;
+      gap: 20px;
+      margin-bottom: 32px;
     }
     
     .hero-stat {
-      background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
       border-radius: 16px;
-      padding: 24px;
-      border: 1px solid #e5e5e5;
+      padding: 28px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero-stat::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: linear-gradient(180deg, #FF6B00, #FF8C33);
     }
     
     .hero-stat-label {
-      font-size: 12px;
-      font-weight: 500;
-      color: #64748b;
+      font-size: 11px;
+      font-weight: 600;
+      color: #888888;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 1px;
     }
     
     .hero-stat-value {
-      font-size: 32px;
+      font-size: 36px;
       font-weight: 800;
-      color: #0f172a;
-      margin: 8px 0;
+      color: white;
+      margin: 10px 0;
     }
     
-    .hero-stat-value.green { color: #22c55e; }
+    .hero-stat-value.green { color: #4ADE80; }
     
     .hero-stat-sub {
       font-size: 12px;
-      color: #64748b;
+      color: #888888;
     }
     
-    .hero-stat-sub.positive { color: #22c55e; }
-    .hero-stat-sub.negative { color: #ef4444; }
+    .hero-stat-sub.positive { color: #4ADE80; }
+    .hero-stat-sub.negative { color: #F87171; }
     
     /* Tables */
     .data-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 12px;
+      border-radius: 12px;
+      overflow: hidden;
     }
     
     .data-table th {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: white;
+      background: linear-gradient(135deg, #1a1a1a 0%, #111111 100%);
+      color: #FF6B00;
       font-weight: 600;
       text-align: left;
       padding: 14px 16px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-size: 10px;
+      border-bottom: 2px solid rgba(255, 107, 0, 0.3);
     }
     
     .data-table th:first-child {
-      border-radius: 8px 0 0 0;
+      border-radius: 10px 0 0 0;
     }
     
     .data-table th:last-child {
-      border-radius: 0 8px 0 0;
+      border-radius: 0 10px 0 0;
     }
     
     .data-table td {
       padding: 14px 16px;
-      border-bottom: 1px solid #f1f5f9;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: white;
+    }
+    
+    .data-table tr {
+      background: #141414;
     }
     
     .data-table tr:nth-child(even) {
-      background: #fafafa;
+      background: #1a1a1a;
     }
     
     .data-table tr:last-child td:first-child {
-      border-radius: 0 0 0 8px;
+      border-radius: 0 0 0 10px;
     }
     
     .data-table tr:last-child td:last-child {
-      border-radius: 0 0 8px 0;
+      border-radius: 0 0 10px 0;
+    }
+    
+    .data-table strong {
+      color: white;
     }
     
     .variation {
       font-weight: 600;
     }
     
-    .variation.positive { color: #22c55e; }
-    .variation.negative { color: #ef4444; }
+    .variation.positive { color: #4ADE80; }
+    .variation.negative { color: #F87171; }
     
     /* Investment Bar */
     .investment-section {
@@ -469,63 +533,71 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .investment-bar {
-      height: 32px;
-      border-radius: 16px;
+      height: 36px;
+      border-radius: 18px;
       overflow: hidden;
       display: flex;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
     
     .investment-bar-google {
-      background: linear-gradient(90deg, #3b82f6, #2563eb);
+      background: linear-gradient(90deg, #4285F4, #3367D6);
     }
     
     .investment-bar-meta {
-      background: linear-gradient(90deg, #0ea5e9, #0284c7);
+      background: linear-gradient(90deg, #0084FF, #0066CC);
     }
     
     .investment-legend {
       display: flex;
-      gap: 40px;
+      gap: 50px;
     }
     
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
     
     .legend-dot {
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
     }
     
-    .legend-dot.google { background: #3b82f6; }
-    .legend-dot.meta { background: #0ea5e9; }
+    .legend-dot.google { background: linear-gradient(135deg, #4285F4, #3367D6); }
+    .legend-dot.meta { background: linear-gradient(135deg, #0084FF, #0066CC); }
     
     .legend-label {
       font-size: 13px;
       font-weight: 600;
-      color: #0f172a;
+      color: white;
     }
     
     .legend-value {
       font-size: 12px;
-      color: #64748b;
+      color: #888888;
     }
     
     /* Page Footer */
     .page-footer {
       position: absolute;
-      bottom: 20px;
-      left: 40px;
-      right: 40px;
+      bottom: 25px;
+      left: 45px;
+      right: 45px;
       display: flex;
       justify-content: space-between;
       font-size: 10px;
-      color: #94a3b8;
+      color: #666666;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 15px;
+    }
+    
+    .page-footer span:first-child {
+      color: #FF6B00;
+      font-weight: 500;
     }
     
     @media print {
@@ -541,6 +613,7 @@ function generateReportHtml(data: ReportData): string {
   <div class="page cover">
     <div class="cover-accent"></div>
     <div class="cover-pattern"></div>
+    <div class="cover-glow"></div>
     
     <div class="cover-content">
       <div class="logo">
