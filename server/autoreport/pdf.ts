@@ -109,6 +109,11 @@ function generateReportHtml(data: ReportData): string {
       line-height: 1.5;
     }
     
+    @page {
+      size: A4;
+      margin: 0;
+    }
+    
     .page {
       width: 210mm;
       min-height: 297mm;
@@ -116,11 +121,43 @@ function generateReportHtml(data: ReportData): string {
       background: #0a0a0a;
       page-break-after: always;
       position: relative;
-      overflow: hidden;
     }
     
     .page:last-child {
       page-break-after: avoid;
+    }
+    
+    /* Page Break Control */
+    .section,
+    .hero-stats,
+    .hero-stat,
+    .metrics-grid,
+    .metric-card,
+    .donut-container,
+    .comparison-chart,
+    .chart-row,
+    .kpi-visual-grid,
+    .kpi-visual-card,
+    .sparkline-row,
+    .gauge-grid,
+    .gauge-card,
+    .data-table,
+    table,
+    thead,
+    tbody tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    
+    .section-title {
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+    
+    /* Prevent orphaned titles */
+    h1, h2, h3, .section-title {
+      page-break-after: avoid;
+      break-after: avoid;
     }
     
     /* Cover Page */
@@ -299,21 +336,27 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .page-content {
-      padding: 35px 45px;
+      padding: 25px 40px 30px;
     }
     
     .section {
-      margin-bottom: 32px;
+      margin-bottom: 24px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    
+    .section:last-child {
+      margin-bottom: 0;
     }
     
     .section-title {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       color: #00D4FF;
-      margin-bottom: 18px;
+      margin-bottom: 14px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       text-transform: uppercase;
       letter-spacing: 1px;
     }
@@ -329,8 +372,8 @@ function generateReportHtml(data: ReportData): string {
     .metrics-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 14px;
-      margin-bottom: 24px;
+      gap: 12px;
+      margin-bottom: 20px;
     }
     
     .metrics-grid-4 {
@@ -340,8 +383,8 @@ function generateReportHtml(data: ReportData): string {
     .metric-card {
       background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 18px;
+      border-radius: 10px;
+      padding: 14px;
       position: relative;
       overflow: hidden;
     }
@@ -417,14 +460,14 @@ function generateReportHtml(data: ReportData): string {
     .hero-stats {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 32px;
+      gap: 16px;
+      margin-bottom: 24px;
     }
     
     .hero-stat {
       background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
-      border-radius: 16px;
-      padding: 28px;
+      border-radius: 12px;
+      padding: 20px;
       border: 1px solid rgba(255, 255, 255, 0.08);
       position: relative;
       overflow: hidden;
@@ -449,10 +492,10 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .hero-stat-value {
-      font-size: 36px;
+      font-size: 28px;
       font-weight: 800;
       color: white;
-      margin: 10px 0;
+      margin: 6px 0;
     }
     
     .hero-stat-value.green { color: #4ADE80; }
@@ -479,7 +522,7 @@ function generateReportHtml(data: ReportData): string {
       color: #00D4FF;
       font-weight: 600;
       text-align: left;
-      padding: 14px 16px;
+      padding: 10px 12px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-size: 10px;
@@ -495,7 +538,7 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .data-table td {
-      padding: 14px 16px;
+      padding: 10px 12px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       color: white;
     }
