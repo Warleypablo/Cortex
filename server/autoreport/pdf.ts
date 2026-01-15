@@ -581,6 +581,357 @@ function generateReportHtml(data: ReportData): string {
       color: #888888;
     }
     
+    /* Comparison Bar Charts */
+    .comparison-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    
+    .chart-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    
+    .chart-label {
+      width: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      text-align: right;
+    }
+    
+    .chart-bars {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    
+    .bar-container {
+      height: 24px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .bar-fill {
+      height: 100%;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: white;
+      min-width: 60px;
+      transition: width 0.3s ease;
+    }
+    
+    .bar-fill.current {
+      background: linear-gradient(90deg, #00D4FF, #0099FF);
+    }
+    
+    .bar-fill.previous {
+      background: linear-gradient(90deg, #444444, #555555);
+    }
+    
+    .chart-legend-inline {
+      display: flex;
+      gap: 8px;
+      margin-left: 8px;
+    }
+    
+    .legend-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+    
+    .legend-badge.current {
+      background: rgba(0, 212, 255, 0.2);
+      color: #00D4FF;
+    }
+    
+    .legend-badge.previous {
+      background: rgba(255, 255, 255, 0.1);
+      color: #888888;
+    }
+    
+    /* Donut Chart */
+    .donut-container {
+      display: flex;
+      align-items: center;
+      gap: 40px;
+      padding: 20px;
+      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .donut-chart {
+      position: relative;
+      width: 140px;
+      height: 140px;
+    }
+    
+    .donut-chart svg {
+      transform: rotate(-90deg);
+    }
+    
+    .donut-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    
+    .donut-center-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: white;
+    }
+    
+    .donut-center-label {
+      font-size: 10px;
+      color: #888888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .donut-legend {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .donut-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .donut-legend-color {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+    
+    .donut-legend-color.google { background: linear-gradient(135deg, #4285F4, #3367D6); }
+    .donut-legend-color.meta { background: linear-gradient(135deg, #0084FF, #0066CC); }
+    .donut-legend-color.primary { background: linear-gradient(135deg, #00D4FF, #0099FF); }
+    .donut-legend-color.secondary { background: linear-gradient(135deg, #4ADE80, #22C55E); }
+    
+    .donut-legend-info {
+      flex: 1;
+    }
+    
+    .donut-legend-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: white;
+    }
+    
+    .donut-legend-value {
+      font-size: 12px;
+      color: #888888;
+    }
+    
+    .donut-legend-percent {
+      font-size: 16px;
+      font-weight: 700;
+      color: white;
+    }
+    
+    /* Progress Gauge */
+    .gauge-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    
+    .gauge-card {
+      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .gauge-circle {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 16px;
+    }
+    
+    .gauge-circle svg {
+      transform: rotate(-90deg);
+    }
+    
+    .gauge-value {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 20px;
+      font-weight: 800;
+      color: white;
+    }
+    
+    .gauge-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #888888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .gauge-sublabel {
+      font-size: 11px;
+      color: #666666;
+      margin-top: 4px;
+    }
+    
+    /* Sparkline Mini Charts */
+    .sparkline-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    
+    .sparkline-info {
+      flex: 1;
+    }
+    
+    .sparkline-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .sparkline-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: white;
+      margin-top: 4px;
+    }
+    
+    .sparkline-change {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-top: 6px;
+    }
+    
+    .sparkline-change.positive {
+      background: rgba(74, 222, 128, 0.15);
+      color: #4ADE80;
+    }
+    
+    .sparkline-change.negative {
+      background: rgba(248, 113, 113, 0.15);
+      color: #F87171;
+    }
+    
+    .sparkline-chart {
+      width: 120px;
+      height: 50px;
+    }
+    
+    /* KPI Cards with Visual */
+    .kpi-visual-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+    
+    .kpi-visual-card {
+      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .kpi-visual-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, #00D4FF, #0099FF);
+    }
+    
+    .kpi-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 24px;
+    }
+    
+    .kpi-icon.blue { background: rgba(0, 212, 255, 0.15); }
+    .kpi-icon.green { background: rgba(74, 222, 128, 0.15); }
+    .kpi-icon.purple { background: rgba(168, 85, 247, 0.15); }
+    .kpi-icon.yellow { background: rgba(250, 204, 21, 0.15); }
+    
+    .kpi-visual-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .kpi-visual-value {
+      font-size: 28px;
+      font-weight: 800;
+      color: white;
+      margin: 8px 0;
+    }
+    
+    .kpi-visual-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .kpi-visual-change {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .kpi-visual-change.positive { color: #4ADE80; }
+    .kpi-visual-change.negative { color: #F87171; }
+    
+    .kpi-visual-period {
+      font-size: 11px;
+      color: #666666;
+    }
+
     /* Page Footer */
     .page-footer {
       position: absolute;
@@ -656,7 +1007,7 @@ function generateReportHtml(data: ReportData): string {
     <div class="page-header">
       <div class="page-brand">Turbo Partners</div>
       <div class="page-title">Resumo Executivo</div>
-      <div class="header-accent orange"></div>
+      <div class="header-accent blue"></div>
     </div>
     
     <div class="page-content">
@@ -693,64 +1044,106 @@ function generateReportHtml(data: ReportData): string {
       </div>
       
       <div class="section">
-        <div class="section-title">Comparativo com Período Anterior</div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Métrica</th>
-              <th>Período Atual</th>
-              <th>Período Anterior</th>
-              <th>Variação</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>Sessões</strong></td>
-              <td>${formatNumber(data.ga4Atual.sessoes)}</td>
-              <td>${formatNumber(data.ga4Anterior.sessoes)}</td>
-              <td><span class="variation ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</span></td>
-            </tr>
-            <tr>
-              <td><strong>Usuários</strong></td>
-              <td>${formatNumber(data.ga4Atual.usuarios)}</td>
-              <td>${formatNumber(data.ga4Anterior.usuarios)}</td>
-              <td><span class="variation ${usuariosVar.isPositive ? 'positive' : 'negative'}">${usuariosVar.text}</span></td>
-            </tr>
-            <tr>
-              <td><strong>Conversões</strong></td>
-              <td>${formatNumber(data.ga4Atual.conversoes)}</td>
-              <td>${formatNumber(data.ga4Anterior.conversoes)}</td>
-              <td><span class="variation ${convVar.isPositive ? 'positive' : 'negative'}">${convVar.text}</span></td>
-            </tr>
-            <tr>
-              <td><strong>Receita</strong></td>
-              <td>${formatCurrency(data.ga4Atual.receita)}</td>
-              <td>${formatCurrency(data.ga4Anterior.receita)}</td>
-              <td><span class="variation ${receitaVar.isPositive ? 'positive' : 'negative'}">${receitaVar.text}</span></td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="section-title">Comparativo Visual</div>
+        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+          <span class="legend-badge current">Período Atual</span>
+          <span class="legend-badge previous">Período Anterior</span>
+        </div>
+        <div class="comparison-chart">
+          <div class="chart-row">
+            <div class="chart-label">Sessões</div>
+            <div class="chart-bars">
+              <div class="bar-container">
+                <div class="bar-fill current" style="width: ${Math.min(100, (data.ga4Atual.sessoes / Math.max(data.ga4Atual.sessoes, data.ga4Anterior.sessoes)) * 100)}%">${formatNumber(data.ga4Atual.sessoes)}</div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-fill previous" style="width: ${Math.min(100, (data.ga4Anterior.sessoes / Math.max(data.ga4Atual.sessoes, data.ga4Anterior.sessoes)) * 100)}%">${formatNumber(data.ga4Anterior.sessoes)}</div>
+              </div>
+            </div>
+            <div class="sparkline-change ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</div>
+          </div>
+          <div class="chart-row">
+            <div class="chart-label">Usuários</div>
+            <div class="chart-bars">
+              <div class="bar-container">
+                <div class="bar-fill current" style="width: ${Math.min(100, (data.ga4Atual.usuarios / Math.max(data.ga4Atual.usuarios, data.ga4Anterior.usuarios)) * 100)}%">${formatNumber(data.ga4Atual.usuarios)}</div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-fill previous" style="width: ${Math.min(100, (data.ga4Anterior.usuarios / Math.max(data.ga4Atual.usuarios, data.ga4Anterior.usuarios)) * 100)}%">${formatNumber(data.ga4Anterior.usuarios)}</div>
+              </div>
+            </div>
+            <div class="sparkline-change ${usuariosVar.isPositive ? 'positive' : 'negative'}">${usuariosVar.text}</div>
+          </div>
+          <div class="chart-row">
+            <div class="chart-label">Conversões</div>
+            <div class="chart-bars">
+              <div class="bar-container">
+                <div class="bar-fill current" style="width: ${Math.min(100, (data.ga4Atual.conversoes / Math.max(data.ga4Atual.conversoes, data.ga4Anterior.conversoes, 1)) * 100)}%">${formatNumber(data.ga4Atual.conversoes)}</div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-fill previous" style="width: ${Math.min(100, (data.ga4Anterior.conversoes / Math.max(data.ga4Atual.conversoes, data.ga4Anterior.conversoes, 1)) * 100)}%">${formatNumber(data.ga4Anterior.conversoes)}</div>
+              </div>
+            </div>
+            <div class="sparkline-change ${convVar.isPositive ? 'positive' : 'negative'}">${convVar.text}</div>
+          </div>
+          <div class="chart-row">
+            <div class="chart-label">Receita</div>
+            <div class="chart-bars">
+              <div class="bar-container">
+                <div class="bar-fill current" style="width: ${Math.min(100, (data.ga4Atual.receita / Math.max(data.ga4Atual.receita, data.ga4Anterior.receita, 1)) * 100)}%">${formatCurrency(data.ga4Atual.receita)}</div>
+              </div>
+              <div class="bar-container">
+                <div class="bar-fill previous" style="width: ${Math.min(100, (data.ga4Anterior.receita / Math.max(data.ga4Atual.receita, data.ga4Anterior.receita, 1)) * 100)}%">${formatCurrency(data.ga4Anterior.receita)}</div>
+              </div>
+            </div>
+            <div class="sparkline-change ${receitaVar.isPositive ? 'positive' : 'negative'}">${receitaVar.text}</div>
+          </div>
+        </div>
       </div>
       
       <div class="section investment-section">
         <div class="section-title">Distribuição de Investimento</div>
-        <div class="investment-bar">
-          <div class="investment-bar-google" style="width: ${googlePct}%"></div>
-          <div class="investment-bar-meta" style="width: ${metaPct}%"></div>
-        </div>
-        <div class="investment-legend">
-          <div class="legend-item">
-            <div class="legend-dot google"></div>
-            <div>
-              <div class="legend-label">Google Ads</div>
-              <div class="legend-value">${formatCurrency(data.googleAds.custo)} (${googlePct.toFixed(0)}%)</div>
+        <div class="donut-container">
+          <div class="donut-chart">
+            <svg width="140" height="140" viewBox="0 0 140 140">
+              <circle cx="70" cy="70" r="55" fill="none" stroke="#222" stroke-width="20"/>
+              <circle cx="70" cy="70" r="55" fill="none" stroke="url(#googleGrad)" stroke-width="20" 
+                stroke-dasharray="${(googlePct / 100) * 345.6} 345.6" stroke-linecap="round"/>
+              <circle cx="70" cy="70" r="55" fill="none" stroke="url(#metaGrad)" stroke-width="20" 
+                stroke-dasharray="${(metaPct / 100) * 345.6} 345.6" 
+                stroke-dashoffset="${-(googlePct / 100) * 345.6}" stroke-linecap="round"/>
+              <defs>
+                <linearGradient id="googleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style="stop-color:#4285F4"/>
+                  <stop offset="100%" style="stop-color:#3367D6"/>
+                </linearGradient>
+                <linearGradient id="metaGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style="stop-color:#0084FF"/>
+                  <stop offset="100%" style="stop-color:#0066CC"/>
+                </linearGradient>
+              </defs>
+            </svg>
+            <div class="donut-center">
+              <div class="donut-center-value">${formatCurrency(investTotal)}</div>
+              <div class="donut-center-label">Total</div>
             </div>
           </div>
-          <div class="legend-item">
-            <div class="legend-dot meta"></div>
-            <div>
-              <div class="legend-label">Meta Ads</div>
-              <div class="legend-value">${formatCurrency(data.metaAds.custo)} (${metaPct.toFixed(0)}%)</div>
+          <div class="donut-legend">
+            <div class="donut-legend-item">
+              <div class="donut-legend-color google"></div>
+              <div class="donut-legend-info">
+                <div class="donut-legend-name">Google Ads</div>
+                <div class="donut-legend-value">${formatCurrency(data.googleAds.custo)}</div>
+              </div>
+              <div class="donut-legend-percent">${googlePct.toFixed(0)}%</div>
+            </div>
+            <div class="donut-legend-item">
+              <div class="donut-legend-color meta"></div>
+              <div class="donut-legend-info">
+                <div class="donut-legend-name">Meta Ads</div>
+                <div class="donut-legend-value">${formatCurrency(data.metaAds.custo)}</div>
+              </div>
+              <div class="donut-legend-percent">${metaPct.toFixed(0)}%</div>
             </div>
           </div>
         </div>
@@ -768,52 +1161,66 @@ function generateReportHtml(data: ReportData): string {
     <div class="page-header">
       <div class="page-brand">Turbo Partners</div>
       <div class="page-title">Google Analytics 4</div>
-      <div class="header-accent orange"></div>
+      <div class="header-accent blue"></div>
     </div>
     
     <div class="page-content">
       <div class="section">
         <div class="section-title">Métricas de Tráfego</div>
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-label">Sessões</div>
-            <div class="metric-value">${formatNumber(data.ga4Atual.sessoes)}</div>
-            <div class="metric-change ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</div>
+        <div class="kpi-visual-grid">
+          <div class="kpi-visual-card">
+            <div class="kpi-icon blue">📊</div>
+            <div class="kpi-visual-label">Sessões</div>
+            <div class="kpi-visual-value">${formatNumber(data.ga4Atual.sessoes)}</div>
+            <div class="kpi-visual-footer">
+              <span class="kpi-visual-change ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</span>
+              <span class="kpi-visual-period">vs anterior</span>
+            </div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Usuários</div>
-            <div class="metric-value">${formatNumber(data.ga4Atual.usuarios)}</div>
-            <div class="metric-change ${usuariosVar.isPositive ? 'positive' : 'negative'}">${usuariosVar.text}</div>
+          <div class="kpi-visual-card">
+            <div class="kpi-icon green">👥</div>
+            <div class="kpi-visual-label">Usuários</div>
+            <div class="kpi-visual-value">${formatNumber(data.ga4Atual.usuarios)}</div>
+            <div class="kpi-visual-footer">
+              <span class="kpi-visual-change ${usuariosVar.isPositive ? 'positive' : 'negative'}">${usuariosVar.text}</span>
+              <span class="kpi-visual-period">vs anterior</span>
+            </div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Novos Usuários</div>
-            <div class="metric-value">${formatNumber(data.ga4Atual.novoUsuarios)}</div>
-            <div class="metric-change ${calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios).isPositive ? 'positive' : 'negative'}">${calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios).text}</div>
+          <div class="kpi-visual-card">
+            <div class="kpi-icon purple">🆕</div>
+            <div class="kpi-visual-label">Novos Usuários</div>
+            <div class="kpi-visual-value">${formatNumber(data.ga4Atual.novoUsuarios)}</div>
+            <div class="kpi-visual-footer">
+              <span class="kpi-visual-change ${calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios).isPositive ? 'positive' : 'negative'}">${calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios).text}</span>
+              <span class="kpi-visual-period">vs anterior</span>
+            </div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Taxa de Rejeição</div>
-            <div class="metric-value">${formatPercent(data.ga4Atual.taxaRejeicao * 100)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Duração Média</div>
-            <div class="metric-value">${formatDuration(data.ga4Atual.duracaoMedia)}</div>
-          </div>
-          <div class="metric-card highlight">
-            <div class="metric-label">Conversões</div>
-            <div class="metric-value">${formatNumber(data.ga4Atual.conversoes)}</div>
-            <div class="metric-change ${convVar.isPositive ? 'positive' : 'negative'}" style="color: ${convVar.isPositive ? '#86efac' : '#fca5a5'}">${convVar.text}</div>
+          <div class="kpi-visual-card">
+            <div class="kpi-icon yellow">⏱️</div>
+            <div class="kpi-visual-label">Duração Média</div>
+            <div class="kpi-visual-value">${formatDuration(data.ga4Atual.duracaoMedia)}</div>
+            <div class="kpi-visual-footer">
+              <span class="kpi-visual-period">Tempo por sessão</span>
+            </div>
           </div>
         </div>
       </div>
       
       <div class="section">
-        <div class="section-title">Receita</div>
-        <div class="hero-stats" style="margin-bottom: 0;">
-          <div class="hero-stat" style="grid-column: span 2;">
-            <div class="hero-stat-label">Receita Total do Período</div>
-            <div class="hero-stat-value green">${formatCurrency(data.ga4Atual.receita)}</div>
-            <div class="hero-stat-sub ${receitaVar.isPositive ? 'positive' : 'negative'}">
-              ${receitaVar.text} vs período anterior (${formatCurrency(data.ga4Anterior.receita)})
+        <div class="section-title">Receita e Conversões</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="sparkline-row" style="margin-bottom: 0;">
+            <div class="sparkline-info">
+              <div class="sparkline-label">💰 Receita Total</div>
+              <div class="sparkline-value" style="color: #4ADE80;">${formatCurrency(data.ga4Atual.receita)}</div>
+              <div class="sparkline-change ${receitaVar.isPositive ? 'positive' : 'negative'}">${receitaVar.text}</div>
+            </div>
+          </div>
+          <div class="sparkline-row" style="margin-bottom: 0;">
+            <div class="sparkline-info">
+              <div class="sparkline-label">🎯 Conversões</div>
+              <div class="sparkline-value" style="color: #00D4FF;">${formatNumber(data.ga4Atual.conversoes)}</div>
+              <div class="sparkline-change ${convVar.isPositive ? 'positive' : 'negative'}">${convVar.text}</div>
             </div>
           </div>
         </div>
@@ -821,24 +1228,27 @@ function generateReportHtml(data: ReportData): string {
       
       <div class="section">
         <div class="section-title">Top Canais de Aquisição</div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Canal</th>
-              <th>Sessões</th>
-              <th>Conversões</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.ga4Atual.canais.slice(0, 5).map(c => `
-            <tr>
-              <td><strong>${c.nome || 'Direto'}</strong></td>
-              <td>${formatNumber(c.sessoes)}</td>
-              <td>${formatNumber(c.conversoes)}</td>
-            </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        ${(() => {
+          const maxSessoes = Math.max(...data.ga4Atual.canais.slice(0, 5).map(c => c.sessoes), 1);
+          return data.ga4Atual.canais.slice(0, 5).map((c, i) => `
+          <div class="sparkline-row">
+            <div style="width: 24px; height: 24px; border-radius: 6px; background: linear-gradient(135deg, #00D4FF, #0099FF); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #000;">${i + 1}</div>
+            <div class="sparkline-info" style="flex: 1;">
+              <div class="sparkline-label">${c.nome || 'Direto'}</div>
+              <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px;">
+                <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                  <div style="height: 100%; width: ${(c.sessoes / maxSessoes) * 100}%; background: linear-gradient(90deg, #00D4FF, #0099FF); border-radius: 4px;"></div>
+                </div>
+                <span style="font-size: 13px; font-weight: 600; color: white; min-width: 70px;">${formatNumber(c.sessoes)} sessões</span>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 18px; font-weight: 700; color: #4ADE80;">${formatNumber(c.conversoes)}</div>
+              <div style="font-size: 10px; color: #888;">conversões</div>
+            </div>
+          </div>
+          `).join('');
+        })()}
       </div>
     </div>
     
