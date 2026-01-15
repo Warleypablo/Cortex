@@ -33,6 +33,8 @@ interface AutoReportJob {
   mensagem?: string;
   presentationId?: string;
   presentationUrl?: string;
+  downloadUrl?: string;
+  fileName?: string;
   criadoEm: string;
   concluidoEm?: string;
 }
@@ -104,8 +106,8 @@ export default function AutoReport() {
     onSuccess: (data: AutoReportJob) => {
       toast({
         title: data.status === 'concluido' ? 'Relatório gerado!' : 'Relatório em processamento',
-        description: data.presentationUrl 
-          ? `Relatório de ${data.clienteNome} disponível.`
+        description: data.downloadUrl 
+          ? `PDF de ${data.clienteNome} pronto para download.`
           : `Processando relatório de ${data.clienteNome}...`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/autoreport/jobs'] });
@@ -381,16 +383,15 @@ export default function AutoReport() {
                       <div className="text-xs text-muted-foreground">
                         {new Date(job.criadoEm).toLocaleString('pt-BR')}
                       </div>
-                      {job.presentationUrl && (
+                      {job.downloadUrl && (
                         <a 
-                          href={job.presentationUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
+                          href={job.downloadUrl}
+                          download={job.fileName || 'relatorio.pdf'}
                           className="flex items-center gap-1 text-xs text-primary hover:underline"
-                          data-testid={`link-report-${job.id}`}
+                          data-testid={`link-download-${job.id}`}
                         >
-                          <ExternalLink className="w-3 h-3" />
-                          Abrir Relatório
+                          <FileText className="w-3 h-3" />
+                          Baixar PDF
                         </a>
                       )}
                       {job.mensagem && (
