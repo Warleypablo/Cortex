@@ -42,6 +42,7 @@ import {
   Info
 } from "lucide-react";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
+import { SalesGoalsModal } from "@/components/SalesGoalsModal";
 
 interface CloserMetrics {
   mrrObtido: number;
@@ -392,6 +393,19 @@ export default function DashboardClosers() {
               </TooltipTrigger>
               <TooltipContent>
                 <p>Modo Apresentação (TV)</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SalesGoalsModal
+                  type="closers"
+                  periodMonth={(dataFechamentoRange?.from || new Date()).getMonth() + 1}
+                  periodYear={(dataFechamentoRange?.from || new Date()).getFullYear()}
+                />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Configurar Metas</p>
               </TooltipContent>
             </Tooltip>
             
