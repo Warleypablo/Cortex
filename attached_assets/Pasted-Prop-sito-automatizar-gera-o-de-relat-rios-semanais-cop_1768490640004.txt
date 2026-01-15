@@ -1,0 +1,97 @@
+Propósito: automatizar geração de relatórios semanais copiando templates Google Slides, preenchendo placeholders (texto e imagens) com dados coletados de GA4 / Meta / Google Ads / painéis e registrando o resultado numa planilha de acompanhamento.
+Entrada: Planilha Central (configurada em settings.py).
+Saída: Apresentações Google Slides por cliente e uma planilha de acompanhamento com links.
+Top-level
+
+report_generator.py: orquestrador principal. Lê clientes via core.leitura_central.fetch_clientes, cria a planilha de acompanhamento (core.relatorio_writer.criar_planilha_relatorio), paraleliza processamento com ThreadPoolExecutor e, para cada cliente, executa processar_cliente() que: atualiza status, calcula períodos, monta placeholders básicos, delega coleta à handler de categoria, copia template, preenche slides, executa pós‑processamento, registra resultado e grava ULTIMA VEZ GERADO (AUTO). Também expõe CLI --cliente.
+README.md: documentação de uso (instalação, variáveis, execução).
+requirements.txt: dependências (Google API clients, libs auxiliares).
+Dockerfile / executar.bat: formas de empacotar/executar o projeto em Docker e Windows respectivamente.
+Arquivos JSON de cliente OAuth no root (ex.: client_secret_...json) são usados por fluxos de autenticação interativos, quando aplicável.
+config
+
+settings.py: arquivo central de configuração. Contém IDs de templates (TEMPLATE_RELATORIO_ID, possivelmente TEMPLATE_ID), CENTRAL_SHEET_URL, CENTRAL_TAB_NAME, RELATORIO_FOLDER_ID, flags (TESTE), e outras constantes utilizadas por report_generator e módulos core. Deve ser preenchido antes da execução.
+__init__.py: exporta o módulo settings.
+config/testeconfig.py: utilitários/valores para execução em modo de teste (se usado).
+core — módulos principais e responsabilidades
+
+cred_manager.py: centraliza carregamento de credenciais (service account ou credenciais de usuário). Fornece load_google_account() utilizado por Sheets/Drive/Slides/GA/API clients. Trata de localizar os JSONs em credentials e criar Credentials compatíveis com googleapiclient.
+leitura_central.py: lê a Planilha Central e converte linhas em instâncias Cliente (dataclass). Verifica colunas obrigatórias (GERAR?, CLIENTE, CATEGORIA, LINK PAINEL, LINK PASTA, ID GOOGLE ADS, ID META ADS, ID GA4). Marca linhas como IGNORADO quando GERAR? = falso ou SEM CATEGORIA se categoria estiver vazia; grava metadados (sheet id, tab, row, índices de coluna) em cliente.extras para permitir atualizações futuras (status, última geração). Usa execute_with_retries() para chamadas de Sheets e core.cred_manager para autenticação.
+periodo.py: calcula períodos de referência (p.ex., semana atual e período comparativo) e fornece objetos com inicio/fim para preenchimento de placeholders e queries.
+basic_placeholders.py: monta placeholders genéricos (datas formatadas, títulos, nome do cliente, métricas agregadas básicas) retornando dicionário que será mesclado com dados específicos de categoria.
+template_manager.py: copia o template de Slides (usando Drive API) para gerar uma cópia por cliente; normalmente usa handler.template_id para escolher qual template copiar e retorna presentation_id. Pode também alocar a cópia em pasta específica (RELATORIO_FOLDER_ID) e aplicar nome padrão.
+slide_filler.py: preenche a apresentação já copiada. Principais responsabilidades:
+construir replaceAllText requests para todos os placeholders textuais;
+mapear objectIds de imagens na página meta (cache via lru_cache) e construir replaceImage requests para placeholders {{img_*}};
+deletar imagens-base quando placeholder indica __NO_IMAGE__;
+executar presentations().batchUpdate com todos os requests (agrupados e com retries);
+delega coloração/estilos de variações negativas para variation_styler.py.
+variation_styler.py: aplica estilos (ex.: pintar variações negativas de vermelho). Trabalha sobre a apresentação após o preenchimento ou gera requests para batchUpdate. Separado para manter slide_filler focado em replace básico.
+relatorio_writer.py: gerencia a planilha de acompanhamento:
+criar_planilha_relatorio() copia template de planilha para a pasta de relatórios e retorna spreadsheetId;
+cache do spreadsheet id global usado durante execução (set_planilha_id, get_planilha_id);
+_append_row() com lock para acrescentar linhas com HYPERLINK para pasta e apresentação;
+registrar(cliente, presentation_id, status) formata valores e insere linha (gestor, squad, nome, categoria, link pasta, link report, status).
+status.py: funções para atualizar célula STATUS (AUTO) e ULTIMA VEZ GERADO (AUTO) na Planilha Central, normalmente chamadas por report_generator.processar_cliente e leitura_central quando necessário.
+progress_bar.py: utilitário de progresso/feedback (possivelmente usado em execuções interativas).
+testeconfig.py: utilitários e constantes auxiliares para execução em modo teste.
+variacao_dados_comparativos.py: lógica para calcular variações entre períodos (ex.: diferença percentual e absoluta).
+channel_descriptions.json: dicionário/descrições para canais (usado em textos do relatório).
+Arquivos auxiliares: status.py e arquivos pequenos com helpers.
+categorias — handlers por categoria
+
+Estrutura: arquivos de alto nível (E-commerce.py, Lead Com Site.py, Lead Sem Site.py) que expõem uma interface comum:
+template_id (ID do template Slides usado por essa categoria);
+_SLIDES.meta_ads (identificador de slide com imagens/elementos meta quando aplicável);
+coletar_dados(cliente, periodo_ref, periodo_comp) → retorna dicionário de placeholders específicos (gráficos, linhas de texto, URLs de criativas, métricas);
+pos_processar(presentation_id, dados) → ação pós‑preenchimento (ex.: ajustar gráficos, remover slides GA4, chamar variation_styler).
+Subpastas (ecommerce/, lead_com_site/, lead_sem_site/) contêm gatherers e scrapers específicos:
+campaign_facebook_gather.py / facebook_metrics_gather.py: conectam à API Meta / Facebook Ads, coletam dados de campanhas, criativas e métricas por período. Lidam com paginação e limites.
+google_metrics_gather.py, ga4_scraper.py, canais_ga4.py, painel_scraper.py: coletam dados do GA4 e painéis internos/exportação; formatam resultados para placeholders.
+campaign_google_gather.py: integra Google Ads (usa google-ads.yaml e bibliotecas Google Ads).
+Cada gatherer retorna métricas finais e possivelmente URLs de imagens para inserção em {{img_*}}.
+credentials
+
+Contém credenciais necessárias para autenticação com APIs:
+client_secret.json, oauth_client.json / token.json: OAuth client & access/refresh tokens para APIs Google interativas;
+conta_servico_ga4.json, conta_servico_google.json: contas de serviço para GA4/Drive/Sheets/... usadas em execução automatizada;
+google-ads.yaml: configuração do Google Ads client (developer_token, client_id, client_secret, refresh_token, login_customer_id, use_proto_plus). Atenção: esse arquivo contém credenciais sensíveis — mantenha fora do controle de versão e seguro.
+get_refresh_token.py: utilitário para obter refresh token manualmente quando necessário.
+token_google_account.json / token.json: tokens gerados que podem ser renovados e utilizados por core/cred_manager.
+utils
+
+logger.py: configuração do logger global do projeto; fornece get_logger(name), StepLogger (auxilia medir tempo e etapas), e constantes de nível/estrutura. Todos os módulos usam este logger para consistência. Gera logs em console e arquivos (rotacionados em logs).
+retry.py: execute_with_retries(callable, logger, context) — encapsula tentativas com backoff exponencial, captura exceções transitórias (rate limits, 5xx) e faz logs. Usado amplamente em todas chamadas HTTP/API.
+formatting.py: helpers para formatar números, moedas, percentuais e textos (ex.: '1.234,56', '12,3%') usados para montar placeholders legíveis.
+env2gcloud.py: auxilia a montar credenciais GCP a partir de variáveis de ambiente (útil em CI/CD).
+Outros utilitários pequenos podem existir (e.g., wrappers de rede).
+logs
+
+Armazena arquivos de log rotacionados (report.log.1 ...). utils/logger escreve eventos de execução, erros e summaries por cliente.
+Fluxo detalhado de interação entre componentes (resumo técnico)
+
+report_generator.main() chama leitura_central.fetch_clientes(...).
+leitura_central usa Sheets API via core.cred_manager.load_google_account() e utils.retry.execute_with_retries(); retorna lista de Cliente com metadados.
+main() cria planilha de acompanhamento (relatorio_writer.criar_planilha_relatorio()), seta id em cache e paraleliza execução.
+Para cada cliente, processar_cliente() faz:
+marca STATUS (AUTO) → PROCESSANDO (core.status.set_status);
+calcula periodo_ref e periodo_comp (core.periodo);
+monta dados básicos (basic_placeholders.montar_placeholders_basicos);
+obtém handler = get_handler(cliente.categoria) e chama handler.coletar_dados(...) — aqui ocorrem chamadas a GA4/Meta/Ads/painel (cada uma autenticada via cred_manager e protegida por retry), e o handler retorna placeholders específicos e URLs de imagens;
+copia template via template_manager.criar_copia(...) → obtém presentation_id;
+chama slide_filler.preencher(presentation_id, dados, handler._SLIDES.meta_ads) para substituir texto e imagens e possivelmente remover slides;
+chama handler.pos_processar(presentation_id, dados) para ajustes finais (ex.: estilização com variation_styler), registra resultado com relatorio_writer.registrar(...), e atualiza ULTIMA VEZ GERADO (AUTO) (usando índices gravados em cliente.extras).
+Erros são capturados e logados; STATUS é atualizado para ERRO: <TipoExceção>.
+Segurança e operações recomendadas
+
+Mantenha credentials fora do Git (use .gitignore), renove refresh_token com get_refresh_token.py se necessário.
+google-ads.yaml contém tokens e secrets — tratar como segredo.
+Configurar settings.py com IDs corretos e permissões de Drive/Sheets/Slides para a conta usada.
+Próximos passos possíveis (escolha um):
+
+Gerar documentação linha-a-linha para um arquivo específico (por exemplo E-commerce.py).
+Revisar settings.py e validar valores obrigatórios.
+Procurar usos de credenciais em código para confirmar práticas de segurança.
+Qual desses prefere que eu faça agora?
+
+GPT-5 mini • 1x
