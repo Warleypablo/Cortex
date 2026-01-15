@@ -138,7 +138,7 @@ function generateReportHtml(data: ReportData): string {
       left: 0;
       width: 6px;
       height: 100%;
-      background: linear-gradient(180deg, #FF6B00 0%, #FF8C33 50%, #FF6B00 100%);
+      background: linear-gradient(180deg, #00D4FF 0%, #0099FF 50%, #0066FF 100%);
     }
     
     .cover-pattern {
@@ -148,9 +148,9 @@ function generateReportHtml(data: ReportData): string {
       width: 60%;
       height: 100%;
       background: 
-        radial-gradient(ellipse at 90% 10%, rgba(255, 107, 0, 0.15) 0%, transparent 40%),
-        radial-gradient(ellipse at 70% 90%, rgba(255, 107, 0, 0.08) 0%, transparent 35%),
-        radial-gradient(ellipse at 50% 50%, rgba(255, 140, 51, 0.05) 0%, transparent 50%);
+        radial-gradient(ellipse at 90% 10%, rgba(0, 212, 255, 0.15) 0%, transparent 40%),
+        radial-gradient(ellipse at 70% 90%, rgba(0, 153, 255, 0.08) 0%, transparent 35%),
+        radial-gradient(ellipse at 50% 50%, rgba(0, 102, 255, 0.05) 0%, transparent 50%);
     }
     
     .cover-glow {
@@ -159,7 +159,7 @@ function generateReportHtml(data: ReportData): string {
       right: 10%;
       width: 300px;
       height: 300px;
-      background: radial-gradient(circle, rgba(255, 107, 0, 0.2) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(0, 212, 255, 0.2) 0%, transparent 70%);
       filter: blur(60px);
     }
     
@@ -187,8 +187,8 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .logo-turbo {
-      color: #FF6B00;
-      text-shadow: 0 0 40px rgba(255, 107, 0, 0.4);
+      color: #00D4FF;
+      text-shadow: 0 0 40px rgba(0, 212, 255, 0.4);
     }
     
     .logo-partners {
@@ -199,16 +199,16 @@ function generateReportHtml(data: ReportData): string {
     .cover-divider {
       width: 100px;
       height: 5px;
-      background: linear-gradient(90deg, #FF6B00, #FF8C33, #FF6B00);
+      background: linear-gradient(90deg, #00D4FF, #0099FF, #0066FF);
       margin: 40px 0;
       border-radius: 3px;
-      box-shadow: 0 0 20px rgba(255, 107, 0, 0.5);
+      box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
     }
     
     .cover-subtitle {
       font-size: 14px;
       font-weight: 600;
-      color: #FF6B00;
+      color: #00D4FF;
       text-transform: uppercase;
       letter-spacing: 4px;
       margin-bottom: 16px;
@@ -226,8 +226,8 @@ function generateReportHtml(data: ReportData): string {
       position: relative;
       z-index: 1;
       padding: 45px 55px;
-      background: linear-gradient(90deg, rgba(255, 107, 0, 0.1) 0%, rgba(0, 0, 0, 0.3) 100%);
-      border-top: 1px solid rgba(255, 107, 0, 0.2);
+      background: linear-gradient(90deg, rgba(0, 212, 255, 0.08) 0%, rgba(0, 0, 0, 0.3) 100%);
+      border-top: 1px solid rgba(0, 212, 255, 0.2);
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
@@ -245,7 +245,7 @@ function generateReportHtml(data: ReportData): string {
     .info-label {
       font-size: 10px;
       font-weight: 600;
-      color: #FF6B00;
+      color: #00D4FF;
       text-transform: uppercase;
       letter-spacing: 1.5px;
       margin-bottom: 8px;
@@ -267,7 +267,7 @@ function generateReportHtml(data: ReportData): string {
       background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
       padding: 35px 45px;
       position: relative;
-      border-bottom: 1px solid rgba(255, 107, 0, 0.2);
+      border-bottom: 1px solid rgba(0, 212, 255, 0.2);
     }
     
     .header-accent {
@@ -278,7 +278,7 @@ function generateReportHtml(data: ReportData): string {
       height: 3px;
     }
     
-    .header-accent.orange { background: linear-gradient(90deg, #FF6B00, #FF8C33); }
+    .header-accent.orange { background: linear-gradient(90deg, #00D4FF, #0099FF); }
     .header-accent.blue { background: linear-gradient(90deg, #4285F4, #5A95F5); }
     .header-accent.meta { background: linear-gradient(90deg, #0084FF, #00A3FF); }
     
@@ -292,7 +292,7 @@ function generateReportHtml(data: ReportData): string {
     .page-brand {
       font-size: 11px;
       font-weight: 600;
-      color: #FF6B00;
+      color: #00D4FF;
       text-transform: uppercase;
       letter-spacing: 2px;
       margin-bottom: 4px;
@@ -309,7 +309,7 @@ function generateReportHtml(data: ReportData): string {
     .section-title {
       font-size: 13px;
       font-weight: 700;
-      color: #FF6B00;
+      color: #00D4FF;
       margin-bottom: 18px;
       display: flex;
       align-items: center;
@@ -322,7 +322,7 @@ function generateReportHtml(data: ReportData): string {
       content: '';
       flex: 1;
       height: 1px;
-      background: linear-gradient(90deg, rgba(255, 107, 0, 0.3) 0%, transparent 100%);
+      background: linear-gradient(90deg, rgba(0, 212, 255, 0.3) 0%, transparent 100%);
     }
     
     /* Metric Cards */
@@ -353,11 +353,11 @@ function generateReportHtml(data: ReportData): string {
       left: 0;
       right: 0;
       height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(255, 107, 0, 0.3), transparent);
+      background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3), transparent);
     }
     
     .metric-card.highlight {
-      background: linear-gradient(135deg, #FF6B00 0%, #CC5500 100%);
+      background: linear-gradient(135deg, #00D4FF 0%, #0099FF 100%);
       border: none;
     }
     
@@ -437,7 +437,7 @@ function generateReportHtml(data: ReportData): string {
       left: 0;
       width: 4px;
       height: 100%;
-      background: linear-gradient(180deg, #FF6B00, #FF8C33);
+      background: linear-gradient(180deg, #00D4FF, #0099FF);
     }
     
     .hero-stat-label {
@@ -476,14 +476,14 @@ function generateReportHtml(data: ReportData): string {
     
     .data-table th {
       background: linear-gradient(135deg, #1a1a1a 0%, #111111 100%);
-      color: #FF6B00;
+      color: #00D4FF;
       font-weight: 600;
       text-align: left;
       padding: 14px 16px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-size: 10px;
-      border-bottom: 2px solid rgba(255, 107, 0, 0.3);
+      border-bottom: 2px solid rgba(0, 212, 255, 0.3);
     }
     
     .data-table th:first-child {
@@ -596,7 +596,7 @@ function generateReportHtml(data: ReportData): string {
     }
     
     .page-footer span:first-child {
-      color: #FF6B00;
+      color: #00D4FF;
       font-weight: 500;
     }
     
