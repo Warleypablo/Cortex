@@ -108,8 +108,8 @@ export default function AutoReport() {
           ? `Relatório de ${data.clienteNome} disponível.`
           : `Processando relatório de ${data.clienteNome}...`,
       });
-      refetchJobs();
-      refetchClientes();
+      queryClient.invalidateQueries({ queryKey: ['/api/autoreport/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/autoreport/clientes'] });
     },
     onError: (error: any) => {
       toast({
@@ -142,8 +142,8 @@ export default function AutoReport() {
         description: `${concluidos} relatórios gerados, ${erros} erros.`,
       });
       setSelectedClientes(new Set());
-      refetchJobs();
-      refetchClientes();
+      queryClient.invalidateQueries({ queryKey: ['/api/autoreport/jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/autoreport/clientes'] });
     },
     onError: (error: any) => {
       toast({
