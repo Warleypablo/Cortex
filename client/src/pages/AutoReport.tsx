@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, FileText, ExternalLink, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 
@@ -79,6 +80,8 @@ function getStatusBadge(status: string) {
 export default function AutoReport() {
   const { toast } = useToast();
   const [selectedClientes, setSelectedClientes] = useState<Set<number>>(new Set());
+  const [filtroGestor, setFiltroGestor] = useState<string>('todos');
+  const [hiddenClientes, setHiddenClientes] = useState<Set<number>>(new Set());
 
   const { data: clientes = [], isLoading: loadingClientes, refetch: refetchClientes } = useQuery<AutoReportCliente[]>({
     queryKey: ['/api/autoreport/clientes'],
@@ -88,6 +91,11 @@ export default function AutoReport() {
     queryKey: ['/api/autoreport/jobs'],
     refetchInterval: 5000,
   });
+
+  const gestores = useMemo(() => {
+    const uniqueGestores = new Set(clientes.map(c => c.gestor).filter(Boolean));
+    return Array.from(uniqueGestores).sort();
+  }, [clientes]);
 
   const gerarRelatorioMutation = useMutation({
     mutationFn: async (cliente: AutoReportCliente): Promise<AutoReportJob> => {
@@ -167,7 +175,7 @@ export default function AutoReport() {
   };
 
   const selectAllGerar = () => {
-    const toSelect = clientes.filter(c => c.gerar && c.categoria).map(c => c.rowIndex);
+    const toSelect = clientesFiltrados.filter(c => c.gerar && c.categoria).map(c => c.rowIndex);
     setSelectedClientes(new Set(toSelect));
   };
 
@@ -184,8 +192,37 @@ export default function AutoReport() {
     gerarLoteMutation.mutate(clientesSelecionados);
   };
 
+  const hideCliente = (rowIndex: number) => {
+    const newHidden = new Set(hiddenClientes);
+    newHidden.add(rowIndex);
+    setHiddenClientes(newHidden);
+    const newSelected = new Set(selectedClientes);
+    newSelected.delete(rowIndex);
+    setSelectedClientes(newSelected);
+    toast({
+      title: 'Cliente oculto',
+      description: 'O cliente foi removido da lista. Use "Restaurar Ocultos" para trazer de volta.',
+    });
+  };
+
+  const restoreHidden = () => {
+    setHiddenClientes(new Set());
+    toast({
+      title: 'Clientes restaurados',
+      description: `${hiddenClientes.size} cliente(s) foram restaurados à lista.`,
+    });
+  };
+
   const clientesValidos = clientes.filter(c => c.categoria);
   const clientesParaGerar = clientes.filter(c => c.gerar && c.categoria);
+  
+  const clientesFiltrados = useMemo(() => {
+    return clientesValidos.filter(c => {
+      if (hiddenClientes.has(c.rowIndex)) return false;
+      if (filtroGestor !== 'todos' && c.gestor !== filtroGestor) return false;
+      return true;
+    });
+  }, [clientesValidos, hiddenClientes, filtroGestor]);
 
   return (
     <div className="p-6 space-y-6" data-testid="autoreport-page">
@@ -247,12 +284,32 @@ export default function AutoReport() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <CardTitle>Clientes</CardTitle>
-                <CardDescription>Selecione os clientes para gerar relatórios</CardDescription>
+                <CardDescription>
+                  {clientesFiltrados.length} de {clientesValidos.length} clientes
+                  {hiddenClientes.size > 0 && ` (${hiddenClientes.size} ocultos)`}
+                </CardDescription>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={filtroGestor} onValueChange={setFiltroGestor}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-gestor">
+                    <SelectValue placeholder="Filtrar por gestor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Gestores</SelectItem>
+                    {gestores.map(gestor => (
+                      <SelectItem key={gestor} value={gestor}>{gestor}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {hiddenClientes.size > 0 && (
+                  <Button variant="outline" size="sm" onClick={restoreHidden} data-testid="button-restore-hidden">
+                    <RotateCcw className="w-4 h-4 mr-1" />
+                    Restaurar ({hiddenClientes.size})
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={selectAllGerar} data-testid="button-select-all">
                   Selecionar Todos
                 </Button>
@@ -267,7 +324,7 @@ export default function AutoReport() {
                   ) : (
                     <Play className="w-4 h-4 mr-2" />
                   )}
-                  Gerar Selecionados ({selectedClientes.size})
+                  Gerar ({selectedClientes.size})
                 </Button>
               </div>
             </div>
@@ -277,19 +334,28 @@ export default function AutoReport() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
-            ) : clientesValidos.length === 0 ? (
+            ) : clientesFiltrados.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhum cliente encontrado na planilha central.</p>
-                <p className="text-sm mt-2">Verifique se a planilha está configurada corretamente.</p>
+                {clientesValidos.length === 0 ? (
+                  <>
+                    <p>Nenhum cliente encontrado na planilha central.</p>
+                    <p className="text-sm mt-2">Verifique se a planilha está configurada corretamente.</p>
+                  </>
+                ) : (
+                  <>
+                    <p>Nenhum cliente corresponde aos filtros aplicados.</p>
+                    <p className="text-sm mt-2">Altere o filtro de gestor ou restaure os clientes ocultos.</p>
+                  </>
+                )}
               </div>
             ) : (
               <ScrollArea className="h-[500px]">
                 <div className="space-y-2">
-                  {clientesValidos.map((cliente) => (
+                  {clientesFiltrados.map((cliente) => (
                     <div 
                       key={cliente.rowIndex}
-                      className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
                         selectedClientes.has(cliente.rowIndex) ? 'bg-primary/5 border-primary/20' : 'hover:bg-muted/50'
                       }`}
                       data-testid={`row-cliente-${cliente.rowIndex}`}
@@ -318,19 +384,31 @@ export default function AutoReport() {
                         {getCategoriaLabel(cliente.categoria)}
                       </Badge>
                       {getStatusBadge(cliente.status)}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => gerarRelatorioMutation.mutate(cliente)}
-                        disabled={gerarRelatorioMutation.isPending}
-                        data-testid={`button-gerar-${cliente.rowIndex}`}
-                      >
-                        {gerarRelatorioMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <FileText className="w-4 h-4" />
-                        )}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => gerarRelatorioMutation.mutate(cliente)}
+                          disabled={gerarRelatorioMutation.isPending}
+                          title="Gerar relatório"
+                          data-testid={`button-gerar-${cliente.rowIndex}`}
+                        >
+                          {gerarRelatorioMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <FileText className="w-4 h-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => hideCliente(cliente.rowIndex)}
+                          title="Ocultar da lista"
+                          data-testid={`button-hide-${cliente.rowIndex}`}
+                        >
+                          <EyeOff className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
