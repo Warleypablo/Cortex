@@ -1,4 +1,6 @@
 import { google, Auth } from 'googleapis';
+import * as fs from 'fs';
+import * as path from 'path';
 
 let googleAuthClient: Auth.GoogleAuth | null = null;
 
@@ -7,16 +9,47 @@ export function getGoogleAuth(): Auth.GoogleAuth {
     return googleAuthClient;
   }
 
-  const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  let serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!serviceAccountJson) {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON not configured');
   }
 
   let credentials: any;
   try {
-    credentials = JSON.parse(serviceAccountJson);
-  } catch (e) {
-    throw new Error('Invalid GOOGLE_SERVICE_ACCOUNT_JSON format');
+    serviceAccountJson = serviceAccountJson.trim();
+    
+    if (serviceAccountJson.endsWith('.json') || serviceAccountJson.startsWith('credentials/')) {
+      const filePath = path.resolve(process.cwd(), serviceAccountJson);
+      console.log(`[autoreport] Loading service account from file: ${filePath}`);
+      
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`Service account file not found: ${filePath}`);
+      }
+      
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      credentials = JSON.parse(fileContent);
+    } else {
+      if (serviceAccountJson.startsWith("'") && serviceAccountJson.endsWith("'")) {
+        serviceAccountJson = serviceAccountJson.slice(1, -1);
+      }
+      if (serviceAccountJson.startsWith('"') && serviceAccountJson.endsWith('"')) {
+        serviceAccountJson = serviceAccountJson.slice(1, -1);
+      }
+      
+      serviceAccountJson = serviceAccountJson.replace(/\\n/g, '\n');
+      
+      credentials = JSON.parse(serviceAccountJson);
+    }
+    
+    if (!credentials.client_email || !credentials.private_key) {
+      throw new Error('Missing required fields in service account JSON');
+    }
+    
+    console.log(`[autoreport] Service account loaded: ${credentials.client_email}`);
+  } catch (e: any) {
+    console.error('[autoreport] Failed to parse service account JSON:', e.message);
+    console.error('[autoreport] Input value starts with:', serviceAccountJson.substring(0, 50));
+    throw new Error(`Invalid GOOGLE_SERVICE_ACCOUNT_JSON format: ${e.message}`);
   }
 
   googleAuthClient = new google.auth.GoogleAuth({
