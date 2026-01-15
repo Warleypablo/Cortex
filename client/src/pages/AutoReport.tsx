@@ -6,9 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw, CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { format, subDays, startOfWeek, endOfWeek, subWeeks } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
 
 interface AutoReportCliente {
   rowIndex: number;
@@ -77,11 +82,19 @@ function getStatusBadge(status: string) {
   return <Badge variant="outline">{status || 'Aguardando'}</Badge>;
 }
 
+function getDefaultDateRange(): DateRange {
+  const hoje = new Date();
+  const inicioSemanaPassada = startOfWeek(subWeeks(hoje, 1), { weekStartsOn: 1 });
+  const fimSemanaPassada = endOfWeek(subWeeks(hoje, 1), { weekStartsOn: 1 });
+  return { from: inicioSemanaPassada, to: fimSemanaPassada };
+}
+
 export default function AutoReport() {
   const { toast } = useToast();
   const [selectedClientes, setSelectedClientes] = useState<Set<number>>(new Set());
   const [filtroGestor, setFiltroGestor] = useState<string>('todos');
   const [hiddenClientes, setHiddenClientes] = useState<Set<number>>(new Set());
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
 
   const { data: clientes = [], isLoading: loadingClientes, refetch: refetchClientes } = useQuery<AutoReportCliente[]>({
     queryKey: ['/api/autoreport/clientes'],
@@ -97,13 +110,44 @@ export default function AutoReport() {
     return Array.from(uniqueGestores).sort();
   }, [clientes]);
 
+  const formatDateRange = () => {
+    if (!dateRange?.from) return 'Selecionar período';
+    if (!dateRange.to) return format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR });
+    return `${format(dateRange.from, 'dd/MM', { locale: ptBR })} - ${format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })}`;
+  };
+
+  const setPresetRange = (preset: 'ultima_semana' | 'ultimos_7' | 'ultimos_14' | 'ultimos_30') => {
+    const hoje = new Date();
+    switch (preset) {
+      case 'ultima_semana':
+        setDateRange(getDefaultDateRange());
+        break;
+      case 'ultimos_7':
+        setDateRange({ from: subDays(hoje, 7), to: subDays(hoje, 1) });
+        break;
+      case 'ultimos_14':
+        setDateRange({ from: subDays(hoje, 14), to: subDays(hoje, 1) });
+        break;
+      case 'ultimos_30':
+        setDateRange({ from: subDays(hoje, 30), to: subDays(hoje, 1) });
+        break;
+    }
+  };
+
   const gerarRelatorioMutation = useMutation({
     mutationFn: async (cliente: AutoReportCliente): Promise<AutoReportJob> => {
+      if (!dateRange?.from || !dateRange?.to) {
+        throw new Error('Selecione um período válido');
+      }
       const response = await fetch('/api/autoreport/gerar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ cliente }),
+        body: JSON.stringify({ 
+          cliente,
+          dataInicio: dateRange.from.toISOString(),
+          dataFim: dateRange.to.toISOString(),
+        }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -132,11 +176,18 @@ export default function AutoReport() {
 
   const gerarLoteMutation = useMutation({
     mutationFn: async (clientes: AutoReportCliente[]): Promise<AutoReportJob[]> => {
+      if (!dateRange?.from || !dateRange?.to) {
+        throw new Error('Selecione um período válido');
+      }
       const response = await fetch('/api/autoreport/gerar-lote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ clientes }),
+        body: JSON.stringify({ 
+          clientes,
+          dataInicio: dateRange.from.toISOString(),
+          dataFim: dateRange.to.toISOString(),
+        }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -245,6 +296,50 @@ export default function AutoReport() {
           </Button>
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Período do Relatório</CardTitle>
+          <CardDescription>Selecione o intervalo de datas para coleta de métricas</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[260px] justify-start text-left" data-testid="button-date-picker">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formatDateRange()}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                  locale={ptBR}
+                />
+              </PopoverContent>
+            </Popover>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setPresetRange('ultima_semana')} data-testid="button-preset-semana">
+                Última Semana
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPresetRange('ultimos_7')} data-testid="button-preset-7">
+                Últimos 7 dias
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPresetRange('ultimos_14')} data-testid="button-preset-14">
+                Últimos 14 dias
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPresetRange('ultimos_30')} data-testid="button-preset-30">
+                Últimos 30 dias
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>

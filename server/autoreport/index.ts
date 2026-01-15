@@ -30,36 +30,46 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-function calcularPeriodoSemanal(): { atual: PeriodoReferencia; anterior: PeriodoReferencia } {
-  const hoje = new Date();
-  const diaSemana = hoje.getDay();
-  
-  const fimSemanaAtual = new Date(hoje);
-  fimSemanaAtual.setDate(hoje.getDate() - diaSemana);
-  fimSemanaAtual.setHours(23, 59, 59, 999);
-  
-  const inicioSemanaAtual = new Date(fimSemanaAtual);
-  inicioSemanaAtual.setDate(fimSemanaAtual.getDate() - 6);
-  inicioSemanaAtual.setHours(0, 0, 0, 0);
+function calcularPeriodos(dataInicio?: string, dataFim?: string): { atual: PeriodoReferencia; anterior: PeriodoReferencia } {
+  let inicioAtual: Date;
+  let fimAtual: Date;
 
-  const fimSemanaAnterior = new Date(inicioSemanaAtual);
-  fimSemanaAnterior.setDate(inicioSemanaAtual.getDate() - 1);
-  fimSemanaAnterior.setHours(23, 59, 59, 999);
+  if (dataInicio && dataFim) {
+    inicioAtual = new Date(dataInicio);
+    inicioAtual.setHours(0, 0, 0, 0);
+    fimAtual = new Date(dataFim);
+    fimAtual.setHours(23, 59, 59, 999);
+  } else {
+    const hoje = new Date();
+    const diaSemana = hoje.getDay();
+    fimAtual = new Date(hoje);
+    fimAtual.setDate(hoje.getDate() - diaSemana);
+    fimAtual.setHours(23, 59, 59, 999);
+    inicioAtual = new Date(fimAtual);
+    inicioAtual.setDate(fimAtual.getDate() - 6);
+    inicioAtual.setHours(0, 0, 0, 0);
+  }
+
+  const duracaoDias = Math.ceil((fimAtual.getTime() - inicioAtual.getTime()) / (1000 * 60 * 60 * 24));
   
-  const inicioSemanaAnterior = new Date(fimSemanaAnterior);
-  inicioSemanaAnterior.setDate(fimSemanaAnterior.getDate() - 6);
-  inicioSemanaAnterior.setHours(0, 0, 0, 0);
+  const fimAnterior = new Date(inicioAtual);
+  fimAnterior.setDate(inicioAtual.getDate() - 1);
+  fimAnterior.setHours(23, 59, 59, 999);
+  
+  const inicioAnterior = new Date(fimAnterior);
+  inicioAnterior.setDate(fimAnterior.getDate() - duracaoDias + 1);
+  inicioAnterior.setHours(0, 0, 0, 0);
 
   return {
     atual: {
-      inicio: inicioSemanaAtual,
-      fim: fimSemanaAtual,
-      label: `${inicioSemanaAtual.toLocaleDateString('pt-BR')} a ${fimSemanaAtual.toLocaleDateString('pt-BR')}`,
+      inicio: inicioAtual,
+      fim: fimAtual,
+      label: `${inicioAtual.toLocaleDateString('pt-BR')} a ${fimAtual.toLocaleDateString('pt-BR')}`,
     },
     anterior: {
-      inicio: inicioSemanaAnterior,
-      fim: fimSemanaAnterior,
-      label: `${inicioSemanaAnterior.toLocaleDateString('pt-BR')} a ${fimSemanaAnterior.toLocaleDateString('pt-BR')}`,
+      inicio: inicioAnterior,
+      fim: fimAnterior,
+      label: `${inicioAnterior.toLocaleDateString('pt-BR')} a ${fimAnterior.toLocaleDateString('pt-BR')}`,
     },
   };
 }
@@ -68,7 +78,7 @@ export async function listarClientes(): Promise<AutoReportCliente[]> {
   return fetchClientes();
 }
 
-export async function gerarRelatorio(cliente: AutoReportCliente): Promise<AutoReportJob> {
+export async function gerarRelatorio(cliente: AutoReportCliente, dataInicio?: string, dataFim?: string): Promise<AutoReportJob> {
   const jobId = `${cliente.cliente}-${Date.now()}`;
   
   const job: AutoReportJob = {
@@ -84,7 +94,7 @@ export async function gerarRelatorio(cliente: AutoReportCliente): Promise<AutoRe
   try {
     await updateClienteStatus(cliente.rowIndex, 'PROCESSANDO');
 
-    const periodos = calcularPeriodoSemanal();
+    const periodos = calcularPeriodos(dataInicio, dataFim);
 
     console.log(`[AutoReport] Coletando métricas para ${cliente.cliente}...`);
 
@@ -139,7 +149,7 @@ export async function gerarRelatorio(cliente: AutoReportCliente): Promise<AutoRe
   }
 }
 
-export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[]): Promise<AutoReportJob[]> {
+export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[], dataInicio?: string, dataFim?: string): Promise<AutoReportJob[]> {
   const jobs: AutoReportJob[] = [];
 
   for (const cliente of clientes) {
@@ -148,7 +158,7 @@ export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[]): Prom
       continue;
     }
 
-    const job = await gerarRelatorio(cliente);
+    const job = await gerarRelatorio(cliente, dataInicio, dataFim);
     jobs.push(job);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
