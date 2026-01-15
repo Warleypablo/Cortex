@@ -128,8 +128,10 @@ export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[]): Prom
   const jobs: AutoReportJob[] = [];
 
   for (const cliente of clientes) {
-    if (!cliente.gerar) continue;
-    if (!cliente.categoria) continue;
+    if (!cliente.categoria) {
+      console.log(`[AutoReport] Pulando ${cliente.cliente}: categoria não definida`);
+      continue;
+    }
 
     const job = await gerarRelatorio(cliente);
     jobs.push(job);
