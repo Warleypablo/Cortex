@@ -58,6 +58,7 @@ export async function generatePdfReport(data: ReportData): Promise<{ buffer: Buf
   
   try {
     const page = await browser.newPage();
+    await page.emulateMediaType('screen');
     await page.setContent(html, { waitUntil: 'networkidle0' });
     
     const pdfBuffer = await page.pdf({
@@ -86,6 +87,9 @@ function generateReportHtml(data: ReportData): string {
   const googlePct = investTotal > 0 ? (data.googleAds.custo / investTotal) * 100 : 50;
   const metaPct = investTotal > 0 ? (data.metaAds.custo / investTotal) * 100 : 50;
   
+  const roas = investTotal > 0 ? data.ga4Atual.receita / investTotal : 0;
+  const cpa = convTotal > 0 ? investTotal / convTotal : 0;
+  
   const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
   return `<!DOCTYPE html>
@@ -94,8 +98,35 @@ function generateReportHtml(data: ReportData): string {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Relatório - ${data.cliente.cliente}</title>
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" as="style">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --primary: #00D4FF;
+      --primary-dark: #0099FF;
+      --primary-darker: #0066FF;
+      --success: #10B981;
+      --success-light: #34D399;
+      --danger: #EF4444;
+      --danger-light: #F87171;
+      --warning: #F59E0B;
+      --bg-dark: #0A0A0A;
+      --bg-card: #111111;
+      --bg-elevated: #1A1A1A;
+      --border: rgba(255,255,255,0.08);
+      --text-primary: #FFFFFF;
+      --text-secondary: #A1A1AA;
+      --text-muted: #71717A;
+      --google: #4285F4;
+      --meta: #0084FF;
+      --spacing-xs: 4px;
+      --spacing-sm: 8px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --spacing-xl: 32px;
+      --spacing-2xl: 48px;
+    }
+    
     * {
       margin: 0;
       padding: 0;
@@ -104,9 +135,10 @@ function generateReportHtml(data: ReportData): string {
     
     body {
       font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0a0a0a;
-      color: #ffffff;
+      background: var(--bg-dark);
+      color: var(--text-primary);
       line-height: 1.5;
+      font-size: 12px;
     }
     
     @page {
@@ -116,614 +148,516 @@ function generateReportHtml(data: ReportData): string {
     
     .page {
       width: 210mm;
-      min-height: 297mm;
+      height: 297mm;
       padding: 0;
-      background: #0a0a0a;
+      background: var(--bg-dark);
       page-break-after: always;
       position: relative;
+      overflow: hidden;
     }
     
     .page:last-child {
       page-break-after: avoid;
     }
-    
-    /* Page Break Control */
-    .section,
-    .hero-stats,
-    .hero-stat,
-    .metrics-grid,
-    .metric-card,
-    .donut-container,
-    .comparison-chart,
-    .chart-row,
-    .kpi-visual-grid,
-    .kpi-visual-card,
-    .sparkline-row,
-    .gauge-grid,
-    .gauge-card,
-    .data-table,
-    table,
-    thead,
-    tbody tr {
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-    
-    .section-title {
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-    
-    /* Prevent orphaned titles */
-    h1, h2, h3, .section-title {
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-    
-    /* Cover Page */
+
+    /* ========== COVER PAGE ========== */
     .cover {
-      background: linear-gradient(160deg, #0a0a0a 0%, #111111 40%, #0a0a0a 100%);
+      background: linear-gradient(135deg, #0A0A0A 0%, #111111 50%, #0A0A0A 100%);
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
-      padding: 0;
     }
     
-    .cover-accent {
+    .cover-sidebar {
       position: absolute;
-      top: 0;
       left: 0;
-      width: 6px;
+      top: 0;
+      width: 8px;
       height: 100%;
-      background: linear-gradient(180deg, #00D4FF 0%, #0099FF 50%, #0066FF 100%);
+      background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 50%, var(--primary-darker) 100%);
     }
     
     .cover-pattern {
       position: absolute;
       top: 0;
       right: 0;
-      width: 60%;
+      width: 50%;
       height: 100%;
       background: 
-        radial-gradient(ellipse at 90% 10%, rgba(0, 212, 255, 0.15) 0%, transparent 40%),
-        radial-gradient(ellipse at 70% 90%, rgba(0, 153, 255, 0.08) 0%, transparent 35%),
-        radial-gradient(ellipse at 50% 50%, rgba(0, 102, 255, 0.05) 0%, transparent 50%);
+        radial-gradient(ellipse at 80% 20%, rgba(0,212,255,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 60% 80%, rgba(0,153,255,0.08) 0%, transparent 40%);
     }
     
-    .cover-glow {
+    .cover-grid {
       position: absolute;
-      top: 30%;
-      right: 10%;
-      width: 300px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(0, 212, 255, 0.2) 0%, transparent 70%);
-      filter: blur(60px);
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
     }
     
     .cover-content {
       position: relative;
       z-index: 1;
-      padding: 70px 55px;
+      padding: 60px 50px;
       flex: 1;
       display: flex;
       flex-direction: column;
       justify-content: center;
     }
     
-    .logo {
-      margin-bottom: 80px;
-    }
-    
-    .logo-text {
-      font-size: 48px;
-      font-weight: 800;
-      letter-spacing: -2px;
-      display: flex;
+    .cover-badge {
+      display: inline-flex;
       align-items: center;
-      gap: 12px;
-    }
-    
-    .logo-turbo {
-      color: #00D4FF;
-      text-shadow: 0 0 40px rgba(0, 212, 255, 0.4);
-    }
-    
-    .logo-partners {
-      color: white;
+      gap: 8px;
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.3);
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 11px;
       font-weight: 600;
-    }
-    
-    .cover-divider {
-      width: 100px;
-      height: 5px;
-      background: linear-gradient(90deg, #00D4FF, #0099FF, #0066FF);
-      margin: 40px 0;
-      border-radius: 3px;
-      box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
-    }
-    
-    .cover-subtitle {
-      font-size: 14px;
-      font-weight: 600;
-      color: #00D4FF;
+      color: var(--primary);
       text-transform: uppercase;
-      letter-spacing: 4px;
-      margin-bottom: 16px;
+      letter-spacing: 2px;
+      margin-bottom: 32px;
+      width: fit-content;
+    }
+    
+    .cover-badge::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--primary);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
     }
     
     .cover-title {
-      font-size: 42px;
-      font-weight: 700;
+      font-size: 48px;
+      font-weight: 800;
       color: white;
-      line-height: 1.15;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      line-height: 1.1;
+      margin-bottom: 16px;
+      letter-spacing: -1px;
+    }
+    
+    .cover-subtitle {
+      font-size: 18px;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-bottom: 48px;
+    }
+    
+    .cover-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      padding: 24px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+    }
+    
+    .cover-meta-item {
+      text-align: center;
+    }
+    
+    .cover-meta-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    
+    .cover-meta-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
     }
     
     .cover-footer {
-      position: relative;
-      z-index: 1;
-      padding: 45px 55px;
-      background: linear-gradient(90deg, rgba(0, 212, 255, 0.08) 0%, rgba(0, 0, 0, 0.3) 100%);
-      border-top: 1px solid rgba(0, 212, 255, 0.2);
+      position: absolute;
+      bottom: 40px;
+      left: 50px;
+      right: 50px;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
     }
     
-    .cover-info {
+    .cover-logo {
       display: flex;
-      gap: 60px;
+      align-items: center;
+      gap: 12px;
     }
     
-    .info-block {
-      color: white;
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     
-    .info-label {
-      font-size: 10px;
-      font-weight: 600;
-      color: #00D4FF;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 8px;
+    .logo-icon svg {
+      width: 24px;
+      height: 24px;
+      fill: white;
     }
     
-    .info-value {
-      font-size: 15px;
-      font-weight: 600;
-      color: white;
+    .logo-text {
+      font-size: 20px;
+      font-weight: 700;
     }
     
-    /* Content Pages */
+    .logo-text span:first-child { color: white; }
+    .logo-text span:last-child { color: var(--primary); }
+    
+    .cover-date {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ========== CONTENT PAGES ========== */
     .content-page {
-      padding: 0;
-      background: #0a0a0a;
+      display: flex;
+      flex-direction: column;
     }
     
     .page-header {
-      background: linear-gradient(135deg, #111111 0%, #1a1a1a 100%);
-      padding: 35px 45px;
-      position: relative;
-      border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+      padding: 24px 40px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
     
-    .header-accent {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
+    .page-header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
     }
     
-    .header-accent.orange { background: linear-gradient(90deg, #00D4FF, #0099FF); }
-    .header-accent.blue { background: linear-gradient(90deg, #4285F4, #5A95F5); }
-    .header-accent.meta { background: linear-gradient(90deg, #0084FF, #00A3FF); }
-    
-    .page-title {
-      font-size: 28px;
+    .page-number {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
       font-weight: 700;
       color: white;
-      letter-spacing: -0.5px;
+    }
+    
+    .page-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: white;
     }
     
     .page-brand {
       font-size: 11px;
       font-weight: 600;
-      color: #00D4FF;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 4px;
-    }
-    
-    .page-content {
-      padding: 25px 40px 30px;
-    }
-    
-    .section {
-      margin-bottom: 24px;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-    
-    .section:last-child {
-      margin-bottom: 0;
-    }
-    
-    .section-title {
-      font-size: 12px;
-      font-weight: 700;
-      color: #00D4FF;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 1px;
     }
     
-    .section-title::after {
-      content: '';
+    .page-body {
       flex: 1;
-      height: 1px;
-      background: linear-gradient(90deg, rgba(0, 212, 255, 0.3) 0%, transparent 100%);
+      padding: 32px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
     }
     
-    /* Metric Cards */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+    .page-footer {
+      padding: 16px 40px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* ========== SECTION STYLES ========== */
+    .section {
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    
+    .section-header {
+      display: flex;
+      align-items: center;
       gap: 12px;
       margin-bottom: 20px;
     }
     
-    .metrics-grid-4 {
-      grid-template-columns: repeat(4, 1fr);
+    .section-icon {
+      width: 36px;
+      height: 36px;
+      background: rgba(0,212,255,0.1);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
     }
     
-    .metric-card {
-      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      padding: 14px;
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+    }
+    
+    .section-subtitle {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--border) 0%, transparent 100%);
+    }
+
+    /* ========== KPI CARDS ========== */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    
+    .kpi-grid-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .kpi-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
       position: relative;
       overflow: hidden;
+      page-break-inside: avoid;
     }
     
-    .metric-card::before {
+    .kpi-card::before {
       content: '';
       position: absolute;
       top: 0;
       left: 0;
       right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3), transparent);
+      height: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--primary-dark));
     }
     
-    .metric-card.highlight {
-      background: linear-gradient(135deg, #00D4FF 0%, #0099FF 100%);
-      border: none;
-    }
+    .kpi-card.success::before { background: linear-gradient(90deg, var(--success), var(--success-light)); }
+    .kpi-card.warning::before { background: linear-gradient(90deg, var(--warning), #FBBF24); }
+    .kpi-card.google::before { background: linear-gradient(90deg, var(--google), #5A95F5); }
+    .kpi-card.meta::before { background: linear-gradient(90deg, var(--meta), #00A3FF); }
     
-    .metric-card.highlight .metric-label {
-      color: rgba(255, 255, 255, 0.9);
-    }
-    
-    .metric-card.highlight .metric-value {
-      color: white;
-    }
-    
-    .metric-card.google {
-      background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
-      border: none;
-    }
-    
-    .metric-card.meta {
-      background: linear-gradient(135deg, #0084FF 0%, #0066CC 100%);
-      border: none;
-    }
-    
-    .metric-card.google .metric-label,
-    .metric-card.google .metric-value,
-    .metric-card.meta .metric-label,
-    .metric-card.meta .metric-value {
-      color: white;
-    }
-    
-    .metric-label {
-      font-size: 10px;
-      font-weight: 600;
-      color: #888888;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-    
-    .metric-value {
-      font-size: 24px;
-      font-weight: 700;
-      color: white;
-    }
-    
-    .metric-change {
-      font-size: 12px;
-      font-weight: 600;
-      margin-top: 8px;
+    .kpi-icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(0,212,255,0.1);
+      border-radius: 10px;
       display: flex;
       align-items: center;
-      gap: 4px;
+      justify-content: center;
+      font-size: 18px;
+      margin-bottom: 12px;
     }
     
-    .metric-change.positive { color: #4ADE80; }
-    .metric-change.negative { color: #F87171; }
+    .kpi-card.success .kpi-icon { background: rgba(16,185,129,0.1); }
+    .kpi-card.google .kpi-icon { background: rgba(66,133,244,0.1); }
+    .kpi-card.meta .kpi-icon { background: rgba(0,132,255,0.1); }
     
-    /* Hero Stats */
-    .hero-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-    
-    .hero-stat {
-      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
-      border-radius: 12px;
-      padding: 20px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .hero-stat::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 4px;
-      height: 100%;
-      background: linear-gradient(180deg, #00D4FF, #0099FF);
-    }
-    
-    .hero-stat-label {
-      font-size: 11px;
+    .kpi-label {
+      font-size: 10px;
       font-weight: 600;
-      color: #888888;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
     }
     
-    .hero-stat-value {
-      font-size: 28px;
+    .kpi-value {
+      font-size: 24px;
       font-weight: 800;
       color: white;
-      margin: 6px 0;
+      line-height: 1.2;
     }
     
-    .hero-stat-value.green { color: #4ADE80; }
+    .kpi-value.small { font-size: 20px; }
+    .kpi-value.success { color: var(--success); }
     
-    .hero-stat-sub {
-      font-size: 12px;
-      color: #888888;
-    }
-    
-    .hero-stat-sub.positive { color: #4ADE80; }
-    .hero-stat-sub.negative { color: #F87171; }
-    
-    /* Tables */
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    
-    .data-table th {
-      background: linear-gradient(135deg, #1a1a1a 0%, #111111 100%);
-      color: #00D4FF;
-      font-weight: 600;
-      text-align: left;
-      padding: 10px 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-size: 10px;
-      border-bottom: 2px solid rgba(0, 212, 255, 0.3);
-    }
-    
-    .data-table th:first-child {
-      border-radius: 10px 0 0 0;
-    }
-    
-    .data-table th:last-child {
-      border-radius: 0 10px 0 0;
-    }
-    
-    .data-table td {
-      padding: 10px 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      color: white;
-    }
-    
-    .data-table tr {
-      background: #141414;
-    }
-    
-    .data-table tr:nth-child(even) {
-      background: #1a1a1a;
-    }
-    
-    .data-table tr:last-child td:first-child {
-      border-radius: 0 0 0 10px;
-    }
-    
-    .data-table tr:last-child td:last-child {
-      border-radius: 0 0 10px 0;
-    }
-    
-    .data-table strong {
-      color: white;
-    }
-    
-    .variation {
-      font-weight: 600;
-    }
-    
-    .variation.positive { color: #4ADE80; }
-    .variation.negative { color: #F87171; }
-    
-    /* Investment Bar */
-    .investment-section {
-      margin-top: 24px;
-    }
-    
-    .investment-bar {
-      height: 36px;
-      border-radius: 18px;
-      overflow: hidden;
-      display: flex;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-    
-    .investment-bar-google {
-      background: linear-gradient(90deg, #4285F4, #3367D6);
-    }
-    
-    .investment-bar-meta {
-      background: linear-gradient(90deg, #0084FF, #0066CC);
-    }
-    
-    .investment-legend {
-      display: flex;
-      gap: 50px;
-    }
-    
-    .legend-item {
-      display: flex;
+    .kpi-change {
+      display: inline-flex;
       align-items: center;
-      gap: 12px;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 8px;
+      padding: 4px 8px;
+      border-radius: 6px;
     }
     
-    .legend-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    .kpi-change.positive {
+      background: rgba(16,185,129,0.15);
+      color: var(--success);
     }
     
-    .legend-dot.google { background: linear-gradient(135deg, #4285F4, #3367D6); }
-    .legend-dot.meta { background: linear-gradient(135deg, #0084FF, #0066CC); }
+    .kpi-change.negative {
+      background: rgba(239,68,68,0.15);
+      color: var(--danger);
+    }
     
-    .legend-label {
+    .kpi-change svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* ========== COMPARISON CHART ========== */
+    .comparison-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    
+    .comparison-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .comparison-title {
       font-size: 13px;
       font-weight: 600;
       color: white;
     }
     
-    .legend-value {
-      font-size: 12px;
-      color: #888888;
+    .comparison-legend {
+      display: flex;
+      gap: 16px;
     }
     
-    /* Comparison Bar Charts */
-    .comparison-chart {
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--text-secondary);
+    }
+    
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+    
+    .legend-dot.current { background: var(--primary); }
+    .legend-dot.previous { background: #444; }
+    
+    .comparison-rows {
       display: flex;
       flex-direction: column;
-      gap: 20px;
-      margin-bottom: 24px;
+      gap: 16px;
     }
     
-    .chart-row {
-      display: flex;
+    .comparison-row {
+      display: grid;
+      grid-template-columns: 100px 1fr 80px;
       align-items: center;
       gap: 16px;
     }
     
-    .chart-label {
-      width: 100px;
+    .comparison-label {
       font-size: 12px;
       font-weight: 600;
       color: white;
-      text-align: right;
     }
     
-    .chart-bars {
-      flex: 1;
+    .comparison-bars {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
     }
     
-    .bar-container {
-      height: 24px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 12px;
+    .bar-track {
+      height: 20px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 6px;
       overflow: hidden;
-      position: relative;
     }
     
     .bar-fill {
       height: 100%;
-      border-radius: 12px;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      padding-right: 12px;
-      font-size: 11px;
+      padding-right: 10px;
+      font-size: 10px;
       font-weight: 600;
       color: white;
-      min-width: 60px;
-      transition: width 0.3s ease;
+      min-width: 50px;
     }
     
     .bar-fill.current {
-      background: linear-gradient(90deg, #00D4FF, #0099FF);
+      background: linear-gradient(90deg, var(--primary), var(--primary-dark));
     }
     
     .bar-fill.previous {
-      background: linear-gradient(90deg, #444444, #555555);
+      background: linear-gradient(90deg, #555, #444);
     }
     
-    .chart-legend-inline {
-      display: flex;
-      gap: 8px;
-      margin-left: 8px;
+    .comparison-change {
+      text-align: right;
+      font-size: 12px;
+      font-weight: 700;
     }
     
-    .legend-badge {
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 10px;
-      font-weight: 500;
-    }
-    
-    .legend-badge.current {
-      background: rgba(0, 212, 255, 0.2);
-      color: #00D4FF;
-    }
-    
-    .legend-badge.previous {
-      background: rgba(255, 255, 255, 0.1);
-      color: #888888;
-    }
-    
-    /* Donut Chart */
-    .donut-container {
-      display: flex;
+    .comparison-change.positive { color: var(--success); }
+    .comparison-change.negative { color: var(--danger); }
+
+    /* ========== DONUT CHART ========== */
+    .chart-container {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 32px;
       align-items: center;
-      gap: 40px;
-      padding: 20px;
-      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
-      border-radius: 16px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
     }
     
-    .donut-chart {
+    .donut-wrapper {
       position: relative;
       width: 140px;
       height: 140px;
     }
     
-    .donut-chart svg {
+    .donut-wrapper svg {
       transform: rotate(-90deg);
     }
     
@@ -735,737 +669,880 @@ function generateReportHtml(data: ReportData): string {
       text-align: center;
     }
     
-    .donut-center-value {
-      font-size: 24px;
+    .donut-value {
+      font-size: 18px;
       font-weight: 800;
       color: white;
     }
     
-    .donut-center-label {
-      font-size: 10px;
-      color: #888888;
+    .donut-label {
+      font-size: 9px;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
     }
     
-    .donut-legend {
-      flex: 1;
+    .chart-legend {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 16px;
     }
     
-    .donut-legend-item {
+    .chart-legend-item {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
     
-    .donut-legend-color {
-      width: 16px;
-      height: 16px;
+    .chart-legend-color {
+      width: 12px;
+      height: 12px;
       border-radius: 4px;
     }
     
-    .donut-legend-color.google { background: linear-gradient(135deg, #4285F4, #3367D6); }
-    .donut-legend-color.meta { background: linear-gradient(135deg, #0084FF, #0066CC); }
-    .donut-legend-color.primary { background: linear-gradient(135deg, #00D4FF, #0099FF); }
-    .donut-legend-color.secondary { background: linear-gradient(135deg, #4ADE80, #22C55E); }
+    .chart-legend-color.google { background: var(--google); }
+    .chart-legend-color.meta { background: var(--meta); }
     
-    .donut-legend-info {
+    .chart-legend-info {
       flex: 1;
     }
     
-    .donut-legend-name {
-      font-size: 13px;
+    .chart-legend-name {
+      font-size: 12px;
       font-weight: 600;
       color: white;
     }
     
-    .donut-legend-value {
-      font-size: 12px;
-      color: #888888;
+    .chart-legend-value {
+      font-size: 11px;
+      color: var(--text-muted);
     }
     
-    .donut-legend-percent {
+    .chart-legend-percent {
       font-size: 16px;
       font-weight: 700;
       color: white;
     }
+
+    /* ========== FUNNEL CHART ========== */
+    .funnel-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
     
-    /* Progress Gauge */
+    .funnel-stages {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+      height: 180px;
+    }
+    
+    .funnel-stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .funnel-bar-container {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+    }
+    
+    .funnel-bar {
+      width: 100%;
+      border-radius: 8px 8px 0 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      color: white;
+      position: relative;
+    }
+    
+    .funnel-bar.impressions { background: linear-gradient(180deg, #6366F1, #4F46E5); }
+    .funnel-bar.clicks { background: linear-gradient(180deg, #00D4FF, #0099FF); }
+    .funnel-bar.sessions { background: linear-gradient(180deg, #10B981, #059669); }
+    .funnel-bar.conversions { background: linear-gradient(180deg, #F59E0B, #D97706); }
+    
+    .funnel-info {
+      text-align: center;
+      padding: 12px;
+      background: var(--bg-elevated);
+      border-radius: 8px;
+      width: 100%;
+    }
+    
+    .funnel-stage-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .funnel-rate {
+      font-size: 11px;
+      color: var(--primary);
+      margin-top: 4px;
+    }
+
+    /* ========== DATA TABLE ========== */
+    .data-table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    
+    .data-table th {
+      background: var(--bg-elevated);
+      padding: 12px 16px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .data-table td {
+      padding: 12px 16px;
+      font-size: 12px;
+      color: white;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .data-table tr:hover {
+      background: rgba(255,255,255,0.02);
+    }
+    
+    .table-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 600;
+    }
+    
+    .table-badge.positive {
+      background: rgba(16,185,129,0.15);
+      color: var(--success);
+    }
+    
+    .table-badge.negative {
+      background: rgba(239,68,68,0.15);
+      color: var(--danger);
+    }
+
+    /* ========== INSIGHTS BOX ========== */
+    .insights-box {
+      background: linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,153,255,0.04) 100%);
+      border: 1px solid rgba(0,212,255,0.2);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    
+    .insights-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 12px;
+    }
+    
+    .insights-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .insight-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    
+    .insight-bullet {
+      width: 6px;
+      height: 6px;
+      background: var(--primary);
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+
+    /* ========== GAUGE CHART ========== */
     .gauge-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 16px;
     }
     
     .gauge-card {
-      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
       padding: 20px;
       text-align: center;
     }
     
-    .gauge-circle {
+    .gauge-wrapper {
       position: relative;
       width: 100px;
-      height: 100px;
-      margin: 0 auto 16px;
+      height: 60px;
+      margin: 0 auto 12px;
+      overflow: hidden;
     }
     
-    .gauge-circle svg {
-      transform: rotate(-90deg);
+    .gauge-wrapper svg {
+      position: absolute;
+      top: 0;
+      left: 0;
     }
     
     .gauge-value {
       position: absolute;
-      top: 50%;
+      bottom: 0;
       left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 20px;
+      transform: translateX(-50%);
+      font-size: 18px;
       font-weight: 800;
       color: white;
     }
     
     .gauge-label {
-      font-size: 12px;
+      font-size: 10px;
       font-weight: 600;
-      color: #888888;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
-    
-    .gauge-sublabel {
-      font-size: 11px;
-      color: #666666;
-      margin-top: 4px;
+
+    /* ========== PROGRESS BAR ========== */
+    .progress-container {
+      margin-top: 8px;
     }
     
-    /* Sparkline Mini Charts */
-    .sparkline-row {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 16px;
-      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
-      border-radius: 12px;
-      margin-bottom: 12px;
-    }
-    
-    .sparkline-info {
-      flex: 1;
-    }
-    
-    .sparkline-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: #888888;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .sparkline-value {
-      font-size: 22px;
-      font-weight: 700;
-      color: white;
-      margin-top: 4px;
-    }
-    
-    .sparkline-change {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: 20px;
-      margin-top: 6px;
-    }
-    
-    .sparkline-change.positive {
-      background: rgba(74, 222, 128, 0.15);
-      color: #4ADE80;
-    }
-    
-    .sparkline-change.negative {
-      background: rgba(248, 113, 113, 0.15);
-      color: #F87171;
-    }
-    
-    .sparkline-chart {
-      width: 120px;
-      height: 50px;
-    }
-    
-    /* KPI Cards with Visual */
-    .kpi-visual-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-    }
-    
-    .kpi-visual-card {
-      background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 16px;
-      padding: 24px;
-      position: relative;
+    .progress-track {
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
       overflow: hidden;
     }
     
-    .kpi-visual-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 3px;
-      background: linear-gradient(90deg, #00D4FF, #0099FF);
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--primary-dark));
     }
     
-    .kpi-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 16px;
-      font-size: 24px;
-    }
-    
-    .kpi-icon.blue { background: rgba(0, 212, 255, 0.15); }
-    .kpi-icon.green { background: rgba(74, 222, 128, 0.15); }
-    .kpi-icon.purple { background: rgba(168, 85, 247, 0.15); }
-    .kpi-icon.yellow { background: rgba(250, 204, 21, 0.15); }
-    
-    .kpi-visual-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: #888888;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .kpi-visual-value {
-      font-size: 28px;
-      font-weight: 800;
-      color: white;
-      margin: 8px 0;
-    }
-    
-    .kpi-visual-footer {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    
-    .kpi-visual-change {
-      font-size: 12px;
-      font-weight: 600;
-    }
-    
-    .kpi-visual-change.positive { color: #4ADE80; }
-    .kpi-visual-change.negative { color: #F87171; }
-    
-    .kpi-visual-period {
-      font-size: 11px;
-      color: #666666;
-    }
-
-    /* Page Footer */
-    .page-footer {
-      position: absolute;
-      bottom: 25px;
-      left: 45px;
-      right: 45px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 10px;
-      color: #666666;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-      padding-top: 15px;
-    }
-    
-    .page-footer span:first-child {
-      color: #00D4FF;
-      font-weight: 500;
-    }
-    
-    @media print {
-      .page {
-        margin: 0;
-        box-shadow: none;
-      }
-    }
+    .progress-fill.success { background: linear-gradient(90deg, var(--success), var(--success-light)); }
+    .progress-fill.google { background: linear-gradient(90deg, var(--google), #5A95F5); }
+    .progress-fill.meta { background: linear-gradient(90deg, var(--meta), #00A3FF); }
   </style>
 </head>
 <body>
-  <!-- Cover Page -->
+  <!-- ==================== PAGE 1: COVER ==================== -->
   <div class="page cover">
-    <div class="cover-accent"></div>
+    <div class="cover-sidebar"></div>
     <div class="cover-pattern"></div>
-    <div class="cover-glow"></div>
+    <div class="cover-grid"></div>
     
     <div class="cover-content">
-      <div class="logo">
-        <span class="logo-text">
-          <span class="logo-turbo">TURBO</span>
-          <span class="logo-partners">PARTNERS</span>
-        </span>
+      <div class="cover-badge">Performance Report</div>
+      
+      <h1 class="cover-title">${data.cliente.cliente}</h1>
+      <p class="cover-subtitle">Relatório de Performance Digital | ${data.periodos.atual.label}</p>
+      
+      <div class="cover-meta">
+        <div class="cover-meta-item">
+          <div class="cover-meta-label">Período Analisado</div>
+          <div class="cover-meta-value">${data.periodos.atual.label}</div>
+        </div>
+        <div class="cover-meta-item">
+          <div class="cover-meta-label">Gestor de Contas</div>
+          <div class="cover-meta-value">${data.cliente.gestor || 'N/A'}</div>
+        </div>
+        <div class="cover-meta-item">
+          <div class="cover-meta-label">Squad</div>
+          <div class="cover-meta-value">${data.cliente.squad || 'Growth'}</div>
+        </div>
       </div>
-      
-      <div class="cover-divider"></div>
-      
-      <div class="cover-subtitle">Relatório de Performance</div>
-      <div class="cover-title">${data.cliente.cliente}</div>
     </div>
     
     <div class="cover-footer">
-      <div class="cover-info">
-        <div class="info-block">
-          <div class="info-label">Período</div>
-          <div class="info-value">${data.periodos.atual.label}</div>
+      <div class="cover-logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
-        <div class="info-block">
-          <div class="info-label">Gestor</div>
-          <div class="info-value">${data.cliente.gestor || 'N/A'}</div>
-        </div>
-        <div class="info-block">
-          <div class="info-label">Squad</div>
-          <div class="info-value">${data.cliente.squad || 'N/A'}</div>
+        <div class="logo-text">
+          <span>TURBO</span><span>PARTNERS</span>
         </div>
       </div>
-      <div class="info-block">
-        <div class="info-label">Gerado em</div>
-        <div class="info-value">${today}</div>
-      </div>
+      <div class="cover-date">${today}</div>
     </div>
   </div>
-  
-  <!-- Executive Summary -->
+
+  <!-- ==================== PAGE 2: EXECUTIVE SUMMARY ==================== -->
   <div class="page content-page">
     <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">02</div>
+        <div class="page-title">Resumo Executivo</div>
+      </div>
       <div class="page-brand">Turbo Partners</div>
-      <div class="page-title">Resumo Executivo</div>
-      <div class="header-accent blue"></div>
     </div>
     
-    <div class="page-content">
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <div class="hero-stat-label">Investimento Total</div>
-          <div class="hero-stat-value">${formatCurrency(investTotal)}</div>
-          <div class="hero-stat-sub">Google Ads + Meta Ads</div>
+    <div class="page-body">
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">📊</div>
+          <div>
+            <div class="section-title">Indicadores Principais</div>
+            <div class="section-subtitle">Visão consolidada do período</div>
+          </div>
+          <div class="section-line"></div>
         </div>
-        <div class="hero-stat">
-          <div class="hero-stat-label">Receita Total (GA4)</div>
-          <div class="hero-stat-value green">${formatCurrency(data.ga4Atual.receita)}</div>
-          <div class="hero-stat-sub ${receitaVar.isPositive ? 'positive' : 'negative'}">${receitaVar.text} vs período anterior</div>
+        
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-icon">💰</div>
+            <div class="kpi-label">Investimento Total</div>
+            <div class="kpi-value small">${formatCurrency(investTotal)}</div>
+          </div>
+          <div class="kpi-card success">
+            <div class="kpi-icon">📈</div>
+            <div class="kpi-label">Receita (GA4)</div>
+            <div class="kpi-value small success">${formatCurrency(data.ga4Atual.receita)}</div>
+            <div class="kpi-change ${receitaVar.isPositive ? 'positive' : 'negative'}">
+              ${receitaVar.isPositive ? '↑' : '↓'} ${receitaVar.text}
+            </div>
+          </div>
+          <div class="kpi-card warning">
+            <div class="kpi-icon">🎯</div>
+            <div class="kpi-label">ROAS</div>
+            <div class="kpi-value small">${roas.toFixed(2)}x</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">💵</div>
+            <div class="kpi-label">CPA Médio</div>
+            <div class="kpi-value small">${formatCurrency(cpa)}</div>
+          </div>
         </div>
       </div>
       
       <div class="section">
-        <div class="section-title">Métricas Principais</div>
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-label">Sessões</div>
-            <div class="metric-value">${formatNumber(data.ga4Atual.sessoes)}</div>
-            <div class="metric-change ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</div>
+        <div class="section-header">
+          <div class="section-icon">📈</div>
+          <div>
+            <div class="section-title">Comparativo de Períodos</div>
+            <div class="section-subtitle">Evolução das métricas principais</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Conversões Totais</div>
-            <div class="metric-value">${formatNumber(convTotal)}</div>
+          <div class="section-line"></div>
+        </div>
+        
+        <div class="comparison-container">
+          <div class="comparison-header">
+            <div class="comparison-title">Performance GA4</div>
+            <div class="comparison-legend">
+              <div class="legend-item"><div class="legend-dot current"></div>Atual</div>
+              <div class="legend-item"><div class="legend-dot previous"></div>Anterior</div>
+            </div>
           </div>
-          <div class="metric-card highlight">
-            <div class="metric-label">Custo por Conversão</div>
-            <div class="metric-value">${formatCurrency(convTotal > 0 ? investTotal / convTotal : 0)}</div>
+          
+          <div class="comparison-rows">
+            ${[
+              { label: 'Sessões', atual: data.ga4Atual.sessoes, anterior: data.ga4Anterior.sessoes },
+              { label: 'Usuários', atual: data.ga4Atual.usuarios, anterior: data.ga4Anterior.usuarios },
+              { label: 'Conversões', atual: data.ga4Atual.conversoes, anterior: data.ga4Anterior.conversoes }
+            ].map(item => {
+              const max = Math.max(item.atual, item.anterior, 1);
+              const currentPct = (item.atual / max) * 100;
+              const previousPct = (item.anterior / max) * 100;
+              const variation = calcVariation(item.atual, item.anterior);
+              return `
+              <div class="comparison-row">
+                <div class="comparison-label">${item.label}</div>
+                <div class="comparison-bars">
+                  <div class="bar-track">
+                    <div class="bar-fill current" style="width: ${currentPct}%">${formatNumber(item.atual)}</div>
+                  </div>
+                  <div class="bar-track">
+                    <div class="bar-fill previous" style="width: ${previousPct}%">${formatNumber(item.anterior)}</div>
+                  </div>
+                </div>
+                <div class="comparison-change ${variation.isPositive ? 'positive' : 'negative'}">${variation.text}</div>
+              </div>
+              `;
+            }).join('')}
           </div>
         </div>
       </div>
       
       <div class="section">
-        <div class="section-title">Comparativo Visual</div>
-        <div style="display: flex; gap: 12px; margin-bottom: 16px;">
-          <span class="legend-badge current">Período Atual</span>
-          <span class="legend-badge previous">Período Anterior</span>
-        </div>
-        <div class="comparison-chart">
-          <div class="chart-row">
-            <div class="chart-label">Sessões</div>
-            <div class="chart-bars">
-              <div class="bar-container">
-                <div class="bar-fill current" style="width: ${Math.min(100, (data.ga4Atual.sessoes / Math.max(data.ga4Atual.sessoes, data.ga4Anterior.sessoes)) * 100)}%">${formatNumber(data.ga4Atual.sessoes)}</div>
-              </div>
-              <div class="bar-container">
-                <div class="bar-fill previous" style="width: ${Math.min(100, (data.ga4Anterior.sessoes / Math.max(data.ga4Atual.sessoes, data.ga4Anterior.sessoes)) * 100)}%">${formatNumber(data.ga4Anterior.sessoes)}</div>
-              </div>
-            </div>
-            <div class="sparkline-change ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</div>
+        <div class="insights-box">
+          <div class="insights-title">
+            <span>💡</span> Principais Insights
           </div>
-          <div class="chart-row">
-            <div class="chart-label">Usuários</div>
-            <div class="chart-bars">
-              <div class="bar-container">
-                <div class="bar-fill current" style="width: ${Math.min(100, (data.ga4Atual.usuarios / Math.max(data.ga4Atual.usuarios, data.ga4Anterior.usuarios)) * 100)}%">${formatNumber(data.ga4Atual.usuarios)}</div>
-              </div>
-              <div class="bar-container">
-                <div class="bar-fill previous" style="width: ${Math.min(100, (data.ga4Anterior.usuarios / Math.max(data.ga4Atual.usuarios, data.ga4Anterior.usuarios)) * 100)}%">${formatNumber(data.ga4Anterior.usuarios)}</div>
-              </div>
+          <div class="insights-list">
+            <div class="insight-item">
+              <div class="insight-bullet"></div>
+              <div>${receitaVar.isPositive ? 'Crescimento' : 'Redução'} de receita de ${receitaVar.text} comparado ao período anterior, ${receitaVar.isPositive ? 'superando as expectativas' : 'indicando necessidade de otimização'}.</div>
             </div>
-            <div class="sparkline-change ${usuariosVar.isPositive ? 'positive' : 'negative'}">${usuariosVar.text}</div>
-          </div>
-          <div class="chart-row">
-            <div class="chart-label">Conversões</div>
-            <div class="chart-bars">
-              <div class="bar-container">
-                <div class="bar-fill current" style="width: ${Math.min(100, (data.ga4Atual.conversoes / Math.max(data.ga4Atual.conversoes, data.ga4Anterior.conversoes, 1)) * 100)}%">${formatNumber(data.ga4Atual.conversoes)}</div>
-              </div>
-              <div class="bar-container">
-                <div class="bar-fill previous" style="width: ${Math.min(100, (data.ga4Anterior.conversoes / Math.max(data.ga4Atual.conversoes, data.ga4Anterior.conversoes, 1)) * 100)}%">${formatNumber(data.ga4Anterior.conversoes)}</div>
-              </div>
+            <div class="insight-item">
+              <div class="insight-bullet"></div>
+              <div>ROAS de ${roas.toFixed(2)}x representa um retorno de R$ ${roas.toFixed(2)} para cada R$ 1,00 investido em mídia.</div>
             </div>
-            <div class="sparkline-change ${convVar.isPositive ? 'positive' : 'negative'}">${convVar.text}</div>
-          </div>
-          <div class="chart-row">
-            <div class="chart-label">Receita</div>
-            <div class="chart-bars">
-              <div class="bar-container">
-                <div class="bar-fill current" style="width: ${Math.min(100, (data.ga4Atual.receita / Math.max(data.ga4Atual.receita, data.ga4Anterior.receita, 1)) * 100)}%">${formatCurrency(data.ga4Atual.receita)}</div>
-              </div>
-              <div class="bar-container">
-                <div class="bar-fill previous" style="width: ${Math.min(100, (data.ga4Anterior.receita / Math.max(data.ga4Atual.receita, data.ga4Anterior.receita, 1)) * 100)}%">${formatCurrency(data.ga4Anterior.receita)}</div>
-              </div>
+            <div class="insight-item">
+              <div class="insight-bullet"></div>
+              <div>${sessoesVar.isPositive ? 'Aumento' : 'Queda'} de ${sessoesVar.text} no tráfego do site, ${sessoesVar.isPositive ? 'demonstrando efetividade das campanhas' : 'sugerindo revisão de estratégia de aquisição'}.</div>
             </div>
-            <div class="sparkline-change ${receitaVar.isPositive ? 'positive' : 'negative'}">${receitaVar.text}</div>
           </div>
         </div>
       </div>
-      
-      <div class="section investment-section">
-        <div class="section-title">Distribuição de Investimento</div>
-        <div class="donut-container">
-          <div class="donut-chart">
+    </div>
+    
+    <div class="page-footer">
+      <div>Turbo Partners | Relatório de Performance</div>
+      <div>Página 2 de 5</div>
+    </div>
+  </div>
+
+  <!-- ==================== PAGE 3: INVESTMENT & CHANNELS ==================== -->
+  <div class="page content-page">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">03</div>
+        <div class="page-title">Investimento & Canais</div>
+      </div>
+      <div class="page-brand">Turbo Partners</div>
+    </div>
+    
+    <div class="page-body">
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">💎</div>
+          <div>
+            <div class="section-title">Distribuição do Investimento</div>
+            <div class="section-subtitle">Alocação por plataforma de mídia</div>
+          </div>
+          <div class="section-line"></div>
+        </div>
+        
+        <div class="chart-container">
+          <div class="donut-wrapper">
             <svg width="140" height="140" viewBox="0 0 140 140">
-              <circle cx="70" cy="70" r="55" fill="none" stroke="#222" stroke-width="20"/>
-              <circle cx="70" cy="70" r="55" fill="none" stroke="url(#googleGrad)" stroke-width="20" 
-                stroke-dasharray="${(googlePct / 100) * 345.6} 345.6" stroke-linecap="round"/>
-              <circle cx="70" cy="70" r="55" fill="none" stroke="url(#metaGrad)" stroke-width="20" 
-                stroke-dasharray="${(metaPct / 100) * 345.6} 345.6" 
-                stroke-dashoffset="${-(googlePct / 100) * 345.6}" stroke-linecap="round"/>
-              <defs>
-                <linearGradient id="googleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" style="stop-color:#4285F4"/>
-                  <stop offset="100%" style="stop-color:#3367D6"/>
-                </linearGradient>
-                <linearGradient id="metaGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" style="stop-color:#0084FF"/>
-                  <stop offset="100%" style="stop-color:#0066CC"/>
-                </linearGradient>
-              </defs>
+              <circle cx="70" cy="70" r="54" fill="none" stroke="#222" stroke-width="16"/>
+              <circle cx="70" cy="70" r="54" fill="none" stroke="${googlePct > 0 ? 'var(--google)' : '#222'}" stroke-width="16" 
+                stroke-dasharray="${(googlePct / 100) * 339.3} 339.3" stroke-linecap="round"/>
+              <circle cx="70" cy="70" r="54" fill="none" stroke="${metaPct > 0 ? 'var(--meta)' : '#222'}" stroke-width="16" 
+                stroke-dasharray="${(metaPct / 100) * 339.3} 339.3" 
+                stroke-dashoffset="${-(googlePct / 100) * 339.3}" stroke-linecap="round"/>
             </svg>
             <div class="donut-center">
-              <div class="donut-center-value">${formatCurrency(investTotal)}</div>
-              <div class="donut-center-label">Total</div>
+              <div class="donut-value">${formatCurrency(investTotal)}</div>
+              <div class="donut-label">Total</div>
             </div>
           </div>
-          <div class="donut-legend">
-            <div class="donut-legend-item">
-              <div class="donut-legend-color google"></div>
-              <div class="donut-legend-info">
-                <div class="donut-legend-name">Google Ads</div>
-                <div class="donut-legend-value">${formatCurrency(data.googleAds.custo)}</div>
+          
+          <div class="chart-legend">
+            <div class="chart-legend-item">
+              <div class="chart-legend-color google"></div>
+              <div class="chart-legend-info">
+                <div class="chart-legend-name">Google Ads</div>
+                <div class="chart-legend-value">${formatCurrency(data.googleAds.custo)}</div>
               </div>
-              <div class="donut-legend-percent">${googlePct.toFixed(0)}%</div>
+              <div class="chart-legend-percent">${googlePct.toFixed(0)}%</div>
             </div>
-            <div class="donut-legend-item">
-              <div class="donut-legend-color meta"></div>
-              <div class="donut-legend-info">
-                <div class="donut-legend-name">Meta Ads</div>
-                <div class="donut-legend-value">${formatCurrency(data.metaAds.custo)}</div>
+            <div class="chart-legend-item">
+              <div class="chart-legend-color meta"></div>
+              <div class="chart-legend-info">
+                <div class="chart-legend-name">Meta Ads</div>
+                <div class="chart-legend-value">${formatCurrency(data.metaAds.custo)}</div>
               </div>
-              <div class="donut-legend-percent">${metaPct.toFixed(0)}%</div>
+              <div class="chart-legend-percent">${metaPct.toFixed(0)}%</div>
             </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">📊</div>
+          <div>
+            <div class="section-title">Performance por Plataforma</div>
+            <div class="section-subtitle">Métricas detalhadas de cada canal</div>
+          </div>
+          <div class="section-line"></div>
+        </div>
+        
+        <div class="kpi-grid kpi-grid-3">
+          <div class="kpi-card google">
+            <div class="kpi-icon">🔍</div>
+            <div class="kpi-label">Cliques Google</div>
+            <div class="kpi-value small">${formatNumber(data.googleAds.cliques)}</div>
+            <div class="progress-container">
+              <div class="progress-track">
+                <div class="progress-fill google" style="width: ${Math.min(100, (data.googleAds.cliques / Math.max(data.googleAds.cliques, data.metaAds.cliques, 1)) * 100)}%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card meta">
+            <div class="kpi-icon">📱</div>
+            <div class="kpi-label">Cliques Meta</div>
+            <div class="kpi-value small">${formatNumber(data.metaAds.cliques)}</div>
+            <div class="progress-container">
+              <div class="progress-track">
+                <div class="progress-fill meta" style="width: ${Math.min(100, (data.metaAds.cliques / Math.max(data.googleAds.cliques, data.metaAds.cliques, 1)) * 100)}%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="kpi-card success">
+            <div class="kpi-icon">🎯</div>
+            <div class="kpi-label">Conversões Totais</div>
+            <div class="kpi-value small">${formatNumber(convTotal)}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">⚡</div>
+          <div>
+            <div class="section-title">Métricas de Eficiência</div>
+            <div class="section-subtitle">Indicadores de custo e performance</div>
+          </div>
+          <div class="section-line"></div>
+        </div>
+        
+        <div class="gauge-grid">
+          <div class="gauge-card">
+            <div class="gauge-wrapper">
+              <svg width="100" height="60" viewBox="0 0 100 60">
+                <path d="M 10 55 A 40 40 0 0 1 90 55" fill="none" stroke="#222" stroke-width="8" stroke-linecap="round"/>
+                <path d="M 10 55 A 40 40 0 0 1 90 55" fill="none" stroke="var(--google)" stroke-width="8" stroke-linecap="round"
+                  stroke-dasharray="${Math.min(126 * 0.8, 126)} 126"/>
+              </svg>
+              <div class="gauge-value">${formatCurrency(data.googleAds.cliques > 0 ? data.googleAds.custo / data.googleAds.cliques : 0)}</div>
+            </div>
+            <div class="gauge-label">CPC Google</div>
+          </div>
+          <div class="gauge-card">
+            <div class="gauge-wrapper">
+              <svg width="100" height="60" viewBox="0 0 100 60">
+                <path d="M 10 55 A 40 40 0 0 1 90 55" fill="none" stroke="#222" stroke-width="8" stroke-linecap="round"/>
+                <path d="M 10 55 A 40 40 0 0 1 90 55" fill="none" stroke="var(--meta)" stroke-width="8" stroke-linecap="round"
+                  stroke-dasharray="${Math.min(126 * 0.7, 126)} 126"/>
+              </svg>
+              <div class="gauge-value">${formatCurrency(data.metaAds.cliques > 0 ? data.metaAds.custo / data.metaAds.cliques : 0)}</div>
+            </div>
+            <div class="gauge-label">CPC Meta</div>
+          </div>
+          <div class="gauge-card">
+            <div class="gauge-wrapper">
+              <svg width="100" height="60" viewBox="0 0 100 60">
+                <path d="M 10 55 A 40 40 0 0 1 90 55" fill="none" stroke="#222" stroke-width="8" stroke-linecap="round"/>
+                <path d="M 10 55 A 40 40 0 0 1 90 55" fill="none" stroke="var(--success)" stroke-width="8" stroke-linecap="round"
+                  stroke-dasharray="${Math.min(126 * Math.min(roas / 5, 1), 126)} 126"/>
+              </svg>
+              <div class="gauge-value">${roas.toFixed(2)}x</div>
+            </div>
+            <div class="gauge-label">ROAS Geral</div>
           </div>
         </div>
       </div>
     </div>
     
     <div class="page-footer">
-      <span>Turbo Partners | Relatório de Performance</span>
-      <span>Página 2</span>
+      <div>Turbo Partners | Relatório de Performance</div>
+      <div>Página 3 de 5</div>
     </div>
   </div>
-  
-  <!-- Google Analytics Page -->
+
+  <!-- ==================== PAGE 4: FUNNEL & TRAFFIC ==================== -->
   <div class="page content-page">
     <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">04</div>
+        <div class="page-title">Funil & Tráfego</div>
+      </div>
       <div class="page-brand">Turbo Partners</div>
-      <div class="page-title">Google Analytics 4</div>
-      <div class="header-accent blue"></div>
     </div>
     
-    <div class="page-content">
+    <div class="page-body">
       <div class="section">
-        <div class="section-title">Métricas de Tráfego</div>
-        <div class="kpi-visual-grid">
-          <div class="kpi-visual-card">
-            <div class="kpi-icon blue">📊</div>
-            <div class="kpi-visual-label">Sessões</div>
-            <div class="kpi-visual-value">${formatNumber(data.ga4Atual.sessoes)}</div>
-            <div class="kpi-visual-footer">
-              <span class="kpi-visual-change ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</span>
-              <span class="kpi-visual-period">vs anterior</span>
-            </div>
+        <div class="section-header">
+          <div class="section-icon">🔄</div>
+          <div>
+            <div class="section-title">Funil de Conversão</div>
+            <div class="section-subtitle">Jornada do usuário desde impressão até conversão</div>
           </div>
-          <div class="kpi-visual-card">
-            <div class="kpi-icon green">👥</div>
-            <div class="kpi-visual-label">Usuários</div>
-            <div class="kpi-visual-value">${formatNumber(data.ga4Atual.usuarios)}</div>
-            <div class="kpi-visual-footer">
-              <span class="kpi-visual-change ${usuariosVar.isPositive ? 'positive' : 'negative'}">${usuariosVar.text}</span>
-              <span class="kpi-visual-period">vs anterior</span>
-            </div>
-          </div>
-          <div class="kpi-visual-card">
-            <div class="kpi-icon purple">🆕</div>
-            <div class="kpi-visual-label">Novos Usuários</div>
-            <div class="kpi-visual-value">${formatNumber(data.ga4Atual.novoUsuarios)}</div>
-            <div class="kpi-visual-footer">
-              <span class="kpi-visual-change ${calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios).isPositive ? 'positive' : 'negative'}">${calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios).text}</span>
-              <span class="kpi-visual-period">vs anterior</span>
-            </div>
-          </div>
-          <div class="kpi-visual-card">
-            <div class="kpi-icon yellow">⏱️</div>
-            <div class="kpi-visual-label">Duração Média</div>
-            <div class="kpi-visual-value">${formatDuration(data.ga4Atual.duracaoMedia)}</div>
-            <div class="kpi-visual-footer">
-              <span class="kpi-visual-period">Tempo por sessão</span>
-            </div>
-          </div>
+          <div class="section-line"></div>
         </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Receita e Conversões</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-          <div class="sparkline-row" style="margin-bottom: 0;">
-            <div class="sparkline-info">
-              <div class="sparkline-label">💰 Receita Total</div>
-              <div class="sparkline-value" style="color: #4ADE80;">${formatCurrency(data.ga4Atual.receita)}</div>
-              <div class="sparkline-change ${receitaVar.isPositive ? 'positive' : 'negative'}">${receitaVar.text}</div>
-            </div>
-          </div>
-          <div class="sparkline-row" style="margin-bottom: 0;">
-            <div class="sparkline-info">
-              <div class="sparkline-label">🎯 Conversões</div>
-              <div class="sparkline-value" style="color: #00D4FF;">${formatNumber(data.ga4Atual.conversoes)}</div>
-              <div class="sparkline-change ${convVar.isPositive ? 'positive' : 'negative'}">${convVar.text}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Top Canais de Aquisição</div>
-        ${(() => {
-          const maxSessoes = Math.max(...data.ga4Atual.canais.slice(0, 5).map(c => c.sessoes), 1);
-          return data.ga4Atual.canais.slice(0, 5).map((c, i) => `
-          <div class="sparkline-row">
-            <div style="width: 24px; height: 24px; border-radius: 6px; background: linear-gradient(135deg, #00D4FF, #0099FF); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #000;">${i + 1}</div>
-            <div class="sparkline-info" style="flex: 1;">
-              <div class="sparkline-label">${c.nome || 'Direto'}</div>
-              <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px;">
-                <div style="flex: 1; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
-                  <div style="height: 100%; width: ${(c.sessoes / maxSessoes) * 100}%; background: linear-gradient(90deg, #00D4FF, #0099FF); border-radius: 4px;"></div>
+        
+        <div class="funnel-container">
+          <div class="funnel-stages">
+            ${(() => {
+              const impressions = data.googleAds.impressoes + data.metaAds.impressoes;
+              const clicks = data.googleAds.cliques + data.metaAds.cliques;
+              const sessions = data.ga4Atual.sessoes;
+              const conversions = data.ga4Atual.conversoes;
+              const max = Math.max(impressions, 1);
+              
+              const stages = [
+                { label: 'Impressões', value: impressions, pct: 100, class: 'impressions' },
+                { label: 'Cliques', value: clicks, pct: (clicks / max) * 100, class: 'clicks', rate: impressions > 0 ? ((clicks / impressions) * 100).toFixed(2) : '0' },
+                { label: 'Sessões', value: sessions, pct: (sessions / max) * 100, class: 'sessions', rate: clicks > 0 ? ((sessions / clicks) * 100).toFixed(2) : '0' },
+                { label: 'Conversões', value: conversions, pct: Math.max((conversions / max) * 100, 5), class: 'conversions', rate: sessions > 0 ? ((conversions / sessions) * 100).toFixed(2) : '0' }
+              ];
+              
+              return stages.map((stage, i) => `
+                <div class="funnel-stage">
+                  <div class="funnel-bar-container">
+                    <div class="funnel-bar ${stage.class}" style="height: ${Math.max(stage.pct, 15)}%">
+                      ${formatNumber(stage.value)}
+                    </div>
+                  </div>
+                  <div class="funnel-info">
+                    <div class="funnel-stage-label">${stage.label}</div>
+                    ${stage.rate ? `<div class="funnel-rate">Taxa: ${stage.rate}%</div>` : ''}
+                  </div>
                 </div>
-                <span style="font-size: 13px; font-weight: 600; color: white; min-width: 70px;">${formatNumber(c.sessoes)} sessões</span>
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: 18px; font-weight: 700; color: #4ADE80;">${formatNumber(c.conversoes)}</div>
-              <div style="font-size: 10px; color: #888;">conversões</div>
-            </div>
-          </div>
-          `).join('');
-        })()}
-      </div>
-    </div>
-    
-    <div class="page-footer">
-      <span>Turbo Partners | Relatório de Performance</span>
-      <span>Página 3</span>
-    </div>
-  </div>
-  
-  <!-- Google Ads Page -->
-  <div class="page content-page">
-    <div class="page-header">
-      <div class="page-brand">Turbo Partners</div>
-      <div class="page-title">Google Ads</div>
-      <div class="header-accent blue"></div>
-    </div>
-    
-    <div class="page-content">
-      <div class="section">
-        <div class="section-title">Performance Geral</div>
-        <div class="metrics-grid metrics-grid-4">
-          <div class="metric-card">
-            <div class="metric-label">Impressões</div>
-            <div class="metric-value">${formatNumber(data.googleAds.impressoes)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Cliques</div>
-            <div class="metric-value">${formatNumber(data.googleAds.cliques)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">CTR</div>
-            <div class="metric-value">${formatPercent(data.googleAds.ctr)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">CPC Médio</div>
-            <div class="metric-value">${formatCurrency(data.googleAds.cpc)}</div>
-          </div>
-          <div class="metric-card google">
-            <div class="metric-label">Custo Total</div>
-            <div class="metric-value">${formatCurrency(data.googleAds.custo)}</div>
-          </div>
-          <div class="metric-card google">
-            <div class="metric-label">Conversões</div>
-            <div class="metric-value">${formatNumber(data.googleAds.conversoes)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Custo/Conversão</div>
-            <div class="metric-value">${formatCurrency(data.googleAds.custoPorConversao)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">ROAS</div>
-            <div class="metric-value">${data.googleAds.roas.toFixed(2).replace('.', ',')}x</div>
+              `).join('');
+            })()}
           </div>
         </div>
       </div>
       
       <div class="section">
-        <div class="section-title">Top Campanhas</div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Campanha</th>
-              <th>Impressões</th>
-              <th>Cliques</th>
-              <th>Custo</th>
-              <th>Conversões</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.googleAds.campanhas.slice(0, 6).map(c => `
-            <tr>
-              <td><strong>${c.nome.length > 30 ? c.nome.substring(0, 30) + '...' : c.nome}</strong></td>
-              <td>${formatNumber(c.impressoes)}</td>
-              <td>${formatNumber(c.cliques)}</td>
-              <td>${formatCurrency(c.custo)}</td>
-              <td>${formatNumber(c.conversoes)}</td>
-            </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    
-    <div class="page-footer">
-      <span>Turbo Partners | Relatório de Performance</span>
-      <span>Página 4</span>
-    </div>
-  </div>
-  
-  <!-- Meta Ads Page -->
-  <div class="page content-page">
-    <div class="page-header">
-      <div class="page-brand">Turbo Partners</div>
-      <div class="page-title">Meta Ads</div>
-      <div class="header-accent meta"></div>
-    </div>
-    
-    <div class="page-content">
-      <div class="section">
-        <div class="section-title">Performance Geral</div>
-        <div class="metrics-grid metrics-grid-4">
-          <div class="metric-card">
-            <div class="metric-label">Impressões</div>
-            <div class="metric-value">${formatNumber(data.metaAds.impressoes)}</div>
+        <div class="section-header">
+          <div class="section-icon">📱</div>
+          <div>
+            <div class="section-title">Métricas de Tráfego (GA4)</div>
+            <div class="section-subtitle">Comportamento dos usuários no site</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Alcance</div>
-            <div class="metric-value">${formatNumber(data.metaAds.alcance)}</div>
+          <div class="section-line"></div>
+        </div>
+        
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-icon">👥</div>
+            <div class="kpi-label">Usuários</div>
+            <div class="kpi-value small">${formatNumber(data.ga4Atual.usuarios)}</div>
+            <div class="kpi-change ${usuariosVar.isPositive ? 'positive' : 'negative'}">
+              ${usuariosVar.isPositive ? '↑' : '↓'} ${usuariosVar.text}
+            </div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">Cliques</div>
-            <div class="metric-value">${formatNumber(data.metaAds.cliques)}</div>
+          <div class="kpi-card">
+            <div class="kpi-icon">🆕</div>
+            <div class="kpi-label">Novos Usuários</div>
+            <div class="kpi-value small">${formatNumber(data.ga4Atual.novoUsuarios)}</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">CTR</div>
-            <div class="metric-value">${formatPercent(data.metaAds.ctr)}</div>
+          <div class="kpi-card">
+            <div class="kpi-icon">⏱️</div>
+            <div class="kpi-label">Duração Média</div>
+            <div class="kpi-value small">${formatDuration(data.ga4Atual.duracaoMedia)}</div>
           </div>
-          <div class="metric-card">
-            <div class="metric-label">CPC</div>
-            <div class="metric-value">${formatCurrency(data.metaAds.cpc)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">CPM</div>
-            <div class="metric-value">${formatCurrency(data.metaAds.cpm)}</div>
-          </div>
-          <div class="metric-card meta">
-            <div class="metric-label">Custo Total</div>
-            <div class="metric-value">${formatCurrency(data.metaAds.custo)}</div>
-          </div>
-          <div class="metric-card meta">
-            <div class="metric-label">Conversões</div>
-            <div class="metric-value">${formatNumber(data.metaAds.conversoes)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Custo/Conversão</div>
-            <div class="metric-value">${formatCurrency(data.metaAds.custoPorConversao)}</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">ROAS</div>
-            <div class="metric-value">${data.metaAds.roas.toFixed(2).replace('.', ',')}x</div>
+          <div class="kpi-card">
+            <div class="kpi-icon">↩️</div>
+            <div class="kpi-label">Taxa de Rejeição</div>
+            <div class="kpi-value small">${formatPercent(data.ga4Atual.taxaRejeicao * 100)}</div>
           </div>
         </div>
       </div>
       
       <div class="section">
-        <div class="section-title">Top Campanhas</div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Campanha</th>
-              <th>Alcance</th>
-              <th>Cliques</th>
-              <th>Custo</th>
-              <th>Conversões</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.metaAds.campanhas.slice(0, 6).map(c => `
-            <tr>
-              <td><strong>${c.nome.length > 30 ? c.nome.substring(0, 30) + '...' : c.nome}</strong></td>
-              <td>${formatNumber(c.alcance)}</td>
-              <td>${formatNumber(c.cliques)}</td>
-              <td>${formatCurrency(c.custo)}</td>
-              <td>${formatNumber(c.conversoes)}</td>
-            </tr>
-            `).join('')}
-          </tbody>
-        </table>
+        <div class="section-header">
+          <div class="section-icon">🌐</div>
+          <div>
+            <div class="section-title">Top Canais de Aquisição</div>
+            <div class="section-subtitle">Origem do tráfego por canal</div>
+          </div>
+          <div class="section-line"></div>
+        </div>
+        
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 40px">#</th>
+                <th>Canal</th>
+                <th style="text-align: right">Sessões</th>
+                <th style="text-align: right">Conversões</th>
+                <th style="text-align: right">Taxa Conv.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.ga4Atual.canais.slice(0, 5).map((c, i) => {
+                const taxa = c.sessoes > 0 ? (c.conversoes / c.sessoes) * 100 : 0;
+                return `
+                <tr>
+                  <td style="font-weight: 700; color: var(--primary)">${i + 1}</td>
+                  <td style="font-weight: 600">${c.nome || 'Direto'}</td>
+                  <td style="text-align: right">${formatNumber(c.sessoes)}</td>
+                  <td style="text-align: right">${formatNumber(c.conversoes)}</td>
+                  <td style="text-align: right">
+                    <span class="table-badge ${taxa > 2 ? 'positive' : taxa > 0 ? '' : 'negative'}">${taxa.toFixed(2)}%</span>
+                  </td>
+                </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
     
     <div class="page-footer">
-      <span>Turbo Partners | Relatório de Performance</span>
-      <span>Página 5</span>
+      <div>Turbo Partners | Relatório de Performance</div>
+      <div>Página 4 de 5</div>
+    </div>
+  </div>
+
+  <!-- ==================== PAGE 5: CAMPAIGNS & RECOMMENDATIONS ==================== -->
+  <div class="page content-page">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-number">05</div>
+        <div class="page-title">Campanhas & Próximos Passos</div>
+      </div>
+      <div class="page-brand">Turbo Partners</div>
+    </div>
+    
+    <div class="page-body">
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">🎯</div>
+          <div>
+            <div class="section-title">Top Campanhas Google Ads</div>
+            <div class="section-subtitle">Campanhas com melhor performance</div>
+          </div>
+          <div class="section-line"></div>
+        </div>
+        
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Campanha</th>
+                <th style="text-align: right">Custo</th>
+                <th style="text-align: right">Cliques</th>
+                <th style="text-align: right">Conv.</th>
+                <th style="text-align: right">CPA</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.googleAds.campanhas.slice(0, 4).map(c => {
+                const cpaVal = c.conversoes > 0 ? c.custo / c.conversoes : 0;
+                return `
+                <tr>
+                  <td style="font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${c.nome}</td>
+                  <td style="text-align: right">${formatCurrency(c.custo)}</td>
+                  <td style="text-align: right">${formatNumber(c.cliques)}</td>
+                  <td style="text-align: right; font-weight: 700; color: var(--success)">${c.conversoes}</td>
+                  <td style="text-align: right">${formatCurrency(cpaVal)}</td>
+                </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-header">
+          <div class="section-icon">📱</div>
+          <div>
+            <div class="section-title">Top Campanhas Meta Ads</div>
+            <div class="section-subtitle">Campanhas com melhor performance</div>
+          </div>
+          <div class="section-line"></div>
+        </div>
+        
+        <div class="data-table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Campanha</th>
+                <th style="text-align: right">Custo</th>
+                <th style="text-align: right">Cliques</th>
+                <th style="text-align: right">Conv.</th>
+                <th style="text-align: right">CPA</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.metaAds.campanhas.slice(0, 4).map(c => {
+                const cpaVal = c.conversoes > 0 ? c.custo / c.conversoes : 0;
+                return `
+                <tr>
+                  <td style="font-weight: 600; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${c.nome}</td>
+                  <td style="text-align: right">${formatCurrency(c.custo)}</td>
+                  <td style="text-align: right">${formatNumber(c.cliques)}</td>
+                  <td style="text-align: right; font-weight: 700; color: var(--success)">${c.conversoes}</td>
+                  <td style="text-align: right">${formatCurrency(cpaVal)}</td>
+                </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="insights-box">
+          <div class="insights-title">
+            <span>🚀</span> Próximos Passos Recomendados
+          </div>
+          <div class="insights-list">
+            <div class="insight-item">
+              <div class="insight-bullet"></div>
+              <div>${roas >= 3 ? 'Manter a estratégia atual e considerar aumento gradual de investimento nas campanhas de melhor performance.' : 'Otimizar campanhas com baixo ROAS e realocar budget para as de melhor desempenho.'}</div>
+            </div>
+            <div class="insight-item">
+              <div class="insight-bullet"></div>
+              <div>${data.ga4Atual.taxaRejeicao > 0.5 ? 'Revisar landing pages para reduzir taxa de rejeição e melhorar experiência do usuário.' : 'Expandir testes A/B em landing pages para potencializar taxa de conversão.'}</div>
+            </div>
+            <div class="insight-item">
+              <div class="insight-bullet"></div>
+              <div>Implementar remarketing para usuários que visitaram o site mas não converteram no período.</div>
+            </div>
+            <div class="insight-item">
+              <div class="insight-bullet"></div>
+              <div>Revisar segmentação de audiência para aumentar qualificação do tráfego e reduzir CPA.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="page-footer">
+      <div>Turbo Partners | Relatório de Performance</div>
+      <div>Página 5 de 5</div>
     </div>
   </div>
 </body>
