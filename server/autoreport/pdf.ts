@@ -1,4 +1,4 @@
-import PDFDocument from 'pdfkit';
+import puppeteer from 'puppeteer';
 import type { 
   AutoReportCliente, 
   MetricasGA4, 
@@ -6,19 +6,6 @@ import type {
   MetricasMetaAds,
   PeriodoReferencia 
 } from './types';
-
-const COLORS = {
-  primary: '#FF6B35',
-  dark: '#1E1E2E',
-  white: '#FFFFFF',
-  gray: '#F5F5F7',
-  text: '#1E1E2E',
-  textLight: '#6B7280',
-  green: '#22C55E',
-  red: '#EF4444',
-  googleBlue: '#4285F4',
-  metaBlue: '#0866FF',
-};
 
 function formatCurrency(value: number): string {
   return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -38,13 +25,14 @@ function formatDuration(seconds: number): string {
   return `${mins}m ${secs}s`;
 }
 
-function calcVariation(atual: number, anterior: number): { text: string; isPositive: boolean } {
+function calcVariation(atual: number, anterior: number): { value: number; text: string; isPositive: boolean } {
   if (anterior === 0) {
-    return { text: atual > 0 ? '+100%' : '0%', isPositive: atual >= 0 };
+    return { value: atual > 0 ? 100 : 0, text: atual > 0 ? '+100%' : '0%', isPositive: atual >= 0 };
   }
   const variation = ((atual - anterior) / anterior) * 100;
   const sign = variation >= 0 ? '+' : '';
   return { 
+    value: variation,
     text: `${sign}${variation.toFixed(1).replace('.', ',')}%`,
     isPositive: variation >= 0
   };
@@ -60,450 +48,899 @@ interface ReportData {
 }
 
 export async function generatePdfReport(data: ReportData): Promise<{ buffer: Buffer; fileName: string }> {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({
-        size: 'A4',
-        margin: 50,
-        bufferPages: true,
-      });
-
-      const chunks: Buffer[] = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => {
-        const buffer = Buffer.concat(chunks);
-        const dateStr = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
-        const fileName = `Relatorio_${data.cliente.cliente.replace(/\s+/g, '_')}_${dateStr}.pdf`;
-        resolve({ buffer, fileName });
-      });
-      doc.on('error', reject);
-
-      const margin = 50;
-      const pageWidth = doc.page.width - (margin * 2);
-
-      drawCoverPage(doc, data, pageWidth, margin);
-      
-      doc.addPage();
-      drawSummaryPage(doc, data, pageWidth, margin);
-      
-      doc.addPage();
-      drawGA4Page(doc, data, pageWidth, margin);
-      
-      doc.addPage();
-      drawGoogleAdsPage(doc, data, pageWidth, margin);
-      
-      doc.addPage();
-      drawMetaAdsPage(doc, data, pageWidth, margin);
-
-      addPageNumbers(doc);
-      
-      doc.end();
-    } catch (error) {
-      reject(error);
-    }
+  const html = generateReportHtml(data);
+  
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
+  
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    
+    const pdfBuffer = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '0', right: '0', bottom: '0', left: '0' }
+    });
+    
+    const dateStr = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-');
+    const fileName = `Relatorio_${data.cliente.cliente.replace(/\s+/g, '_')}_${dateStr}.pdf`;
+    
+    return { buffer: Buffer.from(pdfBuffer), fileName };
+  } finally {
+    await browser.close();
+  }
 }
 
-function drawCoverPage(doc: PDFKit.PDFDocument, data: ReportData, pageWidth: number, margin: number): void {
-  doc.rect(0, 0, doc.page.width, doc.page.height).fill(COLORS.dark);
-  
-  doc.rect(0, 0, 8, doc.page.height).fill(COLORS.primary);
-  
-  doc.fontSize(42).font('Helvetica-Bold')
-     .fillColor(COLORS.primary).text('TURBO', margin + 20, 200)
-     .fillColor(COLORS.white).text('PARTNERS', margin + 20, 250);
-  
-  doc.moveTo(margin + 20, 310).lineTo(margin + 120, 310)
-     .strokeColor(COLORS.primary).lineWidth(3).stroke();
-  
-  doc.fontSize(12).font('Helvetica')
-     .fillColor(COLORS.primary).text('RELATÓRIO SEMANAL DE PERFORMANCE', margin + 20, 340);
-  
-  doc.fontSize(28).font('Helvetica-Bold')
-     .fillColor(COLORS.white).text(data.cliente.cliente, margin + 20, 380);
-  
-  const infoY = doc.page.height - 180;
-  
-  doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-     .text('PERÍODO', margin + 20, infoY);
-  doc.fontSize(14).font('Helvetica-Bold').fillColor(COLORS.white)
-     .text(data.periodos.atual.label, margin + 20, infoY + 15);
-  
-  doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-     .text('GESTOR', margin + 20, infoY + 50);
-  doc.fontSize(12).font('Helvetica').fillColor(COLORS.white)
-     .text(data.cliente.gestor || 'N/A', margin + 20, infoY + 65);
-  
-  doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-     .text('SQUAD', margin + 200, infoY + 50);
-  doc.fontSize(12).font('Helvetica').fillColor(COLORS.white)
-     .text(data.cliente.squad || 'N/A', margin + 200, infoY + 65);
-  
-  const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
-  doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-     .text('GERADO EM', pageWidth - 50, infoY + 50);
-  doc.fontSize(12).font('Helvetica').fillColor(COLORS.white)
-     .text(today, pageWidth - 50, infoY + 65);
-}
-
-function drawSummaryPage(doc: PDFKit.PDFDocument, data: ReportData, pageWidth: number, margin: number): void {
-  drawPageHeader(doc, 'Resumo Executivo', COLORS.primary, margin, pageWidth);
-  
-  let y = 130;
-  
+function generateReportHtml(data: ReportData): string {
   const investTotal = data.googleAds.custo + data.metaAds.custo;
   const convTotal = data.googleAds.conversoes + data.metaAds.conversoes;
   const receitaVar = calcVariation(data.ga4Atual.receita, data.ga4Anterior.receita);
+  const sessoesVar = calcVariation(data.ga4Atual.sessoes, data.ga4Anterior.sessoes);
+  const usuariosVar = calcVariation(data.ga4Atual.usuarios, data.ga4Anterior.usuarios);
+  const convVar = calcVariation(data.ga4Atual.conversoes, data.ga4Anterior.conversoes);
   
-  doc.fontSize(11).font('Helvetica').fillColor(COLORS.textLight)
-     .text('INVESTIMENTO TOTAL', margin, y);
-  doc.fontSize(28).font('Helvetica-Bold').fillColor(COLORS.text)
-     .text(formatCurrency(investTotal), margin, y + 15);
-  doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-     .text('Google Ads + Meta Ads', margin, y + 50);
+  const googlePct = investTotal > 0 ? (data.googleAds.custo / investTotal) * 100 : 50;
+  const metaPct = investTotal > 0 ? (data.metaAds.custo / investTotal) * 100 : 50;
   
-  doc.fontSize(11).font('Helvetica').fillColor(COLORS.textLight)
-     .text('RECEITA TOTAL (GA4)', margin + 260, y);
-  doc.fontSize(28).font('Helvetica-Bold').fillColor(COLORS.green)
-     .text(formatCurrency(data.ga4Atual.receita), margin + 260, y + 15);
-  doc.fontSize(10).font('Helvetica').fillColor(receitaVar.isPositive ? COLORS.green : COLORS.red)
-     .text(receitaVar.text + ' vs semana anterior', margin + 260, y + 50);
-  
-  y += 100;
-  
-  drawSectionTitle(doc, 'Métricas Principais', margin, y);
-  y += 30;
-  
-  const metrics = [
-    { label: 'Sessões', value: formatNumber(data.ga4Atual.sessoes), var: calcVariation(data.ga4Atual.sessoes, data.ga4Anterior.sessoes) },
-    { label: 'Conversões Totais', value: formatNumber(convTotal), var: null },
-    { label: 'Custo/Conversão', value: formatCurrency(convTotal > 0 ? investTotal / convTotal : 0), var: null },
-  ];
-  
-  const cardWidth = (pageWidth - 40) / 3;
-  metrics.forEach((m, i) => {
-    const x = margin + (i * (cardWidth + 20));
-    drawMetricCard(doc, x, y, cardWidth, 70, m.label, m.value, m.var);
-  });
-  
-  y += 100;
-  
-  drawSectionTitle(doc, 'Comparativo Semanal', margin, y);
-  y += 30;
-  
-  const compHeaders = ['Métrica', 'Semana Atual', 'Semana Anterior', 'Variação'];
-  const compData = [
-    ['Sessões', formatNumber(data.ga4Atual.sessoes), formatNumber(data.ga4Anterior.sessoes), calcVariation(data.ga4Atual.sessoes, data.ga4Anterior.sessoes)],
-    ['Usuários', formatNumber(data.ga4Atual.usuarios), formatNumber(data.ga4Anterior.usuarios), calcVariation(data.ga4Atual.usuarios, data.ga4Anterior.usuarios)],
-    ['Conversões', formatNumber(data.ga4Atual.conversoes), formatNumber(data.ga4Anterior.conversoes), calcVariation(data.ga4Atual.conversoes, data.ga4Anterior.conversoes)],
-    ['Receita', formatCurrency(data.ga4Atual.receita), formatCurrency(data.ga4Anterior.receita), calcVariation(data.ga4Atual.receita, data.ga4Anterior.receita)],
-  ];
-  
-  drawComparisonTable(doc, margin, y, pageWidth, compHeaders, compData);
-  
-  y += 180;
-  
-  drawSectionTitle(doc, 'Distribuição de Investimento', margin, y);
-  y += 30;
-  
-  const googlePct = investTotal > 0 ? (data.googleAds.custo / investTotal) * 100 : 0;
-  const metaPct = investTotal > 0 ? (data.metaAds.custo / investTotal) * 100 : 0;
-  
-  drawInvestmentBar(doc, margin, y, pageWidth, [
-    { label: 'Google Ads', value: data.googleAds.custo, pct: googlePct, color: COLORS.googleBlue },
-    { label: 'Meta Ads', value: data.metaAds.custo, pct: metaPct, color: COLORS.metaBlue },
-  ]);
-}
+  const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
 
-function drawGA4Page(doc: PDFKit.PDFDocument, data: ReportData, pageWidth: number, margin: number): void {
-  drawPageHeader(doc, 'Google Analytics 4', COLORS.primary, margin, pageWidth);
-  
-  let y = 130;
-  
-  const metrics = [
-    { label: 'Sessões', value: formatNumber(data.ga4Atual.sessoes), var: calcVariation(data.ga4Atual.sessoes, data.ga4Anterior.sessoes) },
-    { label: 'Usuários', value: formatNumber(data.ga4Atual.usuarios), var: calcVariation(data.ga4Atual.usuarios, data.ga4Anterior.usuarios) },
-    { label: 'Novos Usuários', value: formatNumber(data.ga4Atual.novoUsuarios), var: calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios) },
-    { label: 'Taxa de Rejeição', value: formatPercent(data.ga4Atual.taxaRejeicao * 100), var: calcVariation(data.ga4Anterior.taxaRejeicao, data.ga4Atual.taxaRejeicao) },
-    { label: 'Duração Média', value: formatDuration(data.ga4Atual.duracaoMedia), var: calcVariation(data.ga4Atual.duracaoMedia, data.ga4Anterior.duracaoMedia) },
-    { label: 'Conversões', value: formatNumber(data.ga4Atual.conversoes), var: calcVariation(data.ga4Atual.conversoes, data.ga4Anterior.conversoes) },
-  ];
-  
-  const cardWidth = (pageWidth - 40) / 3;
-  metrics.forEach((m, i) => {
-    const row = Math.floor(i / 3);
-    const col = i % 3;
-    const x = margin + (col * (cardWidth + 20));
-    const cardY = y + (row * 85);
-    drawMetricCard(doc, x, cardY, cardWidth, 70, m.label, m.value, m.var);
-  });
-  
-  y += 200;
-  
-  drawSectionTitle(doc, 'Receita', margin, y);
-  y += 30;
-  
-  const receitaVar = calcVariation(data.ga4Atual.receita, data.ga4Anterior.receita);
-  doc.fontSize(32).font('Helvetica-Bold').fillColor(COLORS.green)
-     .text(formatCurrency(data.ga4Atual.receita), margin, y);
-  doc.fontSize(12).font('Helvetica').fillColor(receitaVar.isPositive ? COLORS.green : COLORS.red)
-     .text(`${receitaVar.text} vs semana anterior (${formatCurrency(data.ga4Anterior.receita)})`, margin, y + 40);
-  
-  y += 90;
-  
-  drawSectionTitle(doc, 'Top Canais de Aquisição', margin, y);
-  y += 30;
-  
-  const channelHeaders = ['Canal', 'Sessões', 'Conversões'];
-  const channelData = data.ga4Atual.canais.slice(0, 5).map(c => [
-    c.nome || 'Direto',
-    formatNumber(c.sessoes),
-    formatNumber(c.conversoes)
-  ]);
-  
-  drawSimpleTable(doc, margin, y, pageWidth, channelHeaders, channelData, [0.5, 0.25, 0.25]);
-}
-
-function drawGoogleAdsPage(doc: PDFKit.PDFDocument, data: ReportData, pageWidth: number, margin: number): void {
-  drawPageHeader(doc, 'Google Ads', COLORS.googleBlue, margin, pageWidth);
-  
-  let y = 130;
-  
-  const metrics = [
-    { label: 'Impressões', value: formatNumber(data.googleAds.impressoes) },
-    { label: 'Cliques', value: formatNumber(data.googleAds.cliques) },
-    { label: 'CTR', value: formatPercent(data.googleAds.ctr) },
-    { label: 'CPC Médio', value: formatCurrency(data.googleAds.cpc) },
-    { label: 'Custo Total', value: formatCurrency(data.googleAds.custo), highlight: true },
-    { label: 'Conversões', value: formatNumber(data.googleAds.conversoes), highlight: true },
-    { label: 'Custo/Conversão', value: formatCurrency(data.googleAds.custoPorConversao) },
-    { label: 'ROAS', value: data.googleAds.roas.toFixed(2).replace('.', ',') + 'x' },
-  ];
-  
-  const cardWidth = (pageWidth - 60) / 4;
-  metrics.forEach((m, i) => {
-    const row = Math.floor(i / 4);
-    const col = i % 4;
-    const x = margin + (col * (cardWidth + 20));
-    const cardY = y + (row * 80);
-    drawSimpleCard(doc, x, cardY, cardWidth, 65, m.label, m.value, m.highlight ? COLORS.googleBlue : undefined);
-  });
-  
-  y += 190;
-  
-  drawSectionTitle(doc, 'Top Campanhas', margin, y);
-  y += 30;
-  
-  const campHeaders = ['Campanha', 'Impressões', 'Cliques', 'Custo', 'Conv.'];
-  const campData = data.googleAds.campanhas.slice(0, 5).map(c => [
-    c.nome.length > 25 ? c.nome.substring(0, 25) + '...' : c.nome,
-    formatNumber(c.impressoes),
-    formatNumber(c.cliques),
-    formatCurrency(c.custo),
-    formatNumber(c.conversoes)
-  ]);
-  
-  drawSimpleTable(doc, margin, y, pageWidth, campHeaders, campData, [0.35, 0.16, 0.14, 0.2, 0.15]);
-}
-
-function drawMetaAdsPage(doc: PDFKit.PDFDocument, data: ReportData, pageWidth: number, margin: number): void {
-  drawPageHeader(doc, 'Meta Ads', COLORS.metaBlue, margin, pageWidth);
-  
-  let y = 130;
-  
-  const metrics = [
-    { label: 'Impressões', value: formatNumber(data.metaAds.impressoes) },
-    { label: 'Alcance', value: formatNumber(data.metaAds.alcance) },
-    { label: 'Cliques', value: formatNumber(data.metaAds.cliques) },
-    { label: 'CTR', value: formatPercent(data.metaAds.ctr) },
-    { label: 'CPC', value: formatCurrency(data.metaAds.cpc) },
-    { label: 'CPM', value: formatCurrency(data.metaAds.cpm) },
-    { label: 'Custo Total', value: formatCurrency(data.metaAds.custo), highlight: true },
-    { label: 'Conversões', value: formatNumber(data.metaAds.conversoes), highlight: true },
-    { label: 'Custo/Conv.', value: formatCurrency(data.metaAds.custoPorConversao) },
-    { label: 'ROAS', value: data.metaAds.roas.toFixed(2).replace('.', ',') + 'x' },
-  ];
-  
-  const cardWidth = (pageWidth - 80) / 5;
-  metrics.forEach((m, i) => {
-    const row = Math.floor(i / 5);
-    const col = i % 5;
-    const x = margin + (col * (cardWidth + 20));
-    const cardY = y + (row * 75);
-    drawSimpleCard(doc, x, cardY, cardWidth, 60, m.label, m.value, m.highlight ? COLORS.metaBlue : undefined);
-  });
-  
-  y += 180;
-  
-  drawSectionTitle(doc, 'Top Campanhas', margin, y);
-  y += 30;
-  
-  const campHeaders = ['Campanha', 'Alcance', 'Cliques', 'Custo', 'Conv.'];
-  const campData = data.metaAds.campanhas.slice(0, 5).map(c => [
-    c.nome.length > 25 ? c.nome.substring(0, 25) + '...' : c.nome,
-    formatNumber(c.alcance),
-    formatNumber(c.cliques),
-    formatCurrency(c.custo),
-    formatNumber(c.conversoes)
-  ]);
-  
-  drawSimpleTable(doc, margin, y, pageWidth, campHeaders, campData, [0.35, 0.16, 0.14, 0.2, 0.15]);
-}
-
-function drawPageHeader(doc: PDFKit.PDFDocument, title: string, color: string, margin: number, pageWidth: number): void {
-  doc.rect(0, 0, doc.page.width, 100).fill(COLORS.dark);
-  doc.rect(0, 95, doc.page.width, 5).fill(color);
-  
-  doc.fontSize(24).font('Helvetica-Bold').fillColor(COLORS.white)
-     .text(title, margin, 40);
-  
-  doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-     .text('TURBO PARTNERS', doc.page.width - margin - 100, 45);
-}
-
-function drawSectionTitle(doc: PDFKit.PDFDocument, title: string, x: number, y: number): void {
-  doc.fontSize(14).font('Helvetica-Bold').fillColor(COLORS.text)
-     .text(title, x, y);
-  doc.moveTo(x, y + 18).lineTo(x + 80, y + 18)
-     .strokeColor(COLORS.primary).lineWidth(2).stroke();
-}
-
-function drawMetricCard(doc: PDFKit.PDFDocument, x: number, y: number, width: number, height: number, label: string, value: string, variation: { text: string; isPositive: boolean } | null): void {
-  doc.rect(x, y, width, height).fill(COLORS.gray);
-  doc.rect(x, y, width, height).strokeColor('#E5E5E5').stroke();
-  
-  doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-     .text(label, x + 12, y + 12, { width: width - 24 });
-  
-  doc.fontSize(18).font('Helvetica-Bold').fillColor(COLORS.text)
-     .text(value, x + 12, y + 28, { width: width - 24 });
-  
-  if (variation) {
-    doc.fontSize(11).font('Helvetica-Bold')
-       .fillColor(variation.isPositive ? COLORS.green : COLORS.red)
-       .text(variation.text, x + 12, y + 52, { width: width - 24 });
-  }
-}
-
-function drawSimpleCard(doc: PDFKit.PDFDocument, x: number, y: number, width: number, height: number, label: string, value: string, highlightColor?: string): void {
-  if (highlightColor) {
-    doc.rect(x, y, width, height).fill(highlightColor);
-    doc.fontSize(9).font('Helvetica').fillColor('rgba(255,255,255,0.8)')
-       .text(label, x + 10, y + 10, { width: width - 20 });
-    doc.fontSize(14).font('Helvetica-Bold').fillColor(COLORS.white)
-       .text(value, x + 10, y + 28, { width: width - 20 });
-  } else {
-    doc.rect(x, y, width, height).fill(COLORS.gray);
-    doc.rect(x, y, width, height).strokeColor('#E5E5E5').stroke();
-    doc.fontSize(9).font('Helvetica').fillColor(COLORS.textLight)
-       .text(label, x + 10, y + 10, { width: width - 20 });
-    doc.fontSize(14).font('Helvetica-Bold').fillColor(COLORS.text)
-       .text(value, x + 10, y + 28, { width: width - 20 });
-  }
-}
-
-function drawComparisonTable(doc: PDFKit.PDFDocument, x: number, y: number, width: number, headers: string[], data: any[][]): void {
-  const rowHeight = 30;
-  const headerHeight = 35;
-  
-  doc.rect(x, y, width, headerHeight).fill(COLORS.dark);
-  
-  const cols = [0.28, 0.24, 0.24, 0.24];
-  let xPos = x;
-  headers.forEach((h, i) => {
-    doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.white)
-       .text(h, xPos + 10, y + 12, { width: width * cols[i] - 20 });
-    xPos += width * cols[i];
-  });
-  
-  data.forEach((row, rowIndex) => {
-    const rowY = y + headerHeight + (rowIndex * rowHeight);
-    const bgColor = rowIndex % 2 === 0 ? COLORS.gray : COLORS.white;
-    doc.rect(x, rowY, width, rowHeight).fill(bgColor);
-    
-    let xPos = x;
-    row.forEach((cell, colIndex) => {
-      if (colIndex === 3 && typeof cell === 'object') {
-        doc.fontSize(10).font('Helvetica-Bold')
-           .fillColor(cell.isPositive ? COLORS.green : COLORS.red)
-           .text(cell.text, xPos + 10, rowY + 10, { width: width * cols[colIndex] - 20 });
-      } else {
-        doc.fontSize(10).font(colIndex === 0 ? 'Helvetica-Bold' : 'Helvetica')
-           .fillColor(COLORS.text)
-           .text(String(cell), xPos + 10, rowY + 10, { width: width * cols[colIndex] - 20 });
-      }
-      xPos += width * cols[colIndex];
-    });
-  });
-}
-
-function drawSimpleTable(doc: PDFKit.PDFDocument, x: number, y: number, width: number, headers: string[], data: string[][], colWidths: number[]): void {
-  const rowHeight = 28;
-  const headerHeight = 32;
-  
-  doc.rect(x, y, width, headerHeight).fill(COLORS.dark);
-  
-  let xPos = x;
-  headers.forEach((h, i) => {
-    doc.fontSize(9).font('Helvetica-Bold').fillColor(COLORS.white)
-       .text(h, xPos + 8, y + 10, { width: width * colWidths[i] - 16 });
-    xPos += width * colWidths[i];
-  });
-  
-  data.forEach((row, rowIndex) => {
-    const rowY = y + headerHeight + (rowIndex * rowHeight);
-    const bgColor = rowIndex % 2 === 0 ? COLORS.gray : COLORS.white;
-    doc.rect(x, rowY, width, rowHeight).fill(bgColor);
-    
-    let xPos = x;
-    row.forEach((cell, colIndex) => {
-      doc.fontSize(9).font(colIndex === 0 ? 'Helvetica-Bold' : 'Helvetica')
-         .fillColor(COLORS.text)
-         .text(cell, xPos + 8, rowY + 9, { width: width * colWidths[colIndex] - 16 });
-      xPos += width * colWidths[colIndex];
-    });
-  });
-}
-
-function drawInvestmentBar(doc: PDFKit.PDFDocument, x: number, y: number, width: number, data: { label: string; value: number; pct: number; color: string }[]): void {
-  const barHeight = 25;
-  
-  doc.rect(x, y, width, barHeight).fill('#E5E5E5');
-  
-  let currentX = x;
-  data.forEach((item) => {
-    const itemWidth = (width * item.pct) / 100;
-    if (itemWidth > 0) {
-      doc.rect(currentX, y, itemWidth, barHeight).fill(item.color);
-      currentX += itemWidth;
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Relatório - ${data.cliente.cliente}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-  });
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+      line-height: 1.5;
+    }
+    
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 0;
+      background: white;
+      page-break-after: always;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .page:last-child {
+      page-break-after: avoid;
+    }
+    
+    /* Cover Page */
+    .cover {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 0;
+    }
+    
+    .cover-accent {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 8px;
+      height: 100%;
+      background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+    }
+    
+    .cover-pattern {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 50%;
+      height: 100%;
+      background: radial-gradient(circle at 80% 20%, rgba(249, 115, 22, 0.1) 0%, transparent 50%),
+                  radial-gradient(circle at 60% 80%, rgba(249, 115, 22, 0.05) 0%, transparent 40%);
+    }
+    
+    .cover-content {
+      position: relative;
+      z-index: 1;
+      padding: 60px 50px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    
+    .logo {
+      margin-bottom: 60px;
+    }
+    
+    .logo-text {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+    
+    .logo-turbo {
+      color: #f97316;
+    }
+    
+    .logo-partners {
+      color: white;
+      margin-left: 10px;
+    }
+    
+    .cover-divider {
+      width: 80px;
+      height: 4px;
+      background: linear-gradient(90deg, #f97316, #ea580c);
+      margin: 30px 0;
+      border-radius: 2px;
+    }
+    
+    .cover-subtitle {
+      font-size: 13px;
+      font-weight: 500;
+      color: #f97316;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-bottom: 20px;
+    }
+    
+    .cover-title {
+      font-size: 36px;
+      font-weight: 700;
+      color: white;
+      line-height: 1.2;
+    }
+    
+    .cover-footer {
+      position: relative;
+      z-index: 1;
+      padding: 40px 50px;
+      background: rgba(0, 0, 0, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    
+    .cover-info {
+      display: flex;
+      gap: 50px;
+    }
+    
+    .info-block {
+      color: white;
+    }
+    
+    .info-label {
+      font-size: 10px;
+      font-weight: 500;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+    
+    .info-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: white;
+    }
+    
+    /* Content Pages */
+    .content-page {
+      padding: 0;
+    }
+    
+    .page-header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      padding: 30px 40px;
+      position: relative;
+    }
+    
+    .header-accent {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+    }
+    
+    .header-accent.orange { background: linear-gradient(90deg, #f97316, #ea580c); }
+    .header-accent.blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+    .header-accent.meta { background: linear-gradient(90deg, #0ea5e9, #0284c7); }
+    
+    .page-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: white;
+    }
+    
+    .page-brand {
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .page-content {
+      padding: 30px 40px;
+    }
+    
+    .section {
+      margin-bottom: 30px;
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+    
+    /* Metric Cards */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    
+    .metrics-grid-4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    
+    .metric-card {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .metric-card.highlight {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      border: none;
+    }
+    
+    .metric-card.highlight .metric-label,
+    .metric-card.highlight .metric-value {
+      color: white;
+    }
+    
+    .metric-card.google {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+    
+    .metric-card.meta {
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    }
+    
+    .metric-card.google .metric-label,
+    .metric-card.google .metric-value,
+    .metric-card.meta .metric-label,
+    .metric-card.meta .metric-value {
+      color: white;
+    }
+    
+    .metric-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    
+    .metric-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    
+    .metric-change {
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .metric-change.positive { color: #22c55e; }
+    .metric-change.negative { color: #ef4444; }
+    
+    /* Hero Stats */
+    .hero-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 30px;
+    }
+    
+    .hero-stat {
+      background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid #e5e5e5;
+    }
+    
+    .hero-stat-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .hero-stat-value {
+      font-size: 32px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 8px 0;
+    }
+    
+    .hero-stat-value.green { color: #22c55e; }
+    
+    .hero-stat-sub {
+      font-size: 12px;
+      color: #64748b;
+    }
+    
+    .hero-stat-sub.positive { color: #22c55e; }
+    .hero-stat-sub.negative { color: #ef4444; }
+    
+    /* Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    
+    .data-table th {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: white;
+      font-weight: 600;
+      text-align: left;
+      padding: 14px 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-size: 10px;
+    }
+    
+    .data-table th:first-child {
+      border-radius: 8px 0 0 0;
+    }
+    
+    .data-table th:last-child {
+      border-radius: 0 8px 0 0;
+    }
+    
+    .data-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    
+    .data-table tr:nth-child(even) {
+      background: #fafafa;
+    }
+    
+    .data-table tr:last-child td:first-child {
+      border-radius: 0 0 0 8px;
+    }
+    
+    .data-table tr:last-child td:last-child {
+      border-radius: 0 0 8px 0;
+    }
+    
+    .variation {
+      font-weight: 600;
+    }
+    
+    .variation.positive { color: #22c55e; }
+    .variation.negative { color: #ef4444; }
+    
+    /* Investment Bar */
+    .investment-section {
+      margin-top: 24px;
+    }
+    
+    .investment-bar {
+      height: 32px;
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .investment-bar-google {
+      background: linear-gradient(90deg, #3b82f6, #2563eb);
+    }
+    
+    .investment-bar-meta {
+      background: linear-gradient(90deg, #0ea5e9, #0284c7);
+    }
+    
+    .investment-legend {
+      display: flex;
+      gap: 40px;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .legend-dot.google { background: #3b82f6; }
+    .legend-dot.meta { background: #0ea5e9; }
+    
+    .legend-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    
+    .legend-value {
+      font-size: 12px;
+      color: #64748b;
+    }
+    
+    /* Page Footer */
+    .page-footer {
+      position: absolute;
+      bottom: 20px;
+      left: 40px;
+      right: 40px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #94a3b8;
+    }
+    
+    @media print {
+      .page {
+        margin: 0;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Cover Page -->
+  <div class="page cover">
+    <div class="cover-accent"></div>
+    <div class="cover-pattern"></div>
+    
+    <div class="cover-content">
+      <div class="logo">
+        <span class="logo-text">
+          <span class="logo-turbo">TURBO</span>
+          <span class="logo-partners">PARTNERS</span>
+        </span>
+      </div>
+      
+      <div class="cover-divider"></div>
+      
+      <div class="cover-subtitle">Relatório de Performance</div>
+      <div class="cover-title">${data.cliente.cliente}</div>
+    </div>
+    
+    <div class="cover-footer">
+      <div class="cover-info">
+        <div class="info-block">
+          <div class="info-label">Período</div>
+          <div class="info-value">${data.periodos.atual.label}</div>
+        </div>
+        <div class="info-block">
+          <div class="info-label">Gestor</div>
+          <div class="info-value">${data.cliente.gestor || 'N/A'}</div>
+        </div>
+        <div class="info-block">
+          <div class="info-label">Squad</div>
+          <div class="info-value">${data.cliente.squad || 'N/A'}</div>
+        </div>
+      </div>
+      <div class="info-block">
+        <div class="info-label">Gerado em</div>
+        <div class="info-value">${today}</div>
+      </div>
+    </div>
+  </div>
   
-  let legendX = x;
-  data.forEach((item) => {
-    doc.circle(legendX + 6, y + 45, 5).fill(item.color);
-    doc.fontSize(10).font('Helvetica-Bold').fillColor(COLORS.text)
-       .text(item.label, legendX + 16, y + 40);
-    doc.fontSize(10).font('Helvetica').fillColor(COLORS.textLight)
-       .text(`${formatCurrency(item.value)} (${item.pct.toFixed(0)}%)`, legendX + 16, y + 55);
-    legendX += 200;
-  });
-}
-
-function addPageNumbers(doc: PDFKit.PDFDocument): void {
-  const pageCount = doc.bufferedPageRange().count;
+  <!-- Executive Summary -->
+  <div class="page content-page">
+    <div class="page-header">
+      <div class="page-brand">Turbo Partners</div>
+      <div class="page-title">Resumo Executivo</div>
+      <div class="header-accent orange"></div>
+    </div>
+    
+    <div class="page-content">
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-label">Investimento Total</div>
+          <div class="hero-stat-value">${formatCurrency(investTotal)}</div>
+          <div class="hero-stat-sub">Google Ads + Meta Ads</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-label">Receita Total (GA4)</div>
+          <div class="hero-stat-value green">${formatCurrency(data.ga4Atual.receita)}</div>
+          <div class="hero-stat-sub ${receitaVar.isPositive ? 'positive' : 'negative'}">${receitaVar.text} vs período anterior</div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Métricas Principais</div>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">Sessões</div>
+            <div class="metric-value">${formatNumber(data.ga4Atual.sessoes)}</div>
+            <div class="metric-change ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Conversões Totais</div>
+            <div class="metric-value">${formatNumber(convTotal)}</div>
+          </div>
+          <div class="metric-card highlight">
+            <div class="metric-label">Custo por Conversão</div>
+            <div class="metric-value">${formatCurrency(convTotal > 0 ? investTotal / convTotal : 0)}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Comparativo com Período Anterior</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Métrica</th>
+              <th>Período Atual</th>
+              <th>Período Anterior</th>
+              <th>Variação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Sessões</strong></td>
+              <td>${formatNumber(data.ga4Atual.sessoes)}</td>
+              <td>${formatNumber(data.ga4Anterior.sessoes)}</td>
+              <td><span class="variation ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</span></td>
+            </tr>
+            <tr>
+              <td><strong>Usuários</strong></td>
+              <td>${formatNumber(data.ga4Atual.usuarios)}</td>
+              <td>${formatNumber(data.ga4Anterior.usuarios)}</td>
+              <td><span class="variation ${usuariosVar.isPositive ? 'positive' : 'negative'}">${usuariosVar.text}</span></td>
+            </tr>
+            <tr>
+              <td><strong>Conversões</strong></td>
+              <td>${formatNumber(data.ga4Atual.conversoes)}</td>
+              <td>${formatNumber(data.ga4Anterior.conversoes)}</td>
+              <td><span class="variation ${convVar.isPositive ? 'positive' : 'negative'}">${convVar.text}</span></td>
+            </tr>
+            <tr>
+              <td><strong>Receita</strong></td>
+              <td>${formatCurrency(data.ga4Atual.receita)}</td>
+              <td>${formatCurrency(data.ga4Anterior.receita)}</td>
+              <td><span class="variation ${receitaVar.isPositive ? 'positive' : 'negative'}">${receitaVar.text}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="section investment-section">
+        <div class="section-title">Distribuição de Investimento</div>
+        <div class="investment-bar">
+          <div class="investment-bar-google" style="width: ${googlePct}%"></div>
+          <div class="investment-bar-meta" style="width: ${metaPct}%"></div>
+        </div>
+        <div class="investment-legend">
+          <div class="legend-item">
+            <div class="legend-dot google"></div>
+            <div>
+              <div class="legend-label">Google Ads</div>
+              <div class="legend-value">${formatCurrency(data.googleAds.custo)} (${googlePct.toFixed(0)}%)</div>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot meta"></div>
+            <div>
+              <div class="legend-label">Meta Ads</div>
+              <div class="legend-value">${formatCurrency(data.metaAds.custo)} (${metaPct.toFixed(0)}%)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="page-footer">
+      <span>Turbo Partners | Relatório de Performance</span>
+      <span>Página 2</span>
+    </div>
+  </div>
   
-  for (let i = 0; i < pageCount; i++) {
-    doc.switchToPage(i);
+  <!-- Google Analytics Page -->
+  <div class="page content-page">
+    <div class="page-header">
+      <div class="page-brand">Turbo Partners</div>
+      <div class="page-title">Google Analytics 4</div>
+      <div class="header-accent orange"></div>
+    </div>
     
-    if (i === 0) continue;
+    <div class="page-content">
+      <div class="section">
+        <div class="section-title">Métricas de Tráfego</div>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-label">Sessões</div>
+            <div class="metric-value">${formatNumber(data.ga4Atual.sessoes)}</div>
+            <div class="metric-change ${sessoesVar.isPositive ? 'positive' : 'negative'}">${sessoesVar.text}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Usuários</div>
+            <div class="metric-value">${formatNumber(data.ga4Atual.usuarios)}</div>
+            <div class="metric-change ${usuariosVar.isPositive ? 'positive' : 'negative'}">${usuariosVar.text}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Novos Usuários</div>
+            <div class="metric-value">${formatNumber(data.ga4Atual.novoUsuarios)}</div>
+            <div class="metric-change ${calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios).isPositive ? 'positive' : 'negative'}">${calcVariation(data.ga4Atual.novoUsuarios, data.ga4Anterior.novoUsuarios).text}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Taxa de Rejeição</div>
+            <div class="metric-value">${formatPercent(data.ga4Atual.taxaRejeicao * 100)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Duração Média</div>
+            <div class="metric-value">${formatDuration(data.ga4Atual.duracaoMedia)}</div>
+          </div>
+          <div class="metric-card highlight">
+            <div class="metric-label">Conversões</div>
+            <div class="metric-value">${formatNumber(data.ga4Atual.conversoes)}</div>
+            <div class="metric-change ${convVar.isPositive ? 'positive' : 'negative'}" style="color: ${convVar.isPositive ? '#86efac' : '#fca5a5'}">${convVar.text}</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Receita</div>
+        <div class="hero-stats" style="margin-bottom: 0;">
+          <div class="hero-stat" style="grid-column: span 2;">
+            <div class="hero-stat-label">Receita Total do Período</div>
+            <div class="hero-stat-value green">${formatCurrency(data.ga4Atual.receita)}</div>
+            <div class="hero-stat-sub ${receitaVar.isPositive ? 'positive' : 'negative'}">
+              ${receitaVar.text} vs período anterior (${formatCurrency(data.ga4Anterior.receita)})
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Top Canais de Aquisição</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Canal</th>
+              <th>Sessões</th>
+              <th>Conversões</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.ga4Atual.canais.slice(0, 5).map(c => `
+            <tr>
+              <td><strong>${c.nome || 'Direto'}</strong></td>
+              <td>${formatNumber(c.sessoes)}</td>
+              <td>${formatNumber(c.conversoes)}</td>
+            </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
     
-    const footerY = doc.page.height - 30;
+    <div class="page-footer">
+      <span>Turbo Partners | Relatório de Performance</span>
+      <span>Página 3</span>
+    </div>
+  </div>
+  
+  <!-- Google Ads Page -->
+  <div class="page content-page">
+    <div class="page-header">
+      <div class="page-brand">Turbo Partners</div>
+      <div class="page-title">Google Ads</div>
+      <div class="header-accent blue"></div>
+    </div>
     
-    doc.fontSize(8).font('Helvetica').fillColor(COLORS.textLight)
-       .text('Turbo Partners | Relatório Semanal', 50, footerY);
+    <div class="page-content">
+      <div class="section">
+        <div class="section-title">Performance Geral</div>
+        <div class="metrics-grid metrics-grid-4">
+          <div class="metric-card">
+            <div class="metric-label">Impressões</div>
+            <div class="metric-value">${formatNumber(data.googleAds.impressoes)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Cliques</div>
+            <div class="metric-value">${formatNumber(data.googleAds.cliques)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">CTR</div>
+            <div class="metric-value">${formatPercent(data.googleAds.ctr)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">CPC Médio</div>
+            <div class="metric-value">${formatCurrency(data.googleAds.cpc)}</div>
+          </div>
+          <div class="metric-card google">
+            <div class="metric-label">Custo Total</div>
+            <div class="metric-value">${formatCurrency(data.googleAds.custo)}</div>
+          </div>
+          <div class="metric-card google">
+            <div class="metric-label">Conversões</div>
+            <div class="metric-value">${formatNumber(data.googleAds.conversoes)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Custo/Conversão</div>
+            <div class="metric-value">${formatCurrency(data.googleAds.custoPorConversao)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">ROAS</div>
+            <div class="metric-value">${data.googleAds.roas.toFixed(2).replace('.', ',')}x</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Top Campanhas</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Campanha</th>
+              <th>Impressões</th>
+              <th>Cliques</th>
+              <th>Custo</th>
+              <th>Conversões</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.googleAds.campanhas.slice(0, 6).map(c => `
+            <tr>
+              <td><strong>${c.nome.length > 30 ? c.nome.substring(0, 30) + '...' : c.nome}</strong></td>
+              <td>${formatNumber(c.impressoes)}</td>
+              <td>${formatNumber(c.cliques)}</td>
+              <td>${formatCurrency(c.custo)}</td>
+              <td>${formatNumber(c.conversoes)}</td>
+            </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
     
-    doc.fontSize(8).font('Helvetica').fillColor(COLORS.textLight)
-       .text(`Página ${i + 1} de ${pageCount}`, doc.page.width - 100, footerY);
-  }
+    <div class="page-footer">
+      <span>Turbo Partners | Relatório de Performance</span>
+      <span>Página 4</span>
+    </div>
+  </div>
+  
+  <!-- Meta Ads Page -->
+  <div class="page content-page">
+    <div class="page-header">
+      <div class="page-brand">Turbo Partners</div>
+      <div class="page-title">Meta Ads</div>
+      <div class="header-accent meta"></div>
+    </div>
+    
+    <div class="page-content">
+      <div class="section">
+        <div class="section-title">Performance Geral</div>
+        <div class="metrics-grid metrics-grid-4">
+          <div class="metric-card">
+            <div class="metric-label">Impressões</div>
+            <div class="metric-value">${formatNumber(data.metaAds.impressoes)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Alcance</div>
+            <div class="metric-value">${formatNumber(data.metaAds.alcance)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Cliques</div>
+            <div class="metric-value">${formatNumber(data.metaAds.cliques)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">CTR</div>
+            <div class="metric-value">${formatPercent(data.metaAds.ctr)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">CPC</div>
+            <div class="metric-value">${formatCurrency(data.metaAds.cpc)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">CPM</div>
+            <div class="metric-value">${formatCurrency(data.metaAds.cpm)}</div>
+          </div>
+          <div class="metric-card meta">
+            <div class="metric-label">Custo Total</div>
+            <div class="metric-value">${formatCurrency(data.metaAds.custo)}</div>
+          </div>
+          <div class="metric-card meta">
+            <div class="metric-label">Conversões</div>
+            <div class="metric-value">${formatNumber(data.metaAds.conversoes)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Custo/Conversão</div>
+            <div class="metric-value">${formatCurrency(data.metaAds.custoPorConversao)}</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">ROAS</div>
+            <div class="metric-value">${data.metaAds.roas.toFixed(2).replace('.', ',')}x</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Top Campanhas</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Campanha</th>
+              <th>Alcance</th>
+              <th>Cliques</th>
+              <th>Custo</th>
+              <th>Conversões</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.metaAds.campanhas.slice(0, 6).map(c => `
+            <tr>
+              <td><strong>${c.nome.length > 30 ? c.nome.substring(0, 30) + '...' : c.nome}</strong></td>
+              <td>${formatNumber(c.alcance)}</td>
+              <td>${formatNumber(c.cliques)}</td>
+              <td>${formatCurrency(c.custo)}</td>
+              <td>${formatNumber(c.conversoes)}</td>
+            </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <div class="page-footer">
+      <span>Turbo Partners | Relatório de Performance</span>
+      <span>Página 5</span>
+    </div>
+  </div>
+</body>
+</html>`;
 }
