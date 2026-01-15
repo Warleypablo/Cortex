@@ -16115,6 +16115,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Sales Goals endpoints - configurable targets for Closers and SDRs
+  app.get("/api/sales-goals", isAuthenticated, async (req, res) => {
+    try {
+      const { goalType, periodMonth, periodYear } = req.query;
+      
+      const conditions: any[] = [];
+      
+      if (goalType) {
+        conditions.push(sql`goal_type = ${goalType as string}`);
+      }
+      if (periodMonth) {
+        const month = parseInt(periodMonth as string, 10);
+        if (isNaN(month) || month < 1 || month > 12) {
+          return res.status(400).json({ error: "periodMonth deve ser um número entre 1 e 12" });
+        }
+        conditions.push(sql`(period_month = ${month} OR period_month IS NULL)`);
+      }
+      if (periodYear) {
+        const year = parseInt(periodYear as string, 10);
+        if (isNaN(year) || year < 2000 || year > 2100) {
+          return res.status(400).json({ error: "periodYear deve ser um ano válido (2000-2100)" });
+        }
+        conditions.push(sql`(period_year = ${year} OR period_year IS NULL)`);
+      }
+      
+      let result;
+      if (conditions.length > 0) {
+        const whereClause = sql.join(conditions, sql` AND `);
+        result = await db.execute(sql`
+          SELECT * FROM staging.sales_goals 
+          WHERE ${whereClause}
+          ORDER BY goal_type, goal_key
+        `);
+      } else {
+        result = await db.execute(sql`
+          SELECT * FROM staging.sales_goals 
+          ORDER BY goal_type, goal_key
+        `);
+      }
+      
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("[sales-goals] Error fetching goals:", error);
+      res.status(500).json({ error: error.message || "Erro ao buscar metas" });
+    }
+  });
+
+  app.put("/api/sales-goals", isAuthenticated, async (req, res) => {
+    try {
+      const { goalType, goalKey, goalValue, periodMonth, periodYear } = req.body;
+      
+      if (!goalType || !goalKey || goalValue === undefined) {
+        return res.status(400).json({ error: "goalType, goalKey e goalValue são obrigatórios" });
+      }
+      
+      const numValue = parseFloat(goalValue);
+      if (isNaN(numValue) || numValue < 0) {
+        return res.status(400).json({ error: "goalValue deve ser um número válido maior ou igual a zero" });
+      }
+      
+      const validMonth = periodMonth ? parseInt(periodMonth, 10) : null;
+      const validYear = periodYear ? parseInt(periodYear, 10) : null;
+      
+      if (validMonth !== null && (isNaN(validMonth) || validMonth < 1 || validMonth > 12)) {
+        return res.status(400).json({ error: "periodMonth deve ser um número entre 1 e 12" });
+      }
+      if (validYear !== null && (isNaN(validYear) || validYear < 2000 || validYear > 2100)) {
+        return res.status(400).json({ error: "periodYear deve ser um ano válido (2000-2100)" });
+      }
+      
+      const user = req.user as any;
+      const updatedBy = user?.email || user?.name || 'system';
+      
+      const result = await db.execute(sql`
+        INSERT INTO staging.sales_goals (goal_type, goal_key, goal_value, period_month, period_year, updated_by, updated_at)
+        VALUES (${goalType}, ${goalKey}, ${numValue}, ${validMonth}, ${validYear}, ${updatedBy}, NOW())
+        ON CONFLICT (goal_type, goal_key, period_month, period_year)
+        DO UPDATE SET goal_value = ${numValue}, updated_by = ${updatedBy}, updated_at = NOW()
+        RETURNING *
+      `);
+      
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      console.error("[sales-goals] Error updating goal:", error);
+      res.status(500).json({ error: error.message || "Erro ao atualizar meta" });
+    }
+  });
+
+  app.post("/api/sales-goals/batch", isAuthenticated, async (req, res) => {
+    try {
+      const { goals } = req.body;
+      
+      if (!Array.isArray(goals) || goals.length === 0) {
+        return res.status(400).json({ error: "goals deve ser um array não vazio" });
+      }
+      
+      const user = req.user as any;
+      const updatedBy = user?.email || user?.name || 'system';
+      const results: any[] = [];
+      
+      for (const goal of goals) {
+        const { goalType, goalKey, goalValue, periodMonth, periodYear } = goal;
+        
+        if (!goalType || !goalKey || goalValue === undefined) {
+          continue;
+        }
+        
+        const numValue = parseFloat(goalValue);
+        if (isNaN(numValue) || numValue < 0) {
+          continue;
+        }
+        
+        const validMonth = periodMonth ? parseInt(periodMonth, 10) : null;
+        const validYear = periodYear ? parseInt(periodYear, 10) : null;
+        
+        if (validMonth !== null && (isNaN(validMonth) || validMonth < 1 || validMonth > 12)) {
+          continue;
+        }
+        if (validYear !== null && (isNaN(validYear) || validYear < 2000 || validYear > 2100)) {
+          continue;
+        }
+        
+        const result = await db.execute(sql`
+          INSERT INTO staging.sales_goals (goal_type, goal_key, goal_value, period_month, period_year, updated_by, updated_at)
+          VALUES (${goalType}, ${goalKey}, ${numValue}, ${validMonth}, ${validYear}, ${updatedBy}, NOW())
+          ON CONFLICT (goal_type, goal_key, period_month, period_year)
+          DO UPDATE SET goal_value = ${numValue}, updated_by = ${updatedBy}, updated_at = NOW()
+          RETURNING *
+        `);
+        
+        results.push(result.rows[0]);
+      }
+      
+      res.json(results);
+    } catch (error: any) {
+      console.error("[sales-goals] Error batch updating goals:", error);
+      res.status(500).json({ error: error.message || "Erro ao atualizar metas em lote" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
