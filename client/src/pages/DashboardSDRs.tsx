@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { DealCelebration, useDealCelebrationTrigger } from "@/components/DealCelebration";
 import { formatPercent } from "@/lib/utils";
+import { SalesGoalsModal } from "@/components/SalesGoalsModal";
 
 interface SDRMetrics {
   leadsTotais: number;
@@ -384,6 +385,19 @@ export default function DashboardSDRs() {
               </TooltipTrigger>
               <TooltipContent>
                 <p>Modo Apresentação (TV)</p>
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <SalesGoalsModal
+                  type="sdrs"
+                  periodMonth={(dateRangeReuniao?.from || new Date()).getMonth() + 1}
+                  periodYear={(dateRangeReuniao?.from || new Date()).getFullYear()}
+                />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Configurar Metas</p>
               </TooltipContent>
             </Tooltip>
             
