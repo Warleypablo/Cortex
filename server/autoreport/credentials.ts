@@ -36,9 +36,34 @@ export function getGoogleAuth(): Auth.GoogleAuth {
         serviceAccountJson = serviceAccountJson.slice(1, -1);
       }
       
-      serviceAccountJson = serviceAccountJson.replace(/\\n/g, '\n');
+      // Temporarily protect the private_key content by extracting it
+      const privateKeyMatch = serviceAccountJson.match(/"private_key"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      let preservedPrivateKey = '';
+      
+      if (privateKeyMatch) {
+        preservedPrivateKey = privateKeyMatch[1];
+        // Replace private_key with placeholder
+        serviceAccountJson = serviceAccountJson.replace(
+          /"private_key"\s*:\s*"(?:[^"\\]|\\.)*"/,
+          '"private_key": "__PRESERVED_KEY__"'
+        );
+      }
+      
+      // Now safely normalize whitespace in the rest of the JSON
+      serviceAccountJson = serviceAccountJson
+        .replace(/\r\n/g, ' ')
+        .replace(/\r/g, ' ')
+        .replace(/\n/g, ' ')
+        .replace(/\t/g, ' ')
+        .replace(/\s+/g, ' ');
       
       credentials = JSON.parse(serviceAccountJson);
+      
+      // Restore the original private_key with proper newline handling
+      if (preservedPrivateKey) {
+        // Convert escaped \\n to actual newlines
+        credentials.private_key = preservedPrivateKey.replace(/\\n/g, '\n');
+      }
     }
     
     if (!credentials.client_email || !credentials.private_key) {
