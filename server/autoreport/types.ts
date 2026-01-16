@@ -35,6 +35,8 @@ export interface MetricasGA4 {
     sessoes: number;
     conversoes: number;
   }[];
+  disponivel?: boolean;
+  erro?: string;
 }
 
 export interface MetricasGoogleAds {
@@ -53,6 +55,8 @@ export interface MetricasGoogleAds {
     custo: number;
     conversoes: number;
   }[];
+  disponivel?: boolean;
+  erro?: string;
 }
 
 export interface MetricasMetaAds {
@@ -81,6 +85,8 @@ export interface MetricasMetaAds {
     impressoes: number;
     cliques: number;
   }[];
+  disponivel?: boolean;
+  erro?: string;
 }
 
 export interface PlaceholderMap {
