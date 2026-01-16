@@ -8,8 +8,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw, CalendarIcon } from "lucide-react";
+import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw, CalendarIcon, FileStack } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+interface PageSelection {
+  cover: boolean;
+  executiveSummary: boolean;
+  investmentChannels: boolean;
+  funnelTraffic: boolean;
+  campaignsRecommendations: boolean;
+}
 import { queryClient } from "@/lib/queryClient";
 import { format, subDays, startOfWeek, endOfWeek, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -89,12 +97,33 @@ function getDefaultDateRange(): DateRange {
   return { from: inicioSemanaPassada, to: fimSemanaPassada };
 }
 
+const DEFAULT_PAGE_SELECTION: PageSelection = {
+  cover: true,
+  executiveSummary: true,
+  investmentChannels: true,
+  funnelTraffic: true,
+  campaignsRecommendations: true,
+};
+
+const PAGE_OPTIONS = [
+  { key: 'investmentChannels' as keyof PageSelection, label: 'Investimento & Canais', description: 'Google Ads + Meta Ads', icon: '💰' },
+  { key: 'funnelTraffic' as keyof PageSelection, label: 'Funil & Tráfego', description: 'Métricas GA4', icon: '📊' },
+  { key: 'campaignsRecommendations' as keyof PageSelection, label: 'Campanhas & Recomendações', description: 'Detalhes + Insights', icon: '🎯' },
+];
+
 export default function AutoReport() {
   const { toast } = useToast();
   const [selectedClientes, setSelectedClientes] = useState<Set<number>>(new Set());
   const [filtroGestor, setFiltroGestor] = useState<string>('todos');
   const [hiddenClientes, setHiddenClientes] = useState<Set<number>>(new Set());
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
+  const [pageSelection, setPageSelection] = useState<PageSelection>(DEFAULT_PAGE_SELECTION);
+
+  const togglePage = (key: keyof PageSelection) => {
+    setPageSelection(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const selectedPagesCount = Object.values(pageSelection).filter(Boolean).length;
 
   const { data: clientes = [], isLoading: loadingClientes, refetch: refetchClientes } = useQuery<AutoReportCliente[]>({
     queryKey: ['/api/autoreport/clientes'],
@@ -147,6 +176,7 @@ export default function AutoReport() {
           cliente,
           dataInicio: dateRange.from.toISOString(),
           dataFim: dateRange.to.toISOString(),
+          pageSelection,
         }),
       });
       if (!response.ok) {
@@ -187,6 +217,7 @@ export default function AutoReport() {
           clientes,
           dataInicio: dateRange.from.toISOString(),
           dataFim: dateRange.to.toISOString(),
+          pageSelection,
         }),
       });
       if (!response.ok) {
@@ -337,6 +368,50 @@ export default function AutoReport() {
                 Últimos 30 dias
               </Button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <FileStack className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base">Páginas do Relatório</CardTitle>
+          </div>
+          <CardDescription>Selecione quais páginas serão geradas no PDF ({selectedPagesCount} de 5 páginas)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50">
+              <Checkbox checked disabled className="opacity-60" />
+              <span className="text-sm text-muted-foreground">Capa (obrigatória)</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50">
+              <Checkbox checked disabled className="opacity-60" />
+              <span className="text-sm text-muted-foreground">Resumo Executivo (obrigatória)</span>
+            </div>
+            {PAGE_OPTIONS.map((page) => (
+              <div 
+                key={page.key}
+                className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                  pageSelection[page.key] 
+                    ? 'bg-primary/10 border-primary/30' 
+                    : 'bg-muted/30 border-transparent hover:bg-muted/50'
+                }`}
+                onClick={() => togglePage(page.key)}
+                data-testid={`toggle-page-${page.key}`}
+              >
+                <Checkbox 
+                  checked={pageSelection[page.key]} 
+                  onClick={(e) => e.stopPropagation()}
+                  onCheckedChange={() => togglePage(page.key)}
+                />
+                <div>
+                  <div className="text-sm font-medium">{page.label}</div>
+                  <div className="text-xs text-muted-foreground">{page.description}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
