@@ -8,7 +8,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw, CalendarIcon, FileStack } from "lucide-react";
+import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw, CalendarIcon, FileStack, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 interface PageSelection {
@@ -115,6 +116,7 @@ export default function AutoReport() {
   const { toast } = useToast();
   const [selectedClientes, setSelectedClientes] = useState<Set<number>>(new Set());
   const [filtroGestor, setFiltroGestor] = useState<string>('todos');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   const [hiddenClientes, setHiddenClientes] = useState<Set<number>>(new Set());
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
   const [pageSelection, setPageSelection] = useState<PageSelection>(DEFAULT_PAGE_SELECTION);
@@ -302,9 +304,10 @@ export default function AutoReport() {
     return clientesValidos.filter(c => {
       if (hiddenClientes.has(c.rowIndex)) return false;
       if (filtroGestor !== 'todos' && c.gestor !== filtroGestor) return false;
+      if (searchTerm && !c.cliente.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       return true;
     });
-  }, [clientesValidos, hiddenClientes, filtroGestor]);
+  }, [clientesValidos, hiddenClientes, filtroGestor, searchTerm]);
 
   return (
     <div className="p-6 space-y-6" data-testid="autoreport-page">
@@ -463,6 +466,16 @@ export default function AutoReport() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Pesquisar cliente..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-[180px]"
+                    data-testid="input-search-cliente"
+                  />
+                </div>
                 <Select value={filtroGestor} onValueChange={setFiltroGestor}>
                   <SelectTrigger className="w-[180px]" data-testid="select-gestor">
                     <SelectValue placeholder="Filtrar por gestor" />
