@@ -9,6 +9,59 @@ function extractSheetId(url: string): string {
   return match[1];
 }
 
+export async function fetchMetasFromPainel(linkPainel: string): Promise<{ metaFaturamento: number; metaInvestimento: number }> {
+  if (!linkPainel) {
+    return { metaFaturamento: 0, metaInvestimento: 0 };
+  }
+
+  try {
+    const sheets = getSheetsClient();
+    const spreadsheetId = extractSheetId(linkPainel);
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'A:Z',
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length < 2) {
+      return { metaFaturamento: 0, metaInvestimento: 0 };
+    }
+
+    const headers = rows[0].map((h: string) => h?.toString().toLowerCase().trim() || '');
+    
+    const metaFatCol = headers.findIndex((h: string) => 
+      h.includes('meta') && (h.includes('fat') || h.includes('faturamento'))
+    );
+    const metaInvCol = headers.findIndex((h: string) => 
+      h.includes('meta') && (h.includes('inv') || h.includes('investimento'))
+    );
+
+    let metaFaturamento = 0;
+    let metaInvestimento = 0;
+
+    if (rows.length > 1) {
+      const dataRow = rows[1];
+      
+      if (metaFatCol >= 0 && dataRow[metaFatCol]) {
+        const val = dataRow[metaFatCol].toString().replace(/[R$\s.]/g, '').replace(',', '.');
+        metaFaturamento = parseFloat(val) || 0;
+      }
+      
+      if (metaInvCol >= 0 && dataRow[metaInvCol]) {
+        const val = dataRow[metaInvCol].toString().replace(/[R$\s.]/g, '').replace(',', '.');
+        metaInvestimento = parseFloat(val) || 0;
+      }
+    }
+
+    console.log(`[AutoReport] Metas do painel: Fat=${metaFaturamento}, Inv=${metaInvestimento}`);
+    return { metaFaturamento, metaInvestimento };
+  } catch (error: any) {
+    console.error(`[AutoReport] Erro ao buscar metas do painel:`, error.message);
+    return { metaFaturamento: 0, metaInvestimento: 0 };
+  }
+}
+
 export async function fetchClientes(): Promise<AutoReportCliente[]> {
   const sheets = getSheetsClient();
   const sheetUrl = process.env.CENTRAL_SHEET_URL;
