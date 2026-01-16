@@ -2249,8 +2249,7 @@ export default function DashboardGeG() {
                         <p className="text-xs text-muted-foreground">{aniv.cargo || 'N/A'} - {aniv.squad || 'N/A'}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium">{formatData(aniv.aniversario)}</p>
-                        <p className="text-xs text-muted-foreground">Dia {aniv.diaAniversario}</p>
+                        <p className="text-sm font-medium">{String(aniv.diaAniversario).padStart(2, '0')}/{String(new Date().getMonth() + 1).padStart(2, '0')}</p>
                       </div>
                     </div>
                   ))}
