@@ -12,6 +12,8 @@ export interface AutoReportCliente {
   squad: string;
   status: string;
   ultimaGeracao: string;
+  metaFaturamento?: number;
+  metaInvestimento?: number;
 }
 
 export interface PeriodoReferencia {

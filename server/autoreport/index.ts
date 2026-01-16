@@ -1,4 +1,4 @@
-import { fetchClientes, updateClienteStatus, appendToTrackingSheet } from './sheets';
+import { fetchClientes, updateClienteStatus, appendToTrackingSheet, fetchMetasFromPainel } from './sheets';
 import { getMetricasGA4 } from './ga4';
 import { getMetricasGoogleAds } from './googleAds';
 import { getMetricasMetaAds } from './metaAds';
@@ -109,12 +109,16 @@ export async function gerarRelatorio(
 
     console.log(`[AutoReport] Coletando métricas para ${cliente.cliente}...`);
 
-    const [ga4Atual, ga4Anterior, googleAds, metaAds] = await Promise.all([
+    const [ga4Atual, ga4Anterior, googleAds, metaAds, metas] = await Promise.all([
       getMetricasGA4(cliente.idGa4, periodos.atual),
       getMetricasGA4(cliente.idGa4, periodos.anterior),
       getMetricasGoogleAds(cliente.idGoogleAds, periodos.atual),
       getMetricasMetaAds(cliente.idMetaAds, periodos.atual),
+      fetchMetasFromPainel(cliente.linkPainel),
     ]);
+
+    cliente.metaFaturamento = metas.metaFaturamento;
+    cliente.metaInvestimento = metas.metaInvestimento;
 
     if (outputFormat === 'slides') {
       console.log(`[AutoReport] Métricas coletadas. Gerando PPTX...`);
