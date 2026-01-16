@@ -44,6 +44,8 @@ export async function copyTemplate(
 
   const copyResponse = await drive.files.copy({
     fileId: templateId,
+    supportsAllDrives: true,
+    supportsTeamDrives: true,
     requestBody: {
       name: fileName,
       parents: folderId ? [folderId] : undefined,
