@@ -16047,11 +16047,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/autoreport/gerar", isAuthenticated, async (req, res) => {
     try {
-      const { cliente, dataInicio, dataFim, pageSelection } = req.body;
+      const { cliente, dataInicio, dataFim, pageSelection, outputFormat } = req.body;
       if (!cliente) {
         return res.status(400).json({ error: "Cliente é obrigatório" });
       }
-      const job = await autoreport.gerarRelatorio(cliente, dataInicio, dataFim, pageSelection);
+      const job = await autoreport.gerarRelatorio(cliente, dataInicio, dataFim, pageSelection, outputFormat || 'pdf');
       res.json(job);
     } catch (error: any) {
       console.error("[autoreport] Error generating report:", error);
@@ -16061,11 +16061,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/autoreport/gerar-lote", isAuthenticated, async (req, res) => {
     try {
-      const { clientes, dataInicio, dataFim, pageSelection } = req.body;
+      const { clientes, dataInicio, dataFim, pageSelection, outputFormat } = req.body;
       if (!clientes || !Array.isArray(clientes)) {
         return res.status(400).json({ error: "Lista de clientes é obrigatória" });
       }
-      const jobs = await autoreport.gerarRelatoriosEmLote(clientes, dataInicio, dataFim, pageSelection);
+      const jobs = await autoreport.gerarRelatoriosEmLote(clientes, dataInicio, dataFim, pageSelection, outputFormat || 'pdf');
       res.json(jobs);
     } catch (error: any) {
       console.error("[autoreport] Error generating batch reports:", error);
