@@ -54,8 +54,9 @@ export async function getMetricasGoogleAds(
         AND campaign.status = 'ENABLED'
     `;
 
-    const response = await fetch(
-      `https://googleads.googleapis.com/v18/customers/${cleanCustomerId}/googleAds:searchStream`,
+    // Try v18 first with regular search (not stream)
+    let response = await fetch(
+      `https://googleads.googleapis.com/v18/customers/${cleanCustomerId}/googleAds:search`,
       {
         method: 'POST',
         headers: {
@@ -68,6 +69,24 @@ export async function getMetricasGoogleAds(
       }
     );
 
+    // If v18 fails, try v17
+    if (!response.ok) {
+      console.log(`[AutoReport GoogleAds] v18 failed (${response.status}), trying v17...`);
+      response = await fetch(
+        `https://googleads.googleapis.com/v17/customers/${cleanCustomerId}/googleAds:search`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'developer-token': creds.developerToken,
+            'login-customer-id': creds.loginCustomerId,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query }),
+        }
+      );
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[AutoReport GoogleAds] API Error:`, errorText);
@@ -75,6 +94,7 @@ export async function getMetricasGoogleAds(
     }
 
     const data = await response.json();
+    console.log(`[AutoReport GoogleAds] Data received:`, JSON.stringify(data).substring(0, 500));
     
     let totalImpressoes = 0;
     let totalCliques = 0;
@@ -83,30 +103,31 @@ export async function getMetricasGoogleAds(
     let totalValorConversoes = 0;
     const campanhas: MetricasGoogleAds['campanhas'] = [];
 
-    for (const result of data || []) {
-      for (const row of result.results || []) {
-        const nome = row.campaign?.name || 'Campanha';
-        const impressoes = parseInt(row.metrics?.impressions || '0');
-        const cliques = parseInt(row.metrics?.clicks || '0');
-        const custoMicros = parseInt(row.metrics?.costMicros || '0');
-        const custo = custoMicros / 1000000;
-        const conversoes = parseFloat(row.metrics?.conversions || '0');
-        const valorConversoes = parseFloat(row.metrics?.conversionsValue || '0');
+    // Handle both searchStream format (array of results) and search format (single results object)
+    const results = Array.isArray(data) ? data.flatMap(r => r.results || []) : (data.results || []);
+    
+    for (const row of results) {
+      const nome = row.campaign?.name || 'Campanha';
+      const impressoes = parseInt(row.metrics?.impressions || '0');
+      const cliques = parseInt(row.metrics?.clicks || '0');
+      const custoMicros = parseInt(row.metrics?.costMicros || '0');
+      const custo = custoMicros / 1000000;
+      const conversoes = parseFloat(row.metrics?.conversions || '0');
+      const valorConversoes = parseFloat(row.metrics?.conversionsValue || '0');
 
-        totalImpressoes += impressoes;
-        totalCliques += cliques;
-        totalCusto += custo;
-        totalConversoes += conversoes;
-        totalValorConversoes += valorConversoes;
+      totalImpressoes += impressoes;
+      totalCliques += cliques;
+      totalCusto += custo;
+      totalConversoes += conversoes;
+      totalValorConversoes += valorConversoes;
 
-        campanhas.push({
-          nome,
-          impressoes,
-          cliques,
-          custo,
-          conversoes,
-        });
-      }
+      campanhas.push({
+        nome,
+        impressoes,
+        cliques,
+        custo,
+        conversoes,
+      });
     }
 
     campanhas.sort((a, b) => b.custo - a.custo);
