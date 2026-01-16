@@ -232,6 +232,35 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     var_roas_face: '-',
     var_cpa_face: '-',
     
+    // Placeholders específicos para leads (lead sem site)
+    lead_sem: formatNumber(convTotal),
+    lead_sem_comp: formatNumber(ga4Anterior.conversoes),
+    var_lead_sem: varVendas,
+    lead_mes: formatNumber(convTotal),
+    meta_lead: (cliente as any).metaLeads ? formatNumber((cliente as any).metaLeads) : '-',
+    per_meta_lead: (cliente as any).metaLeads ? formatPercentShort((convTotal / (cliente as any).metaLeads) * 100) : '-',
+    
+    // Impressões consolidadas
+    imp: formatNumber(metaAds.impressoes + googleAds.impressoes),
+    imp_comp: '-',
+    var_imp: '-',
+    
+    // Custo por Lead (CPL)
+    cpl: formatCurrency(convTotal > 0 ? investTotal / convTotal : 0),
+    cpl_comp: '-',
+    var_cpl: '-',
+    
+    // Meta Ads para leads
+    lead_face: formatNumber(metaAds.conversoes),
+    lead_face_comp: '-',
+    var_lead_face: '-',
+    cpl_face: formatCurrency(metaAds.conversoes > 0 ? metaAds.custo / metaAds.conversoes : 0),
+    cpl_face_comp: '-',
+    var_cpl_face: '-',
+    lpi_face: metaAds.impressoes > 0 ? (metaAds.conversoes / metaAds.impressoes * 1000).toFixed(2).replace('.', ',') : '0',
+    lpi_face_comp: '-',
+    var_lpi_face: '-',
+    
     // Campanhas Meta Ads (adf1-5)
     nome_adf1: metaCampanhas[0]?.nome || '-',
     conv_adf1: formatNumber(metaCampanhas[0]?.conversoes || 0),
@@ -240,6 +269,9 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     roas_adf1: '-',
     fat_adf1: '-',
     imp_adf1: formatNumber(metaCampanhas[0]?.impressoes || 0),
+    lead_adf1: formatNumber(metaCampanhas[0]?.conversoes || 0),
+    cpl_adf1: formatCurrency(metaCampanhas[0]?.conversoes ? metaCampanhas[0].custo / metaCampanhas[0].conversoes : 0),
+    lpi_adf1: metaCampanhas[0]?.impressoes ? ((metaCampanhas[0].conversoes || 0) / metaCampanhas[0].impressoes * 1000).toFixed(2).replace('.', ',') : '0',
     
     nome_adf2: metaCampanhas[1]?.nome || '-',
     conv_adf2: formatNumber(metaCampanhas[1]?.conversoes || 0),
@@ -248,6 +280,9 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     roas_adf2: '-',
     fat_adf2: '-',
     imp_adf2: formatNumber(metaCampanhas[1]?.impressoes || 0),
+    lead_adf2: formatNumber(metaCampanhas[1]?.conversoes || 0),
+    cpl_adf2: formatCurrency(metaCampanhas[1]?.conversoes ? metaCampanhas[1].custo / metaCampanhas[1].conversoes : 0),
+    lpi_adf2: metaCampanhas[1]?.impressoes ? ((metaCampanhas[1].conversoes || 0) / metaCampanhas[1].impressoes * 1000).toFixed(2).replace('.', ',') : '0',
     
     nome_adf3: metaCampanhas[2]?.nome || '-',
     conv_adf3: formatNumber(metaCampanhas[2]?.conversoes || 0),
@@ -256,6 +291,9 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     roas_adf3: '-',
     fat_adf3: '-',
     imp_adf3: formatNumber(metaCampanhas[2]?.impressoes || 0),
+    lead_adf3: formatNumber(metaCampanhas[2]?.conversoes || 0),
+    cpl_adf3: formatCurrency(metaCampanhas[2]?.conversoes ? metaCampanhas[2].custo / metaCampanhas[2].conversoes : 0),
+    lpi_adf3: metaCampanhas[2]?.impressoes ? ((metaCampanhas[2].conversoes || 0) / metaCampanhas[2].impressoes * 1000).toFixed(2).replace('.', ',') : '0',
     
     nome_adf4: metaCampanhas[3]?.nome || '-',
     conv_adf4: formatNumber(metaCampanhas[3]?.conversoes || 0),
@@ -264,6 +302,9 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     roas_adf4: '-',
     fat_adf4: '-',
     imp_adf4: formatNumber(metaCampanhas[3]?.impressoes || 0),
+    lead_adf4: formatNumber(metaCampanhas[3]?.conversoes || 0),
+    cpl_adf4: formatCurrency(metaCampanhas[3]?.conversoes ? metaCampanhas[3].custo / metaCampanhas[3].conversoes : 0),
+    lpi_adf4: metaCampanhas[3]?.impressoes ? ((metaCampanhas[3].conversoes || 0) / metaCampanhas[3].impressoes * 1000).toFixed(2).replace('.', ',') : '0',
     
     nome_adf5: metaCampanhas[4]?.nome || '-',
     conv_adf5: formatNumber(metaCampanhas[4]?.conversoes || 0),
@@ -272,6 +313,9 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     roas_adf5: '-',
     fat_adf5: '-',
     imp_adf5: formatNumber(metaCampanhas[4]?.impressoes || 0),
+    lead_adf5: formatNumber(metaCampanhas[4]?.conversoes || 0),
+    cpl_adf5: formatCurrency(metaCampanhas[4]?.conversoes ? metaCampanhas[4].custo / metaCampanhas[4].conversoes : 0),
+    lpi_adf5: metaCampanhas[4]?.impressoes ? ((metaCampanhas[4].conversoes || 0) / metaCampanhas[4].impressoes * 1000).toFixed(2).replace('.', ',') : '0',
     
     // Slide 4 - Google Ads (mostrar N/D se indisponível)
     fat_goog: googleAdsDisponivel ? formatCurrencyShort(googleAds.roas * googleAds.custo) : 'N/D',
