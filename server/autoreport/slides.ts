@@ -7,7 +7,7 @@ import type {
   MetricasMetaAds,
   PeriodoReferencia 
 } from './types';
-import { SLIDES_TEMPLATE_ID } from './types';
+import { TEMPLATE_IDS } from './types';
 
 function formatCurrency(value: number): string {
   return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -204,8 +204,18 @@ export async function generateSlidesReport(data: SlidesReportData): Promise<{
   const googlePct = investTotal > 0 ? (googleAds.custo / investTotal) * 100 : 50;
   const metaPct = investTotal > 0 ? (metaAds.custo / investTotal) * 100 : 50;
   
+  // Selecionar template baseado na categoria do cliente
+  const categoria = cliente.categoria || 'ecommerce';
+  const templateId = TEMPLATE_IDS[categoria];
+  
+  if (!templateId) {
+    throw new Error(`Template não configurado para a categoria: ${categoria}`);
+  }
+  
+  console.log(`[AutoReport Slides] Usando template ${categoria}: ${templateId}`);
+  
   const { presentationId, presentationUrl } = await copyTemplate(
-    SLIDES_TEMPLATE_ID,
+    templateId,
     cliente.cliente,
     cliente.linkPasta ? extractFolderId(cliente.linkPasta) : undefined
   );
