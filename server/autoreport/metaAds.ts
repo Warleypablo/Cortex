@@ -160,14 +160,15 @@ export async function getMetricasMetaAds(
       roas,
       campanhas,
       criativas: adCreatives,
+      disponivel: true,
     };
   } catch (error: any) {
     console.error(`[AutoReport Meta] Error:`, error.message);
-    return getEmptyMetrics();
+    return getEmptyMetrics(error.message);
   }
 }
 
-function getEmptyMetrics(): MetricasMetaAds {
+function getEmptyMetrics(erro?: string): MetricasMetaAds {
   return {
     impressoes: 0,
     alcance: 0,
@@ -181,5 +182,7 @@ function getEmptyMetrics(): MetricasMetaAds {
     roas: 0,
     campanhas: [],
     criativas: [],
+    disponivel: false,
+    erro: erro || 'Dados não disponíveis',
   };
 }

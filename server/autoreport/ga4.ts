@@ -88,14 +88,15 @@ export async function getMetricasGA4(
       conversoes: totalConversoes,
       receita: totalReceita,
       canais,
+      disponivel: true,
     };
   } catch (error: any) {
     console.error(`[AutoReport GA4] Error fetching metrics for ${propertyId}:`, error.message);
-    return getEmptyMetrics();
+    return getEmptyMetrics(error.message);
   }
 }
 
-function getEmptyMetrics(): MetricasGA4 {
+function getEmptyMetrics(erro?: string): MetricasGA4 {
   return {
     sessoes: 0,
     usuarios: 0,
@@ -105,5 +106,7 @@ function getEmptyMetrics(): MetricasGA4 {
     conversoes: 0,
     receita: 0,
     canais: [],
+    disponivel: false,
+    erro: erro || 'Dados não disponíveis',
   };
 }

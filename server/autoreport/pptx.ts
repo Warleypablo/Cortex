@@ -82,13 +82,24 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
   
   console.log(`[AutoReport PPTX] Gerando relatório usando template: ${templatePath}`);
   
-  // Debug: mostrar métricas recebidas
+  // Verificar disponibilidade das fontes de dados
+  const ga4Disponivel = ga4Atual.disponivel !== false;
+  const googleAdsDisponivel = googleAds.disponivel !== false;
+  const metaAdsDisponivel = metaAds.disponivel !== false;
+  
+  // Debug: mostrar métricas recebidas e status de disponibilidade
+  console.log(`[AutoReport PPTX] Status das fontes:`);
+  console.log(`  - GA4: ${ga4Disponivel ? 'DISPONÍVEL' : 'INDISPONÍVEL - ' + (ga4Atual.erro || 'Sem permissão')}`);
+  console.log(`  - Google Ads: ${googleAdsDisponivel ? 'DISPONÍVEL' : 'INDISPONÍVEL - ' + (googleAds.erro || 'Sem permissão')}`);
+  console.log(`  - Meta Ads: ${metaAdsDisponivel ? 'DISPONÍVEL' : 'INDISPONÍVEL - ' + (metaAds.erro || 'Sem permissão')}`);
+  
   console.log(`[AutoReport PPTX] Métricas recebidas:`);
   console.log(`  - GA4 Atual: sessoes=${ga4Atual.sessoes}, receita=${ga4Atual.receita}, conversoes=${ga4Atual.conversoes}, canais=${ga4Atual.canais?.length || 0}`);
   console.log(`  - GA4 Anterior: sessoes=${ga4Anterior.sessoes}, receita=${ga4Anterior.receita}`);
   console.log(`  - Meta Ads: custo=${metaAds.custo}, conversoes=${metaAds.conversoes}, roas=${metaAds.roas}, campanhas=${metaAds.campanhas?.length || 0}`);
   console.log(`  - Google Ads: custo=${googleAds.custo}, conversoes=${googleAds.conversoes}, campanhas=${googleAds.campanhas?.length || 0}`);
   console.log(`  - Metas: fat=${cliente.metaFaturamento}, inv=${cliente.metaInvestimento}`);
+  console.log(`  - Meta Ads detalhes: cliques=${metaAds.cliques}, impressoes=${metaAds.impressoes}, ctr=${metaAds.ctr}`);
   
   const templateContent = fs.readFileSync(templatePath, 'binary');
   const zip = new PizZip(templateContent);
@@ -99,15 +110,40 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     delimiters: { start: '{{', end: '}}' },
   });
   
-  // Cálculos gerais
+  // Cálculos gerais - usar dados disponíveis
   const investTotal = googleAds.custo + metaAds.custo;
   const convTotal = googleAds.conversoes + metaAds.conversoes;
-  const receita = ga4Atual.receita;
+  
+  // Calcular faturamento: priorizar GA4, senão usar ROAS do Meta + Google Ads
+  const fatMeta = metaAds.roas * metaAds.custo;
+  const fatGoogle = googleAds.roas * googleAds.custo;
+  const receita = ga4Disponivel && ga4Atual.receita > 0 ? ga4Atual.receita : (fatMeta + fatGoogle);
+  const receitaFonte = ga4Disponivel && ga4Atual.receita > 0 ? 'GA4' : 'Estimado (ROAS * Investimento)';
+  
+  // ROAS consolidado: usar receita calculada / investimento total
   const roas = investTotal > 0 ? receita / investTotal : 0;
   const cpa = convTotal > 0 ? investTotal / convTotal : 0;
-  const taxaConv = ga4Atual.sessoes > 0 ? (ga4Atual.conversoes / ga4Atual.sessoes) * 100 : 0;
+  
+  // Taxa de conversão: usar GA4 se disponível, senão estimar baseado nas plataformas
+  const taxaConv = ga4Disponivel && ga4Atual.sessoes > 0 
+    ? (ga4Atual.conversoes / ga4Atual.sessoes) * 100 
+    : (metaAds.cliques > 0 ? (metaAds.conversoes / metaAds.cliques) * 100 : 0);
+  
   const ticketMedio = convTotal > 0 ? receita / convTotal : 0;
-  const cps = ga4Atual.sessoes > 0 ? investTotal / ga4Atual.sessoes : 0;
+  
+  // CPS: usar GA4 se disponível, senão usar cliques do Meta
+  const totalCliques = metaAds.cliques + googleAds.cliques;
+  const cps = ga4Disponivel && ga4Atual.sessoes > 0 
+    ? investTotal / ga4Atual.sessoes 
+    : (totalCliques > 0 ? investTotal / totalCliques : 0);
+    
+  console.log(`[AutoReport PPTX] Cálculos consolidados:`);
+  console.log(`  - Receita: R$ ${receita.toFixed(2)} (fonte: ${receitaFonte})`);
+  console.log(`  - Investimento Total: R$ ${investTotal.toFixed(2)}`);
+  console.log(`  - ROAS: ${roas.toFixed(2)}`);
+  console.log(`  - Conversões: ${convTotal}`);
+  console.log(`  - CPA: R$ ${cpa.toFixed(2)}`);
+  console.log(`  - Ticket Médio: R$ ${ticketMedio.toFixed(2)}`);
   
   // Variações (assumindo anterior = 0 se não disponível)
   const varFat = formatVariation(calcVariation(receita, ga4Anterior.receita));

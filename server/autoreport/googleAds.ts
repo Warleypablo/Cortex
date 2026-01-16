@@ -71,7 +71,7 @@ export async function getMetricasGoogleAds(
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[AutoReport GoogleAds] API Error:`, errorText);
-      return getEmptyMetrics();
+      return getEmptyMetrics(`API Error ${response.status}: Sem acesso ao Google Ads`);
     }
 
     const data = await response.json();
@@ -126,14 +126,15 @@ export async function getMetricasGoogleAds(
       custoPorConversao,
       roas,
       campanhas,
+      disponivel: true,
     };
   } catch (error: any) {
     console.error(`[AutoReport GoogleAds] Error:`, error.message);
-    return getEmptyMetrics();
+    return getEmptyMetrics(error.message);
   }
 }
 
-function getEmptyMetrics(): MetricasGoogleAds {
+function getEmptyMetrics(erro?: string): MetricasGoogleAds {
   return {
     impressoes: 0,
     cliques: 0,
@@ -144,5 +145,7 @@ function getEmptyMetrics(): MetricasGoogleAds {
     custoPorConversao: 0,
     roas: 0,
     campanhas: [],
+    disponivel: false,
+    erro: erro || 'Dados não disponíveis',
   };
 }
