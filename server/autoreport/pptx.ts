@@ -82,6 +82,14 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
   
   console.log(`[AutoReport PPTX] Gerando relatório usando template: ${templatePath}`);
   
+  // Debug: mostrar métricas recebidas
+  console.log(`[AutoReport PPTX] Métricas recebidas:`);
+  console.log(`  - GA4 Atual: sessoes=${ga4Atual.sessoes}, receita=${ga4Atual.receita}, conversoes=${ga4Atual.conversoes}, canais=${ga4Atual.canais?.length || 0}`);
+  console.log(`  - GA4 Anterior: sessoes=${ga4Anterior.sessoes}, receita=${ga4Anterior.receita}`);
+  console.log(`  - Meta Ads: custo=${metaAds.custo}, conversoes=${metaAds.conversoes}, roas=${metaAds.roas}, campanhas=${metaAds.campanhas?.length || 0}`);
+  console.log(`  - Google Ads: custo=${googleAds.custo}, conversoes=${googleAds.conversoes}, campanhas=${googleAds.campanhas?.length || 0}`);
+  console.log(`  - Metas: fat=${cliente.metaFaturamento}, inv=${cliente.metaInvestimento}`);
+  
   const templateContent = fs.readFileSync(templatePath, 'binary');
   const zip = new PizZip(templateContent);
   
