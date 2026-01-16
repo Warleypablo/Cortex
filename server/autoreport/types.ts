@@ -130,3 +130,7 @@ export const DEFAULT_PAGE_SELECTION: PageSelection = {
   funnelTraffic: true,
   campaignsRecommendations: true,
 };
+
+export type OutputFormat = 'pdf' | 'slides';
+
+export const SLIDES_TEMPLATE_ID = '1761L48IW8KY6oBlsYgFdh5rwoUTrycrUNFY6NSVVeuU';
