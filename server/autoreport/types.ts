@@ -114,3 +114,19 @@ export const TEMPLATE_IDS: Record<string, string> = {
   'lead_com_site': process.env.TEMPLATE_LEAD_COM_SITE || '',
   'lead_sem_site': process.env.TEMPLATE_LEAD_SEM_SITE || '',
 };
+
+export interface PageSelection {
+  cover: boolean;
+  executiveSummary: boolean;
+  investmentChannels: boolean;
+  funnelTraffic: boolean;
+  campaignsRecommendations: boolean;
+}
+
+export const DEFAULT_PAGE_SELECTION: PageSelection = {
+  cover: true,
+  executiveSummary: true,
+  investmentChannels: true,
+  funnelTraffic: true,
+  campaignsRecommendations: true,
+};
