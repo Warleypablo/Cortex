@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import * as fs from 'fs';
 import type { 
   AutoReportCliente, 
   MetricasGA4, 
@@ -8,6 +9,33 @@ import type {
   PageSelection
 } from './types';
 import { DEFAULT_PAGE_SELECTION } from './types';
+
+function findChromiumPath(): string | undefined {
+  const possiblePaths = [
+    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+  ];
+  
+  for (const p of possiblePaths) {
+    if (p && fs.existsSync(p)) {
+      return p;
+    }
+  }
+  
+  try {
+    const { execSync } = require('child_process');
+    const nixChromium = execSync('which chromium 2>/dev/null || which chromium-browser 2>/dev/null || which google-chrome 2>/dev/null', { encoding: 'utf8' }).trim();
+    if (nixChromium && fs.existsSync(nixChromium)) {
+      return nixChromium;
+    }
+  } catch {}
+  
+  return undefined;
+}
 
 function formatCurrency(value: number): string {
   return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -53,9 +81,17 @@ interface ReportData {
 export async function generatePdfReport(data: ReportData): Promise<{ buffer: Buffer; fileName: string }> {
   const html = generateReportHtml(data);
   
+  const chromiumPath = findChromiumPath();
+  
+  if (!chromiumPath) {
+    throw new Error('Chromium não encontrado. Para gerar PDF, use o formato PPTX que não requer Chromium.');
+  }
+  
+  console.log(`[AutoReport PDF] Usando Chromium: ${chromiumPath}`);
+  
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
+    executablePath: chromiumPath,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
   });
   
