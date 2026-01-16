@@ -8,6 +8,78 @@ import type {
   PeriodoReferencia 
 } from './types';
 import { TEMPLATE_IDS } from './types';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// Cache para IDs de templates uploadados pelo service account
+const uploadedTemplateCache: Record<string, string> = {};
+
+// Mapeia categoria para arquivo PPTX local
+const LOCAL_PPTX_TEMPLATES: Record<string, string> = {
+  'ecommerce': 'attached_assets/[ECOM_TEMPLATE]_Auto_Report_Semanal_1768573133921.pptx',
+  'lead_com_site': '', // Adicionar quando disponível
+  'lead_sem_site': '', // Adicionar quando disponível
+};
+
+async function ensureTemplateUploaded(categoria: string): Promise<string> {
+  // Se já temos o ID em cache, retornar
+  if (uploadedTemplateCache[categoria]) {
+    console.log(`[AutoReport Slides] Usando template em cache para ${categoria}: ${uploadedTemplateCache[categoria]}`);
+    return uploadedTemplateCache[categoria];
+  }
+  
+  const drive = getDriveClient();
+  
+  // Verificar se já existe um template uploadado pelo service account
+  const templateName = `_TURBO_TEMPLATE_${categoria.toUpperCase()}`;
+  
+  const searchResponse = await drive.files.list({
+    q: `name='${templateName}' and mimeType='application/vnd.google-apps.presentation' and trashed=false`,
+    fields: 'files(id, name)',
+    spaces: 'drive',
+  });
+  
+  if (searchResponse.data.files && searchResponse.data.files.length > 0) {
+    const existingId = searchResponse.data.files[0].id!;
+    uploadedTemplateCache[categoria] = existingId;
+    console.log(`[AutoReport Slides] Template ${categoria} encontrado no Drive: ${existingId}`);
+    return existingId;
+  }
+  
+  // Se não existe, fazer upload do PPTX local
+  const localPath = LOCAL_PPTX_TEMPLATES[categoria];
+  if (!localPath || !fs.existsSync(localPath)) {
+    // Fallback: tentar usar o ID do env var (Google Slides original)
+    const envTemplateId = TEMPLATE_IDS[categoria];
+    if (envTemplateId) {
+      console.log(`[AutoReport Slides] Arquivo local não encontrado para ${categoria}, tentando template do Drive: ${envTemplateId}`);
+      return envTemplateId;
+    }
+    throw new Error(`Template PPTX local não encontrado para categoria: ${categoria}`);
+  }
+  
+  console.log(`[AutoReport Slides] Fazendo upload do template ${categoria} de ${localPath}...`);
+  
+  const fileContent = fs.readFileSync(localPath);
+  
+  const uploadResponse = await drive.files.create({
+    requestBody: {
+      name: templateName,
+      mimeType: 'application/vnd.google-apps.presentation', // Converte PPTX para Slides
+    },
+    media: {
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      body: fs.createReadStream(localPath),
+    },
+    fields: 'id',
+  });
+  
+  const newId = uploadResponse.data.id!;
+  uploadedTemplateCache[categoria] = newId;
+  console.log(`[AutoReport Slides] Template ${categoria} uploadado com sucesso: ${newId}`);
+  
+  return newId;
+}
 
 function formatCurrency(value: number): string {
   return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -208,13 +280,11 @@ export async function generateSlidesReport(data: SlidesReportData): Promise<{
   
   // Selecionar template baseado na categoria do cliente
   const categoria = cliente.categoria || 'ecommerce';
-  const templateId = TEMPLATE_IDS[categoria];
   
-  if (!templateId) {
-    throw new Error(`Template não configurado para a categoria: ${categoria}`);
-  }
+  // Garantir que o template esteja disponível (upload se necessário)
+  const templateId = await ensureTemplateUploaded(categoria);
   
-  console.log(`[AutoReport Slides] Usando template ${categoria}: ${templateId}`);
+  console.log(`[AutoReport Slides] Copiando template ${categoria}: ${templateId}`);
   
   const { presentationId, presentationUrl } = await copyTemplate(
     templateId,
