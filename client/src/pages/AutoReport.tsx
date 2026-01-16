@@ -193,12 +193,11 @@ export default function AutoReport() {
     },
     onSuccess: (data: AutoReportJob) => {
       let description = `Processando relatório de ${data.clienteNome}...`;
-      if (data.status === 'concluido') {
-        if (data.presentationUrl) {
-          description = `Apresentação de ${data.clienteNome} criada no Google Slides.`;
-        } else if (data.downloadUrl) {
-          description = `PDF de ${data.clienteNome} pronto para download.`;
-        }
+      if (data.status === 'concluido' && data.downloadUrl) {
+        const isPptx = data.fileName?.endsWith('.pptx');
+        description = isPptx 
+          ? `PPTX de ${data.clienteNome} pronto para download.`
+          : `PDF de ${data.clienteNome} pronto para download.`;
       }
       toast({
         title: data.status === 'concluido' ? 'Relatório gerado!' : 'Relatório em processamento',
@@ -707,20 +706,17 @@ export default function AutoReport() {
                           className="flex items-center gap-1 text-xs text-primary hover:underline"
                           data-testid={`link-download-${job.id}`}
                         >
-                          <FileText className="w-3 h-3" />
-                          Baixar PDF
-                        </a>
-                      )}
-                      {job.presentationUrl && (
-                        <a 
-                          href={job.presentationUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-primary hover:underline"
-                          data-testid={`link-slides-${job.id}`}
-                        >
-                          <Presentation className="w-3 h-3" />
-                          Abrir no Google Slides
+                          {job.fileName?.endsWith('.pptx') ? (
+                            <>
+                              <Presentation className="w-3 h-3" />
+                              Baixar PPTX
+                            </>
+                          ) : (
+                            <>
+                              <FileText className="w-3 h-3" />
+                              Baixar PDF
+                            </>
+                          )}
                         </a>
                       )}
                       {job.mensagem && (

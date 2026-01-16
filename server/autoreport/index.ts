@@ -3,7 +3,7 @@ import { getMetricasGA4 } from './ga4';
 import { getMetricasGoogleAds } from './googleAds';
 import { getMetricasMetaAds } from './metaAds';
 import { generatePdfReport } from './pdf';
-import { generateSlidesReport } from './slides';
+import { generatePptxReport } from './pptx';
 import type { 
   AutoReportCliente, 
   AutoReportJob, 
@@ -117,9 +117,9 @@ export async function gerarRelatorio(
     ]);
 
     if (outputFormat === 'slides') {
-      console.log(`[AutoReport] Métricas coletadas. Gerando Google Slides...`);
+      console.log(`[AutoReport] Métricas coletadas. Gerando PPTX...`);
 
-      const { presentationId, presentationUrl, fileName } = await generateSlidesReport({
+      const { buffer, fileName } = await generatePptxReport({
         cliente,
         periodos,
         ga4Atual,
@@ -128,19 +128,22 @@ export async function gerarRelatorio(
         metaAds,
       });
 
-      console.log(`[AutoReport] Slides gerado: ${presentationUrl}`);
+      console.log(`[AutoReport] PPTX gerado: ${fileName}`);
+
+      pdfBuffers.set(jobId, { buffer, fileName, createdAt: new Date() });
+
+      const downloadUrl = `/api/autoreport/download/${encodeURIComponent(jobId)}`;
 
       const agora = new Date().toLocaleString('pt-BR');
       await updateClienteStatus(cliente.rowIndex, 'CONCLUÍDO', agora);
 
       job.status = 'concluido';
-      job.presentationId = presentationId;
-      job.presentationUrl = presentationUrl;
+      job.downloadUrl = downloadUrl;
       job.fileName = fileName;
       job.concluidoEm = new Date();
       activeJobs.set(jobId, job);
 
-      console.log(`[AutoReport] Relatório pronto: ${presentationUrl}`);
+      console.log(`[AutoReport] Relatório PPTX pronto para download: ${downloadUrl}`);
 
       return job;
     } else {
