@@ -13,8 +13,8 @@ import type {
 
 const LOCAL_PPTX_TEMPLATES: Record<string, string> = {
   'ecommerce': 'attached_assets/[ECOM_TEMPLATE]_Auto_Report_Semanal_1768573133921.pptx',
-  'lead_com_site': '',
-  'lead_sem_site': 'attached_assets/[LEAD_SITE_TEMPLATE]_Auto_Report_Semanal_1768587780766.pptx',
+  'lead_com_site': 'attached_assets/[LEAD_SITE_TEMPLATE]_Auto_Report_Semanal_1768587780766.pptx',
+  'lead_sem_site': '',
 };
 
 function formatCurrency(value: number): string {
