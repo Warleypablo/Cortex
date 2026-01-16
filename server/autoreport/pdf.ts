@@ -4,8 +4,10 @@ import type {
   MetricasGA4, 
   MetricasGoogleAds, 
   MetricasMetaAds,
-  PeriodoReferencia 
+  PeriodoReferencia,
+  PageSelection
 } from './types';
+import { DEFAULT_PAGE_SELECTION } from './types';
 
 function formatCurrency(value: number): string {
   return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -45,6 +47,7 @@ interface ReportData {
   ga4Anterior: MetricasGA4;
   googleAds: MetricasGoogleAds;
   metaAds: MetricasMetaAds;
+  pageSelection?: PageSelection;
 }
 
 export async function generatePdfReport(data: ReportData): Promise<{ buffer: Buffer; fileName: string }> {
@@ -77,6 +80,7 @@ export async function generatePdfReport(data: ReportData): Promise<{ buffer: Buf
 }
 
 function generateReportHtml(data: ReportData): string {
+  const pages = data.pageSelection || DEFAULT_PAGE_SELECTION;
   const investTotal = data.googleAds.custo + data.metaAds.custo;
   const convTotal = data.googleAds.conversoes + data.metaAds.conversoes;
   const receitaVar = calcVariation(data.ga4Atual.receita, data.ga4Anterior.receita);
@@ -91,6 +95,20 @@ function generateReportHtml(data: ReportData): string {
   const cpa = convTotal > 0 ? investTotal / convTotal : 0;
   
   const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  
+  // Calculate total pages and dynamic page numbers
+  const totalPages = 2 + // Cover + Executive Summary (always included)
+    (pages.investmentChannels ? 1 : 0) +
+    (pages.funnelTraffic ? 1 : 0) +
+    (pages.campaignsRecommendations ? 1 : 0);
+  
+  let currentPage = 2; // Start at 2 (after cover)
+  const pageNum = {
+    executiveSummary: '02',
+    investmentChannels: pages.investmentChannels ? String(++currentPage).padStart(2, '0') : '',
+    funnelTraffic: pages.funnelTraffic ? String(++currentPage).padStart(2, '0') : '',
+    campaignsRecommendations: pages.campaignsRecommendations ? String(++currentPage).padStart(2, '0') : '',
+  };
 
   return `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -1129,15 +1147,16 @@ function generateReportHtml(data: ReportData): string {
     
     <div class="page-footer">
       <div>Turbo Partners | Relatório de Performance</div>
-      <div>Página 2 de 5</div>
+      <div>Página 2 de ${totalPages}</div>
     </div>
   </div>
 
+  ${pages.investmentChannels ? `
   <!-- ==================== PAGE 3: INVESTMENT & CHANNELS ==================== -->
   <div class="page content-page">
     <div class="page-header">
       <div class="page-header-left">
-        <div class="page-number">03</div>
+        <div class="page-number">${pageNum.investmentChannels}</div>
         <div class="page-title">Investimento & Canais</div>
       </div>
       <div class="page-brand">Turbo Partners</div>
@@ -1280,15 +1299,17 @@ function generateReportHtml(data: ReportData): string {
     
     <div class="page-footer">
       <div>Turbo Partners | Relatório de Performance</div>
-      <div>Página 3 de 5</div>
+      <div>Página ${pageNum.investmentChannels} de ${totalPages}</div>
     </div>
   </div>
+  ` : ''}
 
+  ${pages.funnelTraffic ? `
   <!-- ==================== PAGE 4: FUNNEL & TRAFFIC ==================== -->
   <div class="page content-page">
     <div class="page-header">
       <div class="page-header-left">
-        <div class="page-number">04</div>
+        <div class="page-number">${pageNum.funnelTraffic}</div>
         <div class="page-title">Funil & Tráfego</div>
       </div>
       <div class="page-brand">Turbo Partners</div>
@@ -1420,15 +1441,17 @@ function generateReportHtml(data: ReportData): string {
     
     <div class="page-footer">
       <div>Turbo Partners | Relatório de Performance</div>
-      <div>Página 4 de 5</div>
+      <div>Página ${pageNum.funnelTraffic} de ${totalPages}</div>
     </div>
   </div>
+  ` : ''}
 
+  ${pages.campaignsRecommendations ? `
   <!-- ==================== PAGE 5: CAMPAIGNS & RECOMMENDATIONS ==================== -->
   <div class="page content-page">
     <div class="page-header">
       <div class="page-header-left">
-        <div class="page-number">05</div>
+        <div class="page-number">${pageNum.campaignsRecommendations}</div>
         <div class="page-title">Campanhas & Próximos Passos</div>
       </div>
       <div class="page-brand">Turbo Partners</div>
@@ -1542,9 +1565,10 @@ function generateReportHtml(data: ReportData): string {
     
     <div class="page-footer">
       <div>Turbo Partners | Relatório de Performance</div>
-      <div>Página 5 de 5</div>
+      <div>Página ${pageNum.campaignsRecommendations} de ${totalPages}</div>
     </div>
   </div>
+  ` : ''}
 </body>
 </html>`;
 }

@@ -9,8 +9,10 @@ import type {
   PeriodoReferencia, 
   MetricasGA4,
   MetricasGoogleAds,
-  MetricasMetaAds
+  MetricasMetaAds,
+  PageSelection
 } from './types';
+import { DEFAULT_PAGE_SELECTION } from './types';
 
 const activeJobs: Map<string, AutoReportJob> = new Map();
 const pdfBuffers: Map<string, { buffer: Buffer; fileName: string; createdAt: Date }> = new Map();
@@ -78,8 +80,9 @@ export async function listarClientes(): Promise<AutoReportCliente[]> {
   return fetchClientes();
 }
 
-export async function gerarRelatorio(cliente: AutoReportCliente, dataInicio?: string, dataFim?: string): Promise<AutoReportJob> {
+export async function gerarRelatorio(cliente: AutoReportCliente, dataInicio?: string, dataFim?: string, pageSelection?: PageSelection): Promise<AutoReportJob> {
   const jobId = `${cliente.cliente}-${Date.now()}`;
+  const pages = pageSelection || DEFAULT_PAGE_SELECTION;
   
   const job: AutoReportJob = {
     id: jobId,
@@ -114,6 +117,7 @@ export async function gerarRelatorio(cliente: AutoReportCliente, dataInicio?: st
       ga4Anterior,
       googleAds,
       metaAds,
+      pageSelection: pages,
     });
 
     console.log(`[AutoReport] PDF gerado: ${fileName}`);
@@ -149,7 +153,7 @@ export async function gerarRelatorio(cliente: AutoReportCliente, dataInicio?: st
   }
 }
 
-export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[], dataInicio?: string, dataFim?: string): Promise<AutoReportJob[]> {
+export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[], dataInicio?: string, dataFim?: string, pageSelection?: PageSelection): Promise<AutoReportJob[]> {
   const jobs: AutoReportJob[] = [];
 
   for (const cliente of clientes) {
@@ -158,7 +162,7 @@ export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[], dataI
       continue;
     }
 
-    const job = await gerarRelatorio(cliente, dataInicio, dataFim);
+    const job = await gerarRelatorio(cliente, dataInicio, dataFim, pageSelection);
     jobs.push(job);
 
     await new Promise(resolve => setTimeout(resolve, 2000));
