@@ -55,7 +55,7 @@ export async function getMetricasGoogleAds(
     `;
 
     const response = await fetch(
-      `https://googleads.googleapis.com/v14/customers/${cleanCustomerId}/googleAds:searchStream`,
+      `https://googleads.googleapis.com/v18/customers/${cleanCustomerId}/googleAds:searchStream`,
       {
         method: 'POST',
         headers: {
