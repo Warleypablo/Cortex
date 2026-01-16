@@ -3,6 +3,7 @@ import { getMetricasGA4 } from './ga4';
 import { getMetricasGoogleAds } from './googleAds';
 import { getMetricasMetaAds } from './metaAds';
 import { generatePdfReport } from './pdf';
+import { generateSlidesReport } from './slides';
 import type { 
   AutoReportCliente, 
   AutoReportJob, 
@@ -10,7 +11,8 @@ import type {
   MetricasGA4,
   MetricasGoogleAds,
   MetricasMetaAds,
-  PageSelection
+  PageSelection,
+  OutputFormat
 } from './types';
 import { DEFAULT_PAGE_SELECTION } from './types';
 
@@ -80,7 +82,13 @@ export async function listarClientes(): Promise<AutoReportCliente[]> {
   return fetchClientes();
 }
 
-export async function gerarRelatorio(cliente: AutoReportCliente, dataInicio?: string, dataFim?: string, pageSelection?: PageSelection): Promise<AutoReportJob> {
+export async function gerarRelatorio(
+  cliente: AutoReportCliente, 
+  dataInicio?: string, 
+  dataFim?: string, 
+  pageSelection?: PageSelection,
+  outputFormat: OutputFormat = 'pdf'
+): Promise<AutoReportJob> {
   const jobId = `${cliente.cliente}-${Date.now()}`;
   const pages = pageSelection || DEFAULT_PAGE_SELECTION;
   
@@ -108,36 +116,65 @@ export async function gerarRelatorio(cliente: AutoReportCliente, dataInicio?: st
       getMetricasMetaAds(cliente.idMetaAds, periodos.atual),
     ]);
 
-    console.log(`[AutoReport] Métricas coletadas. Gerando PDF...`);
+    if (outputFormat === 'slides') {
+      console.log(`[AutoReport] Métricas coletadas. Gerando Google Slides...`);
 
-    const { buffer, fileName } = await generatePdfReport({
-      cliente,
-      periodos,
-      ga4Atual,
-      ga4Anterior,
-      googleAds,
-      metaAds,
-      pageSelection: pages,
-    });
+      const { presentationId, presentationUrl, fileName } = await generateSlidesReport({
+        cliente,
+        periodos,
+        ga4Atual,
+        ga4Anterior,
+        googleAds,
+        metaAds,
+      });
 
-    console.log(`[AutoReport] PDF gerado: ${fileName}`);
+      console.log(`[AutoReport] Slides gerado: ${presentationUrl}`);
 
-    pdfBuffers.set(jobId, { buffer, fileName, createdAt: new Date() });
+      const agora = new Date().toLocaleString('pt-BR');
+      await updateClienteStatus(cliente.rowIndex, 'CONCLUÍDO', agora);
 
-    const downloadUrl = `/api/autoreport/download/${encodeURIComponent(jobId)}`;
+      job.status = 'concluido';
+      job.presentationId = presentationId;
+      job.presentationUrl = presentationUrl;
+      job.fileName = fileName;
+      job.concluidoEm = new Date();
+      activeJobs.set(jobId, job);
 
-    const agora = new Date().toLocaleString('pt-BR');
-    await updateClienteStatus(cliente.rowIndex, 'CONCLUÍDO', agora);
+      console.log(`[AutoReport] Relatório pronto: ${presentationUrl}`);
 
-    job.status = 'concluido';
-    job.downloadUrl = downloadUrl;
-    job.fileName = fileName;
-    job.concluidoEm = new Date();
-    activeJobs.set(jobId, job);
+      return job;
+    } else {
+      console.log(`[AutoReport] Métricas coletadas. Gerando PDF...`);
 
-    console.log(`[AutoReport] Relatório pronto para download: ${downloadUrl}`);
+      const { buffer, fileName } = await generatePdfReport({
+        cliente,
+        periodos,
+        ga4Atual,
+        ga4Anterior,
+        googleAds,
+        metaAds,
+        pageSelection: pages,
+      });
 
-    return job;
+      console.log(`[AutoReport] PDF gerado: ${fileName}`);
+
+      pdfBuffers.set(jobId, { buffer, fileName, createdAt: new Date() });
+
+      const downloadUrl = `/api/autoreport/download/${encodeURIComponent(jobId)}`;
+
+      const agora = new Date().toLocaleString('pt-BR');
+      await updateClienteStatus(cliente.rowIndex, 'CONCLUÍDO', agora);
+
+      job.status = 'concluido';
+      job.downloadUrl = downloadUrl;
+      job.fileName = fileName;
+      job.concluidoEm = new Date();
+      activeJobs.set(jobId, job);
+
+      console.log(`[AutoReport] Relatório pronto para download: ${downloadUrl}`);
+
+      return job;
+    }
 
   } catch (error: any) {
     console.error(`[AutoReport] Erro ao gerar relatório:`, error);
@@ -153,7 +190,13 @@ export async function gerarRelatorio(cliente: AutoReportCliente, dataInicio?: st
   }
 }
 
-export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[], dataInicio?: string, dataFim?: string, pageSelection?: PageSelection): Promise<AutoReportJob[]> {
+export async function gerarRelatoriosEmLote(
+  clientes: AutoReportCliente[], 
+  dataInicio?: string, 
+  dataFim?: string, 
+  pageSelection?: PageSelection,
+  outputFormat: OutputFormat = 'pdf'
+): Promise<AutoReportJob[]> {
   const jobs: AutoReportJob[] = [];
 
   for (const cliente of clientes) {
@@ -162,7 +205,7 @@ export async function gerarRelatoriosEmLote(clientes: AutoReportCliente[], dataI
       continue;
     }
 
-    const job = await gerarRelatorio(cliente, dataInicio, dataFim, pageSelection);
+    const job = await gerarRelatorio(cliente, dataInicio, dataFim, pageSelection, outputFormat);
     jobs.push(job);
 
     await new Promise(resolve => setTimeout(resolve, 2000));

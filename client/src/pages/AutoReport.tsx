@@ -8,7 +8,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw, CalendarIcon, FileStack, Search } from "lucide-react";
+import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw, CalendarIcon, FileStack, Search, Presentation } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
@@ -120,6 +122,7 @@ export default function AutoReport() {
   const [hiddenClientes, setHiddenClientes] = useState<Set<number>>(new Set());
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
   const [pageSelection, setPageSelection] = useState<PageSelection>(DEFAULT_PAGE_SELECTION);
+  const [outputFormat, setOutputFormat] = useState<'pdf' | 'slides'>('pdf');
 
   const togglePage = (key: keyof PageSelection) => {
     setPageSelection(prev => ({ ...prev, [key]: !prev[key] }));
@@ -179,6 +182,7 @@ export default function AutoReport() {
           dataInicio: dateRange.from.toISOString(),
           dataFim: dateRange.to.toISOString(),
           pageSelection,
+          outputFormat,
         }),
       });
       if (!response.ok) {
@@ -188,11 +192,17 @@ export default function AutoReport() {
       return response.json();
     },
     onSuccess: (data: AutoReportJob) => {
+      let description = `Processando relatório de ${data.clienteNome}...`;
+      if (data.status === 'concluido') {
+        if (data.presentationUrl) {
+          description = `Apresentação de ${data.clienteNome} criada no Google Slides.`;
+        } else if (data.downloadUrl) {
+          description = `PDF de ${data.clienteNome} pronto para download.`;
+        }
+      }
       toast({
         title: data.status === 'concluido' ? 'Relatório gerado!' : 'Relatório em processamento',
-        description: data.downloadUrl 
-          ? `PDF de ${data.clienteNome} pronto para download.`
-          : `Processando relatório de ${data.clienteNome}...`,
+        description,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/autoreport/jobs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/autoreport/clientes'] });
@@ -220,6 +230,7 @@ export default function AutoReport() {
           dataInicio: dateRange.from.toISOString(),
           dataFim: dateRange.to.toISOString(),
           pageSelection,
+          outputFormat,
         }),
       });
       if (!response.ok) {
@@ -377,45 +388,90 @@ export default function AutoReport() {
 
       <Card>
         <CardHeader className="pb-2">
-          <div className="flex items-center gap-2">
-            <FileStack className="w-5 h-5 text-primary" />
-            <CardTitle className="text-base">Páginas do Relatório</CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <FileStack className="w-5 h-5 text-primary" />
+                <CardTitle className="text-base">Configurações do Relatório</CardTitle>
+              </div>
+              <CardDescription>Escolha o formato e as páginas que serão geradas</CardDescription>
+            </div>
+            <RadioGroup 
+              value={outputFormat} 
+              onValueChange={(value: 'pdf' | 'slides') => setOutputFormat(value)}
+              className="flex gap-4"
+            >
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-all ${
+                outputFormat === 'pdf' ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
+              }`}>
+                <RadioGroupItem value="pdf" id="format-pdf" />
+                <Label htmlFor="format-pdf" className="flex items-center gap-2 cursor-pointer">
+                  <FileText className="w-4 h-4" />
+                  <span className="font-medium">PDF</span>
+                </Label>
+              </div>
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-all ${
+                outputFormat === 'slides' ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
+              }`}>
+                <RadioGroupItem value="slides" id="format-slides" />
+                <Label htmlFor="format-slides" className="flex items-center gap-2 cursor-pointer">
+                  <Presentation className="w-4 h-4" />
+                  <span className="font-medium">Google Slides</span>
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
-          <CardDescription>Selecione quais páginas serão geradas no PDF ({selectedPagesCount} de 5 páginas)</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50">
-              <Checkbox checked disabled className="opacity-60" />
-              <span className="text-sm text-muted-foreground">Capa (obrigatória)</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50">
-              <Checkbox checked disabled className="opacity-60" />
-              <span className="text-sm text-muted-foreground">Resumo Executivo (obrigatória)</span>
-            </div>
-            {PAGE_OPTIONS.map((page) => (
-              <div 
-                key={page.key}
-                className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
-                  pageSelection[page.key] 
-                    ? 'bg-primary/10 border-primary/30' 
-                    : 'bg-muted/30 border-transparent hover:bg-muted/50'
-                }`}
-                onClick={() => togglePage(page.key)}
-                data-testid={`toggle-page-${page.key}`}
-              >
-                <Checkbox 
-                  checked={pageSelection[page.key]} 
-                  onClick={(e) => e.stopPropagation()}
-                  onCheckedChange={() => togglePage(page.key)}
-                />
-                <div>
-                  <div className="text-sm font-medium">{page.label}</div>
-                  <div className="text-xs text-muted-foreground">{page.description}</div>
+          {outputFormat === 'pdf' && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Páginas do PDF ({selectedPagesCount} de 5 páginas):</p>
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50">
+                  <Checkbox checked disabled className="opacity-60" />
+                  <span className="text-sm text-muted-foreground">Capa (obrigatória)</span>
                 </div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50">
+                  <Checkbox checked disabled className="opacity-60" />
+                  <span className="text-sm text-muted-foreground">Resumo Executivo (obrigatória)</span>
+                </div>
+                {PAGE_OPTIONS.map((page) => (
+                  <div 
+                    key={page.key}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
+                      pageSelection[page.key] 
+                        ? 'bg-primary/10 border-primary/30' 
+                        : 'bg-muted/30 border-transparent hover:bg-muted/50'
+                    }`}
+                    onClick={() => togglePage(page.key)}
+                    data-testid={`toggle-page-${page.key}`}
+                  >
+                    <Checkbox 
+                      checked={pageSelection[page.key]} 
+                      onClick={(e) => e.stopPropagation()}
+                      onCheckedChange={() => togglePage(page.key)}
+                    />
+                    <div>
+                      <div className="text-sm font-medium">{page.label}</div>
+                      <div className="text-xs text-muted-foreground">{page.description}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+          {outputFormat === 'slides' && (
+            <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg">
+              <Presentation className="w-8 h-8 text-primary" />
+              <div>
+                <p className="text-sm font-medium">Apresentação Google Slides</p>
+                <p className="text-xs text-muted-foreground">
+                  O relatório será gerado como uma apresentação editável no Google Slides, 
+                  com todos os dados preenchidos automaticamente no template.
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -653,6 +709,18 @@ export default function AutoReport() {
                         >
                           <FileText className="w-3 h-3" />
                           Baixar PDF
+                        </a>
+                      )}
+                      {job.presentationUrl && (
+                        <a 
+                          href={job.presentationUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-primary hover:underline"
+                          data-testid={`link-slides-${job.id}`}
+                        >
+                          <Presentation className="w-3 h-3" />
+                          Abrir no Google Slides
                         </a>
                       )}
                       {job.mensagem && (
