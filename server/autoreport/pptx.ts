@@ -21,12 +21,25 @@ function formatCurrency(value: number): string {
   return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatCurrencyShort(value: number): string {
+  if (value >= 1000000) {
+    return 'R$ ' + (value / 1000000).toFixed(2).replace('.', ',') + 'M';
+  } else if (value >= 1000) {
+    return 'R$ ' + (value / 1000).toFixed(2).replace('.', ',') + 'K';
+  }
+  return 'R$ ' + value.toFixed(2).replace('.', ',');
+}
+
 function formatNumber(value: number): string {
   return value.toLocaleString('pt-BR');
 }
 
 function formatPercent(value: number): string {
   return value.toFixed(2).replace('.', ',') + '%';
+}
+
+function formatPercentShort(value: number): string {
+  return value.toFixed(1).replace('.', ',') + '%';
 }
 
 function calcVariation(atual: number, anterior: number): number {
@@ -42,16 +55,7 @@ function formatVariation(value: number): string {
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}m ${secs}s`;
-}
-
-function getCategoriaLabel(categoria: string): string {
-  switch (categoria) {
-    case 'ecommerce': return 'E-commerce';
-    case 'lead_com_site': return 'Lead (Com Site)';
-    case 'lead_sem_site': return 'Lead (Sem Site)';
-    default: return categoria;
-  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
 interface PptxReportData {
@@ -87,70 +91,269 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     delimiters: { start: '{{', end: '}}' },
   });
   
+  // Cálculos gerais
   const investTotal = googleAds.custo + metaAds.custo;
   const convTotal = googleAds.conversoes + metaAds.conversoes;
-  const roas = investTotal > 0 ? ga4Atual.receita / investTotal : 0;
+  const receita = ga4Atual.receita;
+  const roas = investTotal > 0 ? receita / investTotal : 0;
   const cpa = convTotal > 0 ? investTotal / convTotal : 0;
+  const taxaConv = ga4Atual.sessoes > 0 ? (ga4Atual.conversoes / ga4Atual.sessoes) * 100 : 0;
+  const ticketMedio = convTotal > 0 ? receita / convTotal : 0;
+  const cps = ga4Atual.sessoes > 0 ? investTotal / ga4Atual.sessoes : 0;
   
-  const receitaVar = calcVariation(ga4Atual.receita, ga4Anterior.receita);
-  const sessoesVar = calcVariation(ga4Atual.sessoes, ga4Anterior.sessoes);
-  const usuariosVar = calcVariation(ga4Atual.usuarios, ga4Anterior.usuarios);
-  const convVar = calcVariation(ga4Atual.conversoes, ga4Anterior.conversoes);
+  // Variações (assumindo anterior = 0 se não disponível)
+  const varFat = formatVariation(calcVariation(receita, ga4Anterior.receita));
+  const varInv = formatVariation(calcVariation(investTotal, 0)); // Sem dado anterior
+  const varVendas = formatVariation(calcVariation(convTotal, ga4Anterior.conversoes));
+  const varRoas = formatVariation(0); // Sem dado anterior
+  const varTaxaConv = formatVariation(calcVariation(taxaConv, ga4Anterior.sessoes > 0 ? (ga4Anterior.conversoes / ga4Anterior.sessoes) * 100 : 0));
+  const varCpa = formatVariation(0);
+  const varCps = formatVariation(0);
+  const varTckMed = formatVariation(0);
   
-  const googlePct = investTotal > 0 ? (googleAds.custo / investTotal) * 100 : 50;
-  const metaPct = investTotal > 0 ? (metaAds.custo / investTotal) * 100 : 50;
+  // Meta Ads (Facebook)
+  const metaCampanhas = metaAds.campanhas || [];
   
+  // Google Ads
+  const googleCampanhas = googleAds.campanhas || [];
+  
+  // GA4 Canais
+  const ga4Canais = ga4Atual.canais || [];
+  
+  // Mapeamento de placeholders conforme o template
   const placeholders: PlaceholderMap = {
+    // Slide 1 - Capa
+    freq: 'Semanal',
     cliente: cliente.cliente,
     periodo: periodos.atual.label,
-    periodo_atual: periodos.atual.label,
-    periodo_anterior: periodos.anterior.label,
     
-    investimento_total: formatCurrency(investTotal),
-    receita: formatCurrency(ga4Atual.receita),
+    // Slide 2 - Resumo Executivo
+    periodo_comp: periodos.anterior.label,
+    
+    // Faturamento e Investimento
+    fat_sem: formatCurrencyShort(receita),
+    fat_sem_comp: formatCurrencyShort(ga4Anterior.receita),
+    inv_sem: formatCurrencyShort(investTotal),
+    inv_sem_comp: '-',
+    var_fat_sem: varFat,
+    var_inv_sem: varInv,
+    
+    // KPIs principais
     roas: roas.toFixed(2).replace('.', ','),
+    roas_comp: '-',
+    var_roas: varRoas,
+    
+    taxa_conv: formatPercentShort(taxaConv),
+    taxa_conv_comp: '-',
+    var_taxa_conv: varTaxaConv,
+    
+    vendas: formatNumber(convTotal),
+    vendas_comp: formatNumber(ga4Anterior.conversoes),
+    var_vendas: varVendas,
+    
+    cps: formatCurrency(cps),
+    cps_comp: '-',
+    var_cps: varCps,
+    
+    tck_med: formatCurrency(ticketMedio),
+    tck_med_comp: '-',
+    var_tck_med: varTckMed,
+    
     cpa: formatCurrency(cpa),
+    cpa_comp: '-',
+    var_cpa: varCpa,
     
-    receita_variacao: formatVariation(receitaVar),
+    // Metas mensais (placeholder - não temos dados)
+    fat_mes: formatCurrencyShort(receita),
+    meta_fat: '-',
+    per_meta_fat: '-',
+    inv_mes: formatCurrencyShort(investTotal),
+    meta_inv: '-',
+    per_meta_inv: '-',
     
-    sessoes: formatNumber(ga4Atual.sessoes),
-    sessoes_variacao: formatVariation(sessoesVar),
-    usuarios: formatNumber(ga4Atual.usuarios),
-    usuarios_variacao: formatVariation(usuariosVar),
-    conversoes: formatNumber(ga4Atual.conversoes),
-    conversoes_variacao: formatVariation(convVar),
+    // Slide 3 - Meta Ads (Facebook)
+    fat_face: formatCurrencyShort(metaAds.roas * metaAds.custo),
+    fat_face_comp: '-',
+    inv_face: formatCurrencyShort(metaAds.custo),
+    inv_face_comp: '-',
+    roas_face: metaAds.roas.toFixed(2).replace('.', ','),
+    roas_face_comp: '-',
+    vendas_face: formatNumber(metaAds.conversoes),
+    vendas_face_comp: '-',
+    cpa_face: formatCurrency(metaAds.conversoes > 0 ? metaAds.custo / metaAds.conversoes : 0),
+    cpa_face_comp: '-',
+    var_fat_face: '-',
+    var_inv_face: '-',
+    var_vendas_face: '-',
+    var_roas_face: '-',
+    var_cpa_face: '-',
     
-    taxa_rejeicao: formatPercent(ga4Atual.taxaRejeicao),
-    duracao_media: formatDuration(ga4Atual.duracaoMedia),
+    // Campanhas Meta Ads (adf1-5)
+    nome_adf1: metaCampanhas[0]?.nome || '-',
+    conv_adf1: formatNumber(metaCampanhas[0]?.conversoes || 0),
+    cpa_adf1: formatCurrency(metaCampanhas[0]?.conversoes ? metaCampanhas[0].custo / metaCampanhas[0].conversoes : 0),
+    inv_adf1: formatCurrencyShort(metaCampanhas[0]?.custo || 0),
+    roas_adf1: '-',
+    fat_adf1: '-',
+    imp_adf1: formatNumber(metaCampanhas[0]?.impressoes || 0),
     
-    google_ads_custo: formatCurrency(googleAds.custo),
-    google_ads_impressoes: formatNumber(googleAds.impressoes),
-    google_ads_cliques: formatNumber(googleAds.cliques),
-    google_ads_ctr: formatPercent(googleAds.ctr),
-    google_ads_cpc: formatCurrency(googleAds.cpc),
-    google_ads_conversoes: formatNumber(googleAds.conversoes),
-    google_ads_roas: googleAds.roas.toFixed(2).replace('.', ','),
-    google_ads_percentual: googlePct.toFixed(0) + '%',
+    nome_adf2: metaCampanhas[1]?.nome || '-',
+    conv_adf2: formatNumber(metaCampanhas[1]?.conversoes || 0),
+    cpa_adf2: formatCurrency(metaCampanhas[1]?.conversoes ? metaCampanhas[1].custo / metaCampanhas[1].conversoes : 0),
+    inv_adf2: formatCurrencyShort(metaCampanhas[1]?.custo || 0),
+    roas_adf2: '-',
+    fat_adf2: '-',
+    imp_adf2: formatNumber(metaCampanhas[1]?.impressoes || 0),
     
-    meta_ads_custo: formatCurrency(metaAds.custo),
-    meta_ads_impressoes: formatNumber(metaAds.impressoes),
-    meta_ads_alcance: formatNumber(metaAds.alcance),
-    meta_ads_cliques: formatNumber(metaAds.cliques),
-    meta_ads_ctr: formatPercent(metaAds.ctr),
-    meta_ads_cpc: formatCurrency(metaAds.cpc),
-    meta_ads_cpm: formatCurrency(metaAds.cpm),
-    meta_ads_conversoes: formatNumber(metaAds.conversoes),
-    meta_ads_roas: metaAds.roas.toFixed(2).replace('.', ','),
-    meta_ads_percentual: metaPct.toFixed(0) + '%',
+    nome_adf3: metaCampanhas[2]?.nome || '-',
+    conv_adf3: formatNumber(metaCampanhas[2]?.conversoes || 0),
+    cpa_adf3: formatCurrency(metaCampanhas[2]?.conversoes ? metaCampanhas[2].custo / metaCampanhas[2].conversoes : 0),
+    inv_adf3: formatCurrencyShort(metaCampanhas[2]?.custo || 0),
+    roas_adf3: '-',
+    fat_adf3: '-',
+    imp_adf3: formatNumber(metaCampanhas[2]?.impressoes || 0),
     
-    gestor: cliente.gestor || '',
-    squad: cliente.squad || '',
-    categoria: getCategoriaLabel(cliente.categoria),
+    nome_adf4: metaCampanhas[3]?.nome || '-',
+    conv_adf4: formatNumber(metaCampanhas[3]?.conversoes || 0),
+    cpa_adf4: formatCurrency(metaCampanhas[3]?.conversoes ? metaCampanhas[3].custo / metaCampanhas[3].conversoes : 0),
+    inv_adf4: formatCurrencyShort(metaCampanhas[3]?.custo || 0),
+    roas_adf4: '-',
+    fat_adf4: '-',
+    imp_adf4: formatNumber(metaCampanhas[3]?.impressoes || 0),
     
-    data_geracao: new Date().toLocaleDateString('pt-BR'),
+    nome_adf5: metaCampanhas[4]?.nome || '-',
+    conv_adf5: formatNumber(metaCampanhas[4]?.conversoes || 0),
+    cpa_adf5: formatCurrency(metaCampanhas[4]?.conversoes ? metaCampanhas[4].custo / metaCampanhas[4].conversoes : 0),
+    inv_adf5: formatCurrencyShort(metaCampanhas[4]?.custo || 0),
+    roas_adf5: '-',
+    fat_adf5: '-',
+    imp_adf5: formatNumber(metaCampanhas[4]?.impressoes || 0),
+    
+    // Slide 4 - Google Ads
+    fat_goog: formatCurrencyShort(googleAds.roas * googleAds.custo),
+    fat_goog_comp: '-',
+    inv_goog: formatCurrencyShort(googleAds.custo),
+    inv_goog_comp: '-',
+    roas_goog: googleAds.roas.toFixed(2).replace('.', ','),
+    roas_goog_comp: '-',
+    vendas_goog: formatNumber(googleAds.conversoes),
+    vendas_goog_comp: '-',
+    cpa_goog: formatCurrency(googleAds.conversoes > 0 ? googleAds.custo / googleAds.conversoes : 0),
+    cpa_goog_comp: '-',
+    var_fat_goog: '-',
+    var_inv_goog: '-',
+    var_vendas_goog: '-',
+    var_roas_goog: '-',
+    var_cpa_goog: '-',
+    
+    // Campanhas Google Ads (adg1-5)
+    nome_adg1: googleCampanhas[0]?.nome || '-',
+    conv_adg1: formatNumber(googleCampanhas[0]?.conversoes || 0),
+    cpa_adg1: formatCurrency(googleCampanhas[0]?.conversoes ? googleCampanhas[0].custo / googleCampanhas[0].conversoes : 0),
+    inv_adg1: formatCurrencyShort(googleCampanhas[0]?.custo || 0),
+    roas_adg1: '-',
+    fat_adg1: '-',
+    imp_adg1: formatNumber(googleCampanhas[0]?.impressoes || 0),
+    
+    nome_adg2: googleCampanhas[1]?.nome || '-',
+    conv_adg2: formatNumber(googleCampanhas[1]?.conversoes || 0),
+    cpa_adg2: formatCurrency(googleCampanhas[1]?.conversoes ? googleCampanhas[1].custo / googleCampanhas[1].conversoes : 0),
+    inv_adg2: formatCurrencyShort(googleCampanhas[1]?.custo || 0),
+    roas_adg2: '-',
+    fat_adg2: '-',
+    imp_adg2: formatNumber(googleCampanhas[1]?.impressoes || 0),
+    
+    nome_adg3: googleCampanhas[2]?.nome || '-',
+    conv_adg3: formatNumber(googleCampanhas[2]?.conversoes || 0),
+    cpa_adg3: formatCurrency(googleCampanhas[2]?.conversoes ? googleCampanhas[2].custo / googleCampanhas[2].conversoes : 0),
+    inv_adg3: formatCurrencyShort(googleCampanhas[2]?.custo || 0),
+    roas_adg3: '-',
+    fat_adg3: '-',
+    imp_adg3: formatNumber(googleCampanhas[2]?.impressoes || 0),
+    
+    nome_adg4: googleCampanhas[3]?.nome || '-',
+    conv_adg4: formatNumber(googleCampanhas[3]?.conversoes || 0),
+    cpa_adg4: formatCurrency(googleCampanhas[3]?.conversoes ? googleCampanhas[3].custo / googleCampanhas[3].conversoes : 0),
+    inv_adg4: formatCurrencyShort(googleCampanhas[3]?.custo || 0),
+    roas_adg4: '-',
+    fat_adg4: '-',
+    imp_adg4: formatNumber(googleCampanhas[3]?.impressoes || 0),
+    
+    nome_adg5: googleCampanhas[4]?.nome || '-',
+    conv_adg5: formatNumber(googleCampanhas[4]?.conversoes || 0),
+    cpa_adg5: formatCurrency(googleCampanhas[4]?.conversoes ? googleCampanhas[4].custo / googleCampanhas[4].conversoes : 0),
+    inv_adg5: formatCurrencyShort(googleCampanhas[4]?.custo || 0),
+    roas_adg5: '-',
+    fat_adg5: '-',
+    imp_adg5: formatNumber(googleCampanhas[4]?.impressoes || 0),
+    
+    // Slide 5 - GA4 Canais
+    ses_ga: formatNumber(ga4Atual.sessoes),
+    ses_ga_comp: formatNumber(ga4Anterior.sessoes),
+    ses_eng_ga: formatNumber(ga4Atual.usuarios),
+    ses_eng_ga_comp: formatNumber(ga4Anterior.usuarios),
+    temp_med_ga: formatDuration(ga4Atual.duracaoMedia),
+    temp_med_ga_comp: formatDuration(ga4Anterior.duracaoMedia),
+    taxa_eng_ga: formatPercentShort(100 - ga4Atual.taxaRejeicao),
+    taxa_eng_ga_comp: formatPercentShort(100 - ga4Anterior.taxaRejeicao),
+    var_ses_ga: formatVariation(calcVariation(ga4Atual.sessoes, ga4Anterior.sessoes)),
+    var_ses_eng_ga: formatVariation(calcVariation(ga4Atual.usuarios, ga4Anterior.usuarios)),
+    var_taxa_eng_ga: '-',
+    var_temp_med_ga: formatVariation(calcVariation(ga4Atual.duracaoMedia, ga4Anterior.duracaoMedia)),
+    
+    // Canais GA4 (ca1-5)
+    canal_ca1: ga4Canais[0]?.nome || '-',
+    desc_ca1: '',
+    ses_ca1: formatNumber(ga4Canais[0]?.sessoes || 0),
+    ses_eng_ca1: '-',
+    taxa_eng_ca1: '-',
+    temp_med_ca1: '-',
+    event_ca1: '-',
+    receit_ca1: formatCurrencyShort(0),
+    
+    canal_ca2: ga4Canais[1]?.nome || '-',
+    desc_ca2: '',
+    ses_ca2: formatNumber(ga4Canais[1]?.sessoes || 0),
+    ses_eng_ca2: '-',
+    taxa_eng_ca2: '-',
+    temp_med_ca2: '-',
+    event_ca2: '-',
+    receit_ca2: formatCurrencyShort(0),
+    
+    canal_ca3: ga4Canais[2]?.nome || '-',
+    desc_ca3: '',
+    ses_ca3: formatNumber(ga4Canais[2]?.sessoes || 0),
+    ses_eng_ca3: '-',
+    taxa_eng_ca3: '-',
+    temp_med_ca3: '-',
+    event_ca3: '-',
+    receit_ca3: formatCurrencyShort(0),
+    
+    canal_ca4: ga4Canais[3]?.nome || '-',
+    desc_ca4: '',
+    ses_ca4: formatNumber(ga4Canais[3]?.sessoes || 0),
+    ses_eng_ca4: '-',
+    taxa_eng_ca4: '-',
+    temp_med_ca4: '-',
+    event_ca4: '-',
+    receit_ca4: formatCurrencyShort(0),
+    
+    canal_ca5: ga4Canais[4]?.nome || '-',
+    desc_ca5: '',
+    ses_ca5: formatNumber(ga4Canais[4]?.sessoes || 0),
+    ses_eng_ca5: '-',
+    taxa_eng_ca5: '-',
+    temp_med_ca5: '-',
+    event_ca5: '-',
+    receit_ca5: formatCurrencyShort(0),
   };
   
-  doc.render(placeholders);
+  try {
+    doc.render(placeholders);
+  } catch (error: any) {
+    console.error('[AutoReport PPTX] Erro ao renderizar template:', error);
+    throw error;
+  }
   
   const buffer = doc.getZip().generate({
     type: 'nodebuffer',
