@@ -163,13 +163,13 @@ export async function generatePptxReport(data: PptxReportData): Promise<{
     cpa_comp: '-',
     var_cpa: varCpa,
     
-    // Metas mensais (placeholder - não temos dados)
+    // Metas mensais
     fat_mes: formatCurrencyShort(receita),
-    meta_fat: '-',
-    per_meta_fat: '-',
+    meta_fat: cliente.metaFaturamento ? formatCurrencyShort(cliente.metaFaturamento) : '-',
+    per_meta_fat: cliente.metaFaturamento ? formatPercentShort((receita / cliente.metaFaturamento) * 100) : '-',
     inv_mes: formatCurrencyShort(investTotal),
-    meta_inv: '-',
-    per_meta_inv: '-',
+    meta_inv: cliente.metaInvestimento ? formatCurrencyShort(cliente.metaInvestimento) : '-',
+    per_meta_inv: cliente.metaInvestimento ? formatPercentShort((investTotal / cliente.metaInvestimento) * 100) : '-',
     
     // Slide 3 - Meta Ads (Facebook)
     fat_face: formatCurrencyShort(metaAds.roas * metaAds.custo),
