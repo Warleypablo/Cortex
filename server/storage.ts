@@ -8033,6 +8033,222 @@ export class DbStorage implements IStorage {
     return { metodos };
   }
 
+  // Inadimplência por Vendedor - cruza caz_parcelas com caz_clientes, cup_clientes e cup_contratos
+  async getInadimplenciaPorVendedor(dataInicio?: string, dataFim?: string): Promise<{
+    vendedores: {
+      vendedor: string;
+      valorTotal: number;
+      quantidadeClientes: number;
+      quantidadeParcelas: number;
+      percentual: number;
+    }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND cp.data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
+    }
+    
+    const result = await db.execute(sql.raw(`
+      WITH parcelas_inadimplentes AS (
+        SELECT 
+          cp.id_cliente,
+          cp.nao_pago::numeric as valor_inadimplente,
+          1 as parcela_count
+        FROM caz_parcelas cp
+        WHERE cp.tipo_evento = 'RECEITA'
+          AND cp.data_vencimento < '${dataHoje}'
+          AND cp.nao_pago::numeric > 0
+          AND cp.id_cliente IS NOT NULL
+          AND cp.id_cliente::text != ''
+          ${whereDataInicio}
+          ${whereDataFim}
+      ),
+      cliente_contrato AS (
+        SELECT DISTINCT ON (TRIM(cc.ids::text))
+          TRIM(cc.ids::text) as id_cliente,
+          cont.vendedor
+        FROM caz_clientes cc
+        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+          AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
+        LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        WHERE cc.ids IS NOT NULL
+        ORDER BY TRIM(cc.ids::text), cont.data_inicio DESC NULLS LAST
+      )
+      SELECT 
+        COALESCE(cc.vendedor, 'Não Identificado') as vendedor,
+        COALESCE(SUM(pi.valor_inadimplente), 0) as valor_total,
+        COUNT(DISTINCT pi.id_cliente) as quantidade_clientes,
+        COUNT(*) as quantidade_parcelas
+      FROM parcelas_inadimplentes pi
+      LEFT JOIN cliente_contrato cc ON TRIM(pi.id_cliente::text) = cc.id_cliente
+      GROUP BY COALESCE(cc.vendedor, 'Não Identificado')
+      ORDER BY valor_total DESC
+    `));
+    
+    const totalGeral = (result.rows as any[]).reduce((sum, row) => sum + parseFloat(row.valor_total || '0'), 0);
+    
+    const vendedores = (result.rows as any[]).map(row => ({
+      vendedor: row.vendedor,
+      valorTotal: parseFloat(row.valor_total || '0'),
+      quantidadeClientes: parseInt(row.quantidade_clientes || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      percentual: totalGeral > 0 ? (parseFloat(row.valor_total || '0') / totalGeral) * 100 : 0,
+    }));
+    
+    return { vendedores };
+  }
+
+  // Inadimplência por Squad - cruza caz_parcelas com caz_clientes, cup_clientes e cup_contratos
+  async getInadimplenciaPorSquad(dataInicio?: string, dataFim?: string): Promise<{
+    squads: {
+      squad: string;
+      valorTotal: number;
+      quantidadeClientes: number;
+      quantidadeParcelas: number;
+      percentual: number;
+    }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND cp.data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
+    }
+    
+    const result = await db.execute(sql.raw(`
+      WITH parcelas_inadimplentes AS (
+        SELECT 
+          cp.id_cliente,
+          cp.nao_pago::numeric as valor_inadimplente,
+          1 as parcela_count
+        FROM caz_parcelas cp
+        WHERE cp.tipo_evento = 'RECEITA'
+          AND cp.data_vencimento < '${dataHoje}'
+          AND cp.nao_pago::numeric > 0
+          AND cp.id_cliente IS NOT NULL
+          AND cp.id_cliente::text != ''
+          ${whereDataInicio}
+          ${whereDataFim}
+      ),
+      cliente_contrato AS (
+        SELECT DISTINCT ON (TRIM(cc.ids::text))
+          TRIM(cc.ids::text) as id_cliente,
+          cont.squad
+        FROM caz_clientes cc
+        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+          AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
+        LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        WHERE cc.ids IS NOT NULL
+        ORDER BY TRIM(cc.ids::text), cont.data_inicio DESC NULLS LAST
+      )
+      SELECT 
+        COALESCE(cc.squad, 'Não Identificado') as squad,
+        COALESCE(SUM(pi.valor_inadimplente), 0) as valor_total,
+        COUNT(DISTINCT pi.id_cliente) as quantidade_clientes,
+        COUNT(*) as quantidade_parcelas
+      FROM parcelas_inadimplentes pi
+      LEFT JOIN cliente_contrato cc ON TRIM(pi.id_cliente::text) = cc.id_cliente
+      GROUP BY COALESCE(cc.squad, 'Não Identificado')
+      ORDER BY valor_total DESC
+    `));
+    
+    const totalGeral = (result.rows as any[]).reduce((sum, row) => sum + parseFloat(row.valor_total || '0'), 0);
+    
+    const squads = (result.rows as any[]).map(row => ({
+      squad: row.squad,
+      valorTotal: parseFloat(row.valor_total || '0'),
+      quantidadeClientes: parseInt(row.quantidade_clientes || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      percentual: totalGeral > 0 ? (parseFloat(row.valor_total || '0') / totalGeral) * 100 : 0,
+    }));
+    
+    return { squads };
+  }
+
+  // Inadimplência por Responsável - cruza caz_parcelas com caz_clientes, cup_clientes e cup_contratos
+  async getInadimplenciaPorResponsavel(dataInicio?: string, dataFim?: string): Promise<{
+    responsaveis: {
+      responsavel: string;
+      valorTotal: number;
+      quantidadeClientes: number;
+      quantidadeParcelas: number;
+      percentual: number;
+    }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND cp.data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
+    }
+    
+    const result = await db.execute(sql.raw(`
+      WITH parcelas_inadimplentes AS (
+        SELECT 
+          cp.id_cliente,
+          cp.nao_pago::numeric as valor_inadimplente,
+          1 as parcela_count
+        FROM caz_parcelas cp
+        WHERE cp.tipo_evento = 'RECEITA'
+          AND cp.data_vencimento < '${dataHoje}'
+          AND cp.nao_pago::numeric > 0
+          AND cp.id_cliente IS NOT NULL
+          AND cp.id_cliente::text != ''
+          ${whereDataInicio}
+          ${whereDataFim}
+      ),
+      cliente_contrato AS (
+        SELECT DISTINCT ON (TRIM(cc.ids::text))
+          TRIM(cc.ids::text) as id_cliente,
+          cont.responsavel
+        FROM caz_clientes cc
+        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+          AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
+        LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        WHERE cc.ids IS NOT NULL
+        ORDER BY TRIM(cc.ids::text), cont.data_inicio DESC NULLS LAST
+      )
+      SELECT 
+        COALESCE(cc.responsavel, 'Não Identificado') as responsavel,
+        COALESCE(SUM(pi.valor_inadimplente), 0) as valor_total,
+        COUNT(DISTINCT pi.id_cliente) as quantidade_clientes,
+        COUNT(*) as quantidade_parcelas
+      FROM parcelas_inadimplentes pi
+      LEFT JOIN cliente_contrato cc ON TRIM(pi.id_cliente::text) = cc.id_cliente
+      GROUP BY COALESCE(cc.responsavel, 'Não Identificado')
+      ORDER BY valor_total DESC
+    `));
+    
+    const totalGeral = (result.rows as any[]).reduce((sum, row) => sum + parseFloat(row.valor_total || '0'), 0);
+    
+    const responsaveis = (result.rows as any[]).map(row => ({
+      responsavel: row.responsavel,
+      valorTotal: parseFloat(row.valor_total || '0'),
+      quantidadeClientes: parseInt(row.quantidade_clientes || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      percentual: totalGeral > 0 ? (parseFloat(row.valor_total || '0') / totalGeral) * 100 : 0,
+    }));
+    
+    return { responsaveis };
+  }
+
   async getRevenueGoals(mes: number, ano: number): Promise<{
     resumo: {
       totalPrevisto: number;
