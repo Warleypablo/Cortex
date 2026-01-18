@@ -171,6 +171,18 @@ interface ParcelaDetalhe {
   urlCobranca: string | null;
 }
 
+interface MetricasRecebimento {
+  tempoMedioRecebimento: number;
+  tempoMedioRecebimentoInadimplentes: number;
+  clientesInadimPrimeiraParcela: number;
+  percentualInadimPrimeiraParcela: number;
+  valorInadimPrimeiraParcela: number;
+  clientesNuncaPagaram: number;
+  percentualNuncaPagaram: number;
+  valorNuncaPagaram: number;
+  totalClientesComParcelas: number;
+}
+
 interface InadimplenciaContexto {
   contexto: string | null;
   evidencias: string | null;
@@ -293,6 +305,11 @@ export default function DashboardInadimplencia() {
 
   const { data: responsaveisDetData, isLoading: isLoadingResponsaveisDet, isError: isErrorResponsaveisDet } = useQuery<{ responsaveis: ResponsavelInadimplente[] }>({
     queryKey: ['/api/inadimplencia/por-responsavel', empresasParams],
+  });
+
+  // Query para métricas de recebimento
+  const { data: metricasRecebimento, isLoading: isLoadingMetricas, isError: isErrorMetricas } = useQuery<MetricasRecebimento>({
+    queryKey: ['/api/inadimplencia/metricas-recebimento', resumoParams],
   });
 
   // Query para drill-down - busca clientes filtrados por vendedor/squad/responsável
@@ -848,6 +865,46 @@ export default function DashboardInadimplencia() {
           variant="warning"
           loading={isLoadingResumo}
           testId="kpi-ultimos-45-dias"
+        />
+      </div>
+
+      {/* Métricas de Recebimento */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          title="Tempo Médio Recebimento"
+          value={`${metricasRecebimento?.tempoMedioRecebimento || 0} dias`}
+          subtitle="Prazo médio entre vencimento e quitação"
+          icon={Clock}
+          variant="info"
+          loading={isLoadingMetricas}
+          testId="kpi-tempo-medio-recebimento"
+        />
+        <KPICard
+          title="Tempo Médio (Atrasados)"
+          value={`${metricasRecebimento?.tempoMedioRecebimentoInadimplentes || 0} dias`}
+          subtitle="Pagos após o vencimento"
+          icon={Clock}
+          variant="warning"
+          loading={isLoadingMetricas}
+          testId="kpi-tempo-medio-inadimplentes"
+        />
+        <KPICard
+          title="Inadimplentes 1ª Parcela"
+          value={String(metricasRecebimento?.clientesInadimPrimeiraParcela || 0)}
+          subtitle={`${formatPercent(metricasRecebimento?.percentualInadimPrimeiraParcela || 0)} • ${formatCurrency(metricasRecebimento?.valorInadimPrimeiraParcela || 0)}`}
+          icon={AlertTriangle}
+          variant="danger"
+          loading={isLoadingMetricas}
+          testId="kpi-inadim-primeira-parcela"
+        />
+        <KPICard
+          title="Nunca Pagaram"
+          value={String(metricasRecebimento?.clientesNuncaPagaram || 0)}
+          subtitle={`${formatPercent(metricasRecebimento?.percentualNuncaPagaram || 0)} • ${formatCurrency(metricasRecebimento?.valorNuncaPagaram || 0)}`}
+          icon={XCircle}
+          variant="danger"
+          loading={isLoadingMetricas}
+          testId="kpi-nunca-pagaram"
         />
       </div>
 
