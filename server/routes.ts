@@ -6491,23 +6491,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
 
       // Contratos ativos, churn e LT médio
-      // LT calculado APENAS sobre contratos já encerrados (com data_encerramento preenchida)
+      // LT calculado sobre contratos com data_solicitacao_encerramento preenchida
+      // IMPORTANTE: Churn usa data_solicitacao_encerramento (quando cliente solicitou cancelamento)
       const clientesResult = await db.execute(sql`
         SELECT 
           COUNT(CASE WHEN c.valorr > 0 AND c.status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_recorrentes_ativos,
-          COUNT(CASE WHEN c.data_encerramento IS NOT NULL AND c.valorr > 0 THEN 1 END) as contratos_encerrados_total,
-          COUNT(CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
-            AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+          COUNT(CASE WHEN c.data_solicitacao_encerramento IS NOT NULL AND c.valorr > 0 THEN 1 END) as contratos_encerrados_total,
+          COUNT(CASE WHEN c.data_solicitacao_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
+            AND c.data_solicitacao_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
             AND c.valorr > 0
             THEN 1 END) as churn_mes,
-          COALESCE(SUM(CASE WHEN c.data_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
-            AND c.data_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+          COALESCE(SUM(CASE WHEN c.data_solicitacao_encerramento >= DATE_TRUNC('month', CURRENT_DATE) 
+            AND c.data_solicitacao_encerramento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
             AND c.valorr > 0
             THEN c.valorr ELSE 0 END), 0) as mrr_churn_mes,
           COALESCE(AVG(
-            CASE WHEN c.data_encerramento IS NOT NULL AND c.data_inicio IS NOT NULL AND c.valorr > 0 THEN
-              EXTRACT(MONTH FROM AGE(c.data_encerramento, c.data_inicio)) +
-              EXTRACT(YEAR FROM AGE(c.data_encerramento, c.data_inicio)) * 12
+            CASE WHEN c.data_solicitacao_encerramento IS NOT NULL AND c.data_inicio IS NOT NULL AND c.valorr > 0 THEN
+              EXTRACT(MONTH FROM AGE(c.data_solicitacao_encerramento, c.data_inicio)) +
+              EXTRACT(YEAR FROM AGE(c.data_solicitacao_encerramento, c.data_inicio)) * 12
             END
           ), 6) as lt_medio_meses
         FROM cup_contratos c
@@ -6576,6 +6577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Métricas mensais de contratos (churn, MRR vendido, pontual vendido) - cup_contratos
       // Filtra apenas dados até o mês atual (não inclui datas futuras)
+      // IMPORTANTE: Churn usa data_solicitacao_encerramento (quando cliente solicitou cancelamento)
       const contratosEvolucaoResult = await db.execute(sql`
         SELECT 
           mes,
@@ -6583,16 +6585,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(mrr_vendido), 0) as mrr_vendido,
           COALESCE(SUM(pontual_vendido), 0) as pontual_vendido
         FROM (
-          -- Churn MRR (contratos encerrados no mês - usa valorr)
+          -- Churn MRR (contratos com solicitação de encerramento no mês - usa valorr)
           SELECT 
-            TO_CHAR(data_encerramento, 'YYYY-MM') as mes,
+            TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
             COALESCE(valorr, 0) as churn_mrr,
             0 as mrr_vendido,
             0 as pontual_vendido
           FROM cup_contratos
-          WHERE data_encerramento IS NOT NULL
-            AND data_encerramento >= CURRENT_DATE - INTERVAL '12 months'
-            AND data_encerramento <= CURRENT_DATE
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= CURRENT_DATE - INTERVAL '12 months'
+            AND data_solicitacao_encerramento <= CURRENT_DATE
             AND COALESCE(valorr, 0) > 0
           UNION ALL
           -- MRR vendido (contratos recorrentes iniciados no mês - valorr > 0)
@@ -7590,17 +7592,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let pausaDateFilter = sql`TRUE`;
       
       // If explicit date range provided, use it for each type with its respective date column
+      // IMPORTANTE: Churn usa data_solicitacao_encerramento (quando cliente solicitou cancelamento)
       if (startDate && endDate) {
-        churnDateFilter = sql`c.data_encerramento >= ${startDate}::date AND c.data_encerramento <= ${endDate}::date`;
+        churnDateFilter = sql`c.data_solicitacao_encerramento >= ${startDate}::date AND c.data_solicitacao_encerramento <= ${endDate}::date`;
         pausaDateFilter = sql`c.data_pausa >= ${startDate}::date AND c.data_pausa <= ${endDate}::date`;
       } else if (meses !== "all") {
         const mesesNum = parseInt(meses) || 12;
-        churnDateFilter = sql`c.data_encerramento >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
+        churnDateFilter = sql`c.data_solicitacao_encerramento >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
         pausaDateFilter = sql`c.data_pausa >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
       }
       
-      // Get churned/encerrados contracts - same logic as Home dashboard
-      // Home counts ALL contracts with data_encerramento in period (regardless of status)
+      // Get churned/encerrados contracts - uses data_solicitacao_encerramento
+      // IMPORTANTE: Churn usa data_solicitacao_encerramento (quando cliente solicitou cancelamento)
       // Exclude irrelevant squads: turbo interno, squad x
       const churnResult = await db.execute(sql`
         SELECT 
@@ -7612,21 +7615,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.responsavel,
           COALESCE(c.valorr, 0) as valorr,
           c.data_inicio,
-          c.data_encerramento,
+          c.data_solicitacao_encerramento as data_encerramento,
           NULL::timestamp as data_pausa,
           c.status,
           c.servico,
           'churn' as tipo,
           CASE 
-            WHEN c.data_inicio IS NOT NULL AND c.data_encerramento IS NOT NULL 
+            WHEN c.data_inicio IS NOT NULL AND c.data_solicitacao_encerramento IS NOT NULL 
             THEN GREATEST(0.5, 
-              (c.data_encerramento::date - c.data_inicio::date)::numeric / 30.44
+              (c.data_solicitacao_encerramento::date - c.data_inicio::date)::numeric / 30.44
             )
             ELSE 0 
           END as lifetime_meses
         FROM cup_contratos c
         LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
-        WHERE c.data_encerramento IS NOT NULL
+        WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND c.valorr IS NOT NULL
           AND c.valorr > 0
           AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
