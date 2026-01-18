@@ -403,6 +403,19 @@ export interface IStorage {
       quantidadeContratos: number;
     };
   }>;
+  
+  // Métricas de Recebimento (Inadimplência)
+  getMetricasRecebimento(dataInicio?: string, dataFim?: string): Promise<{
+    tempoMedioRecebimento: number;
+    tempoMedioRecebimentoInadimplentes: number;
+    clientesInadimPrimeiraParcela: number;
+    percentualInadimPrimeiraParcela: number;
+    valorInadimPrimeiraParcela: number;
+    clientesNuncaPagaram: number;
+    percentualNuncaPagaram: number;
+    valorNuncaPagaram: number;
+    totalClientesComParcelas: number;
+  }>;
 }
 
 // GEG Dashboard Extended Types
@@ -1142,6 +1155,21 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
   async deleteTurboEvento(id: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  // Métricas de Recebimento - MemStorage stub
+  async getMetricasRecebimento(dataInicio?: string, dataFim?: string): Promise<{
+    tempoMedioRecebimento: number;
+    tempoMedioRecebimentoInadimplentes: number;
+    clientesInadimPrimeiraParcela: number;
+    percentualInadimPrimeiraParcela: number;
+    valorInadimPrimeiraParcela: number;
+    clientesNuncaPagaram: number;
+    percentualNuncaPagaram: number;
+    valorNuncaPagaram: number;
+    totalClientesComParcelas: number;
+  }> {
     throw new Error("Not implemented in MemStorage");
   }
 }
@@ -7731,6 +7759,115 @@ export class DbStorage implements IStorage {
       quantidadeUltimos45Dias,
       faixas,
       evolucaoMensal,
+    };
+  }
+
+  async getMetricasRecebimento(dataInicio?: string, dataFim?: string): Promise<{
+    tempoMedioRecebimento: number;
+    tempoMedioRecebimentoInadimplentes: number;
+    clientesInadimPrimeiraParcela: number;
+    percentualInadimPrimeiraParcela: number;
+    valorInadimPrimeiraParcela: number;
+    clientesNuncaPagaram: number;
+    percentualNuncaPagaram: number;
+    valorNuncaPagaram: number;
+    totalClientesComParcelas: number;
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND data_vencimento <= '${dataFim}'`;
+    }
+    
+    // 1. Tempo médio de recebimento (data_quitacao - data_vencimento para parcelas pagas)
+    const tempoMedioResult = await db.execute(sql.raw(`
+      SELECT 
+        AVG(data_quitacao::date - data_vencimento::date) as tempo_medio_geral,
+        AVG(CASE WHEN data_quitacao::date > data_vencimento::date THEN data_quitacao::date - data_vencimento::date END) as tempo_medio_inadimplentes,
+        COUNT(CASE WHEN data_quitacao::date > data_vencimento::date THEN 1 END) as quantidade_pagos_atrasados
+      FROM caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_quitacao IS NOT NULL
+        AND data_quitacao::text != ''
+        AND valor_liquido::numeric > 0
+        ${whereDataInicio}
+        ${whereDataFim}
+    `));
+    
+    const tempoMedioRecebimento = parseFloat((tempoMedioResult.rows[0] as any)?.tempo_medio_geral || '0');
+    const tempoMedioRecebimentoInadimplentes = parseFloat((tempoMedioResult.rows[0] as any)?.tempo_medio_inadimplentes || '0');
+    
+    // 2. Clientes inadimplentes na primeira parcela (DESC contendo "1/" ou parcela número 1)
+    // Identificar clientes que têm a primeira parcela em atraso
+    const primeiraParecelaResult = await db.execute(sql.raw(`
+      WITH primeiras_parcelas AS (
+        SELECT DISTINCT ON (id_cliente)
+          id_cliente,
+          data_vencimento,
+          nao_pago::numeric as valor_nao_pago,
+          CASE WHEN nao_pago::numeric > 0 AND data_vencimento < '${dataHoje}' THEN 1 ELSE 0 END as inadimplente
+        FROM caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND (descricao LIKE '%1/%' OR descricao LIKE '% 1 de %' OR descricao LIKE '%parcela 1%' OR descricao ILIKE '%primeira%')
+          ${whereDataInicio}
+          ${whereDataFim}
+        ORDER BY id_cliente, data_vencimento ASC
+      )
+      SELECT 
+        COUNT(CASE WHEN inadimplente = 1 THEN 1 END) as clientes_inadim_primeira,
+        SUM(CASE WHEN inadimplente = 1 THEN valor_nao_pago ELSE 0 END) as valor_inadim_primeira,
+        COUNT(*) as total_clientes_primeira
+      FROM primeiras_parcelas
+    `));
+    
+    const clientesInadimPrimeiraParcela = parseInt((primeiraParecelaResult.rows[0] as any)?.clientes_inadim_primeira || '0');
+    const valorInadimPrimeiraParcela = parseFloat((primeiraParecelaResult.rows[0] as any)?.valor_inadim_primeira || '0');
+    const totalClientesPrimeira = parseInt((primeiraParecelaResult.rows[0] as any)?.total_clientes_primeira || '1');
+    const percentualInadimPrimeiraParcela = totalClientesPrimeira > 0 ? (clientesInadimPrimeiraParcela / totalClientesPrimeira) * 100 : 0;
+    
+    // 3. Clientes que nunca pagaram nenhuma parcela
+    const nuncaPagaramResult = await db.execute(sql.raw(`
+      WITH clientes_parcelas AS (
+        SELECT 
+          id_cliente,
+          COUNT(*) as total_parcelas,
+          SUM(CASE WHEN (pago::numeric > 0 OR data_quitacao IS NOT NULL) THEN 1 ELSE 0 END) as parcelas_pagas,
+          SUM(nao_pago::numeric) as valor_total_devido
+        FROM caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND data_vencimento < '${dataHoje}'
+          ${whereDataInicio}
+          ${whereDataFim}
+        GROUP BY id_cliente
+      )
+      SELECT 
+        COUNT(CASE WHEN parcelas_pagas = 0 AND total_parcelas > 0 THEN 1 END) as clientes_nunca_pagaram,
+        SUM(CASE WHEN parcelas_pagas = 0 AND total_parcelas > 0 THEN valor_total_devido ELSE 0 END) as valor_nunca_pagaram,
+        COUNT(*) as total_clientes
+      FROM clientes_parcelas
+    `));
+    
+    const clientesNuncaPagaram = parseInt((nuncaPagaramResult.rows[0] as any)?.clientes_nunca_pagaram || '0');
+    const valorNuncaPagaram = parseFloat((nuncaPagaramResult.rows[0] as any)?.valor_nunca_pagaram || '0');
+    const totalClientesComParcelas = parseInt((nuncaPagaramResult.rows[0] as any)?.total_clientes || '1');
+    const percentualNuncaPagaram = totalClientesComParcelas > 0 ? (clientesNuncaPagaram / totalClientesComParcelas) * 100 : 0;
+    
+    return {
+      tempoMedioRecebimento: Math.round(tempoMedioRecebimento * 10) / 10,
+      tempoMedioRecebimentoInadimplentes: Math.round(tempoMedioRecebimentoInadimplentes * 10) / 10,
+      clientesInadimPrimeiraParcela,
+      percentualInadimPrimeiraParcela: Math.round(percentualInadimPrimeiraParcela * 10) / 10,
+      valorInadimPrimeiraParcela,
+      clientesNuncaPagaram,
+      percentualNuncaPagaram: Math.round(percentualNuncaPagaram * 10) / 10,
+      valorNuncaPagaram,
+      totalClientesComParcelas,
     };
   }
 
