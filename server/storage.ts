@@ -416,6 +416,21 @@ export interface IStorage {
     valorNuncaPagaram: number;
     totalClientesComParcelas: number;
   }>;
+  
+  // Lista de clientes que nunca pagaram
+  getClientesNuncaPagaram(dataInicio?: string, dataFim?: string): Promise<{
+    clientes: {
+      idCliente: string;
+      nomeCliente: string;
+      valorTotal: number;
+      quantidadeParcelas: number;
+      parcelaMaisAntiga: string;
+      diasAtrasoMax: number;
+      vendedor: string | null;
+      squad: string | null;
+      responsavel: string | null;
+    }[];
+  }>;
 }
 
 // GEG Dashboard Extended Types
@@ -7870,6 +7885,93 @@ export class DbStorage implements IStorage {
       valorNuncaPagaram,
       totalClientesComParcelas,
     };
+  }
+
+  async getClientesNuncaPagaram(dataInicio?: string, dataFim?: string): Promise<{
+    clientes: {
+      idCliente: string;
+      nomeCliente: string;
+      valorTotal: number;
+      quantidadeParcelas: number;
+      parcelaMaisAntiga: string;
+      diasAtrasoMax: number;
+      vendedor: string | null;
+      squad: string | null;
+      responsavel: string | null;
+    }[];
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    let whereDataInicio = '';
+    let whereDataFim = '';
+    if (dataInicio) {
+      whereDataInicio = ` AND cp.data_vencimento >= '${dataInicio}'`;
+    }
+    if (dataFim) {
+      whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
+    }
+    
+    // Busca clientes que nunca pagaram nenhuma parcela (todas as parcelas com nao_pago > 0)
+    const result = await db.execute(sql.raw(`
+      WITH clientes_nunca_pagaram AS (
+        SELECT 
+          cp.id_cliente,
+          COUNT(*) as total_parcelas,
+          SUM(CASE WHEN (cp.data_quitacao IS NOT NULL AND cp.data_quitacao::text != '') THEN 1 ELSE 0 END) as parcelas_pagas,
+          SUM(cp.nao_pago::numeric) as valor_total,
+          MIN(cp.data_vencimento) as parcela_mais_antiga,
+          MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max
+        FROM caz_parcelas cp
+        WHERE cp.tipo_evento = 'RECEITA'
+          AND cp.data_vencimento < '${dataHoje}'
+          ${whereDataInicio}
+          ${whereDataFim}
+        GROUP BY cp.id_cliente
+        HAVING SUM(CASE WHEN (cp.data_quitacao IS NOT NULL AND cp.data_quitacao::text != '') THEN 1 ELSE 0 END) = 0
+          AND COUNT(*) > 0
+      ),
+      cliente_info AS (
+        SELECT DISTINCT ON (caz.id_cliente)
+          caz.id_cliente,
+          COALESCE(cup.nome, caz.nome) as nome_cliente,
+          cup.responsavel,
+          COALESCE(con.vendedor, 'Não Identificado') as vendedor,
+          COALESCE(con.squad, 'Não Identificado') as squad
+        FROM caz_clientes caz
+        LEFT JOIN cup_clientes cup ON cup.id_conta_azul = caz.id_cliente
+        LEFT JOIN cup_contratos con ON con.id_cliente = cup.id
+        ORDER BY caz.id_cliente, con.data_inicio DESC NULLS LAST
+      )
+      SELECT 
+        cnp.id_cliente,
+        COALESCE(ci.nome_cliente, cnp.id_cliente) as nome_cliente,
+        cnp.valor_total,
+        cnp.total_parcelas as quantidade_parcelas,
+        cnp.parcela_mais_antiga,
+        cnp.dias_atraso_max,
+        ci.vendedor,
+        ci.squad,
+        ci.responsavel
+      FROM clientes_nunca_pagaram cnp
+      LEFT JOIN cliente_info ci ON ci.id_cliente = cnp.id_cliente
+      ORDER BY cnp.valor_total DESC
+      LIMIT 100
+    `));
+    
+    const clientes = (result.rows as any[]).map(row => ({
+      idCliente: row.id_cliente || '',
+      nomeCliente: row.nome_cliente || 'Cliente Desconhecido',
+      valorTotal: parseFloat(row.valor_total || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      parcelaMaisAntiga: row.parcela_mais_antiga || '',
+      diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
+      vendedor: row.vendedor || null,
+      squad: row.squad || null,
+      responsavel: row.responsavel || null,
+    }));
+    
+    return { clientes };
   }
 
   async getInadimplenciaClientes(
