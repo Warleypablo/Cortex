@@ -238,6 +238,9 @@ export default function DashboardInadimplencia() {
   const [acaoSelecionada, setAcaoSelecionada] = useState<AcaoContexto | null>(null);
   const [statusFinanceiroSelecionado, setStatusFinanceiroSelecionado] = useState<StatusFinanceiro | null>(null);
   const [detalheFinanceiroTexto, setDetalheFinanceiroTexto] = useState("");
+  
+  // Estados para drill-down de inadimplência
+  const [drillDown, setDrillDown] = useState<{ tipo: 'vendedor' | 'squad' | 'responsavel'; valor: string } | null>(null);
 
   useEffect(() => {
     setClienteSelecionado(null);
@@ -290,6 +293,28 @@ export default function DashboardInadimplencia() {
 
   const { data: responsaveisDetData, isLoading: isLoadingResponsaveisDet, isError: isErrorResponsaveisDet } = useQuery<{ responsaveis: ResponsavelInadimplente[] }>({
     queryKey: ['/api/inadimplencia/por-responsavel', empresasParams],
+  });
+
+  // Query para drill-down - busca clientes filtrados por vendedor/squad/responsável
+  const drillDownParams = useMemo(() => {
+    if (!drillDown) return null;
+    const params: Record<string, string> = {
+      ...(dataInicio && { dataInicio }),
+      ...(dataFim && { dataFim }),
+      ordenarPor: 'valor',
+      limite: '100',
+    };
+    if (drillDown.tipo === 'vendedor') params.vendedor = drillDown.valor;
+    if (drillDown.tipo === 'squad') params.squad = drillDown.valor;
+    if (drillDown.tipo === 'responsavel') params.responsavel = drillDown.valor;
+    return params;
+  }, [drillDown, dataInicio, dataFim]);
+
+  const { data: drillDownData, isLoading: isLoadingDrillDown, isError: isErrorDrillDown } = useQuery<{ 
+    clientes: (ClienteInadimplente & { vendedor: string | null; squad: string | null })[] 
+  }>({
+    queryKey: ['/api/inadimplencia/clientes', drillDownParams],
+    enabled: !!drillDown && !!drillDownParams,
   });
 
   const parcelasParams = {
@@ -976,6 +1001,12 @@ export default function DashboardInadimplencia() {
                     data={vendedoresData.vendedores.slice(0, 8)} 
                     layout="vertical" 
                     margin={{ left: 10, right: 30 }}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(data) => {
+                      if (data?.activePayload?.[0]?.payload?.vendedor) {
+                        setDrillDown({ tipo: 'vendedor', valor: data.activePayload[0].payload.vendedor });
+                      }
+                    }}
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
@@ -994,7 +1025,7 @@ export default function DashboardInadimplencia() {
                       }}
                       formatter={(value: number) => [formatCurrency(value), "Valor"]}
                     />
-                    <Bar dataKey="valorTotal" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="valorTotal" fill="#ef4444" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1028,6 +1059,12 @@ export default function DashboardInadimplencia() {
                     data={squadsData.squads.slice(0, 8)} 
                     layout="vertical" 
                     margin={{ left: 10, right: 30 }}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(data) => {
+                      if (data?.activePayload?.[0]?.payload?.squad) {
+                        setDrillDown({ tipo: 'squad', valor: data.activePayload[0].payload.squad });
+                      }
+                    }}
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
@@ -1046,7 +1083,7 @@ export default function DashboardInadimplencia() {
                       }}
                       formatter={(value: number) => [formatCurrency(value), "Valor"]}
                     />
-                    <Bar dataKey="valorTotal" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="valorTotal" fill="#f59e0b" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1080,6 +1117,12 @@ export default function DashboardInadimplencia() {
                     data={responsaveisDetData.responsaveis.slice(0, 8)} 
                     layout="vertical" 
                     margin={{ left: 10, right: 30 }}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(data) => {
+                      if (data?.activePayload?.[0]?.payload?.responsavel) {
+                        setDrillDown({ tipo: 'responsavel', valor: data.activePayload[0].payload.responsavel });
+                      }
+                    }}
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
@@ -1098,7 +1141,7 @@ export default function DashboardInadimplencia() {
                       }}
                       formatter={(value: number) => [formatCurrency(value), "Valor"]}
                     />
-                    <Bar dataKey="valorTotal" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="valorTotal" fill="#3b82f6" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1776,7 +1819,12 @@ export default function DashboardInadimplencia() {
                       </TableHeader>
                       <TableBody>
                         {vendedoresData.vendedores.map((v, idx) => (
-                          <TableRow key={idx} data-testid={`row-vendedor-${idx}`}>
+                          <TableRow 
+                            key={idx} 
+                            data-testid={`row-vendedor-${idx}`}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => setDrillDown({ tipo: 'vendedor', valor: v.vendedor })}
+                          >
                             <TableCell className="font-medium">{v.vendedor}</TableCell>
                             <TableCell className="text-right">{v.quantidadeClientes}</TableCell>
                             <TableCell className="text-right">{v.quantidadeParcelas}</TableCell>
@@ -1830,7 +1878,12 @@ export default function DashboardInadimplencia() {
                       </TableHeader>
                       <TableBody>
                         {squadsData.squads.map((s, idx) => (
-                          <TableRow key={idx} data-testid={`row-squad-${idx}`}>
+                          <TableRow 
+                            key={idx} 
+                            data-testid={`row-squad-${idx}`}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => setDrillDown({ tipo: 'squad', valor: s.squad })}
+                          >
                             <TableCell className="font-medium">{s.squad}</TableCell>
                             <TableCell className="text-right">{s.quantidadeClientes}</TableCell>
                             <TableCell className="text-right">{s.quantidadeParcelas}</TableCell>
@@ -1884,7 +1937,12 @@ export default function DashboardInadimplencia() {
                       </TableHeader>
                       <TableBody>
                         {responsaveisDetData.responsaveis.map((r, idx) => (
-                          <TableRow key={idx} data-testid={`row-responsavel-${idx}`}>
+                          <TableRow 
+                            key={idx} 
+                            data-testid={`row-responsavel-${idx}`}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => setDrillDown({ tipo: 'responsavel', valor: r.responsavel })}
+                          >
                             <TableCell className="font-medium">{r.responsavel}</TableCell>
                             <TableCell className="text-right">{r.quantidadeClientes}</TableCell>
                             <TableCell className="text-right">{r.quantidadeParcelas}</TableCell>
@@ -1907,6 +1965,77 @@ export default function DashboardInadimplencia() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Modal de Drill-down - Clientes por Vendedor/Squad/Responsável */}
+      <Dialog open={!!drillDown} onOpenChange={(open) => !open && setDrillDown(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-drill-down">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Clientes Inadimplentes - {drillDown?.tipo === 'vendedor' ? 'Vendedor' : drillDown?.tipo === 'squad' ? 'Squad' : 'Responsável'}: {drillDown?.valor}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {isLoadingDrillDown ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : isErrorDrillDown ? (
+              <ErrorDisplay message="Erro ao carregar clientes." />
+            ) : !drillDownData?.clientes?.length ? (
+              <div className="text-center py-12 text-muted-foreground">
+                Nenhum cliente encontrado
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right">Parcelas</TableHead>
+                      <TableHead className="text-right">Dias Atraso</TableHead>
+                      <TableHead>Responsável</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {drillDownData.clientes.map((cliente, idx) => (
+                      <TableRow key={idx} data-testid={`row-drilldown-${idx}`}>
+                        <TableCell>
+                          <div className="font-medium">{cliente.nomeCliente}</div>
+                          {cliente.cnpj && (
+                            <div className="text-xs text-muted-foreground">{cliente.cnpj}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
+                          {formatCurrency(cliente.valorTotal)}
+                        </TableCell>
+                        <TableCell className="text-right">{cliente.quantidadeParcelas}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge variant={cliente.diasAtrasoMax > 90 ? "destructive" : cliente.diasAtrasoMax > 30 ? "secondary" : "outline"}>
+                            {cliente.diasAtrasoMax} dias
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {cliente.responsavel || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+          <div className="pt-4 border-t flex justify-between items-center">
+            <div className="text-sm text-muted-foreground">
+              {drillDownData?.clientes?.length || 0} cliente(s) • Total: {formatCurrency(drillDownData?.clientes?.reduce((acc, c) => acc + c.valorTotal, 0) || 0)}
+            </div>
+            <Button variant="outline" onClick={() => setDrillDown(null)} data-testid="button-close-drilldown">
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
