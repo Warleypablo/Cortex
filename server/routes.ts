@@ -4015,6 +4015,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inadimplência por Produto/Serviço
+  app.get("/api/inadimplencia/por-produto", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const produtos = await storage.getInadimplenciaPorProduto(dataInicio, dataFim);
+      res.json(produtos);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia por produto:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia por produto" });
+    }
+  });
+
   app.get("/api/inadimplencia/relatorio-pdf", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string | undefined;
