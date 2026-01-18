@@ -7912,40 +7912,53 @@ export class DbStorage implements IStorage {
       whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
     }
     
-    // Busca clientes que nunca pagaram nenhuma parcela (todas as parcelas com nao_pago > 0)
+    // Busca clientes que NUNCA pagaram NENHUMA parcela (agrupa por CNPJ para evitar duplicados)
     const result = await db.execute(sql.raw(`
-      WITH clientes_nunca_pagaram AS (
+      WITH parcelas_por_cnpj AS (
         SELECT 
+          TRIM(cc.cnpj::text) as cnpj,
+          cc.nome as nome_caz,
           cp.id_cliente,
-          COUNT(*) as total_parcelas,
-          SUM(CASE WHEN (cp.data_quitacao IS NOT NULL AND cp.data_quitacao::text != '') THEN 1 ELSE 0 END) as parcelas_pagas,
-          SUM(cp.nao_pago::numeric) as valor_total,
-          MIN(cp.data_vencimento) as parcela_mais_antiga,
-          MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max
+          cp.data_quitacao,
+          cp.nao_pago::numeric as nao_pago,
+          cp.data_vencimento
         FROM caz_parcelas cp
+        INNER JOIN caz_clientes cc ON cp.id_cliente = cc.ids::text
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento < '${dataHoje}'
           ${whereDataInicio}
           ${whereDataFim}
-        GROUP BY cp.id_cliente
-        HAVING SUM(CASE WHEN (cp.data_quitacao IS NOT NULL AND cp.data_quitacao::text != '') THEN 1 ELSE 0 END) = 0
+      ),
+      clientes_nunca_pagaram AS (
+        SELECT 
+          p.cnpj,
+          MAX(p.nome_caz) as nome_caz,
+          COUNT(*) as total_parcelas,
+          SUM(CASE WHEN (p.data_quitacao IS NOT NULL AND p.data_quitacao::text != '') THEN 1 ELSE 0 END) as parcelas_pagas,
+          SUM(p.nao_pago) as valor_total,
+          MIN(p.data_vencimento) as parcela_mais_antiga,
+          MAX('${dataHoje}'::date - p.data_vencimento::date) as dias_atraso_max
+        FROM parcelas_por_cnpj p
+        WHERE p.cnpj IS NOT NULL AND p.cnpj != ''
+        GROUP BY p.cnpj
+        HAVING SUM(CASE WHEN (p.data_quitacao IS NOT NULL AND p.data_quitacao::text != '') THEN 1 ELSE 0 END) = 0
           AND COUNT(*) > 0
       ),
       cliente_info AS (
-        SELECT DISTINCT ON (cc.ids::text)
-          cc.ids::text as id_cliente,
-          COALESCE(cup.nome, cc.nome) as nome_cliente,
+        SELECT DISTINCT ON (TRIM(cup.cnpj::text))
+          TRIM(cup.cnpj::text) as cnpj,
+          cup.nome as nome_cliente,
           cup.responsavel,
           COALESCE(cont.vendedor, 'Não Identificado') as vendedor,
           COALESCE(cont.squad, 'Não Identificado') as squad
-        FROM caz_clientes cc
-        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+        FROM cup_clientes cup
         LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
-        ORDER BY cc.ids::text, cont.data_inicio DESC NULLS LAST
+        WHERE cup.cnpj IS NOT NULL
+        ORDER BY TRIM(cup.cnpj::text), cont.data_inicio DESC NULLS LAST
       )
       SELECT 
-        cnp.id_cliente,
-        COALESCE(ci.nome_cliente, cnp.id_cliente::text) as nome_cliente,
+        cnp.cnpj as id_cliente,
+        COALESCE(ci.nome_cliente, cnp.nome_caz, cnp.cnpj) as nome_cliente,
         cnp.valor_total,
         cnp.total_parcelas as quantidade_parcelas,
         cnp.parcela_mais_antiga,
@@ -7954,7 +7967,7 @@ export class DbStorage implements IStorage {
         ci.squad,
         ci.responsavel
       FROM clientes_nunca_pagaram cnp
-      LEFT JOIN cliente_info ci ON ci.id_cliente = cnp.id_cliente::text
+      LEFT JOIN cliente_info ci ON ci.cnpj = cnp.cnpj
       ORDER BY cnp.valor_total DESC
       LIMIT 100
     `));
