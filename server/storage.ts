@@ -7945,7 +7945,7 @@ export class DbStorage implements IStorage {
       )
       SELECT 
         cnp.id_cliente,
-        COALESCE(ci.nome_cliente, cnp.id_cliente) as nome_cliente,
+        COALESCE(ci.nome_cliente, cnp.id_cliente::text) as nome_cliente,
         cnp.valor_total,
         cnp.total_parcelas as quantidade_parcelas,
         cnp.parcela_mais_antiga,
