@@ -7923,7 +7923,7 @@ export class DbStorage implements IStorage {
           cp.nao_pago::numeric as nao_pago,
           cp.data_vencimento
         FROM caz_parcelas cp
-        INNER JOIN caz_clientes cc ON cp.id_cliente = cc.ids::text
+        INNER JOIN caz_clientes cc ON cp.id_cliente::text = cc.ids::text
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento < '${dataHoje}'
           ${whereDataInicio}
