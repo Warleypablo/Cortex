@@ -7734,7 +7734,15 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getInadimplenciaClientes(dataInicio?: string, dataFim?: string, ordenarPor: 'valor' | 'diasAtraso' | 'nome' = 'valor', limite: number = 100): Promise<{
+  async getInadimplenciaClientes(
+    dataInicio?: string, 
+    dataFim?: string, 
+    ordenarPor: 'valor' | 'diasAtraso' | 'nome' = 'valor', 
+    limite: number = 100,
+    filtroVendedor?: string,
+    filtroSquad?: string,
+    filtroResponsavel?: string
+  ): Promise<{
     clientes: {
       idCliente: string;
       nomeCliente: string;
@@ -7749,6 +7757,8 @@ export class DbStorage implements IStorage {
       cluster: string | null;
       servicos: string | null;
       telefone: string | null;
+      vendedor: string | null;
+      squad: string | null;
     }[];
   }> {
     const hoje = new Date();
@@ -7768,6 +7778,20 @@ export class DbStorage implements IStorage {
       orderByClause = 'parcelas.dias_atraso_max DESC';
     } else if (ordenarPor === 'nome') {
       orderByClause = 'COALESCE(cliente_info.nome_clickup, caz.nome_caz) ASC';
+    }
+    
+    let filtroWhere = '';
+    if (filtroVendedor) {
+      const vendedorSafe = filtroVendedor.replace(/'/g, "''");
+      filtroWhere += ` AND COALESCE(contrato_info.vendedor, 'Não Identificado') = '${vendedorSafe}'`;
+    }
+    if (filtroSquad) {
+      const squadSafe = filtroSquad.replace(/'/g, "''");
+      filtroWhere += ` AND COALESCE(contrato_info.squad, 'Não Identificado') = '${squadSafe}'`;
+    }
+    if (filtroResponsavel) {
+      const responsavelSafe = filtroResponsavel.replace(/'/g, "''");
+      filtroWhere += ` AND COALESCE(cliente_info.responsavel, 'Não Identificado') = '${responsavelSafe}'`;
     }
     
     // Query refatorada com CTEs separadas para evitar duplicação de valores
@@ -7820,15 +7844,16 @@ export class DbStorage implements IStorage {
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
       ),
-      contratos_agregados AS (
-        -- CTE 3: Serviços agregados por task_id (evita multiplicação de linhas)
-        SELECT 
+      contratos_info AS (
+        -- CTE 3: Vendedor e Squad por task_id
+        SELECT DISTINCT ON (TRIM(cont.id_task::text))
           TRIM(cont.id_task::text) as task_id,
-          STRING_AGG(DISTINCT cont.servico, ', ') as servicos
+          cont.vendedor,
+          cont.squad,
+          STRING_AGG(DISTINCT cont.servico, ', ') OVER (PARTITION BY TRIM(cont.id_task::text)) as servicos
         FROM cup_contratos cont
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
-          AND cont.servico IS NOT NULL
-        GROUP BY TRIM(cont.id_task::text)
+        ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
       )
       SELECT 
         parcelas.id_cliente,
@@ -7843,12 +7868,15 @@ export class DbStorage implements IStorage {
         cliente_info.status_clickup,
         cliente_info.responsavel,
         cliente_info.cluster,
-        contratos.servicos,
-        cliente_info.telefone
+        contrato_info.servicos,
+        cliente_info.telefone,
+        contrato_info.vendedor,
+        contrato_info.squad
       FROM parcelas_agregadas parcelas
       LEFT JOIN cliente_caz caz ON TRIM(parcelas.id_cliente::text) = caz.id_cliente
       LEFT JOIN cliente_metadata cliente_info ON TRIM(parcelas.id_cliente::text) = cliente_info.id_cliente
-      LEFT JOIN contratos_agregados contratos ON TRIM(cliente_info.task_id::text) = contratos.task_id
+      LEFT JOIN contratos_info contrato_info ON TRIM(cliente_info.task_id::text) = contrato_info.task_id
+      WHERE 1=1 ${filtroWhere}
       ORDER BY ${orderByClause}
       LIMIT ${limite}
     `));
@@ -7867,6 +7895,8 @@ export class DbStorage implements IStorage {
       cluster: row.cluster || null,
       servicos: row.servicos || null,
       telefone: row.telefone || null,
+      vendedor: row.vendedor || null,
+      squad: row.squad || null,
     }));
     
     return { clientes };
