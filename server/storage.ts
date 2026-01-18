@@ -7932,8 +7932,8 @@ export class DbStorage implements IStorage {
           AND COUNT(*) > 0
       ),
       cliente_info AS (
-        SELECT DISTINCT ON (cc.ids)
-          cc.ids as id_cliente,
+        SELECT DISTINCT ON (cc.ids::text)
+          cc.ids::text as id_cliente,
           COALESCE(cup.nome, cc.nome) as nome_cliente,
           cup.responsavel,
           COALESCE(cont.vendedor, 'Não Identificado') as vendedor,
@@ -7941,7 +7941,7 @@ export class DbStorage implements IStorage {
         FROM caz_clientes cc
         LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
         LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
-        ORDER BY cc.ids, cont.data_inicio DESC NULLS LAST
+        ORDER BY cc.ids::text, cont.data_inicio DESC NULLS LAST
       )
       SELECT 
         cnp.id_cliente,
@@ -7954,7 +7954,7 @@ export class DbStorage implements IStorage {
         ci.squad,
         ci.responsavel
       FROM clientes_nunca_pagaram cnp
-      LEFT JOIN cliente_info ci ON ci.id_cliente = cnp.id_cliente
+      LEFT JOIN cliente_info ci ON ci.id_cliente = cnp.id_cliente::text
       ORDER BY cnp.valor_total DESC
       LIMIT 100
     `));
