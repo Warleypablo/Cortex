@@ -1341,6 +1341,76 @@ export default function DashboardInadimplencia() {
           )}
         </CardContent>
       </Card>
+
+      {/* Tabela por Produto */}
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50" data-testid="card-table-produto">
+        <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-700/50">
+          <CardTitle className="text-base flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+              <Package className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+            </div>
+            Inadimplência por Produto
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingProdutos ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isErrorProdutos ? (
+            <ErrorDisplay message="Erro ao carregar dados." />
+          ) : !produtosData?.produtos?.length ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700/50 max-h-[400px] overflow-auto bg-white dark:bg-slate-800/50">
+              <Table>
+                <TableHeader className="sticky top-0 bg-slate-50 dark:bg-slate-800 z-10">
+                  <TableRow className="border-b border-slate-200 dark:border-slate-700/50">
+                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Produto/Serviço</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">Clientes</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">Parcelas</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">Valor Total</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">%</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {produtosData.produtos.map((p, idx) => (
+                    <TableRow 
+                      key={idx} 
+                      data-testid={`row-produto-${idx}`}
+                      className="hover:bg-purple-50/50 dark:hover:bg-purple-950/20 transition-colors border-b border-slate-100 dark:border-slate-700/30"
+                    >
+                      <TableCell className="font-medium">{p.produto}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-800">
+                          {p.quantidadeClientes}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-800">
+                          {p.quantidadeParcelas}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-1 rounded-md">
+                          {formatCurrency(p.valorTotal)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge className="text-xs bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                          {formatPercent(p.percentual)}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 
@@ -2171,63 +2241,6 @@ export default function DashboardInadimplencia() {
               </CardContent>
             </Card>
 
-            {/* Tabela por Produto */}
-            <Card data-testid="card-table-produto">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Package className="h-4 w-4" />
-                  Inadimplência por Produto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingProdutos ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : isErrorProdutos ? (
-                  <ErrorDisplay message="Erro ao carregar dados." />
-                ) : !produtosData?.produtos?.length ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    Nenhum dado disponível
-                  </div>
-                ) : (
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Produto/Serviço</TableHead>
-                          <TableHead className="text-right">Clientes</TableHead>
-                          <TableHead className="text-right">Parcelas</TableHead>
-                          <TableHead className="text-right">Valor Total</TableHead>
-                          <TableHead className="text-right">%</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {produtosData.produtos.map((p, idx) => (
-                          <TableRow 
-                            key={idx} 
-                            data-testid={`row-produto-${idx}`}
-                            className="hover:bg-muted/50"
-                          >
-                            <TableCell className="font-medium">{p.produto}</TableCell>
-                            <TableCell className="text-right">{p.quantidadeClientes}</TableCell>
-                            <TableCell className="text-right">{p.quantidadeParcelas}</TableCell>
-                            <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
-                              {formatCurrency(p.valorTotal)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="outline" className="text-xs">
-                                {formatPercent(p.percentual)}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
       </Tabs>
