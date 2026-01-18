@@ -3941,6 +3941,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Inadimplência por Vendedor
+  app.get("/api/inadimplencia/por-vendedor", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const vendedores = await storage.getInadimplenciaPorVendedor(dataInicio, dataFim);
+      res.json(vendedores);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia por vendedor:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia por vendedor" });
+    }
+  });
+
+  // Inadimplência por Squad
+  app.get("/api/inadimplencia/por-squad", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const squads = await storage.getInadimplenciaPorSquad(dataInicio, dataFim);
+      res.json(squads);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia por squad:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia por squad" });
+    }
+  });
+
+  // Inadimplência por Responsável
+  app.get("/api/inadimplencia/por-responsavel", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const responsaveis = await storage.getInadimplenciaPorResponsavel(dataInicio, dataFim);
+      res.json(responsaveis);
+    } catch (error) {
+      console.error("[api] Error fetching inadimplencia por responsavel:", error);
+      res.status(500).json({ error: "Failed to fetch inadimplencia por responsavel" });
+    }
+  });
+
   app.get("/api/inadimplencia/relatorio-pdf", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string | undefined;
