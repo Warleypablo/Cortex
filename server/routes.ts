@@ -3923,6 +3923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filtroVendedor = req.query.vendedor as string | undefined;
       const filtroSquad = req.query.squad as string | undefined;
       const filtroResponsavel = req.query.responsavel as string | undefined;
+      const filtroProduto = req.query.produto as string | undefined;
       const clientes = await storage.getInadimplenciaClientes(
         dataInicio, 
         dataFim, 
@@ -3930,7 +3931,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limite, 
         filtroVendedor, 
         filtroSquad, 
-        filtroResponsavel
+        filtroResponsavel,
+        filtroProduto
       );
       res.json(clientes);
     } catch (error) {
