@@ -9848,7 +9848,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const closerInfo = closerResult.rows[0] as any;
 
-      // Usa data_fechamento como referência principal para filtros de data
+      // Usa data_fechamento como referência principal para filtros de data (negócios)
       const dateConditions: ReturnType<typeof sql>[] = [];
       if (dataInicio) {
         dateConditions.push(sql`d.data_fechamento >= ${dataInicio}`);
@@ -9861,13 +9861,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? sql`AND ${sql.join(dateConditions, sql` AND `)}` 
         : sql``;
 
+      // Query separada para reuniões - filtra por data_reuniao_realizada (consistente com dashboard)
+      const reunioesConditions: ReturnType<typeof sql>[] = [];
+      reunioesConditions.push(sql`d.data_reuniao_realizada IS NOT NULL`);
+      if (dataInicio) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada >= ${dataInicio}`);
+      }
+      if (dataFim) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada <= ${dataFim}`);
+      }
+
+      const reunioesResult = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_realizadas
+        FROM crm_deal d
+        WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+          AND ${sql.join(reunioesConditions, sql` AND `)}
+      `);
+
       const metricsResult = await db.execute(sql`
         SELECT 
           COUNT(*) as total_negocios,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios_ganhos,
           COUNT(CASE WHEN d.stage_name IN ('Negócio perdido', 'Negócio Perdido', 'Perdido', 'Descartado', 'Descartado/sem fit') THEN 1 END) as negocios_perdidos,
           COUNT(CASE WHEN d.stage_name NOT IN ('Negócio Ganho', 'Negócio perdido', 'Negócio Perdido', 'Perdido', 'Descartado', 'Descartado/sem fit') THEN 1 END) as negocios_em_andamento,
-          COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes_realizadas,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente END), 0) as valor_recorrente,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual END), 0) as valor_pontual,
           MIN(d.data_fechamento) as primeiro_negocio,
@@ -9879,12 +9895,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
 
       const row = metricsResult.rows[0] as any;
+      const rowReunioes = reunioesResult.rows[0] as any;
       
       const totalNegocios = parseInt(row.total_negocios) || 0;
       const negociosGanhos = parseInt(row.negocios_ganhos) || 0;
       const negociosPerdidos = parseInt(row.negocios_perdidos) || 0;
       const negociosEmAndamento = parseInt(row.negocios_em_andamento) || 0;
-      const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
+      const reunioesRealizadas = parseInt(rowReunioes.reunioes_realizadas) || 0;
       const valorRecorrente = parseFloat(row.valor_recorrente) || 0;
       const valorPontual = parseFloat(row.valor_pontual) || 0;
       const valorTotal = valorRecorrente + valorPontual;
