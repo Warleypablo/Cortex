@@ -7921,6 +7921,7 @@ export class DbStorage implements IStorage {
           cp.id_cliente,
           cp.data_quitacao,
           cp.nao_pago::numeric as nao_pago,
+          COALESCE(cp.valor_pago::numeric, 0) as valor_pago,
           cp.data_vencimento
         FROM caz_parcelas cp
         INNER JOIN caz_clientes cc ON cp.id_cliente::text = cc.ids::text
@@ -7934,14 +7935,14 @@ export class DbStorage implements IStorage {
           p.cnpj,
           MAX(p.nome_caz) as nome_caz,
           COUNT(*) as total_parcelas,
-          SUM(CASE WHEN (p.data_quitacao IS NOT NULL AND p.data_quitacao::text != '') THEN 1 ELSE 0 END) as parcelas_pagas,
+          SUM(p.valor_pago) as total_valor_pago,
           SUM(p.nao_pago) as valor_total,
           MIN(p.data_vencimento) as parcela_mais_antiga,
           MAX('${dataHoje}'::date - p.data_vencimento::date) as dias_atraso_max
         FROM parcelas_por_cnpj p
         WHERE p.cnpj IS NOT NULL AND p.cnpj != ''
         GROUP BY p.cnpj
-        HAVING SUM(CASE WHEN (p.data_quitacao IS NOT NULL AND p.data_quitacao::text != '') THEN 1 ELSE 0 END) = 0
+        HAVING COALESCE(SUM(p.valor_pago), 0) = 0
           AND COUNT(*) > 0
       ),
       cliente_info AS (
