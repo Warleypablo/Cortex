@@ -948,101 +948,164 @@ export default function DashboardInadimplencia() {
         </Card>
       </div>
 
-      <Card data-testid="card-por-empresa">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Inadimplência por Empresa
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoadingEmpresas ? (
-            <div className="space-y-3" data-testid="loading-empresas">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : isErrorEmpresas ? (
-            <ErrorDisplay message="Erro ao carregar dados por empresa." />
-          ) : !empresasData?.empresas?.length ? (
-            <div className="h-32 flex items-center justify-center text-muted-foreground" data-testid="empty-empresas">
-              Nenhum dado disponível
-            </div>
-          ) : (
-            <div className="space-y-3" data-testid="list-empresas">
-              {empresasData.empresas.map((empresa, index) => (
-                <div key={empresa.empresa} className="flex items-center gap-4" data-testid={`row-empresa-${index}`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium truncate">{empresa.empresa}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {empresa.quantidadeClientes} cliente{empresa.quantidadeClientes !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <Progress value={empresa.percentual} className="h-2" />
-                  </div>
-                  <div className="text-right min-w-[100px]">
-                    <p className="font-bold text-red-600 dark:text-red-400">
-                      {formatCurrency(empresa.valorTotal)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatPercent(empresa.percentual)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Gráficos de Inadimplência por Vendedor, Squad e Responsável */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Por Vendedor - Gráfico */}
+        <Card data-testid="card-chart-vendedor">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Por Vendedor
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingVendedores ? (
+              <div className="h-[250px] flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : isErrorVendedores ? (
+              <ErrorDisplay message="Erro ao carregar dados." />
+            ) : !vendedoresData?.vendedores?.length ? (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
+                Nenhum dado disponível
+              </div>
+            ) : (
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={vendedoresData.vendedores.slice(0, 8)} 
+                    layout="vertical" 
+                    margin={{ left: 10, right: 30 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                    <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
+                    <YAxis 
+                      type="category" 
+                      dataKey="vendedor" 
+                      width={90} 
+                      tick={{ fontSize: 10 }} 
+                      tickFormatter={(v) => v.length > 12 ? v.substring(0, 12) + '...' : v}
+                    />
+                    <RechartsTooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => [formatCurrency(value), "Valor"]}
+                    />
+                    <Bar dataKey="valorTotal" fill="#ef4444" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      <Card data-testid="card-por-metodo-pagamento">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <CreditCard className="h-4 w-4" />
-            Inadimplência por Método de Pagamento
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoadingMetodos ? (
-            <div className="space-y-3" data-testid="loading-metodos">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : isErrorMetodos ? (
-            <ErrorDisplay message="Erro ao carregar dados por método de pagamento." />
-          ) : !metodosData?.metodos?.length ? (
-            <div className="h-32 flex items-center justify-center text-muted-foreground" data-testid="empty-metodos">
-              Nenhum dado disponível
-            </div>
-          ) : (
-            <div className="space-y-3" data-testid="list-metodos">
-              {metodosData.metodos.map((metodo, index) => (
-                <div key={metodo.metodo} className="flex items-center gap-4" data-testid={`row-metodo-${index}`}>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium truncate">{metodo.metodo}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {metodo.quantidadeParcelas} parcela{metodo.quantidadeParcelas !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <Progress value={metodo.percentual} className="h-2" />
-                  </div>
-                  <div className="text-right min-w-[100px]">
-                    <p className="font-bold text-red-600 dark:text-red-400">
-                      {formatCurrency(metodo.valorTotal)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatPercent(metodo.percentual)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* Por Squad - Gráfico */}
+        <Card data-testid="card-chart-squad">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Por Squad
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingSquads ? (
+              <div className="h-[250px] flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : isErrorSquads ? (
+              <ErrorDisplay message="Erro ao carregar dados." />
+            ) : !squadsData?.squads?.length ? (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
+                Nenhum dado disponível
+              </div>
+            ) : (
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={squadsData.squads.slice(0, 8)} 
+                    layout="vertical" 
+                    margin={{ left: 10, right: 30 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                    <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
+                    <YAxis 
+                      type="category" 
+                      dataKey="squad" 
+                      width={90} 
+                      tick={{ fontSize: 10 }} 
+                      tickFormatter={(v) => v.length > 12 ? v.substring(0, 12) + '...' : v}
+                    />
+                    <RechartsTooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => [formatCurrency(value), "Valor"]}
+                    />
+                    <Bar dataKey="valorTotal" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Por Responsável - Gráfico */}
+        <Card data-testid="card-chart-responsavel">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Por Responsável
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingResponsaveisDet ? (
+              <div className="h-[250px] flex items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : isErrorResponsaveisDet ? (
+              <ErrorDisplay message="Erro ao carregar dados." />
+            ) : !responsaveisDetData?.responsaveis?.length ? (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
+                Nenhum dado disponível
+              </div>
+            ) : (
+              <div className="h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={responsaveisDetData.responsaveis.slice(0, 8)} 
+                    layout="vertical" 
+                    margin={{ left: 10, right: 30 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                    <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
+                    <YAxis 
+                      type="category" 
+                      dataKey="responsavel" 
+                      width={90} 
+                      tick={{ fontSize: 10 }} 
+                      tickFormatter={(v) => v.length > 12 ? v.substring(0, 12) + '...' : v}
+                    />
+                    <RechartsTooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      formatter={(value: number) => [formatCurrency(value), "Valor"]}
+                    />
+                    <Bar dataKey="valorTotal" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 
@@ -1680,139 +1743,167 @@ export default function DashboardInadimplencia() {
 
         <TabsContent value="detalhamento">
           <div className="space-y-6" data-testid="section-detalhamento">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Por Vendedor */}
-              <Card data-testid="card-por-vendedor">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Por Vendedor
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingVendedores ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : isErrorVendedores ? (
-                    <ErrorDisplay message="Erro ao carregar dados." />
-                  ) : !vendedoresData?.vendedores?.length ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      Nenhum dado disponível
-                    </div>
-                  ) : (
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                      {vendedoresData.vendedores.map((v, idx) => (
-                        <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{v.vendedor}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {v.quantidadeClientes} clientes • {v.quantidadeParcelas} parcelas
-                            </p>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-2">
-                            <p className="font-semibold text-sm text-red-600 dark:text-red-400">
+            {/* Tabela por Vendedor */}
+            <Card data-testid="card-table-vendedor">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Inadimplência por Vendedor
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingVendedores ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : isErrorVendedores ? (
+                  <ErrorDisplay message="Erro ao carregar dados." />
+                ) : !vendedoresData?.vendedores?.length ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum dado disponível
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Vendedor</TableHead>
+                          <TableHead className="text-right">Clientes</TableHead>
+                          <TableHead className="text-right">Parcelas</TableHead>
+                          <TableHead className="text-right">Valor Total</TableHead>
+                          <TableHead className="text-right">%</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vendedoresData.vendedores.map((v, idx) => (
+                          <TableRow key={idx} data-testid={`row-vendedor-${idx}`}>
+                            <TableCell className="font-medium">{v.vendedor}</TableCell>
+                            <TableCell className="text-right">{v.quantidadeClientes}</TableCell>
+                            <TableCell className="text-right">{v.quantidadeParcelas}</TableCell>
+                            <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
                               {formatCurrency(v.valorTotal)}
-                            </p>
-                            <Badge variant="outline" className="text-xs">
-                              {formatPercent(v.percentual)}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="text-xs">
+                                {formatPercent(v.percentual)}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-              {/* Por Squad */}
-              <Card data-testid="card-por-squad">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Por Squad
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingSquads ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : isErrorSquads ? (
-                    <ErrorDisplay message="Erro ao carregar dados." />
-                  ) : !squadsData?.squads?.length ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      Nenhum dado disponível
-                    </div>
-                  ) : (
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                      {squadsData.squads.map((s, idx) => (
-                        <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{s.squad}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {s.quantidadeClientes} clientes • {s.quantidadeParcelas} parcelas
-                            </p>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-2">
-                            <p className="font-semibold text-sm text-red-600 dark:text-red-400">
+            {/* Tabela por Squad */}
+            <Card data-testid="card-table-squad">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Inadimplência por Squad
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingSquads ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : isErrorSquads ? (
+                  <ErrorDisplay message="Erro ao carregar dados." />
+                ) : !squadsData?.squads?.length ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum dado disponível
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Squad</TableHead>
+                          <TableHead className="text-right">Clientes</TableHead>
+                          <TableHead className="text-right">Parcelas</TableHead>
+                          <TableHead className="text-right">Valor Total</TableHead>
+                          <TableHead className="text-right">%</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {squadsData.squads.map((s, idx) => (
+                          <TableRow key={idx} data-testid={`row-squad-${idx}`}>
+                            <TableCell className="font-medium">{s.squad}</TableCell>
+                            <TableCell className="text-right">{s.quantidadeClientes}</TableCell>
+                            <TableCell className="text-right">{s.quantidadeParcelas}</TableCell>
+                            <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
                               {formatCurrency(s.valorTotal)}
-                            </p>
-                            <Badge variant="outline" className="text-xs">
-                              {formatPercent(s.percentual)}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="text-xs">
+                                {formatPercent(s.percentual)}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-              {/* Por Responsável */}
-              <Card data-testid="card-por-responsavel">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Por Responsável
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingResponsaveisDet ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : isErrorResponsaveisDet ? (
-                    <ErrorDisplay message="Erro ao carregar dados." />
-                  ) : !responsaveisDetData?.responsaveis?.length ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      Nenhum dado disponível
-                    </div>
-                  ) : (
-                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                      {responsaveisDetData.responsaveis.map((r, idx) => (
-                        <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{r.responsavel}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {r.quantidadeClientes} clientes • {r.quantidadeParcelas} parcelas
-                            </p>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-2">
-                            <p className="font-semibold text-sm text-red-600 dark:text-red-400">
+            {/* Tabela por Responsável */}
+            <Card data-testid="card-table-responsavel">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Inadimplência por Responsável
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingResponsaveisDet ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : isErrorResponsaveisDet ? (
+                  <ErrorDisplay message="Erro ao carregar dados." />
+                ) : !responsaveisDetData?.responsaveis?.length ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum dado disponível
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Responsável</TableHead>
+                          <TableHead className="text-right">Clientes</TableHead>
+                          <TableHead className="text-right">Parcelas</TableHead>
+                          <TableHead className="text-right">Valor Total</TableHead>
+                          <TableHead className="text-right">%</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {responsaveisDetData.responsaveis.map((r, idx) => (
+                          <TableRow key={idx} data-testid={`row-responsavel-${idx}`}>
+                            <TableCell className="font-medium">{r.responsavel}</TableCell>
+                            <TableCell className="text-right">{r.quantidadeClientes}</TableCell>
+                            <TableCell className="text-right">{r.quantidadeParcelas}</TableCell>
+                            <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
                               {formatCurrency(r.valorTotal)}
-                            </p>
-                            <Badge variant="outline" className="text-xs">
-                              {formatPercent(r.percentual)}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="text-xs">
+                                {formatPercent(r.percentual)}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
