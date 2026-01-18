@@ -81,6 +81,7 @@ import {
   Pause,
   XCircle,
   Gavel,
+  Package,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -153,6 +154,14 @@ interface SquadInadimplente {
 
 interface ResponsavelInadimplente {
   responsavel: string;
+  valorTotal: number;
+  quantidadeClientes: number;
+  quantidadeParcelas: number;
+  percentual: number;
+}
+
+interface ProdutoInadimplente {
+  produto: string;
   valorTotal: number;
   quantidadeClientes: number;
   quantidadeParcelas: number;
@@ -317,6 +326,11 @@ export default function DashboardInadimplencia() {
 
   const { data: responsaveisDetData, isLoading: isLoadingResponsaveisDet, isError: isErrorResponsaveisDet } = useQuery<{ responsaveis: ResponsavelInadimplente[] }>({
     queryKey: ['/api/inadimplencia/por-responsavel', empresasParams],
+  });
+
+  // Query para inadimplência por produto
+  const { data: produtosData, isLoading: isLoadingProdutos, isError: isErrorProdutos } = useQuery<{ produtos: ProdutoInadimplente[] }>({
+    queryKey: ['/api/inadimplencia/por-produto', empresasParams],
   });
 
   // Query para métricas de recebimento
@@ -2146,6 +2160,64 @@ export default function DashboardInadimplencia() {
                             <TableCell className="text-right">
                               <Badge variant="outline" className="text-xs">
                                 {formatPercent(r.percentual)}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tabela por Produto */}
+            <Card data-testid="card-table-produto">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  Inadimplência por Produto
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingProdutos ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : isErrorProdutos ? (
+                  <ErrorDisplay message="Erro ao carregar dados." />
+                ) : !produtosData?.produtos?.length ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum dado disponível
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Produto/Serviço</TableHead>
+                          <TableHead className="text-right">Clientes</TableHead>
+                          <TableHead className="text-right">Parcelas</TableHead>
+                          <TableHead className="text-right">Valor Total</TableHead>
+                          <TableHead className="text-right">%</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {produtosData.produtos.map((p, idx) => (
+                          <TableRow 
+                            key={idx} 
+                            data-testid={`row-produto-${idx}`}
+                            className="hover:bg-muted/50"
+                          >
+                            <TableCell className="font-medium">{p.produto}</TableCell>
+                            <TableCell className="text-right">{p.quantidadeClientes}</TableCell>
+                            <TableCell className="text-right">{p.quantidadeParcelas}</TableCell>
+                            <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
+                              {formatCurrency(p.valorTotal)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="text-xs">
+                                {formatPercent(p.percentual)}
                               </Badge>
                             </TableCell>
                           </TableRow>
