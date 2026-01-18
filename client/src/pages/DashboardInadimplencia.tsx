@@ -183,6 +183,18 @@ interface MetricasRecebimento {
   totalClientesComParcelas: number;
 }
 
+interface ClienteNuncaPagou {
+  idCliente: string;
+  nomeCliente: string;
+  valorTotal: number;
+  quantidadeParcelas: number;
+  parcelaMaisAntiga: string;
+  diasAtrasoMax: number;
+  vendedor: string | null;
+  squad: string | null;
+  responsavel: string | null;
+}
+
 interface InadimplenciaContexto {
   contexto: string | null;
   evidencias: string | null;
@@ -310,6 +322,11 @@ export default function DashboardInadimplencia() {
   // Query para métricas de recebimento
   const { data: metricasRecebimento, isLoading: isLoadingMetricas, isError: isErrorMetricas } = useQuery<MetricasRecebimento>({
     queryKey: ['/api/inadimplencia/metricas-recebimento', resumoParams],
+  });
+
+  // Query para clientes que nunca pagaram
+  const { data: clientesNuncaPagaramData, isLoading: isLoadingNuncaPagaram, isError: isErrorNuncaPagaram } = useQuery<{ clientes: ClienteNuncaPagou[] }>({
+    queryKey: ['/api/inadimplencia/clientes-nunca-pagaram', resumoParams],
   });
 
   // Query para drill-down - busca clientes filtrados por vendedor/squad/responsável
@@ -1206,6 +1223,84 @@ export default function DashboardInadimplencia() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tabela de Clientes que Nunca Pagaram */}
+      <Card data-testid="card-nunca-pagaram">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <XCircle className="h-4 w-4 text-red-500" />
+            Clientes que Nunca Pagaram
+            {clientesNuncaPagaramData?.clientes?.length ? (
+              <Badge variant="destructive" className="ml-2">
+                {clientesNuncaPagaramData.clientes.length}
+              </Badge>
+            ) : null}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoadingNuncaPagaram ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isErrorNuncaPagaram ? (
+            <ErrorDisplay message="Erro ao carregar dados." />
+          ) : !clientesNuncaPagaramData?.clientes?.length ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              Nenhum cliente encontrado que nunca pagou
+            </div>
+          ) : (
+            <div className="rounded-md border max-h-[400px] overflow-auto">
+              <Table>
+                <TableHeader className="sticky top-0 bg-background z-10">
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Vendedor</TableHead>
+                    <TableHead>Squad</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead className="text-right">Parcelas</TableHead>
+                    <TableHead className="text-right">Dias Atraso</TableHead>
+                    <TableHead className="text-right">Valor Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientesNuncaPagaramData.clientes.map((cliente, idx) => (
+                    <TableRow 
+                      key={cliente.idCliente || idx} 
+                      data-testid={`row-nunca-pagou-${idx}`}
+                    >
+                      <TableCell className="font-medium max-w-[200px] truncate" title={cliente.nomeCliente}>
+                        {cliente.nomeCliente}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {cliente.vendedor || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {cliente.squad || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {cliente.responsavel || '-'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant="outline" className="text-xs">
+                          {cliente.quantidadeParcelas}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={cliente.diasAtrasoMax > 90 ? "destructive" : "secondary"} className="text-xs">
+                          {cliente.diasAtrasoMax} dias
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
+                        {formatCurrency(cliente.valorTotal)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 
