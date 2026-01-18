@@ -3902,6 +3902,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/inadimplencia/clientes-nunca-pagaram", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const data = await storage.getClientesNuncaPagaram(dataInicio, dataFim);
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching clientes nunca pagaram:", error);
+      res.status(500).json({ error: "Failed to fetch clientes nunca pagaram" });
+    }
+  });
+
   app.get("/api/inadimplencia/clientes", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string | undefined;
