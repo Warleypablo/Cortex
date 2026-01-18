@@ -641,14 +641,32 @@ export default function DetailClosers() {
             </div>
 
             {/* Premium Metrics Grid - Row 2 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+              <PremiumMetricCard
+                title="Ticket Médio Recorrente"
+                value={metrics.ticketMedioRecorrente}
+                icon={Repeat}
+                color="violet"
+                subtitle={`${metrics.negociosGanhos} negócios ganhos`}
+                delay={0.4}
+                isCurrency
+              />
+              <PremiumMetricCard
+                title="Ticket Médio Pontual"
+                value={metrics.ticketMedioPontual}
+                icon={Banknote}
+                color="cyan"
+                subtitle={`${metrics.negociosGanhos} negócios ganhos`}
+                delay={0.5}
+                isCurrency
+              />
               <PremiumMetricCard
                 title="Reuniões Realizadas"
                 value={metrics.reunioesRealizadas}
                 icon={Calendar}
                 color="blue"
                 subtitle="Total no período"
-                delay={0.4}
+                delay={0.6}
               />
               <PremiumMetricCard
                 title="Negócios Ganhos"
@@ -656,7 +674,7 @@ export default function DetailClosers() {
                 icon={Trophy}
                 color="emerald"
                 subtitle={`${metrics.negociosPerdidos} perdidos`}
-                delay={0.5}
+                delay={0.7}
                 extraBadge={
                   <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
                     <CheckCircle2 className="w-3 h-3 mr-1" />
@@ -664,13 +682,17 @@ export default function DetailClosers() {
                   </Badge>
                 }
               />
+            </div>
+
+            {/* Premium Metrics Grid - Row 3 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               <PremiumMetricCard
                 title="Em Andamento"
                 value={metrics.negociosEmAndamento}
                 icon={Activity}
                 color="orange"
                 subtitle="Negócios ativos"
-                delay={0.6}
+                delay={0.8}
               />
               <PremiumMetricCard
                 title="Média Contratos/Mês"
@@ -678,7 +700,23 @@ export default function DetailClosers() {
                 icon={TrendingUp}
                 color="pink"
                 subtitle={`${metrics.lt} meses ativos`}
-                delay={0.7}
+                delay={0.9}
+              />
+              <PremiumMetricCard
+                title="Negócios Perdidos"
+                value={metrics.negociosPerdidos}
+                icon={XCircle}
+                color="amber"
+                subtitle={`${metrics.totalNegocios} total`}
+                delay={1.0}
+              />
+              <PremiumMetricCard
+                title="Total de Negócios"
+                value={metrics.totalNegocios}
+                icon={Briefcase}
+                color="blue"
+                subtitle="No período selecionado"
+                delay={1.1}
               />
             </div>
 
