@@ -7995,7 +7995,8 @@ export class DbStorage implements IStorage {
     limite: number = 100,
     filtroVendedor?: string,
     filtroSquad?: string,
-    filtroResponsavel?: string
+    filtroResponsavel?: string,
+    filtroProduto?: string
   ): Promise<{
     clientes: {
       idCliente: string;
@@ -8046,6 +8047,10 @@ export class DbStorage implements IStorage {
     if (filtroResponsavel) {
       const responsavelSafe = filtroResponsavel.replace(/'/g, "''");
       filtroWhere += ` AND COALESCE(cliente_info.responsavel, 'Não Identificado') = '${responsavelSafe}'`;
+    }
+    if (filtroProduto) {
+      const produtoSafe = filtroProduto.replace(/'/g, "''");
+      filtroWhere += ` AND COALESCE(contrato_info.servico, 'Não Identificado') = '${produtoSafe}'`;
     }
     
     // Query refatorada com CTEs separadas para evitar duplicação de valores
@@ -8109,11 +8114,12 @@ export class DbStorage implements IStorage {
         GROUP BY TRIM(cont.id_task::text)
       ),
       contratos_info AS (
-        -- CTE 3b: Vendedor e Squad por task_id (contrato mais recente)
+        -- CTE 3b: Vendedor, Squad e Serviço por task_id (contrato mais recente)
         SELECT DISTINCT ON (TRIM(cont.id_task::text))
           TRIM(cont.id_task::text) as task_id,
           cont.vendedor,
-          cont.squad
+          cont.squad,
+          cont.servico
         FROM cup_contratos cont
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
         ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
