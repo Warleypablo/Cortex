@@ -261,6 +261,55 @@ export default function DetailClosers() {
 
   const queryParams = buildQueryParams();
 
+  // Parâmetros para visão geral do mês (quando nenhum closer selecionado)
+  const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const fimMesAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+  const mesAtualLabel = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  
+  const overviewParams = new URLSearchParams();
+  overviewParams.append("dataReuniaoInicio", format(inicioMesAtual, 'yyyy-MM-dd'));
+  overviewParams.append("dataReuniaoFim", format(fimMesAtual, 'yyyy-MM-dd'));
+  overviewParams.append("dataFechamentoInicio", format(inicioMesAtual, 'yyyy-MM-dd'));
+  overviewParams.append("dataFechamentoFim", format(fimMesAtual, 'yyyy-MM-dd'));
+  overviewParams.append("dataLeadInicio", format(inicioMesAtual, 'yyyy-MM-dd'));
+  overviewParams.append("dataLeadFim", format(fimMesAtual, 'yyyy-MM-dd'));
+  const overviewQueryParams = overviewParams.toString();
+
+  interface OverviewMetrics {
+    mrrObtido: number;
+    pontualObtido: number;
+    reunioesRealizadas: number;
+    negociosGanhos: number;
+    leadsCriados: number;
+    taxaConversao: number;
+  }
+
+  interface ChartDataReceita {
+    closer: string;
+    mrr: number;
+    pontual: number;
+  }
+
+  const { data: overviewMetrics, isLoading: isLoadingOverview } = useQuery<OverviewMetrics>({
+    queryKey: ["/api/closers/metrics", overviewQueryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/closers/metrics?${overviewQueryParams}`);
+      return res.json();
+    },
+    enabled: !closerId,
+    refetchInterval: 60000,
+  });
+
+  const { data: overviewRanking, isLoading: isLoadingRanking } = useQuery<ChartDataReceita[]>({
+    queryKey: ["/api/closers/chart-receita", overviewQueryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/closers/chart-receita?${overviewQueryParams}`);
+      return res.json();
+    },
+    enabled: !closerId,
+    refetchInterval: 60000,
+  });
+
   const { data: metrics, isLoading: isLoadingMetrics } = useQuery<CloserDetailMetrics>({
     queryKey: ["/api/closers/detail", queryParams],
     queryFn: async () => {
@@ -322,9 +371,9 @@ export default function DetailClosers() {
     if (metrics?.closerName) {
       setPageInfo(metrics.closerName, "Análise individual de performance em tempo real");
     } else {
-      setPageInfo("Detalhamento de Closers", "Selecione um closer para ver detalhes");
+      setPageInfo(`Visão Geral - ${mesAtualLabel}`, "Performance consolidada de todos os closers");
     }
-  }, [metrics?.closerName, setPageInfo]);
+  }, [metrics?.closerName, mesAtualLabel, setPageInfo]);
 
 
   const selectedCloser = closers?.find(c => c.id.toString() === closerId);
@@ -480,31 +529,266 @@ export default function DetailClosers() {
           )}
         </AnimatePresence>
 
-        {/* Empty State */}
+        {/* Visão Geral do Mês (quando nenhum closer selecionado) */}
         {!closerId ? (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-24"
-          >
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-500/30 to-purple-500/30 rounded-full blur-3xl animate-pulse" />
-              <motion.div 
-                animate={{ 
-                  scale: [1, 1.1, 1],
-                  rotate: [0, 5, -5, 0]
-                }}
-                transition={{ duration: 4, repeat: Infinity }}
-                className="relative w-32 h-32 rounded-full bg-gradient-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/30 flex items-center justify-center"
-              >
-                <Users className="w-16 h-16 text-violet-400" />
-              </motion.div>
+          isLoadingOverview ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                >
+                  <Skeleton className="h-36 bg-muted/50 rounded-2xl" />
+                </motion.div>
+              ))}
             </div>
-            <h2 className="text-2xl font-bold text-foreground mt-8 mb-3">Selecione um Closer</h2>
-            <p className="text-muted-foreground text-center max-w-md">
-              Escolha um closer no menu acima para visualizar suas métricas detalhadas de performance.
-            </p>
-          </motion.div>
+          ) : overviewMetrics ? (
+            <>
+              {/* Overview Hero */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-8"
+              >
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-cyan-600 via-blue-600 to-violet-600 rounded-3xl blur-xl opacity-40 group-hover:opacity-60 transition-opacity" />
+                  <Card className="relative bg-gradient-to-br from-slate-900/95 via-blue-950/50 to-slate-900/95 border-0 rounded-3xl overflow-hidden">
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(6,182,212,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(6,182,212,0.05)_1px,transparent_1px)] bg-[size:30px_30px]" />
+                    <CardContent className="relative p-8">
+                      <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+                        {/* Icon */}
+                        <motion.div 
+                          whileHover={{ scale: 1.05 }}
+                          className="relative"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl blur-xl opacity-60" />
+                          <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-500 to-violet-500 flex items-center justify-center shadow-2xl">
+                            <BarChart3 className="w-12 h-12 text-foreground" />
+                          </div>
+                        </motion.div>
+
+                        {/* Info */}
+                        <div className="flex-1">
+                          <h2 className="text-3xl lg:text-4xl font-black bg-gradient-to-r from-white via-cyan-200 to-blue-200 bg-clip-text text-transparent capitalize">
+                            Visão Geral - {mesAtualLabel}
+                          </h2>
+                          <div className="flex flex-wrap items-center gap-3 mt-3">
+                            <Badge className="bg-cyan-500/20 text-cyan-300 border-cyan-500/30 px-4 py-1.5 text-sm font-semibold">
+                              <Users className="w-4 h-4 mr-2" />
+                              {closers?.filter(c => c.active).length || 0} closers ativos
+                            </Badge>
+                            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 px-4 py-1.5 text-sm font-semibold">
+                              <Trophy className="w-4 h-4 mr-2" />
+                              {overviewMetrics.negociosGanhos} negócios ganhos
+                            </Badge>
+                            <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 px-4 py-1.5 text-sm font-semibold">
+                              <Flame className="w-4 h-4 mr-2" />
+                              {formatPercent(overviewMetrics.taxaConversao)} conversão
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Total Value */}
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground mb-1">Receita Total do Mês</p>
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", delay: 0.3 }}
+                          >
+                            <p className="text-4xl lg:text-5xl font-black bg-gradient-to-r from-emerald-400 via-green-400 to-teal-400 bg-clip-text text-transparent">
+                              <AnimatedCounter value={overviewMetrics.mrrObtido + overviewMetrics.pontualObtido} prefix="R$ " />
+                            </p>
+                          </motion.div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </motion.div>
+
+              {/* Overview Metrics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                <PremiumMetricCard
+                  title="MRR Obtido"
+                  value={overviewMetrics.mrrObtido}
+                  icon={Repeat}
+                  color="violet"
+                  subtitle="Receita recorrente mensal"
+                  delay={0}
+                  isCurrency
+                />
+                <PremiumMetricCard
+                  title="Receita Pontual"
+                  value={overviewMetrics.pontualObtido}
+                  icon={Banknote}
+                  color="cyan"
+                  subtitle="Vendas avulsas do mês"
+                  delay={0.1}
+                  isCurrency
+                />
+                <PremiumMetricCard
+                  title="Reuniões Realizadas"
+                  value={overviewMetrics.reunioesRealizadas}
+                  icon={Calendar}
+                  color="blue"
+                  subtitle="Total de reuniões no mês"
+                  delay={0.2}
+                />
+                <PremiumMetricCard
+                  title="Negócios Ganhos"
+                  value={overviewMetrics.negociosGanhos}
+                  icon={Trophy}
+                  color="emerald"
+                  subtitle={`Taxa: ${formatPercent(overviewMetrics.taxaConversao)}`}
+                  delay={0.3}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <PremiumMetricCard
+                  title="Leads Criados"
+                  value={overviewMetrics.leadsCriados}
+                  icon={Users}
+                  color="orange"
+                  subtitle="Novos leads no mês"
+                  delay={0.4}
+                />
+                <PremiumMetricCard
+                  title="Taxa de Conversão"
+                  value={overviewMetrics.taxaConversao}
+                  icon={Target}
+                  color="amber"
+                  subtitle={`${overviewMetrics.negociosGanhos}/${overviewMetrics.reunioesRealizadas} reuniões`}
+                  delay={0.5}
+                  isPercentage
+                />
+                <PremiumMetricCard
+                  title="Ticket Médio"
+                  value={overviewMetrics.negociosGanhos > 0 ? (overviewMetrics.mrrObtido + overviewMetrics.pontualObtido) / overviewMetrics.negociosGanhos : 0}
+                  icon={DollarSign}
+                  color="green"
+                  subtitle="Por negócio fechado"
+                  delay={0.6}
+                  isCurrency
+                />
+                <PremiumMetricCard
+                  title="Receita por Reunião"
+                  value={overviewMetrics.reunioesRealizadas > 0 ? (overviewMetrics.mrrObtido + overviewMetrics.pontualObtido) / overviewMetrics.reunioesRealizadas : 0}
+                  icon={TrendingUp}
+                  color="pink"
+                  subtitle="Média de receita"
+                  delay={0.7}
+                  isCurrency
+                />
+              </div>
+
+              {/* Ranking de Closers */}
+              {overviewRanking && overviewRanking.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                >
+                  <div className="relative group">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/30 to-purple-600/30 rounded-2xl blur-xl opacity-50 group-hover:opacity-100 transition-opacity duration-500" />
+                    <Card className="relative bg-card/80 border-border/50 backdrop-blur-xl rounded-2xl overflow-hidden">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-3 text-foreground">
+                          <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 shadow-lg shadow-violet-500/25">
+                            <Crown className="w-6 h-6 text-foreground" />
+                          </div>
+                          <span className="text-xl font-bold bg-gradient-to-r from-violet-400 to-purple-400 bg-clip-text text-transparent">
+                            Ranking de Closers - {mesAtualLabel}
+                          </span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          {overviewRanking
+                            .sort((a, b) => (b.mrr + b.pontual) - (a.mrr + a.pontual))
+                            .slice(0, 10)
+                            .map((closer, index) => (
+                              <motion.div
+                                key={closer.closer}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: 0.9 + index * 0.05 }}
+                                className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl border border-border/30 hover:bg-muted/50 transition-colors cursor-pointer"
+                                onClick={() => {
+                                  const foundCloser = closers?.find(c => c.name === closer.closer);
+                                  if (foundCloser) {
+                                    setCloserId(foundCloser.id.toString());
+                                  }
+                                }}
+                                data-testid={`ranking-closer-${index}`}
+                              >
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
+                                  index === 0 ? 'bg-gradient-to-br from-amber-400 to-orange-500 text-foreground' :
+                                  index === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-900' :
+                                  index === 2 ? 'bg-gradient-to-br from-amber-600 to-amber-700 text-foreground' :
+                                  'bg-muted/50 text-muted-foreground'
+                                }`}>
+                                  {index + 1}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-semibold text-foreground">{closer.closer}</p>
+                                  <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                    <span className="flex items-center gap-1">
+                                      <Repeat className="w-3 h-3 text-violet-400" />
+                                      MRR: {formatCurrency(closer.mrr)}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Banknote className="w-3 h-3 text-cyan-400" />
+                                      Pontual: {formatCurrency(closer.pontual)}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text text-transparent">
+                                    {formatCurrency(closer.mrr + closer.pontual)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Total</p>
+                                </div>
+                              </motion.div>
+                            ))}
+                        </div>
+                        <p className="text-center text-sm text-muted-foreground mt-4">
+                          Clique em um closer para ver detalhes
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </motion.div>
+              )}
+            </>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center justify-center py-24"
+            >
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500/30 to-purple-500/30 rounded-full blur-3xl animate-pulse" />
+                <motion.div 
+                  animate={{ 
+                    scale: [1, 1.1, 1],
+                    rotate: [0, 5, -5, 0]
+                  }}
+                  transition={{ duration: 4, repeat: Infinity }}
+                  className="relative w-32 h-32 rounded-full bg-gradient-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/30 flex items-center justify-center"
+                >
+                  <Users className="w-16 h-16 text-violet-400" />
+                </motion.div>
+              </div>
+              <h2 className="text-2xl font-bold text-foreground mt-8 mb-3">Sem dados disponíveis</h2>
+              <p className="text-muted-foreground text-center max-w-md">
+                Não há dados de vendas disponíveis para este mês.
+              </p>
+            </motion.div>
+          )
         ) : isLoadingMetrics ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {Array.from({ length: 8 }).map((_, i) => (
