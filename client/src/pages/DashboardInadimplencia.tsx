@@ -273,7 +273,7 @@ export default function DashboardInadimplencia() {
   const [detalheFinanceiroTexto, setDetalheFinanceiroTexto] = useState("");
   
   // Estados para drill-down de inadimplência
-  const [drillDown, setDrillDown] = useState<{ tipo: 'vendedor' | 'squad' | 'responsavel'; valor: string } | null>(null);
+  const [drillDown, setDrillDown] = useState<{ tipo: 'vendedor' | 'squad' | 'responsavel' | 'produto'; valor: string } | null>(null);
 
   useEffect(() => {
     setClienteSelecionado(null);
@@ -355,6 +355,7 @@ export default function DashboardInadimplencia() {
     if (drillDown.tipo === 'vendedor') params.vendedor = drillDown.valor;
     if (drillDown.tipo === 'squad') params.squad = drillDown.valor;
     if (drillDown.tipo === 'responsavel') params.responsavel = drillDown.valor;
+    if (drillDown.tipo === 'produto') params.produto = drillDown.valor;
     return params;
   }, [drillDown, dataInicio, dataFim]);
 
@@ -1380,7 +1381,8 @@ export default function DashboardInadimplencia() {
                     <TableRow 
                       key={idx} 
                       data-testid={`row-produto-${idx}`}
-                      className="hover:bg-purple-50/50 dark:hover:bg-purple-950/20 transition-colors border-b border-slate-100 dark:border-slate-700/30"
+                      className="cursor-pointer hover:bg-purple-50/50 dark:hover:bg-purple-950/20 transition-colors border-b border-slate-100 dark:border-slate-700/30"
+                      onClick={() => setDrillDown({ tipo: 'produto', valor: p.produto })}
                     >
                       <TableCell className="font-medium">{p.produto}</TableCell>
                       <TableCell className="text-right">
@@ -2251,7 +2253,7 @@ export default function DashboardInadimplencia() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Clientes Inadimplentes - {drillDown?.tipo === 'vendedor' ? 'Vendedor' : drillDown?.tipo === 'squad' ? 'Squad' : 'Responsável'}: {drillDown?.valor}
+              Clientes Inadimplentes - {drillDown?.tipo === 'vendedor' ? 'Vendedor' : drillDown?.tipo === 'squad' ? 'Squad' : drillDown?.tipo === 'produto' ? 'Produto' : 'Responsável'}: {drillDown?.valor}
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto">
