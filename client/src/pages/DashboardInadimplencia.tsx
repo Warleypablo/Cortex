@@ -135,6 +135,30 @@ interface MetodoPagamentoInadimplente {
   percentual: number;
 }
 
+interface VendedorInadimplente {
+  vendedor: string;
+  valorTotal: number;
+  quantidadeClientes: number;
+  quantidadeParcelas: number;
+  percentual: number;
+}
+
+interface SquadInadimplente {
+  squad: string;
+  valorTotal: number;
+  quantidadeClientes: number;
+  quantidadeParcelas: number;
+  percentual: number;
+}
+
+interface ResponsavelInadimplente {
+  responsavel: string;
+  valorTotal: number;
+  quantidadeClientes: number;
+  quantidadeParcelas: number;
+  percentual: number;
+}
+
 interface ParcelaDetalhe {
   id: number;
   descricao: string;
@@ -187,6 +211,7 @@ const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
   "visao-geral": { title: "Inadimplência - Visão Geral", subtitle: "Análise geral de inadimplência e métricas" },
   "clientes": { title: "Inadimplência - Clientes", subtitle: "Lista de clientes inadimplentes" },
   "empresas": { title: "Inadimplência - Por Empresa", subtitle: "Inadimplência agrupada por empresa" },
+  "detalhamento": { title: "Inadimplência - Detalhamento", subtitle: "Inadimplência por vendedor, squad e responsável" },
 };
 
 export default function DashboardInadimplencia() {
@@ -252,6 +277,19 @@ export default function DashboardInadimplencia() {
 
   const { data: metodosData, isLoading: isLoadingMetodos, isError: isErrorMetodos } = useQuery<{ metodos: MetodoPagamentoInadimplente[] }>({
     queryKey: ['/api/inadimplencia/por-metodo-pagamento', empresasParams],
+  });
+
+  // Novas queries para detalhamento por vendedor, squad e responsável
+  const { data: vendedoresData, isLoading: isLoadingVendedores, isError: isErrorVendedores } = useQuery<{ vendedores: VendedorInadimplente[] }>({
+    queryKey: ['/api/inadimplencia/por-vendedor', empresasParams],
+  });
+
+  const { data: squadsData, isLoading: isLoadingSquads, isError: isErrorSquads } = useQuery<{ squads: SquadInadimplente[] }>({
+    queryKey: ['/api/inadimplencia/por-squad', empresasParams],
+  });
+
+  const { data: responsaveisDetData, isLoading: isLoadingResponsaveisDet, isError: isErrorResponsaveisDet } = useQuery<{ responsaveis: ResponsavelInadimplente[] }>({
+    queryKey: ['/api/inadimplencia/por-responsavel', empresasParams],
   });
 
   const parcelasParams = {
@@ -1620,6 +1658,10 @@ export default function DashboardInadimplencia() {
             <Gavel className="h-4 w-4 mr-2" />
             Jurídico
           </TabsTrigger>
+          <TabsTrigger value="detalhamento" data-testid="tab-detalhamento">
+            <Building2 className="h-4 w-4 mr-2" />
+            Detalhamento
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="visao-geral">
@@ -1634,6 +1676,144 @@ export default function DashboardInadimplencia() {
           <Suspense fallback={<div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
             <JuridicoClientes embedded />
           </Suspense>
+        </TabsContent>
+
+        <TabsContent value="detalhamento">
+          <div className="space-y-6" data-testid="section-detalhamento">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Por Vendedor */}
+              <Card data-testid="card-por-vendedor">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Por Vendedor
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingVendedores ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : isErrorVendedores ? (
+                    <ErrorDisplay message="Erro ao carregar dados." />
+                  ) : !vendedoresData?.vendedores?.length ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Nenhum dado disponível
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                      {vendedoresData.vendedores.map((v, idx) => (
+                        <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{v.vendedor}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {v.quantidadeClientes} clientes • {v.quantidadeParcelas} parcelas
+                            </p>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <p className="font-semibold text-sm text-red-600 dark:text-red-400">
+                              {formatCurrency(v.valorTotal)}
+                            </p>
+                            <Badge variant="outline" className="text-xs">
+                              {formatPercent(v.percentual)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Por Squad */}
+              <Card data-testid="card-por-squad">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Por Squad
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingSquads ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : isErrorSquads ? (
+                    <ErrorDisplay message="Erro ao carregar dados." />
+                  ) : !squadsData?.squads?.length ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Nenhum dado disponível
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                      {squadsData.squads.map((s, idx) => (
+                        <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{s.squad}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {s.quantidadeClientes} clientes • {s.quantidadeParcelas} parcelas
+                            </p>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <p className="font-semibold text-sm text-red-600 dark:text-red-400">
+                              {formatCurrency(s.valorTotal)}
+                            </p>
+                            <Badge variant="outline" className="text-xs">
+                              {formatPercent(s.percentual)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Por Responsável */}
+              <Card data-testid="card-por-responsavel">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Por Responsável
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingResponsaveisDet ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : isErrorResponsaveisDet ? (
+                    <ErrorDisplay message="Erro ao carregar dados." />
+                  ) : !responsaveisDetData?.responsaveis?.length ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Nenhum dado disponível
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                      {responsaveisDetData.responsaveis.map((r, idx) => (
+                        <div key={idx} className="flex items-center justify-between py-2 border-b last:border-0">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{r.responsavel}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {r.quantidadeClientes} clientes • {r.quantidadeParcelas} parcelas
+                            </p>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <p className="font-semibold text-sm text-red-600 dark:text-red-400">
+                              {formatCurrency(r.valorTotal)}
+                            </p>
+                            <Badge variant="outline" className="text-xs">
+                              {formatPercent(r.percentual)}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
