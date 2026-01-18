@@ -7832,12 +7832,13 @@ export class DbStorage implements IStorage {
     const percentualInadimPrimeiraParcela = totalClientesPrimeira > 0 ? (clientesInadimPrimeiraParcela / totalClientesPrimeira) * 100 : 0;
     
     // 3. Clientes que nunca pagaram nenhuma parcela
+    // Usa data_quitacao para identificar pagamentos (nao_pago = 0 quando pago)
     const nuncaPagaramResult = await db.execute(sql.raw(`
       WITH clientes_parcelas AS (
         SELECT 
           id_cliente,
           COUNT(*) as total_parcelas,
-          SUM(CASE WHEN (pago::numeric > 0 OR data_quitacao IS NOT NULL) THEN 1 ELSE 0 END) as parcelas_pagas,
+          SUM(CASE WHEN (data_quitacao IS NOT NULL AND data_quitacao::text != '') THEN 1 ELSE 0 END) as parcelas_pagas,
           SUM(nao_pago::numeric) as valor_total_devido
         FROM caz_parcelas
         WHERE tipo_evento = 'RECEITA'
