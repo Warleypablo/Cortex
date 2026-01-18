@@ -7844,13 +7844,22 @@ export class DbStorage implements IStorage {
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
       ),
+      contratos_servicos AS (
+        -- CTE 3a: Serviços agregados por task_id
+        SELECT 
+          TRIM(cont.id_task::text) as task_id,
+          STRING_AGG(DISTINCT cont.servico, ', ') as servicos
+        FROM cup_contratos cont
+        WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
+          AND cont.servico IS NOT NULL
+        GROUP BY TRIM(cont.id_task::text)
+      ),
       contratos_info AS (
-        -- CTE 3: Vendedor e Squad por task_id
+        -- CTE 3b: Vendedor e Squad por task_id (contrato mais recente)
         SELECT DISTINCT ON (TRIM(cont.id_task::text))
           TRIM(cont.id_task::text) as task_id,
           cont.vendedor,
-          cont.squad,
-          STRING_AGG(DISTINCT cont.servico, ', ') OVER (PARTITION BY TRIM(cont.id_task::text)) as servicos
+          cont.squad
         FROM cup_contratos cont
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
         ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
@@ -7868,7 +7877,7 @@ export class DbStorage implements IStorage {
         cliente_info.status_clickup,
         cliente_info.responsavel,
         cliente_info.cluster,
-        contrato_info.servicos,
+        contrato_servicos.servicos,
         cliente_info.telefone,
         contrato_info.vendedor,
         contrato_info.squad
@@ -7876,6 +7885,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN cliente_caz caz ON TRIM(parcelas.id_cliente::text) = caz.id_cliente
       LEFT JOIN cliente_metadata cliente_info ON TRIM(parcelas.id_cliente::text) = cliente_info.id_cliente
       LEFT JOIN contratos_info contrato_info ON TRIM(cliente_info.task_id::text) = contrato_info.task_id
+      LEFT JOIN contratos_servicos contrato_servicos ON TRIM(cliente_info.task_id::text) = contrato_servicos.task_id
       WHERE 1=1 ${filtroWhere}
       ORDER BY ${orderByClause}
       LIMIT ${limite}
