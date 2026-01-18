@@ -3890,6 +3890,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/inadimplencia/metricas-recebimento", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+      const metricas = await storage.getMetricasRecebimento(dataInicio, dataFim);
+      res.json(metricas);
+    } catch (error) {
+      console.error("[api] Error fetching metricas recebimento:", error);
+      res.status(500).json({ error: "Failed to fetch metricas recebimento" });
+    }
+  });
+
   app.get("/api/inadimplencia/clientes", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string | undefined;
