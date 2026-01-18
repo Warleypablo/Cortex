@@ -3896,7 +3896,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dataFim = req.query.dataFim as string | undefined;
       const ordenarPor = (req.query.ordenarPor as 'valor' | 'diasAtraso' | 'nome') || 'valor';
       const limite = parseInt(req.query.limite as string) || 100;
-      const clientes = await storage.getInadimplenciaClientes(dataInicio, dataFim, ordenarPor, limite);
+      const filtroVendedor = req.query.vendedor as string | undefined;
+      const filtroSquad = req.query.squad as string | undefined;
+      const filtroResponsavel = req.query.responsavel as string | undefined;
+      const clientes = await storage.getInadimplenciaClientes(
+        dataInicio, 
+        dataFim, 
+        ordenarPor, 
+        limite, 
+        filtroVendedor, 
+        filtroSquad, 
+        filtroResponsavel
+      );
       res.json(clientes);
     } catch (error) {
       console.error("[api] Error fetching inadimplencia clientes:", error);
