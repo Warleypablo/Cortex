@@ -930,10 +930,12 @@ export default function DashboardInadimplencia() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card data-testid="card-distribuicao-faixas">
-          <CardHeader>
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50" data-testid="card-distribuicao-faixas">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-700/50 pb-4">
             <CardTitle className="text-base flex items-center gap-2">
-              <Clock className="h-4 w-4" />
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              </div>
               Distribuição por Faixa de Atraso
             </CardTitle>
           </CardHeader>
@@ -991,10 +993,12 @@ export default function DashboardInadimplencia() {
           </CardContent>
         </Card>
 
-        <Card data-testid="card-evolucao-mensal">
-          <CardHeader>
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50" data-testid="card-evolucao-mensal">
+          <CardHeader className="border-b border-slate-100 dark:border-slate-700/50 pb-4">
             <CardTitle className="text-base flex items-center gap-2">
-              <TrendingDown className="h-4 w-4" />
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+              </div>
               Evolução Mensal da Inadimplência
             </CardTitle>
           </CardHeader>
@@ -1050,10 +1054,12 @@ export default function DashboardInadimplencia() {
       {/* Gráficos de Inadimplência por Vendedor, Squad e Responsável */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Por Vendedor - Gráfico */}
-        <Card data-testid="card-chart-vendedor">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" />
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 hover:shadow-xl transition-shadow duration-300" data-testid="card-chart-vendedor">
+          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-700/50">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              </div>
               Por Vendedor
             </CardTitle>
           </CardHeader>
@@ -1108,10 +1114,12 @@ export default function DashboardInadimplencia() {
         </Card>
 
         {/* Por Squad - Gráfico */}
-        <Card data-testid="card-chart-squad">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 hover:shadow-xl transition-shadow duration-300" data-testid="card-chart-squad">
+          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-700/50">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                <Building2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              </div>
               Por Squad
             </CardTitle>
           </CardHeader>
@@ -1166,10 +1174,12 @@ export default function DashboardInadimplencia() {
         </Card>
 
         {/* Por Responsável - Gráfico */}
-        <Card data-testid="card-chart-responsavel">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" />
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 hover:shadow-xl transition-shadow duration-300" data-testid="card-chart-responsavel">
+          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-700/50">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-green-100 dark:bg-green-900/30">
+                <Users className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+              </div>
               Por Responsável
             </CardTitle>
           </CardHeader>
@@ -1225,19 +1235,24 @@ export default function DashboardInadimplencia() {
       </div>
 
       {/* Tabela de Clientes que Nunca Pagaram */}
-      <Card data-testid="card-nunca-pagaram">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <XCircle className="h-4 w-4 text-red-500" />
-            Clientes que Nunca Pagaram
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50/50 to-white dark:from-red-950/20 dark:to-slate-900 overflow-hidden" data-testid="card-nunca-pagaram">
+        <CardHeader className="pb-4 bg-gradient-to-r from-red-500/10 to-transparent border-b border-red-100 dark:border-red-900/30">
+          <CardTitle className="text-base flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 shadow-lg shadow-red-500/25">
+              <XCircle className="h-5 w-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <span className="font-semibold">Clientes que Nunca Pagaram</span>
+              <p className="text-xs text-muted-foreground font-normal mt-0.5">Clientes sem nenhum pagamento registrado</p>
+            </div>
             {clientesNuncaPagaramData?.clientes?.length ? (
-              <Badge variant="destructive" className="ml-2">
-                {clientesNuncaPagaramData.clientes.length}
+              <Badge className="bg-gradient-to-r from-red-500 to-rose-600 text-white border-0 shadow-sm px-3 py-1">
+                {clientesNuncaPagaramData.clientes.length} clientes
               </Badge>
             ) : null}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           {isLoadingNuncaPagaram ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -1249,17 +1264,17 @@ export default function DashboardInadimplencia() {
               Nenhum cliente encontrado que nunca pagou
             </div>
           ) : (
-            <div className="rounded-md border max-h-[400px] overflow-auto">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700/50 max-h-[400px] overflow-auto bg-white dark:bg-slate-800/50">
               <Table>
-                <TableHeader className="sticky top-0 bg-background z-10">
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Vendedor</TableHead>
-                    <TableHead>Squad</TableHead>
-                    <TableHead>Responsável</TableHead>
-                    <TableHead className="text-right">Parcelas</TableHead>
-                    <TableHead className="text-right">Dias Atraso</TableHead>
-                    <TableHead className="text-right">Valor Total</TableHead>
+                <TableHeader className="sticky top-0 bg-slate-50 dark:bg-slate-800 z-10">
+                  <TableRow className="border-b border-slate-200 dark:border-slate-700/50">
+                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Cliente</TableHead>
+                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Vendedor</TableHead>
+                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Squad</TableHead>
+                    <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Responsável</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">Parcelas</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">Dias Atraso</TableHead>
+                    <TableHead className="text-right font-semibold text-slate-700 dark:text-slate-300">Valor Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1267,31 +1282,42 @@ export default function DashboardInadimplencia() {
                     <TableRow 
                       key={cliente.idCliente || idx} 
                       data-testid={`row-nunca-pagou-${idx}`}
+                      className="hover:bg-red-50/50 dark:hover:bg-red-950/20 transition-colors border-b border-slate-100 dark:border-slate-700/30"
                     >
-                      <TableCell className="font-medium max-w-[200px] truncate" title={cliente.nomeCliente}>
-                        {cliente.nomeCliente}
+                      <TableCell className="font-medium max-w-[200px]">
+                        <div className="truncate" title={cliente.nomeCliente}>
+                          {cliente.nomeCliente}
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {cliente.vendedor || '-'}
+                        {cliente.vendedor || <span className="text-slate-400">-</span>}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {cliente.squad || '-'}
+                        {cliente.squad || <span className="text-slate-400">-</span>}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {cliente.responsavel || '-'}
+                        {cliente.responsavel || <span className="text-slate-400">-</span>}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-800">
                           {cliente.quantidadeParcelas}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Badge variant={cliente.diasAtrasoMax > 90 ? "destructive" : "secondary"} className="text-xs">
+                        <Badge 
+                          className={`text-xs ${
+                            cliente.diasAtrasoMax > 90 
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' 
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                          }`}
+                        >
                           {cliente.diasAtrasoMax} dias
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
-                        {formatCurrency(cliente.valorTotal)}
+                      <TableCell className="text-right">
+                        <span className="font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 px-2 py-1 rounded-md">
+                          {formatCurrency(cliente.valorTotal)}
+                        </span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1899,24 +1925,40 @@ export default function DashboardInadimplencia() {
   );
 
   return (
-    <div className="p-6 space-y-6" data-testid="page-inadimplencia">
+    <div className="p-6 space-y-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen" data-testid="page-inadimplencia">
       {renderFiltros()}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4" data-testid="tabs-inadimplencia">
-          <TabsTrigger value="visao-geral" data-testid="tab-visao-geral">
+        <TabsList className="mb-6 bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 p-1.5 rounded-xl shadow-sm border border-slate-200/50 dark:border-slate-700/50" data-testid="tabs-inadimplencia">
+          <TabsTrigger 
+            value="visao-geral" 
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md rounded-lg px-4 py-2.5 transition-all duration-200"
+            data-testid="tab-visao-geral"
+          >
             <TrendingDown className="h-4 w-4 mr-2" />
             Visão Geral
           </TabsTrigger>
-          <TabsTrigger value="clientes" data-testid="tab-clientes">
+          <TabsTrigger 
+            value="clientes" 
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md rounded-lg px-4 py-2.5 transition-all duration-200"
+            data-testid="tab-clientes"
+          >
             <Users className="h-4 w-4 mr-2" />
             Clientes ({clientesData?.clientes?.length || 0})
           </TabsTrigger>
-          <TabsTrigger value="juridico" data-testid="tab-juridico">
+          <TabsTrigger 
+            value="juridico" 
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md rounded-lg px-4 py-2.5 transition-all duration-200"
+            data-testid="tab-juridico"
+          >
             <Gavel className="h-4 w-4 mr-2" />
             Jurídico
           </TabsTrigger>
-          <TabsTrigger value="detalhamento" data-testid="tab-detalhamento">
+          <TabsTrigger 
+            value="detalhamento" 
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md rounded-lg px-4 py-2.5 transition-all duration-200"
+            data-testid="tab-detalhamento"
+          >
             <Building2 className="h-4 w-4 mr-2" />
             Detalhamento
           </TabsTrigger>
