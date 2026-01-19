@@ -7903,47 +7903,59 @@ export class DbStorage implements IStorage {
     const hoje = new Date();
     const dataHoje = hoje.toISOString().split('T')[0];
     
-    let whereDataInicio = '';
-    let whereDataFim = '';
+    // Build date filter conditions for parameterized query
+    const dateConditions: ReturnType<typeof sql>[] = [];
     if (dataInicio) {
-      whereDataInicio = ` AND cp.data_vencimento >= '${dataInicio}'`;
+      dateConditions.push(sql`cp.data_vencimento >= ${dataInicio}`);
     }
     if (dataFim) {
-      whereDataFim = ` AND cp.data_vencimento <= '${dataFim}'`;
+      dateConditions.push(sql`cp.data_vencimento <= ${dataFim}`);
     }
     
-    // Busca clientes que NUNCA pagaram NENHUMA parcela (agrupa por CNPJ para evitar duplicados)
-    const result = await db.execute(sql.raw(`
-      WITH parcelas_por_cnpj AS (
+    // Query corrigida: classifica "nunca pagou" baseado no histórico COMPLETO do cliente,
+    // não apenas no período filtrado. O filtro de data aplica apenas para calcular os totais.
+    const result = await db.execute(sql`
+      WITH 
+      -- Primeiro: identificar CNPJs que NUNCA pagaram NENHUMA parcela em toda a história
+      historico_completo AS (
         SELECT 
           TRIM(cc.cnpj::text) as cnpj,
-          cc.nome as nome_caz,
-          cp.id_cliente,
-          cp.data_quitacao,
-          cp.nao_pago::numeric as nao_pago,
-          COALESCE(cp.valor_pago::numeric, 0) as valor_pago,
-          cp.data_vencimento
+          SUM(COALESCE(cp.valor_pago::numeric, 0)) as total_pago_historico
         FROM caz_parcelas cp
         INNER JOIN caz_clientes cc ON cp.id_cliente::text = cc.ids::text
         WHERE cp.tipo_evento = 'RECEITA'
-          AND cp.data_vencimento < '${dataHoje}'
-          ${whereDataInicio}
-          ${whereDataFim}
+          AND cc.cnpj IS NOT NULL 
+          AND TRIM(cc.cnpj::text) != ''
+        GROUP BY TRIM(cc.cnpj::text)
+        HAVING SUM(COALESCE(cp.valor_pago::numeric, 0)) = 0
       ),
+      -- Segundo: para esses CNPJs, buscar parcelas vencidas no período filtrado
+      parcelas_filtradas AS (
+        SELECT 
+          TRIM(cc.cnpj::text) as cnpj,
+          cc.nome as nome_caz,
+          cp.nao_pago::numeric as nao_pago,
+          cp.data_vencimento
+        FROM caz_parcelas cp
+        INNER JOIN caz_clientes cc ON cp.id_cliente::text = cc.ids::text
+        INNER JOIN historico_completo hc ON TRIM(cc.cnpj::text) = hc.cnpj
+        WHERE cp.tipo_evento = 'RECEITA'
+          AND cp.data_vencimento < ${dataHoje}
+          ${dateConditions.length > 0 ? sql`AND ${sql.join(dateConditions, sql` AND `)}` : sql``}
+      ),
+      -- Terceiro: agregar as parcelas por CNPJ
       clientes_nunca_pagaram AS (
         SELECT 
-          p.cnpj,
-          MAX(p.nome_caz) as nome_caz,
+          pf.cnpj,
+          MAX(pf.nome_caz) as nome_caz,
           COUNT(*) as total_parcelas,
-          SUM(p.valor_pago) as total_valor_pago,
-          SUM(p.nao_pago) as valor_total,
-          MIN(p.data_vencimento) as parcela_mais_antiga,
-          MAX('${dataHoje}'::date - p.data_vencimento::date) as dias_atraso_max
-        FROM parcelas_por_cnpj p
-        WHERE p.cnpj IS NOT NULL AND p.cnpj != ''
-        GROUP BY p.cnpj
-        HAVING COALESCE(SUM(p.valor_pago), 0) = 0
-          AND COUNT(*) > 0
+          SUM(pf.nao_pago) as valor_total,
+          MIN(pf.data_vencimento) as parcela_mais_antiga,
+          MAX(${dataHoje}::date - pf.data_vencimento::date) as dias_atraso_max
+        FROM parcelas_filtradas pf
+        WHERE pf.cnpj IS NOT NULL AND pf.cnpj != ''
+        GROUP BY pf.cnpj
+        HAVING SUM(pf.nao_pago) > 0
       ),
       cliente_info AS (
         SELECT DISTINCT ON (TRIM(cup.cnpj::text))
@@ -7971,7 +7983,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN cliente_info ci ON ci.cnpj = cnp.cnpj
       ORDER BY cnp.valor_total DESC
       LIMIT 100
-    `));
+    `);
     
     const clientes = (result.rows as any[]).map(row => ({
       idCliente: row.id_cliente || '',
