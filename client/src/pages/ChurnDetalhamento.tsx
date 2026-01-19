@@ -496,6 +496,135 @@ export default function ChurnDetalhamento() {
       .slice(-12);
   }, [filteredContratos]);
 
+  // Top clientes perdidos (maior impacto financeiro)
+  const topClientesPerdidos = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+    return churnContratos
+      .sort((a, b) => b.valorr - a.valorr)
+      .slice(0, 10);
+  }, [filteredContratos]);
+
+  // Distribuição por faixa de ticket (MRR)
+  const distribuicaoPorTicket = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const ranges = [
+      { name: "< R$1k", min: 0, max: 1000, count: 0, mrr: 0 },
+      { name: "R$1k-3k", min: 1000, max: 3000, count: 0, mrr: 0 },
+      { name: "R$3k-5k", min: 3000, max: 5000, count: 0, mrr: 0 },
+      { name: "R$5k-10k", min: 5000, max: 10000, count: 0, mrr: 0 },
+      { name: "> R$10k", min: 10000, max: Infinity, count: 0, mrr: 0 },
+    ];
+    
+    filteredContratos.forEach(c => {
+      const valor = c.valorr || 0;
+      for (const range of ranges) {
+        if (valor >= range.min && valor < range.max) {
+          range.count++;
+          range.mrr += valor;
+          break;
+        }
+      }
+    });
+    
+    const total = filteredContratos.length;
+    return ranges.map(r => ({
+      ...r,
+      percentual: total > 0 ? (r.count / total) * 100 : 0
+    })).filter(r => r.count > 0);
+  }, [filteredContratos]);
+
+  // Comparativo Churn vs Pausado por mês
+  const comparativoMensal = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const meses: Record<string, { churn: number; pausado: number; mrrChurn: number; mrrPausado: number; sortKey: string }> = {};
+    
+    filteredContratos.forEach(c => {
+      const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
+      if (!refDate) return;
+      const parsedDate = parseISO(refDate);
+      const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
+      const sortKey = format(parsedDate, "yyyy-MM");
+      
+      if (!meses[mes]) meses[mes] = { churn: 0, pausado: 0, mrrChurn: 0, mrrPausado: 0, sortKey };
+      
+      if (c.tipo === 'churn') {
+        meses[mes].churn++;
+        meses[mes].mrrChurn += c.valorr || 0;
+      } else {
+        meses[mes].pausado++;
+        meses[mes].mrrPausado += c.valorr || 0;
+      }
+    });
+    
+    return Object.entries(meses)
+      .map(([mes, data]) => ({ mes, ...data }))
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .slice(-12);
+  }, [filteredContratos]);
+
+  // Análise de cohort: tempo médio até churn por mês de início
+  const cohortAnalysis = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && c.data_inicio);
+    if (churnContratos.length === 0) return [];
+    
+    const cohorts: Record<string, { count: number; totalLifetime: number; totalMrr: number }> = {};
+    
+    churnContratos.forEach(c => {
+      if (!c.data_inicio) return;
+      const startDate = parseISO(c.data_inicio);
+      const cohort = format(startDate, "MMM/yy", { locale: ptBR });
+      const sortKey = format(startDate, "yyyy-MM");
+      
+      if (!cohorts[cohort]) {
+        cohorts[cohort] = { count: 0, totalLifetime: 0, totalMrr: 0 };
+        (cohorts[cohort] as any).sortKey = sortKey;
+      }
+      cohorts[cohort].count++;
+      cohorts[cohort].totalLifetime += c.lifetime_meses || 0;
+      cohorts[cohort].totalMrr += c.valorr || 0;
+    });
+    
+    return Object.entries(cohorts)
+      .map(([cohort, data]) => ({
+        cohort,
+        count: data.count,
+        avgLifetime: data.count > 0 ? data.totalLifetime / data.count : 0,
+        avgMrr: data.count > 0 ? data.totalMrr / data.count : 0,
+        sortKey: (data as any).sortKey
+      }))
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .slice(-12);
+  }, [filteredContratos]);
+
+  // MRR perdido por mês (evolução)
+  const mrrPerdidoPorMes = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const meses: Record<string, { mrr: number; sortKey: string }> = {};
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+    
+    churnContratos.forEach(c => {
+      if (!c.data_encerramento) return;
+      const parsedDate = parseISO(c.data_encerramento);
+      const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
+      const sortKey = format(parsedDate, "yyyy-MM");
+      
+      if (!meses[mes]) meses[mes] = { mrr: 0, sortKey };
+      meses[mes].mrr += c.valorr || 0;
+    });
+    
+    return Object.entries(meses)
+      .map(([mes, data]) => ({ mes, mrr: data.mrr, sortKey: data.sortKey }))
+      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+      .slice(-12);
+  }, [filteredContratos]);
+
   interface ClienteAgrupado {
     cnpj: string;
     cliente_nome: string;
@@ -1060,6 +1189,258 @@ export default function ChurnDetalhamento() {
           )}
         </TechChartCard>
       </div>
+
+      {/* Nova seção: Análises Avançadas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* MRR Perdido por Mês */}
+        <TechChartCard
+          title="Evolução do MRR Perdido"
+          subtitle="Valor perdido mensalmente"
+          icon={DollarSign}
+          iconBg="bg-gradient-to-r from-red-500 to-rose-500"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[200px] w-full" />
+          ) : mrrPerdidoPorMes.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={mrrPerdidoPorMes} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="mrrGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.9}/>
+                    <stop offset="100%" stopColor="#dc2626" stopOpacity={0.7}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="mes" 
+                  tick={{ fontSize: 10 }} 
+                  axisLine={false}
+                  tickLine={false}
+                  className="fill-muted-foreground"
+                />
+                <YAxis 
+                  tick={{ fontSize: 10 }} 
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => `${(v/1000).toFixed(0)}k`}
+                  className="fill-muted-foreground"
+                />
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => formatCurrency(v)} />} />
+                <Bar dataKey="mrr" fill="url(#mrrGradient)" radius={[4, 4, 0, 0]} name="MRR Perdido" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </TechChartCard>
+
+        {/* Comparativo Churn vs Pausado */}
+        <TechChartCard
+          title="Churn vs Pausados"
+          subtitle="Comparativo mensal de tipos"
+          icon={BarChart3}
+          iconBg="bg-gradient-to-r from-amber-500 to-yellow-500"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[200px] w-full" />
+          ) : comparativoMensal.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={comparativoMensal} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <XAxis 
+                  dataKey="mes" 
+                  tick={{ fontSize: 10 }} 
+                  axisLine={false}
+                  tickLine={false}
+                  className="fill-muted-foreground"
+                />
+                <YAxis 
+                  tick={{ fontSize: 10 }} 
+                  axisLine={false}
+                  tickLine={false}
+                  className="fill-muted-foreground"
+                />
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Bar dataKey="churn" fill="#ef4444" radius={[4, 4, 0, 0]} name="Churn" />
+                <Bar dataKey="pausado" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Pausado" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </TechChartCard>
+      </div>
+
+      {/* Distribuição por Ticket e Cohort */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Distribuição por Faixa de Ticket */}
+        <TechChartCard
+          title="Churn por Faixa de Ticket"
+          subtitle="Distribuição por valor do contrato"
+          icon={DollarSign}
+          iconBg="bg-gradient-to-r from-indigo-500 to-purple-500"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[200px] w-full" />
+          ) : distribuicaoPorTicket.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <ResponsiveContainer width="55%" height={200}>
+                <RechartsPie>
+                  <Pie
+                    data={distribuicaoPorTicket}
+                    dataKey="count"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    strokeWidth={2}
+                    stroke="hsl(var(--card))"
+                  >
+                    {distribuicaoPorTicket.map((entry, index) => (
+                      <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                </RechartsPie>
+              </ResponsiveContainer>
+              <div className="flex-1 space-y-2 text-xs">
+                {distribuicaoPorTicket.map((item, i) => (
+                  <div key={item.name} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div 
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
+                        style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                      />
+                      <span className="truncate text-muted-foreground">{item.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-semibold text-foreground tabular-nums">{item.count}</span>
+                      <span className="text-muted-foreground ml-1">({item.percentual.toFixed(0)}%)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </TechChartCard>
+
+        {/* Análise de Cohort */}
+        <TechChartCard
+          title="Tempo até Churn por Cohort"
+          subtitle="Lifetime médio por mês de início"
+          icon={Clock}
+          iconBg="bg-gradient-to-r from-teal-500 to-emerald-500"
+        >
+          {isLoading ? (
+            <Skeleton className="h-[200px] w-full" />
+          ) : cohortAnalysis.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={cohortAnalysis} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <defs>
+                  <linearGradient id="cohortGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.9}/>
+                    <stop offset="100%" stopColor="#10b981" stopOpacity={0.7}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="cohort" 
+                  tick={{ fontSize: 10 }} 
+                  axisLine={false}
+                  tickLine={false}
+                  className="fill-muted-foreground"
+                />
+                <YAxis 
+                  tick={{ fontSize: 10 }} 
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => `${v.toFixed(0)}m`}
+                  className="fill-muted-foreground"
+                />
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v.toFixed(1)} meses`} />} />
+                <Bar dataKey="avgLifetime" fill="url(#cohortGradient)" radius={[4, 4, 0, 0]} name="Lifetime Médio" />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </TechChartCard>
+      </div>
+
+      {/* Top Clientes Perdidos */}
+      {!isLoading && topClientesPerdidos.length > 0 && (
+        <Card className="border-red-200 dark:border-red-900/40">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 shadow-lg">
+                <TrendingDown className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Top 10 Clientes Perdidos</CardTitle>
+                <CardDescription>Maior impacto financeiro no período</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">#</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>Squad</TableHead>
+                    <TableHead className="text-right">MRR</TableHead>
+                    <TableHead className="text-right">LTV</TableHead>
+                    <TableHead className="text-center">Lifetime</TableHead>
+                    <TableHead>Data Saída</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {topClientesPerdidos.map((c, idx) => (
+                    <TableRow key={c.id} data-testid={`row-top-cliente-${idx}`}>
+                      <TableCell>
+                        <Badge variant={idx < 3 ? "destructive" : "secondary"} className="font-bold">
+                          {idx + 1}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <span className="font-medium">{c.cliente_nome}</span>
+                          {c.cnpj && <p className="text-xs text-muted-foreground">{c.cnpj}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{c.produto}</TableCell>
+                      <TableCell className="text-sm">{c.squad}</TableCell>
+                      <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
+                        {formatCurrency(c.valorr)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrencyNoDecimals(c.ltv)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline">{c.lifetime_meses.toFixed(1)}m</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(c.data_encerramento)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <Collapsible open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
