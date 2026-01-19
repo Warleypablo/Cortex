@@ -2291,11 +2291,45 @@ export default function DashboardInadimplencia() {
                       Contratos com status cancelado ou em cancelamento que ainda possuem parcelas a vencer
                     </p>
                   </div>
-                  {canceladosComCobrancaData?.totalContratos ? (
-                    <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
-                      {canceladosComCobrancaData.totalContratos} contratos • {formatCurrency(canceladosComCobrancaData.totalValor)}
-                    </Badge>
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    {canceladosComCobrancaData?.totalContratos ? (
+                      <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                        {canceladosComCobrancaData.totalContratos} contratos • {formatCurrency(canceladosComCobrancaData.totalValor)}
+                      </Badge>
+                    ) : null}
+                    {canceladosComCobrancaData?.contratos?.length ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const headers = ['Cliente', 'CNPJ', 'Status', 'Valor em Aberto', 'Qtd Parcelas', 'Próxima Parcela', 'Vendedor', 'Squad', 'Produto'];
+                          const rows = canceladosComCobrancaData.contratos.map(c => [
+                            c.nomeCliente || '',
+                            c.cnpj || '',
+                            c.statusContrato || '',
+                            c.valorEmAberto?.toString() || '0',
+                            c.quantidadeParcelas?.toString() || '0',
+                            c.parcelaMaisProxima ? new Date(c.parcelaMaisProxima).toLocaleDateString('pt-BR') : '',
+                            c.vendedor || '',
+                            c.squad || '',
+                            c.produto || ''
+                          ]);
+                          const csvContent = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(';')).join('\n');
+                          const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `cancelados_com_cobranca_${new Date().toISOString().split('T')[0]}.csv`;
+                          link.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                        data-testid="button-export-cancelados"
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Exportar
+                      </Button>
+                    ) : null}
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
