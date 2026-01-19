@@ -204,6 +204,20 @@ interface ClienteNuncaPagou {
   responsavel: string | null;
 }
 
+interface ContratoCanceladoComCobranca {
+  cnpj: string;
+  nomeCliente: string;
+  statusContrato: string;
+  dataEncerramento: string | null;
+  valorEmAberto: number;
+  quantidadeParcelas: number;
+  parcelaMaisProxima: string;
+  vendedor: string | null;
+  squad: string | null;
+  responsavel: string | null;
+  produto: string | null;
+}
+
 interface InadimplenciaContexto {
   contexto: string | null;
   evidencias: string | null;
@@ -341,6 +355,15 @@ export default function DashboardInadimplencia() {
   // Query para clientes que nunca pagaram
   const { data: clientesNuncaPagaramData, isLoading: isLoadingNuncaPagaram, isError: isErrorNuncaPagaram } = useQuery<{ clientes: ClienteNuncaPagou[] }>({
     queryKey: ['/api/inadimplencia/clientes-nunca-pagaram', resumoParams],
+  });
+
+  // Query para contratos cancelados com cobranças em aberto
+  const { data: canceladosComCobrancaData, isLoading: isLoadingCancelados, isError: isErrorCancelados } = useQuery<{ 
+    contratos: ContratoCanceladoComCobranca[];
+    totalValor: number;
+    totalContratos: number;
+  }>({
+    queryKey: ['/api/inadimplencia/cancelados-com-cobranca'],
   });
 
   // Query para drill-down - busca clientes filtrados por vendedor/squad/responsável
@@ -2048,6 +2071,14 @@ export default function DashboardInadimplencia() {
             <Building2 className="h-4 w-4 mr-2" />
             Detalhamento
           </TabsTrigger>
+          <TabsTrigger 
+            value="cancelados" 
+            className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md rounded-lg px-4 py-2.5 transition-all duration-200"
+            data-testid="tab-cancelados"
+          >
+            <XCircle className="h-4 w-4 mr-2" />
+            Cancelados ({canceladosComCobrancaData?.totalContratos || 0})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="visao-geral">
@@ -2243,6 +2274,96 @@ export default function DashboardInadimplencia() {
               </CardContent>
             </Card>
 
+          </div>
+        </TabsContent>
+
+        <TabsContent value="cancelados">
+          <div className="space-y-6" data-testid="section-cancelados">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-50/50 to-white dark:from-amber-950/20 dark:to-slate-900" data-testid="card-cancelados-cobranca">
+              <CardHeader className="pb-4 bg-gradient-to-r from-amber-500/10 to-transparent border-b border-amber-100 dark:border-amber-900/30">
+                <CardTitle className="text-base flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/25">
+                    <XCircle className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="font-semibold">Contratos Cancelados com Cobranças em Aberto</span>
+                    <p className="text-xs text-muted-foreground font-normal mt-0.5">
+                      Contratos com status cancelado ou em cancelamento que ainda possuem parcelas a vencer
+                    </p>
+                  </div>
+                  {canceladosComCobrancaData?.totalContratos ? (
+                    <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                      {canceladosComCobrancaData.totalContratos} contratos • {formatCurrency(canceladosComCobrancaData.totalValor)}
+                    </Badge>
+                  ) : null}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                {isLoadingCancelados ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : isErrorCancelados ? (
+                  <ErrorDisplay message="Erro ao carregar dados de contratos cancelados." />
+                ) : !canceladosComCobrancaData?.contratos?.length ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    Nenhum contrato cancelado com cobranças pendentes
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Valor em Aberto</TableHead>
+                          <TableHead className="text-center">Parcelas</TableHead>
+                          <TableHead>Próxima Parcela</TableHead>
+                          <TableHead>Vendedor</TableHead>
+                          <TableHead>Squad</TableHead>
+                          <TableHead>Produto</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {canceladosComCobrancaData.contratos.map((contrato, index) => (
+                          <TableRow key={`${contrato.cnpj}-${index}`} data-testid={`row-cancelado-${index}`}>
+                            <TableCell>
+                              <div>
+                                <span className="font-medium">{contrato.nomeCliente}</span>
+                                <p className="text-xs text-muted-foreground">{contrato.cnpj}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700">
+                                {contrato.statusContrato}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-amber-600 dark:text-amber-400">
+                              {formatCurrency(contrato.valorEmAberto)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="secondary">{contrato.quantidadeParcelas}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {contrato.parcelaMaisProxima ? new Date(contrato.parcelaMaisProxima).toLocaleDateString('pt-BR') : '-'}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {contrato.vendedor || '-'}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {contrato.squad || '-'}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {contrato.produto || '-'}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
