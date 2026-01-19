@@ -8042,7 +8042,7 @@ export class DbStorage implements IStorage {
     // Busca contratos com status cancelado/em cancelamento que ainda têm parcelas em aberto após hoje
     const result = await db.execute(sql`
       WITH contratos_cancelados AS (
-        SELECT DISTINCT ON (cup.cnpj)
+        SELECT DISTINCT ON (TRIM(cup.cnpj::text))
           TRIM(cup.cnpj::text) as cnpj,
           cup.nome as nome_cliente,
           cont.status as status_contrato,
