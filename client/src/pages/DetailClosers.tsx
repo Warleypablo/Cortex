@@ -263,18 +263,22 @@ export default function DetailClosers() {
 
   const queryParams = buildQueryParams();
 
-  // Parâmetros para visão geral do mês (quando nenhum closer selecionado)
+  // Parâmetros para visão geral (quando nenhum closer selecionado) - usa dateRange selecionado
   const inicioMesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   const fimMesAtual = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
   const mesAtualLabel = hoje.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
   
+  // Usa as datas do filtro selecionado, com fallback para o mês atual
+  const overviewDataInicio = dateRange?.from || inicioMesAtual;
+  const overviewDataFim = dateRange?.to || fimMesAtual;
+  
   const overviewParams = new URLSearchParams();
-  overviewParams.append("dataReuniaoInicio", format(inicioMesAtual, 'yyyy-MM-dd'));
-  overviewParams.append("dataReuniaoFim", format(fimMesAtual, 'yyyy-MM-dd'));
-  overviewParams.append("dataFechamentoInicio", format(inicioMesAtual, 'yyyy-MM-dd'));
-  overviewParams.append("dataFechamentoFim", format(fimMesAtual, 'yyyy-MM-dd'));
-  overviewParams.append("dataLeadInicio", format(inicioMesAtual, 'yyyy-MM-dd'));
-  overviewParams.append("dataLeadFim", format(fimMesAtual, 'yyyy-MM-dd'));
+  overviewParams.append("dataReuniaoInicio", format(overviewDataInicio, 'yyyy-MM-dd'));
+  overviewParams.append("dataReuniaoFim", format(overviewDataFim, 'yyyy-MM-dd'));
+  overviewParams.append("dataFechamentoInicio", format(overviewDataInicio, 'yyyy-MM-dd'));
+  overviewParams.append("dataFechamentoFim", format(overviewDataFim, 'yyyy-MM-dd'));
+  overviewParams.append("dataLeadInicio", format(overviewDataInicio, 'yyyy-MM-dd'));
+  overviewParams.append("dataLeadFim", format(overviewDataFim, 'yyyy-MM-dd'));
   const overviewQueryParams = overviewParams.toString();
 
   interface OverviewMetrics {
