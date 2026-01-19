@@ -9996,6 +9996,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN d.stage_name NOT IN ('Negócio Ganho', 'Negócio perdido', 'Negócio Perdido', 'Perdido', 'Descartado', 'Descartado/sem fit') THEN 1 END) as negocios_em_andamento,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente END), 0) as valor_recorrente,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual END), 0) as valor_pontual,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' AND COALESCE(d.valor_recorrente, 0) > 0 THEN 1 END) as negocios_com_recorrente,
+          COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' AND COALESCE(d.valor_pontual, 0) > 0 THEN 1 END) as negocios_com_pontual,
           MIN(d.data_fechamento) as primeiro_negocio,
           MAX(d.data_fechamento) as ultimo_negocio
         FROM crm_deal d
@@ -10014,11 +10016,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const reunioesRealizadas = parseInt(rowReunioes.reunioes_realizadas) || 0;
       const valorRecorrente = parseFloat(row.valor_recorrente) || 0;
       const valorPontual = parseFloat(row.valor_pontual) || 0;
+      const negociosComRecorrente = parseInt(row.negocios_com_recorrente) || 0;
+      const negociosComPontual = parseInt(row.negocios_com_pontual) || 0;
       const valorTotal = valorRecorrente + valorPontual;
       const taxaConversao = reunioesRealizadas > 0 ? (negociosGanhos / reunioesRealizadas) * 100 : 0;
       const ticketMedio = negociosGanhos > 0 ? valorTotal / negociosGanhos : 0;
-      const ticketMedioRecorrente = negociosGanhos > 0 ? valorRecorrente / negociosGanhos : 0;
-      const ticketMedioPontual = negociosGanhos > 0 ? valorPontual / negociosGanhos : 0;
+      const ticketMedioRecorrente = negociosComRecorrente > 0 ? valorRecorrente / negociosComRecorrente : 0;
+      const ticketMedioPontual = negociosComPontual > 0 ? valorPontual / negociosComPontual : 0;
 
       const primeiroNegocio = row.primeiro_negocio;
       const ultimoNegocio = row.ultimo_negocio;
@@ -10049,6 +10053,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ticketMedio,
         ticketMedioRecorrente,
         ticketMedioPontual,
+        negociosComRecorrente,
+        negociosComPontual,
         lt,
         primeiroNegocio: primeiroNegocio ? new Date(primeiroNegocio).toISOString() : null,
         ultimoNegocio: ultimoNegocio ? new Date(ultimoNegocio).toISOString() : null,

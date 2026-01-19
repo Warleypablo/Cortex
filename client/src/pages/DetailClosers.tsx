@@ -93,6 +93,8 @@ interface CloserDetailMetrics {
   ticketMedio: number;
   ticketMedioRecorrente: number;
   ticketMedioPontual: number;
+  negociosComRecorrente: number;
+  negociosComPontual: number;
   lt: number;
   primeiroNegocio: string | null;
   ultimoNegocio: string | null;
@@ -931,7 +933,7 @@ export default function DetailClosers() {
                 value={metrics.ticketMedioRecorrente}
                 icon={Repeat}
                 color="violet"
-                subtitle={`${metrics.negociosGanhos} negócios ganhos`}
+                subtitle={`${metrics.negociosComRecorrente || 0} negócios com recorrente`}
                 delay={0.4}
                 isCurrency
               />
@@ -940,7 +942,7 @@ export default function DetailClosers() {
                 value={metrics.ticketMedioPontual}
                 icon={Banknote}
                 color="cyan"
-                subtitle={`${metrics.negociosGanhos} negócios ganhos`}
+                subtitle={`${metrics.negociosComPontual || 0} negócios com pontual`}
                 delay={0.5}
                 isCurrency
               />
