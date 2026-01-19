@@ -3862,6 +3862,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/financeiro/revenue-goals/detalhes-dia", async (req, res) => {
+    try {
+      const dataParam = req.query.data as string;
+      if (!dataParam) {
+        return res.status(400).json({ error: "Missing required parameter: data" });
+      }
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(dataParam)) {
+        return res.status(400).json({ error: "Invalid date format. Expected YYYY-MM-DD" });
+      }
+      const detalhes = await storage.getRevenueGoalsDiaDetalhes(dataParam);
+      res.json(detalhes);
+    } catch (error) {
+      console.error("[api] Error fetching revenue goals day details:", error);
+      res.status(500).json({ error: "Failed to fetch revenue goals day details" });
+    }
+  });
+
   // ============== MARGEM POR CLIENTE ==============
   
   app.get("/api/financeiro/margem-clientes", async (req, res) => {
