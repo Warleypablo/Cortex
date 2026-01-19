@@ -1028,15 +1028,20 @@ export default function ChurnDetalhamento() {
               </ResponsiveContainer>
               <div className="flex-1 space-y-2 text-xs">
                 {distribuicaoPorProduto.slice(0, 5).map((item, i) => (
-                  <div key={item.name} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div 
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
-                        style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
-                      />
-                      <span className="truncate text-muted-foreground">{item.fullName}</span>
+                  <div key={item.name} className="space-y-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
+                          style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                        />
+                        <span className="truncate text-muted-foreground">{item.fullName}</span>
+                      </div>
+                      <span className="font-semibold text-foreground tabular-nums">{item.count}</span>
                     </div>
-                    <span className="font-semibold text-foreground tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    <div className="pl-4 text-[10px] text-red-500 dark:text-red-400">
+                      {formatCurrencyNoDecimals(item.mrr)} MRR
+                    </div>
                   </div>
                 ))}
                 {distribuicaoPorProduto.length > 5 && (
@@ -1052,9 +1057,9 @@ export default function ChurnDetalhamento() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <TechChartCard
-          title="Churn por Squad"
-          subtitle="Quantidade por squad"
-          icon={Users}
+          title="MRR Perdido por Squad"
+          subtitle="Valor mensal perdido (R$)"
+          icon={DollarSign}
           iconBg="bg-gradient-to-r from-emerald-500 to-teal-500"
         >
           {isLoading ? (
@@ -1065,12 +1070,13 @@ export default function ChurnDetalhamento() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={distribuicaoPorSquad} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={distribuicaoPorSquad.sort((a, b) => b.mrr - a.mrr)} layout="vertical" margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
                 <XAxis 
                   type="number" 
                   tick={{ fontSize: 10 }} 
                   axisLine={false}
                   tickLine={false}
+                  tickFormatter={(v) => `${(v/1000).toFixed(0)}k`}
                   className="fill-muted-foreground"
                 />
                 <YAxis 
@@ -1082,8 +1088,8 @@ export default function ChurnDetalhamento() {
                   tickLine={false}
                   className="fill-muted-foreground"
                 />
-                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Quantidade">
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => formatCurrency(v)} />} />
+                <Bar dataKey="mrr" radius={[0, 4, 4, 0]} name="MRR Perdido">
                   {distribuicaoPorSquad.map((entry, index) => (
                     <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
                   ))}
@@ -1129,15 +1135,20 @@ export default function ChurnDetalhamento() {
               </ResponsiveContainer>
               <div className="flex-1 space-y-2 text-xs">
                 {distribuicaoPorLifetime.filter(d => d.count > 0).map((item, i) => (
-                  <div key={item.name} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
-                        style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
-                      />
-                      <span className="text-muted-foreground">{item.name}</span>
+                  <div key={item.name} className="space-y-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
+                          style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                        />
+                        <span className="text-muted-foreground">{item.name}</span>
+                      </div>
+                      <span className="font-semibold text-foreground tabular-nums">{item.count}</span>
                     </div>
-                    <span className="font-semibold text-foreground tabular-nums">{item.percentual.toFixed(0)}%</span>
+                    <div className="pl-4 text-[10px] text-red-500 dark:text-red-400">
+                      {formatCurrencyNoDecimals(item.mrr)} MRR
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1146,9 +1157,9 @@ export default function ChurnDetalhamento() {
         </TechChartCard>
 
         <TechChartCard
-          title="Churn por Responsável"
-          subtitle="Top 6 responsáveis"
-          icon={Users}
+          title="MRR Perdido por Responsável"
+          subtitle="Top 6 responsáveis (R$)"
+          icon={DollarSign}
           iconBg="bg-gradient-to-r from-cyan-500 to-blue-500"
         >
           {isLoading ? (
@@ -1159,7 +1170,7 @@ export default function ChurnDetalhamento() {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={distribuicaoPorResponsavel} layout="vertical" margin={{ top: 0, right: 10, left: -10, bottom: 0 }}>
+              <BarChart data={distribuicaoPorResponsavel.sort((a, b) => b.mrr - a.mrr)} layout="vertical" margin={{ top: 0, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="blueBarGradient" x1="0" y1="0" x2="1" y2="0">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
@@ -1171,6 +1182,7 @@ export default function ChurnDetalhamento() {
                   tick={{ fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
+                  tickFormatter={(v) => `${(v/1000).toFixed(0)}k`}
                   className="fill-muted-foreground"
                 />
                 <YAxis 
@@ -1182,8 +1194,8 @@ export default function ChurnDetalhamento() {
                   tickLine={false}
                   className="fill-muted-foreground"
                 />
-                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                <Bar dataKey="count" fill="url(#blueBarGradient)" radius={[0, 4, 4, 0]} name="Quantidade" />
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => formatCurrency(v)} />} />
+                <Bar dataKey="mrr" fill="url(#blueBarGradient)" radius={[0, 4, 4, 0]} name="MRR Perdido" />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -1235,11 +1247,11 @@ export default function ChurnDetalhamento() {
           )}
         </TechChartCard>
 
-        {/* Comparativo Churn vs Pausado */}
+        {/* Comparativo MRR Churn vs Pausado */}
         <TechChartCard
-          title="Churn vs Pausados"
-          subtitle="Comparativo mensal de tipos"
-          icon={BarChart3}
+          title="MRR Churn vs Pausados"
+          subtitle="Comparativo mensal de valor (R$)"
+          icon={DollarSign}
           iconBg="bg-gradient-to-r from-amber-500 to-yellow-500"
         >
           {isLoading ? (
@@ -1262,12 +1274,13 @@ export default function ChurnDetalhamento() {
                   tick={{ fontSize: 10 }} 
                   axisLine={false}
                   tickLine={false}
+                  tickFormatter={(v) => `${(v/1000).toFixed(0)}k`}
                   className="fill-muted-foreground"
                 />
-                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                <Tooltip content={<CustomTooltip valueFormatter={(v: number) => formatCurrency(v)} />} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
-                <Bar dataKey="churn" fill="#ef4444" radius={[4, 4, 0, 0]} name="Churn" />
-                <Bar dataKey="pausado" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Pausado" />
+                <Bar dataKey="mrrChurn" fill="#ef4444" radius={[4, 4, 0, 0]} name="MRR Churn" />
+                <Bar dataKey="mrrPausado" fill="#f59e0b" radius={[4, 4, 0, 0]} name="MRR Pausado" />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -1313,17 +1326,19 @@ export default function ChurnDetalhamento() {
               </ResponsiveContainer>
               <div className="flex-1 space-y-2 text-xs">
                 {distribuicaoPorTicket.map((item, i) => (
-                  <div key={item.name} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div 
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
-                        style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
-                      />
-                      <span className="truncate text-muted-foreground">{item.name}</span>
-                    </div>
-                    <div className="text-right">
+                  <div key={item.name} className="space-y-0.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
+                          style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                        />
+                        <span className="truncate text-muted-foreground">{item.name}</span>
+                      </div>
                       <span className="font-semibold text-foreground tabular-nums">{item.count}</span>
-                      <span className="text-muted-foreground ml-1">({item.percentual.toFixed(0)}%)</span>
+                    </div>
+                    <div className="pl-4 text-[10px] text-red-500 dark:text-red-400">
+                      {formatCurrencyNoDecimals(item.mrr)} MRR
                     </div>
                   </div>
                 ))}
