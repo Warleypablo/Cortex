@@ -100,6 +100,10 @@ interface CloserDetailMetrics {
   ultimoNegocio: string | null;
   diasAtivo: number;
   mediaContratosPorMes: number;
+  // LTV metrics (baseado no lifetime médio global)
+  ltvEstimado: number;
+  ltvTotal: number;
+  lifetimeMedioGlobal: number;
 }
 
 interface MonthlyData {
@@ -1030,6 +1034,39 @@ export default function DetailClosers() {
                 color="blue"
                 subtitle="No período selecionado"
                 delay={1.1}
+              />
+            </div>
+
+            {/* LTV Metrics Grid - Row 4 */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <PremiumMetricCard
+                title="LTV Estimado"
+                value={metrics.ltvEstimado || 0}
+                icon={Sparkles}
+                color="amber"
+                subtitle={`Ticket × ${formatDecimal(metrics.lifetimeMedioGlobal || 0)} meses`}
+                delay={1.2}
+                isCurrency
+              />
+              <PremiumMetricCard
+                title="LTV Total Gerado"
+                value={metrics.ltvTotal || 0}
+                icon={Crown}
+                color="orange"
+                subtitle={`MRR total × Lifetime médio`}
+                delay={1.3}
+                isCurrency
+              />
+              <PremiumMetricCard
+                title="Lifetime Médio (Base)"
+                value={parseFloat(formatDecimal(metrics.lifetimeMedioGlobal || 0))}
+                icon={Clock}
+                color="cyan"
+                subtitle="Média global de contratos"
+                delay={1.4}
+                extraBadge={
+                  <span className="text-xs text-muted-foreground">meses</span>
+                }
               />
             </div>
 

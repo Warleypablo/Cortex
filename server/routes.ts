@@ -10158,6 +10158,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const mediaContratosPorMes = lt > 0 ? negociosGanhos / lt : 0;
 
+      // Query para calcular lifetime médio global dos contratos
+      // Usamos o lifetime médio global como base para todos os closers
+      // Isso garante consistência e evita problemas de matching por nome
+      const globalLifetimeResult = await db.execute(sql`
+        SELECT 
+          AVG(
+            CASE 
+              WHEN c.data_inicio IS NOT NULL AND c.data_solicitacao_encerramento IS NOT NULL 
+              THEN GREATEST(0.5, (c.data_solicitacao_encerramento::date - c.data_inicio::date)::numeric / 30.44)
+              ELSE NULL 
+            END
+          ) as lifetime_medio,
+          COUNT(CASE WHEN c.data_solicitacao_encerramento IS NOT NULL THEN 1 END) as total_encerrados,
+          COUNT(CASE WHEN LOWER(c.status) IN ('ativo', 'active') THEN 1 END) as total_ativos
+        FROM cup_contratos c
+        WHERE c.valorr IS NOT NULL 
+          AND c.valorr > 0
+          AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+      `);
+
+      const globalLtRow = globalLifetimeResult.rows[0] as any;
+      const lifetimeMedioGlobal = parseFloat(globalLtRow?.lifetime_medio) || 12;
+      
+      // LTV Estimado = Ticket Médio Recorrente × Lifetime Médio Global
+      const ltvEstimado = ticketMedioRecorrente * lifetimeMedioGlobal;
+      
+      // LTV Total = MRR Total × Lifetime Médio Global
+      const ltvTotal = valorRecorrente * lifetimeMedioGlobal;
+
       res.json({
         closerId: parseInt(closerId as string),
         closerName: closerInfo.nome,
@@ -10179,7 +10208,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         primeiroNegocio: primeiroNegocio ? new Date(primeiroNegocio).toISOString() : null,
         ultimoNegocio: ultimoNegocio ? new Date(ultimoNegocio).toISOString() : null,
         diasAtivo,
-        mediaContratosPorMes
+        mediaContratosPorMes,
+        // LTV metrics (baseado no lifetime médio global dos contratos)
+        ltvEstimado,
+        ltvTotal,
+        lifetimeMedioGlobal
       });
     } catch (error) {
       console.error("[api] Error fetching closer detail:", error);
