@@ -3932,6 +3932,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/inadimplencia/cancelados-com-cobranca", async (req, res) => {
+    try {
+      const data = await storage.getContratosCanceladosComCobranca();
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching contratos cancelados com cobranca:", error);
+      res.status(500).json({ error: "Failed to fetch contratos cancelados com cobranca" });
+    }
+  });
+
   app.get("/api/inadimplencia/clientes", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string | undefined;

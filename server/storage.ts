@@ -431,6 +431,25 @@ export interface IStorage {
       responsavel: string | null;
     }[];
   }>;
+
+  // Lista de contratos cancelados/em cancelamento com cobranças em aberto
+  getContratosCanceladosComCobranca(): Promise<{
+    contratos: {
+      cnpj: string;
+      nomeCliente: string;
+      statusContrato: string;
+      dataEncerramento: string | null;
+      valorEmAberto: number;
+      quantidadeParcelas: number;
+      parcelaMaisProxima: string;
+      vendedor: string | null;
+      squad: string | null;
+      responsavel: string | null;
+      produto: string | null;
+    }[];
+    totalValor: number;
+    totalContratos: number;
+  }>;
 }
 
 // GEG Dashboard Extended Types
@@ -7998,6 +8017,98 @@ export class DbStorage implements IStorage {
     }));
     
     return { clientes };
+  }
+
+  async getContratosCanceladosComCobranca(): Promise<{
+    contratos: {
+      cnpj: string;
+      nomeCliente: string;
+      statusContrato: string;
+      dataEncerramento: string | null;
+      valorEmAberto: number;
+      quantidadeParcelas: number;
+      parcelaMaisProxima: string;
+      vendedor: string | null;
+      squad: string | null;
+      responsavel: string | null;
+      produto: string | null;
+    }[];
+    totalValor: number;
+    totalContratos: number;
+  }> {
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    // Busca contratos com status cancelado/em cancelamento que ainda têm parcelas em aberto após hoje
+    const result = await db.execute(sql`
+      WITH contratos_cancelados AS (
+        SELECT DISTINCT ON (cup.cnpj)
+          TRIM(cup.cnpj::text) as cnpj,
+          cup.nome as nome_cliente,
+          cont.status as status_contrato,
+          cont.data_encerramento,
+          cont.vendedor,
+          cont.squad,
+          cont.responsavel,
+          cont.produto
+        FROM cup_clientes cup
+        INNER JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        WHERE LOWER(cont.status) IN ('canceled', 'canceling', 'cancelado', 'em cancelamento', 'cancelamento')
+          AND cup.cnpj IS NOT NULL 
+          AND TRIM(cup.cnpj::text) != ''
+        ORDER BY TRIM(cup.cnpj::text), cont.data_encerramento DESC NULLS LAST
+      ),
+      parcelas_em_aberto AS (
+        SELECT 
+          TRIM(cc.cnpj::text) as cnpj,
+          SUM(COALESCE(cp.nao_pago::numeric, 0)) as valor_em_aberto,
+          COUNT(*) as quantidade_parcelas,
+          MIN(cp.data_vencimento) as parcela_mais_proxima
+        FROM caz_parcelas cp
+        INNER JOIN caz_clientes cc ON cp.id_cliente::text = cc.ids::text
+        WHERE cp.tipo_evento = 'RECEITA'
+          AND cp.data_vencimento >= ${dataHoje}
+          AND COALESCE(cp.nao_pago::numeric, 0) > 0
+          AND cc.cnpj IS NOT NULL 
+          AND TRIM(cc.cnpj::text) != ''
+        GROUP BY TRIM(cc.cnpj::text)
+      )
+      SELECT 
+        cc.cnpj,
+        cc.nome_cliente,
+        cc.status_contrato,
+        cc.data_encerramento,
+        pa.valor_em_aberto,
+        pa.quantidade_parcelas,
+        pa.parcela_mais_proxima,
+        cc.vendedor,
+        cc.squad,
+        cc.responsavel,
+        cc.produto
+      FROM contratos_cancelados cc
+      INNER JOIN parcelas_em_aberto pa ON pa.cnpj = cc.cnpj
+      ORDER BY pa.valor_em_aberto DESC
+      LIMIT 200
+    `);
+    
+    const contratos = (result.rows as any[]).map(row => ({
+      cnpj: row.cnpj || '',
+      nomeCliente: row.nome_cliente || 'Cliente Desconhecido',
+      statusContrato: row.status_contrato || '',
+      dataEncerramento: row.data_encerramento ? new Date(row.data_encerramento).toISOString().split('T')[0] : null,
+      valorEmAberto: parseFloat(row.valor_em_aberto || '0'),
+      quantidadeParcelas: parseInt(row.quantidade_parcelas || '0'),
+      parcelaMaisProxima: row.parcela_mais_proxima || '',
+      vendedor: row.vendedor || null,
+      squad: row.squad || null,
+      responsavel: row.responsavel || null,
+      produto: row.produto || null,
+    }));
+    
+    const totalValor = contratos.reduce((sum, c) => sum + c.valorEmAberto, 0);
+    const totalContratos = contratos.length;
+    
+    return { contratos, totalValor, totalContratos };
   }
 
   async getInadimplenciaClientes(
