@@ -9901,6 +9901,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { 
         dataFechamentoInicio, 
         dataFechamentoFim,
+        dataReuniaoInicio,
+        dataReuniaoFim,
         source,
         pipeline
       } = req.query;
@@ -9923,23 +9925,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
+      // Query principal: negócios ganhos, MRR, pontual, contadores
       const result = await db.execute(sql`
         SELECT 
+          c.id as closer_id,
           c.nome as closer_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
-          COALESCE(SUM(d.valor_pontual), 0) as pontual
+          COALESCE(SUM(d.valor_pontual), 0) as pontual,
+          COUNT(*) as negocios_ganhos,
+          COUNT(CASE WHEN COALESCE(d.valor_recorrente, 0) > 0 THEN 1 END) as negocios_com_recorrente,
+          COUNT(CASE WHEN COALESCE(d.valor_pontual, 0) > 0 THEN 1 END) as negocios_com_pontual
         FROM crm_deal d
         INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
         GROUP BY c.id, c.nome
         ORDER BY c.nome
       `);
+
+      // Query separada para reuniões (usa datas de reunião)
+      const reunioesConditions: ReturnType<typeof sql>[] = [sql`d.data_reuniao_realizada IS NOT NULL`];
+      if (dataReuniaoInicio) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada >= ${dataReuniaoInicio}`);
+      }
+      if (dataReuniaoFim) {
+        reunioesConditions.push(sql`d.data_reuniao_realizada <= ${dataReuniaoFim}`);
+      }
+      if (source) {
+        reunioesConditions.push(sql`d.source = ${source}`);
+      }
+      if (pipeline) {
+        reunioesConditions.push(sql`d.category_name = ${pipeline}`);
+      }
+      const whereClauseReunioes = sql`WHERE ${sql.join(reunioesConditions, sql` AND `)}`;
+
+      const reunioesResult = await db.execute(sql`
+        SELECT 
+          c.id as closer_id,
+          COUNT(*) as reunioes
+        FROM crm_deal d
+        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        ${whereClauseReunioes}
+        GROUP BY c.id
+      `);
+
+      // Mapa de reuniões por closer
+      const reunioesMap: Record<number, number> = {};
+      for (const row of reunioesResult.rows as any[]) {
+        reunioesMap[row.closer_id] = parseInt(row.reunioes) || 0;
+      }
       
-      const data = result.rows.map((row: any) => ({
-        closer: row.closer_name,
-        mrr: parseFloat(row.mrr) || 0,
-        pontual: parseFloat(row.pontual) || 0
-      }));
+      const data = result.rows.map((row: any) => {
+        const mrr = parseFloat(row.mrr) || 0;
+        const pontual = parseFloat(row.pontual) || 0;
+        const negociosGanhos = parseInt(row.negocios_ganhos) || 0;
+        const negociosComRecorrente = parseInt(row.negocios_com_recorrente) || 0;
+        const negociosComPontual = parseInt(row.negocios_com_pontual) || 0;
+        const reunioes = reunioesMap[row.closer_id] || 0;
+        const taxaConversao = reunioes > 0 ? (negociosGanhos / reunioes) * 100 : 0;
+        const tmRecorrente = negociosComRecorrente > 0 ? mrr / negociosComRecorrente : 0;
+        const tmPontual = negociosComPontual > 0 ? pontual / negociosComPontual : 0;
+
+        return {
+          closer: row.closer_name,
+          mrr,
+          pontual,
+          reunioes,
+          negociosGanhos,
+          negociosComRecorrente,
+          negociosComPontual,
+          taxaConversao,
+          tmRecorrente,
+          tmPontual
+        };
+      });
 
       res.json(data);
     } catch (error) {

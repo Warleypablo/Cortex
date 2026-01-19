@@ -298,6 +298,13 @@ export default function DetailClosers() {
     closer: string;
     mrr: number;
     pontual: number;
+    reunioes: number;
+    negociosGanhos: number;
+    negociosComRecorrente: number;
+    negociosComPontual: number;
+    taxaConversao: number;
+    tmRecorrente: number;
+    tmPontual: number;
   }
 
   const { data: overviewMetrics, isLoading: isLoadingOverview } = useQuery<OverviewMetrics>({
@@ -743,9 +750,9 @@ export default function DetailClosers() {
                                 }`}>
                                   {index + 1}
                                 </div>
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0">
                                   <p className="font-semibold text-foreground">{closer.closer}</p>
-                                  <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground mt-1">
                                     <span className="flex items-center gap-1">
                                       <Repeat className="w-3 h-3 text-violet-400" />
                                       MRR: {formatCurrency(closer.mrr)}
@@ -754,9 +761,21 @@ export default function DetailClosers() {
                                       <Banknote className="w-3 h-3 text-cyan-400" />
                                       Pontual: {formatCurrency(closer.pontual)}
                                     </span>
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="w-3 h-3 text-blue-400" />
+                                      {closer.reunioes || 0} reuniões
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Target className="w-3 h-3 text-amber-400" />
+                                      {formatPercent(closer.taxaConversao || 0)} conv.
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
+                                    <span>TM MRR: {formatCurrency(closer.tmRecorrente || 0)}</span>
+                                    <span>TM Pontual: {formatCurrency(closer.tmPontual || 0)}</span>
                                   </div>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right shrink-0">
                                   <p className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text text-transparent">
                                     {formatCurrency(closer.mrr + closer.pontual)}
                                   </p>
