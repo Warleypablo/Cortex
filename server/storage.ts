@@ -8735,6 +8735,153 @@ export class DbStorage implements IStorage {
     };
   }
 
+  async getRevenueGoalsDiaDetalhes(data: string): Promise<{
+    data: string;
+    resumo: {
+      totalPrevisto: number;
+      totalRecebido: number;
+      totalPendente: number;
+      totalInadimplente: number;
+      quantidadeParcelas: number;
+    };
+    parcelas: {
+      id: number;
+      descricao: string;
+      valorBruto: number;
+      valorPago: number;
+      naoPago: number;
+      dataVencimento: string;
+      status: 'pago' | 'pendente' | 'inadimplente';
+      empresa: string;
+      idCliente: string;
+      nomeCliente: string;
+      cnpj: string | null;
+      responsavel: string | null;
+      squad: string | null;
+      servico: string | null;
+      statusClickup: string | null;
+    }[];
+  }> {
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(data)) {
+      throw new Error('Invalid date format. Expected YYYY-MM-DD');
+    }
+    
+    const hoje = new Date();
+    const dataHoje = hoje.toISOString().split('T')[0];
+    
+    const result = await db.execute(sql`
+      WITH cliente_info AS (
+        SELECT DISTINCT ON (TRIM(cc.ids::text))
+          TRIM(cc.ids::text) as id_cliente,
+          cc.cnpj,
+          cc.nome as nome_caz,
+          cup.nome as nome_clickup,
+          cup.status as status_clickup,
+          cup.responsavel,
+          cup.task_id
+        FROM caz_clientes cc
+        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
+          AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
+        WHERE cc.ids IS NOT NULL
+        ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
+      ),
+      contrato_info AS (
+        SELECT DISTINCT ON (TRIM(cont.id_task::text))
+          TRIM(cont.id_task::text) as task_id,
+          cont.squad,
+          cont.servico
+        FROM cup_contratos cont
+        WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
+        ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
+      )
+      SELECT 
+        cp.id,
+        cp.descricao,
+        cp.valor_bruto,
+        COALESCE(cp.valor_pago, 0) as valor_pago,
+        COALESCE(cp.nao_pago, 0) as nao_pago,
+        TO_CHAR(cp.data_vencimento, 'YYYY-MM-DD') as data_vencimento,
+        cp.status,
+        cp.empresa,
+        cp.id_cliente,
+        COALESCE(cli.nome_clickup, cli.nome_caz, 'Cliente Desconhecido') as nome_cliente,
+        cli.cnpj,
+        cli.responsavel,
+        cli.status_clickup,
+        cont.squad,
+        cont.servico,
+        CASE
+          WHEN UPPER(cp.status) IN ('PAGO', 'ACQUITTED') OR COALESCE(cp.valor_pago::numeric, 0) >= cp.valor_bruto::numeric THEN 'pago'
+          WHEN cp.data_vencimento::date > ${dataHoje}::date THEN 'pendente'
+          ELSE 'inadimplente'
+        END as status_calculado
+      FROM caz_parcelas cp
+      LEFT JOIN cliente_info cli ON TRIM(cp.id_cliente::text) = cli.id_cliente
+      LEFT JOIN contrato_info cont ON TRIM(cli.task_id::text) = cont.task_id
+      WHERE cp.tipo_evento = 'RECEITA'
+        AND cp.data_vencimento::date = ${data}::date
+      ORDER BY 
+        CASE
+          WHEN UPPER(cp.status) IN ('PAGO', 'ACQUITTED') OR COALESCE(cp.valor_pago::numeric, 0) >= cp.valor_bruto::numeric THEN 1
+          WHEN cp.data_vencimento::date > ${dataHoje}::date THEN 2
+          ELSE 3
+        END,
+        cp.valor_bruto::numeric DESC
+    `);
+    
+    let totalPrevisto = 0;
+    let totalRecebido = 0;
+    let totalPendente = 0;
+    let totalInadimplente = 0;
+    
+    const parcelas = (result.rows as any[]).map(row => {
+      const valorBruto = parseFloat(row.valor_bruto || '0');
+      const valorPago = parseFloat(row.valor_pago || '0');
+      const naoPago = parseFloat(row.nao_pago || '0');
+      const statusCalc = row.status_calculado as 'pago' | 'pendente' | 'inadimplente';
+      
+      totalPrevisto += valorBruto;
+      if (statusCalc === 'pago') {
+        totalRecebido += valorPago;
+      } else if (statusCalc === 'pendente') {
+        totalPendente += naoPago;
+      } else {
+        totalInadimplente += naoPago;
+      }
+      
+      return {
+        id: row.id,
+        descricao: row.descricao || '',
+        valorBruto,
+        valorPago,
+        naoPago,
+        dataVencimento: row.data_vencimento,
+        status: statusCalc,
+        empresa: row.empresa || '',
+        idCliente: row.id_cliente || '',
+        nomeCliente: row.nome_cliente || 'Cliente Desconhecido',
+        cnpj: row.cnpj || null,
+        responsavel: row.responsavel || null,
+        squad: row.squad || null,
+        servico: row.servico || null,
+        statusClickup: row.status_clickup || null,
+      };
+    });
+    
+    return {
+      data: dataParam,
+      resumo: {
+        totalPrevisto,
+        totalRecebido,
+        totalPendente,
+        totalInadimplente,
+        quantidadeParcelas: parcelas.length,
+      },
+      parcelas,
+    };
+  }
+
   async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>> {
     if (!clienteIds.length) return {};
     
