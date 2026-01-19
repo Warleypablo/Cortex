@@ -8870,7 +8870,7 @@ export class DbStorage implements IStorage {
     });
     
     return {
-      data: dataParam,
+      data,
       resumo: {
         totalPrevisto,
         totalRecebido,
