@@ -8053,7 +8053,7 @@ export class DbStorage implements IStorage {
           cont.produto
         FROM cup_clientes cup
         INNER JOIN cup_contratos cont ON cup.task_id = cont.id_task
-        WHERE LOWER(cont.status) IN ('canceled', 'canceling', 'cancelado', 'em cancelamento', 'cancelamento')
+        WHERE LOWER(cont.status) IN ('canceled', 'canceling', 'cancelado', 'em cancelamento', 'cancelamento', 'cancelado/inativo', 'pausado')
           AND cup.cnpj IS NOT NULL 
           AND TRIM(cup.cnpj::text) != ''
         ORDER BY TRIM(cup.cnpj::text), cont.data_encerramento DESC NULLS LAST
