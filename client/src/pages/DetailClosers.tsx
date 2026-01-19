@@ -284,6 +284,10 @@ export default function DetailClosers() {
     negociosGanhos: number;
     leadsCriados: number;
     taxaConversao: number;
+    negociosComRecorrente: number;
+    negociosComPontual: number;
+    ticketMedioRecorrente: number;
+    ticketMedioPontual: number;
   }
 
   interface ChartDataReceita {
@@ -668,20 +672,20 @@ export default function DetailClosers() {
                   isPercentage
                 />
                 <PremiumMetricCard
-                  title="Ticket Médio"
-                  value={overviewMetrics.negociosGanhos > 0 ? (overviewMetrics.mrrObtido + overviewMetrics.pontualObtido) / overviewMetrics.negociosGanhos : 0}
-                  icon={DollarSign}
-                  color="green"
-                  subtitle="Por negócio fechado"
+                  title="TM MRR"
+                  value={overviewMetrics.ticketMedioRecorrente || 0}
+                  icon={Repeat}
+                  color="violet"
+                  subtitle={`${overviewMetrics.negociosComRecorrente || 0} negócios com MRR`}
                   delay={0.6}
                   isCurrency
                 />
                 <PremiumMetricCard
-                  title="Receita por Reunião"
-                  value={overviewMetrics.reunioesRealizadas > 0 ? (overviewMetrics.mrrObtido + overviewMetrics.pontualObtido) / overviewMetrics.reunioesRealizadas : 0}
-                  icon={TrendingUp}
-                  color="pink"
-                  subtitle="Média de receita"
+                  title="TM Pontual"
+                  value={overviewMetrics.ticketMedioPontual || 0}
+                  icon={DollarSign}
+                  color="cyan"
+                  subtitle={`${overviewMetrics.negociosComPontual || 0} negócios pontuais`}
                   delay={0.7}
                   isCurrency
                 />
