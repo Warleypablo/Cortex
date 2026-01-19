@@ -57,7 +57,11 @@ import {
   Cell,
   PieChart as RechartsPie,
   Pie,
-  Legend
+  Legend,
+  LineChart,
+  Line,
+  Area,
+  AreaChart
 } from "recharts";
 
 interface ChurnContract {
@@ -85,6 +89,16 @@ interface ChurnPorSquad {
   percentual: number;
 }
 
+interface RetentionPoint {
+  monthIndex: number;
+  retainedPct: number;
+  mrrRetainedPct: number;
+  retainedCount: number;
+  totalStarted: number;
+  retainedMrr: number;
+  churnedCount: number;
+}
+
 interface ChurnDetalhamentoData {
   contratos: ChurnContract[];
   metricas: {
@@ -105,6 +119,7 @@ interface ChurnDetalhamentoData {
     responsaveis: string[];
     servicos: string[];
   };
+  retentionCurve?: RetentionPoint[];
 }
 
 const CHART_COLORS = {
@@ -600,6 +615,42 @@ export default function ChurnDetalhamento() {
       }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .slice(-12);
+  }, [filteredContratos]);
+
+  // Curva de distribuição de lifetime (calculada no frontend com filtros)
+  const lifetimeCurve = useMemo(() => {
+    const contratosComLifetime = filteredContratos.filter(c => 
+      c.lifetime_meses !== undefined && c.lifetime_meses !== null && c.lifetime_meses >= 0
+    );
+    
+    if (contratosComLifetime.length === 0) return [];
+    
+    const totalBase = contratosComLifetime.length;
+    const totalMrrBase = contratosComLifetime.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    
+    const curve: { monthIndex: number; retainedPct: number; mrrRetainedPct: number; retainedCount: number; totalStarted: number; churnedCount: number }[] = [];
+    
+    for (let month = 0; month <= 12; month++) {
+      const sobreviventes = contratosComLifetime.filter(c => c.lifetime_meses >= month);
+      const sobrevivMrr = sobreviventes.reduce((sum, c) => sum + (c.valorr || 0), 0);
+      const churnedNoPeriodo = contratosComLifetime.filter(c => 
+        c.lifetime_meses >= month && c.lifetime_meses < month + 1
+      );
+      
+      const retainedPct = totalBase > 0 ? (sobreviventes.length / totalBase) * 100 : 0;
+      const mrrRetainedPct = totalMrrBase > 0 ? (sobrevivMrr / totalMrrBase) * 100 : 0;
+      
+      curve.push({
+        monthIndex: month,
+        retainedPct: Math.round(retainedPct * 10) / 10,
+        mrrRetainedPct: Math.round(mrrRetainedPct * 10) / 10,
+        retainedCount: sobreviventes.length,
+        totalStarted: totalBase,
+        churnedCount: churnedNoPeriodo.length,
+      });
+    }
+    
+    return curve;
   }, [filteredContratos]);
 
   // MRR perdido por mês (evolução)
@@ -1390,6 +1441,128 @@ export default function ChurnDetalhamento() {
           )}
         </TechChartCard>
       </div>
+
+      {/* Distribuição de Lifetime */}
+      <Card className="border-emerald-200 dark:border-emerald-900/40">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg">
+              <Target className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <CardTitle className="text-base">Distribuição de Lifetime</CardTitle>
+              <CardDescription>Quanto tempo os clientes permaneceram antes de sair</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-[280px] w-full" />
+          ) : lifetimeCurve.length === 0 ? (
+            <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
+              Nenhum dado disponível
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={lifetimeCurve} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="retentionGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.4}/>
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.05}/>
+                    </linearGradient>
+                    <linearGradient id="mrrRetentionGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4}/>
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis 
+                    dataKey="monthIndex" 
+                    tick={{ fontSize: 11 }} 
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => `${v}m`}
+                    className="fill-muted-foreground"
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 11 }} 
+                    axisLine={false}
+                    tickLine={false}
+                    domain={[0, 100]}
+                    tickFormatter={(v) => `${v}%`}
+                    className="fill-muted-foreground"
+                  />
+                  <Tooltip 
+                    content={({ active, payload, label }) => {
+                      if (!active || !payload?.length) return null;
+                      const point = payload[0]?.payload as RetentionPoint;
+                      return (
+                        <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-700/50 rounded-lg shadow-xl p-3 min-w-[200px]">
+                          <p className="text-xs font-medium text-gray-600 dark:text-zinc-300 mb-2 uppercase tracking-wider">
+                            Mês {label}
+                          </p>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span className="text-gray-500 dark:text-zinc-400">Contratos {label}+ meses</span>
+                              </span>
+                              <span className="font-bold text-emerald-600 dark:text-emerald-400">{point?.retainedPct?.toFixed(1)}%</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                <span className="text-gray-500 dark:text-zinc-400">MRR {label}+ meses</span>
+                              </span>
+                              <span className="font-bold text-blue-600 dark:text-blue-400">{point?.mrrRetainedPct?.toFixed(1)}%</span>
+                            </div>
+                            <div className="border-t border-gray-200 dark:border-zinc-700 pt-1 mt-2">
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Contratos que viveram {label}+ meses</span>
+                                <span>{point?.retainedCount?.toLocaleString('pt-BR')} de {point?.totalStarted?.toLocaleString('pt-BR')}</span>
+                              </div>
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Saíram entre {label}-{Number(label)+1} meses</span>
+                                <span className="text-red-500">{point?.churnedCount?.toLocaleString('pt-BR')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="retainedPct" 
+                    stroke="#10b981" 
+                    strokeWidth={2}
+                    fill="url(#retentionGradient)" 
+                    name="Retenção Clientes (%)"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="mrrRetainedPct" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2}
+                    fill="url(#mrrRetentionGradient)" 
+                    name="Retenção MRR (%)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+              <div className="flex items-center justify-center gap-6 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span className="text-muted-foreground">% Contratos que viveram X+ meses</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span className="text-muted-foreground">% MRR que viveu X+ meses</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Top Clientes Perdidos */}
       {!isLoading && topClientesPerdidos.length > 0 && (

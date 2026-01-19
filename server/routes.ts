@@ -7911,6 +7911,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ordenar por percentual de churn (maior primeiro)
       churnPercentualPorSquad.sort((a, b) => b.percentual - a.percentual);
       
+      // ===== ANÁLISE DE SOBREVIVÊNCIA =====
+      // Mostra quanto tempo os contratos sobrevivem antes de sair (churn/pausa)
+      // Baseado nos contratos filtrados que já saíram
+      
+      const contratosComLifetime = allContratos.filter((c: any) => 
+        c.lifetime_meses !== undefined && c.lifetime_meses !== null && c.lifetime_meses >= 0
+      );
+      
+      const totalBase = contratosComLifetime.length;
+      const totalMrrBase = contratosComLifetime.reduce((sum: number, c: any) => sum + (c.valorr || 0), 0);
+      
+      // Calcular distribuição de sobrevivência
+      const retentionCurve: { monthIndex: number; retainedPct: number; mrrRetainedPct: number; retainedCount: number; totalStarted: number; retainedMrr: number; churnedCount: number; atRisk: number }[] = [];
+      
+      for (let month = 0; month <= 12; month++) {
+        // Contratos que sobreviveram pelo menos X meses
+        const sobreviventes = contratosComLifetime.filter((c: any) => c.lifetime_meses >= month);
+        const sobrevivMrr = sobreviventes.reduce((sum: number, c: any) => sum + (c.valorr || 0), 0);
+        
+        // Churned neste intervalo [month, month+1)
+        const churnedNoPeriodo = contratosComLifetime.filter((c: any) => 
+          c.lifetime_meses >= month && c.lifetime_meses < month + 1
+        );
+        
+        const retainedPct = totalBase > 0 ? (sobreviventes.length / totalBase) * 100 : 0;
+        const mrrRetainedPct = totalMrrBase > 0 ? (sobrevivMrr / totalMrrBase) * 100 : 0;
+        
+        retentionCurve.push({
+          monthIndex: month,
+          retainedPct: Math.round(retainedPct * 10) / 10,
+          mrrRetainedPct: Math.round(mrrRetainedPct * 10) / 10,
+          retainedCount: sobreviventes.length,
+          totalStarted: totalBase,
+          retainedMrr: sobrevivMrr,
+          churnedCount: churnedNoPeriodo.length,
+          atRisk: sobreviventes.length,
+        });
+      }
+      
       res.json({
         contratos: allContratos,
         metricas: {
@@ -7931,6 +7970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           responsaveis,
           servicos,
         },
+        retentionCurve,
       });
     } catch (error) {
       console.error("[api] Error fetching churn detalhamento:", error);
