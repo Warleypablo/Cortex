@@ -9736,7 +9736,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(SUM(d.valor_recorrente), 0) as mrr_obtido,
           COALESCE(SUM(d.valor_pontual), 0) as pontual_obtido,
-          COUNT(*) as negocios_ganhos
+          COUNT(*) as negocios_ganhos,
+          COUNT(CASE WHEN COALESCE(d.valor_recorrente, 0) > 0 THEN 1 END) as negocios_com_recorrente,
+          COUNT(CASE WHEN COALESCE(d.valor_pontual, 0) > 0 THEN 1 END) as negocios_com_pontual
         FROM crm_deal d
         LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseNegocios}
@@ -9768,17 +9770,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const reunioes = parseInt(rowReunioes.reunioes_realizadas) || 0;
       const negocios = parseInt(rowNegocios.negocios_ganhos) || 0;
       const leads = parseInt(rowLeads.leads_criados) || 0;
+      const negociosComRecorrente = parseInt(rowNegocios.negocios_com_recorrente) || 0;
+      const negociosComPontual = parseInt(rowNegocios.negocios_com_pontual) || 0;
       const conversao = reunioes > 0 ? (negocios / reunioes) * 100 : 0;
+      const mrrObtido = parseFloat(rowNegocios.mrr_obtido) || 0;
+      const pontualObtido = parseFloat(rowNegocios.pontual_obtido) || 0;
+      const ticketMedioRecorrente = negociosComRecorrente > 0 ? mrrObtido / negociosComRecorrente : 0;
+      const ticketMedioPontual = negociosComPontual > 0 ? pontualObtido / negociosComPontual : 0;
 
       console.log("[closers/metrics] Independent results - Reuniões:", reunioes, "Negócios:", negocios, "Leads:", leads);
 
       res.json({
-        mrrObtido: parseFloat(rowNegocios.mrr_obtido) || 0,
-        pontualObtido: parseFloat(rowNegocios.pontual_obtido) || 0,
+        mrrObtido,
+        pontualObtido,
         reunioesRealizadas: reunioes,
         negociosGanhos: negocios,
         leadsCriados: leads,
-        taxaConversao: conversao
+        taxaConversao: conversao,
+        negociosComRecorrente,
+        negociosComPontual,
+        ticketMedioRecorrente,
+        ticketMedioPontual
       });
     } catch (error) {
       console.error("[api] Error fetching closers metrics:", error);
