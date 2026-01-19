@@ -8,6 +8,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   DollarSign, 
   TrendingUp, 
@@ -20,7 +23,12 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   CalendarDays,
-  Zap
+  Zap,
+  X,
+  Building2,
+  User,
+  FileText,
+  Briefcase
 } from "lucide-react";
 import { 
   ComposedChart, 
@@ -56,6 +64,34 @@ interface RevenueGoalsData {
     recebido: number;
     pendente: number;
     inadimplente: number;
+  }[];
+}
+
+interface DiaDetalhesData {
+  data: string;
+  resumo: {
+    totalPrevisto: number;
+    totalRecebido: number;
+    totalPendente: number;
+    totalInadimplente: number;
+    quantidadeParcelas: number;
+  };
+  parcelas: {
+    id: number;
+    descricao: string;
+    valorBruto: number;
+    valorPago: number;
+    naoPago: number;
+    dataVencimento: string;
+    status: 'pago' | 'pendente' | 'inadimplente';
+    empresa: string;
+    idCliente: string;
+    nomeCliente: string;
+    cnpj: string | null;
+    responsavel: string | null;
+    squad: string | null;
+    servico: string | null;
+    statusClickup: string | null;
   }[];
 }
 
@@ -225,6 +261,7 @@ export default function RevenueGoals() {
   
   const hoje = new Date();
   const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<RevenueGoalsData>({
     queryKey: ['/api/financeiro/revenue-goals', selectedMonth.month, selectedMonth.year],
@@ -234,6 +271,28 @@ export default function RevenueGoals() {
       return response.json();
     },
   });
+
+  const { data: diaDetalhes, isLoading: isLoadingDetalhes } = useQuery<DiaDetalhesData>({
+    queryKey: ['/api/financeiro/revenue-goals/detalhes-dia', selectedDay],
+    queryFn: async () => {
+      const response = await fetch(`/api/financeiro/revenue-goals/detalhes-dia?data=${selectedDay}`);
+      if (!response.ok) throw new Error('Failed to fetch day details');
+      return response.json();
+    },
+    enabled: !!selectedDay,
+  });
+
+  const handleBarClick = (data: any) => {
+    if (data?.activePayload?.[0]?.payload) {
+      const dia = data.activePayload[0].payload.dia;
+      const dataCompleta = `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+      setSelectedDay(dataCompleta);
+    }
+  };
+
+  const parcelasPagas = diaDetalhes?.parcelas.filter(p => p.status === 'pago') || [];
+  const parcelasPendentes = diaDetalhes?.parcelas.filter(p => p.status === 'pendente') || [];
+  const parcelasInadimplentes = diaDetalhes?.parcelas.filter(p => p.status === 'inadimplente') || [];
 
   const chartData = useMemo(() => {
     if (!data?.porDia) return [];
@@ -390,7 +449,7 @@ export default function RevenueGoals() {
             <CardContent className="pt-4">
               <div className="h-[420px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
                     <defs>
                       <linearGradient id="recebidoGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.9}/>
@@ -603,6 +662,173 @@ export default function RevenueGoals() {
           </div>
         </Card>
       )}
+
+      <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-primary" />
+              Detalhes do Dia {selectedDay ? new Date(selectedDay + 'T12:00:00').toLocaleDateString('pt-BR') : ''}
+            </DialogTitle>
+            <DialogDescription>
+              Parcelas com vencimento nesta data
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingDetalhes ? (
+            <div className="space-y-4 p-4">
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-40 w-full" />
+            </div>
+          ) : diaDetalhes ? (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Previsto</p>
+                  <p className="text-lg font-bold">{formatCurrency(diaDetalhes.resumo.totalPrevisto)}</p>
+                </div>
+                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Recebido</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(diaDetalhes.resumo.totalRecebido)}</p>
+                </div>
+                <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">Pendente</p>
+                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{formatCurrency(diaDetalhes.resumo.totalPendente)}</p>
+                </div>
+                <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                  <p className="text-xs text-red-600 dark:text-red-400">Inadimplente</p>
+                  <p className="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(diaDetalhes.resumo.totalInadimplente)}</p>
+                </div>
+              </div>
+
+              <Tabs defaultValue="todas" className="flex-1 overflow-hidden flex flex-col">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="todas" data-testid="tab-todas">
+                    Todas ({diaDetalhes.parcelas.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="pagas" data-testid="tab-pagas" className="text-emerald-600">
+                    Pagas ({parcelasPagas.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="pendentes" data-testid="tab-pendentes" className="text-amber-600">
+                    Pendentes ({parcelasPendentes.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="inadimplentes" data-testid="tab-inadimplentes" className="text-red-600">
+                    Inadimplentes ({parcelasInadimplentes.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="todas" className="flex-1 overflow-hidden mt-4">
+                  <ParcelasList parcelas={diaDetalhes.parcelas} />
+                </TabsContent>
+                <TabsContent value="pagas" className="flex-1 overflow-hidden mt-4">
+                  <ParcelasList parcelas={parcelasPagas} />
+                </TabsContent>
+                <TabsContent value="pendentes" className="flex-1 overflow-hidden mt-4">
+                  <ParcelasList parcelas={parcelasPendentes} />
+                </TabsContent>
+                <TabsContent value="inadimplentes" className="flex-1 overflow-hidden mt-4">
+                  <ParcelasList parcelas={parcelasInadimplentes} />
+                </TabsContent>
+              </Tabs>
+            </div>
+          ) : (
+            <div className="p-4 text-center text-muted-foreground">
+              Nenhum dado disponível
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+function ParcelasList({ parcelas }: { parcelas: DiaDetalhesData['parcelas'] }) {
+  if (parcelas.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-32 text-muted-foreground">
+        Nenhuma parcela encontrada
+      </div>
+    );
+  }
+
+  const statusColors = {
+    pago: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    pendente: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    inadimplente: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  };
+
+  const statusLabels = {
+    pago: 'Pago',
+    pendente: 'Pendente',
+    inadimplente: 'Inadimplente',
+  };
+
+  return (
+    <ScrollArea className="h-[400px]">
+      <div className="space-y-3 pr-4">
+        {parcelas.map((parcela) => (
+          <Card key={parcela.id} className="p-4" data-testid={`card-parcela-${parcela.id}`}>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-semibold truncate">{parcela.nomeCliente}</h4>
+                    <Badge variant="outline" className={statusColors[parcela.status]}>
+                      {statusLabels[parcela.status]}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{parcela.descricao}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-bold text-lg">{formatCurrency(parcela.valorBruto)}</p>
+                  {parcela.status === 'pago' && parcela.valorPago > 0 && (
+                    <p className="text-xs text-emerald-600">Pago: {formatCurrency(parcela.valorPago)}</p>
+                  )}
+                  {parcela.naoPago > 0 && parcela.status !== 'pago' && (
+                    <p className="text-xs text-red-600">Falta: {formatCurrency(parcela.naoPago)}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                {parcela.cnpj && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span className="truncate">{parcela.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.***.***/****-$5')}</span>
+                  </div>
+                )}
+                {parcela.responsavel && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <User className="w-3.5 h-3.5" />
+                    <span className="truncate">{parcela.responsavel}</span>
+                  </div>
+                )}
+                {parcela.squad && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <Briefcase className="w-3.5 h-3.5" />
+                    <span className="truncate">{parcela.squad}</span>
+                  </div>
+                )}
+                {parcela.servico && (
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="truncate">{parcela.servico}</span>
+                  </div>
+                )}
+              </div>
+
+              {parcela.statusClickup && (
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="secondary" className="text-xs">
+                    {parcela.statusClickup}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{parcela.empresa}</span>
+                </div>
+              )}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </ScrollArea>
   );
 }
