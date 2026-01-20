@@ -1098,7 +1098,7 @@ export async function initializeBPTables(): Promise<void> {
     await db.execute(sql`CREATE SCHEMA IF NOT EXISTS kpi`);
     
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS plan.metric_targets_monthly (
+      CREATE TABLE IF NOT EXISTS cortex_core.metric_targets_monthly (
         id SERIAL PRIMARY KEY,
         year INTEGER NOT NULL,
         month INTEGER NOT NULL,
@@ -1146,7 +1146,7 @@ export async function initializeBPTables(): Promise<void> {
       )
     `);
     
-    console.log('[database] BP tables initialized (plan.metric_targets_monthly, kpi.metrics_registry_extended, kpi.metric_actuals_monthly)');
+    console.log('[database] BP tables initialized (cortex_core.metric_targets_monthly, kpi.metrics_registry_extended, kpi.metric_actuals_monthly)');
   } catch (error) {
     console.error('[database] Error initializing BP tables:', error);
   }
