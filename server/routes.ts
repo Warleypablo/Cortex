@@ -750,7 +750,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         const [targetsResult, metricsResult, actualsResult] = await Promise.all([
-          db.execute(sql`SELECT COUNT(*) as count FROM plan.metric_targets_monthly`),
+          db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.metric_targets_monthly`),
           db.execute(sql`SELECT COUNT(*) as count FROM kpi.metrics_registry_extended`),
           db.execute(sql`SELECT COUNT(*) as count FROM kpi.metric_actuals_monthly`)
         ]);
@@ -13681,7 +13681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { BP_2026_TARGETS } = await import("./okr2026/bp2026Targets");
       
       // Delete existing data first for clean seed
-      await db.execute(sql`DELETE FROM plan.metric_targets_monthly WHERE year = 2026`);
+      await db.execute(sql`DELETE FROM cortex_core.metric_targets_monthly WHERE year = 2026`);
       await db.execute(sql`DELETE FROM kpi.metrics_registry_extended WHERE metric_key LIKE '%'`);
       
       // Batch insert all metrics registry
@@ -13720,7 +13720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sql`(${r.year}, ${r.month}, ${r.metricKey}, ${r.dimKey}, ${r.dimVal}, ${r.value})`
         );
         await db.execute(sql`
-          INSERT INTO plan.metric_targets_monthly 
+          INSERT INTO cortex_core.metric_targets_monthly 
             (year, month, metric_key, dimension_key, dimension_value, target_value)
           VALUES ${sql.join(values, sql`, `)}
         `);
@@ -13749,7 +13749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const targetsResult = await db.execute(sql`
           SELECT year, month, metric_key, dimension_key, dimension_value, target_value
-          FROM plan.metric_targets_monthly
+          FROM cortex_core.metric_targets_monthly
           WHERE year = 2026
           ORDER BY metric_key, month
         `);
