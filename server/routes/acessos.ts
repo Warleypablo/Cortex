@@ -41,7 +41,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const turboToolsCount = await db.execute(sql`SELECT COUNT(*) as count FROM turbo_tools`);
       const turboCount = parseInt((turboToolsCount.rows[0] as any)?.count) || 0;
       
-      const cazStatusResult = await db.execute(sql`SELECT cnpj, ativo, id FROM caz_clientes WHERE cnpj IS NOT NULL`);
+      const cazStatusResult = await db.execute(sql`SELECT cnpj, ativo, id FROM "Conta Azul".caz_clientes WHERE cnpj IS NOT NULL`);
       const cazStatusMap = new Map<string, { ativo: string; id: number }>();
       for (const row of cazStatusResult.rows as any[]) {
         if (row.cnpj) {
@@ -49,7 +49,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         }
       }
       
-      const cupStatusResult = await db.execute(sql`SELECT cnpj, status FROM cup_clientes WHERE cnpj IS NOT NULL`);
+      const cupStatusResult = await db.execute(sql`SELECT cnpj, status FROM clickup.cup_clientes WHERE cnpj IS NOT NULL`);
       const cupStatusMap = new Map<string, string>();
       for (const row of cupStatusResult.rows as any[]) {
         if (row.cnpj) {
@@ -146,7 +146,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
             caz.cnpj, 
             caz.ativo,
             CASE WHEN cl.id IS NOT NULL THEN true ELSE false END as has_credentials
-          FROM caz_clientes caz
+          FROM "Conta Azul".caz_clientes caz
           LEFT JOIN clients cl ON LOWER(caz.nome) = LOWER(cl.name)
           WHERE LOWER(caz.nome) LIKE LOWER(${searchPattern}) OR LOWER(caz.cnpj) LIKE LOWER(${searchPattern})
           ORDER BY caz.nome ASC
@@ -160,7 +160,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
             caz.cnpj, 
             caz.ativo,
             CASE WHEN cl.id IS NOT NULL THEN true ELSE false END as has_credentials
-          FROM caz_clientes caz
+          FROM "Conta Azul".caz_clientes caz
           LEFT JOIN clients cl ON LOWER(caz.nome) = LOWER(cl.name)
           ORDER BY caz.nome ASC
           LIMIT 50
@@ -370,7 +370,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         const searchPattern = `%${search}%`;
         result = await db.execute(sql`
           SELECT nome, cnpj, status 
-          FROM cup_clientes 
+          FROM clickup.cup_clientes 
           WHERE (nome ILIKE ${searchPattern} OR cnpj ILIKE ${searchPattern})
           AND LOWER(status) = 'ativo'
           ORDER BY nome
@@ -379,7 +379,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       } else {
         result = await db.execute(sql`
           SELECT nome, cnpj, status 
-          FROM cup_clientes 
+          FROM clickup.cup_clientes 
           WHERE LOWER(status) = 'ativo'
           ORDER BY nome
           LIMIT 100
@@ -417,7 +417,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         
         try {
           const result = await db.execute(sql`
-            UPDATE cup_clientes 
+            UPDATE clickup.cup_clientes 
             SET link_lista_clickup = ${link}
             WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${cleanCnpj}
             RETURNING cnpj
@@ -456,7 +456,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       `);
       
       const cazClientes = await db.execute(sql`
-        SELECT id, nome, cnpj FROM caz_clientes WHERE nome IS NOT NULL
+        SELECT id, nome, cnpj FROM "Conta Azul".caz_clientes WHERE nome IS NOT NULL
       `);
       
       if (acessosClients.rows.length === 0 || cazClientes.rows.length === 0) {
@@ -673,7 +673,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       
       // Get the client name from caz_clientes for the aggregated display name
       const clientNameResult = await db.execute(sql`
-        SELECT nome FROM caz_clientes 
+        SELECT nome FROM "Conta Azul".caz_clientes 
         WHERE REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = ${normalizedCnpj}
         LIMIT 1
       `);
@@ -694,7 +694,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         INNER JOIN credentials cr ON c.id = cr.client_id
         WHERE REGEXP_REPLACE(c.linked_client_cnpj, '[^0-9]', '', 'g') = ${normalizedCnpj}
            OR LOWER(TRIM(c.name)) = (
-             SELECT LOWER(TRIM(nome)) FROM caz_clientes 
+             SELECT LOWER(TRIM(nome)) FROM "Conta Azul".caz_clientes 
              WHERE REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = ${normalizedCnpj}
              LIMIT 1
            )

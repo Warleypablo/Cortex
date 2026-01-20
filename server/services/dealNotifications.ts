@@ -46,7 +46,7 @@ async function initializeLastCheckedId() {
   try {
     const result = await db.execute(sql`
       SELECT MAX(id) as max_id 
-      FROM crm_deal 
+      FROM "Bitrix".crm_deal 
       WHERE stage_name = 'Negócio Ganho'
     `);
     
@@ -82,7 +82,7 @@ async function checkForNewDeals() {
         d.data_fechamento,
         d.category_name,
         d.assigned_by_name as closer_name
-      FROM crm_deal d
+      FROM "Bitrix".crm_deal d
       WHERE d.stage_name = 'Negócio Ganho'
         AND d.id > ${lastCheckedId}
         AND d.category_name = 'Recorrente'

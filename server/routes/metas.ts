@@ -200,7 +200,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
           squad,
           COUNT(*) as total_contratos,
           COALESCE(SUM(CAST(valorr AS DECIMAL)), 0) as mrr_realizado
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE status = 'Ativo'
           AND data_inicio <= ${endDate.toISOString()}
           AND (data_encerramento IS NULL OR data_encerramento > ${startDate.toISOString()})
@@ -363,7 +363,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
   app.get("/api/squads/list", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT DISTINCT squad FROM cup_contratos 
+        SELECT DISTINCT squad FROM clickup.cup_contratos 
         WHERE squad IS NOT NULL AND squad != ''
         ORDER BY squad
       `);

@@ -1182,7 +1182,7 @@ async function createCanonicalContractsView(): Promise<void> {
       c.data_encerramento,
       c.data_solicitacao_encerramento,
       c.data_pausa
-    FROM public.cup_contratos c
+    FROM clickup.cup_contratos c
     LEFT JOIN sys.catalog_aliases pa ON pa.catalog_key = 'catalog_products' 
       AND LOWER(TRIM(c.produto)) = pa.alias
     LEFT JOIN sys.catalog_aliases sa ON sa.catalog_key = 'catalog_squads' 
@@ -1370,9 +1370,9 @@ export async function initializeRhPesquisasTables(): Promise<void> {
   try {
     // Criar tabela de e-NPS (pesquisa completa)
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS rh_enps (
+      CREATE TABLE IF NOT EXISTS "Inhire".rh_enps (
         id SERIAL PRIMARY KEY,
-        colaborador_id INTEGER NOT NULL REFERENCES rh_pessoal(id),
+        colaborador_id INTEGER NOT NULL REFERENCES "Inhire".rh_pessoal(id),
         score INTEGER NOT NULL CHECK (score >= 0 AND score <= 10),
         comentario TEXT,
         data DATE DEFAULT CURRENT_DATE,
@@ -1394,9 +1394,9 @@ export async function initializeRhPesquisasTables(): Promise<void> {
     for (const col of columns) {
       try {
         if (col.startsWith('score_')) {
-          await db.execute(sql.raw(`ALTER TABLE rh_enps ADD COLUMN IF NOT EXISTS ${col} INTEGER`));
+          await db.execute(sql.raw(`ALTER TABLE "Inhire".rh_enps ADD COLUMN IF NOT EXISTS ${col} INTEGER`));
         } else {
-          await db.execute(sql.raw(`ALTER TABLE rh_enps ADD COLUMN IF NOT EXISTS ${col} TEXT`));
+          await db.execute(sql.raw(`ALTER TABLE "Inhire".rh_enps ADD COLUMN IF NOT EXISTS ${col} TEXT`));
         }
       } catch (e) {
         // Coluna já existe, ignorar
@@ -1405,10 +1405,10 @@ export async function initializeRhPesquisasTables(): Promise<void> {
     
     // Criar tabela de 1x1
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS rh_one_on_one (
+      CREATE TABLE IF NOT EXISTS "Inhire".rh_one_on_one (
         id SERIAL PRIMARY KEY,
-        colaborador_id INTEGER NOT NULL REFERENCES rh_pessoal(id),
-        lider_id INTEGER REFERENCES rh_pessoal(id),
+        colaborador_id INTEGER NOT NULL REFERENCES "Inhire".rh_pessoal(id),
+        lider_id INTEGER REFERENCES "Inhire".rh_pessoal(id),
         data DATE NOT NULL,
         tipo VARCHAR(50) DEFAULT 'regular',
         anotacoes TEXT,
@@ -1426,7 +1426,7 @@ export async function initializeRhPesquisasTables(): Promise<void> {
     const oneOnOneColumns = ['pdf_object_key', 'pdf_filename', 'transcript_url', 'transcript_text', 'uploaded_by'];
     for (const col of oneOnOneColumns) {
       try {
-        await db.execute(sql.raw(`ALTER TABLE rh_one_on_one ADD COLUMN IF NOT EXISTS ${col} ${col.includes('text') ? 'TEXT' : 'VARCHAR(1000)'}`));
+        await db.execute(sql.raw(`ALTER TABLE "Inhire".rh_one_on_one ADD COLUMN IF NOT EXISTS ${col} ${col.includes('text') ? 'TEXT' : 'VARCHAR(1000)'}`));
       } catch (e) {
         // Coluna já existe, ignorar
       }
@@ -1434,17 +1434,17 @@ export async function initializeRhPesquisasTables(): Promise<void> {
     
     // Migração para adicionar colunas de análise de IA
     try {
-      await db.execute(sql`ALTER TABLE rh_one_on_one ADD COLUMN IF NOT EXISTS ai_analysis TEXT`);
-      await db.execute(sql`ALTER TABLE rh_one_on_one ADD COLUMN IF NOT EXISTS ai_analyzed_at TIMESTAMP`);
+      await db.execute(sql`ALTER TABLE "Inhire".rh_one_on_one ADD COLUMN IF NOT EXISTS ai_analysis TEXT`);
+      await db.execute(sql`ALTER TABLE "Inhire".rh_one_on_one ADD COLUMN IF NOT EXISTS ai_analyzed_at TIMESTAMP`);
     } catch (e) {
       // Colunas já existem, ignorar
     }
     
     // Criar tabela de PDI
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS rh_pdi (
+      CREATE TABLE IF NOT EXISTS "Inhire".rh_pdi (
         id SERIAL PRIMARY KEY,
-        colaborador_id INTEGER NOT NULL REFERENCES rh_pessoal(id),
+        colaborador_id INTEGER NOT NULL REFERENCES "Inhire".rh_pessoal(id),
         titulo VARCHAR(200) NOT NULL,
         descricao TEXT,
         status VARCHAR(50) DEFAULT 'em_andamento',
@@ -1458,12 +1458,12 @@ export async function initializeRhPesquisasTables(): Promise<void> {
     `);
     
     // Criar índices
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_enps_colaborador ON rh_enps(colaborador_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_enps_data ON rh_enps(data)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_one_on_one_colaborador ON rh_one_on_one(colaborador_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_one_on_one_data ON rh_one_on_one(data)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_pdi_colaborador ON rh_pdi(colaborador_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_pdi_status ON rh_pdi(status)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_enps_colaborador ON "Inhire".rh_enps(colaborador_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_enps_data ON "Inhire".rh_enps(data)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_one_on_one_colaborador ON "Inhire".rh_one_on_one(colaborador_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_one_on_one_data ON "Inhire".rh_one_on_one(data)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_pdi_colaborador ON "Inhire".rh_pdi(colaborador_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_pdi_status ON "Inhire".rh_pdi(status)`);
     
     console.log('[database] RH Pesquisas tables (e-NPS, 1x1, PDI) initialized');
   } catch (error) {
