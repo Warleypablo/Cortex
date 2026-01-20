@@ -108,7 +108,7 @@ export async function getMrrAtivo(): Promise<number> {
     // Usa cup_contratos diretamente (dados em tempo real) - mesma lógica da Home
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr), 0) as mrr
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
     return parseFloat((result.rows[0] as any)?.mrr || "0");
@@ -123,11 +123,11 @@ export async function getMrrInicioMes(): Promise<number> {
     const result = await db.execute(sql`
       WITH primeiro_snapshot_mes AS (
         SELECT MIN(data_snapshot) as data_primeiro
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       )
       SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
-      FROM cup_data_hist h
+      FROM clickup.cup_data_hist h
       JOIN primeiro_snapshot_mes ps ON h.data_snapshot = ps.data_primeiro
       WHERE status IN ('ativo', 'onboarding', 'triagem')
         AND valorr IS NOT NULL
@@ -147,7 +147,7 @@ export async function getMrrSerie(): Promise<{ month: string; value: number }[]>
         SELECT 
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           MAX(data_snapshot) as last_snapshot
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE data_snapshot >= NOW() - INTERVAL '12 months'
         GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
       )
@@ -155,7 +155,7 @@ export async function getMrrSerie(): Promise<{ month: string; value: number }[]>
         ms.month,
         COALESCE(SUM(h.valorr::numeric), 0) as mrr
       FROM monthly_snapshots ms
-      JOIN cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      JOIN clickup.cup_data_hist h ON h.data_snapshot = ms.last_snapshot
       WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         AND h.valorr IS NOT NULL
         AND h.valorr > 0
@@ -186,7 +186,7 @@ export async function getReceitaYTD(): Promise<{
       SELECT 
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as total,
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND categoria_nome NOT ILIKE '%imposto%' THEN valor_pago::numeric ELSE 0 END), 0) as liquida
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
         AND tipo_evento = 'RECEITA'
         AND status = 'QUITADO'
@@ -216,7 +216,7 @@ export async function getEbitdaYTD(): Promise<number> {
       SELECT 
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
         COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as ebitda
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
         AND status = 'QUITADO'
     `);
@@ -231,7 +231,7 @@ export async function getCaixaAtual(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(balance::numeric), 0) as saldo
-      FROM caz_bancos
+      FROM "Conta Azul".caz_bancos
       WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
     `);
     return parseFloat((result.rows[0] as any)?.saldo || "0");
@@ -248,7 +248,7 @@ export async function getInadimplenciaValor(): Promise<number> {
     // Mesma lógica do /api/inadimplencia/resumo
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(nao_pago::numeric), 0) as valor_inadimplente
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= date_trunc('month', CURRENT_DATE)
         AND data_vencimento < CURRENT_DATE
@@ -266,7 +266,7 @@ export async function getInadimplenciaPct(): Promise<number> {
     const result = await db.execute(sql`
       WITH inadimplente AS (
         SELECT COALESCE(SUM(nao_pago::numeric), 0) as valor_inadimplente
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND data_vencimento >= date_trunc('month', CURRENT_DATE)
           AND data_vencimento < CURRENT_DATE
@@ -274,7 +274,7 @@ export async function getInadimplenciaPct(): Promise<number> {
       ),
       receita_mes AS (
         SELECT COALESCE(SUM(valor_bruto::numeric), 0) as receita_total
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND data_vencimento >= date_trunc('month', CURRENT_DATE)
           AND data_vencimento <= CURRENT_DATE
@@ -306,7 +306,7 @@ export async function getGrossChurnMrr(): Promise<number> {
     // Churn = contratos com data_solicitacao_encerramento no mês atual
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr::numeric), 0) as churn_mrr
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE valorr IS NOT NULL
         AND valorr::numeric > 0
         AND data_solicitacao_encerramento IS NOT NULL 
@@ -340,7 +340,7 @@ export async function getExpansionMrr(): Promise<number> {
           id_task,
           id_subtask,
           valorr::numeric as valorr_atual
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
           AND valorr IS NOT NULL
@@ -351,7 +351,7 @@ export async function getExpansionMrr(): Promise<number> {
           id_task,
           id_subtask,
           valorr::numeric as valorr_anterior
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW() - INTERVAL '1 month', 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
           AND valorr IS NOT NULL
@@ -403,14 +403,14 @@ export async function getLogoChurn(): Promise<number> {
     const result = await db.execute(sql`
       WITH clientes_cancelados AS (
         SELECT DISTINCT c.id_task
-        FROM cup_contratos c
+        FROM clickup.cup_contratos c
         WHERE c.status = 'cancelado'
           AND c.data_encerramento IS NOT NULL
           AND TO_CHAR(c.data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       ),
       clientes_ainda_ativos AS (
         SELECT DISTINCT id_task
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE status IN ('ativo', 'onboarding', 'triagem')
       )
       SELECT COUNT(DISTINCT cc.id_task) as logo_churn
@@ -429,11 +429,11 @@ export async function getClientesInicioMes(): Promise<number> {
     const result = await db.execute(sql`
       WITH primeiro_snapshot_mes AS (
         SELECT MIN(data_snapshot) as data_primeiro
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       )
       SELECT COUNT(DISTINCT h.id_task) as total
-      FROM cup_data_hist h
+      FROM clickup.cup_data_hist h
       JOIN primeiro_snapshot_mes ps ON h.data_snapshot = ps.data_primeiro
       WHERE h.status IN ('ativo', 'onboarding', 'triagem')
     `);
@@ -497,7 +497,7 @@ export async function getClientesAtivos(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COUNT(DISTINCT id_task) as total
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
     return parseInt((result.rows[0] as any)?.total || "0");
@@ -511,7 +511,7 @@ export async function getHeadcount(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE status = 'Ativo'
     `);
     return parseInt((result.rows[0] as any)?.total || "0");
@@ -526,19 +526,19 @@ export async function getNewMrr(): Promise<number> {
     const result = await db.execute(sql`
       WITH novos_clientes AS (
         SELECT DISTINCT id_task
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE data_inicio IS NOT NULL
           AND TO_CHAR(data_inicio, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
       ),
       clientes_existentes AS (
         SELECT DISTINCT id_task
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW() - INTERVAL '1 month', 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
       )
       SELECT COALESCE(SUM(c.valorr::numeric), 0) as new_mrr
-      FROM cup_contratos c
+      FROM clickup.cup_contratos c
       JOIN novos_clientes nc ON c.id_task = nc.id_task
       WHERE c.status IN ('ativo', 'onboarding', 'triagem')
         AND c.valorr IS NOT NULL
@@ -557,7 +557,7 @@ export async function getNewMrrYTD(): Promise<number> {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr::numeric), 0) as new_mrr_ytd
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE data_inicio IS NOT NULL
         AND EXTRACT(YEAR FROM data_inicio) = ${currentYear}
         AND status IN ('ativo', 'onboarding', 'triagem')
@@ -575,7 +575,7 @@ export async function getVendasPontual(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorp::numeric), 0) as vendas_pontual
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE data_inicio IS NOT NULL
         AND TO_CHAR(data_inicio, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
         AND valorp IS NOT NULL
@@ -593,7 +593,7 @@ export async function getVendasMrr(): Promise<number> {
     // Vendas MRR = soma de valor_recorrente de deals com stage_name = 'Negócio Ganho' fechados no mês atual
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valor_recorrente::numeric), 0) as vendas_mrr
-      FROM crm_deal
+      FROM "Bitrix".crm_deal
       WHERE stage_name = 'Negócio Ganho'
         AND data_fechamento IS NOT NULL
         AND TO_CHAR(data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
@@ -615,7 +615,7 @@ export async function getGeracaoCaixa(): Promise<number> {
       SELECT 
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
         COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as geracao_caixa
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
         AND status = 'QUITADO'
     `);
@@ -631,7 +631,7 @@ export async function getTurboohReceita(): Promise<number | null> {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valor_pago::numeric), 0) as receita
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND status = 'QUITADO'
         AND EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
@@ -654,7 +654,7 @@ export async function getTurboohCustos(): Promise<number | null> {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valor_pago::numeric), 0) as custos
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'DESPESA'
         AND status = 'QUITADO'
         AND EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
@@ -706,7 +706,7 @@ export async function getTechProjetosEntregues(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE servico ILIKE '%tech%'
         AND status = 'concluido'
         AND EXTRACT(YEAR FROM data_encerramento) = EXTRACT(YEAR FROM NOW())
@@ -729,7 +729,7 @@ export async function getTechFreelancersCusto(): Promise<number> {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valor_pago::numeric), 0) as custo
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'DESPESA'
         AND status = 'QUITADO'
         AND EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
@@ -765,7 +765,7 @@ export async function getTechProjetosValor(): Promise<number> {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(COALESCE(valorr::numeric, 0) + COALESCE(valorp::numeric, 0)), 0) as valor
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE servico ILIKE '%tech%'
         AND EXTRACT(YEAR FROM data_inicio) = ${currentYear}
     `);
@@ -847,7 +847,7 @@ async function getMrrSeriesForRange(startDate: string, endDate: string): Promise
         SELECT 
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           MAX(data_snapshot) as last_snapshot
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
         GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
@@ -856,7 +856,7 @@ async function getMrrSeriesForRange(startDate: string, endDate: string): Promise
         ms.month as date,
         COALESCE(SUM(h.valorr::numeric), 0) as value
       FROM monthly_snapshots ms
-      JOIN cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      JOIN clickup.cup_data_hist h ON h.data_snapshot = ms.last_snapshot
       WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         AND h.valorr IS NOT NULL
         AND h.valorr > 0
@@ -879,7 +879,7 @@ async function getRevenueSeriesForRange(startDate: string, endDate: string): Pro
       SELECT 
         TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
         COALESCE(SUM(valor_pago::numeric), 0) as value
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
         AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
         AND tipo_evento = 'RECEITA'
@@ -904,7 +904,7 @@ async function getActiveCustomersSeriesForRange(startDate: string, endDate: stri
         SELECT 
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           MAX(data_snapshot) as last_snapshot
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
         GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
@@ -913,7 +913,7 @@ async function getActiveCustomersSeriesForRange(startDate: string, endDate: stri
         ms.month as date,
         COUNT(DISTINCT h.id_task) as value
       FROM monthly_snapshots ms
-      JOIN cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      JOIN clickup.cup_data_hist h ON h.data_snapshot = ms.last_snapshot
       WHERE h.status IN ('ativo', 'onboarding', 'triagem')
       GROUP BY ms.month
       ORDER BY ms.month
@@ -935,7 +935,7 @@ async function getEbitdaSeriesForRange(startDate: string, endDate: string): Prom
         TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
         COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as value
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
         AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
         AND status = 'QUITADO'
@@ -958,7 +958,7 @@ async function getChurnSeriesForRange(startDate: string, endDate: string): Promi
       SELECT 
         TO_CHAR(data_encerramento, 'YYYY-MM') as date,
         COALESCE(SUM(valorr::numeric), 0) as value
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE status = 'cancelado'
         AND data_encerramento IS NOT NULL
         AND data_encerramento >= ${startDate}::date 
@@ -984,7 +984,7 @@ async function getTurboohRevenueSeriesForRange(startDate: string, endDate: strin
       SELECT 
         TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
         COALESCE(SUM(valor_pago::numeric), 0) as value
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
         AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
         AND tipo_evento = 'RECEITA'
@@ -1014,7 +1014,7 @@ async function getNewMrrSeriesForRange(startDate: string, endDate: string): Prom
       SELECT 
         TO_CHAR(data_inicio, 'YYYY-MM') as date,
         COALESCE(SUM(valorr::numeric), 0) as value
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE data_inicio >= ${startDate}::date 
         AND data_inicio <= ${endDate}::date
         AND status IN ('ativo', 'onboarding', 'triagem')
@@ -1040,7 +1040,7 @@ async function getInadimplenciaSeriesForRange(startDate: string, endDate: string
         SELECT 
           TO_CHAR(data_vencimento, 'YYYY-MM') as date,
           COALESCE(SUM(nao_pago::numeric + COALESCE(perda::numeric, 0)), 0) as valor_inadimplente
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento < NOW()
@@ -1052,7 +1052,7 @@ async function getInadimplenciaSeriesForRange(startDate: string, endDate: string
         SELECT 
           TO_CHAR(data_vencimento, 'YYYY-MM') as date,
           COALESCE(SUM(valor_bruto::numeric), 0) as receita_total
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND data_vencimento >= ${startDate}::date 
           AND data_vencimento <= ${endDate}::date
@@ -1084,7 +1084,7 @@ async function getCashBalanceSeriesForRange(startDate: string, endDate: string):
       SELECT 
         TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE -valor_pago::numeric END), 0) as value
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
         AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
         AND status = 'QUITADO'
@@ -1112,7 +1112,7 @@ async function getTurboohResultSeriesForRange(startDate: string, endDate: string
         TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
         COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as value
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
         AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
         AND status = 'QUITADO'
@@ -1144,7 +1144,7 @@ async function getExpansionMrrSeriesForRange(startDate: string, endDate: string)
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           valorr::numeric as valorr,
           status
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
           AND status IN ('ativo', 'onboarding', 'triagem')
@@ -1186,7 +1186,7 @@ async function getSgaPctSeriesForRange(startDate: string, endDate: string): Prom
         SELECT 
           TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
           COALESCE(SUM(valor_pago::numeric), 0) as sga_total
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status = 'QUITADO'
           AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
@@ -1209,7 +1209,7 @@ async function getSgaPctSeriesForRange(startDate: string, endDate: string): Prom
         SELECT 
           TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
           COALESCE(SUM(valor_pago::numeric), 0) as receita_total
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND status = 'QUITADO'
           AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
@@ -1243,7 +1243,7 @@ async function getCacPctSeriesForRange(startDate: string, endDate: string): Prom
         SELECT 
           TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
           COALESCE(SUM(valor_pago::numeric), 0) as cac_total
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status = 'QUITADO'
           AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
@@ -1291,7 +1291,7 @@ async function getCacPctSeriesForRange(startDate: string, endDate: string): Prom
         SELECT 
           TO_CHAR(data_inicio, 'YYYY-MM') as date,
           COALESCE(SUM(valorr::numeric), 0) as new_mrr
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE data_inicio >= ${startDate}::date 
           AND data_inicio <= ${endDate}::date
           AND status IN ('ativo', 'onboarding', 'triagem')
@@ -1339,7 +1339,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
     const result = await db.execute(sql`
       WITH all_months AS (
         SELECT DISTINCT TO_CHAR(data_snapshot, 'YYYY-MM') as month
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
       ),
@@ -1353,7 +1353,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
         SELECT 
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           MAX(data_snapshot) as last_snapshot
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE data_snapshot >= (${startDate}::date - INTERVAL '1 month')
           AND data_snapshot <= ${endDate}::date
         GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
@@ -1364,7 +1364,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
           h.id_subtask,
           COALESCE(MAX(h.valorr::numeric), 0) as valorr
         FROM monthly_snapshots ms
-        JOIN cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+        JOIN clickup.cup_data_hist h ON h.data_snapshot = ms.last_snapshot
         WHERE h.status IN ('ativo', 'onboarding', 'triagem')
           AND h.valorr IS NOT NULL
           AND h.valorr > 0
@@ -1382,7 +1382,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
         SELECT 
           TO_CHAR(data_encerramento, 'YYYY-MM') as month,
           COALESCE(SUM(valorr::numeric), 0) as churn_mrr
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE status = 'cancelado'
           AND data_encerramento IS NOT NULL
           AND data_encerramento >= ${startDate}::date 
@@ -1440,7 +1440,7 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
         SELECT DISTINCT ON (TO_CHAR(data_snapshot, 'YYYY-MM'))
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           data_snapshot
-        FROM cup_data_hist
+        FROM clickup.cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
         ORDER BY TO_CHAR(data_snapshot, 'YYYY-MM'), data_snapshot ASC
@@ -1450,7 +1450,7 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
           mi.month,
           COUNT(DISTINCT h.id_task) as clientes_inicio
         FROM monthly_clients_inicio mi
-        JOIN cup_data_hist h ON h.data_snapshot = mi.data_snapshot
+        JOIN clickup.cup_data_hist h ON h.data_snapshot = mi.data_snapshot
         WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         GROUP BY mi.month
       ),
@@ -1458,14 +1458,14 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
         SELECT 
           TO_CHAR(data_encerramento, 'YYYY-MM') as date,
           COUNT(DISTINCT id_task) as logos_churned
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE status = 'cancelado'
           AND data_encerramento IS NOT NULL
           AND data_encerramento >= ${startDate}::date 
           AND data_encerramento <= ${endDate}::date
           AND id_task NOT IN (
             SELECT DISTINCT id_task 
-            FROM cup_contratos 
+            FROM clickup.cup_contratos 
             WHERE status IN ('ativo', 'onboarding', 'triagem')
               AND id_task IS NOT NULL
           )

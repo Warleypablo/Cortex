@@ -133,7 +133,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     try {
       const result = await db.execute(sql`
         SELECT id, nome, descricao, ativo, criado_em as "criadoEm"
-        FROM rh_cargos 
+        FROM "Inhire".rh_cargos 
         WHERE ativo = 'true' 
         ORDER BY nome
       `);
@@ -158,7 +158,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       }
       const { nome, descricao, ativo } = validation.data;
       const result = await db.execute(sql`
-        INSERT INTO rh_cargos (nome, descricao, ativo)
+        INSERT INTO "Inhire".rh_cargos (nome, descricao, ativo)
         VALUES (${nome}, ${descricao || null}, ${ativo || 'true'})
         RETURNING id, nome, descricao, ativo, criado_em as "criadoEm"
       `);
@@ -176,7 +176,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Invalid cargo ID" });
       }
       await db.execute(sql`
-        UPDATE rh_cargos SET ativo = 'false' WHERE id = ${id}
+        UPDATE "Inhire".rh_cargos SET ativo = 'false' WHERE id = ${id}
       `);
       res.status(204).send();
     } catch (error) {
@@ -190,7 +190,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     try {
       const result = await db.execute(sql`
         SELECT id, nome, ordem, ativo, criado_em as "criadoEm"
-        FROM rh_niveis 
+        FROM "Inhire".rh_niveis 
         WHERE ativo = 'true' 
         ORDER BY ordem, nome
       `);
@@ -215,7 +215,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       }
       const { nome, ordem, ativo } = validation.data;
       const result = await db.execute(sql`
-        INSERT INTO rh_niveis (nome, ordem, ativo)
+        INSERT INTO "Inhire".rh_niveis (nome, ordem, ativo)
         VALUES (${nome}, ${ordem || 0}, ${ativo || 'true'})
         RETURNING id, nome, ordem, ativo, criado_em as "criadoEm"
       `);
@@ -233,7 +233,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Invalid nivel ID" });
       }
       await db.execute(sql`
-        UPDATE rh_niveis SET ativo = 'false' WHERE id = ${id}
+        UPDATE "Inhire".rh_niveis SET ativo = 'false' WHERE id = ${id}
       `);
       res.status(204).send();
     } catch (error) {
@@ -247,7 +247,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
     try {
       const result = await db.execute(sql`
         SELECT id, nome, descricao, ativo, criado_em as "criadoEm"
-        FROM rh_squads 
+        FROM "Inhire".rh_squads 
         WHERE ativo = 'true' 
         ORDER BY nome
       `);
@@ -272,7 +272,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       }
       const { nome, descricao, ativo } = validation.data;
       const result = await db.execute(sql`
-        INSERT INTO rh_squads (nome, descricao, ativo)
+        INSERT INTO "Inhire".rh_squads (nome, descricao, ativo)
         VALUES (${nome}, ${descricao || null}, ${ativo || 'true'})
         RETURNING id, nome, descricao, ativo, criado_em as "criadoEm"
       `);
@@ -290,7 +290,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Invalid squad ID" });
       }
       await db.execute(sql`
-        UPDATE rh_squads SET ativo = 'false' WHERE id = ${id}
+        UPDATE "Inhire".rh_squads SET ativo = 'false' WHERE id = ${id}
       `);
       res.status(204).send();
     } catch (error) {
@@ -320,7 +320,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
           observacoes,
           criado_em as "criadoEm",
           criado_por as "criadoPor"
-        FROM rh_promocoes 
+        FROM "Inhire".rh_promocoes 
         WHERE colaborador_id = ${id}
         ORDER BY data_promocao DESC
       `);
@@ -344,7 +344,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       const { dataPromocao, cargoAnterior, cargoNovo, nivelAnterior, nivelNovo, salarioAnterior, salarioNovo, observacoes, criadoPor } = validation.data;
       
       const result = await db.execute(sql`
-        INSERT INTO rh_promocoes (colaborador_id, data_promocao, cargo_anterior, cargo_novo, nivel_anterior, nivel_novo, salario_anterior, salario_novo, observacoes, criado_por)
+        INSERT INTO "Inhire".rh_promocoes (colaborador_id, data_promocao, cargo_anterior, cargo_novo, nivel_anterior, nivel_novo, salario_anterior, salario_novo, observacoes, criado_por)
         VALUES (${colaboradorId}, ${dataPromocao}, ${cargoAnterior || null}, ${cargoNovo || null}, ${nivelAnterior || null}, ${nivelNovo || null}, ${salarioAnterior || null}, ${salarioNovo || null}, ${observacoes || null}, ${criadoPor || null})
         RETURNING 
           id, 
@@ -363,7 +363,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       
       try {
         await db.execute(sql`
-          UPDATE rh_pessoal 
+          UPDATE "Inhire".rh_pessoal 
           SET 
             cargo = COALESCE(${cargoNovo || null}, cargo),
             nivel = COALESCE(${nivelNovo || null}, nivel),
@@ -618,13 +618,13 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       
       if (type === "pdf") {
         await db.execute(sql`
-          UPDATE rh_one_on_one 
+          UPDATE "Inhire".rh_one_on_one 
           SET pdf_object_key = NULL, pdf_filename = NULL
           WHERE id = ${id}
         `);
       } else {
         await db.execute(sql`
-          UPDATE rh_one_on_one 
+          UPDATE "Inhire".rh_one_on_one 
           SET transcript_url = NULL, transcript_text = NULL
           WHERE id = ${id}
         `);
@@ -648,7 +648,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       const { pauta, notas } = req.body;
       
       await db.execute(sql`
-        UPDATE rh_one_on_one 
+        UPDATE "Inhire".rh_one_on_one 
         SET anotacoes = ${pauta || null}, proximos_passos = ${notas || null}
         WHERE id = ${id}
       `);
@@ -663,7 +663,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
           transcript_url as "transcriptUrl", transcript_text as "transcriptText",
           uploaded_by as "uploadedBy",
           ai_analysis as "aiAnalysis", ai_analyzed_at as "aiAnalyzedAt"
-        FROM rh_one_on_one 
+        FROM "Inhire".rh_one_on_one 
         WHERE id = ${id}
       `);
       
@@ -684,7 +684,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       // Get meeting to find document object key
       const meetings = await db.execute(sql`
         SELECT pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename"
-        FROM rh_one_on_one 
+        FROM "Inhire".rh_one_on_one 
         WHERE id = ${id}
       `);
       
@@ -744,7 +744,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
           data, tipo, anotacoes as "pauta", proximos_passos as "notas",
           transcript_text as "transcriptText", 
           pdf_object_key as "pdfObjectKey", pdf_filename as "pdfFilename"
-        FROM rh_one_on_one 
+        FROM "Inhire".rh_one_on_one 
         WHERE id = ${id}
       `);
       
@@ -756,7 +756,7 @@ export function registerHRRoutes(app: Express, db: any, storage: IStorage) {
       
       // Get colaborador name
       const colaboradorResult = await db.execute(sql`
-        SELECT nome FROM rh_pessoal WHERE id = ${meeting.colaboradorId}
+        SELECT nome FROM "Inhire".rh_pessoal WHERE id = ${meeting.colaboradorId}
       `);
       const colaboradorNome = colaboradorResult.rows[0]?.nome || "Colaborador";
       
@@ -901,7 +901,7 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
       
       // Save the analysis to the database
       await db.execute(sql`
-        UPDATE rh_one_on_one 
+        UPDATE "Inhire".rh_one_on_one 
         SET ai_analysis = ${JSON.stringify(analysis)}, ai_analyzed_at = NOW()
         WHERE id = ${id}
       `);
@@ -1074,43 +1074,43 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
         // E-NPS responses
         db.execute(sql`
           SELECT id, score, comentario, data, created_at
-          FROM rh_enps
+          FROM "Inhire".rh_enps
           WHERE colaborador_id = ${colaboradorId}
           ORDER BY data DESC
         `),
         // 1x1 meetings
         db.execute(sql`
           SELECT id, data, pauta, notas, created_at
-          FROM rh_one_on_one
+          FROM "Inhire".rh_one_on_one
           WHERE colaborador_id = ${colaboradorId}
           ORDER BY data DESC
         `),
         // PDI goals
         db.execute(sql`
           SELECT id, titulo, descricao, competencia, status, data_inicio, data_alvo, created_at
-          FROM rh_pdi
+          FROM "Inhire".rh_pdi
           WHERE colaborador_id = ${colaboradorId}
           ORDER BY created_at DESC
         `),
         // PDI checkpoints (all for this colaborador's PDIs)
         db.execute(sql`
           SELECT pc.id, pc.pdi_id, pc.descricao, pc.data_alvo, pc.concluido, pc.concluido_em, p.titulo as pdi_titulo
-          FROM rh_pdi_checkpoints pc
-          JOIN rh_pdi p ON p.id = pc.pdi_id
+          FROM "Inhire".rh_pdi_checkpoints pc
+          JOIN "Inhire".rh_pdi p ON p.id = pc.pdi_id
           WHERE p.colaborador_id = ${colaboradorId}
           ORDER BY COALESCE(pc.concluido_em, pc.data_alvo) DESC NULLS LAST
         `),
         // Promoções
         db.execute(sql`
           SELECT id, cargo_anterior, cargo_novo, nivel_anterior, nivel_novo, salario_anterior, salario_novo, data_promocao, observacao
-          FROM rh_promocoes
+          FROM "Inhire".rh_promocoes
           WHERE colaborador_id = ${colaboradorId}
           ORDER BY data_promocao DESC
         `),
         // Health score changes
         db.execute(sql`
           SELECT id, score, categoria, observacao, data, created_at
-          FROM rh_health_scores
+          FROM "Inhire".rh_health_scores
           WHERE colaborador_id = ${colaboradorId}
           ORDER BY data DESC
         `)
@@ -1250,8 +1250,8 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
           COUNT(*) FILTER (WHERE e.score >= 7 AND e.score < 9) as "neutros",
           COUNT(*) FILTER (WHERE e.score < 7) as "detratores",
           COUNT(*) as "totalRespostas"
-        FROM rh_enps e
-        JOIN rh_pessoal c ON e.colaborador_id = c.id
+        FROM "Inhire".rh_enps e
+        JOIN "Inhire".rh_pessoal c ON e.colaborador_id = c.id
         WHERE c.status = 'Ativo'
       `);
       const enpsData = enpsResult.rows[0] as any;
@@ -1268,8 +1268,8 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
           c.squad,
           MAX(o.data) as "ultimaReuniao",
           COUNT(o.id) as "totalReunioes"
-        FROM rh_pessoal c
-        LEFT JOIN rh_one_on_one o ON c.id = o.colaborador_id
+        FROM "Inhire".rh_pessoal c
+        LEFT JOIN "Inhire".rh_one_on_one o ON c.id = o.colaborador_id
         WHERE c.status = 'Ativo'
         GROUP BY c.id, c.nome, c.squad
       `);
@@ -1306,8 +1306,8 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
           COUNT(p.id) FILTER (WHERE p.status = 'em_andamento') as "pdiAtivos",
           COUNT(p.id) FILTER (WHERE p.status = 'concluido') as "pdiConcluidos",
           AVG(p.progresso) FILTER (WHERE p.status = 'em_andamento') as "progressoMedio"
-        FROM rh_pessoal c
-        LEFT JOIN rh_pdi p ON c.id = p.colaborador_id
+        FROM "Inhire".rh_pessoal c
+        LEFT JOIN "Inhire".rh_pdi p ON c.id = p.colaborador_id
         WHERE c.status = 'Ativo'
         GROUP BY c.id, c.nome, c.squad
       `);
@@ -1338,8 +1338,8 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
           c.id as "colaboradorId",
           c.nome,
           c.squad
-        FROM rh_enps e
-        JOIN rh_pessoal c ON e.colaborador_id = c.id
+        FROM "Inhire".rh_enps e
+        JOIN "Inhire".rh_pessoal c ON e.colaborador_id = c.id
         WHERE c.status = 'Ativo'
         ORDER BY e.data DESC
         LIMIT 20
@@ -1453,7 +1453,7 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
         FROM onboarding_colaborador oc
         JOIN onboarding_progresso op ON op.onboarding_colaborador_id = oc.id
         JOIN onboarding_etapas oe ON op.etapa_id = oe.id
-        JOIN rh_pessoal c ON oc.colaborador_id = c.id
+        JOIN "Inhire".rh_pessoal c ON oc.colaborador_id = c.id
         WHERE op.status != 'completed'
           AND oe.prazo_dias IS NOT NULL
           AND oc.data_inicio IS NOT NULL
@@ -1495,7 +1495,7 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
     try {
       const result = await db.execute(sql`
         SELECT id, nome, cargo, squad
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE status = 'Ativo'
         ORDER BY nome
       `);
@@ -1867,7 +1867,7 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
                c.nome as "colaboradorNome"
         FROM onboarding_colaborador oc
         JOIN onboarding_templates ot ON oc.template_id = ot.id
-        JOIN rh_pessoal c ON oc.colaborador_id = c.id
+        JOIN "Inhire".rh_pessoal c ON oc.colaborador_id = c.id
         WHERE oc.colaborador_id = ${colaboradorId}
         ORDER BY oc.created_at DESC
         LIMIT 1
@@ -1883,7 +1883,7 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
                r.nome as "responsavelNome"
         FROM onboarding_progresso op
         JOIN onboarding_etapas oe ON op.etapa_id = oe.id
-        LEFT JOIN rh_pessoal r ON op.responsavel_id = r.id
+        LEFT JOIN "Inhire".rh_pessoal r ON op.responsavel_id = r.id
         WHERE op.onboarding_colaborador_id = ${onboarding.id}
         ORDER BY oe.ordem
       `);
@@ -1909,7 +1909,7 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
                (SELECT COUNT(*) FROM onboarding_progresso op WHERE op.onboarding_colaborador_id = oc.id AND op.status = 'completed') as "etapasConcluidas"
         FROM onboarding_colaborador oc
         JOIN onboarding_templates ot ON oc.template_id = ot.id
-        JOIN rh_pessoal c ON oc.colaborador_id = c.id
+        JOIN "Inhire".rh_pessoal c ON oc.colaborador_id = c.id
         ORDER BY oc.created_at DESC
       `);
       res.json(result.rows);
