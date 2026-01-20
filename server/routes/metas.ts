@@ -79,7 +79,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
       // 1. Seed metrics registry first
       for (const metric of BP_2026_TARGETS) {
         await db.execute(sql`
-          INSERT INTO kpi.metrics_registry_extended (
+          INSERT INTO cortex_core.metrics_registry_extended (
             metric_key, title, unit, period_type, direction, 
             is_derived, formula_expr, dimension_key, dimension_value, updated_at
           )
@@ -387,7 +387,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
       
       // Metric overrides table
       await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS kpi.metric_overrides_monthly (
+        CREATE TABLE IF NOT EXISTS cortex_core.metric_overrides_monthly (
           id SERIAL PRIMARY KEY,
           year INTEGER NOT NULL,
           month INTEGER NOT NULL,
@@ -457,13 +457,13 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
       
       // Get all metrics from registry
       const registryResult = await db.execute(sql`
-        SELECT * FROM kpi.metrics_registry_extended ORDER BY is_derived ASC, sort_order ASC
+        SELECT * FROM cortex_core.metrics_registry_extended ORDER BY is_derived ASC, sort_order ASC
       `);
       const metrics = registryResult.rows as any[];
       
       // Get all overrides for the year (including dimension keys)
       const overridesResult = await db.execute(sql`
-        SELECT * FROM kpi.metric_overrides_monthly WHERE year = ${year}
+        SELECT * FROM cortex_core.metric_overrides_monthly WHERE year = ${year}
       `);
       const overrides = overridesResult.rows as any[];
       const overrideMap = new Map<string, number>();
@@ -515,7 +515,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
             const dbDimValue = dimValue || null;
             
             await db.execute(sql`
-              INSERT INTO kpi.metric_actuals_monthly (year, month, metric_key, dimension_key, dimension_value, actual_value, source, calculated_at)
+              INSERT INTO cortex_core.metric_actuals_monthly (year, month, metric_key, dimension_key, dimension_value, actual_value, source, calculated_at)
               VALUES (${year}, ${month}, ${metric.metric_key}, ${dbDimKey}, ${dbDimValue}, ${actualValue}, ${source}, NOW())
               ON CONFLICT (year, month, metric_key, COALESCE(dimension_key, ''), COALESCE(dimension_value, ''))
               DO UPDATE SET actual_value = EXCLUDED.actual_value, source = EXCLUDED.source, calculated_at = NOW()
@@ -545,7 +545,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
               // Get actuals that match the derived metric's dimension scope using IS NOT DISTINCT FROM
               const actualsResult = await db.execute(sql`
                 SELECT metric_key, actual_value, dimension_key, dimension_value 
-                FROM kpi.metric_actuals_monthly 
+                FROM cortex_core.metric_actuals_monthly 
                 WHERE year = ${year} AND month = ${month}
                 AND metric_key = ANY(${referencedKeys})
                 AND (dimension_key IS NOT DISTINCT FROM ${derivedDimKey})
@@ -568,7 +568,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
             if (computedValue !== null && !isNaN(computedValue)) {
               // Include dimension_key and dimension_value in INSERT for derived metrics
               await db.execute(sql`
-                INSERT INTO kpi.metric_actuals_monthly (year, month, metric_key, dimension_key, dimension_value, actual_value, source, calculated_at)
+                INSERT INTO cortex_core.metric_actuals_monthly (year, month, metric_key, dimension_key, dimension_value, actual_value, source, calculated_at)
                 VALUES (${year}, ${month}, ${metric.metric_key}, ${derivedDimKey}, ${derivedDimValue}, ${computedValue}, 'derived', NOW())
                 ON CONFLICT (year, month, metric_key, COALESCE(dimension_key, ''), COALESCE(dimension_value, ''))
                 DO UPDATE SET actual_value = EXCLUDED.actual_value, source = EXCLUDED.source, calculated_at = NOW()
@@ -640,7 +640,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
     try {
       const year = parseInt(req.query.year as string) || 2026;
       const result = await db.execute(sql`
-        SELECT * FROM kpi.metric_overrides_monthly 
+        SELECT * FROM cortex_core.metric_overrides_monthly 
         WHERE year = ${year}
         ORDER BY month, metric_key
       `);
@@ -661,7 +661,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
       const dbDimValue = dimensionValue || null;
       
       const result = await db.execute(sql`
-        INSERT INTO kpi.metric_overrides_monthly (year, month, metric_key, dimension_key, dimension_value, override_value, note, updated_by, updated_at)
+        INSERT INTO cortex_core.metric_overrides_monthly (year, month, metric_key, dimension_key, dimension_value, override_value, note, updated_by, updated_at)
         VALUES (${year}, ${month}, ${metricKey}, ${dbDimKey}, ${dbDimValue}, ${overrideValue}, ${note || null}, ${updatedBy}, NOW())
         ON CONFLICT (year, month, metric_key, COALESCE(dimension_key, ''), COALESCE(dimension_value, ''))
         DO UPDATE SET override_value = EXCLUDED.override_value, note = EXCLUDED.note, updated_by = EXCLUDED.updated_by, updated_at = NOW()
@@ -678,7 +678,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
   app.delete("/api/kpi/overrides/:id", isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      await db.execute(sql`DELETE FROM kpi.metric_overrides_monthly WHERE id = ${parseInt(id)}`);
+      await db.execute(sql`DELETE FROM cortex_core.metric_overrides_monthly WHERE id = ${parseInt(id)}`);
       res.status(204).send();
     } catch (error) {
       console.error("[api] Error deleting override:", error);
