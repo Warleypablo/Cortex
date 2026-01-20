@@ -1,7 +1,13 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, decimal, integer, date, serial, boolean } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Define schemas for different source systems
+export const clickupSchema = pgSchema("Clickup");
+export const contaAzulSchema = pgSchema("Conta Azul");
+export const bitrixSchema = pgSchema("Bitrix");
+export const inhireSchema = pgSchema("Inhire");
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -24,7 +30,7 @@ export const authUsers = pgTable("auth_users", {
 export type AuthUser = typeof authUsers.$inferSelect;
 export type InsertAuthUser = typeof authUsers.$inferInsert;
 
-export const cazClientes = pgTable("caz_clientes", {
+export const cazClientes = contaAzulSchema.table("caz_clientes", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
   cnpj: text("cnpj"),
@@ -37,7 +43,7 @@ export const cazClientes = pgTable("caz_clientes", {
   ids: text("ids"),
 });
 
-export const cazReceber = pgTable("caz_receber", {
+export const cazReceber = contaAzulSchema.table("caz_receber", {
   id: integer("id").primaryKey(),
   status: text("status"),
   total: decimal("total"),
@@ -52,7 +58,7 @@ export const cazReceber = pgTable("caz_receber", {
   empresa: text("empresa"),
 });
 
-export const cazPagar = pgTable("caz_pagar", {
+export const cazPagar = contaAzulSchema.table("caz_pagar", {
   id: integer("id").primaryKey(),
   status: text("status"),
   total: decimal("total"),
@@ -67,7 +73,7 @@ export const cazPagar = pgTable("caz_pagar", {
   empresa: text("empresa"),
 });
 
-export const cazParcelas = pgTable("caz_parcelas", {
+export const cazParcelas = contaAzulSchema.table("caz_parcelas", {
   id: integer("id").primaryKey(),
   status: text("status"),
   valorPago: decimal("valor_pago"),
@@ -91,14 +97,14 @@ export const cazParcelas = pgTable("caz_parcelas", {
   valorCategoria: text("valor_categoria"),
 });
 
-export const cazCategorias = pgTable("caz_categorias", {
+export const cazCategorias = contaAzulSchema.table("caz_categorias", {
   id: text("id").primaryKey(),
   nome: text("nome"),
   tipo: text("tipo"),
   empresa: text("empresa"),
 });
 
-export const cazBancos = pgTable("caz_bancos", {
+export const cazBancos = contaAzulSchema.table("caz_bancos", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
   balance: decimal("balance"),
@@ -106,7 +112,7 @@ export const cazBancos = pgTable("caz_bancos", {
   ativo: text("ativo"),
 });
 
-export const cupClientes = pgTable("cup_clientes", {
+export const cupClientes = clickupSchema.table("cup_clientes", {
   nome: text("nome"),
   cnpj: text("cnpj").primaryKey(),
   status: text("status"),
@@ -127,7 +133,7 @@ export const cupClientes = pgTable("cup_clientes", {
   statusConta: text("status_conta"),
 });
 
-export const cupContratos = pgTable("cup_contratos", {
+export const cupContratos = clickupSchema.table("cup_contratos", {
   servico: text("servico"),
   status: text("status"),
   valorr: decimal("valorr"),
@@ -145,7 +151,7 @@ export const cupContratos = pgTable("cup_contratos", {
   vendedor: text("vendedor"),
 });
 
-export const cupDataHist = pgTable("cup_data_hist", {
+export const cupDataHist = clickupSchema.table("cup_data_hist", {
   id: integer("id").primaryKey(),
   dataSnapshot: timestamp("data_snapshot"),
   servico: text("servico"),
@@ -164,7 +170,7 @@ export const cupDataHist = pgTable("cup_data_hist", {
   vendedor: text("vendedor"),
 });
 
-export const rhPessoal = pgTable("rh_pessoal", {
+export const rhPessoal = inhireSchema.table("rh_pessoal", {
   id: integer("id").primaryKey(),
   status: varchar("status", { length: 50 }),
   nome: varchar("nome", { length: 150 }).notNull(),
@@ -195,7 +201,7 @@ export const rhPessoal = pgTable("rh_pessoal", {
 });
 
 // Tabela de cargos disponíveis
-export const rhCargos = pgTable("rh_cargos", {
+export const rhCargos = inhireSchema.table("rh_cargos", {
   id: integer("id").primaryKey(),
   nome: varchar("nome", { length: 100 }).notNull(),
   descricao: text("descricao"),
@@ -204,7 +210,7 @@ export const rhCargos = pgTable("rh_cargos", {
 });
 
 // Tabela de níveis disponíveis
-export const rhNiveis = pgTable("rh_niveis", {
+export const rhNiveis = inhireSchema.table("rh_niveis", {
   id: integer("id").primaryKey(),
   nome: varchar("nome", { length: 50 }).notNull(),
   ordem: integer("ordem").default(0),
@@ -213,7 +219,7 @@ export const rhNiveis = pgTable("rh_niveis", {
 });
 
 // Tabela de squads disponíveis
-export const rhSquads = pgTable("rh_squads", {
+export const rhSquads = inhireSchema.table("rh_squads", {
   id: integer("id").primaryKey(),
   nome: varchar("nome", { length: 100 }).notNull(),
   descricao: text("descricao"),
@@ -222,7 +228,7 @@ export const rhSquads = pgTable("rh_squads", {
 });
 
 // Tabela de histórico de promoções
-export const rhPromocoes = pgTable("rh_promocoes", {
+export const rhPromocoes = inhireSchema.table("rh_promocoes", {
   id: integer("id").primaryKey(),
   colaboradorId: integer("colaborador_id").notNull(),
   dataPromocao: date("data_promocao").notNull(),
@@ -321,7 +327,7 @@ export type ClienteContratoDetail = {
   dataEncerramento: Date | null;
 };
 
-export const rhPatrimonio = pgTable("rh_patrimonio", {
+export const rhPatrimonio = inhireSchema.table("rh_patrimonio", {
   id: integer("id").primaryKey(),
   numeroAtivo: varchar("numero_ativo", { length: 100 }),
   ativo: varchar("ativo", { length: 200 }),
@@ -510,7 +516,7 @@ export type MrrEvolucaoMensal = {
   receitaPontualEntregue: number;
 };
 
-export const rhCandidaturas = pgTable("rh_candidaturas", {
+export const rhCandidaturas = inhireSchema.table("rh_candidaturas", {
   id: integer("id").primaryKey(),
   talentStatus: text("talent_status"),
   stageName: text("stage_name"),
@@ -520,14 +526,14 @@ export const rhCandidaturas = pgTable("rh_candidaturas", {
   updatedAt: timestamp("updated_at"),
 });
 
-export const rhVagas = pgTable("rh_vagas", {
+export const rhVagas = inhireSchema.table("rh_vagas", {
   id: text("id").primaryKey(),
   nome: text("nome"),
   status: text("status"),
   atualizacao: timestamp("atualizacao"),
 });
 
-export const rhTalentos = pgTable("rh_talentos", {
+export const rhTalentos = inhireSchema.table("rh_talentos", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
   email: text("email"),
@@ -731,7 +737,7 @@ export const metaInsightsDaily = pgTable("meta_insights_daily", {
 });
 
 // CRM Deal table
-export const crmDeal = pgTable("crm_deal", {
+export const crmDeal = bitrixSchema.table("crm_deal", {
   id: integer("id").primaryKey(),
   dateCreate: timestamp("date_create"),
   dateModify: timestamp("date_modify"),
@@ -1629,7 +1635,7 @@ export type InsertAccessLog = z.infer<typeof insertAccessLogSchema>;
 // Telefones Module - Linhas Telefônicas
 // ============================================
 
-export const rhTelefones = pgTable("rh_telefones", {
+export const rhTelefones = inhireSchema.table("rh_telefones", {
   id: integer("id").primaryKey(),
   conta: varchar("conta", { length: 50 }),
   planoOperadora: varchar("plano_operadora", { length: 50 }),
@@ -2412,8 +2418,8 @@ export type TurbodashKPIsPayload = z.infer<typeof turbodashKPIsPayloadSchema>;
 export type TurbodashClientResponse = z.infer<typeof turbodashClientResponseSchema>;
 export type TurbodashListResponse = z.infer<typeof turbodashListResponseSchema>;
 
-// Tabela de pagamentos de colaboradores (staging schema)
-export const rhPagamentos = pgTable("staging.rh_pagamentos", {
+// Tabela de pagamentos de colaboradores (Inhire schema)
+export const rhPagamentos = inhireSchema.table("rh_pagamentos", {
   id: serial("id").primaryKey(),
   colaboradorId: integer("colaborador_id").notNull(),
   mesReferencia: integer("mes_referencia").notNull(),
@@ -2427,8 +2433,8 @@ export const rhPagamentos = pgTable("staging.rh_pagamentos", {
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
 
-// Tabela de notas fiscais dos colaboradores (staging schema)
-export const rhNotasFiscais = pgTable("staging.rh_notas_fiscais", {
+// Tabela de notas fiscais dos colaboradores (Inhire schema)
+export const rhNotasFiscais = inhireSchema.table("rh_notas_fiscais", {
   id: serial("id").primaryKey(),
   pagamentoId: integer("pagamento_id").notNull(),
   colaboradorId: integer("colaborador_id").notNull(),
