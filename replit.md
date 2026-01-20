@@ -11,14 +11,20 @@ Preferred communication style: Simple, everyday language.
 ### Development Rules (MANDATORY)
 
 1.  **External Database Only**: Never use Replit's internal database. All database connections must use the external PostgreSQL via `DB_HOST` environment variable (Google Cloud SQL).
-2.  **Staging Schema for New Tables**: When creating new database tables, always use the `staging` schema (e.g., `staging.table_name`). This keeps new development isolated from production tables.
+2.  **Schema Organization**: Database tables are organized by source system:
+    -   `cortex_core` - Core Cortex platform tables (formerly staging)
+    -   `clickup` - ClickUp integration tables (cup_* tables)
+    -   `"Conta Azul"` - Conta Azul ERP tables (caz_* tables) - requires double quotes
+    -   `"Bitrix"` - Bitrix CRM tables (crm_* tables) - requires double quotes
+    -   `"Inhire"` - Inhire HR tables (rh_* tables) - requires double quotes
+    -   `sys` - Canonical data governance layer
 3.  **Security First**: Never expose credentials outside of environment variables (`process.env`). All API keys, database passwords, and secrets must be stored in `.env` or Replit Secrets. No hardcoded credentials in code under any circumstances.
 4.  **Database Design Standards**:
     -   Create tables with clear purpose and meaningful names
     -   Design for easy relationships with existing tables (use consistent foreign key patterns)
     -   Build for scalability from the start (proper indexing, normalized structure)
     -   Avoid creating redundant or throwaway tables
-    -   Follow existing naming conventions (snake_case for columns, prefixes like `rh_`, `caz_`, `cup_` for domain grouping)
+    -   Follow existing naming conventions (snake_case for columns, tables organized by schema prefix)
 5.  **Database Documentation Reference**: Before any database intervention or query, consult the documentation files in `attached_assets/Estrutura_Banco/`:
     -   `funcao_colunas_tabelas_*.pdf` — Column definitions and table functions
     -   `relacionamento_tabelas_*.pdf` — Table relationships and foreign keys
