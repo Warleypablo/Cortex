@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 async function updateAssinfyConfig() {
   try {
     await db.execute(sql`
-      UPDATE staging.assinafy_config 
+      UPDATE cortex_core.assinafy_config 
       SET api_key = '***REMOVED***',
           account_id = '***REMOVED***',
           data_atualizacao = CURRENT_TIMESTAMP
