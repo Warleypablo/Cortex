@@ -9558,7 +9558,7 @@ export class DbStorage implements IStorage {
     try {
       const credenciaisResult = await db.execute(sql`
         SELECT cr.id::text, cr.platform, cr.username, c.name as client_name, cr.client_id::text
-        FROM credentials cr
+        FROM cortex_core.credentials cr
         LEFT JOIN cortex_core.clients c ON cr.client_id = c.id
         WHERE cr.platform ILIKE ${searchTerm} OR cr.username ILIKE ${searchTerm} OR c.name ILIKE ${searchTerm}
         LIMIT 20

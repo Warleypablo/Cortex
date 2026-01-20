@@ -59,7 +59,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       
       const credentialsPlatformsResult = await db.execute(sql`
         SELECT client_id, array_agg(DISTINCT platform) as platforms 
-        FROM credentials 
+        FROM cortex_core.credentials 
         GROUP BY client_id
       `);
       const clientPlatformsMap = new Map<string, string[]>();
@@ -74,7 +74,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
           SELECT c.*, 
             CASE 
               WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
-              ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
+              ELSE (SELECT COUNT(*) FROM cortex_core.credentials cr WHERE cr.client_id = c.id)
             END as credential_count
           FROM cortex_core.clients c 
           WHERE LOWER(c.name) LIKE LOWER(${searchPattern}) OR LOWER(c.cnpj) LIKE LOWER(${searchPattern})
@@ -85,7 +85,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
           SELECT c.*, 
             CASE 
               WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
-              ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
+              ELSE (SELECT COUNT(*) FROM cortex_core.credentials cr WHERE cr.client_id = c.id)
             END as credential_count
           FROM cortex_core.clients c 
           ORDER BY c.created_at DESC
@@ -205,7 +205,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       }
       
       const credentialsResult = await db.execute(sql`
-        SELECT * FROM credentials WHERE client_id::text = ANY(${idsArray}::text[]) ORDER BY platform
+        SELECT * FROM cortex_core.credentials WHERE client_id::text = ANY(${idsArray}::text[]) ORDER BY platform
       `);
       
       const credentialsByClientId = new Map<string, any[]>();
@@ -273,7 +273,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       }
       
       const credentialsResult = await db.execute(sql`
-        SELECT * FROM credentials WHERE client_id = ${id} ORDER BY platform
+        SELECT * FROM cortex_core.credentials WHERE client_id = ${id} ORDER BY platform
       `);
       
       const client = clientResult.rows[0] as any;
@@ -691,7 +691,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
           cr.access_url,
           cr.observations
         FROM cortex_core.clients c
-        INNER JOIN credentials cr ON c.id = cr.client_id
+        INNER JOIN cortex_core.credentials cr ON c.id = cr.client_id
         WHERE REGEXP_REPLACE(c.linked_client_cnpj, '[^0-9]', '', 'g') = ${normalizedCnpj}
            OR LOWER(TRIM(c.name)) = (
              SELECT LOWER(TRIM(nome)) FROM "Conta Azul".caz_clientes 
@@ -744,7 +744,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
     try {
       const { id } = req.params;
       
-      await db.execute(sql`DELETE FROM credentials WHERE client_id = ${id}`);
+      await db.execute(sql`DELETE FROM cortex_core.credentials WHERE client_id = ${id}`);
       
       const result = await db.execute(sql`DELETE FROM cortex_core.clients WHERE id = ${id} RETURNING id`);
       
@@ -763,7 +763,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
     try {
       const { clientId } = req.params;
       const result = await db.execute(sql`
-        SELECT * FROM credentials WHERE client_id = ${clientId} ORDER BY platform
+        SELECT * FROM cortex_core.credentials WHERE client_id = ${clientId} ORDER BY platform
       `);
       res.json(result.rows.map(mapCredential));
     } catch (error) {
@@ -782,7 +782,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       }
       
       const result = await db.execute(sql`
-        INSERT INTO credentials (client_id, platform, username, password, access_url, observations, created_by)
+        INSERT INTO cortex_core.credentials (client_id, platform, username, password, access_url, observations, created_by)
         VALUES (${clientId}, ${platform}, ${username || null}, ${password || null}, ${accessUrl || null}, ${observations || null}, ${createdBy})
         RETURNING *
       `);
@@ -800,7 +800,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const { platform, username, password, accessUrl, observations } = req.body;
       
       const result = await db.execute(sql`
-        UPDATE credentials 
+        UPDATE cortex_core.credentials 
         SET platform = COALESCE(${platform}, platform),
             username = COALESCE(${username}, username),
             password = COALESCE(${password}, password),
@@ -825,7 +825,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
   app.delete("/api/acessos/credentials/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await db.execute(sql`DELETE FROM credentials WHERE id = ${id} RETURNING id`);
+      const result = await db.execute(sql`DELETE FROM cortex_core.credentials WHERE id = ${id} RETURNING id`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Credential not found" });
