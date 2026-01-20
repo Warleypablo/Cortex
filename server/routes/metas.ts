@@ -106,7 +106,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
           const [year, month] = monthStr.split('-').map(Number);
           
           await db.execute(sql`
-            INSERT INTO plan.metric_targets_monthly (
+            INSERT INTO cortex_core.metric_targets_monthly (
               year, month, metric_key, dimension_key, dimension_value, target_value, updated_at
             )
             VALUES (
@@ -497,7 +497,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
             const dbDimValueForTarget = dimValue || null;
             
             const targetResult = await db.execute(sql`
-              SELECT target_value FROM plan.metric_targets_monthly 
+              SELECT target_value FROM cortex_core.metric_targets_monthly 
               WHERE year = ${year} AND month = ${month} AND metric_key = ${metric.metric_key}
               AND (dimension_key IS NOT DISTINCT FROM ${dbDimKeyForTarget})
               AND (dimension_value IS NOT DISTINCT FROM ${dbDimValueForTarget})
