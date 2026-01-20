@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Define schemas for different source systems
+export const cortexCoreSchema = pgSchema("cortex_core");
 export const clickupSchema = pgSchema("Clickup");
 export const contaAzulSchema = pgSchema("Conta Azul");
 export const bitrixSchema = pgSchema("Bitrix");
@@ -15,7 +16,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
-export const authUsers = pgTable("auth_users", {
+export const authUsers = cortexCoreSchema.table("auth_users", {
   id: varchar("id", { length: 100 }).primaryKey(),
   googleId: varchar("google_id", { length: 100 }).notNull().unique(),
   email: varchar("email", { length: 255 }).notNull(),

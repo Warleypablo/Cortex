@@ -3004,7 +3004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (row.user_id) {
         const userResult = await db.execute(sql`
           SELECT id, email, name, picture, role
-          FROM auth_users
+          FROM cortex_core.auth_users
           WHERE id = ${row.user_id}
         `);
         if (userResult.rows.length > 0) {
@@ -3016,7 +3016,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const emailNormalized = row.email_turbo.toLowerCase().trim();
         const userByEmailResult = await db.execute(sql`
           SELECT id, email, name, picture, role
-          FROM auth_users
+          FROM cortex_core.auth_users
           WHERE LOWER(TRIM(email)) = ${emailNormalized}
         `);
         if (userByEmailResult.rows.length > 0) {
@@ -11926,7 +11926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           LOWER(TRIM(email)) as email,
           name,
           picture
-        FROM auth_users
+        FROM cortex_core.auth_users
         WHERE email IS NOT NULL AND picture IS NOT NULL
       `);
 
@@ -11954,7 +11954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           LOWER(TRIM(c.email)) as closer_email,
           a.picture
         FROM "Bitrix".crm_closers c
-        LEFT JOIN auth_users a ON LOWER(TRIM(c.email)) = LOWER(TRIM(a.email))
+        LEFT JOIN cortex_core.auth_users a ON LOWER(TRIM(c.email)) = LOWER(TRIM(a.email))
         WHERE c.email IS NOT NULL
       `);
 
@@ -11982,7 +11982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           LOWER(TRIM(u.email)) as sdr_email,
           a.picture
         FROM "Bitrix".crm_users u
-        LEFT JOIN auth_users a ON LOWER(TRIM(u.email)) = LOWER(TRIM(a.email))
+        LEFT JOIN cortex_core.auth_users a ON LOWER(TRIM(u.email)) = LOWER(TRIM(a.email))
         WHERE u.email IS NOT NULL
       `);
 
