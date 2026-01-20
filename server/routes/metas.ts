@@ -404,7 +404,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
       
       // Contract status mapping table
       await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS admin.contract_status_map (
+        CREATE TABLE IF NOT EXISTS cortex_core.contract_status_map (
           id SERIAL PRIMARY KEY,
           status VARCHAR(100) UNIQUE NOT NULL,
           is_active BOOLEAN DEFAULT false,
@@ -429,7 +429,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
       
       for (const s of defaultStatuses) {
         await db.execute(sql`
-          INSERT INTO admin.contract_status_map (status, is_active)
+          INSERT INTO cortex_core.contract_status_map (status, is_active)
           VALUES (${s.status}, ${s.isActive})
           ON CONFLICT (status) DO NOTHING
         `);
@@ -691,7 +691,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
   app.get("/api/admin/contract-status-map", isAdmin, async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT * FROM admin.contract_status_map ORDER BY status
+        SELECT * FROM cortex_core.contract_status_map ORDER BY status
       `);
       res.json(result.rows);
     } catch (error) {
@@ -705,7 +705,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
       const { status, isActive } = req.body;
       
       const result = await db.execute(sql`
-        INSERT INTO admin.contract_status_map (status, is_active, updated_at)
+        INSERT INTO cortex_core.contract_status_map (status, is_active, updated_at)
         VALUES (${status}, ${isActive || false}, NOW())
         ON CONFLICT (status) DO UPDATE SET is_active = EXCLUDED.is_active, updated_at = NOW()
         RETURNING *
@@ -724,7 +724,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
       const { isActive } = req.body;
       
       const result = await db.execute(sql`
-        UPDATE admin.contract_status_map 
+        UPDATE cortex_core.contract_status_map 
         SET is_active = ${isActive}, updated_at = NOW()
         WHERE id = ${parseInt(id)}
         RETURNING *
@@ -744,7 +744,7 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
   app.delete("/api/admin/contract-status-map/:id", isAdmin, async (req, res) => {
     try {
       const { id } = req.params;
-      await db.execute(sql`DELETE FROM admin.contract_status_map WHERE id = ${parseInt(id)}`);
+      await db.execute(sql`DELETE FROM cortex_core.contract_status_map WHERE id = ${parseInt(id)}`);
       res.status(204).send();
     } catch (error) {
       console.error("[api] Error deleting contract status:", error);
