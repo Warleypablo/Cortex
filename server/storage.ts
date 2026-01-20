@@ -3190,7 +3190,7 @@ export class DbStorage implements IStorage {
   async getDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot | null> {
     const result = await db.execute(sql`
       SELECT mes_ano, data_snapshot, saldo_inicial, dados_diarios
-      FROM staging.dfc_snapshots
+      FROM cortex_core.dfc_snapshots
       WHERE mes_ano = ${mesAno}
     `);
     
@@ -3247,7 +3247,7 @@ export class DbStorage implements IStorage {
     }));
     
     await db.execute(sql`
-      INSERT INTO staging.dfc_snapshots (mes_ano, saldo_inicial, dados_diarios)
+      INSERT INTO cortex_core.dfc_snapshots (mes_ano, saldo_inicial, dados_diarios)
       VALUES (${mesAno}, ${saldoAtual.saldoTotal}, ${JSON.stringify(dadosDiarios)}::jsonb)
       ON CONFLICT (mes_ano) DO UPDATE SET
         saldo_inicial = ${saldoAtual.saldoTotal},
@@ -7272,9 +7272,9 @@ export class DbStorage implements IStorage {
   // Tech Dashboard - DatabaseStorage implementations
   async getTechMetricas(): Promise<TechMetricas> {
     const [projetosAtivos, projetosFechados, tasks] = await Promise.all([
-      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM staging.cup_projetos_tech`),
-      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM staging.cup_projetos_tech_fechados`),
-      db.execute(sql`SELECT COUNT(*) as count FROM staging.cup_tech_tasks`)
+      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM cortex_core.cup_projetos_tech`),
+      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM cortex_core.cup_projetos_tech_fechados`),
+      db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.cup_tech_tasks`)
     ]);
 
     const projetosEmAndamento = parseInt((projetosAtivos.rows[0] as any).count || '0');
@@ -7288,7 +7288,7 @@ export class DbStorage implements IStorage {
     // Calcular tempo médio de entrega (diferença entre lancamento e data_criada para projetos fechados)
     const tempoMedioResult = await db.execute(sql`
       SELECT AVG(lancamento::date - data_criada::date) as tempo_medio
-      FROM staging.cup_projetos_tech_fechados
+      FROM cortex_core.cup_projetos_tech_fechados
       WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
     `);
     const tempoMedioEntrega = parseFloat((tempoMedioResult.rows[0] as any).tempo_medio || '0');
@@ -7308,7 +7308,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(status_projeto, 'Não definido') as status,
         COUNT(*) as quantidade
-      FROM staging.cup_projetos_tech
+      FROM cortex_core.cup_projetos_tech
       GROUP BY status_projeto
       ORDER BY quantidade DESC
     `);
@@ -7329,7 +7329,7 @@ export class DbStorage implements IStorage {
           COALESCE(responsavel, 'Não atribuído') as responsavel,
           COUNT(*) as projetos_ativos,
           COALESCE(SUM(valor_p), 0) as valor_ativos
-        FROM staging.cup_projetos_tech
+        FROM cortex_core.cup_projetos_tech
         GROUP BY responsavel
       ),
       fechados AS (
@@ -7337,7 +7337,7 @@ export class DbStorage implements IStorage {
           COALESCE(responsavel, 'Não atribuído') as responsavel,
           COUNT(*) as projetos_fechados,
           COALESCE(SUM(valor_p), 0) as valor_fechados
-        FROM staging.cup_projetos_tech_fechados
+        FROM cortex_core.cup_projetos_tech_fechados
         GROUP BY responsavel
       )
       SELECT 
@@ -7365,9 +7365,9 @@ export class DbStorage implements IStorage {
         COUNT(*) as quantidade,
         COALESCE(SUM(valor_p), 0) as valor_total
       FROM (
-        SELECT tipo, valor_p FROM staging.cup_projetos_tech
+        SELECT tipo, valor_p FROM cortex_core.cup_projetos_tech
         UNION ALL
-        SELECT tipo, valor_p FROM staging.cup_projetos_tech_fechados
+        SELECT tipo, valor_p FROM cortex_core.cup_projetos_tech_fechados
       ) combined
       GROUP BY tipo
       ORDER BY quantidade DESC
@@ -7394,7 +7394,7 @@ export class DbStorage implements IStorage {
         data_vencimento,
         lancamento,
         data_criada
-      FROM staging.cup_projetos_tech
+      FROM cortex_core.cup_projetos_tech
       ORDER BY data_criada DESC
     `);
 
@@ -7427,7 +7427,7 @@ export class DbStorage implements IStorage {
         data_vencimento,
         lancamento,
         data_criada
-      FROM staging.cup_projetos_tech_fechados
+      FROM cortex_core.cup_projetos_tech_fechados
       ORDER BY lancamento DESC NULLS LAST
       LIMIT ${limit}
     `);
@@ -7452,7 +7452,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(status_projeto, 'Não definido') as status,
         COUNT(*) as quantidade
-      FROM staging.cup_tech_tasks
+      FROM cortex_core.cup_tech_tasks
       GROUP BY status_projeto
       ORDER BY quantidade DESC
     `);
@@ -7470,7 +7470,7 @@ export class DbStorage implements IStorage {
     
     const entreguesMesResult = await db.execute(sql`
       SELECT COUNT(*) as count
-      FROM staging.cup_projetos_tech_fechados
+      FROM cortex_core.cup_projetos_tech_fechados
       WHERE lancamento >= ${inicioMes.toISOString().split('T')[0]}
     `);
     const projetosEntreguesMes = parseInt((entreguesMesResult.rows[0] as any).count || '0');
@@ -7478,7 +7478,7 @@ export class DbStorage implements IStorage {
     // Tempo médio de entrega
     const tempoMedioResult = await db.execute(sql`
       SELECT AVG(lancamento::date - data_criada::date) as tempo_medio
-      FROM staging.cup_projetos_tech_fechados
+      FROM cortex_core.cup_projetos_tech_fechados
       WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
     `);
     const tempoMedioEntrega = parseFloat((tempoMedioResult.rows[0] as any).tempo_medio || '0');
@@ -7488,7 +7488,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COUNT(CASE WHEN lancamento <= data_vencimento THEN 1 END) as no_prazo,
         COUNT(*) as total
-      FROM staging.cup_projetos_tech_fechados
+      FROM cortex_core.cup_projetos_tech_fechados
       WHERE lancamento IS NOT NULL AND data_vencimento IS NOT NULL
     `);
     const noPrazo = parseInt((taxaPrazoResult.rows[0] as any).no_prazo || '0');
@@ -7545,7 +7545,7 @@ export class DbStorage implements IStorage {
           COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL AND lancamento <= data_vencimento THEN 1 END)::float / 
             NULLIF(COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL THEN 1 END), 0) * 100 as taxa_no_prazo,
           COALESCE(SUM(valor_p), 0) as valor_total_entregue
-        FROM staging.cup_projetos_tech_fechados
+        FROM cortex_core.cup_projetos_tech_fechados
         ${fechadosWhere}
         GROUP BY responsavel
       ),
@@ -7561,7 +7561,7 @@ export class DbStorage implements IStorage {
             END
           ) as tempo_em_aberto,
           COALESCE(SUM(valor_p), 0) as valor_ativos
-        FROM staging.cup_projetos_tech
+        FROM cortex_core.cup_projetos_tech
         ${ativosWhere}
         GROUP BY responsavel
       )
@@ -7593,7 +7593,7 @@ export class DbStorage implements IStorage {
   }
 
   async getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]> {
-    const table = tipo === 'abertos' ? 'staging.cup_projetos_tech' : 'staging.cup_projetos_tech_fechados';
+    const table = tipo === 'abertos' ? 'cortex_core.cup_projetos_tech' : 'cortex_core.cup_projetos_tech_fechados';
     
     let whereConditions: string[] = [];
     if (responsavel) {
@@ -9511,7 +9511,7 @@ export class DbStorage implements IStorage {
     try {
       const projetosResult = await db.execute(sql`
         SELECT clickup_task_id as id, task_name, status_projeto, responsavel
-        FROM staging.cup_projetos_tech
+        FROM cortex_core.cup_projetos_tech
         WHERE task_name ILIKE ${searchTerm} OR status_projeto ILIKE ${searchTerm}
         LIMIT 20
       `);
@@ -9825,7 +9825,7 @@ export class DbStorage implements IStorage {
           created_at as "createdAt", 
           expires_at as "expiresAt",
           unique_key as "uniqueKey"
-        FROM staging.notifications
+        FROM cortex_core.notifications
         WHERE dismissed = false AND read = false
         ORDER BY 
           CASE COALESCE(priority, 'medium') WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
@@ -9842,7 +9842,7 @@ export class DbStorage implements IStorage {
           created_at as "createdAt", 
           expires_at as "expiresAt",
           unique_key as "uniqueKey"
-        FROM staging.notifications
+        FROM cortex_core.notifications
         WHERE dismissed = false
         ORDER BY 
           CASE COALESCE(priority, 'medium') WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
@@ -9855,7 +9855,7 @@ export class DbStorage implements IStorage {
 
   async markNotificationRead(id: number): Promise<void> {
     await db.execute(sql`
-      UPDATE staging.notifications
+      UPDATE cortex_core.notifications
       SET read = true
       WHERE id = ${id}
     `);
@@ -9863,7 +9863,7 @@ export class DbStorage implements IStorage {
 
   async markAllNotificationsRead(): Promise<void> {
     await db.execute(sql`
-      UPDATE staging.notifications
+      UPDATE cortex_core.notifications
       SET read = true
       WHERE read = false
     `);
@@ -9871,7 +9871,7 @@ export class DbStorage implements IStorage {
 
   async dismissNotification(id: number): Promise<void> {
     await db.execute(sql`
-      UPDATE staging.notifications
+      UPDATE cortex_core.notifications
       SET dismissed = true
       WHERE id = ${id}
     `);
@@ -9879,7 +9879,7 @@ export class DbStorage implements IStorage {
 
   async createNotification(notification: import("@shared/schema").InsertNotification): Promise<import("@shared/schema").Notification> {
     const result = await db.execute(sql`
-      INSERT INTO staging.notifications (type, title, message, entity_id, entity_type, priority, read, dismissed, expires_at, unique_key)
+      INSERT INTO cortex_core.notifications (type, title, message, entity_id, entity_type, priority, read, dismissed, expires_at, unique_key)
       VALUES (
         ${notification.type}, 
         ${notification.title}, 
@@ -9907,7 +9907,7 @@ export class DbStorage implements IStorage {
 
   async notificationExists(uniqueKey: string): Promise<boolean> {
     const result = await db.execute(sql`
-      SELECT 1 FROM staging.notifications
+      SELECT 1 FROM cortex_core.notifications
       WHERE unique_key = ${uniqueKey}
       LIMIT 1
     `);
@@ -10344,7 +10344,7 @@ export class DbStorage implements IStorage {
         data_inicio as "dataInicio", data_fim as "dataFim",
         local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
         cor, criado_em as "criadoEm", criado_por as "criadoPor"
-      FROM staging.turbo_eventos
+      FROM cortex_core.turbo_eventos
     `;
     
     if (startDate && endDate) {
@@ -10353,7 +10353,7 @@ export class DbStorage implements IStorage {
           data_inicio as "dataInicio", data_fim as "dataFim",
           local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
           cor, criado_em as "criadoEm", criado_por as "criadoPor"
-        FROM staging.turbo_eventos
+        FROM cortex_core.turbo_eventos
         WHERE data_inicio >= ${startDate}::timestamp AND data_inicio <= ${endDate}::timestamp
         ORDER BY data_inicio
       `;
@@ -10363,7 +10363,7 @@ export class DbStorage implements IStorage {
           data_inicio as "dataInicio", data_fim as "dataFim",
           local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
           cor, criado_em as "criadoEm", criado_por as "criadoPor"
-        FROM staging.turbo_eventos
+        FROM cortex_core.turbo_eventos
         ORDER BY data_inicio
       `;
     }
@@ -10378,7 +10378,7 @@ export class DbStorage implements IStorage {
         data_inicio as "dataInicio", data_fim as "dataFim",
         local, organizador_id as "organizadorId", organizador_nome as "organizadorNome",
         cor, criado_em as "criadoEm", criado_por as "criadoPor"
-      FROM staging.turbo_eventos
+      FROM cortex_core.turbo_eventos
       WHERE id = ${id}
     `);
     return (result.rows[0] as TurboEvento) || null;
@@ -10386,7 +10386,7 @@ export class DbStorage implements IStorage {
 
   async createTurboEvento(data: InsertTurboEvento): Promise<TurboEvento> {
     const result = await db.execute(sql`
-      INSERT INTO staging.turbo_eventos (titulo, descricao, tipo, data_inicio, data_fim, local, organizador_id, organizador_nome, cor, criado_por)
+      INSERT INTO cortex_core.turbo_eventos (titulo, descricao, tipo, data_inicio, data_fim, local, organizador_id, organizador_nome, cor, criado_por)
       VALUES (${data.titulo}, ${data.descricao || null}, ${data.tipo}, ${data.dataInicio}, ${data.dataFim || null}, ${data.local || null}, ${data.organizadorId || null}, ${data.organizadorNome || null}, ${data.cor || '#f97316'}, ${data.criadoPor || null})
       RETURNING id, titulo, descricao, tipo, 
         data_inicio as "dataInicio", data_fim as "dataFim",
@@ -10398,7 +10398,7 @@ export class DbStorage implements IStorage {
 
   async updateTurboEvento(id: number, data: Partial<InsertTurboEvento>): Promise<TurboEvento> {
     const result = await db.execute(sql`
-      UPDATE staging.turbo_eventos 
+      UPDATE cortex_core.turbo_eventos 
       SET 
         titulo = COALESCE(${data.titulo ?? null}, titulo),
         descricao = COALESCE(${data.descricao ?? null}, descricao),
@@ -10419,7 +10419,7 @@ export class DbStorage implements IStorage {
   }
 
   async deleteTurboEvento(id: number): Promise<void> {
-    await db.execute(sql`DELETE FROM staging.turbo_eventos WHERE id = ${id}`);
+    await db.execute(sql`DELETE FROM cortex_core.turbo_eventos WHERE id = ${id}`);
   }
 
   // System Settings

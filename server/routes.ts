@@ -1767,7 +1767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============================================
 
   // GET /api/cliente/:cnpj/tasks - Fetch tasks for a client
-  // Uses staging.tarefas_clientes table, related by cliente column matching cup_clientes.nome
+  // Uses cortex_core.tarefas_clientes table, related by cliente column matching cup_clientes.nome
   app.get("/api/cliente/:cnpj/tasks", async (req, res) => {
     try {
       const { cnpj } = req.params;
@@ -1783,7 +1783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
       
-      // Query tasks from staging.tarefas_clientes
+      // Query tasks from cortex_core.tarefas_clientes
       // Related by "cliente" column matching cup_clientes.nome (case-insensitive, trimmed)
       const tasksResult = await db.execute(sql`
         SELECT 
@@ -1797,7 +1797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           t.cliente,
           t.equipe,
           t.tipo_task as "tipoTask"
-        FROM staging.tarefas_clientes t
+        FROM cortex_core.tarefas_clientes t
         WHERE LOWER(TRIM(t.cliente)) = LOWER(TRIM(${clienteNome}))
            OR t.cliente ILIKE ${`%${clienteNome}%`}
         ORDER BY 
@@ -4956,7 +4956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (contratosColabStatusTableInitialized) return;
     try {
       await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS staging.contratos_colaboradores_status (
+        CREATE TABLE IF NOT EXISTS cortex_core.contratos_colaboradores_status (
           id SERIAL PRIMARY KEY,
           colaborador_id INTEGER NOT NULL,
           colaborador_nome VARCHAR(255) NOT NULL,
@@ -4992,7 +4992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await ensureContratosColabStatusTable();
       
       const result = await db.execute(sql`
-        SELECT * FROM staging.contratos_colaboradores_status 
+        SELECT * FROM cortex_core.contratos_colaboradores_status 
         ORDER BY data_envio DESC
       `);
       
@@ -5010,7 +5010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const colaboradorId = parseInt(req.params.id);
       
       const result = await db.execute(sql`
-        SELECT * FROM staging.contratos_colaboradores_status 
+        SELECT * FROM cortex_core.contratos_colaboradores_status 
         WHERE colaborador_id = ${colaboradorId}
         ORDER BY data_envio DESC
         LIMIT 1
@@ -5041,13 +5041,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dataAssinatura = status === 'Assinado' ? sql`NOW()` : sql`NULL`;
       
       const result = await db.execute(sql`
-        UPDATE staging.contratos_colaboradores_status 
+        UPDATE cortex_core.contratos_colaboradores_status 
         SET status = ${status}, 
             data_assinatura = ${dataAssinatura},
             updated_at = NOW()
         WHERE colaborador_id = ${colaboradorId}
         AND id = (
-          SELECT id FROM staging.contratos_colaboradores_status 
+          SELECT id FROM cortex_core.contratos_colaboradores_status 
           WHERE colaborador_id = ${colaboradorId}
           ORDER BY data_envio DESC
           LIMIT 1
@@ -5075,7 +5075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // 1. Buscar configuração do Assinafy para colaboradores
       const configResult = await db.execute(sql`
-        SELECT account_id, api_key, api_url FROM staging.assinafy_config WHERE ativo = true AND tipo = 'colaboradores' LIMIT 1
+        SELECT account_id, api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'colaboradores' LIMIT 1
       `);
       
       if (configResult.rows.length === 0) {
@@ -5712,7 +5712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 8. Salvar status do contrato na tabela de controle
       await ensureContratosColabStatusTable();
       await db.execute(sql`
-        INSERT INTO staging.contratos_colaboradores_status 
+        INSERT INTO cortex_core.contratos_colaboradores_status 
         (colaborador_id, colaborador_nome, colaborador_email, documento_id, status, data_envio)
         VALUES (${colaboradorId}, ${colaborador.nome}, ${colaborador.email}, ${documentId}, 'Enviado para assinatura', NOW())
       `);
@@ -12193,7 +12193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (bugReportsTableInitialized) return;
     try {
       await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS staging.bug_reports (
+        CREATE TABLE IF NOT EXISTS cortex_core.bug_reports (
           id SERIAL PRIMARY KEY,
           titulo TEXT NOT NULL,
           descricao TEXT NOT NULL,
@@ -12226,7 +12226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        INSERT INTO staging.bug_reports (titulo, descricao, pagina, user_agent, user_email, user_name)
+        INSERT INTO cortex_core.bug_reports (titulo, descricao, pagina, user_agent, user_email, user_name)
         VALUES (${titulo}, ${descricao}, ${pagina || null}, ${userAgent || null}, ${userEmail}, ${userName})
         RETURNING *
       `);
@@ -12263,7 +12263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (sugestoesTableInitialized) return;
     try {
       await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS staging.sugestoes (
+        CREATE TABLE IF NOT EXISTS cortex_core.sugestoes (
           id SERIAL PRIMARY KEY,
           tipo VARCHAR(50) NOT NULL,
           titulo VARCHAR(255) NOT NULL,
@@ -12281,7 +12281,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
       `);
       sugestoesTableInitialized = true;
-      console.log("[api] staging.sugestoes table initialized");
+      console.log("[api] cortex_core.sugestoes table initialized");
     } catch (error) {
       console.error("[api] Error initializing sugestoes table:", error);
     }
@@ -12293,7 +12293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await ensureSugestoesTable();
       
       const result = await db.execute(sql`
-        SELECT * FROM staging.sugestoes ORDER BY criado_em DESC
+        SELECT * FROM cortex_core.sugestoes ORDER BY criado_em DESC
       `);
       
       const sugestoes = result.rows.map((row: any) => ({
@@ -12333,7 +12333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        INSERT INTO staging.sugestoes (tipo, titulo, descricao, prioridade, modulo, autor_id, autor_nome, autor_email)
+        INSERT INTO cortex_core.sugestoes (tipo, titulo, descricao, prioridade, modulo, autor_id, autor_nome, autor_email)
         VALUES (${tipo}, ${titulo}, ${descricao}, ${prioridade || 'media'}, ${modulo || null}, ${user.id}, ${user.name}, ${user.email})
         RETURNING *
       `);
@@ -12398,7 +12398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        UPDATE staging.sugestoes 
+        UPDATE cortex_core.sugestoes 
         SET status = COALESCE(${status}, status),
             comentario_admin = COALESCE(${comentarioAdmin}, comentario_admin),
             atualizado_em = NOW()
@@ -15745,8 +15745,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT 
           p.*,
-          (SELECT COUNT(*) FROM staging.rh_notas_fiscais WHERE pagamento_id = p.id) as total_nfs
-        FROM staging.rh_pagamentos p
+          (SELECT COUNT(*) FROM cortex_core.rh_notas_fiscais WHERE pagamento_id = p.id) as total_nfs
+        FROM cortex_core.rh_pagamentos p
         WHERE p.colaborador_id = ${colaboradorId}
         ORDER BY p.ano_referencia DESC, p.mes_referencia DESC
       `);
@@ -15768,7 +15768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Verificar permissão via colaborador_id do pagamento
       const pagamentoCheck = await db.execute(sql`
-        SELECT colaborador_id FROM staging.rh_pagamentos WHERE id = ${pagamentoId}
+        SELECT colaborador_id FROM cortex_core.rh_pagamentos WHERE id = ${pagamentoId}
       `);
       
       if (pagamentoCheck.rows.length === 0) {
@@ -15784,7 +15784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        SELECT * FROM staging.rh_notas_fiscais
+        SELECT * FROM cortex_core.rh_notas_fiscais
         WHERE pagamento_id = ${pagamentoId}
         ORDER BY criado_em DESC
         LIMIT 1
@@ -15813,7 +15813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar dados do pagamento para validação
       const pagamentoResult = await db.execute(sql`
-        SELECT colaborador_id FROM staging.rh_pagamentos WHERE id = ${pagamentoId}
+        SELECT colaborador_id FROM cortex_core.rh_pagamentos WHERE id = ${pagamentoId}
       `);
       
       if (pagamentoResult.rows.length === 0) {
@@ -15831,7 +15831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        INSERT INTO staging.rh_notas_fiscais (
+        INSERT INTO cortex_core.rh_notas_fiscais (
           pagamento_id, colaborador_id, numero_nf, valor_nf, 
           arquivo_path, arquivo_nome, data_emissao, status, criado_por
         ) VALUES (
@@ -15843,7 +15843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Atualizar status do pagamento
       await db.execute(sql`
-        UPDATE staging.rh_pagamentos 
+        UPDATE cortex_core.rh_pagamentos 
         SET status = 'nf_anexada', atualizado_em = NOW()
         WHERE id = ${pagamentoId}
       `);
@@ -16155,9 +16155,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Arquivo, mês e ano são obrigatórios" });
       }
       
-      // Inserir NF diretamente na tabela staging.rh_notas_fiscais
+      // Inserir NF diretamente na tabela cortex_core.rh_notas_fiscais
       const result = await db.execute(sql`
-        INSERT INTO staging.rh_notas_fiscais (
+        INSERT INTO cortex_core.rh_notas_fiscais (
           colaborador_id, numero_nf, valor_nf, 
           arquivo_path, arquivo_nome, data_emissao, status, criado_por,
           mes_referencia, ano_referencia
@@ -16193,8 +16193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await db.execute(sql`
         SELECT nf.*, p.mes_referencia, p.ano_referencia, p.valor_bruto
-        FROM staging.rh_notas_fiscais nf
-        JOIN staging.rh_pagamentos p ON p.id = nf.pagamento_id
+        FROM cortex_core.rh_notas_fiscais nf
+        JOIN cortex_core.rh_pagamentos p ON p.id = nf.pagamento_id
         WHERE nf.colaborador_id = ${colaboradorId}
         ORDER BY p.ano_referencia DESC, p.mes_referencia DESC
       `);
@@ -16430,13 +16430,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (conditions.length > 0) {
         const whereClause = sql.join(conditions, sql` AND `);
         result = await db.execute(sql`
-          SELECT * FROM staging.sales_goals 
+          SELECT * FROM cortex_core.sales_goals 
           WHERE ${whereClause}
           ORDER BY goal_type, goal_key
         `);
       } else {
         result = await db.execute(sql`
-          SELECT * FROM staging.sales_goals 
+          SELECT * FROM cortex_core.sales_goals 
           ORDER BY goal_type, goal_key
         `);
       }
@@ -16475,7 +16475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedBy = user?.email || user?.name || 'system';
       
       const result = await db.execute(sql`
-        INSERT INTO staging.sales_goals (goal_type, goal_key, goal_value, period_month, period_year, updated_by, updated_at)
+        INSERT INTO cortex_core.sales_goals (goal_type, goal_key, goal_value, period_month, period_year, updated_by, updated_at)
         VALUES (${goalType}, ${goalKey}, ${numValue}, ${validMonth}, ${validYear}, ${updatedBy}, NOW())
         ON CONFLICT (goal_type, goal_key, period_month, period_year)
         DO UPDATE SET goal_value = ${numValue}, updated_by = ${updatedBy}, updated_at = NOW()
@@ -16524,7 +16524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const result = await db.execute(sql`
-          INSERT INTO staging.sales_goals (goal_type, goal_key, goal_value, period_month, period_year, updated_by, updated_at)
+          INSERT INTO cortex_core.sales_goals (goal_type, goal_key, goal_value, period_month, period_year, updated_by, updated_at)
           VALUES (${goalType}, ${goalKey}, ${numValue}, ${validMonth}, ${validYear}, ${updatedBy}, NOW())
           ON CONFLICT (goal_type, goal_key, period_month, period_year)
           DO UPDATE SET goal_value = ${numValue}, updated_by = ${updatedBy}, updated_at = NOW()
