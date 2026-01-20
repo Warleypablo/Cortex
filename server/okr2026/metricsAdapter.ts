@@ -1477,7 +1477,7 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
           THEN (COALESCE(lc.logos_churned, 0)::numeric / ci.clientes_inicio) * 100
           ELSE 0 
         END as value
-      FROM clients_inicio_count ci
+      FROM cortex_core.clients_inicio_count ci
       LEFT JOIN monthly_logo_churn lc ON ci.month = lc.date
       ORDER BY ci.month
     `);

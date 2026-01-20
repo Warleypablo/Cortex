@@ -12827,12 +12827,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (search) {
         const searchPattern = `%${search}%`;
         result = await db.execute(sql`
-          SELECT * FROM turbo_tools
+          SELECT * FROM cortex_core.turbo_tools
           WHERE LOWER(name) LIKE LOWER(${searchPattern}) OR LOWER(site) LIKE LOWER(${searchPattern})
           ORDER BY created_at DESC
         `);
       } else {
-        result = await db.execute(sql`SELECT * FROM turbo_tools ORDER BY created_at DESC`);
+        result = await db.execute(sql`SELECT * FROM cortex_core.turbo_tools ORDER BY created_at DESC`);
       }
       
       res.json(result.rows);
@@ -12846,7 +12846,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/ferramentas/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await db.execute(sql`SELECT * FROM turbo_tools WHERE id = ${id}`);
+      const result = await db.execute(sql`SELECT * FROM cortex_core.turbo_tools WHERE id = ${id}`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Tool not found" });
@@ -12918,7 +12918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/ferramentas/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await db.execute(sql`DELETE FROM turbo_tools WHERE id = ${id} RETURNING id`);
+      const result = await db.execute(sql`DELETE FROM cortex_core.turbo_tools WHERE id = ${id} RETURNING id`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Tool not found" });

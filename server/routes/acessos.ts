@@ -30,7 +30,7 @@ const mapCredential = (row: any) => ({
 
 export async function registerAcessosRoutes(app: Express, db: any, storage: IStorage) {
   try {
-    await db.execute(sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ativo'`);
+    await db.execute(sql`ALTER TABLE cortex_core.clients ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ativo'`);
   } catch (e) {
   }
 
@@ -38,7 +38,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
     try {
       const search = req.query.search as string;
       
-      const turboToolsCount = await db.execute(sql`SELECT COUNT(*) as count FROM turbo_tools`);
+      const turboToolsCount = await db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.turbo_tools`);
       const turboCount = parseInt((turboToolsCount.rows[0] as any)?.count) || 0;
       
       const cazStatusResult = await db.execute(sql`SELECT cnpj, ativo, id FROM "Conta Azul".caz_clientes WHERE cnpj IS NOT NULL`);
@@ -76,7 +76,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
               WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
               ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
             END as credential_count
-          FROM clients c 
+          FROM cortex_core.clients c 
           WHERE LOWER(c.name) LIKE LOWER(${searchPattern}) OR LOWER(c.cnpj) LIKE LOWER(${searchPattern})
           ORDER BY c.created_at DESC
         `);
@@ -87,7 +87,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
               WHEN LOWER(TRIM(c.name)) = 'turbo partners' THEN ${turboCount}
               ELSE (SELECT COUNT(*) FROM credentials cr WHERE cr.client_id = c.id)
             END as credential_count
-          FROM clients c 
+          FROM cortex_core.clients c 
           ORDER BY c.created_at DESC
         `);
       }
@@ -147,7 +147,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
             caz.ativo,
             CASE WHEN cl.id IS NOT NULL THEN true ELSE false END as has_credentials
           FROM "Conta Azul".caz_clientes caz
-          LEFT JOIN clients cl ON LOWER(caz.nome) = LOWER(cl.name)
+          LEFT JOIN cortex_core.clients cl ON LOWER(caz.nome) = LOWER(cl.name)
           WHERE LOWER(caz.nome) LIKE LOWER(${searchPattern}) OR LOWER(caz.cnpj) LIKE LOWER(${searchPattern})
           ORDER BY caz.nome ASC
           LIMIT 50
@@ -161,7 +161,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
             caz.ativo,
             CASE WHEN cl.id IS NOT NULL THEN true ELSE false END as has_credentials
           FROM "Conta Azul".caz_clientes caz
-          LEFT JOIN clients cl ON LOWER(caz.nome) = LOWER(cl.name)
+          LEFT JOIN cortex_core.clients cl ON LOWER(caz.nome) = LOWER(cl.name)
           ORDER BY caz.nome ASC
           LIMIT 50
         `);
@@ -197,7 +197,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const idsArray = `{${ids.join(',')}}`;
       
       const clientsResult = await db.execute(sql`
-        SELECT * FROM clients WHERE id::text = ANY(${idsArray}::text[])
+        SELECT * FROM cortex_core.clients WHERE id::text = ANY(${idsArray}::text[])
       `);
       
       if (clientsResult.rows.length === 0) {
@@ -266,7 +266,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
   app.get("/api/acessos/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const clientResult = await db.execute(sql`SELECT * FROM clients WHERE id = ${id}`);
+      const clientResult = await db.execute(sql`SELECT * FROM cortex_core.clients WHERE id = ${id}`);
       
       if (clientResult.rows.length === 0) {
         return res.status(404).json({ error: "Client not found" });
@@ -297,7 +297,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       }
       
       const result = await db.execute(sql`
-        INSERT INTO clients (name, cnpj, status, additional_info, created_by)
+        INSERT INTO cortex_core.clients (name, cnpj, status, additional_info, created_by)
         VALUES (${name}, ${cnpj || null}, ${status || 'ativo'}, ${additionalInfo || null}, ${createdBy})
         RETURNING *
       `);
@@ -313,7 +313,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
     try {
       const result = await db.execute(sql`
         SELECT id, name, login, password, site, observations
-        FROM turbo_tools
+        FROM cortex_core.turbo_tools
         ORDER BY name ASC
       `);
       
@@ -339,7 +339,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const { name, cnpj, status, additionalInfo, linkedClientCnpj } = req.body;
       
       const result = await db.execute(sql`
-        UPDATE clients 
+        UPDATE cortex_core.clients 
         SET name = COALESCE(${name}, name),
             cnpj = COALESCE(${cnpj}, cnpj),
             status = COALESCE(${status}, status),
@@ -452,7 +452,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
       
       const acessosClients = await db.execute(sql`
-        SELECT id, name FROM clients WHERE linked_client_cnpj IS NULL
+        SELECT id, name FROM cortex_core.clients WHERE linked_client_cnpj IS NULL
       `);
       
       const cazClientes = await db.execute(sql`
@@ -648,7 +648,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       }
       
       const result = await db.execute(sql`
-        UPDATE clients 
+        UPDATE cortex_core.clients 
         SET linked_client_cnpj = ${cnpjToLink},
             updated_at = NOW()
         WHERE id = ${acessosId}
@@ -690,7 +690,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
           cr.password,
           cr.access_url,
           cr.observations
-        FROM clients c
+        FROM cortex_core.clients c
         INNER JOIN credentials cr ON c.id = cr.client_id
         WHERE REGEXP_REPLACE(c.linked_client_cnpj, '[^0-9]', '', 'g') = ${normalizedCnpj}
            OR LOWER(TRIM(c.name)) = (
@@ -746,7 +746,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       
       await db.execute(sql`DELETE FROM credentials WHERE client_id = ${id}`);
       
-      const result = await db.execute(sql`DELETE FROM clients WHERE id = ${id} RETURNING id`);
+      const result = await db.execute(sql`DELETE FROM cortex_core.clients WHERE id = ${id} RETURNING id`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Client not found" });
