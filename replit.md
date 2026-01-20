@@ -13,7 +13,7 @@ Preferred communication style: Simple, everyday language.
 1.  **External Database Only**: Never use Replit's internal database. All database connections must use the external PostgreSQL via `DB_HOST` environment variable (Google Cloud SQL).
 2.  **Schema Organization**: Database tables are organized by source system:
     -   `cortex_core` - Core Cortex platform tables (formerly staging)
-    -   `clickup` - ClickUp integration tables (cup_* tables)
+    -   `"Clickup"` - ClickUp integration tables (cup_* tables) - requires double quotes
     -   `"Conta Azul"` - Conta Azul ERP tables (caz_* tables) - requires double quotes
     -   `"Bitrix"` - Bitrix CRM tables (crm_* tables) - requires double quotes
     -   `"Inhire"` - Inhire HR tables (rh_* tables) - requires double quotes
