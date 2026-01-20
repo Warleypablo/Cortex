@@ -214,7 +214,7 @@ export async function getKPIsByCNPJ(
   try {
     // Use raw SQL to properly access staging schema
     const result = await db.execute(sql`
-      SELECT * FROM staging.turbodash_kpis 
+      SELECT * FROM cortex_core.turbodash_kpis 
       WHERE cnpj = ${cnpjLimpo}
       ORDER BY last_synced_at DESC
       LIMIT 1
@@ -335,7 +335,7 @@ export async function getKPIsByCNPJ(
     if (cached.length > 0) {
       try {
         await db.execute(sql`
-          UPDATE staging.turbodash_kpis 
+          UPDATE cortex_core.turbodash_kpis 
           SET sync_status = 'error' 
           WHERE id = ${cached[0].id}
         `);
@@ -385,7 +385,7 @@ export async function getAllKPIs(forceRefresh = false): Promise<TurbodashListRes
   let cached: any[] = [];
   try {
     const result = await db.execute(sql`
-      SELECT * FROM staging.turbodash_kpis ORDER BY faturamento DESC
+      SELECT * FROM cortex_core.turbodash_kpis ORDER BY faturamento DESC
     `);
     cached = result.rows as any[];
   } catch (error: any) {
@@ -469,13 +469,13 @@ async function saveKPIToCache(data: TurbodashClientResponse): Promise<void> {
   try {
     // Check if exists using raw SQL
     const existingResult = await db.execute(sql`
-      SELECT id FROM staging.turbodash_kpis WHERE cnpj = ${cnpjLimpo} LIMIT 1
+      SELECT id FROM cortex_core.turbodash_kpis WHERE cnpj = ${cnpjLimpo} LIMIT 1
     `);
     const existing = existingResult.rows as { id: number }[];
     
     if (existing.length > 0) {
       await db.execute(sql`
-        UPDATE staging.turbodash_kpis SET
+        UPDATE cortex_core.turbodash_kpis SET
           cliente_nome = ${data.nome_cliente},
           cliente_id_cortex = ${clienteIdCortex},
           periodo_inicio = ${data.periodo_inicio},
@@ -506,7 +506,7 @@ async function saveKPIToCache(data: TurbodashClientResponse): Promise<void> {
       `);
     } else {
       await db.execute(sql`
-        INSERT INTO staging.turbodash_kpis (
+        INSERT INTO cortex_core.turbodash_kpis (
           cnpj, cliente_nome, cliente_id_cortex, periodo_inicio, periodo_fim,
           faturamento, faturamento_variacao, investimento, investimento_variacao,
           roas, roas_variacao, compras, compras_variacao, cpa, cpa_variacao,
@@ -569,7 +569,7 @@ export async function initTurbodashTable(): Promise<void> {
     await db.execute(sql`CREATE SCHEMA IF NOT EXISTS staging`);
     
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS staging.turbodash_kpis (
+      CREATE TABLE IF NOT EXISTS cortex_core.turbodash_kpis (
         id SERIAL PRIMARY KEY,
         cnpj VARCHAR(20) NOT NULL,
         cliente_nome VARCHAR(255),
@@ -602,8 +602,8 @@ export async function initTurbodashTable(): Promise<void> {
       )
     `);
     
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_turbodash_kpis_cnpj ON staging.turbodash_kpis(cnpj)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_turbodash_kpis_cliente_id ON staging.turbodash_kpis(cliente_id_cortex)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_turbodash_kpis_cnpj ON cortex_core.turbodash_kpis(cnpj)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_turbodash_kpis_cliente_id ON cortex_core.turbodash_kpis(cliente_id_cortex)`);
     
     console.log('[TurboDash] Table initialized');
   } catch (error) {

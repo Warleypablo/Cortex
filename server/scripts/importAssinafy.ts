@@ -5,7 +5,7 @@ async function importAssinafy() {
   try {
     // Create table if not exists
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS staging.assinafy_config (
+      CREATE TABLE IF NOT EXISTS cortex_core.assinafy_config (
         id SERIAL PRIMARY KEY,
         account_id VARCHAR(255),
         api_key VARCHAR(255),
@@ -21,7 +21,7 @@ async function importAssinafy() {
 
     // Insert data
     await db.execute(sql`
-      INSERT INTO staging.assinafy_config (id, account_id, api_key, api_url, webhook_url, webhook_secret, ativo, data_cadastro, data_atualizacao)
+      INSERT INTO cortex_core.assinafy_config (id, account_id, api_key, api_url, webhook_url, webhook_secret, ativo, data_cadastro, data_atualizacao)
       VALUES (
         1,
         'ffaee2469fa51a647e2f2796e4a',
@@ -46,7 +46,7 @@ async function importAssinafy() {
     console.log('[assinafy] Data imported successfully');
 
     // Verify
-    const result = await db.execute(sql`SELECT * FROM staging.assinafy_config`);
+    const result = await db.execute(sql`SELECT * FROM cortex_core.assinafy_config`);
     console.log('[assinafy] Records:', result.rows);
     
     process.exit(0);

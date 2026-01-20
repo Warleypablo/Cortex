@@ -94,7 +94,7 @@ async function importTable(
     
     try {
       await db.execute(sql.raw(`
-        INSERT INTO staging.${tableName} (${columnsStr})
+        INSERT INTO cortex_core.${tableName} (${columnsStr})
         VALUES ${valuesClauses.join(',\n')}
         ON CONFLICT (id) DO NOTHING
       `));
@@ -124,11 +124,11 @@ export async function runImport(): Promise<ImportResult[]> {
   }
   
   try {
-    const existingCount = await db.execute(sql`SELECT COUNT(*) as count FROM staging.contratos`);
+    const existingCount = await db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.contratos`);
     const count = parseInt((existingCount.rows[0] as any).count);
     
     if (count > 0) {
-      console.log(`[import] Table staging.contratos already has ${count} records, skipping import`);
+      console.log(`[import] Table cortex_core.contratos already has ${count} records, skipping import`);
       return [];
     }
   } catch (e) {
