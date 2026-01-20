@@ -1182,7 +1182,7 @@ async function createCanonicalContractsView(): Promise<void> {
       c.data_encerramento,
       c.data_solicitacao_encerramento,
       c.data_pausa
-    FROM clickup.cup_contratos c
+    FROM "Clickup".cup_contratos c
     LEFT JOIN sys.catalog_aliases pa ON pa.catalog_key = 'catalog_products' 
       AND LOWER(TRIM(c.produto)) = pa.alias
     LEFT JOIN sys.catalog_aliases sa ON sa.catalog_key = 'catalog_squads' 
