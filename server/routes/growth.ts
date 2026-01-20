@@ -276,7 +276,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(COALESCE(valor_pontual, 0)) as valor_pontual_total,
           SUM(COALESCE(valor_recorrente, 0)) as valor_recorrente_total,
           SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor_total
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE stage_name = 'Negócio Ganho'
           AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
           AND (utm_content IS NOT NULL AND utm_content != '' OR utm_campaign IS NOT NULL AND utm_campaign != '')
@@ -414,7 +414,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT 
           COUNT(DISTINCT id) as total_negocios,
           SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor_total
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE stage_name = 'Negócio Ganho'
           AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
           ${canalFilterForDeals}
@@ -437,7 +437,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           DATE(data_fechamento) as data,
           COUNT(DISTINCT id) as negocios,
           SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE stage_name = 'Negócio Ganho'
           AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
           ${canalFilterForDeals}
@@ -460,7 +460,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
           COUNT(*) as leads,
           SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
         GROUP BY DATE(created_at), COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
         ORDER BY DATE(created_at), canal
@@ -502,7 +502,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
             SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado') THEN 1 ELSE 0 END) as rm,
             SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado') THEN 1 ELSE 0 END) as rr
-          FROM crm_deal
+          FROM "Bitrix".crm_deal
           WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
             ${canalFilterSQL}
           GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
@@ -512,7 +512,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
             COUNT(DISTINCT id) as vendas,
             SUM(COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)) as valor_vendas
-          FROM crm_deal
+          FROM "Bitrix".crm_deal
           WHERE stage_name = 'Negócio Ganho'
             AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
             ${canalFilterSQL}
@@ -648,7 +648,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(valor_pontual, 0) as valor_pontual,
           COALESCE(valor_recorrente, 0) as valor_recorrente,
           COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) as valor_total
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
           ${canalFilterSQL}
         ORDER BY created_at DESC
@@ -764,7 +764,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) ELSE 0 END) as valor_pontual,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_recorrente,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_total
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE utm_content IS NOT NULL 
           AND utm_content != ''
           AND created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
@@ -979,7 +979,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado') THEN 1 ELSE 0 END) as rr,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_total
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE utm_content IS NOT NULL 
           AND utm_content != ''
           AND created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
