@@ -49,7 +49,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         }
       }
       
-      const cupStatusResult = await db.execute(sql`SELECT cnpj, status FROM clickup.cup_clientes WHERE cnpj IS NOT NULL`);
+      const cupStatusResult = await db.execute(sql`SELECT cnpj, status FROM "Clickup".cup_clientes WHERE cnpj IS NOT NULL`);
       const cupStatusMap = new Map<string, string>();
       for (const row of cupStatusResult.rows as any[]) {
         if (row.cnpj) {
@@ -370,7 +370,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         const searchPattern = `%${search}%`;
         result = await db.execute(sql`
           SELECT nome, cnpj, status 
-          FROM clickup.cup_clientes 
+          FROM "Clickup".cup_clientes 
           WHERE (nome ILIKE ${searchPattern} OR cnpj ILIKE ${searchPattern})
           AND LOWER(status) = 'ativo'
           ORDER BY nome
@@ -379,7 +379,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       } else {
         result = await db.execute(sql`
           SELECT nome, cnpj, status 
-          FROM clickup.cup_clientes 
+          FROM "Clickup".cup_clientes 
           WHERE LOWER(status) = 'ativo'
           ORDER BY nome
           LIMIT 100
@@ -417,7 +417,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         
         try {
           const result = await db.execute(sql`
-            UPDATE clickup.cup_clientes 
+            UPDATE "Clickup".cup_clientes 
             SET link_lista_clickup = ${link}
             WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${cleanCnpj}
             RETURNING cnpj

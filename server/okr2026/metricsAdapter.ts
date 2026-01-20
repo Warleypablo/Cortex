@@ -108,7 +108,7 @@ export async function getMrrAtivo(): Promise<number> {
     // Usa cup_contratos diretamente (dados em tempo real) - mesma lógica da Home
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr), 0) as mrr
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
     return parseFloat((result.rows[0] as any)?.mrr || "0");
@@ -123,11 +123,11 @@ export async function getMrrInicioMes(): Promise<number> {
     const result = await db.execute(sql`
       WITH primeiro_snapshot_mes AS (
         SELECT MIN(data_snapshot) as data_primeiro
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       )
       SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
-      FROM clickup.cup_data_hist h
+      FROM "Clickup".cup_data_hist h
       JOIN primeiro_snapshot_mes ps ON h.data_snapshot = ps.data_primeiro
       WHERE status IN ('ativo', 'onboarding', 'triagem')
         AND valorr IS NOT NULL
@@ -147,7 +147,7 @@ export async function getMrrSerie(): Promise<{ month: string; value: number }[]>
         SELECT 
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           MAX(data_snapshot) as last_snapshot
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE data_snapshot >= NOW() - INTERVAL '12 months'
         GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
       )
@@ -155,7 +155,7 @@ export async function getMrrSerie(): Promise<{ month: string; value: number }[]>
         ms.month,
         COALESCE(SUM(h.valorr::numeric), 0) as mrr
       FROM monthly_snapshots ms
-      JOIN clickup.cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      JOIN "Clickup".cup_data_hist h ON h.data_snapshot = ms.last_snapshot
       WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         AND h.valorr IS NOT NULL
         AND h.valorr > 0
@@ -306,7 +306,7 @@ export async function getGrossChurnMrr(): Promise<number> {
     // Churn = contratos com data_solicitacao_encerramento no mês atual
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr::numeric), 0) as churn_mrr
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE valorr IS NOT NULL
         AND valorr::numeric > 0
         AND data_solicitacao_encerramento IS NOT NULL 
@@ -340,7 +340,7 @@ export async function getExpansionMrr(): Promise<number> {
           id_task,
           id_subtask,
           valorr::numeric as valorr_atual
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
           AND valorr IS NOT NULL
@@ -351,7 +351,7 @@ export async function getExpansionMrr(): Promise<number> {
           id_task,
           id_subtask,
           valorr::numeric as valorr_anterior
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW() - INTERVAL '1 month', 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
           AND valorr IS NOT NULL
@@ -403,14 +403,14 @@ export async function getLogoChurn(): Promise<number> {
     const result = await db.execute(sql`
       WITH clientes_cancelados AS (
         SELECT DISTINCT c.id_task
-        FROM clickup.cup_contratos c
+        FROM "Clickup".cup_contratos c
         WHERE c.status = 'cancelado'
           AND c.data_encerramento IS NOT NULL
           AND TO_CHAR(c.data_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       ),
       clientes_ainda_ativos AS (
         SELECT DISTINCT id_task
-        FROM clickup.cup_contratos
+        FROM "Clickup".cup_contratos
         WHERE status IN ('ativo', 'onboarding', 'triagem')
       )
       SELECT COUNT(DISTINCT cc.id_task) as logo_churn
@@ -429,11 +429,11 @@ export async function getClientesInicioMes(): Promise<number> {
     const result = await db.execute(sql`
       WITH primeiro_snapshot_mes AS (
         SELECT MIN(data_snapshot) as data_primeiro
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       )
       SELECT COUNT(DISTINCT h.id_task) as total
-      FROM clickup.cup_data_hist h
+      FROM "Clickup".cup_data_hist h
       JOIN primeiro_snapshot_mes ps ON h.data_snapshot = ps.data_primeiro
       WHERE h.status IN ('ativo', 'onboarding', 'triagem')
     `);
@@ -497,7 +497,7 @@ export async function getClientesAtivos(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COUNT(DISTINCT id_task) as total
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
     return parseInt((result.rows[0] as any)?.total || "0");
@@ -526,19 +526,19 @@ export async function getNewMrr(): Promise<number> {
     const result = await db.execute(sql`
       WITH novos_clientes AS (
         SELECT DISTINCT id_task
-        FROM clickup.cup_contratos
+        FROM "Clickup".cup_contratos
         WHERE data_inicio IS NOT NULL
           AND TO_CHAR(data_inicio, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
       ),
       clientes_existentes AS (
         SELECT DISTINCT id_task
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW() - INTERVAL '1 month', 'YYYY-MM')
           AND status IN ('ativo', 'onboarding', 'triagem')
       )
       SELECT COALESCE(SUM(c.valorr::numeric), 0) as new_mrr
-      FROM clickup.cup_contratos c
+      FROM "Clickup".cup_contratos c
       JOIN novos_clientes nc ON c.id_task = nc.id_task
       WHERE c.status IN ('ativo', 'onboarding', 'triagem')
         AND c.valorr IS NOT NULL
@@ -557,7 +557,7 @@ export async function getNewMrrYTD(): Promise<number> {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr::numeric), 0) as new_mrr_ytd
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE data_inicio IS NOT NULL
         AND EXTRACT(YEAR FROM data_inicio) = ${currentYear}
         AND status IN ('ativo', 'onboarding', 'triagem')
@@ -575,7 +575,7 @@ export async function getVendasPontual(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorp::numeric), 0) as vendas_pontual
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE data_inicio IS NOT NULL
         AND TO_CHAR(data_inicio, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
         AND valorp IS NOT NULL
@@ -706,7 +706,7 @@ export async function getTechProjetosEntregues(): Promise<number> {
   try {
     const result = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE servico ILIKE '%tech%'
         AND status = 'concluido'
         AND EXTRACT(YEAR FROM data_encerramento) = EXTRACT(YEAR FROM NOW())
@@ -765,7 +765,7 @@ export async function getTechProjetosValor(): Promise<number> {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(COALESCE(valorr::numeric, 0) + COALESCE(valorp::numeric, 0)), 0) as valor
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE servico ILIKE '%tech%'
         AND EXTRACT(YEAR FROM data_inicio) = ${currentYear}
     `);
@@ -847,7 +847,7 @@ async function getMrrSeriesForRange(startDate: string, endDate: string): Promise
         SELECT 
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           MAX(data_snapshot) as last_snapshot
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
         GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
@@ -856,7 +856,7 @@ async function getMrrSeriesForRange(startDate: string, endDate: string): Promise
         ms.month as date,
         COALESCE(SUM(h.valorr::numeric), 0) as value
       FROM monthly_snapshots ms
-      JOIN clickup.cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      JOIN "Clickup".cup_data_hist h ON h.data_snapshot = ms.last_snapshot
       WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         AND h.valorr IS NOT NULL
         AND h.valorr > 0
@@ -904,7 +904,7 @@ async function getActiveCustomersSeriesForRange(startDate: string, endDate: stri
         SELECT 
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           MAX(data_snapshot) as last_snapshot
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
         GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
@@ -913,7 +913,7 @@ async function getActiveCustomersSeriesForRange(startDate: string, endDate: stri
         ms.month as date,
         COUNT(DISTINCT h.id_task) as value
       FROM monthly_snapshots ms
-      JOIN clickup.cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+      JOIN "Clickup".cup_data_hist h ON h.data_snapshot = ms.last_snapshot
       WHERE h.status IN ('ativo', 'onboarding', 'triagem')
       GROUP BY ms.month
       ORDER BY ms.month
@@ -958,7 +958,7 @@ async function getChurnSeriesForRange(startDate: string, endDate: string): Promi
       SELECT 
         TO_CHAR(data_encerramento, 'YYYY-MM') as date,
         COALESCE(SUM(valorr::numeric), 0) as value
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE status = 'cancelado'
         AND data_encerramento IS NOT NULL
         AND data_encerramento >= ${startDate}::date 
@@ -1014,7 +1014,7 @@ async function getNewMrrSeriesForRange(startDate: string, endDate: string): Prom
       SELECT 
         TO_CHAR(data_inicio, 'YYYY-MM') as date,
         COALESCE(SUM(valorr::numeric), 0) as value
-      FROM clickup.cup_contratos
+      FROM "Clickup".cup_contratos
       WHERE data_inicio >= ${startDate}::date 
         AND data_inicio <= ${endDate}::date
         AND status IN ('ativo', 'onboarding', 'triagem')
@@ -1144,7 +1144,7 @@ async function getExpansionMrrSeriesForRange(startDate: string, endDate: string)
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           valorr::numeric as valorr,
           status
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
           AND status IN ('ativo', 'onboarding', 'triagem')
@@ -1291,7 +1291,7 @@ async function getCacPctSeriesForRange(startDate: string, endDate: string): Prom
         SELECT 
           TO_CHAR(data_inicio, 'YYYY-MM') as date,
           COALESCE(SUM(valorr::numeric), 0) as new_mrr
-        FROM clickup.cup_contratos
+        FROM "Clickup".cup_contratos
         WHERE data_inicio >= ${startDate}::date 
           AND data_inicio <= ${endDate}::date
           AND status IN ('ativo', 'onboarding', 'triagem')
@@ -1339,7 +1339,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
     const result = await db.execute(sql`
       WITH all_months AS (
         SELECT DISTINCT TO_CHAR(data_snapshot, 'YYYY-MM') as month
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
       ),
@@ -1353,7 +1353,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
         SELECT 
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           MAX(data_snapshot) as last_snapshot
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE data_snapshot >= (${startDate}::date - INTERVAL '1 month')
           AND data_snapshot <= ${endDate}::date
         GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
@@ -1364,7 +1364,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
           h.id_subtask,
           COALESCE(MAX(h.valorr::numeric), 0) as valorr
         FROM monthly_snapshots ms
-        JOIN clickup.cup_data_hist h ON h.data_snapshot = ms.last_snapshot
+        JOIN "Clickup".cup_data_hist h ON h.data_snapshot = ms.last_snapshot
         WHERE h.status IN ('ativo', 'onboarding', 'triagem')
           AND h.valorr IS NOT NULL
           AND h.valorr > 0
@@ -1382,7 +1382,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
         SELECT 
           TO_CHAR(data_encerramento, 'YYYY-MM') as month,
           COALESCE(SUM(valorr::numeric), 0) as churn_mrr
-        FROM clickup.cup_contratos
+        FROM "Clickup".cup_contratos
         WHERE status = 'cancelado'
           AND data_encerramento IS NOT NULL
           AND data_encerramento >= ${startDate}::date 
@@ -1440,7 +1440,7 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
         SELECT DISTINCT ON (TO_CHAR(data_snapshot, 'YYYY-MM'))
           TO_CHAR(data_snapshot, 'YYYY-MM') as month,
           data_snapshot
-        FROM clickup.cup_data_hist
+        FROM "Clickup".cup_data_hist
         WHERE data_snapshot >= ${startDate}::date 
           AND data_snapshot <= ${endDate}::date
         ORDER BY TO_CHAR(data_snapshot, 'YYYY-MM'), data_snapshot ASC
@@ -1450,7 +1450,7 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
           mi.month,
           COUNT(DISTINCT h.id_task) as clientes_inicio
         FROM monthly_clients_inicio mi
-        JOIN clickup.cup_data_hist h ON h.data_snapshot = mi.data_snapshot
+        JOIN "Clickup".cup_data_hist h ON h.data_snapshot = mi.data_snapshot
         WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         GROUP BY mi.month
       ),
@@ -1458,14 +1458,14 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
         SELECT 
           TO_CHAR(data_encerramento, 'YYYY-MM') as date,
           COUNT(DISTINCT id_task) as logos_churned
-        FROM clickup.cup_contratos
+        FROM "Clickup".cup_contratos
         WHERE status = 'cancelado'
           AND data_encerramento IS NOT NULL
           AND data_encerramento >= ${startDate}::date 
           AND data_encerramento <= ${endDate}::date
           AND id_task NOT IN (
             SELECT DISTINCT id_task 
-            FROM clickup.cup_contratos 
+            FROM "Clickup".cup_contratos 
             WHERE status IN ('ativo', 'onboarding', 'triagem')
               AND id_task IS NOT NULL
           )
