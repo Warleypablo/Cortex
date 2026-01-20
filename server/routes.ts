@@ -751,8 +751,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const [targetsResult, metricsResult, actualsResult] = await Promise.all([
           db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.metric_targets_monthly`),
-          db.execute(sql`SELECT COUNT(*) as count FROM kpi.metrics_registry_extended`),
-          db.execute(sql`SELECT COUNT(*) as count FROM kpi.metric_actuals_monthly`)
+          db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.metrics_registry_extended`),
+          db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.metric_actuals_monthly`)
         ]);
         
         okrStats.targetsCount = parseInt((targetsResult.rows[0] as any)?.count || '0');
@@ -761,7 +761,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check for overrides table
         try {
-          const overridesResult = await db.execute(sql`SELECT COUNT(*) as count FROM kpi.metric_overrides_monthly`);
+          const overridesResult = await db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.metric_overrides_monthly`);
           okrStats.overridesCount = parseInt((overridesResult.rows[0] as any)?.count || '0');
         } catch {
           okrStats.overridesCount = -1; // table doesn't exist
@@ -13682,13 +13682,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Delete existing data first for clean seed
       await db.execute(sql`DELETE FROM cortex_core.metric_targets_monthly WHERE year = 2026`);
-      await db.execute(sql`DELETE FROM kpi.metrics_registry_extended WHERE metric_key LIKE '%'`);
+      await db.execute(sql`DELETE FROM cortex_core.metrics_registry_extended WHERE metric_key LIKE '%'`);
       
       // Batch insert all metrics registry
       for (let i = 0; i < BP_2026_TARGETS.length; i++) {
         const metric = BP_2026_TARGETS[i];
         await db.execute(sql`
-          INSERT INTO kpi.metrics_registry_extended 
+          INSERT INTO cortex_core.metrics_registry_extended 
             (metric_key, title, unit, period_type, direction, is_derived, formula_expr, dimension_key, dimension_value, sort_order)
           VALUES 
             (${metric.metric_key}, ${metric.title}, ${metric.unit}, ${metric.period_type}, ${metric.direction}, 
@@ -13767,7 +13767,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const actualsResult = await db.execute(sql`
           SELECT year, month, metric_key, dimension_key, dimension_value, actual_value
-          FROM kpi.metric_actuals_monthly
+          FROM cortex_core.metric_actuals_monthly
           WHERE year = 2026
           ORDER BY metric_key, month
         `);
