@@ -543,18 +543,18 @@ export async function initializeSystemFieldsTable(): Promise<void> {
 }
 
 // ============================================================================
-// SYS SCHEMA - Canonical layer for catalogs and system fields
+// CORTEX_CORE SCHEMA - Canonical layer for catalogs and system fields
 // ============================================================================
 
 export async function initializeSysSchema(): Promise<void> {
   try {
-    // Create sys schema if not exists
-    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS sys`);
-    console.log('[database] sys schema created');
+    // Create cortex_core schema if not exists
+    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS cortex_core`);
+    console.log('[database] cortex_core schema created');
 
-    // 1. sys.catalogs - catalog definitions
+    // 1. cortex_core.catalogs - catalog definitions
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS sys.catalogs (
+      CREATE TABLE IF NOT EXISTS cortex_core.catalogs (
         catalog_key VARCHAR(100) PRIMARY KEY,
         description TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
@@ -562,9 +562,9 @@ export async function initializeSysSchema(): Promise<void> {
       )
     `);
 
-    // 2. sys.catalog_items - items within catalogs
+    // 2. cortex_core.catalog_items - items within catalogs
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS sys.catalog_items (
+      CREATE TABLE IF NOT EXISTS cortex_core.catalog_items (
         catalog_key VARCHAR(100) NOT NULL,
         slug VARCHAR(100) NOT NULL,
         name VARCHAR(255) NOT NULL,
@@ -574,25 +574,25 @@ export async function initializeSysSchema(): Promise<void> {
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (catalog_key, slug),
-        FOREIGN KEY (catalog_key) REFERENCES sys.catalogs(catalog_key)
+        FOREIGN KEY (catalog_key) REFERENCES cortex_core.catalogs(catalog_key)
       )
     `);
 
-    // 3. sys.catalog_aliases - aliases for mapping raw values to slugs
+    // 3. cortex_core.catalog_aliases - aliases for mapping raw values to slugs
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS sys.catalog_aliases (
+      CREATE TABLE IF NOT EXISTS cortex_core.catalog_aliases (
         catalog_key VARCHAR(100) NOT NULL,
         alias VARCHAR(255) NOT NULL,
         slug VARCHAR(100) NOT NULL,
         created_at TIMESTAMP DEFAULT NOW(),
         PRIMARY KEY (catalog_key, alias),
-        FOREIGN KEY (catalog_key, slug) REFERENCES sys.catalog_items(catalog_key, slug)
+        FOREIGN KEY (catalog_key, slug) REFERENCES cortex_core.catalog_items(catalog_key, slug)
       )
     `);
 
-    // 4. sys.system_fields - field definitions for entities
+    // 4. cortex_core.system_fields - field definitions for entities
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS sys.system_fields (
+      CREATE TABLE IF NOT EXISTS cortex_core.system_fields (
         field_key VARCHAR(100) PRIMARY KEY,
         label VARCHAR(255) NOT NULL,
         entity VARCHAR(50) NOT NULL,
@@ -609,9 +609,9 @@ export async function initializeSysSchema(): Promise<void> {
       )
     `);
 
-    // 5. sys.validation_rules - business validation rules
+    // 5. cortex_core.validation_rules - business validation rules
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS sys.validation_rules (
+      CREATE TABLE IF NOT EXISTS cortex_core.validation_rules (
         rule_id VARCHAR(100) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         entity VARCHAR(50) NOT NULL,
@@ -624,7 +624,7 @@ export async function initializeSysSchema(): Promise<void> {
       )
     `);
 
-    console.log('[database] sys schema tables created');
+    console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
     await applySysCatalogs();
@@ -632,7 +632,7 @@ export async function initializeSysSchema(): Promise<void> {
     // Generate aliases
     await generateSysAliases();
     
-    // Apply system fields to sys schema
+    // Apply system fields to cortex_core schema
     await applySysSystemFields();
     
     // Apply validation rules
@@ -641,9 +641,9 @@ export async function initializeSysSchema(): Promise<void> {
     // Create canonical view
     await createCanonicalContractsView();
 
-    console.log('[database] sys schema fully initialized');
+    console.log('[database] cortex_core schema fully initialized');
   } catch (error) {
-    console.error('[database] Error initializing sys schema:', error);
+    console.error('[database] Error initializing cortex_core schema:', error);
   }
 }
 
@@ -662,7 +662,7 @@ async function applySysCatalogs(): Promise<void> {
 
   for (const c of catalogs) {
     await db.execute(sql`
-      INSERT INTO sys.catalogs (catalog_key, description, updated_at)
+      INSERT INTO cortex_core.catalogs (catalog_key, description, updated_at)
       VALUES (${c.catalog_key}, ${c.description}, NOW())
       ON CONFLICT (catalog_key) DO UPDATE SET 
         description = EXCLUDED.description,
@@ -698,7 +698,7 @@ async function applySysCatalogs(): Promise<void> {
   let sortOrder = 10;
   for (const p of products) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_items (catalog_key, slug, name, sort_order, meta, updated_at)
+      INSERT INTO cortex_core.catalog_items (catalog_key, slug, name, sort_order, meta, updated_at)
       VALUES ('catalog_products', ${p.slug}, ${p.name}, ${sortOrder}, ${JSON.stringify(p.meta)}, NOW())
       ON CONFLICT (catalog_key, slug) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -721,7 +721,7 @@ async function applySysCatalogs(): Promise<void> {
   sortOrder = 10;
   for (const p of plans) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_items (catalog_key, slug, name, sort_order, updated_at)
+      INSERT INTO cortex_core.catalog_items (catalog_key, slug, name, sort_order, updated_at)
       VALUES ('catalog_plans', ${p.slug}, ${p.name}, ${sortOrder}, NOW())
       ON CONFLICT (catalog_key, slug) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -749,7 +749,7 @@ async function applySysCatalogs(): Promise<void> {
   sortOrder = 10;
   for (const s of squads) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_items (catalog_key, slug, name, sort_order, meta, updated_at)
+      INSERT INTO cortex_core.catalog_items (catalog_key, slug, name, sort_order, meta, updated_at)
       VALUES ('catalog_squads', ${s.slug}, ${s.name}, ${sortOrder}, ${JSON.stringify(s.meta)}, NOW())
       ON CONFLICT (catalog_key, slug) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -771,7 +771,7 @@ async function applySysCatalogs(): Promise<void> {
   sortOrder = 10;
   for (const c of clusters) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_items (catalog_key, slug, name, sort_order, updated_at)
+      INSERT INTO cortex_core.catalog_items (catalog_key, slug, name, sort_order, updated_at)
       VALUES ('catalog_clusters', ${c.slug}, ${c.name}, ${sortOrder}, NOW())
       ON CONFLICT (catalog_key, slug) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -794,7 +794,7 @@ async function applySysCatalogs(): Promise<void> {
   sortOrder = 10;
   for (const s of statuses) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_items (catalog_key, slug, name, sort_order, meta, updated_at)
+      INSERT INTO cortex_core.catalog_items (catalog_key, slug, name, sort_order, meta, updated_at)
       VALUES ('catalog_contract_status', ${s.slug}, ${s.name}, ${sortOrder}, ${JSON.stringify(s.meta)}, NOW())
       ON CONFLICT (catalog_key, slug) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -814,7 +814,7 @@ async function applySysCatalogs(): Promise<void> {
   sortOrder = 10;
   for (const h of healthOptions) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_items (catalog_key, slug, name, sort_order, updated_at)
+      INSERT INTO cortex_core.catalog_items (catalog_key, slug, name, sort_order, updated_at)
       VALUES ('catalog_account_health', ${h.slug}, ${h.name}, ${sortOrder}, NOW())
       ON CONFLICT (catalog_key, slug) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -834,7 +834,7 @@ async function applySysCatalogs(): Promise<void> {
   sortOrder = 10;
   for (const r of roiBuckets) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_items (catalog_key, slug, name, sort_order, updated_at)
+      INSERT INTO cortex_core.catalog_items (catalog_key, slug, name, sort_order, updated_at)
       VALUES ('catalog_roi_bucket', ${r.slug}, ${r.name}, ${sortOrder}, NOW())
       ON CONFLICT (catalog_key, slug) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -859,7 +859,7 @@ async function applySysCatalogs(): Promise<void> {
   sortOrder = 10;
   for (const c of churnReasons) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_items (catalog_key, slug, name, sort_order, updated_at)
+      INSERT INTO cortex_core.catalog_items (catalog_key, slug, name, sort_order, updated_at)
       VALUES ('catalog_churn_reason', ${c.slug}, ${c.name}, ${sortOrder}, NOW())
       ON CONFLICT (catalog_key, slug) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -875,7 +875,7 @@ async function applySysCatalogs(): Promise<void> {
 async function generateSysAliases(): Promise<void> {
   // Get all catalog items and generate automatic aliases
   const items = await db.execute(sql`
-    SELECT catalog_key, slug, name FROM sys.catalog_items WHERE active = true
+    SELECT catalog_key, slug, name FROM cortex_core.catalog_items WHERE active = true
   `);
   
   for (const item of items.rows as any[]) {
@@ -908,7 +908,7 @@ async function generateSysAliases(): Promise<void> {
     for (const alias of Array.from(aliases)) {
       if (alias && alias.length > 0) {
         await db.execute(sql`
-          INSERT INTO sys.catalog_aliases (catalog_key, alias, slug)
+          INSERT INTO cortex_core.catalog_aliases (catalog_key, alias, slug)
           VALUES (${catalog_key}, ${alias}, ${slug})
           ON CONFLICT (catalog_key, alias) DO UPDATE SET slug = EXCLUDED.slug
         `);
@@ -950,7 +950,7 @@ async function generateSysAliases(): Promise<void> {
   
   for (const a of manualAliases) {
     await db.execute(sql`
-      INSERT INTO sys.catalog_aliases (catalog_key, alias, slug)
+      INSERT INTO cortex_core.catalog_aliases (catalog_key, alias, slug)
       VALUES (${a.catalog_key}, ${a.alias}, ${a.slug})
       ON CONFLICT (catalog_key, alias) DO UPDATE SET slug = EXCLUDED.slug
     `);
@@ -960,7 +960,7 @@ async function generateSysAliases(): Promise<void> {
 }
 
 async function applySysSystemFields(): Promise<void> {
-  // UPSERT system fields into sys.system_fields
+  // UPSERT system fields into cortex_core.system_fields
   const clientFields = [
     { field_key: 'client.name', label: 'Nome do Cliente', entity: 'client', field_type: 'string', required: true, enum_catalog: null, help_text: 'Nome oficial do cliente' },
     { field_key: 'client.cluster_slug', label: 'Cluster', entity: 'client', field_type: 'enum', required: true, enum_catalog: 'catalog_clusters', help_text: null },
@@ -996,7 +996,7 @@ async function applySysSystemFields(): Promise<void> {
 
   for (const f of allFields) {
     await db.execute(sql`
-      INSERT INTO sys.system_fields (field_key, label, entity, field_type, required, enum_catalog, help_text, sort_order, updated_at)
+      INSERT INTO cortex_core.system_fields (field_key, label, entity, field_type, required, enum_catalog, help_text, sort_order, updated_at)
       VALUES (${f.field_key}, ${f.label}, ${f.entity}, ${f.field_type}, ${f.required}, ${f.enum_catalog}, ${f.help_text}, ${sortOrder}, NOW())
       ON CONFLICT (field_key) DO UPDATE SET 
         label = EXCLUDED.label,
@@ -1015,7 +1015,7 @@ async function applySysSystemFields(): Promise<void> {
 }
 
 async function applySysValidationRules(): Promise<void> {
-  // UPSERT validation rules into sys.validation_rules
+  // UPSERT validation rules into cortex_core.validation_rules
   const rules = [
     {
       rule_id: 'contract.require_product',
@@ -1077,7 +1077,7 @@ async function applySysValidationRules(): Promise<void> {
 
   for (const r of rules) {
     await db.execute(sql`
-      INSERT INTO sys.validation_rules (rule_id, name, entity, when_condition, action, message, updated_at)
+      INSERT INTO cortex_core.validation_rules (rule_id, name, entity, when_condition, action, message, updated_at)
       VALUES (${r.rule_id}, ${r.name}, ${r.entity}, ${JSON.stringify(r.when_condition)}, ${JSON.stringify(r.action)}, ${r.message}, NOW())
       ON CONFLICT (rule_id) DO UPDATE SET 
         name = EXCLUDED.name,
@@ -1154,7 +1154,7 @@ export async function initializeBPTables(): Promise<void> {
 
 async function createCanonicalContractsView(): Promise<void> {
   // Create or replace the canonical view for contracts
-  // Maps raw cup_contratos data to canonical slugs via sys.catalog_aliases
+  // Maps raw cup_contratos data to canonical slugs via cortex_core.catalog_aliases
   // 
   // NOTE: The source table cup_contratos does NOT contain a 'plano' field.
   // Available fields are: servico, status, valorr, valorp, squad, produto, etc.
@@ -1183,11 +1183,11 @@ async function createCanonicalContractsView(): Promise<void> {
       c.data_solicitacao_encerramento,
       c.data_pausa
     FROM "Clickup".cup_contratos c
-    LEFT JOIN sys.catalog_aliases pa ON pa.catalog_key = 'catalog_products' 
+    LEFT JOIN cortex_core.catalog_aliases pa ON pa.catalog_key = 'catalog_products' 
       AND LOWER(TRIM(c.produto)) = pa.alias
-    LEFT JOIN sys.catalog_aliases sa ON sa.catalog_key = 'catalog_squads' 
+    LEFT JOIN cortex_core.catalog_aliases sa ON sa.catalog_key = 'catalog_squads' 
       AND LOWER(TRIM(c.squad)) = sa.alias
-    LEFT JOIN sys.catalog_aliases sta ON sta.catalog_key = 'catalog_contract_status' 
+    LEFT JOIN cortex_core.catalog_aliases sta ON sta.catalog_key = 'catalog_contract_status' 
       AND LOWER(TRIM(c.status)) = sta.alias
   `);
   
