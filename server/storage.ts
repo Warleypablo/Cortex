@@ -2670,9 +2670,9 @@ export class DbStorage implements IStorage {
   private async ensurePatrimonioHistoricoTable(): Promise<void> {
     try {
       await db.execute(sql`
-        CREATE TABLE IF NOT EXISTS rh_patrimonio_historico (
+        CREATE TABLE IF NOT EXISTS "Inhire".rh_patrimonio_historico (
           id SERIAL PRIMARY KEY,
-          patrimonio_id INTEGER NOT NULL REFERENCES rh_patrimonio(id) ON DELETE CASCADE,
+          patrimonio_id INTEGER NOT NULL REFERENCES "Inhire".rh_patrimonio(id) ON DELETE CASCADE,
           acao TEXT NOT NULL,
           usuario TEXT NOT NULL,
           data TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -2680,7 +2680,7 @@ export class DbStorage implements IStorage {
       `);
       await db.execute(sql`
         CREATE INDEX IF NOT EXISTS idx_patrimonio_historico_patrimonio_data 
-        ON rh_patrimonio_historico(patrimonio_id, data DESC)
+        ON "Inhire".rh_patrimonio_historico(patrimonio_id, data DESC)
       `);
     } catch (error) {
       console.log("[storage] Error ensuring patrimonio historico table:", error);
