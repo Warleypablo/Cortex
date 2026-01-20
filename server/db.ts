@@ -1475,10 +1475,10 @@ export async function initializeRhComentariosTables(): Promise<void> {
   try {
     // Criar tabela de comentários sobre colaboradores
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS rh_comentarios (
+      CREATE TABLE IF NOT EXISTS "Inhire".rh_comentarios (
         id SERIAL PRIMARY KEY,
-        colaborador_id INTEGER NOT NULL REFERENCES rh_pessoal(id),
-        autor_id INTEGER REFERENCES rh_pessoal(id),
+        colaborador_id INTEGER NOT NULL REFERENCES "Inhire".rh_pessoal(id),
+        autor_id INTEGER REFERENCES "Inhire".rh_pessoal(id),
         autor_nome VARCHAR(200),
         autor_email VARCHAR(200),
         comentario TEXT NOT NULL,
@@ -1490,9 +1490,9 @@ export async function initializeRhComentariosTables(): Promise<void> {
     `);
     
     // Criar índices
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_comentarios_colaborador ON rh_comentarios(colaborador_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_comentarios_autor ON rh_comentarios(autor_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_comentarios_criado ON rh_comentarios(criado_em)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_comentarios_colaborador ON "Inhire".rh_comentarios(colaborador_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_comentarios_autor ON "Inhire".rh_comentarios(autor_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_comentarios_criado ON "Inhire".rh_comentarios(criado_em)`);
     
     console.log('[database] RH Comentarios table initialized');
   } catch (error) {
