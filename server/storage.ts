@@ -9581,7 +9581,7 @@ export class DbStorage implements IStorage {
     try {
       const conhecimentosResult = await db.execute(sql`
         SELECT id::text, nome, tema_principal, plataforma, status
-        FROM courses
+        FROM cortex_core.courses
         WHERE nome ILIKE ${searchTerm} OR tema_principal ILIKE ${searchTerm} OR plataforma ILIKE ${searchTerm}
         LIMIT 20
       `);
