@@ -12593,9 +12593,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let result;
       if (conditions.length > 0) {
         const whereClause = sql.join(conditions, sql` AND `);
-        result = await db.execute(sql`SELECT * FROM courses WHERE ${whereClause} ORDER BY created_at DESC`);
+        result = await db.execute(sql`SELECT * FROM cortex_core.courses WHERE ${whereClause} ORDER BY created_at DESC`);
       } else {
-        result = await db.execute(sql`SELECT * FROM courses ORDER BY created_at DESC`);
+        result = await db.execute(sql`SELECT * FROM cortex_core.courses ORDER BY created_at DESC`);
       }
       
       res.json(result.rows);
@@ -12609,7 +12609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/conhecimentos/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await db.execute(sql`SELECT * FROM courses WHERE id = ${id}`);
+      const result = await db.execute(sql`SELECT * FROM cortex_core.courses WHERE id = ${id}`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Course not found" });
@@ -12633,7 +12633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        INSERT INTO courses (nome, status, tema_principal, plataforma, url, login, senha, created_by)
+        INSERT INTO cortex_core.courses (nome, status, tema_principal, plataforma, url, login, senha, created_by)
         VALUES (${nome}, ${status || 'sem_status'}, ${temaPrincipal || null}, ${plataforma || null}, ${url || null}, ${login || null}, ${senha || null}, ${createdBy})
         RETURNING *
       `);
@@ -12652,7 +12652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { nome, status, temaPrincipal, plataforma, url, login, senha } = req.body;
       
       const result = await db.execute(sql`
-        UPDATE courses 
+        UPDATE cortex_core.courses 
         SET nome = COALESCE(${nome}, nome),
             status = COALESCE(${status}, status),
             tema_principal = COALESCE(${temaPrincipal}, tema_principal),
@@ -12680,7 +12680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/conhecimentos/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await db.execute(sql`DELETE FROM courses WHERE id = ${id} RETURNING id`);
+      const result = await db.execute(sql`DELETE FROM cortex_core.courses WHERE id = ${id} RETURNING id`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Course not found" });
