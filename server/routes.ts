@@ -38,7 +38,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cnpj = req.params.cnpj;
       
       const clienteResult = await db.execute(sql`
-        SELECT id, nome, cnpj, ids FROM caz_clientes 
+        SELECT id, nome, cnpj, ids FROM "Conta Azul".caz_clientes 
         WHERE REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = REGEXP_REPLACE(${cnpj}, '[^0-9]', '', 'g')
         LIMIT 1
       `);
@@ -51,21 +51,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const idsRef = cliente.ids || String(cliente.id);
       
       const parcelasResult = await db.execute(sql`
-        SELECT * FROM caz_parcelas 
+        SELECT * FROM "Conta Azul".caz_parcelas 
         WHERE id_cliente = ${idsRef}
         ORDER BY data_vencimento DESC
         LIMIT 50
       `);
       
       const receberResult = await db.execute(sql`
-        SELECT * FROM caz_receber 
+        SELECT * FROM "Conta Azul".caz_receber 
         WHERE cliente_id = ${idsRef}
         ORDER BY data_vencimento DESC
         LIMIT 50
       `);
       
       const jan2025Result = await db.execute(sql`
-        SELECT * FROM caz_parcelas 
+        SELECT * FROM "Conta Azul".caz_parcelas 
         WHERE id_cliente = ${idsRef}
           AND data_vencimento >= '2025-01-01'
           AND data_vencimento <= '2025-01-31'
@@ -78,26 +78,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           MAX(data_vencimento) as max_vencimento,
           MAX(data_criacao) as max_criacao,
           COUNT(*) as total
-        FROM caz_receber
+        FROM "Conta Azul".caz_receber
         UNION ALL
         SELECT 
           'caz_parcelas' as tabela,
           MAX(data_vencimento) as max_vencimento,
           MAX(data_quitacao) as max_criacao,
           COUNT(*) as total
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
       `);
       
       const clientesSimilares = await db.execute(sql`
         SELECT id, nome, cnpj, ids 
-        FROM caz_clientes 
+        FROM "Conta Azul".caz_clientes 
         WHERE LOWER(nome) LIKE '%feira%'
         ORDER BY nome
       `);
       
       const faturasRecentes = await db.execute(sql`
         SELECT id, cliente_id, cliente_nome, data_vencimento, total, status, descricao 
-        FROM caz_receber 
+        FROM "Conta Azul".caz_receber 
         WHERE (LOWER(cliente_nome) LIKE '%feira%' OR LOWER(descricao) LIKE '%feira%')
           AND data_vencimento >= '2024-11-01'
         ORDER BY data_vencimento DESC
@@ -151,8 +151,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           p.descricao,
           c.id as colaborador_id,
           c.nome as colaborador_nome
-        FROM rh_patrimonio p
-        LEFT JOIN rh_pessoal c ON TRIM(c.nome) = TRIM(p.responsavel_atual)
+        FROM "Inhire".rh_patrimonio p
+        LEFT JOIN "Inhire".rh_pessoal c ON TRIM(c.nome) = TRIM(p.responsavel_atual)
         WHERE p.responsavel_atual IS NOT NULL AND p.responsavel_atual != ''
         ORDER BY p.numero_ativo::integer NULLS LAST
       `);
@@ -177,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/debug-add-responsavel-id-column", async (req, res) => {
     try {
       await db.execute(sql`
-        ALTER TABLE rh_patrimonio 
+        ALTER TABLE "Inhire".rh_patrimonio 
         ADD COLUMN IF NOT EXISTS responsavel_id INTEGER
       `);
       res.json({ success: true, message: "Coluna responsavel_id adicionada com sucesso" });
@@ -190,9 +190,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/debug-backfill-responsavel-id", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        UPDATE rh_patrimonio p
+        UPDATE "Inhire".rh_patrimonio p
         SET responsavel_id = c.id
-        FROM rh_pessoal c
+        FROM "Inhire".rh_pessoal c
         WHERE TRIM(p.responsavel_atual) = TRIM(c.nome)
         AND p.responsavel_id IS NULL
         RETURNING p.id, p.numero_ativo, p.responsavel_atual, c.id as colaborador_id, c.nome
@@ -215,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "patrimonioId e colaboradorId são obrigatórios" });
       }
       await db.execute(sql`
-        UPDATE rh_patrimonio 
+        UPDATE "Inhire".rh_patrimonio 
         SET responsavel_id = ${colaboradorId}
         WHERE id = ${patrimonioId}
       `);
@@ -234,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           p.numero_ativo,
           p.responsavel_atual,
           p.responsavel_id
-        FROM rh_patrimonio p
+        FROM "Inhire".rh_patrimonio p
         WHERE p.responsavel_atual IS NOT NULL 
           AND p.responsavel_atual != ''
           AND p.responsavel_id IS NULL
@@ -255,7 +255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const result = await db.execute(sql`
         SELECT id, nome
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE LOWER(nome) LIKE LOWER(${'%' + nome + '%'})
         ORDER BY nome
         LIMIT 10
@@ -272,17 +272,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Get structure of cup_projetos_tech
       const projetosAtivos = await db.execute(sql`
-        SELECT * FROM cup_projetos_tech LIMIT 5
+        SELECT * FROM clickup.cup_projetos_tech LIMIT 5
       `);
       
       // Get structure of cup_projetos_tech_fechados
       const projetosFechados = await db.execute(sql`
-        SELECT * FROM cup_projetos_tech_fechados LIMIT 5
+        SELECT * FROM clickup.cup_projetos_tech_fechados LIMIT 5
       `);
       
       // Get structure of cup_tech_tasks
       const tasks = await db.execute(sql`
-        SELECT * FROM cup_tech_tasks LIMIT 5
+        SELECT * FROM clickup.cup_tech_tasks LIMIT 5
       `);
       
       // Get column info
@@ -291,9 +291,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const columnsTasks = tasks.rows.length > 0 ? Object.keys(tasks.rows[0] as object) : [];
       
       // Get counts
-      const countAtivos = await db.execute(sql`SELECT COUNT(*) as count FROM cup_projetos_tech`);
-      const countFechados = await db.execute(sql`SELECT COUNT(*) as count FROM cup_projetos_tech_fechados`);
-      const countTasks = await db.execute(sql`SELECT COUNT(*) as count FROM cup_tech_tasks`);
+      const countAtivos = await db.execute(sql`SELECT COUNT(*) as count FROM clickup.cup_projetos_tech`);
+      const countFechados = await db.execute(sql`SELECT COUNT(*) as count FROM clickup.cup_projetos_tech_fechados`);
+      const countTasks = await db.execute(sql`SELECT COUNT(*) as count FROM clickup.cup_tech_tasks`);
       
       res.json({
         cup_projetos_tech: {
@@ -322,14 +322,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const patrimoniosResult = await db.execute(sql`
         SELECT id, numero_ativo, responsavel_atual
-        FROM rh_patrimonio
+        FROM "Inhire".rh_patrimonio
         WHERE responsavel_atual IS NOT NULL 
           AND responsavel_atual != ''
           AND responsavel_id IS NULL
       `);
       
       const colaboradoresResult = await db.execute(sql`
-        SELECT id, nome FROM rh_pessoal
+        SELECT id, nome FROM "Inhire".rh_pessoal
       `);
       
       const colaboradores = colaboradoresResult.rows as { id: number; nome: string }[];
@@ -374,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (melhorMatch && melhorScore >= 2) {
           await db.execute(sql`
-            UPDATE rh_patrimonio SET responsavel_id = ${melhorMatch.id} WHERE id = ${p.id}
+            UPDATE "Inhire".rh_patrimonio SET responsavel_id = ${melhorMatch.id} WHERE id = ${p.id}
           `);
           updates.push({
             patrimonioId: p.id,
@@ -439,8 +439,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.cnpj,
           c.nome as nome_cliente,
           COALESCE(SUM(COALESCE(p.nao_pago, 0)), 0) as faturamento_pendente
-        FROM caz_clientes c
-        LEFT JOIN caz_parcelas p ON c.nome = p.empresa
+        FROM "Conta Azul".caz_clientes c
+        LEFT JOIN "Conta Azul".caz_parcelas p ON c.nome = p.empresa
         WHERE c.cnpj IS NOT NULL AND c.cnpj != ''
         GROUP BY c.cnpj, c.nome
         LIMIT 100
@@ -504,8 +504,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.cnpj,
           c.nome as nome_cliente,
           COALESCE(SUM(COALESCE(p.nao_pago, 0)), 0) as faturamento_pendente
-        FROM caz_clientes c
-        LEFT JOIN caz_parcelas p ON c.nome = p.empresa
+        FROM "Conta Azul".caz_clientes c
+        LEFT JOIN "Conta Azul".caz_parcelas p ON c.nome = p.empresa
         WHERE REGEXP_REPLACE(c.cnpj, '[^0-9]', '', 'g') = ${cnpj}
         GROUP BY c.cnpj, c.nome
         LIMIT 1
@@ -1494,8 +1494,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       // Check clientes between ContaAzul and ClickUp
-      const cazClientesCount = await safeTableCount('caz_clientes');
-      const cupClientesCount = await safeTableCount('cup_clientes');
+      const cazClientesCount = await safeTableCount('"Conta Azul".caz_clientes');
+      const cupClientesCount = await safeTableCount('clickup.cup_clientes');
       
       if (cazClientesCount !== null && cupClientesCount !== null) {
         const diff = Math.abs(cazClientesCount - cupClientesCount);
@@ -1517,8 +1517,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Check contratos/receivables between ContaAzul and ClickUp
-      const cazReceberCount = await safeTableCount('caz_receber');
-      const cupContratosCount = await safeTableCount('cup_contratos');
+      const cazReceberCount = await safeTableCount('"Conta Azul".caz_receber');
+      const cupContratosCount = await safeTableCount('clickup.cup_contratos');
       
       if (cazReceberCount !== null && cupContratosCount !== null) {
         const diff = Math.abs(cazReceberCount - cupContratosCount);
@@ -1590,7 +1590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           cliente_id,
           COALESCE(SUM(CAST(pago AS DECIMAL)), 0) as ltv
-        FROM caz_receber
+        FROM "Conta Azul".caz_receber
         WHERE cliente_id IS NOT NULL 
           AND UPPER(status) IN ('PAGO', 'ACQUITTED')
         GROUP BY cliente_id
@@ -1657,7 +1657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oldResponsavelGeral = cliente.responsavelGeral;
       
       await db.execute(sql`
-        UPDATE cup_clientes
+        UPDATE clickup.cup_clientes
         SET 
           cnpj = COALESCE(${newCnpj ?? null}, cnpj),
           telefone = ${telefone ?? null},
@@ -1719,7 +1719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await db.execute(sql`
-        UPDATE cup_clientes
+        UPDATE clickup.cup_clientes
         SET status_conta = ${statusConta ?? null}
         WHERE cnpj = ${cnpj}
       `);
@@ -1774,7 +1774,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // First get the client name from cup_clientes
       const clienteResult = await db.execute(sql`
-        SELECT nome FROM cup_clientes WHERE cnpj = ${cnpj}
+        SELECT nome FROM clickup.cup_clientes WHERE cnpj = ${cnpj}
       `);
       
       const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
@@ -1997,13 +1997,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get client info from caz_clientes
       const clienteResult = await db.execute(sql`
-        SELECT nome FROM caz_clientes WHERE cnpj = ${cnpj}
+        SELECT nome FROM "Conta Azul".caz_clientes WHERE cnpj = ${cnpj}
       `);
       const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
 
       // Get client status from cup_clientes
       const statusResult = await db.execute(sql`
-        SELECT status FROM cup_clientes WHERE cnpj = ${cnpj}
+        SELECT status FROM clickup.cup_clientes WHERE cnpj = ${cnpj}
       `);
       const clienteStatus = statusResult.rows.length > 0 ? (statusResult.rows[0] as any).status : null;
 
@@ -2014,7 +2014,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT 
             COUNT(*) as count,
             SUM(COALESCE(nao_pago, 0)) as total
-          FROM caz_parcelas
+          FROM "Conta Azul".caz_parcelas
           WHERE empresa = ${clienteNome}
             AND COALESCE(nao_pago, 0) > 0
             AND data_vencimento < ${today}
@@ -2043,7 +2043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT 
             SUM(COALESCE(nao_pago, 0)) as total,
             MIN(data_vencimento) as proxima_data
-          FROM caz_parcelas
+          FROM "Conta Azul".caz_parcelas
           WHERE empresa = ${clienteNome}
             AND COALESCE(nao_pago, 0) > 0
             AND data_vencimento >= ${today}
@@ -2075,14 +2075,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           servico,
           data_encerramento
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE id_task IN (
-          SELECT id_task FROM cup_contratos c2
+          SELECT id_task FROM clickup.cup_contratos c2
           WHERE EXISTS (
-            SELECT 1 FROM cup_clientes cl WHERE cl.cnpj = ${cnpj} AND cl.nome = c2.id_task
+            SELECT 1 FROM clickup.cup_clientes cl WHERE cl.cnpj = ${cnpj} AND cl.nome = c2.id_task
           )
           UNION
-          SELECT task_id FROM cup_clientes WHERE cnpj = ${cnpj}
+          SELECT task_id FROM clickup.cup_clientes WHERE cnpj = ${cnpj}
         )
         AND LOWER(status) = 'ativo'
         AND data_encerramento IS NOT NULL
@@ -2119,7 +2119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Get client info from caz_clientes
       const clienteResult = await db.execute(sql`
-        SELECT nome FROM caz_clientes WHERE cnpj = ${cnpj}
+        SELECT nome FROM "Conta Azul".caz_clientes WHERE cnpj = ${cnpj}
       `);
       
       const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
@@ -2146,7 +2146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             descricao,
             metodo_pagamento,
             valor_bruto
-          FROM caz_parcelas
+          FROM "Conta Azul".caz_parcelas
           WHERE empresa = ${clienteNome}
             AND (data_vencimento >= ${twelveMonthsAgo} OR data_quitacao >= ${twelveMonthsAgo})
           ORDER BY COALESCE(data_quitacao, data_vencimento) DESC
@@ -2163,10 +2163,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             data_inicio,
             data_encerramento,
             squad
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE id_task IN (
-            SELECT id_task FROM cup_contratos c2
-            INNER JOIN cup_clientes cl ON cl.nome ILIKE ('%' || SPLIT_PART(c2.servico, ' - ', 1) || '%')
+            SELECT id_task FROM clickup.cup_contratos c2
+            INNER JOIN clickup.cup_clientes cl ON cl.nome ILIKE ('%' || SPLIT_PART(c2.servico, ' - ', 1) || '%')
             WHERE cl.cnpj = ${cnpj}
           ) OR servico ILIKE ('%' || ${clienteNome} || '%')
           ORDER BY COALESCE(data_encerramento, data_inicio) DESC NULLS LAST
@@ -2417,7 +2417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meses_ult_aumento,
           salario,
           user_id
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         ORDER BY nome
       `);
       
@@ -2512,7 +2512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Busca o colaborador pelo email (email_turbo ou email_pessoal)
       const result = await db.execute(sql`
-        SELECT id FROM rh_pessoal 
+        SELECT id FROM "Inhire".rh_pessoal 
         WHERE LOWER(email_turbo) = LOWER(${user.email}) 
            OR LOWER(email_pessoal) = LOWER(${user.email})
         LIMIT 1
@@ -2573,7 +2573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meses_ult_aumento as "mesesUltAumento",
           ultimo_aumento as "ultimoAumento",
           admissao
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE status = 'Ativo'
         ORDER BY nome
       `);
@@ -2720,7 +2720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           meses_ult_aumento as "mesesUltAumento",
           salario,
           admissao
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE status = 'Ativo'
         ORDER BY nome
       `);
@@ -2959,8 +2959,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ) FILTER (WHERE p.id IS NOT NULL),
             '[]'
           ) as patrimonios
-        FROM rh_pessoal c
-        LEFT JOIN rh_patrimonio p ON (p.responsavel_id = c.id OR (p.responsavel_id IS NULL AND p.responsavel_atual = c.nome))
+        FROM "Inhire".rh_pessoal c
+        LEFT JOIN "Inhire".rh_patrimonio p ON (p.responsavel_id = c.id OR (p.responsavel_id IS NULL AND p.responsavel_atual = c.nome))
         WHERE c.id = ${id}
         GROUP BY c.id
       `);
@@ -2988,7 +2988,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             observacoes,
             criado_em as "criadoEm",
             criado_por as "criadoPor"
-          FROM rh_promocoes 
+          FROM "Inhire".rh_promocoes 
           WHERE colaborador_id = ${id}
           ORDER BY data_promocao DESC
         `);
@@ -3136,7 +3136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let enpsScore = 0;
         try {
           const enpsResult = await db.execute(sql`
-            SELECT score FROM rh_enps 
+            SELECT score FROM "Inhire".rh_enps 
             WHERE colaborador_id = ${colaboradorId} 
               AND data <= ${endDateStr}
             ORDER BY data DESC LIMIT 1
@@ -3152,7 +3152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let oneOnOneScore = 0;
         try {
           const oneOnOneResult = await db.execute(sql`
-            SELECT data FROM rh_one_on_one 
+            SELECT data FROM "Inhire".rh_one_on_one 
             WHERE colaborador_id = ${colaboradorId} 
               AND data <= ${endDateStr}
             ORDER BY data DESC LIMIT 1
@@ -3169,7 +3169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let pdiScore = 0;
         try {
           const pdiResult = await db.execute(sql`
-            SELECT AVG(progresso) as avg_progress FROM rh_pdi 
+            SELECT AVG(progresso) as avg_progress FROM "Inhire".rh_pdi 
             WHERE colaborador_id = ${colaboradorId}
               AND (criado_em IS NULL OR criado_em <= ${endDateStr})
           `);
@@ -3182,8 +3182,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let pendingActionsScore = 20;
         try {
           const actionsResult = await db.execute(sql`
-            SELECT COUNT(*) as count FROM rh_one_on_one_acoes a
-            JOIN rh_one_on_one o ON a.one_on_one_id = o.id
+            SELECT COUNT(*) as count FROM "Inhire".rh_one_on_one_acoes a
+            JOIN "Inhire".rh_one_on_one o ON a.one_on_one_id = o.id
             WHERE o.colaborador_id = ${colaboradorId} 
               AND o.data <= ${endDateStr}
               AND (a.status IS NULL OR a.status != 'concluida')
@@ -3327,7 +3327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await db.execute(sql`
         SELECT DISTINCT produto 
-        FROM cup_contratos 
+        FROM clickup.cup_contratos 
         WHERE produto IS NOT NULL AND produto != ''
         ORDER BY produto
       `);
@@ -4735,7 +4735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             TRIM(ids::text) as id_cliente,
             nome,
             COALESCE(empresa, '') as empresa
-          FROM caz_clientes
+          FROM "Conta Azul".caz_clientes
           WHERE ids IS NOT NULL AND TRIM(ids::text) IN (${escapedIds})
           ORDER BY TRIM(ids::text)
         `));
@@ -4874,7 +4874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db.execute(sql`
         UPDATE inadimplencia_contextos ic
         SET valor_acordado = 3283
-        FROM caz_clientes c
+        FROM "Conta Azul".caz_clientes c
         WHERE ic.cliente_id = c.id::text
           AND UPPER(c.nome) LIKE '%GO COFFEE%'
       `);
@@ -5088,7 +5088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const colaboradorResult = await db.execute(sql`
         SELECT id, nome, cpf, cnpj, endereco, estado, cargo, setor, admissao::text as admissao,
                COALESCE(email_pessoal, email_turbo) as email, salario
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE id = ${colaboradorId}
       `);
       
@@ -6342,7 +6342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           nome as name,
           cnpj,
           'conta_azul' as fonte
-        FROM caz_clientes
+        FROM "Conta Azul".caz_clientes
         WHERE nome IS NOT NULL
           AND (
             LOWER(nome) LIKE LOWER(${searchPattern})
@@ -6359,7 +6359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           cnpj,
           'clickup' as fonte,
           status
-        FROM cup_clientes
+        FROM clickup.cup_clientes
         WHERE nome IS NOT NULL
           AND (
             LOWER(nome) LIKE LOWER(${searchPattern})
@@ -6413,9 +6413,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Cliente ativo = cliente que possui contrato com status ativo/onboarding/triagem
       const clientesResult = await db.execute(sql`
         SELECT 
-          (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
+          (SELECT COUNT(DISTINCT cnpj) FROM clickup.cup_clientes) as total_clientes,
           COUNT(DISTINCT c.id_task) as clientes_ativos
-        FROM cup_contratos c
+        FROM clickup.cup_contratos c
         WHERE c.status IN ('ativo', 'onboarding', 'triagem')
       `);
       
@@ -6427,7 +6427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN valorp > 0 THEN 1 END) as contratos_pontuais,
           COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr_ativo,
           COALESCE(AVG(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN valorr END), 0) as aov_recorrente
-        FROM cup_contratos
+        FROM clickup.cup_contratos
       `);
       
       // Métricas de Equipe (rh_pessoal) - status pode ser 'ativo' ou 'Ativo'
@@ -6440,7 +6440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                  EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12
             END
           ), 0) as tempo_medio_meses
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE LOWER(status) = 'ativo'
       `);
       
@@ -6449,7 +6449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(setor, 'Não definido') as setor,
           COUNT(*) as quantidade
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE LOWER(status) = 'ativo'
         GROUP BY setor
         ORDER BY quantidade DESC
@@ -6467,7 +6467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto,
             COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' 
               THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
-          FROM caz_parcelas
+          FROM "Conta Azul".caz_parcelas
           WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
             AND tipo_evento IN ('RECEITA', 'DESPESA')
           GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
@@ -6487,7 +6487,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               COALESCE(SUM(pago::numeric), 0) as faturamento,
               0 as despesas,
               COALESCE(SUM(total::numeric), 0) as valor_bruto
-            FROM caz_receber
+            FROM "Conta Azul".caz_receber
             WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
               AND COALESCE(data_vencimento, data_criacao) < CURRENT_DATE - INTERVAL '12 months'
               AND COALESCE(data_vencimento, data_criacao) >= CURRENT_DATE - INTERVAL '5 years'
@@ -6501,7 +6501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               0 as faturamento,
               COALESCE(SUM(pago::numeric), 0) as despesas,
               0 as valor_bruto
-            FROM caz_pagar
+            FROM "Conta Azul".caz_pagar
             WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
               AND COALESCE(data_vencimento, data_criacao) < CURRENT_DATE - INTERVAL '12 months'
               AND COALESCE(data_vencimento, data_criacao) >= CURRENT_DATE - INTERVAL '5 years'
@@ -6526,7 +6526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto_mes,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia_mes
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
           AND tipo_evento IN ('RECEITA', 'DESPESA')
       `);
@@ -6601,9 +6601,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clientes ativos (igual à página) - usando cup_clientes e cup_contratos
       const clientesContagem = await db.execute(sql`
         SELECT 
-          (SELECT COUNT(DISTINCT cnpj) FROM cup_clientes) as total_clientes,
+          (SELECT COUNT(DISTINCT cnpj) FROM clickup.cup_clientes) as total_clientes,
           COUNT(DISTINCT c.id_task) as clientes_ativos
-        FROM cup_contratos c
+        FROM clickup.cup_contratos c
         WHERE c.status IN ('ativo', 'onboarding', 'triagem')
       `);
 
@@ -6628,7 +6628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               EXTRACT(YEAR FROM AGE(c.data_solicitacao_encerramento, c.data_inicio)) * 12
             END
           ), 6) as lt_medio_meses
-        FROM cup_contratos c
+        FROM clickup.cup_contratos c
       `);
       
       // Contratos detalhados
@@ -6640,13 +6640,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr_ativo,
           COALESCE(AVG(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN valorr END), 0) as aov_recorrente,
           COALESCE(SUM(CASE WHEN status = 'churn' THEN valorr ELSE 0 END), 0) as mrr_churn
-        FROM cup_contratos
+        FROM clickup.cup_contratos
       `);
       
       // MRR atual (não tem histórico disponível na tabela)
       const mrrAtualResult = await db.execute(sql`
         SELECT COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr
-        FROM cup_contratos
+        FROM clickup.cup_contratos
       `);
       const mrrHistoricoResult = { rows: [{ mes: new Date().toISOString().slice(0,7), mrr: mrrAtualResult.rows[0]?.mrr || 0 }] };
       
@@ -6657,7 +6657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(DISTINCT c.id_task) as qtd_contratos,
           COALESCE(SUM(c.valorr), 0) as mrr_servico,
           COALESCE(AVG(c.valorr), 0) as ticket_medio
-        FROM cup_contratos c
+        FROM clickup.cup_contratos c
         WHERE c.status IN ('ativo', 'onboarding', 'triagem')
           AND c.valorr > 0
         GROUP BY c.servico
@@ -6677,7 +6677,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                  EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12
             END
           ), 0) as tempo_medio_meses
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE LOWER(status) = 'ativo' OR status = 'Desligado'
       `);
       
@@ -6686,7 +6686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(AVG(salario::numeric), 0) as salario_medio,
           COUNT(*) as total_colaboradores
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE LOWER(status) = 'ativo'
           AND salario IS NOT NULL
           AND salario::numeric > 0
@@ -6708,7 +6708,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COALESCE(valorr, 0) as churn_mrr,
             0 as mrr_vendido,
             0 as pontual_vendido
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= CURRENT_DATE - INTERVAL '12 months'
             AND data_solicitacao_encerramento <= CURRENT_DATE
@@ -6720,7 +6720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             0 as churn_mrr,
             COALESCE(valorr, 0) as mrr_vendido,
             0 as pontual_vendido
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE data_inicio IS NOT NULL
             AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
             AND data_inicio <= CURRENT_DATE
@@ -6732,7 +6732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             0 as churn_mrr,
             0 as mrr_vendido,
             COALESCE(valorp, 0) as pontual_vendido
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE data_inicio IS NOT NULL
             AND data_inicio >= CURRENT_DATE - INTERVAL '12 months'
             AND data_inicio <= CURRENT_DATE
@@ -6753,7 +6753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as geracao_caixa
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
           AND COALESCE(data_quitacao, data_vencimento) <= CURRENT_DATE
           AND tipo_evento IN ('RECEITA', 'DESPESA')
@@ -6771,7 +6771,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             EXTRACT(MONTH FROM AGE(CURRENT_DATE, admissao)) + 
             EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao)) * 12
           ), 0) as tempo_medio
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE LOWER(status) = 'ativo'
         GROUP BY setor
         ORDER BY quantidade DESC
@@ -6786,7 +6786,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as receita_bruta,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' 
             THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
           AND tipo_evento IN ('RECEITA', 'DESPESA')
         GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
@@ -6800,7 +6800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receita,
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesa,
           COUNT(DISTINCT id_cliente) as clientes_faturados
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '5 years'
           AND tipo_evento IN ('RECEITA', 'DESPESA')
         GROUP BY EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento))
@@ -6813,8 +6813,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(caz.nome, 'Não identificado') as cliente,
           COALESCE(SUM(p.valor_pago::numeric), 0) as receita_12m,
           COUNT(DISTINCT TO_CHAR(COALESCE(p.data_quitacao, p.data_vencimento), 'YYYY-MM')) as meses_ativos
-        FROM caz_parcelas p
-        LEFT JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
+        FROM "Conta Azul".caz_parcelas p
+        LEFT JOIN "Conta Azul".caz_clientes caz ON p.id_cliente::text = caz.ids::text
         WHERE p.tipo_evento = 'RECEITA' 
           AND COALESCE(p.data_quitacao, p.data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
           AND p.valor_pago::numeric > 0
@@ -6832,8 +6832,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             SUM(p.valor_pago::numeric) as receita,
             ROW_NUMBER() OVER (ORDER BY SUM(p.valor_pago::numeric) DESC) as rank,
             COUNT(*) OVER () as total_clientes
-          FROM caz_parcelas p
-          LEFT JOIN caz_clientes caz ON p.id_cliente::text = caz.ids::text
+          FROM "Conta Azul".caz_parcelas p
+          LEFT JOIN "Conta Azul".caz_clientes caz ON p.id_cliente::text = caz.ids::text
           WHERE p.tipo_evento = 'RECEITA' 
             AND COALESCE(p.data_quitacao, p.data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
             AND p.valor_pago::numeric > 0
@@ -7744,8 +7744,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             )
             ELSE 0 
           END as lifetime_meses
-        FROM cup_contratos c
-        LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
+        FROM clickup.cup_contratos c
+        LEFT JOIN clickup.cup_clientes cl ON c.id_task = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND c.valorr IS NOT NULL
           AND c.valorr > 0
@@ -7759,8 +7759,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.*,
           cl.nome as cliente_nome,
           cl.cnpj
-        FROM cup_contratos c
-        LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
+        FROM clickup.cup_contratos c
+        LEFT JOIN clickup.cup_clientes cl ON c.id_task = cl.task_id
         WHERE c.data_pausa IS NOT NULL
           AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
           AND ${pausaDateFilter}
@@ -7854,7 +7854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(squad, 'Não especificado') as squad,
           COALESCE(SUM(valorr), 0) as mrr_ativo
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE (
           LOWER(TRIM(status)) LIKE '%ativo%'
           OR LOWER(TRIM(status)) = 'ativo'
@@ -9681,7 +9681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/closers/list", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT id, nome as name, email, active FROM crm_closers ORDER BY nome
+        SELECT id, nome as name, email, active FROM "Bitrix".crm_closers ORDER BY nome
       `);
       res.json(result.rows);
     } catch (error) {
@@ -9693,7 +9693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/closers/sources", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT DISTINCT source FROM crm_deal WHERE source IS NOT NULL AND source != '' ORDER BY source
+        SELECT DISTINCT source FROM "Bitrix".crm_deal WHERE source IS NOT NULL AND source != '' ORDER BY source
       `);
       res.json(result.rows.map((r: any) => r.source).filter((s: string) => s && s.trim() !== ''));
     } catch (error) {
@@ -9705,7 +9705,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/closers/pipelines", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT DISTINCT category_name FROM crm_deal WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name
+        SELECT DISTINCT category_name FROM "Bitrix".crm_deal WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name
       `);
       res.json(result.rows.map((r: any) => r.category_name).filter((c: string) => c && c.trim() !== ''));
     } catch (error) {
@@ -9766,8 +9766,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const resultReunioes = await db.execute(sql`
         SELECT COUNT(*) as reunioes_realizadas
-        FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseReunioes}
       `);
 
@@ -9789,8 +9789,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as negocios_ganhos,
           COUNT(CASE WHEN COALESCE(d.valor_recorrente, 0) > 0 THEN 1 END) as negocios_com_recorrente,
           COUNT(CASE WHEN COALESCE(d.valor_pontual, 0) > 0 THEN 1 END) as negocios_com_pontual
-        FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseNegocios}
       `);
 
@@ -9808,8 +9808,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const resultLeads = await db.execute(sql`
         SELECT COUNT(DISTINCT d.id) as leads_criados
-        FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseLeads}
       `);
       
@@ -9884,8 +9884,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.id as closer_id,
           c.nome as closer_name,
           COUNT(*) as reunioes
-        FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseReunioes}
         GROUP BY c.id, c.nome
         ORDER BY c.nome
@@ -9907,8 +9907,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.id as closer_id,
           c.nome as closer_name,
           COUNT(*) as negocios_ganhos
-        FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseNegocios}
         GROUP BY c.id, c.nome
         ORDER BY c.nome
@@ -9985,8 +9985,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as negocios_ganhos,
           COUNT(CASE WHEN COALESCE(d.valor_recorrente, 0) > 0 THEN 1 END) as negocios_com_recorrente,
           COUNT(CASE WHEN COALESCE(d.valor_pontual, 0) > 0 THEN 1 END) as negocios_com_pontual
-        FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
         GROUP BY c.id, c.nome
         ORDER BY c.nome
@@ -10012,8 +10012,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           c.id as closer_id,
           COUNT(*) as reunioes
-        FROM crm_deal d
-        INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseReunioes}
         GROUP BY c.id
       `);
@@ -10069,7 +10069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const closerResult = await db.execute(sql`
-        SELECT id, nome FROM crm_closers WHERE id = ${closerId}
+        SELECT id, nome FROM "Bitrix".crm_closers WHERE id = ${closerId}
       `);
       
       if (closerResult.rows.length === 0) {
@@ -10103,7 +10103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const reunioesResult = await db.execute(sql`
         SELECT COUNT(*) as reunioes_realizadas
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
           AND ${sql.join(reunioesConditions, sql` AND `)}
       `);
@@ -10120,7 +10120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' AND COALESCE(d.valor_pontual, 0) > 0 THEN 1 END) as negocios_com_pontual,
           MIN(d.data_fechamento) as primeiro_negocio,
           MAX(d.data_fechamento) as ultimo_negocio
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
           AND d.data_fechamento IS NOT NULL
         ${dateWhereClause}
@@ -10172,7 +10172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ) as lifetime_medio,
           COUNT(CASE WHEN c.data_solicitacao_encerramento IS NOT NULL THEN 1 END) as total_encerrados,
           COUNT(CASE WHEN LOWER(c.status) IN ('ativo', 'active') THEN 1 END) as total_ativos
-        FROM cup_contratos c
+        FROM clickup.cup_contratos c
         WHERE c.valorr IS NOT NULL 
           AND c.valorr > 0
           AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
@@ -10248,7 +10248,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_pontual END), 0) as valor_pontual,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as negocios,
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
           AND d.data_fechamento IS NOT NULL
           ${dateWhereClause}
@@ -10297,7 +10297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           d.stage_name as stage,
           COUNT(*) as count
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
           AND d.data_fechamento IS NOT NULL
           ${dateWhereClause}
@@ -10345,7 +10345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(d.source, 'Não informado') as source,
           COUNT(*) as count
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
           AND d.data_fechamento IS NOT NULL
           ${dateWhereClause}
@@ -10396,7 +10396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           MAX(EXTRACT(EPOCH FROM (d.data_fechamento::timestamp - d.date_create)) / 86400) as lead_time_max,
           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (d.data_fechamento::timestamp - d.date_create)) / 86400) as lead_time_mediana,
           COUNT(*) as total_negocios
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
           AND d.stage_name = 'Negócio Ganho'
           AND d.data_fechamento IS NOT NULL
@@ -10428,8 +10428,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get distinct SDRs from crm_deal and join with crm_users to get names
       const result = await db.execute(sql`
         SELECT DISTINCT u.id, u.nome as name, u.email, u.active
-        FROM crm_users u
-        INNER JOIN crm_deal d ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+        FROM "Bitrix".crm_users u
+        INNER JOIN "Bitrix".crm_deal d ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
         ORDER BY u.nome
       `);
       res.json(result.rows);
@@ -10443,7 +10443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await db.execute(sql`
         SELECT DISTINCT source
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE source IS NOT NULL AND source != ''
         ORDER BY source
       `);
@@ -10458,7 +10458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await db.execute(sql`
         SELECT DISTINCT category_name
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         WHERE category_name IS NOT NULL AND category_name != ''
         ORDER BY category_name
       `);
@@ -10510,7 +10510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const resultLeads = await db.execute(sql`
         SELECT COUNT(DISTINCT d.id) as leads_totais
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         ${whereClauseLeads}
       `);
 
@@ -10528,7 +10528,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const resultReunioes = await db.execute(sql`
         SELECT COUNT(*) as reunioes_realizadas
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         ${whereClauseReunioes}
       `);
 
@@ -10594,8 +10594,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           u.nome as sdr_name,
           u.id as sdr_id,
           COUNT(DISTINCT d.id) as leads
-        FROM crm_deal d
-        INNER JOIN crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+        FROM "Bitrix".crm_deal d
+        INNER JOIN "Bitrix".crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
         ${whereClauseLeads}
         GROUP BY u.id, u.nome
       `);
@@ -10617,8 +10617,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           u.nome as sdr_name,
           u.id as sdr_id,
           COUNT(*) as reunioes
-        FROM crm_deal d
-        INNER JOIN crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+        FROM "Bitrix".crm_deal d
+        INNER JOIN "Bitrix".crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
         ${whereClauseReunioes}
         GROUP BY u.id, u.nome
       `);
@@ -10709,20 +10709,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const result = await db.execute(sql`
         WITH sdr_info AS (
-          SELECT id, nome, email FROM crm_users WHERE id = ${sdrIdNum}
+          SELECT id, nome, email FROM "Bitrix".crm_users WHERE id = ${sdrIdNum}
         ),
         leads_data AS (
           SELECT 
             COUNT(DISTINCT d.id) as leads_totais,
             MIN(d.date_create) as primeiro_lead,
             MAX(d.date_create) as ultimo_lead
-          FROM crm_deal d
+          FROM "Bitrix".crm_deal d
           WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
           ${dateWhereClause}
         ),
         reunioes_data AS (
           SELECT COUNT(*) as reunioes_realizadas
-          FROM crm_deal d
+          FROM "Bitrix".crm_deal d
           WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
             AND d.data_reuniao_realizada IS NOT NULL
           ${reunioesDateWhereClause}
@@ -10732,21 +10732,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as negocios_ganhos,
             COALESCE(SUM(d.valor_recorrente), 0) as valor_recorrente,
             COALESCE(SUM(d.valor_pontual), 0) as valor_pontual
-          FROM crm_deal d
+          FROM "Bitrix".crm_deal d
           WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
             AND d.stage_name = 'Negócio Ganho'
           ${dateWhereClause}
         ),
         perdidos_data AS (
           SELECT COUNT(*) as negocios_perdidos
-          FROM crm_deal d
+          FROM "Bitrix".crm_deal d
           WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
             AND d.stage_name = 'Negócio Perdido'
           ${dateWhereClause}
         ),
         em_andamento_data AS (
           SELECT COUNT(*) as em_andamento
-          FROM crm_deal d
+          FROM "Bitrix".crm_deal d
           WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
             AND d.stage_name NOT IN ('Negócio Ganho', 'Negócio Perdido')
           ${dateWhereClause}
@@ -10840,7 +10840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             TO_CHAR(d.date_create, 'YYYY-MM') as mes,
             TO_CHAR(d.date_create, 'Mon/YY') as mes_label,
             COUNT(DISTINCT d.id) as leads
-          FROM crm_deal d
+          FROM "Bitrix".crm_deal d
           WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
           ${dateWhereClause}
           GROUP BY TO_CHAR(d.date_create, 'YYYY-MM'), TO_CHAR(d.date_create, 'Mon/YY')
@@ -10849,7 +10849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT 
             TO_CHAR(d.data_reuniao_realizada, 'YYYY-MM') as mes,
             COUNT(*) as reunioes
-          FROM crm_deal d
+          FROM "Bitrix".crm_deal d
           WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
             AND d.data_reuniao_realizada IS NOT NULL
           ${dateConditions.length > 0 ? sql` AND ${sql.join(dateConditions.map(c => {
@@ -10863,7 +10863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as vendas,
             COALESCE(SUM(d.valor_recorrente), 0) as valor_recorrente,
             COALESCE(SUM(d.valor_pontual), 0) as valor_pontual
-          FROM crm_deal d
+          FROM "Bitrix".crm_deal d
           WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
             AND d.stage_name = 'Negócio Ganho'
           ${dateConditions.length > 0 ? sql` AND d.data_fechamento >= ${dataInicio} AND d.data_fechamento <= ${dataFim}` : sql``}
@@ -10929,7 +10929,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(DISTINCT d.id) as leads,
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as vendas
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
         ${dateWhereClause}
         GROUP BY COALESCE(d.source, 'Não informado')
@@ -10983,7 +10983,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 END) as reunioes,
           COUNT(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 END) as vendas,
           COALESCE(SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN d.valor_recorrente ELSE 0 END), 0) as valor_recorrente
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
         ${dateWhereClause}
         GROUP BY COALESCE(d.category_name, 'Não informado')
@@ -11035,7 +11035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(d.stage_name, 'Não informado') as stage,
           COUNT(DISTINCT d.id) as count
-        FROM crm_deal d
+        FROM "Bitrix".crm_deal d
         WHERE CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = ${sdrIdNum}
         ${dateWhereClause}
         GROUP BY COALESCE(d.stage_name, 'Não informado')
@@ -11071,9 +11071,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendas/filtros", async (req, res) => {
     try {
       const [pipelines, sources, utmContents] = await Promise.all([
-        db.execute(sql`SELECT DISTINCT category_name FROM crm_deal WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name`),
-        db.execute(sql`SELECT DISTINCT source FROM crm_deal WHERE source IS NOT NULL AND source != '' ORDER BY source`),
-        db.execute(sql`SELECT DISTINCT utm_content FROM crm_deal WHERE utm_content IS NOT NULL AND utm_content != '' ORDER BY utm_content`)
+        db.execute(sql`SELECT DISTINCT category_name FROM "Bitrix".crm_deal WHERE category_name IS NOT NULL AND category_name != '' ORDER BY category_name`),
+        db.execute(sql`SELECT DISTINCT source FROM "Bitrix".crm_deal WHERE source IS NOT NULL AND source != '' ORDER BY source`),
+        db.execute(sql`SELECT DISTINCT utm_content FROM "Bitrix".crm_deal WHERE utm_content IS NOT NULL AND utm_content != '' ORDER BY utm_content`)
       ]);
       
       res.json({
@@ -11123,7 +11123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(AVG(EXTRACT(EPOCH FROM (data_fechamento - date_create)) / 86400), 0) as tempo_fechamento_dias,
           COALESCE(AVG(CASE WHEN valor_recorrente > 0 THEN valor_recorrente END), 0) as ticket_medio_recorrente,
           COALESCE(AVG(CASE WHEN valor_pontual > 0 THEN valor_pontual END), 0) as ticket_medio_pontual
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
       `);
 
@@ -11177,7 +11177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as contratos,
           COALESCE(SUM(valor_recorrente), 0) as valor_recorrente,
           COALESCE(SUM(valor_pontual), 0) as valor_pontual
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
         GROUP BY DATE(data_fechamento)
         ORDER BY dia
@@ -11226,8 +11226,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual,
           COUNT(*) as contratos
-        FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
         GROUP BY c.id, c.nome
         ORDER BY mrr DESC
@@ -11276,8 +11276,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual,
           COUNT(*) as contratos
-        FROM crm_deal d
-        LEFT JOIN crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
         ${whereClause}
         GROUP BY u.id, u.nome
         ORDER BY mrr DESC
@@ -11326,7 +11326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(valor_recorrente), 0) as mrr,
           COALESCE(SUM(valor_pontual), 0) as pontual,
           COUNT(*) as contratos
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
         GROUP BY source
         ORDER BY (COALESCE(SUM(valor_recorrente), 0) + COALESCE(SUM(valor_pontual), 0)) DESC
@@ -11372,7 +11372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(SUM(valor_recorrente), 0) as mrr_perdido,
           COUNT(*) as contratos_perdidos
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
       `);
 
@@ -11436,8 +11436,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(AVG(d.valor_pontual), 0) as pontual_medio,
           MIN(d.data_fechamento) as primeira_venda,
           MAX(d.data_fechamento) as ultima_venda
-        FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
       `);
 
@@ -11519,8 +11519,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           d.utm_campaign,
           d.utm_term,
           d.utm_content
-        FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
         ORDER BY ${sql.raw(orderColumn)} ${sql.raw(orderDirection)}
         LIMIT 500
@@ -11579,7 +11579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(valor_pontual), 0) as pontual,
           COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as total,
           COALESCE(AVG(COALESCE(valor_recorrente, 0) + COALESCE(valor_pontual, 0)), 0) as ticket_medio
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
         GROUP BY source
         ORDER BY total DESC
@@ -11626,8 +11626,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(d.valor_recorrente) + SUM(d.valor_pontual), 0) as total,
           COALESCE(AVG(COALESCE(d.valor_recorrente, 0) + COALESCE(d.valor_pontual, 0)), 0) as ticket_medio,
           COALESCE(AVG(EXTRACT(EPOCH FROM (d.data_fechamento - d.date_create)) / 86400), 0) as ciclo_medio
-        FROM crm_deal d
-        LEFT JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
         GROUP BY c.nome
         ORDER BY total DESC
@@ -11676,7 +11676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(valor_pontual), 0) as pontual,
           COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as total,
           COALESCE(AVG(COALESCE(valor_recorrente, 0) + COALESCE(valor_pontual, 0)), 0) as ticket_medio
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
         GROUP BY TO_CHAR(data_fechamento, 'YYYY-MM'), TO_CHAR(data_fechamento, 'Mon/YY')
         ORDER BY mes ASC
@@ -11730,7 +11730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(valor_recorrente), 0) as mrr,
           COALESCE(SUM(valor_pontual), 0) as pontual,
           COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as total
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
         GROUP BY ${sql.raw(utmColumn)}
         ORDER BY total DESC
@@ -11753,12 +11753,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendas/detalhamento/filtros", async (req, res) => {
     try {
       const [sources, categories, closersResult] = await Promise.all([
-        db.execute(sql`SELECT DISTINCT source FROM crm_deal WHERE stage_name = 'Negócio Ganho' AND source IS NOT NULL ORDER BY source`),
-        db.execute(sql`SELECT DISTINCT category_name FROM crm_deal WHERE stage_name = 'Negócio Ganho' AND category_name IS NOT NULL ORDER BY category_name`),
+        db.execute(sql`SELECT DISTINCT source FROM "Bitrix".crm_deal WHERE stage_name = 'Negócio Ganho' AND source IS NOT NULL ORDER BY source`),
+        db.execute(sql`SELECT DISTINCT category_name FROM "Bitrix".crm_deal WHERE stage_name = 'Negócio Ganho' AND category_name IS NOT NULL ORDER BY category_name`),
         db.execute(sql`
           SELECT DISTINCT c.nome as closer_name 
-          FROM crm_deal d 
-          INNER JOIN crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id 
+          FROM "Bitrix".crm_deal d 
+          INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id 
           WHERE d.stage_name = 'Negócio Ganho' 
           ORDER BY c.nome
         `)
@@ -11807,7 +11807,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as quantidade,
           COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as valor_total,
           COALESCE(AVG(COALESCE(valor_recorrente, 0) + COALESCE(valor_pontual, 0)), 0) as ticket_medio
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
         GROUP BY 
           CASE 
@@ -11893,7 +11893,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(SUM(valor_recorrente), 0) as mrr,
           COALESCE(SUM(valor_pontual), 0) as pontual,
           COALESCE(SUM(valor_recorrente) + SUM(valor_pontual), 0) as total
-        FROM crm_deal
+        FROM "Bitrix".crm_deal
         ${whereClause}
         GROUP BY 
           CASE 
@@ -11953,7 +11953,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.name,
           LOWER(TRIM(c.email)) as closer_email,
           a.picture
-        FROM crm_closers c
+        FROM "Bitrix".crm_closers c
         LEFT JOIN auth_users a ON LOWER(TRIM(c.email)) = LOWER(TRIM(a.email))
         WHERE c.email IS NOT NULL
       `);
@@ -11981,7 +11981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           u.nome,
           LOWER(TRIM(u.email)) as sdr_email,
           a.picture
-        FROM crm_users u
+        FROM "Bitrix".crm_users u
         LEFT JOIN auth_users a ON LOWER(TRIM(u.email)) = LOWER(TRIM(a.email))
         WHERE u.email IS NOT NULL
       `);
@@ -13019,7 +13019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Fetch all active employees with birthdays, then filter in code
         const birthdayResult = await db.execute(sql`
           SELECT id, nome, aniversario as nascimento
-          FROM rh_pessoal
+          FROM "Inhire".rh_pessoal
           WHERE aniversario IS NOT NULL AND demissao IS NULL
         `);
         
@@ -13071,8 +13071,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const contractResult = await db.execute(sql`
           SELECT c.id_subtask as id, cl.cnpj, c.data_encerramento, cl.nome as client_name, c.servico
-          FROM cup_contratos c
-          LEFT JOIN cup_clientes cl ON cl.task_id = c.id_task
+          FROM clickup.cup_contratos c
+          LEFT JOIN clickup.cup_clientes cl ON cl.task_id = c.id_task
           WHERE c.data_encerramento IS NOT NULL
             AND c.data_encerramento >= CURRENT_DATE
             AND c.data_encerramento <= CURRENT_DATE + INTERVAL '1 day' * ${diasAntecedencia}
@@ -13116,8 +13116,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as parcelas_vencidas, 
             SUM(p.valor_bruto) as total_devido,
             cl.nome as cliente_nome
-          FROM caz_parcelas p
-          LEFT JOIN cup_clientes cl ON cl.cnpj = p.id_cliente::text
+          FROM "Conta Azul".caz_parcelas p
+          LEFT JOIN clickup.cup_clientes cl ON cl.cnpj = p.id_cliente::text
           WHERE p.data_vencimento < CURRENT_DATE - INTERVAL '1 day' * ${diasAtraso}
             AND p.status != 'Pago'
             AND p.id_cliente IS NOT NULL
@@ -13164,11 +13164,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             c.squad,
             cl.nome as cliente_nome,
             cl.cnpj
-          FROM cup_contratos c
-          LEFT JOIN cup_clientes cl ON c.id_task = cl.task_id
+          FROM clickup.cup_contratos c
+          LEFT JOIN clickup.cup_clientes cl ON c.id_task = cl.task_id
           WHERE c.status = 'Ativo'
             AND NOT EXISTS (
-              SELECT 1 FROM caz_parcelas p
+              SELECT 1 FROM "Conta Azul".caz_parcelas p
               WHERE (p.id_cliente = cl.cnpj OR p.id_cliente = c.id_task)
                 AND p.tipo_evento = 'RECEITA'
                 AND p.status = 'Pago'
@@ -13233,12 +13233,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 p.max_atraso,
                 c.nome as cliente_nome
               FROM inadimplencia_contextos ic
-              JOIN caz_clientes c ON ic.cliente_id = c.ids OR ic.cliente_id = CAST(c.id AS TEXT)
+              JOIN "Conta Azul".caz_clientes c ON ic.cliente_id = c.ids OR ic.cliente_id = CAST(c.id AS TEXT)
               JOIN (
                 SELECT 
                   id_cliente,
                   MAX(CURRENT_DATE - data_vencimento::date) as max_atraso
-                FROM caz_parcelas
+                FROM "Conta Azul".caz_parcelas
                 WHERE status != 'Pago' AND data_vencimento < CURRENT_DATE
                 GROUP BY id_cliente
               ) p ON ic.cliente_id = p.id_cliente
@@ -13626,7 +13626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const result = await db.execute(sql`
         SELECT id, nome, email_turbo as email, setor 
-        FROM rh_pessoal 
+        FROM "Inhire".rh_pessoal 
         WHERE LOWER(status) = 'ativo' 
         ORDER BY nome
       `);
@@ -13795,10 +13795,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const mrrResult = await db.execute(sql`
             WITH ultimo_snapshot AS (
               SELECT MAX(data_snapshot) as data_ultimo
-              FROM cup_data_hist
+              FROM clickup.cup_data_hist
             )
             SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
-            FROM cup_data_hist h
+            FROM clickup.cup_data_hist h
             JOIN ultimo_snapshot us ON h.data_snapshot = us.data_ultimo
             WHERE status IN ('ativo', 'onboarding', 'triagem')
               AND valorr IS NOT NULL AND valorr > 0
@@ -13809,7 +13809,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const vendasResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_recorrente::numeric), 0) as vendas_mrr
-            FROM crm_deal
+            FROM "Bitrix".crm_deal
             WHERE stage_name = 'Negócio Ganho'
               AND data_fechamento >= ${startOfMonth.toISOString().split("T")[0]}
               AND data_fechamento < ${today.toISOString().split("T")[0]}
@@ -13820,7 +13820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const receitaPontualResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_pontual::numeric), 0) as receita_pontual
-            FROM crm_deal
+            FROM "Bitrix".crm_deal
             WHERE stage_name = 'Negócio Ganho'
               AND data_fechamento >= ${startOfMonth.toISOString().split("T")[0]}
               AND data_fechamento < ${today.toISOString().split("T")[0]}
@@ -13831,7 +13831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const inadResult = await db.execute(sql`
             SELECT COALESCE(SUM(nao_pago::numeric), 0) as inadimplencia
-            FROM caz_parcelas
+            FROM "Conta Azul".caz_parcelas
             WHERE tipo_evento = 'RECEITA'
               AND data_vencimento >= ${startOfMonth.toISOString().split("T")[0]}
               AND data_vencimento < ${today.toISOString().split("T")[0]}
@@ -13843,7 +13843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const churnResult = await db.execute(sql`
             SELECT COALESCE(SUM(valorr::numeric), 0) as churn
-            FROM cup_contratos
+            FROM clickup.cup_contratos
             WHERE data_solicitacao_encerramento >= ${startOfMonth.toISOString().split("T")[0]}
               AND data_solicitacao_encerramento < ${today.toISOString().split("T")[0]}
           `);
@@ -13853,7 +13853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const receitasResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
-            FROM caz_parcelas
+            FROM "Conta Azul".caz_parcelas
             WHERE tipo_evento = 'RECEITA'
               AND status = 'QUITADO'
               AND data_competencia >= ${startOfMonth.toISOString().split("T")[0]}
@@ -13863,7 +13863,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const despesasResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
-            FROM caz_parcelas
+            FROM "Conta Azul".caz_parcelas
             WHERE tipo_evento = 'DESPESA'
               AND status = 'QUITADO'
               AND data_competencia >= ${startOfMonth.toISOString().split("T")[0]}
@@ -14622,15 +14622,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT 
           COALESCE(SUM(valorr::numeric), 0) as mrr_total,
           COUNT(*) as contratos_total
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE status IN ('ativo', 'onboarding', 'triagem')
       `);
       
       // Buscar clientes ativos (distintos por task_id com contrato ativo)
       const empresaClientesQuery = await db.execute(sql`
         SELECT COUNT(DISTINCT c.id) as clientes_total
-        FROM cup_clientes c
-        INNER JOIN cup_contratos ct ON c.task_id = ct.id_task
+        FROM clickup.cup_clientes c
+        INNER JOIN clickup.cup_contratos ct ON c.task_id = ct.id_task
         WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
       `);
       
@@ -14650,25 +14650,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const variacaoQuery = await db.execute(sql`
           WITH mrr_atual AS (
             SELECT COALESCE(SUM(valorr::numeric), 0) as total
-            FROM cup_contratos
+            FROM clickup.cup_contratos
             WHERE status IN ('ativo', 'onboarding', 'triagem')
           ),
           mrr_mes_passado AS (
             SELECT COALESCE(SUM(valorr::numeric), 0) as total
-            FROM cup_contratos
+            FROM clickup.cup_contratos
             WHERE status IN ('ativo', 'onboarding', 'triagem')
               AND (data_inicio IS NULL OR data_inicio::date < date_trunc('month', CURRENT_DATE))
           ),
           clientes_atual AS (
             SELECT COUNT(DISTINCT c.id) as total
-            FROM cup_clientes c
-            INNER JOIN cup_contratos ct ON c.task_id = ct.id_task
+            FROM clickup.cup_clientes c
+            INNER JOIN clickup.cup_contratos ct ON c.task_id = ct.id_task
             WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
           ),
           clientes_mes_passado AS (
             SELECT COUNT(DISTINCT c.id) as total
-            FROM cup_clientes c
-            INNER JOIN cup_contratos ct ON c.task_id = ct.id_task
+            FROM clickup.cup_clientes c
+            INNER JOIN clickup.cup_contratos ct ON c.task_id = ct.id_task
             WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
               AND (ct.data_inicio IS NULL OR ct.data_inicio::date < date_trunc('month', CURRENT_DATE))
           )
@@ -14707,7 +14707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (userName) {
         // Tentar encontrar o colaborador pelo nome ou email
         const colaboradorQuery = await db.execute(sql`
-          SELECT nome FROM rh_pessoal 
+          SELECT nome FROM "Inhire".rh_pessoal 
           WHERE LOWER(nome) LIKE ${`%${userName.toLowerCase().split(' ')[0]}%`}
           AND status IN ('ativo', 'Ativo')
           LIMIT 1
@@ -14727,8 +14727,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               COUNT(DISTINCT ct.id_task) as contratos_ativos,
               ARRAY_AGG(DISTINCT ct.produto) FILTER (WHERE ct.produto IS NOT NULL) as produtos,
               ARRAY_AGG(DISTINCT ct.squad) FILTER (WHERE ct.squad IS NOT NULL) as squads
-            FROM cup_clientes c
-            INNER JOIN cup_contratos ct ON c.id_task = ct.id_task
+            FROM clickup.cup_clientes c
+            INNER JOIN clickup.cup_contratos ct ON c.id_task = ct.id_task
             WHERE (ct.responsavel ILIKE ${`%${colaboradorNome}%`} OR ct.cs_responsavel ILIKE ${`%${colaboradorNome}%`})
               AND ct.status IN ('ativo', 'onboarding', 'triagem')
             GROUP BY c.id, c.nome, c.cnpj
@@ -14752,8 +14752,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               COALESCE(SUM(ct.valorr::numeric), 0) as mrr_total,
               COUNT(DISTINCT ct.id_task) as contratos_total,
               COUNT(DISTINCT c.id) as clientes_total
-            FROM cup_contratos ct
-            INNER JOIN cup_clientes c ON ct.id_task = c.id_task
+            FROM clickup.cup_contratos ct
+            INNER JOIN clickup.cup_clientes c ON ct.id_task = c.id_task
             WHERE (ct.responsavel ILIKE ${`%${colaboradorNome}%`} OR ct.cs_responsavel ILIKE ${`%${colaboradorNome}%`})
               AND ct.status IN ('ativo', 'onboarding', 'triagem')
           `);
@@ -14806,7 +14806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             jc.valor_aberto as valor,
             jc.dias_atraso as dias
           FROM public.juridico_cobranca jc
-          INNER JOIN cup_clientes cl ON jc.cnpj = cl.cnpj
+          INNER JOIN clickup.cup_clientes cl ON jc.cnpj = cl.cnpj
           WHERE jc.status = 'aberto' AND jc.dias_atraso > 0
           ORDER BY jc.dias_atraso DESC
           LIMIT 5
@@ -14825,8 +14825,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ct.data_encerramento as data,
             ct.valorr as valor,
             0 as dias
-          FROM cup_contratos ct
-          INNER JOIN cup_clientes c ON ct.id_task = c.task_id
+          FROM clickup.cup_contratos ct
+          INNER JOIN clickup.cup_clientes c ON ct.id_task = c.task_id
           WHERE ct.status = 'ativo'
             AND ct.data_encerramento IS NOT NULL
             AND ct.data_encerramento::date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'
@@ -14848,8 +14848,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ct.data_inicio as data,
             COALESCE(ct.valorr::numeric, 0) as valor,
             0 as dias
-          FROM cup_contratos ct
-          INNER JOIN cup_clientes c ON ct.id_task = c.task_id
+          FROM clickup.cup_contratos ct
+          INNER JOIN clickup.cup_clientes c ON ct.id_task = c.task_id
           WHERE ct.status IN ('triagem', 'ativo')
             AND (
               ct.saude_conta IN ('vermelho', 'Vermelho', 'amarelo', 'Amarelo')
@@ -15509,35 +15509,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         WITH raw_status AS (
           SELECT DISTINCT LOWER(TRIM(status)) as raw_val, status as original
-          FROM public.cup_contratos 
+          FROM clickup.cup_contratos 
           WHERE status IS NOT NULL
         ),
         raw_produto AS (
           SELECT DISTINCT LOWER(TRIM(produto)) as raw_val, produto as original
-          FROM public.cup_contratos 
+          FROM clickup.cup_contratos 
           WHERE produto IS NOT NULL
         ),
         raw_squad AS (
           SELECT DISTINCT LOWER(TRIM(squad)) as raw_val, squad as original
-          FROM public.cup_contratos 
+          FROM clickup.cup_contratos 
           WHERE squad IS NOT NULL
         )
         SELECT 'status' as field, r.original as raw_value, 
-               (SELECT COUNT(*) FROM cup_contratos WHERE LOWER(TRIM(status)) = r.raw_val) as count
+               (SELECT COUNT(*) FROM clickup.cup_contratos WHERE LOWER(TRIM(status)) = r.raw_val) as count
         FROM raw_status r
         LEFT JOIN sys.catalog_aliases a ON a.catalog_key = 'catalog_contract_status' AND a.alias = r.raw_val
         LEFT JOIN sys.catalog_items ci ON ci.catalog_key = 'catalog_contract_status' AND ci.slug = r.raw_val AND ci.active = true
         WHERE a.alias IS NULL AND ci.slug IS NULL
         UNION ALL
         SELECT 'produto' as field, r.original as raw_value,
-               (SELECT COUNT(*) FROM cup_contratos WHERE LOWER(TRIM(produto)) = r.raw_val) as count
+               (SELECT COUNT(*) FROM clickup.cup_contratos WHERE LOWER(TRIM(produto)) = r.raw_val) as count
         FROM raw_produto r
         LEFT JOIN sys.catalog_aliases a ON a.catalog_key = 'catalog_products' AND a.alias = r.raw_val
         LEFT JOIN sys.catalog_items ci ON ci.catalog_key = 'catalog_products' AND ci.slug = r.raw_val AND ci.active = true
         WHERE a.alias IS NULL AND ci.slug IS NULL
         UNION ALL
         SELECT 'squad' as field, r.original as raw_value,
-               (SELECT COUNT(*) FROM cup_contratos WHERE LOWER(TRIM(squad)) = r.raw_val) as count
+               (SELECT COUNT(*) FROM clickup.cup_contratos WHERE LOWER(TRIM(squad)) = r.raw_val) as count
         FROM raw_squad r
         LEFT JOIN sys.catalog_aliases a ON a.catalog_key = 'catalog_squads' AND a.alias = r.raw_val
         LEFT JOIN sys.catalog_items ci ON ci.catalog_key = 'catalog_squads' AND ci.slug = r.raw_val AND ci.active = true
@@ -15566,7 +15566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Check if snapshot already exists for this date
       const existingCheck = await db.execute(sql`
-        SELECT COUNT(*) as count FROM cup_data_hist 
+        SELECT COUNT(*) as count FROM clickup.cup_data_hist 
         WHERE DATE(data_snapshot) = DATE(${targetDate})
       `);
       
@@ -15580,18 +15580,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Insert snapshot records from cup_contratos (let DB generate IDs)
       const insertResult = await db.execute(sql`
-        INSERT INTO cup_data_hist (data_snapshot, servico, status, valorr, valorp, id_task, id_subtask, 
+        INSERT INTO clickup.cup_data_hist (data_snapshot, servico, status, valorr, valorp, id_task, id_subtask, 
                                    data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor)
         SELECT 
           ${targetDate}::timestamp as data_snapshot,
           servico, status, valorr, valorp, id_task, id_subtask,
           data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor
-        FROM cup_contratos
+        FROM clickup.cup_contratos
       `);
       
       // Count inserted records
       const countResult = await db.execute(sql`
-        SELECT COUNT(*) as count FROM cup_data_hist 
+        SELECT COUNT(*) as count FROM clickup.cup_data_hist 
         WHERE DATE(data_snapshot) = DATE(${targetDate})
       `);
       
@@ -15619,7 +15619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           date_trunc('month', data_snapshot)::date as month,
           MAX(data_snapshot) as latest_snapshot,
           COUNT(*) as record_count
-        FROM cup_data_hist 
+        FROM clickup.cup_data_hist 
         GROUP BY date_trunc('month', data_snapshot)
         ORDER BY month DESC
         LIMIT 12
@@ -15715,7 +15715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     // Verificar se usuário está vinculado ao colaborador pelo email
     const colaboradorResult = await db.execute(sql`
-      SELECT email_turbo FROM rh_pessoal WHERE id = ${colaboradorId}
+      SELECT email_turbo FROM "Inhire".rh_pessoal WHERE id = ${colaboradorId}
     `);
     
     if (colaboradorResult.rows.length === 0) return false;
@@ -15745,8 +15745,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT 
           p.*,
-          (SELECT COUNT(*) FROM cortex_core.rh_notas_fiscais WHERE pagamento_id = p.id) as total_nfs
-        FROM cortex_core.rh_pagamentos p
+          (SELECT COUNT(*) FROM "Inhire".rh_notas_fiscais WHERE pagamento_id = p.id) as total_nfs
+        FROM "Inhire".rh_pagamentos p
         WHERE p.colaborador_id = ${colaboradorId}
         ORDER BY p.ano_referencia DESC, p.mes_referencia DESC
       `);
@@ -15768,7 +15768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Verificar permissão via colaborador_id do pagamento
       const pagamentoCheck = await db.execute(sql`
-        SELECT colaborador_id FROM cortex_core.rh_pagamentos WHERE id = ${pagamentoId}
+        SELECT colaborador_id FROM "Inhire".rh_pagamentos WHERE id = ${pagamentoId}
       `);
       
       if (pagamentoCheck.rows.length === 0) {
@@ -15784,7 +15784,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        SELECT * FROM cortex_core.rh_notas_fiscais
+        SELECT * FROM "Inhire".rh_notas_fiscais
         WHERE pagamento_id = ${pagamentoId}
         ORDER BY criado_em DESC
         LIMIT 1
@@ -15813,7 +15813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar dados do pagamento para validação
       const pagamentoResult = await db.execute(sql`
-        SELECT colaborador_id FROM cortex_core.rh_pagamentos WHERE id = ${pagamentoId}
+        SELECT colaborador_id FROM "Inhire".rh_pagamentos WHERE id = ${pagamentoId}
       `);
       
       if (pagamentoResult.rows.length === 0) {
@@ -15831,7 +15831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        INSERT INTO cortex_core.rh_notas_fiscais (
+        INSERT INTO "Inhire".rh_notas_fiscais (
           pagamento_id, colaborador_id, numero_nf, valor_nf, 
           arquivo_path, arquivo_nome, data_emissao, status, criado_por
         ) VALUES (
@@ -15843,7 +15843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Atualizar status do pagamento
       await db.execute(sql`
-        UPDATE cortex_core.rh_pagamentos 
+        UPDATE "Inhire".rh_pagamentos 
         SET status = 'nf_anexada', atualizado_em = NOW()
         WHERE id = ${pagamentoId}
       `);
@@ -15872,7 +15872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar dados do colaborador (PIX, CNPJ, CPF, Email)
       const colaboradorResult = await db.execute(sql`
-        SELECT nome, pix, cnpj, cpf, email_turbo, email_pessoal FROM rh_pessoal WHERE id = ${colaboradorId}
+        SELECT nome, pix, cnpj, cpf, email_turbo, email_pessoal FROM "Inhire".rh_pessoal WHERE id = ${colaboradorId}
       `);
       
       if (colaboradorResult.rows.length === 0) {
@@ -15913,7 +15913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const identifier of identifiers) {
         const clienteResult = await db.execute(sql`
-          SELECT ids FROM caz_clientes 
+          SELECT ids FROM "Conta Azul".caz_clientes 
           WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${identifier}
           LIMIT 5
         `);
@@ -15926,7 +15926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Buscar também por email em caz_clientes
       for (const email of emails) {
         const clienteResult = await db.execute(sql`
-          SELECT ids FROM caz_clientes 
+          SELECT ids FROM "Conta Azul".caz_clientes 
           WHERE LOWER(email) = LOWER(${email})
           LIMIT 5
         `);
@@ -15956,7 +15956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             p.status,
             p.categoria_nome,
             'parcelas' as fonte
-          FROM caz_parcelas p
+          FROM "Conta Azul".caz_parcelas p
           WHERE p.tipo_evento = 'DESPESA'
             AND UPPER(p.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO', 'QUITADO')
             AND (
@@ -15984,7 +15984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             pg.status,
             pg.nome as categoria_nome,
             'pagar' as fonte
-          FROM caz_pagar pg
+          FROM "Conta Azul".caz_pagar pg
           WHERE UPPER(pg.status) IN ('PAID', 'PAGO', 'ACQUITTED', 'LIQUIDADO', 'QUITADO')
             AND (
               ${cnpjLimpo ? sql`(pg.descricao ILIKE ${'%' + cnpjLimpo + '%'} OR pg.fornecedor ILIKE ${'%' + cnpjLimpo + '%'})` : sql`FALSE`}
@@ -16050,7 +16050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 1. Buscar em caz_parcelas - descrição
       const parcelas = await db.execute(sql`
         SELECT id, descricao, valor_pago, valor_bruto, status, tipo_evento, data_quitacao, data_vencimento, categoria_nome
-        FROM caz_parcelas 
+        FROM "Conta Azul".caz_parcelas 
         WHERE descricao ILIKE ${'%' + cnpj + '%'}
         LIMIT 10
       `);
@@ -16060,7 +16060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 2. Buscar em caz_pagar - descrição
       const pagar_desc = await db.execute(sql`
         SELECT id, descricao, fornecedor, pago, total, status, data_vencimento
-        FROM caz_pagar 
+        FROM "Conta Azul".caz_pagar 
         WHERE descricao ILIKE ${'%' + cnpj + '%'}
         LIMIT 10
       `);
@@ -16070,7 +16070,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Buscar em caz_pagar - fornecedor
       const pagar_forn = await db.execute(sql`
         SELECT id, descricao, fornecedor, pago, total, status, data_vencimento
-        FROM caz_pagar 
+        FROM "Conta Azul".caz_pagar 
         WHERE fornecedor ILIKE ${'%' + cnpj + '%'}
         LIMIT 10
       `);
@@ -16080,7 +16080,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 4. Buscar em caz_clientes - cnpj
       const clientes = await db.execute(sql`
         SELECT id, nome, cnpj, ids
-        FROM caz_clientes 
+        FROM "Conta Azul".caz_clientes 
         WHERE REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') = ${cnpj}
         LIMIT 10
       `);
@@ -16105,7 +16105,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 6. Buscar pelo nome "Bruno" em caz_pagar.fornecedor
       const pagar_bruno = await db.execute(sql`
         SELECT id, descricao, fornecedor, pago, total, status, data_vencimento
-        FROM caz_pagar 
+        FROM "Conta Azul".caz_pagar 
         WHERE fornecedor ILIKE '%Bruno%'
         LIMIT 10
       `);
@@ -16119,7 +16119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const parcelas_cliente = await db.execute(sql`
           SELECT id, descricao, valor_pago, valor_bruto, status, tipo_evento, data_quitacao, data_vencimento, categoria_nome
-          FROM caz_parcelas 
+          FROM "Conta Azul".caz_parcelas 
           WHERE id_cliente = ${clienteIds}
           LIMIT 20
         `);
@@ -16155,9 +16155,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Arquivo, mês e ano são obrigatórios" });
       }
       
-      // Inserir NF diretamente na tabela cortex_core.rh_notas_fiscais
+      // Inserir NF diretamente na tabela "Inhire".rh_notas_fiscais
       const result = await db.execute(sql`
-        INSERT INTO cortex_core.rh_notas_fiscais (
+        INSERT INTO "Inhire".rh_notas_fiscais (
           colaborador_id, numero_nf, valor_nf, 
           arquivo_path, arquivo_nome, data_emissao, status, criado_por,
           mes_referencia, ano_referencia
@@ -16193,8 +16193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await db.execute(sql`
         SELECT nf.*, p.mes_referencia, p.ano_referencia, p.valor_bruto
-        FROM cortex_core.rh_notas_fiscais nf
-        JOIN cortex_core.rh_pagamentos p ON p.id = nf.pagamento_id
+        FROM "Inhire".rh_notas_fiscais nf
+        JOIN "Inhire".rh_pagamentos p ON p.id = nf.pagamento_id
         WHERE nf.colaborador_id = ${colaboradorId}
         ORDER BY p.ano_referencia DESC, p.mes_referencia DESC
       `);
@@ -16226,8 +16226,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await db.execute(sql`
         SELECT c.*, 
                a.nome_completo as autor_nome_completo
-        FROM rh_comentarios c
-        LEFT JOIN rh_pessoal a ON a.id = c.autor_id
+        FROM "Inhire".rh_comentarios c
+        LEFT JOIN "Inhire".rh_pessoal a ON a.id = c.autor_id
         WHERE c.colaborador_id = ${colaboradorId}
         ORDER BY c.criado_em DESC
       `);
@@ -16262,7 +16262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar dados do autor (colaborador logado)
       const autorResult = await db.execute(sql`
-        SELECT id, nome_completo FROM rh_pessoal 
+        SELECT id, nome_completo FROM "Inhire".rh_pessoal 
         WHERE email = ${user.email}
         LIMIT 1
       `);
@@ -16272,7 +16272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const autorNome = autor ? (autor as any).nome_completo : user.name || user.email;
       
       const result = await db.execute(sql`
-        INSERT INTO rh_comentarios (colaborador_id, autor_id, autor_nome, autor_email, comentario, tipo, visibilidade)
+        INSERT INTO "Inhire".rh_comentarios (colaborador_id, autor_id, autor_nome, autor_email, comentario, tipo, visibilidade)
         VALUES (${colaboradorId}, ${autorId}, ${autorNome}, ${user.email}, ${comentario.trim()}, ${tipo}, ${visibilidade})
         RETURNING *
       `);
@@ -16296,7 +16296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Verificar se o usuário é o autor do comentário ou admin
       const comentarioResult = await db.execute(sql`
-        SELECT * FROM rh_comentarios WHERE id = ${comentarioId}
+        SELECT * FROM "Inhire".rh_comentarios WHERE id = ${comentarioId}
       `);
       
       if (comentarioResult.rows.length === 0) {
@@ -16311,7 +16311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Você só pode deletar seus próprios comentários" });
       }
       
-      await db.execute(sql`DELETE FROM rh_comentarios WHERE id = ${comentarioId}`);
+      await db.execute(sql`DELETE FROM "Inhire".rh_comentarios WHERE id = ${comentarioId}`);
       
       res.json({ success: true });
     } catch (error) {

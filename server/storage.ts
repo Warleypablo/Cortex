@@ -1594,7 +1594,7 @@ export class DbStorage implements IStorage {
         
         // Create table
         await db.execute(sql`
-          CREATE TABLE rh_telefones (
+          CREATE TABLE "Inhire".rh_telefones (
             id INTEGER PRIMARY KEY,
             conta VARCHAR(50),
             plano_operadora VARCHAR(50),
@@ -1609,7 +1609,7 @@ export class DbStorage implements IStorage {
         
         // Insert initial data
         await db.execute(sql`
-          INSERT INTO rh_telefones (id, conta, plano_operadora, telefone, responsavel_nome, responsavel_id, setor, ultima_recarga, status) VALUES
+          INSERT INTO "Inhire".rh_telefones (id, conta, plano_operadora, telefone, responsavel_nome, responsavel_id, setor, ultima_recarga, status) VALUES
           (1, '0454365107', 'PÓS / VIVO', '(27) 99754-7217', NULL, NULL, 'Commerce', NULL, 'Ativo'),
           (2, '0450751313', 'PÓS / VIVO', '(27) 99749-6354', 'Rafael Vilela', NULL, 'Commerce', NULL, 'Ativo'),
           (3, '0450751314', 'PÓS / VIVO', '(27) 99749-4918', 'Maria Mid CX', NULL, 'Commerce', NULL, 'Ativo'),
@@ -1682,17 +1682,17 @@ export class DbStorage implements IStorage {
         cc.cnpj as "cnpjCliente",
         (
           SELECT string_agg(DISTINCT produto, ', ')
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE id_task = cc.task_id
         ) as servicos,
         (
           SELECT MIN(data_inicio)
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE id_task = cc.task_id
         ) as "dataInicio",
         (
           SELECT MIN(COALESCE(cr.data_vencimento, cr.data_criacao))
-          FROM caz_receber cr
+          FROM "Conta Azul".caz_receber cr
           WHERE cr.cliente_id = caz.ids
             AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
         ) as "dataPrimeiroPagamento",
@@ -1701,7 +1701,7 @@ export class DbStorage implements IStorage {
             COALESCE(cr.data_vencimento, cr.data_criacao), 
             'YYYY-MM'
           ))::double precision
-          FROM caz_receber cr
+          FROM "Conta Azul".caz_receber cr
           WHERE cr.cliente_id = caz.ids
             AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
             AND COALESCE(cr.data_vencimento, cr.data_criacao) IS NOT NULL
@@ -1712,20 +1712,20 @@ export class DbStorage implements IStorage {
               MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
             )) / 86400
           )::double precision
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE id_task = cc.task_id
           AND data_inicio IS NOT NULL
         ), 0) as "ltDias",
         COALESCE((
           SELECT SUM(valorr::double precision)
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE id_task = cc.task_id
             AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
             AND valorr IS NOT NULL
         ), 0) as "totalRecorrente",
         COALESCE((
           SELECT SUM(valorp::double precision)
-          FROM cup_contratos
+          FROM clickup.cup_contratos
           WHERE id_task = cc.task_id
             AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
             AND valorp IS NOT NULL
@@ -1735,8 +1735,8 @@ export class DbStorage implements IStorage {
         NULL::text as "faturamentoMensal",
         NULL::text as "investimentoAds",
         cc.status_conta as "statusConta"
-      FROM cup_clientes cc
-      LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+      FROM clickup.cup_clientes cc
+      LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
       ORDER BY cc.task_id, caz.id DESC NULLS LAST, cc.nome
     `);
 
@@ -1865,7 +1865,7 @@ export class DbStorage implements IStorage {
         NULL as "dataInicio",
         (
           SELECT MIN(COALESCE(data_vencimento, data_criacao))
-          FROM caz_receber
+          FROM "Conta Azul".caz_receber
           WHERE cliente_id = COALESCE(caz_clientes.ids, caz_clientes.id::text)
             AND UPPER(status) IN ('PAGO', 'ACQUITTED')
         ) as "dataPrimeiroPagamento",
@@ -1874,7 +1874,7 @@ export class DbStorage implements IStorage {
             COALESCE(data_vencimento, data_criacao), 
             'YYYY-MM'
           ))::double precision
-          FROM caz_receber
+          FROM "Conta Azul".caz_receber
           WHERE cliente_id = COALESCE(caz_clientes.ids, caz_clientes.id::text)
             AND UPPER(status) IN ('PAGO', 'ACQUITTED')
             AND COALESCE(data_vencimento, data_criacao) IS NOT NULL
@@ -1887,7 +1887,7 @@ export class DbStorage implements IStorage {
         NULL::text as "faturamentoMensal",
         NULL::text as "investimentoAds",
         NULL::text as "statusConta"
-      FROM caz_clientes
+      FROM "Conta Azul".caz_clientes
       WHERE id::text = ${id} 
         OR ids = ${id}
         OR REPLACE(REPLACE(cnpj, '.', ''), '-', '') = REPLACE(REPLACE(${id}, '.', ''), '-', '')
@@ -1911,7 +1911,7 @@ export class DbStorage implements IStorage {
     // First, find the client's ids field (used by Conta Azul for linking)
     const clienteResult = await db.execute(sql`
       SELECT COALESCE(ids, id::text) as ids_ref 
-      FROM caz_clientes 
+      FROM "Conta Azul".caz_clientes 
       WHERE id::text = ${clienteId} 
          OR ids = ${clienteId}
          OR REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = REGEXP_REPLACE(${clienteId}, '[^0-9]', '', 'g')
@@ -2052,7 +2052,7 @@ export class DbStorage implements IStorage {
     // First, find the client's ids field (used by Conta Azul for linking)
     const clienteResult = await db.execute(sql`
       SELECT COALESCE(ids, id::text) as ids_ref 
-      FROM caz_clientes 
+      FROM "Conta Azul".caz_clientes 
       WHERE id::text = ${clienteId} 
          OR ids = ${clienteId}
          OR REGEXP_REPLACE(cnpj, '[^0-9]', '', 'g') = REGEXP_REPLACE(${clienteId}, '[^0-9]', '', 'g')
@@ -2220,11 +2220,11 @@ export class DbStorage implements IStorage {
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
     const { id, ...data } = colaborador as any;
     
-    const maxIdResult = await db.execute(sql`SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM rh_pessoal`);
+    const maxIdResult = await db.execute(sql`SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM "Inhire".rh_pessoal`);
     const nextId = (maxIdResult.rows[0] as any).next_id;
     
     const result = await db.execute(sql`
-      INSERT INTO rh_pessoal (
+      INSERT INTO "Inhire".rh_pessoal (
         id, status, nome, cpf, endereco, estado, telefone, aniversario, admissao,
         setor, squad, cargo, nivel, pix, cnpj, email_turbo, email_pessoal, salario
       ) VALUES (
@@ -2339,7 +2339,7 @@ export class DbStorage implements IStorage {
 
   async createPromocao(promocao: InsertRhPromocao): Promise<RhPromocao> {
     const result = await db.execute(sql`
-      INSERT INTO rh_promocoes (
+      INSERT INTO "Inhire".rh_promocoes (
         colaborador_id, 
         data_promocao, 
         salario_anterior, 
@@ -2393,9 +2393,9 @@ export class DbStorage implements IStorage {
         ct.cs_responsavel as "csResponsavel",
         cc.responsavel as "responsavelCliente",
         cc.responsavel_geral as "responsavelGeral"
-      FROM cup_contratos ct
-      LEFT JOIN cup_clientes cc ON ct.id_task = cc.task_id
-      LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+      FROM clickup.cup_contratos ct
+      LEFT JOIN clickup.cup_clientes cc ON ct.id_task = cc.task_id
+      LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
       ORDER BY ct.id_subtask, caz.id DESC NULLS LAST, ct.data_inicio DESC
     `);
 
@@ -2424,9 +2424,9 @@ export class DbStorage implements IStorage {
         ct.cs_responsavel as "csResponsavel",
         cc.responsavel as "responsavelCliente",
         cc.responsavel_geral as "responsavelGeral"
-      FROM cup_contratos ct
-      LEFT JOIN cup_clientes cc ON ct.id_task = cc.task_id
-      LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+      FROM clickup.cup_contratos ct
+      LEFT JOIN clickup.cup_clientes cc ON ct.id_task = cc.task_id
+      LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
       WHERE caz.ids = ${clienteId}
         OR cc.task_id = ${clienteId}
         OR REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') = ${cleanId}
@@ -2440,7 +2440,7 @@ export class DbStorage implements IStorage {
   async updateContrato(idSubtask: string, data: UpdateContrato): Promise<ContratoCompleto | undefined> {
     // Use safe parameterized query with sql template literals
     await db.execute(sql`
-      UPDATE cup_contratos SET
+      UPDATE clickup.cup_contratos SET
         servico = COALESCE(${data.servico ?? null}, servico),
         produto = COALESCE(${data.produto ?? null}, produto),
         status = COALESCE(${data.status ?? null}, status),
@@ -2473,8 +2473,8 @@ export class DbStorage implements IStorage {
         p.valor_mercado as "valorMercado",
         p.valor_venda as "valorVenda",
         p.descricao
-      FROM rh_patrimonio p
-      LEFT JOIN rh_pessoal c ON (
+      FROM "Inhire".rh_patrimonio p
+      LEFT JOIN "Inhire".rh_pessoal c ON (
         p.responsavel_id = c.id 
         OR (p.responsavel_id IS NULL AND p.responsavel_atual = c.nome)
       )
@@ -2559,13 +2559,13 @@ export class DbStorage implements IStorage {
   async updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio> {
     if (responsavelNome === null) {
       await db.execute(sql`
-        UPDATE rh_patrimonio 
+        UPDATE "Inhire".rh_patrimonio 
         SET responsavel_atual = NULL, responsavel_id = NULL 
         WHERE id = ${id}
       `);
     } else {
       await db.execute(sql`
-        UPDATE rh_patrimonio 
+        UPDATE "Inhire".rh_patrimonio 
         SET responsavel_atual = ${responsavelNome} 
         WHERE id = ${id}
       `);
@@ -2579,7 +2579,7 @@ export class DbStorage implements IStorage {
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
         valor_venda as "valorVenda", descricao
-      FROM rh_patrimonio WHERE id = ${id}
+      FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
     
     if (!result.rows || result.rows.length === 0) {
@@ -2591,7 +2591,7 @@ export class DbStorage implements IStorage {
 
   async updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio> {
     await db.execute(sql`
-      UPDATE rh_patrimonio 
+      UPDATE "Inhire".rh_patrimonio 
       SET responsavel_atual = ${responsavelNome}, responsavel_id = ${responsavelId} 
       WHERE id = ${id}
     `);
@@ -2604,7 +2604,7 @@ export class DbStorage implements IStorage {
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
         valor_venda as "valorVenda", descricao
-      FROM rh_patrimonio WHERE id = ${id}
+      FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
     
     if (!result.rows || result.rows.length === 0) {
@@ -2643,7 +2643,7 @@ export class DbStorage implements IStorage {
       throw new Error("No valid fields to update");
     }
     
-    await db.execute(sql`UPDATE rh_patrimonio SET ${sql.join(updates, sql`, `)} WHERE id = ${id}`);
+    await db.execute(sql`UPDATE "Inhire".rh_patrimonio SET ${sql.join(updates, sql`, `)} WHERE id = ${id}`);
     
     const result = await db.execute(sql`
       SELECT 
@@ -2653,7 +2653,7 @@ export class DbStorage implements IStorage {
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
         valor_venda as "valorVenda", descricao
-      FROM rh_patrimonio WHERE id = ${id}
+      FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
     
     if (!result.rows || result.rows.length === 0) {
@@ -2693,7 +2693,7 @@ export class DbStorage implements IStorage {
       
       const result = await db.execute(sql`
         SELECT id, patrimonio_id as "patrimonioId", acao, usuario, data
-        FROM rh_patrimonio_historico
+        FROM "Inhire".rh_patrimonio_historico
         WHERE patrimonio_id = ${patrimonioId}
         ORDER BY data DESC
       `);
@@ -2716,7 +2716,7 @@ export class DbStorage implements IStorage {
           
           const updatedResult = await db.execute(sql`
             SELECT id, patrimonio_id as "patrimonioId", acao, usuario, data
-            FROM rh_patrimonio_historico
+            FROM "Inhire".rh_patrimonio_historico
             WHERE patrimonio_id = ${patrimonioId}
             ORDER BY data DESC
           `);
@@ -2736,7 +2736,7 @@ export class DbStorage implements IStorage {
       await this.ensurePatrimonioHistoricoTable();
       
       const result = await db.execute(sql`
-        INSERT INTO rh_patrimonio_historico (patrimonio_id, acao, usuario, data)
+        INSERT INTO "Inhire".rh_patrimonio_historico (patrimonio_id, acao, usuario, data)
         VALUES (${data.patrimonioId}, ${data.acao}, ${data.usuario}, ${data.data})
         RETURNING id, patrimonio_id as "patrimonioId", acao, usuario, data
       `);
@@ -3027,7 +3027,7 @@ export class DbStorage implements IStorage {
         nmbanco,
         balance,
         empresa
-      FROM caz_bancos
+      FROM "Conta Azul".caz_bancos
       WHERE ativo = true OR ativo IS NULL
       ORDER BY balance::numeric DESC
     `);
@@ -3068,7 +3068,7 @@ export class DbStorage implements IStorage {
           data_vencimento::date as data,
           SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status NOT IN ('PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -3142,7 +3142,7 @@ export class DbStorage implements IStorage {
         COALESCE(metodo_pagamento, 'Não informado') as metodo_pagamento,
         TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_vencimento,
         COALESCE(nome_conta_financeira, 'Não informado') as conta
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE data_vencimento::date = '${data}'::date
         AND status NOT IN ('PERDIDO')
         AND valor_bruto::numeric > 0
@@ -3225,7 +3225,7 @@ export class DbStorage implements IStorage {
           data_vencimento::date as data,
           SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -3269,14 +3269,14 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql`
       WITH saldo_bancos AS (
         SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
-        FROM caz_bancos
+        FROM "Conta Azul".caz_bancos
         WHERE ativo = 'true' OR ativo = 't' OR ativo = '1'
       ),
       proximos_30_dias AS (
         SELECT 
           SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento >= CURRENT_DATE
           AND data_vencimento <= CURRENT_DATE + INTERVAL '30 days'
@@ -3285,7 +3285,7 @@ export class DbStorage implements IStorage {
         SELECT 
           SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ATRASADO' THEN valor_bruto::numeric ELSE 0 END) as entradas_vencidas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as saidas_vencidas
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE data_vencimento < CURRENT_DATE
       ),
       maior_entrada AS (
@@ -3293,7 +3293,7 @@ export class DbStorage implements IStorage {
           valor_bruto::numeric as valor,
           COALESCE(descricao, 'Sem descrição') as descricao,
           TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento >= CURRENT_DATE
@@ -3306,7 +3306,7 @@ export class DbStorage implements IStorage {
           valor_bruto::numeric as valor,
           COALESCE(descricao, 'Sem descrição') as descricao,
           TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento >= CURRENT_DATE
@@ -3364,14 +3364,14 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql`
       WITH saldo_bancos AS (
         SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
-        FROM caz_bancos
+        FROM "Conta Azul".caz_bancos
         WHERE ativo = 'true' OR ativo = 't' OR ativo = '1'
       ),
       periodo AS (
         SELECT 
           SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_periodo,
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_periodo
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
       ),
@@ -3379,7 +3379,7 @@ export class DbStorage implements IStorage {
         SELECT 
           SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ATRASADO' THEN valor_bruto::numeric ELSE 0 END) as entradas_vencidas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as saidas_vencidas
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE data_vencimento < CURRENT_DATE
       ),
       maior_entrada AS (
@@ -3388,7 +3388,7 @@ export class DbStorage implements IStorage {
           COALESCE(descricao, 'Sem descrição') as descricao,
           TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
           COALESCE(empresa, 'N/A') as empresa
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -3401,7 +3401,7 @@ export class DbStorage implements IStorage {
           COALESCE(descricao, 'Sem descrição') as descricao,
           TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
           COALESCE(empresa, 'N/A') as empresa
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -3414,7 +3414,7 @@ export class DbStorage implements IStorage {
           COALESCE(descricao, 'Sem descrição') as descricao,
           TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
           COALESCE(empresa, 'N/A') as empresa
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -3427,7 +3427,7 @@ export class DbStorage implements IStorage {
           COALESCE(descricao, 'Sem descrição') as descricao,
           TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
           COALESCE(empresa, 'N/A') as empresa
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -3439,7 +3439,7 @@ export class DbStorage implements IStorage {
           COALESCE(categoria_nome, 'Sem categoria') as categoria,
           tipo_evento,
           SUM(valor_bruto::numeric) as valor
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
           AND tipo_evento IN ('RECEITA', 'DESPESA')
@@ -3480,7 +3480,7 @@ export class DbStorage implements IStorage {
         COALESCE(descricao, 'Sem descrição') as descricao,
         TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
         COALESCE(empresa, 'N/A') as empresa
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -3494,7 +3494,7 @@ export class DbStorage implements IStorage {
         COALESCE(descricao, 'Sem descrição') as descricao,
         TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data,
         COALESCE(empresa, 'N/A') as empresa
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'DESPESA'
         AND status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -3507,7 +3507,7 @@ export class DbStorage implements IStorage {
         COALESCE(categoria_nome, 'Sem categoria') as categoria,
         tipo_evento,
         SUM(valor_bruto::numeric) as valor
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
         AND tipo_evento IN ('RECEITA', 'DESPESA')
@@ -3825,7 +3825,7 @@ export class DbStorage implements IStorage {
     const mrrQuery = await db.execute(sql`
       SELECT 
         COALESCE(SUM(valorr), 0) as mrr
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
     
@@ -3897,7 +3897,7 @@ export class DbStorage implements IStorage {
     const aquisicaoPontualQuery = await db.execute(sql`
       SELECT 
         COALESCE(SUM(valor_pontual), 0) as aquisicao_pontual_crm
-      FROM crm_deal
+      FROM "Bitrix".crm_deal
       WHERE stage_name = 'Negócio Ganho'
         AND data_fechamento >= ${inicioMes}
         AND data_fechamento <= ${fimMes}
@@ -4055,7 +4055,7 @@ export class DbStorage implements IStorage {
           COUNT(*) as quantidade_churn,
           COALESCE(SUM(valorr::numeric), 0) as valor_churn,
           data_encerramento
-        FROM cup_contratos
+        FROM clickup.cup_contratos
         WHERE ${whereClause}
         GROUP BY produto, TO_CHAR(data_encerramento, 'YYYY-MM'), data_encerramento
       ),
@@ -4065,7 +4065,7 @@ export class DbStorage implements IStorage {
           cd.mes,
           COUNT(*) as total_ativos,
           COALESCE(SUM(valorr::numeric), 0) as valor_total_ativo
-        FROM cup_contratos c
+        FROM clickup.cup_contratos c
         CROSS JOIN (SELECT DISTINCT mes, MIN(data_encerramento) as data_ref FROM churn_data GROUP BY mes) cd
         WHERE c.data_inicio <= cd.data_ref
           AND (c.data_encerramento IS NULL OR c.data_encerramento >= cd.data_ref)
@@ -4154,8 +4154,8 @@ export class DbStorage implements IStorage {
         SELECT 
           con.*,
           cli.responsavel
-        FROM cup_contratos con
-        LEFT JOIN cup_clientes cli ON con.id_task = cli.task_id
+        FROM clickup.cup_contratos con
+        LEFT JOIN clickup.cup_clientes cli ON con.id_task = cli.task_id
         WHERE ${whereClause}
       ),
       churn_por_responsavel AS (
@@ -4171,8 +4171,8 @@ export class DbStorage implements IStorage {
           COALESCE(cli.responsavel, 'Sem responsável') as responsavel,
           COUNT(*) as total_contratos_ativos,
           COALESCE(SUM(con.valorr::numeric), 0) as valor_total_ativo
-        FROM cup_contratos con
-        LEFT JOIN cup_clientes cli ON con.id_task = cli.task_id
+        FROM clickup.cup_contratos con
+        LEFT JOIN clickup.cup_clientes cli ON con.id_task = cli.task_id
         WHERE ${ativosWhereClause}
         GROUP BY cli.responsavel
       )
@@ -4208,23 +4208,23 @@ export class DbStorage implements IStorage {
           COALESCE(caz.ids, caz.id::text) as cliente_id,
           (
             SELECT COALESCE(SUM(cr.valor), 0)
-            FROM caz_receber cr
+            FROM "Conta Azul".caz_receber cr
             WHERE cr.cliente_id = COALESCE(caz.ids, caz.id::text)
               AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
           ) as ltv,
           (
             SELECT COUNT(DISTINCT TO_CHAR(COALESCE(cr.data_vencimento, cr.data_criacao), 'YYYY-MM'))
-            FROM caz_receber cr
+            FROM "Conta Azul".caz_receber cr
             WHERE cr.cliente_id = COALESCE(caz.ids, caz.id::text)
               AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
           ) as lt_meses,
           (
             SELECT string_agg(DISTINCT cup_contratos.produto, ', ')
-            FROM cup_contratos
+            FROM clickup.cup_contratos
             WHERE cup_contratos.id_task = cc.task_id
           ) as servicos
-        FROM cup_clientes cc
-        LEFT JOIN caz_clientes caz ON cc.cnpj = caz.cnpj
+        FROM clickup.cup_clientes cc
+        LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
         WHERE caz.ids IS NOT NULL OR caz.id IS NOT NULL
       )
       SELECT nome, ltv, lt_meses as "ltMeses", COALESCE(servicos, '') as servicos
@@ -4247,7 +4247,7 @@ export class DbStorage implements IStorage {
     // IMPORTANTE: O campo 'nome' contém CÓDIGO + DESCRIÇÃO juntos, ex: "06.10 Despesas Administrativas"
     const categoriasReais = await db.execute(sql.raw(`
       SELECT nome 
-      FROM caz_categorias 
+      FROM "Conta Azul".caz_categorias 
       WHERE nome IS NOT NULL
     `));
     
@@ -4301,7 +4301,7 @@ export class DbStorage implements IStorage {
         valor_categoria,
         data_quitacao,
         tipo_evento
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE ${whereClause}
       ORDER BY data_quitacao
     `));
@@ -4438,7 +4438,7 @@ export class DbStorage implements IStorage {
 
     const headcountResult = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(whereCurrentConditions, sql` AND `)}
     `);
     
@@ -4473,13 +4473,13 @@ export class DbStorage implements IStorage {
 
     const admissoesResult = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(whereAdmissoesConditions, sql` AND `)}
     `);
     
     const demissoesResult = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(whereDemissoesConditions, sql` AND `)}
     `);
 
@@ -4505,7 +4505,7 @@ export class DbStorage implements IStorage {
 
     const headcountInicioResult = await db.execute(sql`
       SELECT COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(whereHeadcountInicio, sql` AND `)}
     `);
 
@@ -4515,7 +4515,7 @@ export class DbStorage implements IStorage {
 
     const tempoMedioResult = await db.execute(sql`
       SELECT AVG(meses_de_turbo) as tempo_medio
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(whereCurrentConditions, sql` AND `)}
         AND meses_de_turbo IS NOT NULL
     `);
@@ -4578,7 +4578,7 @@ export class DbStorage implements IStorage {
             THEN r.id 
           END) as demissoes
         FROM meses m
-        LEFT JOIN rh_pessoal r ON ${sql.join(joinConditions, sql` AND `)}
+        LEFT JOIN "Inhire".rh_pessoal r ON ${sql.join(joinConditions, sql` AND `)}
         GROUP BY m.mes
         ORDER BY m.mes
       )
@@ -4629,7 +4629,7 @@ export class DbStorage implements IStorage {
           THEN r.id 
         END) as demissoes
       FROM meses m
-      LEFT JOIN rh_pessoal r ON ${sql.join(joinConditions, sql` AND `)}
+      LEFT JOIN "Inhire".rh_pessoal r ON ${sql.join(joinConditions, sql` AND `)}
       GROUP BY m.mes
       ORDER BY m.mes
     `);
@@ -4652,7 +4652,7 @@ export class DbStorage implements IStorage {
         COALESCE(r.squad, 'Sem Squad') as squad,
         AVG(r.meses_ult_aumento) as tempo_medio_meses,
         COUNT(*) as total_colaboradores
-      FROM rh_pessoal r
+      FROM "Inhire".rh_pessoal r
       WHERE r.status = 'Ativo'
         AND r.meses_ult_aumento IS NOT NULL
         ${squadFilter}
@@ -4687,7 +4687,7 @@ export class DbStorage implements IStorage {
         squad,
         EXTRACT(DAY FROM aniversario) as dia_aniversario,
         EXTRACT(DAY FROM CURRENT_DATE) as dia_atual
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE status = 'Ativo'
         AND EXTRACT(MONTH FROM aniversario) = ${mesAtual}
         ${squadFilter}
@@ -4733,7 +4733,7 @@ export class DbStorage implements IStorage {
             EXTRACT(MONTH FROM admissao)::int,
             EXTRACT(DAY FROM admissao)::int
           ) as aniversario_ano_proximo
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE status = 'Ativo'
           ${squadFilter}
           ${setorFilter}
@@ -4772,28 +4772,28 @@ export class DbStorage implements IStorage {
   async getGegFiltros(): Promise<any> {
     const squadResult = await db.execute(sql`
       SELECT DISTINCT squad
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE squad IS NOT NULL AND squad != ''
       ORDER BY squad
     `);
 
     const setorResult = await db.execute(sql`
       SELECT DISTINCT setor
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE setor IS NOT NULL AND setor != ''
       ORDER BY setor
     `);
 
     const nivelResult = await db.execute(sql`
       SELECT DISTINCT nivel
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE nivel IS NOT NULL AND nivel != ''
       ORDER BY nivel
     `);
 
     const cargoResult = await db.execute(sql`
       SELECT DISTINCT cargo
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE cargo IS NOT NULL AND cargo != ''
       ORDER BY cargo
     `);
@@ -4845,7 +4845,7 @@ export class DbStorage implements IStorage {
       SELECT 
         AVG(salario::numeric) as valor_medio,
         COUNT(*) as total_colaboradores
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
     `);
 
@@ -4881,7 +4881,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(SUM(salario::numeric), 0) as custo_total,
         COUNT(*) as total_colaboradores
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
     `);
 
@@ -4917,7 +4917,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(SUM(proporcional_caju::numeric), 0) as valor_total,
         COUNT(*) as total_colaboradores
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
     `);
 
@@ -4948,8 +4948,8 @@ export class DbStorage implements IStorage {
     
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(CAST(p.valor_categoria AS NUMERIC)), 0) as valor_total
-      FROM caz_parcelas p
-      INNER JOIN rh_pessoal c ON TRIM(p.nome) = TRIM(c.nome)
+      FROM "Conta Azul".caz_parcelas p
+      INNER JOIN "Inhire".rh_pessoal c ON TRIM(p.nome) = TRIM(c.nome)
       WHERE ${sql.join(conditions, sql` AND `)}
     `);
 
@@ -4965,14 +4965,14 @@ export class DbStorage implements IStorage {
         COUNT(*) as total_ativos,
         COALESCE(SUM(valor_pago), 0) as valor_total_pago,
         COALESCE(SUM(valor_mercado), 0) as valor_total_mercado
-      FROM rh_patrimonio
+      FROM "Inhire".rh_patrimonio
     `);
 
     const porTipoResult = await db.execute(sql`
       SELECT 
         ativo as tipo,
         COUNT(*) as quantidade
-      FROM rh_patrimonio
+      FROM "Inhire".rh_patrimonio
       WHERE ativo IS NOT NULL AND ativo != ''
       GROUP BY ativo
       ORDER BY quantidade DESC
@@ -5007,7 +5007,7 @@ export class DbStorage implements IStorage {
         setor,
         ultimo_aumento,
         meses_ult_aumento
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE status = 'Ativo'
         AND ultimo_aumento IS NOT NULL
         ${squadFilter}
@@ -5055,7 +5055,7 @@ export class DbStorage implements IStorage {
           EXTRACT(YEAR FROM AGE(demissao, admissao)) * 12 + 
           EXTRACT(MONTH FROM AGE(demissao, admissao))
         END) as tempo_medio_desligados
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
     `);
 
@@ -5095,7 +5095,7 @@ export class DbStorage implements IStorage {
         TO_CHAR(admissao, 'YYYY-MM-DD') as admissao,
         TO_CHAR(demissao, 'YYYY-MM-DD') as demissao,
         (demissao::date - admissao::date) as dias_ate_desligamento
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
       ORDER BY demissao DESC
     `);
@@ -5126,7 +5126,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(setor, 'Não informado') as setor,
         COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE status = 'Ativo'
         ${squadFilter}
         ${setorFilter}
@@ -5168,7 +5168,7 @@ export class DbStorage implements IStorage {
         COALESCE(setor, 'Não informado') as setor,
         COALESCE(SUM(salario::numeric), 0) as custo_total,
         COUNT(*) as total_colaboradores
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
       GROUP BY COALESCE(setor, 'Não informado')
       ORDER BY custo_total DESC
@@ -5191,7 +5191,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(tipo_demissao, 'Não informado') as tipo,
         COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE LOWER(status) IN ('inativo', 'em desligamento', 'dispensado')
         ${squadFilter}
         ${setorFilter}
@@ -5231,7 +5231,7 @@ export class DbStorage implements IStorage {
             GREATEST(1, EXTRACT(MONTH FROM AGE(demissao, admissao)) + EXTRACT(YEAR FROM AGE(demissao, admissao)) * 12)::integer
           ELSE 0
         END as tempo_de_empresa
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE LOWER(status) IN ('inativo', 'em desligamento', 'dispensado')
         AND demissao IS NOT NULL
         ${squadFilter}
@@ -5279,7 +5279,7 @@ export class DbStorage implements IStorage {
           ELSE 7
         END as ordem,
         COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE status = 'Ativo'
         AND admissao IS NOT NULL
         ${squadFilter}
@@ -5339,7 +5339,7 @@ export class DbStorage implements IStorage {
       SELECT 
         squad as nome,
         COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
       GROUP BY squad
       ORDER BY total DESC
@@ -5375,7 +5375,7 @@ export class DbStorage implements IStorage {
       SELECT 
         cargo as nome,
         COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
       GROUP BY cargo
       ORDER BY total DESC
@@ -5411,7 +5411,7 @@ export class DbStorage implements IStorage {
       SELECT 
         nivel as nome,
         COUNT(*) as total
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
       GROUP BY nivel
       ORDER BY total DESC
@@ -5710,8 +5710,8 @@ export class DbStorage implements IStorage {
             'total', 1
           )
         ) as "candidatosPorStatus"
-      FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash::bigint = v.id
+      FROM "Inhire".rh_vagas v
+      LEFT JOIN "Inhire".rh_candidaturas c ON c.job_id_hash::bigint = v.id
       GROUP BY v.id, v.nome, v.status
       ORDER BY "totalCandidaturas" DESC
       LIMIT ${limit}
@@ -6486,7 +6486,7 @@ export class DbStorage implements IStorage {
           COUNT(*) as total_parcelas,
           COUNT(CASE WHEN status = 'QUITADO' THEN 1 END) as parcelas_pagas,
           COUNT(CASE WHEN status != 'QUITADO' THEN 1 END) as parcelas_pendentes
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = ${mesAtual}
           AND tipo_evento IN ('RECEITA', 'DESPESA')
       ),
@@ -6494,7 +6494,7 @@ export class DbStorage implements IStorage {
         SELECT 
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receita,
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesa
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = ${mesAnterior}
           AND tipo_evento IN ('RECEITA', 'DESPESA')
           AND status = 'QUITADO'
@@ -6537,7 +6537,7 @@ export class DbStorage implements IStorage {
         TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receita,
         COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesa
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE COALESCE(data_quitacao, data_vencimento) >= NOW() - INTERVAL '1 month' * ${meses}
         AND tipo_evento IN ('RECEITA', 'DESPESA')
         AND status = 'QUITADO'
@@ -6576,7 +6576,7 @@ export class DbStorage implements IStorage {
         tipo_evento,
         COALESCE(SUM(valor_pago::numeric), 0) as valor,
         COUNT(*) as quantidade
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE COALESCE(data_quitacao, data_vencimento) >= NOW() - INTERVAL '1 month' * ${meses}
         AND ${tipoFilter}
         AND status = 'QUITADO'
@@ -6617,7 +6617,7 @@ export class DbStorage implements IStorage {
         COALESCE(SUM(pago::numeric), 0) as receita_total,
         COUNT(*) as quantidade_titulos,
         MAX(data_vencimento) as ultimo_pagamento
-      FROM caz_receber
+      FROM "Conta Azul".caz_receber
       WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
         AND cliente_id IS NOT NULL
         AND data_vencimento >= NOW() - INTERVAL '1 month' * ${meses}
@@ -6647,7 +6647,7 @@ export class DbStorage implements IStorage {
         COALESCE(metodo_pagamento, 'Não informado') as metodo,
         COALESCE(SUM(valor_pago::numeric), 0) as valor,
         COUNT(*) as quantidade
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE COALESCE(data_quitacao, data_vencimento) >= NOW() - INTERVAL '1 month' * ${meses}
         AND status = 'QUITADO'
         AND tipo_evento = 'RECEITA'
@@ -6675,7 +6675,7 @@ export class DbStorage implements IStorage {
         nmbanco as nome,
         COALESCE(balance::numeric, 0) as saldo,
         empresa
-      FROM caz_bancos
+      FROM "Conta Azul".caz_bancos
       WHERE ativo = true
       ORDER BY balance::numeric DESC
     `);
@@ -6692,7 +6692,7 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql`
       WITH saldo_bancos AS (
         SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
-        FROM caz_bancos
+        FROM "Conta Azul".caz_bancos
         WHERE ativo = true
       ),
       a_receber AS (
@@ -6701,7 +6701,7 @@ export class DbStorage implements IStorage {
           COUNT(*) as qtd_titulos,
           COUNT(CASE WHEN status = 'OVERDUE' THEN 1 END) as qtd_vencidos,
           COALESCE(SUM(CASE WHEN status = 'OVERDUE' THEN nao_pago::numeric ELSE 0 END), 0) as valor_vencido
-        FROM caz_receber
+        FROM "Conta Azul".caz_receber
         WHERE status != 'ACQUITTED' AND nao_pago::numeric > 0
       ),
       a_pagar AS (
@@ -6710,14 +6710,14 @@ export class DbStorage implements IStorage {
           COUNT(*) as qtd_titulos,
           COUNT(CASE WHEN data_vencimento < CURRENT_DATE THEN 1 END) as qtd_vencidos,
           COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE THEN nao_pago::numeric ELSE 0 END), 0) as valor_vencido
-        FROM caz_pagar
+        FROM "Conta Azul".caz_pagar
         WHERE status != 'ACQUITTED' AND nao_pago::numeric > 0
       ),
       fluxo_mes_atual AS (
         SELECT 
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
           AND status = 'QUITADO'
       ),
@@ -6725,7 +6725,7 @@ export class DbStorage implements IStorage {
         SELECT 
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE - INTERVAL '1 month', 'YYYY-MM')
           AND status = 'QUITADO'
       )
@@ -6792,7 +6792,7 @@ export class DbStorage implements IStorage {
           data_vencimento::date as data,
           'RECEITA' as tipo,
           COALESCE(SUM(nao_pago::numeric), 0) as valor
-        FROM caz_receber
+        FROM "Conta Azul".caz_receber
         WHERE status != 'ACQUITTED' 
           AND nao_pago::numeric > 0
           AND data_vencimento >= CURRENT_DATE
@@ -6804,7 +6804,7 @@ export class DbStorage implements IStorage {
           data_vencimento::date as data,
           'DESPESA' as tipo,
           COALESCE(SUM(nao_pago::numeric), 0) as valor
-        FROM caz_pagar
+        FROM "Conta Azul".caz_pagar
         WHERE status != 'ACQUITTED' 
           AND nao_pago::numeric > 0
           AND data_vencimento >= CURRENT_DATE
@@ -6835,14 +6835,14 @@ export class DbStorage implements IStorage {
           COUNT(CASE WHEN source = 'manual' THEN 1 END) as hunting,
           COUNT(CASE WHEN source != 'manual' THEN 1 END) as passivo,
           COUNT(CASE WHEN stage_name = 'Oferta' THEN 1 END) as ofertas
-        FROM rh_candidaturas
+        FROM "Inhire".rh_candidaturas
       ),
       vagas_stats AS (
         SELECT
           COUNT(CASE WHEN status = 'open' THEN 1 END) as abertas,
           COUNT(CASE WHEN status = 'paused' THEN 1 END) as pausadas,
           COUNT(CASE WHEN status = 'canceled' THEN 1 END) as canceladas
-        FROM rh_vagas
+        FROM "Inhire".rh_vagas
       )
       SELECT 
         cs.total::int as "totalCandidaturas",
@@ -6890,7 +6890,7 @@ export class DbStorage implements IStorage {
       SELECT 
         stage_name as etapa,
         COUNT(*) as total
-      FROM rh_candidaturas
+      FROM "Inhire".rh_candidaturas
       WHERE stage_name IS NOT NULL
       GROUP BY stage_name
       ORDER BY COUNT(*) DESC
@@ -6927,7 +6927,7 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN talent_status = 'active' THEN 1 END) as ativos,
         COUNT(CASE WHEN talent_status = 'rejected' THEN 1 END) as rejeitados,
         COUNT(CASE WHEN talent_status = 'declined' THEN 1 END) as declinados
-      FROM rh_candidaturas
+      FROM "Inhire".rh_candidaturas
       GROUP BY source
       ORDER BY total DESC
     `);
@@ -6954,7 +6954,7 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN source != 'manual' THEN 1 END) as passivo,
         COUNT(CASE WHEN stage_name = 'Oferta' THEN 1 END) as aprovados,
         COUNT(CASE WHEN talent_status = 'rejected' THEN 1 END) as rejeitados
-      FROM rh_candidaturas
+      FROM "Inhire".rh_candidaturas
       WHERE inserted_at >= NOW() - INTERVAL '1 month' * ${meses}
       GROUP BY TO_CHAR(inserted_at, 'YYYY-MM')
       ORDER BY mes
@@ -6993,8 +6993,8 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN c.stage_name = 'Entrevista final' THEN 1 END) as entrevista_final,
         COUNT(CASE WHEN c.stage_name = 'Oferta' THEN 1 END) as oferta,
         json_agg(DISTINCT c.source) FILTER (WHERE c.source IS NOT NULL) as fontes
-      FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash::bigint = v.id
+      FROM "Inhire".rh_vagas v
+      LEFT JOIN "Inhire".rh_candidaturas c ON c.job_id_hash::bigint = v.id
       WHERE 1=1
         ${filters?.area && filters.area !== 'todos' ? sql`AND v.area = ${filters.area}` : sql``}
         ${filters?.status && filters.status !== 'todos' ? sql`AND v.status = ${filters.status}` : sql``}
@@ -7052,8 +7052,8 @@ export class DbStorage implements IStorage {
             (COUNT(CASE WHEN c.stage_name = 'Oferta' THEN 1 END)::float / COUNT(c.id)::float * 100)
           ELSE 0 
         END as conversao_media
-      FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash::bigint = v.id
+      FROM "Inhire".rh_vagas v
+      LEFT JOIN "Inhire".rh_candidaturas c ON c.job_id_hash::bigint = v.id
       GROUP BY v.area
       ORDER BY total_candidatos DESC
     `);
@@ -7069,19 +7069,19 @@ export class DbStorage implements IStorage {
 
   async getRecrutamentoFiltros(): Promise<import("@shared/schema").RecrutamentoFiltros> {
     const areasResult = await db.execute(sql`
-      SELECT DISTINCT area FROM rh_vagas WHERE area IS NOT NULL ORDER BY area
+      SELECT DISTINCT area FROM "Inhire".rh_vagas WHERE area IS NOT NULL ORDER BY area
     `);
     const senioritiesResult = await db.execute(sql`
-      SELECT DISTINCT seniority FROM rh_vagas WHERE seniority IS NOT NULL ORDER BY seniority
+      SELECT DISTINCT seniority FROM "Inhire".rh_vagas WHERE seniority IS NOT NULL ORDER BY seniority
     `);
     const fontesResult = await db.execute(sql`
-      SELECT DISTINCT source FROM rh_candidaturas WHERE source IS NOT NULL ORDER BY source
+      SELECT DISTINCT source FROM "Inhire".rh_candidaturas WHERE source IS NOT NULL ORDER BY source
     `);
     const statusResult = await db.execute(sql`
-      SELECT DISTINCT status FROM rh_vagas WHERE status IS NOT NULL ORDER BY status
+      SELECT DISTINCT status FROM "Inhire".rh_vagas WHERE status IS NOT NULL ORDER BY status
     `);
     const etapasResult = await db.execute(sql`
-      SELECT DISTINCT stage_name FROM rh_candidaturas WHERE stage_name IS NOT NULL ORDER BY stage_name
+      SELECT DISTINCT stage_name FROM "Inhire".rh_candidaturas WHERE stage_name IS NOT NULL ORDER BY stage_name
     `);
 
     return {
@@ -7106,8 +7106,8 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN c.stage_name = 'Entrevista final' THEN 1 END) as entrevista_final,
         COUNT(CASE WHEN c.stage_name = 'Oferta' THEN 1 END) as oferta,
         COUNT(c.id) as total
-      FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash::bigint = v.id
+      FROM "Inhire".rh_vagas v
+      LEFT JOIN "Inhire".rh_candidaturas c ON c.job_id_hash::bigint = v.id
       GROUP BY v.id, v.nome, v.area
       HAVING COUNT(c.id) > 0
       ORDER BY total DESC
@@ -7148,7 +7148,7 @@ export class DbStorage implements IStorage {
         stage_name as etapa,
         AVG(EXTRACT(EPOCH FROM (updated_at - inserted_at)) / 86400) as tempo_medio_dias,
         COUNT(*) as total_candidatos
-      FROM rh_candidaturas
+      FROM "Inhire".rh_candidaturas
       WHERE stage_name IS NOT NULL
         AND inserted_at IS NOT NULL
         AND updated_at IS NOT NULL
@@ -7172,13 +7172,13 @@ export class DbStorage implements IStorage {
           COUNT(CASE WHEN stage_name = 'Entrevista R&S' THEN 1 END) as entrevista_rs,
           COUNT(CASE WHEN stage_name = 'Entrevista técnica' THEN 1 END) as entrevista_tecnica,
           COUNT(CASE WHEN stage_name = 'Entrevista final' THEN 1 END) as entrevista_final
-        FROM rh_candidaturas
+        FROM "Inhire".rh_candidaturas
         WHERE stage_name IN ('Entrevista R&S', 'Entrevista técnica', 'Entrevista final')
       ),
       vagas_com_entrevistas AS (
         SELECT COUNT(DISTINCT v.id) as total_vagas
-        FROM rh_vagas v
-        INNER JOIN rh_candidaturas c ON c.job_id_hash::bigint = v.id
+        FROM "Inhire".rh_vagas v
+        INNER JOIN "Inhire".rh_candidaturas c ON c.job_id_hash::bigint = v.id
         WHERE c.stage_name IN ('Entrevista R&S', 'Entrevista técnica', 'Entrevista final')
       )
       SELECT 
@@ -7212,8 +7212,8 @@ export class DbStorage implements IStorage {
           COUNT(CASE WHEN c.stage_name = 'Entrevista R&S' THEN 1 END) as entrevista_rs,
           COUNT(CASE WHEN c.stage_name = 'Entrevista técnica' THEN 1 END) as entrevista_tecnica,
           COUNT(CASE WHEN c.stage_name = 'Entrevista final' THEN 1 END) as entrevista_final
-        FROM rh_vagas v
-        INNER JOIN rh_candidaturas c ON c.job_id_hash::bigint = v.id
+        FROM "Inhire".rh_vagas v
+        INNER JOIN "Inhire".rh_candidaturas c ON c.job_id_hash::bigint = v.id
         WHERE c.stage_name IN ('Entrevista R&S', 'Entrevista técnica', 'Entrevista final')
         GROUP BY v.nome, v.area
       )
@@ -7250,8 +7250,8 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN c.talent_status = 'active' THEN 1 END) as candidatos_ativos,
         COUNT(CASE WHEN c.talent_status = 'rejected' THEN 1 END) as candidatos_rejeitados,
         COUNT(DISTINCT CASE WHEN v.status = 'open' THEN v.id END) as vagas_abertas
-      FROM rh_vagas v
-      LEFT JOIN rh_candidaturas c ON c.job_id_hash::bigint = v.id
+      FROM "Inhire".rh_vagas v
+      LEFT JOIN "Inhire".rh_candidaturas c ON c.job_id_hash::bigint = v.id
       GROUP BY v.area
       ORDER BY total_candidaturas DESC
     `);
@@ -7272,9 +7272,9 @@ export class DbStorage implements IStorage {
   // Tech Dashboard - DatabaseStorage implementations
   async getTechMetricas(): Promise<TechMetricas> {
     const [projetosAtivos, projetosFechados, tasks] = await Promise.all([
-      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM cortex_core.cup_projetos_tech`),
-      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM cortex_core.cup_projetos_tech_fechados`),
-      db.execute(sql`SELECT COUNT(*) as count FROM cortex_core.cup_tech_tasks`)
+      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM clickup.cup_projetos_tech`),
+      db.execute(sql`SELECT COUNT(*) as count, COALESCE(SUM(valor_p), 0) as valor_total FROM clickup.cup_projetos_tech_fechados`),
+      db.execute(sql`SELECT COUNT(*) as count FROM clickup.cup_tech_tasks`)
     ]);
 
     const projetosEmAndamento = parseInt((projetosAtivos.rows[0] as any).count || '0');
@@ -7288,7 +7288,7 @@ export class DbStorage implements IStorage {
     // Calcular tempo médio de entrega (diferença entre lancamento e data_criada para projetos fechados)
     const tempoMedioResult = await db.execute(sql`
       SELECT AVG(lancamento::date - data_criada::date) as tempo_medio
-      FROM cortex_core.cup_projetos_tech_fechados
+      FROM clickup.cup_projetos_tech_fechados
       WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
     `);
     const tempoMedioEntrega = parseFloat((tempoMedioResult.rows[0] as any).tempo_medio || '0');
@@ -7308,7 +7308,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(status_projeto, 'Não definido') as status,
         COUNT(*) as quantidade
-      FROM cortex_core.cup_projetos_tech
+      FROM clickup.cup_projetos_tech
       GROUP BY status_projeto
       ORDER BY quantidade DESC
     `);
@@ -7329,7 +7329,7 @@ export class DbStorage implements IStorage {
           COALESCE(responsavel, 'Não atribuído') as responsavel,
           COUNT(*) as projetos_ativos,
           COALESCE(SUM(valor_p), 0) as valor_ativos
-        FROM cortex_core.cup_projetos_tech
+        FROM clickup.cup_projetos_tech
         GROUP BY responsavel
       ),
       fechados AS (
@@ -7337,7 +7337,7 @@ export class DbStorage implements IStorage {
           COALESCE(responsavel, 'Não atribuído') as responsavel,
           COUNT(*) as projetos_fechados,
           COALESCE(SUM(valor_p), 0) as valor_fechados
-        FROM cortex_core.cup_projetos_tech_fechados
+        FROM clickup.cup_projetos_tech_fechados
         GROUP BY responsavel
       )
       SELECT 
@@ -7365,9 +7365,9 @@ export class DbStorage implements IStorage {
         COUNT(*) as quantidade,
         COALESCE(SUM(valor_p), 0) as valor_total
       FROM (
-        SELECT tipo, valor_p FROM cortex_core.cup_projetos_tech
+        SELECT tipo, valor_p FROM clickup.cup_projetos_tech
         UNION ALL
-        SELECT tipo, valor_p FROM cortex_core.cup_projetos_tech_fechados
+        SELECT tipo, valor_p FROM clickup.cup_projetos_tech_fechados
       ) combined
       GROUP BY tipo
       ORDER BY quantidade DESC
@@ -7394,7 +7394,7 @@ export class DbStorage implements IStorage {
         data_vencimento,
         lancamento,
         data_criada
-      FROM cortex_core.cup_projetos_tech
+      FROM clickup.cup_projetos_tech
       ORDER BY data_criada DESC
     `);
 
@@ -7427,7 +7427,7 @@ export class DbStorage implements IStorage {
         data_vencimento,
         lancamento,
         data_criada
-      FROM cortex_core.cup_projetos_tech_fechados
+      FROM clickup.cup_projetos_tech_fechados
       ORDER BY lancamento DESC NULLS LAST
       LIMIT ${limit}
     `);
@@ -7452,7 +7452,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(status_projeto, 'Não definido') as status,
         COUNT(*) as quantidade
-      FROM cortex_core.cup_tech_tasks
+      FROM clickup.cup_tech_tasks
       GROUP BY status_projeto
       ORDER BY quantidade DESC
     `);
@@ -7470,7 +7470,7 @@ export class DbStorage implements IStorage {
     
     const entreguesMesResult = await db.execute(sql`
       SELECT COUNT(*) as count
-      FROM cortex_core.cup_projetos_tech_fechados
+      FROM clickup.cup_projetos_tech_fechados
       WHERE lancamento >= ${inicioMes.toISOString().split('T')[0]}
     `);
     const projetosEntreguesMes = parseInt((entreguesMesResult.rows[0] as any).count || '0');
@@ -7478,7 +7478,7 @@ export class DbStorage implements IStorage {
     // Tempo médio de entrega
     const tempoMedioResult = await db.execute(sql`
       SELECT AVG(lancamento::date - data_criada::date) as tempo_medio
-      FROM cortex_core.cup_projetos_tech_fechados
+      FROM clickup.cup_projetos_tech_fechados
       WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
     `);
     const tempoMedioEntrega = parseFloat((tempoMedioResult.rows[0] as any).tempo_medio || '0');
@@ -7488,7 +7488,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COUNT(CASE WHEN lancamento <= data_vencimento THEN 1 END) as no_prazo,
         COUNT(*) as total
-      FROM cortex_core.cup_projetos_tech_fechados
+      FROM clickup.cup_projetos_tech_fechados
       WHERE lancamento IS NOT NULL AND data_vencimento IS NOT NULL
     `);
     const noPrazo = parseInt((taxaPrazoResult.rows[0] as any).no_prazo || '0');
@@ -7545,7 +7545,7 @@ export class DbStorage implements IStorage {
           COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL AND lancamento <= data_vencimento THEN 1 END)::float / 
             NULLIF(COUNT(CASE WHEN lancamento IS NOT NULL AND data_vencimento IS NOT NULL THEN 1 END), 0) * 100 as taxa_no_prazo,
           COALESCE(SUM(valor_p), 0) as valor_total_entregue
-        FROM cortex_core.cup_projetos_tech_fechados
+        FROM clickup.cup_projetos_tech_fechados
         ${fechadosWhere}
         GROUP BY responsavel
       ),
@@ -7561,7 +7561,7 @@ export class DbStorage implements IStorage {
             END
           ) as tempo_em_aberto,
           COALESCE(SUM(valor_p), 0) as valor_ativos
-        FROM cortex_core.cup_projetos_tech
+        FROM clickup.cup_projetos_tech
         ${ativosWhere}
         GROUP BY responsavel
       )
@@ -7593,7 +7593,7 @@ export class DbStorage implements IStorage {
   }
 
   async getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]> {
-    const table = tipo === 'abertos' ? 'cortex_core.cup_projetos_tech' : 'cortex_core.cup_projetos_tech_fechados';
+    const table = tipo === 'abertos' ? 'clickup.cup_projetos_tech' : 'clickup.cup_projetos_tech_fechados';
     
     let whereConditions: string[] = [];
     if (responsavel) {
@@ -7677,7 +7677,7 @@ export class DbStorage implements IStorage {
         COALESCE(SUM(nao_pago::numeric), 0) as total_inadimplente,
         COUNT(DISTINCT id_cliente) as quantidade_clientes,
         COUNT(*) as quantidade_parcelas
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < '${dataHoje}'
         AND nao_pago::numeric > 0
@@ -7695,7 +7695,7 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(SUM(nao_pago::numeric), 0) as valor,
         COUNT(*) as quantidade
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < '${dataHoje}'
         AND data_vencimento >= '${data45DiasAtras}'
@@ -7718,7 +7718,7 @@ export class DbStorage implements IStorage {
         END as faixa,
         COALESCE(SUM(nao_pago::numeric), 0) as valor,
         COUNT(*) as quantidade
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < '${dataHoje}'
         AND nao_pago::numeric > 0
@@ -7761,7 +7761,7 @@ export class DbStorage implements IStorage {
         TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
         COALESCE(SUM(nao_pago::numeric), 0) as valor,
         COUNT(*) as quantidade
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < '${dataHoje}'
         AND data_vencimento >= '${dataHoje}'::date - INTERVAL '12 months'
@@ -7825,7 +7825,7 @@ export class DbStorage implements IStorage {
         AVG(data_quitacao::date - data_vencimento::date) as tempo_medio_geral,
         AVG(CASE WHEN data_quitacao::date > data_vencimento::date THEN data_quitacao::date - data_vencimento::date END) as tempo_medio_inadimplentes,
         COUNT(CASE WHEN data_quitacao::date > data_vencimento::date THEN 1 END) as quantidade_pagos_atrasados
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_quitacao IS NOT NULL
         AND data_quitacao::text != ''
@@ -7846,7 +7846,7 @@ export class DbStorage implements IStorage {
           data_vencimento,
           nao_pago::numeric as valor_nao_pago,
           CASE WHEN nao_pago::numeric > 0 AND data_vencimento < '${dataHoje}' THEN 1 ELSE 0 END as inadimplente
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND (descricao LIKE '%1/%' OR descricao LIKE '% 1 de %' OR descricao LIKE '%parcela 1%' OR descricao ILIKE '%primeira%')
           ${whereDataInicio}
@@ -7874,7 +7874,7 @@ export class DbStorage implements IStorage {
           COUNT(*) as total_parcelas,
           SUM(CASE WHEN (data_quitacao IS NOT NULL AND data_quitacao::text != '') THEN 1 ELSE 0 END) as parcelas_pagas,
           SUM(nao_pago::numeric) as valor_total_devido
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND data_vencimento < '${dataHoje}'
           ${whereDataInicio}
@@ -7940,8 +7940,8 @@ export class DbStorage implements IStorage {
         SELECT 
           TRIM(cc.cnpj::text) as cnpj,
           SUM(COALESCE(cp.valor_pago::numeric, 0)) as total_pago_historico
-        FROM caz_parcelas cp
-        INNER JOIN caz_clientes cc ON cp.id_cliente::text = cc.ids::text
+        FROM "Conta Azul".caz_parcelas cp
+        INNER JOIN "Conta Azul".caz_clientes cc ON cp.id_cliente::text = cc.ids::text
         WHERE cp.tipo_evento = 'RECEITA'
           AND cc.cnpj IS NOT NULL 
           AND TRIM(cc.cnpj::text) != ''
@@ -7955,8 +7955,8 @@ export class DbStorage implements IStorage {
           cc.nome as nome_caz,
           cp.nao_pago::numeric as nao_pago,
           cp.data_vencimento
-        FROM caz_parcelas cp
-        INNER JOIN caz_clientes cc ON cp.id_cliente::text = cc.ids::text
+        FROM "Conta Azul".caz_parcelas cp
+        INNER JOIN "Conta Azul".caz_clientes cc ON cp.id_cliente::text = cc.ids::text
         INNER JOIN historico_completo hc ON TRIM(cc.cnpj::text) = hc.cnpj
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento < ${dataHoje}
@@ -7983,8 +7983,8 @@ export class DbStorage implements IStorage {
           cup.responsavel,
           COALESCE(cont.vendedor, 'Não Identificado') as vendedor,
           COALESCE(cont.squad, 'Não Identificado') as squad
-        FROM cup_clientes cup
-        LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        FROM clickup.cup_clientes cup
+        LEFT JOIN clickup.cup_contratos cont ON cup.task_id = cont.id_task
         WHERE cup.cnpj IS NOT NULL
         ORDER BY TRIM(cup.cnpj::text), cont.data_inicio DESC NULLS LAST
       )
@@ -8051,8 +8051,8 @@ export class DbStorage implements IStorage {
           cont.squad,
           cont.responsavel,
           cont.produto
-        FROM cup_clientes cup
-        INNER JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        FROM clickup.cup_clientes cup
+        INNER JOIN clickup.cup_contratos cont ON cup.task_id = cont.id_task
         WHERE LOWER(cont.status) IN ('canceled', 'canceling', 'cancelado', 'em cancelamento', 'cancelamento', 'cancelado/inativo', 'pausado')
           AND cup.cnpj IS NOT NULL 
           AND TRIM(cup.cnpj::text) != ''
@@ -8064,8 +8064,8 @@ export class DbStorage implements IStorage {
           SUM(COALESCE(cp.nao_pago::numeric, 0)) as valor_em_aberto,
           COUNT(*) as quantidade_parcelas,
           MIN(cp.data_vencimento) as parcela_mais_proxima
-        FROM caz_parcelas cp
-        INNER JOIN caz_clientes cc ON cp.id_cliente::text = cc.ids::text
+        FROM "Conta Azul".caz_parcelas cp
+        INNER JOIN "Conta Azul".caz_clientes cc ON cp.id_cliente::text = cc.ids::text
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento >= ${dataHoje}
           AND COALESCE(cp.nao_pago::numeric, 0) > 0
@@ -8189,7 +8189,7 @@ export class DbStorage implements IStorage {
           MIN(cp.data_vencimento) as parcela_mais_antiga,
           MAX('${dataHoje}'::date - cp.data_vencimento::date) as dias_atraso_max,
           MAX(cp.empresa) as empresa
-        FROM caz_parcelas cp
+        FROM "Conta Azul".caz_parcelas cp
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento < '${dataHoje}'
           AND cp.nao_pago::numeric > 0
@@ -8205,7 +8205,7 @@ export class DbStorage implements IStorage {
         SELECT DISTINCT ON (TRIM(ids::text))
           TRIM(ids::text) as id_cliente,
           nome as nome_caz
-        FROM caz_clientes
+        FROM "Conta Azul".caz_clientes
         WHERE ids IS NOT NULL
         ORDER BY TRIM(ids::text)
       ),
@@ -8220,8 +8220,8 @@ export class DbStorage implements IStorage {
           cup.cluster,
           cup.task_id,
           cup.telefone
-        FROM caz_clientes cc
-        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
+        FROM "Conta Azul".caz_clientes cc
+        LEFT JOIN clickup.cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
@@ -8231,7 +8231,7 @@ export class DbStorage implements IStorage {
         SELECT 
           TRIM(cont.id_task::text) as task_id,
           STRING_AGG(DISTINCT cont.servico, ', ') as servicos
-        FROM cup_contratos cont
+        FROM clickup.cup_contratos cont
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
           AND cont.servico IS NOT NULL
         GROUP BY TRIM(cont.id_task::text)
@@ -8243,7 +8243,7 @@ export class DbStorage implements IStorage {
           cont.vendedor,
           cont.squad,
           cont.servico
-        FROM cup_contratos cont
+        FROM clickup.cup_contratos cont
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
         ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
       )
@@ -8331,7 +8331,7 @@ export class DbStorage implements IStorage {
         empresa,
         status,
         url_cobranca
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < '${dataHoje}'
         AND nao_pago::numeric > 0
@@ -8383,7 +8383,7 @@ export class DbStorage implements IStorage {
         COALESCE(SUM(nao_pago::numeric), 0) as valor_total,
         COUNT(DISTINCT id_cliente) as quantidade_clientes,
         COUNT(*) as quantidade_parcelas
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < '${dataHoje}'
         AND nao_pago::numeric > 0
@@ -8433,7 +8433,7 @@ export class DbStorage implements IStorage {
         COALESCE(SUM(nao_pago::numeric), 0) as valor_total,
         COUNT(DISTINCT id_cliente) as quantidade_clientes,
         COUNT(*) as quantidade_parcelas
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento < '${dataHoje}'
         AND nao_pago::numeric > 0
@@ -8484,7 +8484,7 @@ export class DbStorage implements IStorage {
           cp.id_cliente,
           cp.nao_pago::numeric as valor_inadimplente,
           1 as parcela_count
-        FROM caz_parcelas cp
+        FROM "Conta Azul".caz_parcelas cp
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento < '${dataHoje}'
           AND cp.nao_pago::numeric > 0
@@ -8497,10 +8497,10 @@ export class DbStorage implements IStorage {
         SELECT DISTINCT ON (TRIM(cc.ids::text))
           TRIM(cc.ids::text) as id_cliente,
           cont.vendedor
-        FROM caz_clientes cc
-        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+        FROM "Conta Azul".caz_clientes cc
+        LEFT JOIN clickup.cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
-        LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        LEFT JOIN clickup.cup_contratos cont ON cup.task_id = cont.id_task
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cont.data_inicio DESC NULLS LAST
       )
@@ -8556,7 +8556,7 @@ export class DbStorage implements IStorage {
           cp.id_cliente,
           cp.nao_pago::numeric as valor_inadimplente,
           1 as parcela_count
-        FROM caz_parcelas cp
+        FROM "Conta Azul".caz_parcelas cp
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento < '${dataHoje}'
           AND cp.nao_pago::numeric > 0
@@ -8569,10 +8569,10 @@ export class DbStorage implements IStorage {
         SELECT DISTINCT ON (TRIM(cc.ids::text))
           TRIM(cc.ids::text) as id_cliente,
           cont.squad
-        FROM caz_clientes cc
-        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+        FROM "Conta Azul".caz_clientes cc
+        LEFT JOIN clickup.cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
-        LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        LEFT JOIN clickup.cup_contratos cont ON cup.task_id = cont.id_task
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cont.data_inicio DESC NULLS LAST
       )
@@ -8628,7 +8628,7 @@ export class DbStorage implements IStorage {
           cp.id_cliente,
           cp.nao_pago::numeric as valor_inadimplente,
           1 as parcela_count
-        FROM caz_parcelas cp
+        FROM "Conta Azul".caz_parcelas cp
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento < '${dataHoje}'
           AND cp.nao_pago::numeric > 0
@@ -8641,10 +8641,10 @@ export class DbStorage implements IStorage {
         SELECT DISTINCT ON (TRIM(cc.ids::text))
           TRIM(cc.ids::text) as id_cliente,
           cont.responsavel
-        FROM caz_clientes cc
-        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+        FROM "Conta Azul".caz_clientes cc
+        LEFT JOIN clickup.cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
-        LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        LEFT JOIN clickup.cup_contratos cont ON cup.task_id = cont.id_task
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cont.data_inicio DESC NULLS LAST
       )
@@ -8693,7 +8693,7 @@ export class DbStorage implements IStorage {
           cp.id_cliente,
           cp.nao_pago::numeric as valor_inadimplente,
           1 as parcela_count
-        FROM caz_parcelas cp
+        FROM "Conta Azul".caz_parcelas cp
         WHERE cp.tipo_evento = 'RECEITA'
           AND cp.data_vencimento < ${dataHoje}::date
           AND cp.nao_pago::numeric > 0
@@ -8706,10 +8706,10 @@ export class DbStorage implements IStorage {
         SELECT DISTINCT ON (TRIM(cc.ids::text))
           TRIM(cc.ids::text) as id_cliente,
           cont.servico as produto
-        FROM caz_clientes cc
-        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+        FROM "Conta Azul".caz_clientes cc
+        LEFT JOIN clickup.cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
-        LEFT JOIN cup_contratos cont ON cup.task_id = cont.id_task
+        LEFT JOIN clickup.cup_contratos cont ON cup.task_id = cont.id_task
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cont.data_inicio DESC NULLS LAST
       )
@@ -8783,7 +8783,7 @@ export class DbStorage implements IStorage {
         COUNT(CASE WHEN UPPER(status) IN ('PAGO', 'ACQUITTED') OR COALESCE(valor_pago::numeric, 0) >= valor_bruto::numeric THEN 1 END) as quantidade_recebidas,
         COUNT(CASE WHEN COALESCE(valor_pago::numeric, 0) < valor_bruto::numeric AND data_vencimento::date > '${dataReferencia}'::date THEN 1 END) as quantidade_pendentes,
         COUNT(CASE WHEN COALESCE(valor_pago::numeric, 0) < valor_bruto::numeric AND data_vencimento::date <= '${dataReferencia}'::date THEN 1 END) as quantidade_inadimplentes
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= '${primeiroDia}'
         AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
@@ -8809,7 +8809,7 @@ export class DbStorage implements IStorage {
           WHEN data_vencimento::date <= '${dataReferencia}'::date 
           THEN GREATEST(valor_bruto::numeric - COALESCE(valor_pago::numeric, 0), 0) ELSE 0 
         END), 0) as inadimplente
-      FROM caz_parcelas
+      FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= '${primeiroDia}'
         AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
@@ -8903,8 +8903,8 @@ export class DbStorage implements IStorage {
           cup.status as status_clickup,
           cup.responsavel,
           cup.task_id
-        FROM caz_clientes cc
-        LEFT JOIN cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
+        FROM "Conta Azul".caz_clientes cc
+        LEFT JOIN clickup.cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
@@ -8914,7 +8914,7 @@ export class DbStorage implements IStorage {
           TRIM(cont.id_task::text) as task_id,
           cont.squad,
           cont.servico
-        FROM cup_contratos cont
+        FROM clickup.cup_contratos cont
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
         ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
       )
@@ -8939,7 +8939,7 @@ export class DbStorage implements IStorage {
           WHEN cp.data_vencimento::date > ${dataHoje}::date THEN 'pendente'
           ELSE 'inadimplente'
         END as status_calculado
-      FROM caz_parcelas cp
+      FROM "Conta Azul".caz_parcelas cp
       LEFT JOIN cliente_info cli ON TRIM(cp.id_cliente::text) = cli.id_cliente
       LEFT JOIN contrato_info cont ON TRIM(cli.task_id::text) = cont.task_id
       WHERE cp.tipo_evento = 'RECEITA'
@@ -9407,10 +9407,10 @@ export class DbStorage implements IStorage {
     try {
       const clientesResult = await db.execute(sql`
         SELECT c.id::text, c.nome, c.cnpj
-        FROM caz_clientes c
+        FROM "Conta Azul".caz_clientes c
         WHERE (c.nome ILIKE ${searchTerm} OR c.cnpj ILIKE ${searchTerm})
           AND NOT EXISTS (
-            SELECT 1 FROM rh_pessoal p 
+            SELECT 1 FROM "Inhire".rh_pessoal p 
             WHERE LOWER(TRIM(REGEXP_REPLACE(p.nome, '\s+', ' ', 'g'))) = LOWER(TRIM(REGEXP_REPLACE(c.nome, '\s+', ' ', 'g')))
           )
         LIMIT 20
@@ -9433,7 +9433,7 @@ export class DbStorage implements IStorage {
     try {
       const colaboradoresResult = await db.execute(sql`
         SELECT id::text, nome, email_turbo, cargo, status
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE nome ILIKE ${searchTerm} OR email_turbo ILIKE ${searchTerm}
         LIMIT 20
       `);
@@ -9458,8 +9458,8 @@ export class DbStorage implements IStorage {
     try {
       const contratosResult = await db.execute(sql`
         SELECT c.id_subtask as id, c.servico, c.status, c.valorr, cc.nome as cliente_nome, cc.id::text as cliente_id
-        FROM cup_contratos c
-        LEFT JOIN cup_clientes cc ON c.id_task = cc.task_id
+        FROM clickup.cup_contratos c
+        LEFT JOIN clickup.cup_clientes cc ON c.id_task = cc.task_id
         WHERE c.servico ILIKE ${searchTerm} OR cc.nome ILIKE ${searchTerm}
         LIMIT 20
       `);
@@ -9485,7 +9485,7 @@ export class DbStorage implements IStorage {
     try {
       const cobrancasResult = await db.execute(sql`
         SELECT id::text, descricao, cliente_nome, status, total
-        FROM caz_receber
+        FROM "Conta Azul".caz_receber
         WHERE descricao ILIKE ${searchTerm} OR cliente_nome ILIKE ${searchTerm}
         LIMIT 20
       `);
@@ -9511,7 +9511,7 @@ export class DbStorage implements IStorage {
     try {
       const projetosResult = await db.execute(sql`
         SELECT clickup_task_id as id, task_name, status_projeto, responsavel
-        FROM cortex_core.cup_projetos_tech
+        FROM clickup.cup_projetos_tech
         WHERE task_name ILIKE ${searchTerm} OR status_projeto ILIKE ${searchTerm}
         LIMIT 20
       `);
@@ -9691,7 +9691,7 @@ export class DbStorage implements IStorage {
         setor, 
         ultima_recarga as "ultimaRecarga", 
         status
-      FROM rh_telefones
+      FROM "Inhire".rh_telefones
       ORDER BY id
     `);
     return result.rows.map((row: any) => ({
@@ -9719,7 +9719,7 @@ export class DbStorage implements IStorage {
         setor, 
         ultima_recarga as "ultimaRecarga", 
         status
-      FROM rh_telefones
+      FROM "Inhire".rh_telefones
       WHERE id = ${id}
     `);
     if (result.rows.length === 0) return undefined;
@@ -9739,7 +9739,7 @@ export class DbStorage implements IStorage {
 
   async createTelefone(telefone: import("@shared/schema").InsertTelefone): Promise<import("@shared/schema").Telefone> {
     const result = await db.execute(sql`
-      INSERT INTO rh_telefones (conta, plano_operadora, telefone, responsavel_nome, responsavel_id, setor, ultima_recarga, status)
+      INSERT INTO "Inhire".rh_telefones (conta, plano_operadora, telefone, responsavel_nome, responsavel_id, setor, ultima_recarga, status)
       VALUES (${telefone.conta || null}, ${telefone.planoOperadora || null}, ${telefone.telefone || null}, ${telefone.responsavelNome || null}, ${telefone.responsavelId || null}, ${telefone.setor || null}, ${telefone.ultimaRecarga || null}, ${telefone.status || 'Ativo'})
       RETURNING id, conta, plano_operadora as "planoOperadora", telefone, responsavel_nome as "responsavelNome", responsavel_id as "responsavelId", setor, ultima_recarga as "ultimaRecarga", status
     `);
@@ -9778,7 +9778,7 @@ export class DbStorage implements IStorage {
     }
     
     await db.execute(sql`
-      UPDATE rh_telefones
+      UPDATE "Inhire".rh_telefones
       SET ${sql.join(setClauses, sql`, `)}
       WHERE id = ${id}
     `);
@@ -9936,7 +9936,7 @@ export class DbStorage implements IStorage {
         SELECT 
           p.id_cliente as client_id,
           DATE_TRUNC('month', MIN(COALESCE(p.data_quitacao, p.data_vencimento)))::date as cohort_month
-        FROM caz_parcelas p
+        FROM "Conta Azul".caz_parcelas p
         WHERE ${dateFilter}
         GROUP BY p.id_cliente
       ),
@@ -9946,7 +9946,7 @@ export class DbStorage implements IStorage {
           p.id_cliente as client_id,
           DATE_TRUNC('month', COALESCE(p.data_quitacao, p.data_vencimento))::date as payment_month,
           SUM(COALESCE(p.valor_pago::numeric, 0)) as revenue
-        FROM caz_parcelas p
+        FROM "Conta Azul".caz_parcelas p
         WHERE p.status = 'QUITADO' 
           AND p.id_cliente IS NOT NULL 
           AND p.valor_pago IS NOT NULL
@@ -10086,7 +10086,7 @@ export class DbStorage implements IStorage {
         transcript_url as "transcriptUrl", transcript_text as "transcriptText",
         uploaded_by as "uploadedBy",
         ai_analysis as "aiAnalysis", ai_analyzed_at as "aiAnalyzedAt"
-      FROM rh_one_on_one 
+      FROM "Inhire".rh_one_on_one 
       WHERE colaborador_id = ${colaboradorId} 
       ORDER BY data DESC
     `);
@@ -10095,7 +10095,7 @@ export class DbStorage implements IStorage {
 
   async createOneOnOneMeeting(data: InsertOneOnOne & { pdf_object_key?: string; pdf_filename?: string; transcricao_url?: string; transcricao_texto?: string }): Promise<OneOnOne> {
     const result = await db.execute(sql`
-      INSERT INTO rh_one_on_one (colaborador_id, lider_id, data, tipo, anotacoes, proximos_passos, pdf_object_key, pdf_filename, transcript_url, transcript_text)
+      INSERT INTO "Inhire".rh_one_on_one (colaborador_id, lider_id, data, tipo, anotacoes, proximos_passos, pdf_object_key, pdf_filename, transcript_url, transcript_text)
       VALUES (
         ${data.colaboradorId}, 
         ${data.gestorId || null}, 
@@ -10126,7 +10126,7 @@ export class DbStorage implements IStorage {
     uploadedBy?: string | null;
   }): Promise<OneOnOne> {
     const result = await db.execute(sql`
-      UPDATE rh_one_on_one 
+      UPDATE "Inhire".rh_one_on_one 
       SET 
         pdf_object_key = COALESCE(${data.pdfObjectKey ?? null}, pdf_object_key),
         pdf_filename = COALESCE(${data.pdfFilename ?? null}, pdf_filename),
@@ -10146,7 +10146,7 @@ export class DbStorage implements IStorage {
 
   async updateOneOnOneMeeting(id: number, data: Partial<InsertOneOnOne>): Promise<OneOnOne> {
     const result = await db.execute(sql`
-      UPDATE rh_one_on_one 
+      UPDATE "Inhire".rh_one_on_one 
       SET 
         lider_id = COALESCE(${data.gestorId ?? null}, lider_id),
         data = COALESCE(${data.data ?? null}, data),
@@ -10165,15 +10165,15 @@ export class DbStorage implements IStorage {
   }
 
   async deleteOneOnOneMeeting(id: number): Promise<void> {
-    await db.execute(sql`DELETE FROM rh_one_on_one_acoes WHERE one_on_one_id = ${id}`);
-    await db.execute(sql`DELETE FROM rh_one_on_one WHERE id = ${id}`);
+    await db.execute(sql`DELETE FROM "Inhire".rh_one_on_one_acoes WHERE one_on_one_id = ${id}`);
+    await db.execute(sql`DELETE FROM "Inhire".rh_one_on_one WHERE id = ${id}`);
   }
 
   async getOneOnOneAcoes(oneOnOneId: number): Promise<OneOnOneAcao[]> {
     const result = await db.execute(sql`
       SELECT 
         id, one_on_one_id as "oneOnOneId", descricao, responsavel, prazo, status, concluida_em as "concluidaEm"
-      FROM rh_one_on_one_acoes 
+      FROM "Inhire".rh_one_on_one_acoes 
       WHERE one_on_one_id = ${oneOnOneId}
       ORDER BY id ASC
     `);
@@ -10182,7 +10182,7 @@ export class DbStorage implements IStorage {
 
   async createOneOnOneAcao(data: InsertOneOnOneAcao): Promise<OneOnOneAcao> {
     const result = await db.execute(sql`
-      INSERT INTO rh_one_on_one_acoes (one_on_one_id, descricao, responsavel, prazo, status)
+      INSERT INTO "Inhire".rh_one_on_one_acoes (one_on_one_id, descricao, responsavel, prazo, status)
       VALUES (${data.oneOnOneId}, ${data.descricao}, ${data.responsavel || null}, ${data.prazo || null}, ${data.status || 'pendente'})
       RETURNING id, one_on_one_id as "oneOnOneId", descricao, responsavel, prazo, status, concluida_em as "concluidaEm"
     `);
@@ -10192,7 +10192,7 @@ export class DbStorage implements IStorage {
   async updateOneOnOneAcao(id: number, data: { status: string }): Promise<OneOnOneAcao> {
     const concluidaEm = data.status === 'concluida' ? sql`NOW()` : sql`NULL`;
     const result = await db.execute(sql`
-      UPDATE rh_one_on_one_acoes 
+      UPDATE "Inhire".rh_one_on_one_acoes 
       SET status = ${data.status}, concluida_em = ${data.status === 'concluida' ? sql`NOW()` : null}
       WHERE id = ${id}
       RETURNING id, one_on_one_id as "oneOnOneId", descricao, responsavel, prazo, status, concluida_em as "concluidaEm"
@@ -10214,7 +10214,7 @@ export class DbStorage implements IStorage {
         score_produtos as "scoreProdutos",
         comentario_produtos as "comentarioProdutos",
         feedback_geral as "feedbackGeral"
-      FROM rh_enps 
+      FROM "Inhire".rh_enps 
       WHERE colaborador_id = ${colaboradorId}
       ORDER BY data DESC
     `);
@@ -10223,7 +10223,7 @@ export class DbStorage implements IStorage {
 
   async createEnpsResponse(data: InsertEnps): Promise<EnpsResponse> {
     const result = await db.execute(sql`
-      INSERT INTO rh_enps (
+      INSERT INTO "Inhire".rh_enps (
         colaborador_id, score, comentario, data, criado_por,
         motivo_permanencia, comentario_empresa, score_lider, comentario_lider,
         score_produtos, comentario_produtos, feedback_geral
@@ -10255,7 +10255,7 @@ export class DbStorage implements IStorage {
       SELECT 
         id, colaborador_id as "colaboradorId", titulo, descricao, competencia, categoria, recursos, prazo,
         progresso, status, criado_em as "criadoEm", criado_por as "criadoPor", atualizado_em as "atualizadoEm"
-      FROM rh_pdi 
+      FROM "Inhire".rh_pdi 
       WHERE colaborador_id = ${colaboradorId}
       ORDER BY criado_em DESC
     `);
@@ -10264,7 +10264,7 @@ export class DbStorage implements IStorage {
 
   async createPdiGoal(data: InsertPdi): Promise<PdiGoal> {
     const result = await db.execute(sql`
-      INSERT INTO rh_pdi (colaborador_id, titulo, descricao, competencia, categoria, recursos, prazo, progresso, status, criado_por)
+      INSERT INTO "Inhire".rh_pdi (colaborador_id, titulo, descricao, competencia, categoria, recursos, prazo, progresso, status, criado_por)
       VALUES (${data.colaboradorId}, ${data.titulo}, ${data.descricao || null}, ${data.competencia || null}, 
         ${(data as any).categoria || null}, ${data.recursos || null}, ${data.prazo || null}, ${data.progresso || 0}, ${data.status || 'em_andamento'}, ${data.criadoPor || null})
       RETURNING id, colaborador_id as "colaboradorId", titulo, descricao, competencia, categoria, recursos, prazo,
@@ -10275,7 +10275,7 @@ export class DbStorage implements IStorage {
 
   async updatePdiGoal(id: number, data: Partial<InsertPdi>): Promise<PdiGoal> {
     const result = await db.execute(sql`
-      UPDATE rh_pdi 
+      UPDATE "Inhire".rh_pdi 
       SET 
         titulo = COALESCE(${data.titulo ?? null}, titulo),
         descricao = COALESCE(${data.descricao ?? null}, descricao),
@@ -10294,8 +10294,8 @@ export class DbStorage implements IStorage {
   }
 
   async deletePdiGoal(id: number): Promise<void> {
-    await db.execute(sql`DELETE FROM rh_pdi_checkpoints WHERE pdi_id = ${id}`);
-    await db.execute(sql`DELETE FROM rh_pdi WHERE id = ${id}`);
+    await db.execute(sql`DELETE FROM "Inhire".rh_pdi_checkpoints WHERE pdi_id = ${id}`);
+    await db.execute(sql`DELETE FROM "Inhire".rh_pdi WHERE id = ${id}`);
   }
 
   async getPdiCheckpoints(pdiId: number): Promise<PdiCheckpoint[]> {
@@ -10303,7 +10303,7 @@ export class DbStorage implements IStorage {
       SELECT 
         id, pdi_id as "pdiId", descricao, data_alvo as "dataAlvo", 
         concluido, concluido_em as "concluidoEm", ordem, criado_em as "criadoEm"
-      FROM rh_pdi_checkpoints 
+      FROM "Inhire".rh_pdi_checkpoints 
       WHERE pdi_id = ${pdiId}
       ORDER BY ordem, criado_em
     `);
@@ -10312,7 +10312,7 @@ export class DbStorage implements IStorage {
 
   async createPdiCheckpoint(data: InsertPdiCheckpoint): Promise<PdiCheckpoint> {
     const result = await db.execute(sql`
-      INSERT INTO rh_pdi_checkpoints (pdi_id, descricao, data_alvo, concluido, ordem)
+      INSERT INTO "Inhire".rh_pdi_checkpoints (pdi_id, descricao, data_alvo, concluido, ordem)
       VALUES (${data.pdiId}, ${data.descricao}, ${data.dataAlvo || null}, ${data.concluido || 'false'}, ${data.ordem || 0})
       RETURNING id, pdi_id as "pdiId", descricao, data_alvo as "dataAlvo", 
         concluido, concluido_em as "concluidoEm", ordem, criado_em as "criadoEm"
@@ -10323,7 +10323,7 @@ export class DbStorage implements IStorage {
   async updatePdiCheckpoint(id: number, data: { concluido?: string; concluidoEm?: Date }): Promise<PdiCheckpoint> {
     const concluidoEm = data.concluido === 'true' ? sql`NOW()` : sql`NULL`;
     const result = await db.execute(sql`
-      UPDATE rh_pdi_checkpoints 
+      UPDATE "Inhire".rh_pdi_checkpoints 
       SET concluido = COALESCE(${data.concluido ?? null}, concluido),
           concluido_em = ${concluidoEm}
       WHERE id = ${id}
@@ -10334,7 +10334,7 @@ export class DbStorage implements IStorage {
   }
 
   async deletePdiCheckpoint(id: number): Promise<void> {
-    await db.execute(sql`DELETE FROM rh_pdi_checkpoints WHERE id = ${id}`);
+    await db.execute(sql`DELETE FROM "Inhire".rh_pdi_checkpoints WHERE id = ${id}`);
   }
 
   // Turbo Calendar
@@ -10470,12 +10470,12 @@ export class DbStorage implements IStorage {
         COUNT(DISTINCT p.id_cliente) as quantidade_clientes,
         COUNT(p.id) as quantidade_parcelas,
         MAX(COALESCE(rh.salario::numeric, 0)) as salario
-      FROM caz_parcelas p
-      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN cup_clientes cup 
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN clickup.cup_clientes cup 
         ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
-      LEFT JOIN rh_pessoal rh 
+      LEFT JOIN "Inhire".rh_pessoal rh 
         ON LOWER(TRIM(rh.nome)) = LOWER(TRIM(cup.responsavel))
         AND (rh.demissao IS NULL OR rh.demissao > CURRENT_DATE)
       WHERE p.status = 'QUITADO'
@@ -10513,12 +10513,12 @@ export class DbStorage implements IStorage {
         COUNT(DISTINCT p.id_cliente) as quantidade_clientes,
         COUNT(p.id) as quantidade_parcelas,
         MAX(COALESCE(rh.salario::numeric, 0)) as salario
-      FROM caz_parcelas p
-      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN cup_clientes cup 
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN clickup.cup_clientes cup 
         ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
-      LEFT JOIN rh_pessoal rh 
+      LEFT JOIN "Inhire".rh_pessoal rh 
         ON LOWER(TRIM(rh.nome)) = LOWER(TRIM(cup.responsavel))
         AND (rh.demissao IS NULL OR rh.demissao > CURRENT_DATE)
       WHERE p.status = 'QUITADO'
@@ -10577,9 +10577,9 @@ export class DbStorage implements IStorage {
     // Primeiro busca lista de colaboradores
     const colaboradoresResult = await db.execute(sql`
       SELECT DISTINCT COALESCE(NULLIF(TRIM(cup.responsavel), ''), 'Sem Responsável') as responsavel
-      FROM caz_parcelas p
-      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN cup_clientes cup 
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN clickup.cup_clientes cup 
         ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
       WHERE p.status = 'QUITADO'
@@ -10606,9 +10606,9 @@ export class DbStorage implements IStorage {
         SUM(COALESCE(p.valor_pago::numeric, 0)) as valor_total,
         COUNT(p.id) as quantidade_parcelas,
         COUNT(DISTINCT p.id_cliente) as quantidade_clientes
-      FROM caz_parcelas p
-      LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN cup_clientes cup 
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN clickup.cup_clientes cup 
         ON REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = 
            REPLACE(REPLACE(REPLACE(cup.cnpj, '.', ''), '-', ''), '/', '')
       WHERE p.status = 'QUITADO'
@@ -10670,7 +10670,7 @@ export class DbStorage implements IStorage {
           const likeSobrenome = `%${sobrenome}%`;
           salarioResult = await db.execute(sql`
             SELECT salario as salario_bruto, nome
-            FROM rh_pessoal
+            FROM "Inhire".rh_pessoal
             WHERE LOWER(nome) LIKE ${likeNome}
               AND LOWER(nome) LIKE ${likeSobrenome}
               AND salario IS NOT NULL
@@ -10684,7 +10684,7 @@ export class DbStorage implements IStorage {
           const likeNome = `%${primeiroNome}%`;
           salarioResult = await db.execute(sql`
             SELECT salario as salario_bruto, nome
-            FROM rh_pessoal
+            FROM "Inhire".rh_pessoal
             WHERE LOWER(nome) LIKE ${likeNome}
               AND salario IS NOT NULL
               AND salario != ''
@@ -10814,7 +10814,7 @@ export class DbStorage implements IStorage {
     // Lista de squads disponíveis
     const squadsResult = await db.execute(sql`
       SELECT DISTINCT COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad
-      FROM cup_contratos
+      FROM clickup.cup_contratos
       WHERE responsavel IS NOT NULL AND TRIM(responsavel) != ''
       ORDER BY squad
     `);
@@ -10843,8 +10843,8 @@ export class DbStorage implements IStorage {
             '\s+', ' ', 'g'
           ))) as servico_norm,
           ct.id_subtask
-        FROM cup_contratos ct
-        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+        FROM clickup.cup_contratos ct
+        INNER JOIN clickup.cup_clientes cc ON ct.id_task = cc.task_id
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
@@ -10860,8 +10860,8 @@ export class DbStorage implements IStorage {
             ct.responsavel,
             COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad,
             ct.id_subtask
-          FROM cup_contratos ct
-          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          FROM clickup.cup_contratos ct
+          INNER JOIN clickup.cup_clientes cc ON ct.id_task = cc.task_id
           WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
         ) sub
@@ -10884,7 +10884,7 @@ export class DbStorage implements IStorage {
             ),
             '\s+', ' ', 'g'
           ))) as item_nome_norm
-        FROM caz_parcelas p
+        FROM "Conta Azul".caz_parcelas p
         INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
         LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
@@ -10899,7 +10899,7 @@ export class DbStorage implements IStorage {
           iv.*,
           REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
         FROM itens_vendidos iv
-        LEFT JOIN caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
+        LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
       ),
       itens_ranked AS (
         SELECT 
@@ -11049,8 +11049,8 @@ export class DbStorage implements IStorage {
             '\s+', ' ', 'g'
           ))) as servico_norm,
           ct.id_subtask
-        FROM cup_contratos ct
-        INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+        FROM clickup.cup_contratos ct
+        INNER JOIN clickup.cup_clientes cc ON ct.id_task = cc.task_id
         WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
           AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
           AND ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
@@ -11068,8 +11068,8 @@ export class DbStorage implements IStorage {
             ct.servico,
             COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') as squad,
             ct.id_subtask
-          FROM cup_contratos ct
-          INNER JOIN cup_clientes cc ON ct.id_task = cc.task_id
+          FROM clickup.cup_contratos ct
+          INNER JOIN clickup.cup_clientes cc ON ct.id_task = cc.task_id
           WHERE cc.cnpj IS NOT NULL AND TRIM(cc.cnpj) != ''
             AND ct.responsavel IS NOT NULL AND TRIM(ct.responsavel) != ''
         ) sub
@@ -11095,7 +11095,7 @@ export class DbStorage implements IStorage {
             '\s+', ' ', 'g'
           ))) as item_nome_norm,
           iv.valor::numeric as item_valor
-        FROM caz_parcelas p
+        FROM "Conta Azul".caz_parcelas p
         INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
         LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
@@ -11111,7 +11111,7 @@ export class DbStorage implements IStorage {
           caz.nome as cliente_nome,
           REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
         FROM itens_vendidos iv
-        LEFT JOIN caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
+        LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(iv.id_cliente::text) = TRIM(caz.ids::text)
       ),
       itens_ranked AS (
         SELECT 
@@ -11398,7 +11398,7 @@ export class DbStorage implements IStorage {
           const likeSobrenome = `%${sobrenome}%`;
           salarioResult = await db.execute(sql`
             SELECT salario as salario_bruto, nome
-            FROM rh_pessoal
+            FROM "Inhire".rh_pessoal
             WHERE LOWER(nome) LIKE ${likeNome}
               AND LOWER(nome) LIKE ${likeSobrenome}
               AND salario IS NOT NULL
@@ -11411,7 +11411,7 @@ export class DbStorage implements IStorage {
           const likeNome = `%${primeiroNome}%`;
           salarioResult = await db.execute(sql`
             SELECT salario as salario_bruto, nome
-            FROM rh_pessoal
+            FROM "Inhire".rh_pessoal
             WHERE LOWER(nome) LIKE ${likeNome}
               AND salario IS NOT NULL
               AND salario != ''
@@ -11470,8 +11470,8 @@ export class DbStorage implements IStorage {
       try {
         const cxResult = await db.execute(sql`
           SELECT DISTINCT cl.responsavel as cx
-          FROM cup_contratos ct
-          JOIN cup_clientes cl ON ct.id_task = cl.task_id
+          FROM clickup.cup_contratos ct
+          JOIN clickup.cup_clientes cl ON ct.id_task = cl.task_id
           WHERE TRIM(ct.responsavel) = ${operador}
             AND cl.responsavel IS NOT NULL AND TRIM(cl.responsavel) != ''
           ORDER BY cl.responsavel
@@ -11580,14 +11580,14 @@ export class DbStorage implements IStorage {
           ids,
           nome,
           REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-        FROM caz_clientes
+        FROM "Conta Azul".caz_clientes
         WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
       ),
       cup_cnpj_normalizado AS (
         SELECT 
           task_id,
           REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-        FROM cup_clientes
+        FROM clickup.cup_clientes
         WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
       ),
       contrato_unico AS (
@@ -11597,12 +11597,12 @@ export class DbStorage implements IStorage {
           ct.servico,
           ct.id_subtask
         FROM cup_cnpj_normalizado cc
-        INNER JOIN cup_contratos ct ON cc.task_id = ct.id_task
+        INNER JOIN clickup.cup_contratos ct ON cc.task_id = ct.id_task
         WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
         ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
       )
       SELECT DISTINCT COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad
-      FROM caz_parcelas p
+      FROM "Conta Azul".caz_parcelas p
       LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
       WHERE p.status = 'QUITADO'
@@ -11625,14 +11625,14 @@ export class DbStorage implements IStorage {
           ids,
           nome,
           REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-        FROM caz_clientes
+        FROM "Conta Azul".caz_clientes
         WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
       ),
       cup_cnpj_normalizado AS (
         SELECT 
           task_id,
           REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-        FROM cup_clientes
+        FROM clickup.cup_clientes
         WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
       ),
       contrato_unico AS (
@@ -11642,7 +11642,7 @@ export class DbStorage implements IStorage {
           ct.servico,
           ct.id_subtask
         FROM cup_cnpj_normalizado cc
-        INNER JOIN cup_contratos ct ON cc.task_id = ct.id_task
+        INNER JOIN clickup.cup_contratos ct ON cc.task_id = ct.id_task
         WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
         ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
       ),
@@ -11655,7 +11655,7 @@ export class DbStorage implements IStorage {
           caz.nome as cliente_nome,
           COALESCE(cu.servico, 'Serviço não identificado') as servico_nome,
           COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad
-        FROM caz_parcelas p
+        FROM "Conta Azul".caz_parcelas p
         LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
         LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
         WHERE p.status = 'QUITADO'
@@ -11811,7 +11811,7 @@ export class DbStorage implements IStorage {
                 ''
               )::numeric
           END as salario
-        FROM rh_pessoal rp
+        FROM "Inhire".rh_pessoal rp
       )
       SELECT 
         id,
@@ -11857,7 +11857,7 @@ export class DbStorage implements IStorage {
     // Buscar média salarial de CXCS ativos
     const cxcsResult = await db.execute(sql`
       SELECT AVG(salario::numeric) as media_cxcs
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE UPPER(TRIM(cargo)) = 'CXCS'
         AND UPPER(TRIM(status)) = 'ATIVO'
         AND salario IS NOT NULL
@@ -11889,8 +11889,8 @@ export class DbStorage implements IStorage {
         ) as valor,
         f.data_pagamento,
         COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
-      FROM cup_freelas f
-      LEFT JOIN rh_pessoal rp ON LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
+      FROM clickup.cup_freelas f
+      LEFT JOIN "Inhire".rh_pessoal rp ON LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
       WHERE f.data_pagamento >= ${dataInicio}::date
         AND f.data_pagamento <= ${dataFimComHora}::timestamp
         AND (
@@ -12058,7 +12058,7 @@ export class DbStorage implements IStorage {
         admissao::text as admissao,
         COALESCE(email_pessoal, email_turbo) as email,
         salario::text as salario
-      FROM rh_pessoal
+      FROM "Inhire".rh_pessoal
       WHERE status = 'Ativo'
         AND nome IS NOT NULL
         AND TRIM(nome) != ''
@@ -12102,7 +12102,7 @@ export class DbStorage implements IStorage {
           REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
           nome,
           cnpj as cnpj_original
-        FROM cup_clientes
+        FROM clickup.cup_clientes
         WHERE LOWER(status) = 'ativo'
           AND cnpj IS NOT NULL 
           AND TRIM(cnpj) != ''
@@ -12112,7 +12112,7 @@ export class DbStorage implements IStorage {
       ),
       salarios_ativos AS (
         SELECT COALESCE(SUM(salario::numeric), 0) as total_salarios
-        FROM rh_pessoal
+        FROM "Inhire".rh_pessoal
         WHERE status = 'Ativo'
       ),
       salario_rateado AS (
@@ -12127,8 +12127,8 @@ export class DbStorage implements IStorage {
         SELECT 
           REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo,
           COALESCE(SUM(p.valor_pago::numeric), 0) as receita
-        FROM caz_parcelas p
-        LEFT JOIN caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        FROM "Conta Azul".caz_parcelas p
+        LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
         WHERE p.tipo_evento = 'RECEITA'
           AND p.status = 'QUITADO'
           AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
@@ -12140,7 +12140,7 @@ export class DbStorage implements IStorage {
           p.descricao,
           p.valor_pago::numeric as valor,
           TRIM(substring(p.descricao from '\\[([^\\]]+)\\]')) as cliente_nome_extraido
-        FROM caz_parcelas p
+        FROM "Conta Azul".caz_parcelas p
         WHERE p.tipo_evento = 'DESPESA'
           AND p.status = 'QUITADO'
           AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
@@ -12155,7 +12155,7 @@ export class DbStorage implements IStorage {
           REPLACE(REPLACE(REPLACE(COALESCE(cup.cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
         FROM parcelas_freelancer pf
         LEFT JOIN LATERAL (
-          SELECT cnpj FROM cup_clientes 
+          SELECT cnpj FROM clickup.cup_clientes 
           WHERE LOWER(nome) = LOWER(pf.cliente_nome_extraido)
              OR LOWER(nome) LIKE LOWER('%' || pf.cliente_nome_extraido || '%')
           ORDER BY 
@@ -12173,7 +12173,7 @@ export class DbStorage implements IStorage {
       ),
       despesas_operacionais AS (
         SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
-        FROM caz_parcelas
+        FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status = 'QUITADO'
           AND data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
@@ -12220,7 +12220,7 @@ export class DbStorage implements IStorage {
               '^Venda\\s+', ''
             )
           ) as numero_venda_extraido
-        FROM caz_parcelas p
+        FROM "Conta Azul".caz_parcelas p
         WHERE p.tipo_evento = 'RECEITA'
           AND p.status = 'QUITADO'
           AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
@@ -12231,7 +12231,7 @@ export class DbStorage implements IStorage {
         pr.categoria_nome,
         COALESCE(iv.valor::numeric, pr.valor) as valor
       FROM parcelas_receita pr
-      LEFT JOIN caz_clientes caz ON TRIM(pr.id_cliente::text) = TRIM(caz.ids::text)
+      LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(pr.id_cliente::text) = TRIM(caz.ids::text)
       LEFT JOIN caz_vendas v ON TRIM(v.numero::text) = TRIM(pr.numero_venda_extraido)
       LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
       WHERE caz.cnpj IS NOT NULL
@@ -12246,7 +12246,7 @@ export class DbStorage implements IStorage {
           p.categoria_nome,
           p.valor_pago::numeric as valor,
           TRIM(substring(p.descricao from '\\[([^\\]]+)\\]')) as cliente_nome_extraido
-        FROM caz_parcelas p
+        FROM "Conta Azul".caz_parcelas p
         WHERE p.tipo_evento = 'DESPESA'
           AND p.status = 'QUITADO'
           AND p.data_quitacao::date BETWEEN ${startDate}::date AND ${endDate}::date
@@ -12259,7 +12259,7 @@ export class DbStorage implements IStorage {
         pf.valor
       FROM parcelas_freela pf
       LEFT JOIN LATERAL (
-        SELECT cnpj FROM cup_clientes 
+        SELECT cnpj FROM clickup.cup_clientes 
         WHERE LOWER(nome) = LOWER(pf.cliente_nome_extraido)
            OR LOWER(nome) LIKE LOWER('%' || pf.cliente_nome_extraido || '%')
         ORDER BY 
