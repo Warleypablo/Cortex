@@ -9536,7 +9536,7 @@ export class DbStorage implements IStorage {
     try {
       const acessosResult = await db.execute(sql`
         SELECT id::text, name, cnpj
-        FROM clients
+        FROM cortex_core.clients
         WHERE name ILIKE ${searchTerm} OR cnpj ILIKE ${searchTerm}
         LIMIT 20
       `);
@@ -9559,7 +9559,7 @@ export class DbStorage implements IStorage {
       const credenciaisResult = await db.execute(sql`
         SELECT cr.id::text, cr.platform, cr.username, c.name as client_name, cr.client_id::text
         FROM credentials cr
-        LEFT JOIN clients c ON cr.client_id = c.id
+        LEFT JOIN cortex_core.clients c ON cr.client_id = c.id
         WHERE cr.platform ILIKE ${searchTerm} OR cr.username ILIKE ${searchTerm} OR c.name ILIKE ${searchTerm}
         LIMIT 20
       `);
@@ -9606,7 +9606,7 @@ export class DbStorage implements IStorage {
     try {
       const ferramentasResult = await db.execute(sql`
         SELECT id::text, nome, categoria, status
-        FROM turbo_tools
+        FROM cortex_core.turbo_tools
         WHERE nome ILIKE ${searchTerm} OR categoria ILIKE ${searchTerm}
         LIMIT 20
       `);
@@ -9797,7 +9797,7 @@ export class DbStorage implements IStorage {
     for (const { name, cnpj } of mappings) {
       const normalizedName = name.toLowerCase().trim();
       const result = await db.execute(sql`
-        UPDATE clients 
+        UPDATE cortex_core.clients 
         SET cnpj = ${cnpj}, updated_at = NOW()
         WHERE LOWER(TRIM(name)) = ${normalizedName}
       `);
