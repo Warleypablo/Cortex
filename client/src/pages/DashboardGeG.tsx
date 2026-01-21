@@ -838,7 +838,7 @@ export default function DashboardGeG() {
                     R$ {formatCurrency(custoFolha?.custoTotal || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {custoFolha?.totalColaboradores || 0} colaboradores ativos
+                    {metricas?.headcount || 0} colaboradores ativos
                   </p>
                 </>
               )}
@@ -869,7 +869,7 @@ export default function DashboardGeG() {
                     R$ {formatCurrency(valorBeneficio?.valorTotal || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {valorBeneficio?.totalColaboradores || 0} colaboradores
+                    {metricas?.headcount || 0} colaboradores
                   </p>
                 </>
               )}
@@ -931,7 +931,7 @@ export default function DashboardGeG() {
                     R$ {formatCurrency(valorMedioSalario?.valorMedio || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Base: {valorMedioSalario?.totalColaboradores || 0} colaboradores
+                    Base: {metricas?.headcount || 0} colaboradores
                   </p>
                 </>
               )}
@@ -967,7 +967,7 @@ export default function DashboardGeG() {
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Base: {valorMedioSalario?.totalColaboradores || 0} colaboradores
+                    Base: {metricas?.headcount || 0} colaboradores
                   </p>
                 </>
               )}

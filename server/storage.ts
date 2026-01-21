@@ -4893,32 +4893,8 @@ export class DbStorage implements IStorage {
   }
 
   async getGegValorBeneficio(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
-    const conditions = [
-      sql`status = 'Ativo'`
-    ];
-    
-    if (squad !== 'todos') {
-      conditions.push(sql`squad = ${squad}`);
-    }
-    if (setor !== 'todos') {
-      conditions.push(sql`setor = ${setor}`);
-    }
-    if (nivel !== 'todos') {
-      conditions.push(sql`nivel = ${nivel}`);
-    }
-    if (cargo !== 'todos') {
-      conditions.push(sql`cargo = ${cargo}`);
-    }
-    
-    const result = await db.execute(sql`
-      SELECT 
-        COUNT(*) as total_colaboradores
-      FROM "Inhire".rh_pessoal
-      WHERE ${sql.join(conditions, sql` AND `)}
-    `);
-
-    const row = result.rows[0] as any;
-    const totalColaboradores = parseInt(row.total_colaboradores || '0');
+    const metricas = await this.getGegMetricas('all', squad, setor, nivel, cargo);
+    const totalColaboradores = metricas.headcount;
     return {
       valorTotal: totalColaboradores * 400,
       totalColaboradores,
