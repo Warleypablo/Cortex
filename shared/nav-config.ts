@@ -89,6 +89,7 @@ export const PERMISSION_KEYS = {
     DESIGN_SYSTEM: 'admin.design_system',
     HEALTH: 'admin.health',
     KPI: 'admin.kpi',
+    AVISOS: 'admin.avisos',
   },
 } as const;
 
@@ -222,6 +223,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/admin/design-system': PERMISSION_KEYS.ADMIN.DESIGN_SYSTEM,
   '/admin/health': PERMISSION_KEYS.ADMIN.HEALTH,
   '/admin/kpi': PERMISSION_KEYS.ADMIN.KPI,
+  '/admin/avisos': PERMISSION_KEYS.ADMIN.AVISOS,
 };
 
 // Convert permission keys to routes (for backwards compatibility)
@@ -432,6 +434,7 @@ export const NAV_CONFIG = {
       { title: 'Design System', url: '/admin/design-system', icon: 'Palette', permissionKey: PERMISSION_KEYS.ADMIN.DESIGN_SYSTEM },
       { title: 'Saúde do Sistema', url: '/admin/health', icon: 'Activity', permissionKey: PERMISSION_KEYS.ADMIN.HEALTH },
       { title: 'Overrides KPI', url: '/admin/kpi', icon: 'Sliders', permissionKey: PERMISSION_KEYS.ADMIN.KPI },
+      { title: 'Avisos', url: '/admin/avisos', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.ADMIN.AVISOS },
     ],
   },
 };
