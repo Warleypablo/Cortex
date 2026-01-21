@@ -3808,6 +3808,7 @@ export class DbStorage implements IStorage {
       return {
         receitaTotal: 0,
         mrr: 0,
+        mrrMesAnterior: 0,
         aquisicaoMrr: 0,
         aquisicaoPontual: 0,
         aquisicaoPontualCommerce: 0,
@@ -3820,6 +3821,28 @@ export class DbStorage implements IStorage {
         pausados: 0,
       };
     }
+
+    // Buscar MRR do mês anterior usando snapshot histórico (para base do cálculo de churn)
+    const inicioMesAnterior = new Date(ano, mes - 2, 1);
+    const fimMesAnterior = new Date(ano, mes - 1, 0, 23, 59, 59);
+    
+    const mrrMesAnteriorQuery = await db.execute(sql`
+      WITH ultimo_snapshot AS (
+        SELECT MAX(data_snapshot) as data_ultimo_snapshot
+        FROM "Clickup".cup_data_hist
+        WHERE data_snapshot >= ${inicioMesAnterior}::timestamp
+          AND data_snapshot <= ${fimMesAnterior}::timestamp
+      )
+      SELECT 
+        COALESCE(SUM(h.valorr::numeric), 0) as mrr_mes_anterior
+      FROM ultimo_snapshot us
+      JOIN "Clickup".cup_data_hist h 
+        ON h.data_snapshot = us.data_ultimo_snapshot
+        AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
+        AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+    `);
+    
+    const mrrMesAnterior = parseFloat((mrrMesAnteriorQuery.rows[0] as any)?.mrr_mes_anterior || '0');
 
     // Buscar MRR diretamente da tabela cup_contratos (dados em tempo real)
     const mrrQuery = await db.execute(sql`
@@ -3934,6 +3957,7 @@ export class DbStorage implements IStorage {
     return {
       receitaTotal: mrr + aquisicaoPontual,
       mrr,
+      mrrMesAnterior,
       aquisicaoMrr,
       aquisicaoPontual,
       aquisicaoPontualCommerce: 0,
