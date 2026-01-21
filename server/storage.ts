@@ -4894,10 +4894,7 @@ export class DbStorage implements IStorage {
 
   async getGegValorBeneficio(squad: string, setor: string, nivel: string, cargo: string): Promise<{ valorTotal: number; totalColaboradores: number }> {
     const conditions = [
-      sql`status = 'Ativo'`,
-      sql`proporcional_caju IS NOT NULL`,
-      sql`proporcional_caju != ''`,
-      sql`proporcional_caju ~ '^[0-9]+(\.[0-9]+)?$'`
+      sql`status = 'Ativo'`
     ];
     
     if (squad !== 'todos') {
@@ -4915,16 +4912,16 @@ export class DbStorage implements IStorage {
     
     const result = await db.execute(sql`
       SELECT 
-        COALESCE(SUM(proporcional_caju::numeric), 0) as valor_total,
         COUNT(*) as total_colaboradores
       FROM "Inhire".rh_pessoal
       WHERE ${sql.join(conditions, sql` AND `)}
     `);
 
     const row = result.rows[0] as any;
+    const totalColaboradores = parseInt(row.total_colaboradores || '0');
     return {
-      valorTotal: parseFloat(row.valor_total || '0'),
-      totalColaboradores: parseInt(row.total_colaboradores || '0'),
+      valorTotal: totalColaboradores * 400,
+      totalColaboradores,
     };
   }
 
