@@ -14707,7 +14707,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Error calculating MRR variation:", e);
       }
       
-      if (userName) {
+      // Buscar clientes vinculados ao usuário de duas formas:
+      // 1. Pelo email do usuário na coluna responsavel de cup_clientes
+      // 2. Pelo nome do colaborador nos contratos (cup_contratos)
+      
+      // Primeiro, buscar pelo email do usuário na coluna responsavel de cup_clientes
+      if (userEmail) {
+        const clientesPorEmailQuery = await db.execute(sql`
+          SELECT 
+            c.id,
+            c.nome,
+            c.cnpj,
+            COALESCE(SUM(ct.valorr::numeric), 0) as mrr,
+            COUNT(DISTINCT ct.id_task) as contratos_ativos,
+            ARRAY_AGG(DISTINCT ct.produto) FILTER (WHERE ct.produto IS NOT NULL) as produtos,
+            ARRAY_AGG(DISTINCT ct.squad) FILTER (WHERE ct.squad IS NOT NULL) as squads
+          FROM "Clickup".cup_clientes c
+          INNER JOIN "Clickup".cup_contratos ct ON c.task_id = ct.id_task
+          WHERE LOWER(c.responsavel) LIKE ${`%${userEmail.toLowerCase()}%`}
+            AND ct.status IN ('ativo', 'onboarding', 'triagem')
+          GROUP BY c.id, c.nome, c.cnpj
+          ORDER BY mrr DESC
+          LIMIT 10
+        `);
+        
+        if (clientesPorEmailQuery.rows.length > 0) {
+          meusClientes = clientesPorEmailQuery.rows.map((row: any) => ({
+            id: row.id,
+            nome: row.nome,
+            cnpj: row.cnpj,
+            mrr: parseFloat(row.mrr || '0'),
+            contratosAtivos: parseInt(row.contratos_ativos || '0'),
+            produto: Array.isArray(row.produtos) ? row.produtos[0] : null,
+            squad: Array.isArray(row.squads) ? row.squads[0] : null,
+          }));
+          
+          // Calcular totais para clientes onde o usuário é responsável
+          const totaisEmailQuery = await db.execute(sql`
+            SELECT 
+              COALESCE(SUM(ct.valorr::numeric), 0) as mrr_total,
+              COUNT(DISTINCT ct.id_task) as contratos_total,
+              COUNT(DISTINCT c.id) as clientes_total
+            FROM "Clickup".cup_clientes c
+            INNER JOIN "Clickup".cup_contratos ct ON c.task_id = ct.id_task
+            WHERE LOWER(c.responsavel) LIKE ${`%${userEmail.toLowerCase()}%`}
+              AND ct.status IN ('ativo', 'onboarding', 'triagem')
+          `);
+          
+          if (totaisEmailQuery.rows.length > 0) {
+            const totaisRow = totaisEmailQuery.rows[0] as any;
+            mrrTotal = parseFloat(totaisRow.mrr_total || '0');
+            contratosAtivos = parseInt(totaisRow.contratos_total || '0');
+            clientesAtivos = parseInt(totaisRow.clientes_total || '0');
+          }
+        }
+      }
+      
+      // Se não encontrou pelo email, tentar pelo nome do colaborador
+      if (meusClientes.length === 0 && userName) {
         // Tentar encontrar o colaborador pelo nome ou email
         const colaboradorQuery = await db.execute(sql`
           SELECT nome FROM "Inhire".rh_pessoal 
@@ -14731,7 +14788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ARRAY_AGG(DISTINCT ct.produto) FILTER (WHERE ct.produto IS NOT NULL) as produtos,
               ARRAY_AGG(DISTINCT ct.squad) FILTER (WHERE ct.squad IS NOT NULL) as squads
             FROM "Clickup".cup_clientes c
-            INNER JOIN "Clickup".cup_contratos ct ON c.id_task = ct.id_task
+            INNER JOIN "Clickup".cup_contratos ct ON c.task_id = ct.id_task
             WHERE (ct.responsavel ILIKE ${`%${colaboradorNome}%`} OR ct.cs_responsavel ILIKE ${`%${colaboradorNome}%`})
               AND ct.status IN ('ativo', 'onboarding', 'triagem')
             GROUP BY c.id, c.nome, c.cnpj
@@ -14756,7 +14813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               COUNT(DISTINCT ct.id_task) as contratos_total,
               COUNT(DISTINCT c.id) as clientes_total
             FROM "Clickup".cup_contratos ct
-            INNER JOIN "Clickup".cup_clientes c ON ct.id_task = c.id_task
+            INNER JOIN "Clickup".cup_clientes c ON ct.id_task = c.task_id
             WHERE (ct.responsavel ILIKE ${`%${colaboradorNome}%`} OR ct.cs_responsavel ILIKE ${`%${colaboradorNome}%`})
               AND ct.status IN ('ativo', 'onboarding', 'triagem')
           `);
