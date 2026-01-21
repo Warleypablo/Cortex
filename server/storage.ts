@@ -8049,45 +8049,44 @@ export class DbStorage implements IStorage {
     const hoje = new Date();
     const dataHoje = hoje.toISOString().split('T')[0];
     
-    // Busca contratos com status cancelado/em cancelamento que ainda têm parcelas em aberto após hoje
+    // Busca clientes com status cancelado/inativo/em cancelamento/pausado que ainda têm parcelas em aberto após hoje
+    // Relacionamento: caz_parcelas.id_cliente -> caz_clientes.ids -> caz_clientes.cnpj -> cup_clientes.cnpj
     const result = await db.execute(sql`
-      WITH contratos_cancelados AS (
+      WITH clientes_cancelados AS (
         SELECT DISTINCT ON (TRIM(cup.cnpj::text))
           TRIM(cup.cnpj::text) as cnpj,
           cup.nome as nome_cliente,
-          cont.status as status_contrato,
-          cont.data_encerramento,
-          cont.vendedor,
-          cont.squad,
-          cont.responsavel,
-          cont.produto
+          cup.status as status_cliente,
+          cup.vendedor,
+          cup.squad,
+          cup.responsavel,
+          cup.produto
         FROM "Clickup".cup_clientes cup
-        INNER JOIN "Clickup".cup_contratos cont ON cup.task_id = cont.id_task
-        WHERE LOWER(cont.status) IN ('canceled', 'canceling', 'cancelado', 'em cancelamento', 'cancelamento', 'cancelado/inativo', 'pausado')
+        WHERE LOWER(cup.status) IN ('cancelado/inativo', 'em cancelamento', 'pausado')
           AND cup.cnpj IS NOT NULL 
           AND TRIM(cup.cnpj::text) != ''
-        ORDER BY TRIM(cup.cnpj::text), cont.data_encerramento DESC NULLS LAST
+        ORDER BY TRIM(cup.cnpj::text)
       ),
       parcelas_em_aberto AS (
         SELECT 
-          TRIM(cc.cnpj::text) as cnpj,
+          TRIM(caz_cli.cnpj::text) as cnpj,
           SUM(COALESCE(cp.nao_pago::numeric, 0)) as valor_em_aberto,
           COUNT(*) as quantidade_parcelas,
           MIN(cp.data_vencimento) as parcela_mais_proxima
         FROM "Conta Azul".caz_parcelas cp
-        INNER JOIN "Conta Azul".caz_clientes cc ON cp.id_cliente::text = cc.ids::text
+        INNER JOIN "Conta Azul".caz_clientes caz_cli ON cp.id_cliente::text = caz_cli.ids::text
         WHERE cp.tipo_evento = 'RECEITA'
-          AND cp.data_vencimento >= ${dataHoje}
+          AND cp.data_vencimento > ${dataHoje}
           AND COALESCE(cp.nao_pago::numeric, 0) > 0
-          AND cc.cnpj IS NOT NULL 
-          AND TRIM(cc.cnpj::text) != ''
-        GROUP BY TRIM(cc.cnpj::text)
+          AND caz_cli.cnpj IS NOT NULL 
+          AND TRIM(caz_cli.cnpj::text) != ''
+        GROUP BY TRIM(caz_cli.cnpj::text)
       )
       SELECT 
         cc.cnpj,
         cc.nome_cliente,
-        cc.status_contrato,
-        cc.data_encerramento,
+        cc.status_cliente as status_contrato,
+        NULL as data_encerramento,
         pa.valor_em_aberto,
         pa.quantidade_parcelas,
         pa.parcela_mais_proxima,
@@ -8095,7 +8094,7 @@ export class DbStorage implements IStorage {
         cc.squad,
         cc.responsavel,
         cc.produto
-      FROM contratos_cancelados cc
+      FROM clientes_cancelados cc
       INNER JOIN parcelas_em_aberto pa ON pa.cnpj = cc.cnpj
       ORDER BY pa.valor_em_aberto DESC
       LIMIT 200
