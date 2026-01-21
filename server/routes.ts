@@ -7857,7 +7857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mrrAtivoResult = await db.execute(sql`
         WITH ultimo_snapshot AS (
           SELECT MAX(data_snapshot) as data_ultimo_snapshot
-          FROM cortex_core.cup_data_hist
+          FROM "Clickup".cup_data_hist
           WHERE data_snapshot >= ${inicioMesRef}::timestamp
             AND data_snapshot <= ${fimMesRef}::timestamp
         )
@@ -7865,7 +7865,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(h.squad, 'Não especificado') as squad,
           COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
         FROM ultimo_snapshot us
-        JOIN cortex_core.cup_data_hist h 
+        JOIN "Clickup".cup_data_hist h 
           ON h.data_snapshot = us.data_ultimo_snapshot
           AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
           AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
