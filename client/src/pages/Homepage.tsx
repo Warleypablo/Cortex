@@ -450,6 +450,7 @@ function DashboardAdmin() {
 
   const { data: visaoGeralData, isLoading: isLoadingVisaoGeral } = useQuery<{
     mrr: number;
+    mrrMesAnterior: number;
     aquisicaoMrr: number;
     aquisicaoPontual: number;
     aquisicaoPontualCommerce: number;
@@ -504,8 +505,10 @@ function DashboardAdmin() {
   const clientesUnicos = visaoGeralData?.clientesUnicos || 0;
   const ticketMedio = visaoGeralData?.ticketMedio || 0;
   const churn = visaoGeralData?.churn || 0;
+  const mrrMesAnterior = visaoGeralData?.mrrMesAnterior || 0;
   
-  const churnPercent = mrrTotal > 0 ? (churn / mrrTotal) * 100 : 0;
+  // Calcular churn usando MRR do mês anterior como base (mesmo critério do detalhamento)
+  const churnPercent = mrrMesAnterior > 0 ? (churn / mrrMesAnterior) * 100 : 0;
   
   // Dados globais da empresa (todos os contratos/clientes ativos)
   const empresaContratosAtivos = homeOverview?.empresaContratosAtivos || 0;
