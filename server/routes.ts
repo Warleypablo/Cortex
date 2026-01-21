@@ -7848,21 +7848,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const refEndDate = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0);
       const refDateStr = refEndDate.toISOString().split('T')[0];
       
-      // Buscar MRR ativo no final do mês anterior (contratos ativos naquela data)
-      // Incluir status: ativo, onboarding, triagem (mesmo critério usado na homepage)
+      // Buscar MRR ativo no final do mês anterior usando tabela de snapshot histórico
+      // Incluir status: ativo, onboarding, triagem (mesmo critério usado no gráfico de evolução)
       // Excluir squads irrelevantes: turbo interno, squad x
+      const inicioMesRef = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
+      const fimMesRef = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59);
+      
       const mrrAtivoResult = await db.execute(sql`
+        WITH ultimo_snapshot AS (
+          SELECT MAX(data_snapshot) as data_ultimo_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= ${inicioMesRef}::timestamp
+            AND data_snapshot <= ${fimMesRef}::timestamp
+        )
         SELECT 
-          COALESCE(squad, 'Não especificado') as squad,
-          COALESCE(SUM(valorr), 0) as mrr_ativo
-        FROM "Clickup".cup_contratos
-        WHERE LOWER(TRIM(status)) IN ('ativo', 'onboarding', 'triagem')
-        AND data_inicio IS NOT NULL
-        AND data_inicio <= ${refDateStr}::date
-        AND (data_encerramento IS NULL OR data_encerramento > ${refDateStr}::date)
-        AND (data_pausa IS NULL OR data_pausa > ${refDateStr}::date)
-        AND LOWER(COALESCE(squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
-        GROUP BY COALESCE(squad, 'Não especificado')
+          COALESCE(h.squad, 'Não especificado') as squad,
+          COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
+        FROM ultimo_snapshot us
+        JOIN "Clickup".cup_data_hist h 
+          ON h.data_snapshot = us.data_ultimo_snapshot
+          AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
+          AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+        GROUP BY COALESCE(h.squad, 'Não especificado')
       `);
       
       // Calcular MRR ativo total e por squad
