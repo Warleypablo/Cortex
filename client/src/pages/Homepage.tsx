@@ -37,7 +37,26 @@ import {
   FileText,
   Phone,
   Plus,
+  Megaphone,
+  ChevronLeft,
+  ChevronRight,
+  Info,
+  CheckCircle,
+  AlertCircle,
+  Zap,
 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+
+interface Aviso {
+  id: number;
+  titulo: string;
+  mensagem: string;
+  tipo: 'info' | 'alerta' | 'sucesso' | 'urgente';
+  cor: string;
+  icone: string | null;
+  link_texto: string | null;
+  link_url: string | null;
+}
 
 interface HomeOverview {
   hasActiveContracts: boolean;
@@ -77,6 +96,130 @@ interface HomeOverview {
     valor: number;
     dias: number;
   }>;
+}
+
+function AvisosCarousel({ avisos }: { avisos: Aviso[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  
+  const nextSlide = useCallback(() => {
+    setCurrentIndex((prev) => (prev + 1) % avisos.length);
+  }, [avisos.length]);
+  
+  const prevSlide = useCallback(() => {
+    setCurrentIndex((prev) => (prev - 1 + avisos.length) % avisos.length);
+  }, [avisos.length]);
+  
+  useEffect(() => {
+    if (avisos.length <= 1 || isPaused) return;
+    
+    const timer = setInterval(() => {
+      nextSlide();
+    }, 6000);
+    
+    return () => clearInterval(timer);
+  }, [avisos.length, isPaused, nextSlide]);
+  
+  if (avisos.length === 0) {
+    return null;
+  }
+  
+  const getIconByType = (tipo: string) => {
+    switch (tipo) {
+      case 'alerta': return AlertTriangle;
+      case 'sucesso': return CheckCircle;
+      case 'urgente': return Zap;
+      default: return Info;
+    }
+  };
+  
+  const getGradientByType = (tipo: string, cor: string) => {
+    switch (tipo) {
+      case 'alerta': return 'from-amber-500/20 to-amber-600/10 border-amber-500/40';
+      case 'sucesso': return 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/40';
+      case 'urgente': return 'from-red-500/20 to-red-600/10 border-red-500/40';
+      default: return 'from-primary/20 to-primary/10 border-primary/40';
+    }
+  };
+  
+  const getTextColorByType = (tipo: string) => {
+    switch (tipo) {
+      case 'alerta': return 'text-amber-400';
+      case 'sucesso': return 'text-emerald-400';
+      case 'urgente': return 'text-red-400';
+      default: return 'text-primary';
+    }
+  };
+  
+  const aviso = avisos[currentIndex];
+  const Icon = getIconByType(aviso.tipo);
+  
+  return (
+    <div 
+      className={`relative rounded-lg border bg-gradient-to-r ${getGradientByType(aviso.tipo, aviso.cor)} p-4 mb-6 overflow-hidden`}
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      data-testid="avisos-carousel"
+    >
+      <div className="flex items-start gap-4">
+        <div className={`p-2 rounded-full ${getTextColorByType(aviso.tipo)} bg-background/50`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <Megaphone className={`w-4 h-4 ${getTextColorByType(aviso.tipo)}`} />
+            <h3 className={`font-semibold ${getTextColorByType(aviso.tipo)}`}>{aviso.titulo}</h3>
+          </div>
+          <p className="text-sm text-foreground/80">{aviso.mensagem}</p>
+          
+          {aviso.link_url && aviso.link_texto && (
+            <a 
+              href={aviso.link_url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 mt-2 text-sm font-medium hover:underline"
+              style={{ color: aviso.cor || '#f97316' }}
+            >
+              {aviso.link_texto}
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
+        </div>
+        
+        {avisos.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={prevSlide}
+              data-testid="button-aviso-prev"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex gap-1">
+              {avisos.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`w-2 h-2 rounded-full transition-colors ${idx === currentIndex ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                  data-testid={`button-aviso-dot-${idx}`}
+                />
+              ))}
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={nextSlide}
+              data-testid="button-aviso-next"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function MiniCalendar({ eventos }: { eventos: HomeOverview['proximosEventos'] }) {
@@ -448,6 +591,10 @@ function DashboardAdmin() {
     queryKey: ['/api/home/overview'],
   });
 
+  const { data: avisosAtivos } = useQuery<Aviso[]>({
+    queryKey: ['/api/avisos/ativos'],
+  });
+
   const { data: visaoGeralData, isLoading: isLoadingVisaoGeral } = useQuery<{
     mrr: number;
     mrrMesAnterior: number;
@@ -581,6 +728,11 @@ function DashboardAdmin() {
 
   return (
     <div className="space-y-6">
+      {/* Avisos em destaque (Outdoor) */}
+      {avisosAtivos && avisosAtivos.length > 0 && (
+        <AvisosCarousel avisos={avisosAtivos} />
+      )}
+
       <div>
         <h2 className="text-lg font-semibold mb-4">Indicadores Principais</h2>
         <KpiCardGrid cards={kpiCards} columns={3} />
