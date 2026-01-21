@@ -3910,6 +3910,7 @@ export class DbStorage implements IStorage {
     const aquisicaoPontualRow = aquisicaoPontualQuery.rows[0] as any;
 
     const mrr = parseFloat(mrrRow.mrr || '0');
+    console.log(`[VisaoGeral] MRR Ativo direto do banco: R$ ${mrr.toFixed(2)}`);
     const aquisicaoMrr = parseFloat(transRow.aquisicao_mrr || '0');
     const aquisicaoPontual = parseFloat(aquisicaoPontualRow.aquisicao_pontual_crm || '0');
     const churn = parseFloat(transRow.churn || '0');
