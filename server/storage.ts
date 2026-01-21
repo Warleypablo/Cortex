@@ -3905,17 +3905,29 @@ export class DbStorage implements IStorage {
         AND valor_pontual > 0
     `);
 
+    // Query para Valor Entregue Pontual - soma de valorp onde data_entrega está no mês atual
+    const valorEntreguePontualQuery = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(valorp::numeric), 0) as valor_entregue_pontual
+      FROM ${schema.cupContratos}
+      WHERE data_entrega >= ${inicioMes}
+        AND data_entrega <= ${fimMes}
+        AND valorp IS NOT NULL
+        AND valorp > 0
+    `);
+
     const mrrRow = mrrQuery.rows[0] as any;
     const transRow = transicoesQuery.rows[0] as any;
     const aquisicaoPontualRow = aquisicaoPontualQuery.rows[0] as any;
+    const valorEntreguePontualRow = valorEntreguePontualQuery.rows[0] as any;
 
     const mrr = parseFloat(mrrRow.mrr || '0');
-    console.log(`[VisaoGeral] MRR Ativo direto do banco: R$ ${mrr.toFixed(2)}`);
     const aquisicaoMrr = parseFloat(transRow.aquisicao_mrr || '0');
     const aquisicaoPontual = parseFloat(aquisicaoPontualRow.aquisicao_pontual_crm || '0');
     const churn = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
     const receitaPontualEntregue = parseFloat(transRow.receita_pontual_entregue || '0');
+    const valorEntreguePontual = parseFloat(valorEntreguePontualRow?.valor_entregue_pontual || '0');
     const clientesUnicos = parseInt(transRow.clientes_unicos || '0');
     const ticketMedio = clientesUnicos > 0 ? mrr / clientesUnicos : 0;
 
@@ -3927,7 +3939,7 @@ export class DbStorage implements IStorage {
       aquisicaoPontualCommerce: 0,
       aquisicaoPontualTech: 0,
       receitaPontualEntregue,
-      valorEntreguePontual: 0,
+      valorEntreguePontual,
       clientesUnicos,
       ticketMedio,
       churn,
