@@ -7849,18 +7849,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const refDateStr = refEndDate.toISOString().split('T')[0];
       
       // Buscar MRR ativo no final do mês anterior (contratos ativos naquela data)
+      // Incluir status: ativo, onboarding, triagem (mesmo critério usado na homepage)
       // Excluir squads irrelevantes: turbo interno, squad x
       const mrrAtivoResult = await db.execute(sql`
         SELECT 
           COALESCE(squad, 'Não especificado') as squad,
           COALESCE(SUM(valorr), 0) as mrr_ativo
         FROM "Clickup".cup_contratos
-        WHERE (
-          LOWER(TRIM(status)) LIKE '%ativo%'
-          OR LOWER(TRIM(status)) = 'ativo'
-          OR LOWER(TRIM(status)) LIKE '%implantação%'
-          OR LOWER(TRIM(status)) LIKE '%running%'
-        )
+        WHERE LOWER(TRIM(status)) IN ('ativo', 'onboarding', 'triagem')
         AND data_inicio IS NOT NULL
         AND data_inicio <= ${refDateStr}::date
         AND (data_encerramento IS NULL OR data_encerramento > ${refDateStr}::date)
