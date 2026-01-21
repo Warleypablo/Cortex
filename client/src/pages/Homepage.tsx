@@ -528,7 +528,7 @@ function DashboardAdmin() {
     {
       title: "Ticket Médio",
       subtitle: `Por cliente ativo`,
-      value: formatCurrency(ticketMedio),
+      value: formatCurrency(Math.round(ticketMedio)),
       icon: Users,
       badge: ticketMedio && ticketMedioVariacao !== 0 ? {
         text: `${ticketMedioVariacao >= 0 ? '+' : ''}${ticketMedioVariacao.toFixed(1)}%`,
