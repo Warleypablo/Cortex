@@ -47,6 +47,7 @@ const ContribuicaoColaborador = lazy(() => import("@/pages/ContribuicaoColaborad
 const ContribuicaoOperador = lazy(() => import("@/pages/ContribuicaoOperador"));
 const ContribuicaoSquad = lazy(() => import("@/pages/ContribuicaoSquad"));
 const AdminUsuarios = lazy(() => import("@/pages/AdminUsuarios"));
+const AdminAvisos = lazy(() => import("@/pages/AdminAvisos"));
 const AccessDenied = lazy(() => import("@/pages/AccessDenied"));
 const Login = lazy(() => import("@/pages/Login"));
 const DashboardClosers = lazy(() => import("@/pages/DashboardClosers"));
@@ -251,6 +252,7 @@ function ProtectedRouter() {
       
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
+      <Route path="/admin/avisos">{() => <ProtectedRoute path="/admin/avisos" component={AdminAvisos} />}</Route>
       <Route path="/admin/regras-notificacoes">{() => <ProtectedRoute path="/admin/regras-notificacoes" component={AdminNotificationRules} />}</Route>
       <Route path="/admin/design-system">{() => <ProtectedRoute path="/admin/design-system" component={AdminDesignSystem} />}</Route>
       <Route path="/admin/health">{() => <ProtectedRoute path="/admin/health" component={AdminHealth} />}</Route>

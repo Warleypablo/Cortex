@@ -14971,6 +14971,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== AVISOS (OUTDOOR) ====================
+  
+  // Criar tabela turbo_avisos no schema cortex_core se não existir
+  db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cortex_core.turbo_avisos (
+      id SERIAL PRIMARY KEY,
+      titulo TEXT NOT NULL,
+      mensagem TEXT NOT NULL,
+      tipo TEXT NOT NULL DEFAULT 'info',
+      cor TEXT DEFAULT '#f97316',
+      icone TEXT,
+      link_texto TEXT,
+      link_url TEXT,
+      ativo BOOLEAN NOT NULL DEFAULT true,
+      ordem INTEGER NOT NULL DEFAULT 0,
+      data_inicio TIMESTAMP,
+      data_fim TIMESTAMP,
+      criado_em TIMESTAMP DEFAULT NOW(),
+      atualizado_em TIMESTAMP DEFAULT NOW(),
+      criado_por TEXT
+    )
+  `).catch(() => {});
+  
+  // Listar avisos ativos (para exibição no carousel)
+  app.get("/api/avisos/ativos", isAuthenticated, async (req, res) => {
+    try {
+      const agora = new Date();
+      const result = await db.execute(sql`
+        SELECT * FROM cortex_core.turbo_avisos 
+        WHERE ativo = true
+          AND (data_inicio IS NULL OR data_inicio <= ${agora})
+          AND (data_fim IS NULL OR data_fim >= ${agora})
+        ORDER BY ordem ASC, criado_em DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching avisos ativos:", error);
+      res.json([]);
+    }
+  });
+  
+  // Listar todos os avisos (para admin)
+  app.get("/api/avisos", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT * FROM cortex_core.turbo_avisos 
+        ORDER BY ordem ASC, criado_em DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching avisos:", error);
+      res.status(500).json({ error: "Failed to fetch avisos" });
+    }
+  });
+  
+  // Criar aviso (aceita snake_case do frontend)
+  app.post("/api/avisos", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { titulo, mensagem, tipo, cor, icone, link_texto, link_url, ativo, ordem, data_inicio, data_fim } = req.body;
+      
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.turbo_avisos (titulo, mensagem, tipo, cor, icone, link_texto, link_url, ativo, ordem, data_inicio, data_fim, criado_por)
+        VALUES (${titulo}, ${mensagem}, ${tipo || 'info'}, ${cor || '#f97316'}, ${icone || null}, ${link_texto || null}, ${link_url || null}, ${ativo !== false}, ${ordem || 0}, ${data_inicio || null}, ${data_fim || null}, ${user?.email || 'system'})
+        RETURNING *
+      `);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error creating aviso:", error);
+      res.status(500).json({ error: "Failed to create aviso" });
+    }
+  });
+  
+  // Atualizar aviso (aceita snake_case do frontend)
+  app.put("/api/avisos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { titulo, mensagem, tipo, cor, icone, link_texto, link_url, ativo, ordem, data_inicio, data_fim } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE cortex_core.turbo_avisos 
+        SET titulo = ${titulo}, mensagem = ${mensagem}, tipo = ${tipo || 'info'}, cor = ${cor || '#f97316'}, icone = ${icone || null}, link_texto = ${link_texto || null}, link_url = ${link_url || null}, ativo = ${ativo !== false}, ordem = ${ordem || 0}, data_inicio = ${data_inicio || null}, data_fim = ${data_fim || null}, atualizado_em = NOW()
+        WHERE id = ${id}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Aviso not found" });
+      }
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("Error updating aviso:", error);
+      res.status(500).json({ error: "Failed to update aviso" });
+    }
+  });
+  
+  // Deletar aviso
+  app.delete("/api/avisos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.execute(sql`DELETE FROM cortex_core.turbo_avisos WHERE id = ${id}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting aviso:", error);
+      res.status(500).json({ error: "Failed to delete aviso" });
+    }
+  });
+
   // ==================== TURBO CALENDAR ====================
   
   app.get("/api/calendario/eventos", isAuthenticated, async (req, res) => {

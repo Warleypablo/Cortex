@@ -2010,6 +2010,30 @@ export const insertTurboEventoSchema = createInsertSchema(turboEventos).omit({ i
 export type TurboEvento = typeof turboEventos.$inferSelect;
 export type InsertTurboEvento = z.infer<typeof insertTurboEventoSchema>;
 
+// ==================== AVISOS CONFIGURÁVEIS (OUTDOOR) ====================
+
+export const turboAvisos = pgTable("turbo_avisos", {
+  id: serial("id").primaryKey(),
+  titulo: text("titulo").notNull(),
+  mensagem: text("mensagem").notNull(),
+  tipo: text("tipo").notNull().default("info"), // 'info', 'alerta', 'sucesso', 'urgente'
+  cor: text("cor").default("#f97316"), // Orange as default (Turbo brand)
+  icone: text("icone"), // Nome do ícone Lucide (opcional)
+  linkTexto: text("link_texto"), // Texto do botão de ação
+  linkUrl: text("link_url"), // URL do botão de ação
+  ativo: boolean("ativo").default(true).notNull(),
+  ordem: integer("ordem").default(0).notNull(),
+  dataInicio: timestamp("data_inicio"), // Data de início de exibição (null = imediato)
+  dataFim: timestamp("data_fim"), // Data de fim de exibição (null = indefinido)
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+  criadoPor: text("criado_por"),
+});
+
+export const insertTurboAvisoSchema = createInsertSchema(turboAvisos).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type TurboAviso = typeof turboAvisos.$inferSelect;
+export type InsertTurboAviso = z.infer<typeof insertTurboAvisoSchema>;
+
 // ==================== METAS POR SQUAD ====================
 
 export const squadMetas = pgTable("squad_metas", {
