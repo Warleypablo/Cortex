@@ -2195,7 +2195,10 @@ export default function Colaboradores() {
     }
 
     if (filters.squad !== "all") {
-      filtered = filtered.filter((col) => col.squad === filters.squad);
+      filtered = filtered.filter((col) => {
+        const matchedSquad = findMatchingSquad(col.squad, squads);
+        return matchedSquad === filters.squad;
+      });
     }
 
     if (filters.status !== "all") {
@@ -2248,7 +2251,7 @@ export default function Colaboradores() {
     }
 
     return filtered;
-  }, [colaboradores, filters]);
+  }, [colaboradores, filters, squads]);
 
   const handleSort = useCallback((column: string) => {
     setSortColumn((prevColumn) => {
