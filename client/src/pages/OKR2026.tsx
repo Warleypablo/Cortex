@@ -89,6 +89,7 @@ interface DashboardMetrics {
   aquisicao_pontual: number | null;
   valor_entregue_pontual: number | null;
   folha_beneficios: number | null;
+  saldo_projetado: number | null;
 }
 
 interface Objective {
@@ -2229,6 +2230,16 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           direction="higher"
           icon={Banknote}
           tooltip="Saldo atual em contas bancárias"
+        />
+        <HeroCard
+          title="Saldo Projetado (Fim do Mês)"
+          value={metrics.saldo_projetado ?? 0}
+          target={null}
+          format="currency"
+          direction="higher"
+          icon={TrendingUp}
+          href="/dashboard/dfc"
+          tooltip="Saldo projetado ao fim do mês (saldo atual + entradas - saídas)"
         />
       </div>
 

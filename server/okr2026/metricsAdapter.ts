@@ -62,6 +62,7 @@ export interface DashboardMetrics {
   tech_projetos_valor: number;
   tech_freelancers_percentual: number;
   folha_beneficios: number;
+  saldo_projetado: number;
   quarter_summary?: QuarterSummaryMetric[];
   standardization_completion_pct?: number | null;
 }
@@ -240,6 +241,44 @@ export async function getCaixaAtual(): Promise<number> {
     return parseFloat((result.rows[0] as any)?.saldo || "0");
   } catch (error) {
     console.error("[OKR] Error fetching Caixa:", error);
+    return 0;
+  }
+}
+
+export async function getSaldoProjetado(): Promise<number> {
+  try {
+    // Mesma lógica de getFluxoCaixaInsightsPeriodo:
+    // saldoFinalPeriodo = saldoAtual + entradasPeriodo - saidasPeriodo
+    // Período = mês atual (do dia 1 até o último dia do mês)
+    const result = await db.execute(sql`
+      WITH saldo_bancos AS (
+        SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
+        FROM "Conta Azul".caz_bancos
+        WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
+      ),
+      periodo AS (
+        SELECT 
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_periodo,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_periodo
+        FROM "Conta Azul".caz_parcelas
+        WHERE status NOT IN ('QUITADO', 'PERDIDO')
+          AND data_vencimento::date BETWEEN date_trunc('month', CURRENT_DATE)::date 
+              AND (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date
+      )
+      SELECT 
+        sb.saldo_total,
+        COALESCE(p.entradas_periodo, 0) as entradas_periodo,
+        COALESCE(p.saidas_periodo, 0) as saidas_periodo
+      FROM saldo_bancos sb
+      CROSS JOIN periodo p
+    `);
+    const row = result.rows[0] as any;
+    const saldoAtual = parseFloat(row?.saldo_total || '0');
+    const entradasPeriodo = parseFloat(row?.entradas_periodo || '0');
+    const saidasPeriodo = parseFloat(row?.saidas_periodo || '0');
+    return saldoAtual + entradasPeriodo - saidasPeriodo;
+  } catch (error) {
+    console.error("[OKR] Error fetching Saldo Projetado:", error);
     return 0;
   }
 }
@@ -1757,7 +1796,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     techFreelancersCusto,
     techProjetosValor,
     techFreelancersPct,
-    folhaBeneficios
+    folhaBeneficios,
+    saldoProjetado
   ] = await Promise.all([
     getMrrAtivo(),
     getMrrInicioMes(),
@@ -1786,7 +1826,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getTechFreelancersCusto(),
     getTechProjetosValor(),
     getTechFreelancersPct(),
-    getFolhaBeneficios()
+    getFolhaBeneficios(),
+    getSaldoProjetado()
   ]);
 
   const receitaPorHead = headcount > 0 ? receitaYTD.liquida / headcount : 0;
@@ -1838,6 +1879,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     tech_projetos_valor: techProjetosValor,
     tech_freelancers_percentual: techFreelancersPct,
     folha_beneficios: folhaBeneficios,
+    saldo_projetado: saldoProjetado,
     standardization_completion_pct: getStandardizationCompletionPct().value
   };
 }
