@@ -4026,8 +4026,6 @@ export default function OKR2026() {
         return <InitiativesTab data={data} collaborators={collaborators} />;
       case "bp-financeiro":
         return <BPFinanceiroTab />;
-      case "metas-squad":
-        return <SquadGoalsTab />;
       default:
         return <DashboardTab data={data} onTabChange={setActiveTab} />;
     }
@@ -4071,7 +4069,7 @@ export default function OKR2026() {
               data-testid="tab-dashboard"
               className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
-              Dashboard
+              Visão Geral
             </TabsTrigger>
             <TabsTrigger 
               value="krs" 
@@ -4093,13 +4091,6 @@ export default function OKR2026() {
               className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
             >
               BP Financeiro
-            </TabsTrigger>
-            <TabsTrigger 
-              value="metas-squad" 
-              data-testid="tab-metas-squad"
-              className="rounded-lg px-4 py-2 text-sm font-medium transition-all data-[state=active]:bg-background data-[state=active]:shadow-sm"
-            >
-              Metas Squad
             </TabsTrigger>
           </TabsList>
 
