@@ -1094,9 +1094,6 @@ async function applySysValidationRules(): Promise<void> {
 
 export async function initializeBPTables(): Promise<void> {
   try {
-    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS plan`);
-    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS kpi`);
-    
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS cortex_core.metric_targets_monthly (
         id SERIAL PRIMARY KEY,
