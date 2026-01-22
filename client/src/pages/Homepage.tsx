@@ -756,9 +756,9 @@ function DashboardAdmin() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <QuickLinkCard
-            title="Visão Geral"
+            title="OKR 2026"
             description="Métricas de MRR e performance"
-            href="/visao-geral"
+            href="/okr-2026"
             icon={<LineChart className="w-5 h-5" />}
           />
           <QuickLinkCard
@@ -1100,7 +1100,7 @@ function DashboardOperacao() {
             value={formatCurrency(visaoGeralData?.mrr || 0)}
             subtitle="Contratos ativos"
             icon={<DollarSign className="w-4 h-4" />}
-            href="/visao-geral"
+            href="/okr-2026"
           />
           <MetricCard
             title="Churn MRR"
@@ -1121,7 +1121,7 @@ function DashboardOperacao() {
             value={topSquads?.length || 0}
             subtitle="Com contratos"
             icon={<Users className="w-4 h-4" />}
-            href="/visao-geral"
+            href="/okr-2026"
           />
         </div>
       </div>
@@ -1159,16 +1159,10 @@ function DashboardOperacao() {
             icon={<ShieldCheck className="w-5 h-5" />}
           />
           <QuickLinkCard
-            title="Visão Geral"
+            title="OKR 2026"
             description="Métricas gerais"
-            href="/visao-geral"
+            href="/okr-2026"
             icon={<LineChart className="w-5 h-5" />}
-          />
-          <QuickLinkCard
-            title="Metas do Squad"
-            description="Acompanhamento de metas"
-            href="/metas-squad"
-            icon={<Target className="w-5 h-5" />}
           />
         </div>
       </div>

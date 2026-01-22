@@ -258,9 +258,9 @@ export function AppSidebar() {
               </div>
             )}
             
-            {/* Visão Geral - Link direto sem submenu */}
+            {/* OKR 2026 - Link direto sem submenu */}
             {renderNavItem({ 
-              title: 'Visão Geral', 
+              title: 'OKR 2026', 
               url: '/okr-2026', 
               icon: 'Target', 
               permissionKey: 'admin.okr_2026' 

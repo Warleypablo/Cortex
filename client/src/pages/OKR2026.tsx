@@ -2143,7 +2143,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label}: Meta ${formatCurrency(mrrTarget)}${isSelectedMonthFuture ? ' (Valor atual - mês futuro)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(mrrTarget)}`}
-          href="/visao-geral"
         />
         <HeroCard
           title="Vendas MRR"
