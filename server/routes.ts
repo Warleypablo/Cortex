@@ -13894,16 +13894,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             SELECT categoria_nome, COUNT(*) as cnt, SUM(valor_liquido::numeric) as total
             FROM "Conta Azul".caz_parcelas
             WHERE tipo_evento = 'RECEITA'
-              AND (
-                categoria_nome LIKE '3.02%' 
-                OR categoria_nome LIKE '3.03%' 
-                OR categoria_nome LIKE '4.01%' 
-                OR categoria_nome LIKE '4.03%'
-              )
+              AND categoria_nome NOT LIKE '1.01%'
+              AND categoria_nome NOT LIKE '1.02%'
             GROUP BY categoria_nome
-            LIMIT 10
+            ORDER BY cnt DESC
+            LIMIT 20
           `);
-          console.log("[api] BP financeiro: Categorias encontradas:", debugCategoriasResult.rows);
+          console.log("[api] BP financeiro: Categorias de receita (excl. 1.01/1.02):", debugCategoriasResult.rows);
           
           const outrasReceitasResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total
