@@ -13890,33 +13890,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["cash_generation"]) actualsByMetric["cash_generation"] = {};
           actualsByMetric["cash_generation"][currentMonthKey] = geracaoCaixa;
           
-          const debugCategoriasResult = await db.execute(sql`
-            SELECT categoria_nome, COUNT(*) as cnt, SUM(valor_liquido::numeric) as total
-            FROM "Conta Azul".caz_parcelas
-            WHERE tipo_evento = 'RECEITA'
-              AND categoria_nome NOT LIKE '1.01%'
-              AND categoria_nome NOT LIKE '1.02%'
-            GROUP BY categoria_nome
-            ORDER BY cnt DESC
-            LIMIT 20
-          `);
-          console.log("[api] BP financeiro: Categorias de receita (excl. 1.01/1.02):", debugCategoriasResult.rows);
-          
           const outrasReceitasResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total
             FROM "Conta Azul".caz_parcelas
             WHERE tipo_evento = 'RECEITA'
               AND (
-                categoria_nome LIKE '3.02%' 
-                OR categoria_nome LIKE '3.03%' 
-                OR categoria_nome LIKE '4.01%' 
-                OR categoria_nome LIKE '4.03%'
+                categoria_nome LIKE '03.02%' 
+                OR categoria_nome LIKE '03.03%' 
+                OR categoria_nome LIKE '04.01%' 
+                OR categoria_nome LIKE '04.03%'
               )
               AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
               AND data_quitacao::date <= CURRENT_DATE
           `);
           const outrasReceitas = parseFloat((outrasReceitasResult.rows[0] as any)?.total || "0");
-          console.log("[api] BP financeiro: Outras Receitas calculated:", outrasReceitas, "período:", startOfMonth.toISOString().split("T")[0], "a", today.toISOString().split("T")[0]);
           if (!actualsByMetric["revenue_other"]) actualsByMetric["revenue_other"] = {};
           actualsByMetric["revenue_other"][currentMonthKey] = outrasReceitas;
           
