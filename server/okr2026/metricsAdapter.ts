@@ -668,9 +668,9 @@ export async function getGeracaoCaixa(): Promise<number> {
 
 export async function getFolhaBeneficios(): Promise<number> {
   try {
-    // Folha + Benefícios = Soma de salarios + caju de rh_pessoal onde status = Ativo
+    // Folha + Benefícios = Soma de salario + caju de rh_pessoal onde status = Ativo
     const result = await db.execute(sql`
-      SELECT COALESCE(SUM(COALESCE(salarios::numeric, 0) + COALESCE(caju::numeric, 0)), 0) as folha_beneficios
+      SELECT COALESCE(SUM(COALESCE(salario::numeric, 0) + COALESCE(caju::numeric, 0)), 0) as folha_beneficios
       FROM "Inhire".rh_pessoal
       WHERE status = 'Ativo'
     `);
