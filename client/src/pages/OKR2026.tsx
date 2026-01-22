@@ -2221,6 +2221,15 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           icon={Briefcase}
           tooltip="Despesas de folha de pagamento e benefícios do mês"
         />
+        <HeroCard
+          title="Saldo Atual"
+          value={metrics.caixa_atual ?? 0}
+          target={null}
+          format="currency"
+          direction="higher"
+          icon={Banknote}
+          tooltip="Saldo atual em contas bancárias"
+        />
       </div>
 
       <ExecutiveSummaryStrip 
