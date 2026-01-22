@@ -13890,6 +13890,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["cash_generation"]) actualsByMetric["cash_generation"] = {};
           actualsByMetric["cash_generation"][currentMonthKey] = geracaoCaixa;
           
+          const outrasReceitasResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total
+            FROM "Conta Azul".caz_parcelas
+            WHERE tipo_evento = 'RECEITA'
+              AND (
+                categoria_nome LIKE '3.02%' 
+                OR categoria_nome LIKE '3.03%' 
+                OR categoria_nome LIKE '4.01%' 
+                OR categoria_nome LIKE '4.03%'
+              )
+              AND data_quitacao >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_quitacao < ${today.toISOString().split("T")[0]}
+          `);
+          const outrasReceitas = parseFloat((outrasReceitasResult.rows[0] as any)?.total || "0");
+          if (!actualsByMetric["revenue_other"]) actualsByMetric["revenue_other"] = {};
+          actualsByMetric["revenue_other"][currentMonthKey] = outrasReceitas;
+          
         } catch (liveError) {
           console.log("[api] BP financeiro: Could not fetch live metrics for current month", liveError);
         }
