@@ -13860,27 +13860,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["churn_mrr_month"]) actualsByMetric["churn_mrr_month"] = {};
           actualsByMetric["churn_mrr_month"][currentMonthKey] = churnMrr;
           
-          const receitasResult = await db.execute(sql`
-            SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
+          // Geração de Caixa = Receitas - Despesas (mesma lógica do DFC)
+          const geracaoCaixaResult = await db.execute(sql`
+            SELECT 
+              COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
+              COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as geracao_caixa
             FROM "Conta Azul".caz_parcelas
-            WHERE tipo_evento = 'RECEITA'
+            WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
               AND status = 'QUITADO'
-              AND data_competencia >= ${startOfMonth.toISOString().split("T")[0]}
-              AND data_competencia < ${today.toISOString().split("T")[0]}
           `);
-          const receitasQuitadas = parseFloat((receitasResult.rows[0] as any)?.total || "0");
-          
-          const despesasResult = await db.execute(sql`
-            SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
-            FROM "Conta Azul".caz_parcelas
-            WHERE tipo_evento = 'DESPESA'
-              AND status = 'QUITADO'
-              AND data_competencia >= ${startOfMonth.toISOString().split("T")[0]}
-              AND data_competencia < ${today.toISOString().split("T")[0]}
-          `);
-          const despesasQuitadas = parseFloat((despesasResult.rows[0] as any)?.total || "0");
-          
-          const geracaoCaixa = receitasQuitadas - despesasQuitadas;
+          const geracaoCaixa = parseFloat((geracaoCaixaResult.rows[0] as any)?.geracao_caixa || "0");
           if (!actualsByMetric["cash_generation"]) actualsByMetric["cash_generation"] = {};
           actualsByMetric["cash_generation"][currentMonthKey] = geracaoCaixa;
           
