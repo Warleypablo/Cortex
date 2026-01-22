@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -587,7 +588,8 @@ function HeroCard({
   direction = "higher",
   icon: Icon, 
   tooltip,
-  status
+  status,
+  href
 }: {
   title: string;
   value: number | null;
@@ -597,6 +599,7 @@ function HeroCard({
   icon: typeof TrendingUp;
   tooltip?: string;
   status?: "green" | "yellow" | "red";
+  href?: string;
 }) {
   const formatValue = (v: number) => {
     if (format === "currency") return formatCurrency(v);
@@ -644,9 +647,9 @@ function HeroCard({
 
   const alertStatus = getAlertStatus();
 
-  return (
+  const cardContent = (
     <Card 
-      className={`relative overflow-visible border-l-4 ${colors.border}`}
+      className={`relative overflow-visible border-l-4 ${colors.border} ${href ? 'cursor-pointer hover-elevate transition-all' : ''}`}
       data-testid={`card-hero-${title.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
@@ -705,6 +708,12 @@ function HeroCard({
       </CardContent>
     </Card>
   );
+
+  if (href) {
+    return <Link href={href} className="block">{cardContent}</Link>;
+  }
+  
+  return cardContent;
 }
 
 function ImpactBadge({ type }: { type: "mrr" | "churn" | "caixa" }) {
@@ -2132,6 +2141,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label}: Meta ${formatCurrency(mrrTarget)}${isSelectedMonthFuture ? ' (Valor atual - mês futuro)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(mrrTarget)}`}
+          href="/visao-geral"
         />
         <HeroCard
           title="Vendas MRR"
@@ -2143,6 +2153,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label}: Meta ${formatCurrency(vendasMrrTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(vendasMrrTarget)}`}
+          href="/dashboard/comercial/closers"
         />
         <HeroCard
           title="Inadimplência"
@@ -2155,6 +2166,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             ? `${selectedMonthData?.label}: Máx ${formatCurrency(inadTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: Máx ${formatCurrency(inadTarget)}`}
           status={isSelectedMonthFuture ? undefined : inadStatus}
+          href="/dashboard/financeiro/inadimplencia"
         />
         <HeroCard
           title="Churn"
@@ -2167,6 +2179,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             ? `${selectedMonthData?.label}: Máx ${formatCurrency(churnTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: Máx ${formatCurrency(churnTarget)}`}
           status={isSelectedMonthFuture ? undefined : churnStatus}
+          href="/dashboard/gestao/churn"
         />
         <HeroCard
           title="Geração de Caixa"
@@ -2178,6 +2191,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label}: Meta ${formatCurrency(cashGenTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(cashGenTarget)}`}
+          href="/dashboard/financeiro/dfc"
         />
         <HeroCard
           title="Vendas Pontuais"
