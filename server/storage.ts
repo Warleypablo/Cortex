@@ -3856,18 +3856,6 @@ export class DbStorage implements IStorage {
     // Estas representam mudanças que ocorreram no período, não estado em um ponto no tempo
     const transicoesQuery = await db.execute(sql`
       SELECT 
-        -- Aquisição MRR: contratos criados no período
-        COALESCE(SUM(
-          CASE 
-            WHEN data_inicio >= ${inicioMes}
-              AND data_inicio <= ${fimMes}
-              AND valorr IS NOT NULL
-              AND valorr > 0
-            THEN valorr::numeric
-            ELSE 0 
-          END
-        ), 0) as aquisicao_mrr,
-        
         -- Churn: contratos encerrados no período
         COALESCE(SUM(
           CASE 
@@ -3916,6 +3904,18 @@ export class DbStorage implements IStorage {
       FROM ${schema.cupContratos}
     `);
 
+    // Query para Aquisição MRR - usando crm_deal do Bitrix (negócios ganhos no período)
+    const aquisicaoMrrQuery = await db.execute(sql`
+      SELECT 
+        COALESCE(SUM(valor_recorrente), 0) as aquisicao_mrr
+      FROM "Bitrix".crm_deal
+      WHERE stage_name = 'Negócio Ganho'
+        AND data_fechamento >= ${inicioMes}
+        AND data_fechamento <= ${fimMes}
+        AND valor_recorrente IS NOT NULL
+        AND valor_recorrente > 0
+    `);
+
     // Query para Aquisição Pontual - usando crm_deal igual à área comercial
     const aquisicaoPontualQuery = await db.execute(sql`
       SELECT 
@@ -3941,11 +3941,12 @@ export class DbStorage implements IStorage {
 
     const mrrRow = mrrQuery.rows[0] as any;
     const transRow = transicoesQuery.rows[0] as any;
+    const aquisicaoMrrRow = aquisicaoMrrQuery.rows[0] as any;
     const aquisicaoPontualRow = aquisicaoPontualQuery.rows[0] as any;
     const valorEntreguePontualRow = valorEntreguePontualQuery.rows[0] as any;
 
     const mrr = parseFloat(mrrRow.mrr || '0');
-    const aquisicaoMrr = parseFloat(transRow.aquisicao_mrr || '0');
+    const aquisicaoMrr = parseFloat(aquisicaoMrrRow.aquisicao_mrr || '0');
     const aquisicaoPontual = parseFloat(aquisicaoPontualRow.aquisicao_pontual_crm || '0');
     const churn = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
