@@ -13900,10 +13900,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 OR categoria_nome LIKE '4.01%' 
                 OR categoria_nome LIKE '4.03%'
               )
-              AND data_quitacao >= ${startOfMonth.toISOString().split("T")[0]}
-              AND data_quitacao < ${today.toISOString().split("T")[0]}
+              AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
+              AND data_quitacao::date <= CURRENT_DATE
           `);
           const outrasReceitas = parseFloat((outrasReceitasResult.rows[0] as any)?.total || "0");
+          console.log("[api] BP financeiro: Outras Receitas calculated:", outrasReceitas);
           if (!actualsByMetric["revenue_other"]) actualsByMetric["revenue_other"] = {};
           actualsByMetric["revenue_other"][currentMonthKey] = outrasReceitas;
           
