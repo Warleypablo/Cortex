@@ -46,6 +46,8 @@ export interface DashboardMetrics {
   expansion_mrr_ytd: number | null;
   vendas_pontual: number;
   vendas_mrr: number;
+  aquisicao_pontual: number;
+  valor_entregue_pontual: number;
   headcount: number;
   receita_por_head: number;
   mrr_por_head: number;
@@ -603,6 +605,43 @@ export async function getVendasMrr(): Promise<number> {
     return parseFloat((result.rows[0] as any)?.vendas_mrr || "0");
   } catch (error) {
     console.error("[OKR] Error fetching Vendas MRR:", error);
+    return 0;
+  }
+}
+
+export async function getAquisicaoPontual(): Promise<number> {
+  try {
+    // Aquisição Pontual = soma de valor_pontual de deals ganhos no mês atual (CRM Bitrix)
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valor_pontual::numeric), 0) as aquisicao_pontual
+      FROM "Bitrix".crm_deal
+      WHERE stage_name = 'Negócio Ganho'
+        AND data_fechamento IS NOT NULL
+        AND TO_CHAR(data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND valor_pontual IS NOT NULL
+        AND valor_pontual > 0
+    `);
+    return parseFloat((result.rows[0] as any)?.aquisicao_pontual || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Aquisição Pontual:", error);
+    return 0;
+  }
+}
+
+export async function getValorEntreguePontual(): Promise<number> {
+  try {
+    // Valor Entregue Pontual = soma de valorp de contratos pontuais entregues no mês atual
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valorp::numeric), 0) as valor_entregue_pontual
+      FROM "Clickup".cup_contratos
+      WHERE data_inicio IS NOT NULL
+        AND TO_CHAR(data_inicio, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND valorp IS NOT NULL
+        AND valorp > 0
+    `);
+    return parseFloat((result.rows[0] as any)?.valor_entregue_pontual || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Valor Entregue Pontual:", error);
     return 0;
   }
 }
@@ -1691,6 +1730,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     expansionMrr,
     vendasPontual,
     vendasMrr,
+    aquisicaoPontual,
+    valorEntreguePontual,
     geracaoCaixa,
     turboohReceita,
     turboohCustos,
@@ -1717,6 +1758,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getExpansionMrr(),
     getVendasPontual(),
     getVendasMrr(),
+    getAquisicaoPontual(),
+    getValorEntreguePontual(),
     getGeracaoCaixa(),
     getTurboohReceita(),
     getTurboohCustos(),
@@ -1761,6 +1804,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     expansion_mrr_ytd: expansionMrr,
     vendas_pontual: vendasPontual,
     vendas_mrr: vendasMrr,
+    aquisicao_pontual: aquisicaoPontual,
+    valor_entregue_pontual: valorEntreguePontual,
     headcount,
     receita_por_head: receitaPorHead,
     mrr_por_head: mrrPorHead,
