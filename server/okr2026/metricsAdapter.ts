@@ -233,10 +233,11 @@ export async function getEbitdaYTD(): Promise<number> {
 
 export async function getCaixaAtual(): Promise<number> {
   try {
+    // Mesma lógica do getFinanceiroKPIsCompletos em storage.ts
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(balance::numeric), 0) as saldo
       FROM "Conta Azul".caz_bancos
-      WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
+      WHERE ativo = true
     `);
     return parseFloat((result.rows[0] as any)?.saldo || "0");
   } catch (error) {
@@ -247,33 +248,26 @@ export async function getCaixaAtual(): Promise<number> {
 
 export async function getSaldoProjetado(): Promise<number> {
   try {
-    // Saldo projetado = Saldo atual + A Receber (até fim do mês) - A Pagar (até fim do mês)
+    // Saldo projetado = Saldo atual + A Receber (total aberto) - A Pagar (total aberto)
+    // Mesma lógica do getFinanceiroKPIsCompletos em storage.ts
     const result = await db.execute(sql`
       WITH saldo_bancos AS (
         SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
         FROM "Conta Azul".caz_bancos
-        WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
+        WHERE ativo = true
       ),
       a_receber AS (
-        SELECT COALESCE(SUM(nao_pago::numeric), 0) as a_receber_total
-        FROM "Conta Azul".caz_parcelas
-        WHERE tipo_evento = 'RECEITA'
-          AND status != 'QUITADO'
-          AND nao_pago::numeric > 0
-          AND data_vencimento >= CURRENT_DATE
-          AND data_vencimento <= (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date
+        SELECT COALESCE(SUM(nao_pago::numeric), 0) as total_aberto
+        FROM "Conta Azul".caz_receber
+        WHERE status != 'ACQUITTED' AND nao_pago::numeric > 0
       ),
       a_pagar AS (
-        SELECT COALESCE(SUM(nao_pago::numeric), 0) as a_pagar_total
-        FROM "Conta Azul".caz_parcelas
-        WHERE tipo_evento = 'DESPESA'
-          AND status != 'QUITADO'
-          AND nao_pago::numeric > 0
-          AND data_vencimento >= CURRENT_DATE
-          AND data_vencimento <= (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date
+        SELECT COALESCE(SUM(nao_pago::numeric), 0) as total_aberto
+        FROM "Conta Azul".caz_pagar
+        WHERE status != 'ACQUITTED' AND nao_pago::numeric > 0
       )
       SELECT 
-        sb.saldo_total + ar.a_receber_total - ap.a_pagar_total as saldo_projetado
+        sb.saldo_total + ar.total_aberto - ap.total_aberto as saldo_projetado
       FROM saldo_bancos sb, a_receber ar, a_pagar ap
     `);
     return parseFloat((result.rows[0] as any)?.saldo_projetado || "0");
