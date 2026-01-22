@@ -61,6 +61,7 @@ export interface DashboardMetrics {
   tech_freelancers_custo: number;
   tech_projetos_valor: number;
   tech_freelancers_percentual: number;
+  folha_beneficios: number;
   quarter_summary?: QuarterSummaryMetric[];
   standardization_completion_pct?: number | null;
 }
@@ -661,6 +662,50 @@ export async function getGeracaoCaixa(): Promise<number> {
     return parseFloat((result.rows[0] as any)?.geracao_caixa || "0");
   } catch (error) {
     console.error("[OKR] Error fetching Geração de Caixa:", error);
+    return 0;
+  }
+}
+
+export async function getFolhaBeneficios(): Promise<number> {
+  try {
+    // Folha + Benefícios = Despesas de pessoal do mês atual
+    // Filtra categorias relacionadas a folha de pagamento e benefícios
+    const result = await db.execute(sql`
+      SELECT COALESCE(SUM(valor_pago::numeric), 0) as folha_beneficios
+      FROM "Conta Azul".caz_parcelas
+      WHERE tipo_evento = 'DESPESA'
+        AND TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+        AND status = 'QUITADO'
+        AND (
+          categoria_nome ILIKE '%folha%'
+          OR categoria_nome ILIKE '%salario%'
+          OR categoria_nome ILIKE '%salário%'
+          OR categoria_nome ILIKE '%pessoal%'
+          OR categoria_nome ILIKE '%beneficio%'
+          OR categoria_nome ILIKE '%benefício%'
+          OR categoria_nome ILIKE '%vale%refeicao%'
+          OR categoria_nome ILIKE '%vale%refeição%'
+          OR categoria_nome ILIKE '%vale%alimentacao%'
+          OR categoria_nome ILIKE '%vale%alimentação%'
+          OR categoria_nome ILIKE '%vale%transporte%'
+          OR categoria_nome ILIKE '%plano%saude%'
+          OR categoria_nome ILIKE '%plano%saúde%'
+          OR categoria_nome ILIKE '%inss%'
+          OR categoria_nome ILIKE '%fgts%'
+          OR categoria_nome ILIKE '%ferias%'
+          OR categoria_nome ILIKE '%férias%'
+          OR categoria_nome ILIKE '%13%'
+          OR categoria_nome ILIKE '%decimo%terceiro%'
+          OR categoria_nome ILIKE '%rescisao%'
+          OR categoria_nome ILIKE '%rescisão%'
+          OR categoria_nome ILIKE '%pro-labore%'
+          OR categoria_nome ILIKE '%pró-labore%'
+          OR categoria_nome ILIKE '%prolabore%'
+        )
+    `);
+    return parseFloat((result.rows[0] as any)?.folha_beneficios || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Folha + Benefícios:", error);
     return 0;
   }
 }
@@ -1740,7 +1785,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     techProjetosEntregues,
     techFreelancersCusto,
     techProjetosValor,
-    techFreelancersPct
+    techFreelancersPct,
+    folhaBeneficios
   ] = await Promise.all([
     getMrrAtivo(),
     getMrrInicioMes(),
@@ -1768,7 +1814,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getTechProjetosEntregues(),
     getTechFreelancersCusto(),
     getTechProjetosValor(),
-    getTechFreelancersPct()
+    getTechFreelancersPct(),
+    getFolhaBeneficios()
   ]);
 
   const receitaPorHead = headcount > 0 ? receitaYTD.liquida / headcount : 0;
@@ -1819,6 +1866,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     tech_freelancers_custo: techFreelancersCusto,
     tech_projetos_valor: techProjetosValor,
     tech_freelancers_percentual: techFreelancersPct,
+    folha_beneficios: folhaBeneficios,
     standardization_completion_pct: getStandardizationCompletionPct().value
   };
 }
