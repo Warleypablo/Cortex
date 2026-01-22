@@ -34,7 +34,7 @@ import {
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
   LayoutGrid, List, Search, Loader2, Database, FileText, ListChecks, Calendar,
-  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap, ShoppingCart, UserMinus, Wallet
+  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap, ShoppingCart, UserMinus, Wallet, Briefcase
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -88,6 +88,7 @@ interface DashboardMetrics {
   expansion_mrr_ytd: number | null;
   aquisicao_pontual: number | null;
   valor_entregue_pontual: number | null;
+  folha_beneficios: number | null;
 }
 
 interface Objective {
@@ -2210,6 +2211,15 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           direction="higher"
           icon={Target}
           tooltip="Projetos pontuais entregues no mês"
+        />
+        <HeroCard
+          title="Folha + Benefícios"
+          value={viewMode === "month" && isSelectedMonthFuture ? null : (metrics.folha_beneficios ?? 0)}
+          target={null}
+          format="currency"
+          direction="lower"
+          icon={Briefcase}
+          tooltip="Despesas de folha de pagamento e benefícios do mês"
         />
       </div>
 
