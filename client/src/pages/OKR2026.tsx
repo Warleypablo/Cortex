@@ -89,7 +89,6 @@ interface DashboardMetrics {
   aquisicao_pontual: number | null;
   valor_entregue_pontual: number | null;
   folha_beneficios: number | null;
-  saldo_projetado: number | null;
 }
 
 interface Objective {
@@ -2221,26 +2220,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           direction="lower"
           icon={Briefcase}
           tooltip="Despesas de folha de pagamento e benefícios do mês"
-        />
-        <HeroCard
-          title="Saldo Atual (Hoje)"
-          value={metrics.caixa_atual ?? 0}
-          target={null}
-          format="currency"
-          direction="higher"
-          icon={Wallet}
-          tooltip="Saldo atual em bancos"
-          href="/dashboard/dfc"
-        />
-        <HeroCard
-          title="Saldo Projetado (Fim do Mês)"
-          value={metrics.saldo_projetado ?? 0}
-          target={null}
-          format="currency"
-          direction="higher"
-          icon={TrendingUp}
-          tooltip="Saldo atual + A Receber - A Pagar até o fim do mês"
-          href="/dashboard/dfc"
         />
       </div>
 
