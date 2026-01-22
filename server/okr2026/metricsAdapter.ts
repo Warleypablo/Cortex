@@ -115,9 +115,7 @@ export async function getMrrAtivo(): Promise<number> {
       FROM "Clickup".cup_contratos
       WHERE status IN ('ativo', 'onboarding', 'triagem')
     `);
-    const mrr = parseFloat((result.rows[0] as any)?.mrr || "0");
-    console.log("[OKR] getMrrAtivo: ", mrr);
-    return mrr;
+    return parseFloat((result.rows[0] as any)?.mrr || "0");
   } catch (error) {
     console.error("[OKR] Error fetching MRR Ativo:", error);
     return 0;
