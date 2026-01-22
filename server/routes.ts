@@ -13919,6 +13919,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["taxes_on_revenue"]) actualsByMetric["taxes_on_revenue"] = {};
           actualsByMetric["taxes_on_revenue"][currentMonthKey] = impostosReceita;
           
+          // Receita Líquida = Receita Total Faturável - Impostos sobre Receita
+          const receitaLiquida = receitaTotalFaturavel - impostosReceita;
+          if (!actualsByMetric["revenue_net"]) actualsByMetric["revenue_net"] = {};
+          actualsByMetric["revenue_net"][currentMonthKey] = receitaLiquida;
+          
         } catch (liveError) {
           console.log("[api] BP financeiro: Could not fetch live metrics for current month", liveError);
         }
