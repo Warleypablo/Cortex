@@ -605,11 +605,17 @@ function HeroCard({
   };
 
   let progress: number | null = null;
+  let overshootPercent: number | null = null;
   if (value !== null && target !== null && target > 0) {
     if (direction === "higher") {
       progress = Math.min(100, (value / target) * 100);
     } else {
-      progress = value <= target ? 100 : Math.max(0, 100 - ((value - target) / target) * 100);
+      if (value <= target) {
+        progress = 100;
+      } else {
+        progress = Math.max(0, 100 - ((value - target) / target) * 100);
+        overshootPercent = ((value - target) / target) * 100;
+      }
     }
   }
 
@@ -686,7 +692,9 @@ function HeroCard({
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Meta: {formatValue(target)}</span>
               {progress !== null && (
-                <span className={`font-medium ${colors.text}`}>{progress.toFixed(0)}%</span>
+                <span className={`font-medium ${colors.text}`}>
+                  {overshootPercent !== null ? `+${overshootPercent.toFixed(0)}%` : `${progress.toFixed(0)}%`}
+                </span>
               )}
             </div>
             {progress !== null && (
