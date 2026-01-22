@@ -13808,15 +13808,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const today = new Date();
           
           const mrrResult = await db.execute(sql`
-            WITH ultimo_snapshot AS (
-              SELECT MAX(data_snapshot) as data_ultimo
-              FROM "Clickup".cup_data_hist
-            )
-            SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
-            FROM "Clickup".cup_data_hist h
-            JOIN ultimo_snapshot us ON h.data_snapshot = us.data_ultimo
+            SELECT COALESCE(SUM(valorr), 0) as mrr
+            FROM "Clickup".cup_contratos
             WHERE status IN ('ativo', 'onboarding', 'triagem')
-              AND valorr IS NOT NULL AND valorr > 0
           `);
           const mrrAtivo = parseFloat((mrrResult.rows[0] as any)?.mrr || "0");
           if (!actualsByMetric["mrr_active"]) actualsByMetric["mrr_active"] = {};
