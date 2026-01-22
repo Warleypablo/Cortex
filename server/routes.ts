@@ -13924,6 +13924,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["revenue_net"]) actualsByMetric["revenue_net"] = {};
           actualsByMetric["revenue_net"][currentMonthKey] = receitaLiquida;
           
+          // Headcount Total: colaboradores ativos
+          const headcountResult = await db.execute(sql`
+            SELECT COUNT(*) as total
+            FROM "Inhire".rh_pessoal
+            WHERE status = 'Ativo'
+          `);
+          const headcountTotal = parseInt((headcountResult.rows[0] as any)?.total || "0");
+          if (!actualsByMetric["headcount_total"]) actualsByMetric["headcount_total"] = {};
+          actualsByMetric["headcount_total"][currentMonthKey] = headcountTotal;
+          
+          // Clientes Ativos
+          const clientesResult = await db.execute(sql`
+            SELECT COUNT(*) as total
+            FROM "Clickup".cup_clientes
+            WHERE status IN ('ativo', 'triagem', 'onboarding')
+          `);
+          const clientesAtivos = parseInt((clientesResult.rows[0] as any)?.total || "0");
+          if (!actualsByMetric["clients_active"]) actualsByMetric["clients_active"] = {};
+          actualsByMetric["clients_active"][currentMonthKey] = clientesAtivos;
+          
+          // Contratos Ativos
+          const contratosResult = await db.execute(sql`
+            SELECT COUNT(*) as total
+            FROM "Clickup".cup_contratos
+            WHERE status IN ('ativo', 'triagem', 'onboarding')
+          `);
+          const contratosAtivos = parseInt((contratosResult.rows[0] as any)?.total || "0");
+          if (!actualsByMetric["contracts_active"]) actualsByMetric["contracts_active"] = {};
+          actualsByMetric["contracts_active"][currentMonthKey] = contratosAtivos;
+          
+          // Saldo de Caixa
+          const saldoResult = await db.execute(sql`
+            SELECT COALESCE(SUM(balance::numeric), 0) as total
+            FROM "Conta Azul".caz_bancos
+          `);
+          const saldoCaixa = parseFloat((saldoResult.rows[0] as any)?.total || "0");
+          if (!actualsByMetric["cash_balance"]) actualsByMetric["cash_balance"] = {};
+          actualsByMetric["cash_balance"][currentMonthKey] = saldoCaixa;
+          
         } catch (liveError) {
           console.log("[api] BP financeiro: Could not fetch live metrics for current month", liveError);
         }
