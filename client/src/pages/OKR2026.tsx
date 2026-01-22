@@ -2166,7 +2166,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             ? `${selectedMonthData?.label}: Máx ${formatCurrency(inadTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: Máx ${formatCurrency(inadTarget)}`}
           status={isSelectedMonthFuture ? undefined : inadStatus}
-          href="/dashboard/financeiro/inadimplencia"
+          href="/dashboard/inadimplencia"
         />
         <HeroCard
           title="Churn"
@@ -2179,7 +2179,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             ? `${selectedMonthData?.label}: Máx ${formatCurrency(churnTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: Máx ${formatCurrency(churnTarget)}`}
           status={isSelectedMonthFuture ? undefined : churnStatus}
-          href="/dashboard/gestao/churn"
+          href="/dashboard/churn-detalhamento"
         />
         <HeroCard
           title="Geração de Caixa"
@@ -2191,7 +2191,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label}: Meta ${formatCurrency(cashGenTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(cashGenTarget)}`}
-          href="/dashboard/financeiro/dfc"
+          href="/dashboard/dfc"
         />
         <HeroCard
           title="Vendas Pontuais"
