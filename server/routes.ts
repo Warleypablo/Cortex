@@ -13463,7 +13463,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           turbooh_margem_pct: metrics.turbooh_margem_pct,
           tech_projetos_entregues: metrics.tech_projetos_entregues,
           tech_freelancers_pct: metrics.tech_freelancers_percentual,
-          mrr_por_head: metrics.mrr_por_head
+          mrr_por_head: metrics.mrr_por_head,
+          // O1 - Bigger KRs
+          faturamento_legado: metrics.receita_total_ytd,
+          vendas_mrr: metrics.vendas_mrr,
+          vendas_pontual: metrics.vendas_pontual,
+          faturamento_ventures: metrics.turbooh_receita,
+          projetos_tech: metrics.tech_projetos_valor,
+          // O2 - Better KRs
+          churn_brl: metrics.churn_brl,
+          inadimplencia_brl: metrics.inadimplencia_brl,
+          nps: null, // Ainda não instrumentado
+          faturamento_por_pessoa: metrics.receita_por_head,
+          entregas_no_prazo_pct: null // Ainda não instrumentado
         };
         
         atual = metricMap[kr.metricKey] ?? null;
