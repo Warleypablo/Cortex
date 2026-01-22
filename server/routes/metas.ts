@@ -380,11 +380,6 @@ export async function registerMetasRoutes(app: Express, db: any, storage: IStora
   // Initialize KPI tables
   async function initializeKPITables() {
     try {
-      // Create kpi schema if not exists
-      await db.execute(sql`CREATE SCHEMA IF NOT EXISTS kpi`);
-      await db.execute(sql`CREATE SCHEMA IF NOT EXISTS plan`);
-      await db.execute(sql`CREATE SCHEMA IF NOT EXISTS admin`);
-      
       // Metric overrides table
       await db.execute(sql`
         CREATE TABLE IF NOT EXISTS cortex_core.metric_overrides_monthly (
