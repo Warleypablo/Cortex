@@ -85,6 +85,8 @@ interface DashboardMetrics {
   new_mrr_ytd: number;
   expansion_mrr: number;
   expansion_mrr_ytd: number | null;
+  aquisicao_pontual: number | null;
+  valor_entregue_pontual: number | null;
 }
 
 interface Objective {
@@ -2168,6 +2170,24 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label}: Meta ${formatCurrency(cashGenTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(cashGenTarget)}`}
+        />
+        <HeroCard
+          title="Vendas Pontuais"
+          value={viewMode === "month" && isSelectedMonthFuture ? null : (metrics.aquisicao_pontual ?? 0)}
+          target={null}
+          format="currency"
+          direction="higher"
+          icon={Wallet}
+          tooltip="Vendas pontuais fechadas no mês (CRM)"
+        />
+        <HeroCard
+          title="Entregas Pontuais"
+          value={viewMode === "month" && isSelectedMonthFuture ? null : (metrics.valor_entregue_pontual ?? 0)}
+          target={null}
+          format="currency"
+          direction="higher"
+          icon={Target}
+          tooltip="Projetos pontuais entregues no mês"
         />
       </div>
 
