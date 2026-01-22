@@ -24,6 +24,7 @@ export interface DashboardMetrics {
   ebitda_ytd: number;
   geracao_caixa_ytd: number;
   caixa_atual: number;
+  saldo_projetado: number;
   inadimplencia_valor: number;
   inadimplencia_brl: number;
   inadimplencia_percentual: number;
@@ -240,6 +241,44 @@ export async function getCaixaAtual(): Promise<number> {
     return parseFloat((result.rows[0] as any)?.saldo || "0");
   } catch (error) {
     console.error("[OKR] Error fetching Caixa:", error);
+    return 0;
+  }
+}
+
+export async function getSaldoProjetado(): Promise<number> {
+  try {
+    // Saldo projetado = Saldo atual + A Receber (até fim do mês) - A Pagar (até fim do mês)
+    const result = await db.execute(sql`
+      WITH saldo_bancos AS (
+        SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
+        FROM "Conta Azul".caz_bancos
+        WHERE ativo = 'true' OR ativo = 't' OR ativo IS NULL
+      ),
+      a_receber AS (
+        SELECT COALESCE(SUM(nao_pago::numeric), 0) as a_receber_total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND status != 'QUITADO'
+          AND nao_pago::numeric > 0
+          AND data_vencimento >= CURRENT_DATE
+          AND data_vencimento <= (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date
+      ),
+      a_pagar AS (
+        SELECT COALESCE(SUM(nao_pago::numeric), 0) as a_pagar_total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status != 'QUITADO'
+          AND nao_pago::numeric > 0
+          AND data_vencimento >= CURRENT_DATE
+          AND data_vencimento <= (date_trunc('month', CURRENT_DATE) + interval '1 month - 1 day')::date
+      )
+      SELECT 
+        sb.saldo_total + ar.a_receber_total - ap.a_pagar_total as saldo_projetado
+      FROM saldo_bancos sb, a_receber ar, a_pagar ap
+    `);
+    return parseFloat((result.rows[0] as any)?.saldo_projetado || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Saldo Projetado:", error);
     return 0;
   }
 }
@@ -1757,7 +1796,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     techFreelancersCusto,
     techProjetosValor,
     techFreelancersPct,
-    folhaBeneficios
+    folhaBeneficios,
+    saldoProjetado
   ] = await Promise.all([
     getMrrAtivo(),
     getMrrInicioMes(),
@@ -1765,6 +1805,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getReceitaYTD(),
     getEbitdaYTD(),
     getCaixaAtual(),
+    getSaldoProjetado(),
     getInadimplencia(),
     getChurnMRR(),
     getClientesAtivos(),
@@ -1800,6 +1841,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     ebitda_ytd: ebitdaYTD,
     geracao_caixa_ytd: geracaoCaixa,
     caixa_atual: caixaAtual,
+    saldo_projetado: saldoProjetado,
     inadimplencia_valor: inadimplencia.valor,
     inadimplencia_brl: inadimplencia.valor,
     inadimplencia_percentual: inadimplencia.percentual,
