@@ -687,6 +687,14 @@ function DashboardAdmin() {
       href: "/visao-geral",
     },
     {
+      title: "Valor Entregue Pontual",
+      subtitle: "Projetos pontuais entregues",
+      value: formatCurrency(valorEntreguePontual),
+      icon: Target,
+      badge: undefined,
+      href: "/visao-geral",
+    },
+    {
       title: "Aquisição MRR",
       subtitle: "Novos contratos no mês",
       value: formatCurrency(aquisicaoMrr),
@@ -696,14 +704,6 @@ function DashboardAdmin() {
         isPositive: true,
       } : undefined,
       href: "/dashboard/comercial/closers",
-    },
-    {
-      title: "Valor Entregue Pontual",
-      subtitle: "Projetos pontuais entregues",
-      value: formatCurrency(valorEntreguePontual),
-      icon: Target,
-      badge: undefined,
-      href: "/visao-geral",
     },
     {
       title: "Aquisição Pontual",
