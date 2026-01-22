@@ -25,7 +25,7 @@ const routeNameMap: Record<string, string> = {
   "conhecimentos": "Conhecimentos",
   "beneficios": "Benefícios",
   "calendario": "Calendário",
-  "okr-2026": "OKR 2026",
+  "okr-2026": "Visão Geral",
   "avisos": "Notificações",
   "visao-geral": "Visão Geral",
   "investors-report": "Investors Report",
