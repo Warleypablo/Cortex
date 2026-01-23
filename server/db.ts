@@ -624,6 +624,22 @@ export async function initializeSysSchema(): Promise<void> {
       )
     `);
 
+    // 6. cortex_core.credentials - client access credentials
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.credentials (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        client_id UUID,
+        platform VARCHAR(255) NOT NULL,
+        username VARCHAR(255),
+        password VARCHAR(255),
+        access_url TEXT,
+        observations TEXT,
+        created_by TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
