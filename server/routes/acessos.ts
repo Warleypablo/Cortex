@@ -781,20 +781,18 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         return res.status(400).json({ error: "clientId and platform are required" });
       }
       
-      const result = await db.execute(sql`
-        INSERT INTO cortex_core.credentials (client_id, platform, username, password, access_url, observations, created_by)
-        VALUES (
-          ${clientId}::uuid, 
-          ${platform}, 
-          ${username || null}, 
-          ${password || null}, 
-          ${accessUrl || null}, 
-          ${observations || null}, 
-          ${createdBy || null}
-        )
-        RETURNING *
-      `);
+      // Use pool directly to avoid Drizzle type inference issues
+      const { Pool } = await import('pg');
+      const pool = new Pool({ connectionString: process.env.DB_HOST });
       
+      const result = await pool.query(
+        `INSERT INTO cortex_core.credentials (client_id, platform, username, password, access_url, observations, created_by)
+         VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)
+         RETURNING *`,
+        [clientId, platform, username || null, password || null, accessUrl || null, observations || null, createdBy]
+      );
+      
+      await pool.end();
       res.status(201).json(mapCredential(result.rows[0]));
     } catch (error) {
       console.error("[api] Error creating credential:", error);
