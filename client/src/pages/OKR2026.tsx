@@ -88,8 +88,26 @@ interface DashboardMetrics {
   expansion_mrr_ytd: number | null;
   aquisicao_pontual: number | null;
   valor_entregue_pontual: number | null;
+  geracao_caixa_margem: number | null;
   folha_beneficios: number | null;
   saldo_projetado: number | null;
+}
+
+interface TargetConfig {
+  year: number;
+  company: {
+    mrr_ativo: Record<string, number>;
+    geracao_caixa_margem_min: number;
+    receita_liquida_anual: number;
+    ebitda_anual: number;
+    inadimplencia_max: number;
+    gross_mrr_churn_max: number;
+    net_churn_max: number;
+    logo_churn_max: number;
+    clientes_eoy: number;
+  };
+  turbooh: any;
+  tech: any;
 }
 
 interface Objective {
@@ -961,7 +979,7 @@ function StatusBadge({ status }: { status: "green" | "yellow" | "red" | "gray" }
 type OverallStatus = "on_track" | "attention" | "off_track";
 
 function calculateOverallStatus(krs: KR[]): { status: OverallStatus; onTrackPct: number; details: { green: number; yellow: number; red: number; gray: number } } {
-  const financialMetricKeys = ["mrr_active", "ebitda", "cash_generation", "delinquency_pct", "net_mrr_churn_pct"];
+  const financialMetricKeys = ["mrr_active", "ebitda", "cash_generation", "geracao_caixa_margem", "delinquency_pct", "net_mrr_churn_pct"];
   
   let green = 0, yellow = 0, red = 0, gray = 0;
   let financialWeight = 0, financialOnTrack = 0;
@@ -2129,6 +2147,15 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <HeroCard
+          title="Margem Geração Caixa %"
+          value={metrics.geracao_caixa_margem}
+          target={targets?.company?.geracao_caixa_margem_min || 30}
+          format="percent"
+          direction="higher"
+          icon={Percent}
+          tooltip="Margem de Geração de Caixa (Receita - Despesa) / Receita (Mês Atual)"
+        />
         <HeroCard
           title="MRR Ativo"
           value={viewMode === "month" 
