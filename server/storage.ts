@@ -2220,6 +2220,21 @@ export class DbStorage implements IStorage {
   async createColaborador(colaborador: InsertColaborador): Promise<Colaborador> {
     const { id, ...data } = colaborador as any;
     
+    // Helper function to fix timezone issues with date fields
+    const fixDateField = (value: any): any => {
+      if (!value) return value;
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return value;
+      }
+      if (value instanceof Date) {
+        const year = value.getFullYear();
+        const month = String(value.getMonth() + 1).padStart(2, '0');
+        const day = String(value.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      return value;
+    };
+    
     const maxIdResult = await db.execute(sql`SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM "Inhire".rh_pessoal`);
     const nextId = (maxIdResult.rows[0] as any).next_id;
     
@@ -2235,8 +2250,8 @@ export class DbStorage implements IStorage {
         ${data.endereco || null},
         ${data.estado || null},
         ${data.telefone || null},
-        ${data.aniversario || null},
-        ${data.admissao || null},
+        ${fixDateField(data.aniversario) || null},
+        ${fixDateField(data.admissao) || null},
         ${data.setor || null},
         ${data.squad || null},
         ${data.cargo || null},
@@ -2293,10 +2308,35 @@ export class DbStorage implements IStorage {
       throw new Error(`Colaborador with id ${id} not found`);
     }
 
+    // Helper function to fix timezone issues with date fields
+    // When a date string "YYYY-MM-DD" is parsed as Date, it assumes UTC midnight
+    // which can shift to the previous day in local timezone
+    const fixDateField = (value: any): any => {
+      if (!value) return value;
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        // It's a date string, keep it as-is for PostgreSQL DATE type
+        return value;
+      }
+      if (value instanceof Date) {
+        // Convert Date back to YYYY-MM-DD string to avoid timezone issues
+        const year = value.getFullYear();
+        const month = String(value.getMonth() + 1).padStart(2, '0');
+        const day = String(value.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      return value;
+    };
+
+    const dateFields = ['admissao', 'aniversario', 'demissao', 'ultimoAumento'];
+    
     const updatePayload: Record<string, any> = {};
     for (const key of Object.keys(colaborador) as (keyof typeof colaborador)[]) {
       if (colaborador[key] !== undefined) {
-        updatePayload[key] = colaborador[key];
+        if (dateFields.includes(key)) {
+          updatePayload[key] = fixDateField(colaborador[key]);
+        } else {
+          updatePayload[key] = colaborador[key];
+        }
       }
     }
 
