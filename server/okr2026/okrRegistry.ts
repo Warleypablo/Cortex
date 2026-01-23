@@ -352,7 +352,7 @@ export const krs: KRDef[] = [
     unit: "PCT",
     direction: "gte",
     aggregation: "quarter_avg",
-    targets: { Q1: 30, Q2: 30, Q3: 30, Q4: 30 }
+    targets: { Q1: 17, Q2: 17, Q3: 17, Q4: 17 }
   },
   {
     id: "Ox_KR8",
