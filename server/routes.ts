@@ -12635,9 +12635,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Nome is required" });
       }
       
+      const id = crypto.randomUUID();
+      const statusVal = status || 'sem_status';
+      const temaVal = temaPrincipal || null;
+      const plataformaVal = plataforma || null;
+      const urlVal = url || null;
+      const loginVal = login || null;
+      const senhaVal = senha || null;
+      const createdByVal = createdBy || null;
+      
       const result = await db.execute(sql`
-        INSERT INTO cortex_core.courses (nome, status, tema_principal, plataforma, url, login, senha, created_by)
-        VALUES (${nome}, ${status || 'sem_status'}, ${temaPrincipal || null}, ${plataforma || null}, ${url || null}, ${login || null}, ${senha || null}, ${createdBy})
+        INSERT INTO cortex_core.courses (id, nome, status, tema_principal, plataforma, url, login, senha, created_by)
+        VALUES (${id}::text, ${nome}::text, ${statusVal}::text, ${temaVal}::text, ${plataformaVal}::text, ${urlVal}::text, ${loginVal}::text, ${senhaVal}::text, ${createdByVal}::text)
         RETURNING *
       `);
       
