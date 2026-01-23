@@ -781,17 +781,16 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         return res.status(400).json({ error: "clientId and platform are required" });
       }
       
-      const createdByValue = createdBy ? String(createdBy) : null;
       const result = await db.execute(sql`
         INSERT INTO cortex_core.credentials (client_id, platform, username, password, access_url, observations, created_by)
         VALUES (
           ${clientId}::uuid, 
-          ${platform}::varchar, 
-          ${username || null}::varchar, 
-          ${password || null}::varchar, 
-          ${accessUrl || null}::text, 
-          ${observations || null}::text, 
-          ${createdByValue}::text
+          ${platform}, 
+          ${username || null}, 
+          ${password || null}, 
+          ${accessUrl || null}, 
+          ${observations || null}, 
+          ${createdBy || null}
         )
         RETURNING *
       `);
