@@ -13572,6 +13572,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const quarterSummary = await getQuarterSummary(new Date().getFullYear());
       
+      console.log(`[OKR-API] geracao_caixa_margem returned: ${metrics.geracao_caixa_margem}`);
+      
       const summaryData = {
         objectives,
         krs,
