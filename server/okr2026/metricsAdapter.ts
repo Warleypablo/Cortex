@@ -51,6 +51,7 @@ export interface DashboardMetrics {
   headcount: number;
   receita_por_head: number;
   mrr_por_head: number;
+  geracao_caixa_margem: number;
   turbooh_receita: number | null;
   turbooh_receita_liquida_ytd: number | null;
   turbooh_custos: number | null;
@@ -1770,6 +1771,43 @@ export async function getQuarterSummary(
   return Promise.all(summaryPromises);
 }
 
+export async function getGeracaoCaixaMargemAtual(): Promise<number> {
+  try {
+    const result = await db.execute(sql`
+      WITH entradas AS (
+        SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND status = 'QUITADO'
+          AND categoria_id IS NOT NULL
+          AND TO_CHAR(data_vencimento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+          AND TO_CHAR(data_quitacao::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+      ),
+      saidas AS (
+        SELECT COALESCE(SUM(valor_pago::numeric), 0) as total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status = 'QUITADO'
+          AND categoria_id IS NOT NULL
+          AND TO_CHAR(data_vencimento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+          AND TO_CHAR(data_quitacao::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+      )
+      SELECT 
+        e.total as entradas,
+        s.total as saidas,
+        CASE 
+          WHEN e.total > 0 THEN ((e.total - s.total) / e.total) * 100
+          ELSE 0
+        END as margem
+      FROM entradas e, saidas s
+    `);
+    return parseFloat((result.rows[0] as any)?.margem || "0");
+  } catch (error) {
+    console.error("[OKR] Error fetching Margem Geração Caixa:", error);
+    return 0;
+  }
+}
+
 export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   const [
     mrrAtivo,
@@ -1843,6 +1881,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     receita_liquida_ytd: receitaYTD.liquida,
     ebitda_ytd: ebitdaYTD,
     geracao_caixa_ytd: geracaoCaixa,
+    geracao_caixa_margem: await getGeracaoCaixaMargemAtual(),
     caixa_atual: caixaAtual,
     inadimplencia_valor: inadimplencia.valor,
     inadimplencia_brl: inadimplencia.valor,
