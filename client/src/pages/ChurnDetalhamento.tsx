@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, parseISO, subMonths } from "date-fns";
+import { format, parseISO, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   ResponsiveContainer, 
@@ -222,8 +222,8 @@ export default function ChurnDetalhamento() {
   const [filterProdutos, setFilterProdutos] = useState<string[]>([]);
   const [filterResponsaveis, setFilterResponsaveis] = useState<string[]>([]);
   const [filterServicos, setFilterServicos] = useState<string[]>([]);
-  const [dataInicio, setDataInicio] = useState<string>(format(subMonths(new Date(), 12), "yyyy-MM-dd"));
-  const [dataFim, setDataFim] = useState<string>(format(new Date(), "yyyy-MM-dd"));
+  const [dataInicio, setDataInicio] = useState<string>(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+  const [dataFim, setDataFim] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isFiltersOpen, setIsFiltersOpen] = useState(true);
