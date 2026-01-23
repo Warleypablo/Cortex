@@ -783,7 +783,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       
       const result = await db.execute(sql`
         INSERT INTO cortex_core.credentials (client_id, platform, username, password, access_url, observations, created_by)
-        VALUES (${clientId}, ${platform}, ${username || null}, ${password || null}, ${accessUrl || null}, ${observations || null}, ${createdBy})
+        VALUES (${clientId}::uuid, ${platform}, ${username || null}, ${password || null}, ${accessUrl || null}, ${observations || null}, ${createdBy}::text)
         RETURNING *
       `);
       
