@@ -175,6 +175,19 @@ export default function DashboardClosers() {
     refetchInterval: 60000,
   });
 
+  const currentPeriodMonth = (dataFechamentoRange?.from || new Date()).getMonth() + 1;
+  const currentPeriodYear = (dataFechamentoRange?.from || new Date()).getFullYear();
+  
+  const { data: salesGoals } = useQuery<Array<{ goal_type: string; goal_key: string; goal_value: number }>>({
+    queryKey: ["/api/sales-goals", "closers", currentPeriodMonth, currentPeriodYear],
+    queryFn: async () => {
+      const res = await fetch(`/api/sales-goals?periodMonth=${currentPeriodMonth}&periodYear=${currentPeriodYear}`);
+      return res.json();
+    },
+  });
+
+  const META_MRR = salesGoals?.find(g => g.goal_type === "closers_vendas" && g.goal_key === "global")?.goal_value || 215000;
+
   const { data: chartReunioesNegocios, isLoading: isLoadingChart1 } = useQuery<ChartDataReunioesNegocios[]>({
     queryKey: ["/api/closers/chart-reunioes-negocios", queryParams],
     queryFn: async () => {
@@ -1006,7 +1019,6 @@ export default function DashboardClosers() {
               <div className="absolute -top-20 -left-20 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
               <div className="absolute -bottom-20 -right-20 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl" />
               {(() => {
-                const META_MRR = 180000;
                 const mrrAtual = metrics?.mrrObtido || 0;
                 const percentual = Math.min((mrrAtual / META_MRR) * 100, 100);
                 
@@ -1042,13 +1054,12 @@ export default function DashboardClosers() {
                 
                 <div className="text-right">
                   <div className="text-sm text-muted-foreground uppercase tracking-wider mb-1">Meta</div>
-                  <div className="text-4xl font-black text-foreground">R$ 180k</div>
+                  <div className="text-4xl font-black text-foreground">{formatCurrencyCompact(META_MRR)}</div>
                 </div>
               </div>
 
               {/* Progress Bar */}
               {(() => {
-                const META_MRR = 180000;
                 const mrrAtual = metrics?.mrrObtido || 0;
                 const percentual = Math.min((mrrAtual / META_MRR) * 100, 100);
                 const faltam = Math.max(META_MRR - mrrAtual, 0);
