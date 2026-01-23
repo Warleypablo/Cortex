@@ -2196,6 +2196,7 @@ function ClientsTab() {
   const [sortField, setSortField] = useState<SortField>('status');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [showOnlyLinked, setShowOnlyLinked] = usePersistentFilters("acessos-linked-only", true);
+  const [statusFilter, setStatusFilter] = usePersistentFilters<"todos" | "ativos" | "inativos">("acessos-status-filter", "ativos");
   const { toast } = useToast();
   const createLog = useCreateLog();
 
@@ -2327,9 +2328,15 @@ function ClientsTab() {
 
     let filtered = aggregated;
     
+    if (statusFilter === "ativos") {
+      filtered = filtered.filter(client => client.status === 'ativo');
+    } else if (statusFilter === "inativos") {
+      filtered = filtered.filter(client => client.status !== 'ativo');
+    }
+    
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = aggregated.filter(
+      filtered = filtered.filter(
         (client) =>
           client.name?.toLowerCase().includes(query) ||
           client.cnpj?.toLowerCase().includes(query) ||
@@ -2375,7 +2382,7 @@ function ClientsTab() {
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [clients, searchQuery, sortField, sortDirection, showOnlyLinked]);
+  }, [clients, searchQuery, sortField, sortDirection, showOnlyLinked, statusFilter]);
 
   const toggleExpand = (clientId: string) => {
     setExpandedClient(expandedClient === clientId ? null : clientId);
@@ -2433,6 +2440,33 @@ function ClientsTab() {
             data-testid="filter-all"
           >
             Todos ({totalCount})
+          </Button>
+        </div>
+        <Separator orientation="vertical" className="h-6" />
+        <div className="flex items-center gap-2">
+          <Button
+            variant={statusFilter === "ativos" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("ativos")}
+            data-testid="filter-ativos"
+          >
+            Ativos
+          </Button>
+          <Button
+            variant={statusFilter === "inativos" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("inativos")}
+            data-testid="filter-inativos"
+          >
+            Inativos
+          </Button>
+          <Button
+            variant={statusFilter === "todos" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setStatusFilter("todos")}
+            data-testid="filter-status-todos"
+          >
+            Todos
           </Button>
         </div>
       </div>
