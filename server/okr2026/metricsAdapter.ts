@@ -66,6 +66,7 @@ export interface DashboardMetrics {
   saldo_projetado: number;
   quarter_summary?: QuarterSummaryMetric[];
   standardization_completion_pct?: number | null;
+  krs?: any[];
 }
 
 export type AggregationType = "quarter_end" | "quarter_sum" | "quarter_avg" | "quarter_max" | "quarter_min";
@@ -1635,6 +1636,8 @@ export async function getMetricSeries(
         return await getNetMrrChurnPctSeriesForRange(startDate, endDate);
       case "logo_churn_pct":
         return await getLogoChurnPctSeriesForRange(startDate, endDate);
+      case "geracao_caixa_margem":
+        return await getGeracaoCaixaMargemSeriesForRange(startDate, endDate);
       case "turbooh_vacancy_pct":
         console.warn(`[OKR] Metric ${metricKey} not yet implemented for series`);
         return [];
@@ -1739,8 +1742,38 @@ const ALL_METRIC_KEYS = [
   "turbooh_revenue_net",
   "turbooh_result",
   "turbooh_vacancy_pct",
-  "standardization_completion_pct"
+  "standardization_completion_pct",
+  "geracao_caixa_margem"
 ];
+
+async function getGeracaoCaixaMargemSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
+  try {
+    const result = await db.execute(sql`
+      WITH monthly_data AS (
+        SELECT 
+          TO_CHAR(data_quitacao, 'YYYY-MM') as month,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as entries,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as exits
+        FROM "Conta Azul".caz_parcelas
+        WHERE status = 'QUITADO'
+          AND data_quitacao BETWEEN ${startDate}::date AND ${endDate}::date
+        GROUP BY TO_CHAR(data_quitacao, 'YYYY-MM')
+      )
+      SELECT 
+        month as date,
+        CASE WHEN entries > 0 THEN ((entries - exits) / entries) * 100 ELSE 0 END as value
+      FROM monthly_data
+      ORDER BY month
+    `);
+    return (result.rows as any[]).map(row => ({
+      date: row.date,
+      value: parseFloat(row.value || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Margem Geração Caixa series:", error);
+    return [];
+  }
+}
 
 export async function getQuarterSummary(
   year: number,
@@ -1779,8 +1812,6 @@ export async function getGeracaoCaixaMargemAtual(): Promise<number> {
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND status = 'QUITADO'
-          AND categoria_id IS NOT NULL
-          AND TO_CHAR(data_vencimento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
           AND TO_CHAR(data_quitacao::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       ),
       saidas AS (
@@ -1788,8 +1819,6 @@ export async function getGeracaoCaixaMargemAtual(): Promise<number> {
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status = 'QUITADO'
-          AND categoria_id IS NOT NULL
-          AND TO_CHAR(data_vencimento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
           AND TO_CHAR(data_quitacao::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
       )
       SELECT 
@@ -1801,7 +1830,15 @@ export async function getGeracaoCaixaMargemAtual(): Promise<number> {
         END as margem
       FROM entradas e, saidas s
     `);
-    return parseFloat((result.rows[0] as any)?.margem || "0");
+    const margem = parseFloat((result.rows[0] as any)?.margem || "0");
+    console.log(`[OKR] Margem Geração Caixa calculada: ${margem}% (Entradas: ${result.rows[0].entradas}, Saídas: ${result.rows[0].saidas})`);
+    
+    // Fallback logic if entries is 0 but we want to see if there's any data at all
+    if (margem === 0 && result.rows[0].saidas > 0 && result.rows[0].entradas === 0) {
+       return -100; // 100% negative margin if there are only exits
+    }
+    
+    return margem;
   } catch (error) {
     console.error("[OKR] Error fetching Margem Geração Caixa:", error);
     return 0;
@@ -1927,14 +1964,23 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 }
 
 export async function getDashboardMetricsWithQuarters(): Promise<DashboardMetrics> {
-  const [baseMetrics, quarterSummary] = await Promise.all([
+    const [baseMetrics, quarterSummary, krsWithValues] = await Promise.all([
     getDashboardMetrics(),
-    getQuarterSummary(new Date().getFullYear())
+    getQuarterSummary(new Date().getFullYear()),
+    Promise.all(krRegistry.map(async kr => {
+      const progress = await getKRProgress(kr.id);
+      return {
+        ...kr,
+        currentValue: progress.actual,
+        status: progress.status
+      };
+    }))
   ]);
   
   return {
     ...baseMetrics,
-    quarter_summary: quarterSummary
+    quarter_summary: quarterSummary,
+    krs: krsWithValues
   };
 }
 

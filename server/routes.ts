@@ -13464,6 +13464,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tech_projetos_entregues: metrics.tech_projetos_entregues,
           tech_freelancers_pct: metrics.tech_freelancers_percentual,
           mrr_por_head: metrics.mrr_por_head,
+          geracao_caixa_margem: metrics.geracao_caixa_margem,
           // O1 - Bigger KRs
           faturamento_legado: metrics.receita_total_ytd,
           vendas_mrr: metrics.vendas_mrr,
@@ -13560,13 +13561,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
       
+      const { getQuarterSummary, getMetricSeries } = await import("./okr2026/metricsAdapter");
+      
       const series = {
         mrr: metrics.mrr_serie || [],
         ebitda: [],
-        churn: []
+        churn: [],
+        geracao_caixa_margem: await getMetricSeries("geracao_caixa_margem", `${new Date().getFullYear()}-01-01`, `${new Date().getFullYear()}-12-31`)
       };
       
-      const { getQuarterSummary } = await import("./okr2026/metricsAdapter");
       const quarterSummary = await getQuarterSummary(new Date().getFullYear());
       
       const summaryData = {
