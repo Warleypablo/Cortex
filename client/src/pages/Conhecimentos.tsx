@@ -64,11 +64,12 @@ import { useToast } from "@/hooks/use-toast";
 interface Benefit {
   id: string;
   empresa: string | null;
-  descricao: string | null;
   cupom: string | null;
-  categoria: string | null;
-  url: string | null;
-  observacao: string | null;
+  desconto: string | null;
+  site: string | null;
+  segmento: string | null;
+  created_at: string | null;
+  created_by: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -78,20 +79,34 @@ const statusColors: Record<string, string> = {
   sem_status: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
 };
 
-const categoryIcons: Record<string, typeof Gift> = {
+const segmentoIcons: Record<string, typeof Gift> = {
   "Alimentação": ShoppingBag,
   "Saúde": Gift,
   "Educação": GraduationCap,
   "Tecnologia": Store,
   "Lazer": Sparkles,
+  "Serviços": Sparkles,
+  "Vestuário": ShoppingBag,
+  "Beleza": Sparkles,
+  "Casa": Store,
+  "Pets": Gift,
+  "Esportes": Sparkles,
+  "Viagens": Sparkles,
 };
 
-const categoryColors: Record<string, string> = {
+const segmentoColors: Record<string, string> = {
   "Alimentação": "from-orange-500 to-amber-400",
   "Saúde": "from-emerald-500 to-green-400",
   "Educação": "from-blue-500 to-cyan-400",
   "Tecnologia": "from-purple-500 to-violet-400",
   "Lazer": "from-pink-500 to-rose-400",
+  "Serviços": "from-indigo-500 to-blue-400",
+  "Vestuário": "from-fuchsia-500 to-pink-400",
+  "Beleza": "from-rose-500 to-red-400",
+  "Casa": "from-teal-500 to-cyan-400",
+  "Pets": "from-amber-500 to-yellow-400",
+  "Esportes": "from-lime-500 to-green-400",
+  "Viagens": "from-sky-500 to-blue-400",
 };
 
 const statusLabels: Record<string, string> = {
@@ -702,8 +717,8 @@ function BenefitCard({
   benefit: Benefit;
   onCopy: (text: string, label: string) => void;
 }) {
-  const CategoryIcon = categoryIcons[benefit.categoria || ""] || Tag;
-  const gradientClass = categoryColors[benefit.categoria || ""] || "from-gray-500 to-slate-400";
+  const SegmentoIcon = segmentoIcons[benefit.segmento || ""] || Tag;
+  const gradientClass = segmentoColors[benefit.segmento || ""] || "from-gray-500 to-slate-400";
 
   return (
     <Card
@@ -715,24 +730,27 @@ function BenefitCard({
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className={`p-2.5 rounded-xl bg-gradient-to-br ${gradientClass} text-white shadow-lg`}>
-              <CategoryIcon className="w-5 h-5" />
+              <SegmentoIcon className="w-5 h-5" />
             </div>
             <div className="min-w-0">
               <CardTitle className="text-lg font-semibold truncate">
                 {benefit.empresa || "Empresa"}
               </CardTitle>
-              {benefit.categoria && (
-                <span className="text-sm text-muted-foreground">{benefit.categoria}</span>
+              {benefit.segmento && (
+                <Badge variant="secondary" className="mt-1 text-xs">
+                  {benefit.segmento}
+                </Badge>
               )}
             </div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {benefit.descricao && (
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {benefit.descricao}
-          </p>
+        {benefit.desconto && (
+          <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            <Percent className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <span className="font-semibold text-green-700 dark:text-green-300">{benefit.desconto}</span>
+          </div>
         )}
 
         {benefit.cupom && (
@@ -740,7 +758,7 @@ function BenefitCard({
             <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-lg" />
             <div className="relative flex items-center justify-between gap-3 px-4 py-3 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
               <div className="flex items-center gap-2">
-                <Percent className="w-4 h-4 text-primary" />
+                <Tag className="w-4 h-4 text-primary" />
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cupom</span>
               </div>
               <div className="flex items-center gap-2">
@@ -761,27 +779,20 @@ function BenefitCard({
           </div>
         )}
 
-        {benefit.observacao && (
-          <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
-            <Sparkles className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
-            <p className="text-xs text-muted-foreground">{benefit.observacao}</p>
-          </div>
-        )}
-
-        {benefit.url && (
+        {benefit.site && (
           <Button
             variant="outline"
             className="w-full"
             asChild
           >
             <a
-              href={benefit.url}
+              href={benefit.site.startsWith('http') ? benefit.site : `https://${benefit.site}`}
               target="_blank"
               rel="noopener noreferrer"
-              data-testid={`link-benefit-url-${benefit.id}`}
+              data-testid={`link-benefit-site-${benefit.id}`}
             >
               <ExternalLink className="w-4 h-4 mr-2" />
-              Acessar Benefício
+              Acessar Site
             </a>
           </Button>
         )}
@@ -792,31 +803,47 @@ function BenefitCard({
 
 function BenefitsTab() {
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [segmentoFilter, setSegmentoFilter] = useState<string>("all");
+  const [hasCupomFilter, setHasCupomFilter] = useState<string>("all");
   const { toast } = useToast();
 
   const { data: benefits = [], isLoading } = useQuery<Benefit[]>({
     queryKey: ["/api/beneficios"],
   });
 
-  const uniqueCategories = useMemo(() => {
-    const categories = new Set(benefits.map((b) => b.categoria).filter(Boolean));
-    return Array.from(categories).sort();
+  const uniqueSegmentos = useMemo(() => {
+    const segmentos = new Set(benefits.map((b) => b.segmento).filter(Boolean));
+    return Array.from(segmentos).sort();
   }, [benefits]);
+
+  const stats = useMemo(() => {
+    const total = benefits.length;
+    const comCupom = benefits.filter(b => b.cupom).length;
+    const comDesconto = benefits.filter(b => b.desconto).length;
+    const porSegmento = uniqueSegmentos.map(seg => ({
+      segmento: seg,
+      count: benefits.filter(b => b.segmento === seg).length
+    })).sort((a, b) => b.count - a.count);
+    return { total, comCupom, comDesconto, porSegmento };
+  }, [benefits, uniqueSegmentos]);
 
   const filteredBenefits = useMemo(() => {
     return benefits.filter((benefit) => {
       const matchesSearch =
         !search ||
         benefit.empresa?.toLowerCase().includes(search.toLowerCase()) ||
-        benefit.descricao?.toLowerCase().includes(search.toLowerCase()) ||
-        benefit.cupom?.toLowerCase().includes(search.toLowerCase());
+        benefit.desconto?.toLowerCase().includes(search.toLowerCase()) ||
+        benefit.cupom?.toLowerCase().includes(search.toLowerCase()) ||
+        benefit.segmento?.toLowerCase().includes(search.toLowerCase());
 
-      const matchesCategory = categoryFilter === "all" || benefit.categoria === categoryFilter;
+      const matchesSegmento = segmentoFilter === "all" || benefit.segmento === segmentoFilter;
+      const matchesCupom = hasCupomFilter === "all" || 
+        (hasCupomFilter === "com" && benefit.cupom) ||
+        (hasCupomFilter === "sem" && !benefit.cupom);
 
-      return matchesSearch && matchesCategory;
+      return matchesSearch && matchesSegmento && matchesCupom;
     });
-  }, [benefits, search, categoryFilter]);
+  }, [benefits, search, segmentoFilter, hasCupomFilter]);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -836,33 +863,118 @@ function BenefitsTab() {
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-200/50 dark:border-blue-800/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Gift className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total de Benefícios</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-200/50 dark:border-green-800/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-green-500/20 rounded-lg">
+                <Tag className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.comCupom}</p>
+                <p className="text-xs text-muted-foreground">Com Cupom</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-200/50 dark:border-purple-800/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-500/20 rounded-lg">
+                <Percent className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.comDesconto}</p>
+                <p className="text-xs text-muted-foreground">Com Desconto</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border-orange-200/50 dark:border-orange-800/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500/20 rounded-lg">
+                <Store className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{uniqueSegmentos.length}</p>
+                <p className="text-xs text-muted-foreground">Segmentos</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar benefícios, empresas ou cupons..."
+            placeholder="Buscar empresa, cupom ou desconto..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             data-testid="input-search-benefits"
           />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-48" data-testid="select-filter-categoria">
-            <SelectValue placeholder="Categoria" />
+        <Select value={segmentoFilter} onValueChange={setSegmentoFilter}>
+          <SelectTrigger className="w-48" data-testid="select-filter-segmento">
+            <SelectValue placeholder="Segmento" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas Categorias</SelectItem>
-            {uniqueCategories.map((cat) => (
-              <SelectItem key={cat} value={cat!}>
-                {cat}
+            <SelectItem value="all">Todos Segmentos</SelectItem>
+            {uniqueSegmentos.map((seg) => (
+              <SelectItem key={seg} value={seg!}>
+                {seg}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        <Select value={hasCupomFilter} onValueChange={setHasCupomFilter}>
+          <SelectTrigger className="w-40" data-testid="select-filter-cupom">
+            <SelectValue placeholder="Cupom" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="com">Com Cupom</SelectItem>
+            <SelectItem value="sem">Sem Cupom</SelectItem>
+          </SelectContent>
+        </Select>
+        {(search || segmentoFilter !== "all" || hasCupomFilter !== "all") && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => {
+              setSearch("");
+              setSegmentoFilter("all");
+              setHasCupomFilter("all");
+            }}
+            data-testid="button-clear-filters"
+          >
+            Limpar Filtros
+          </Button>
+        )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {filteredBenefits.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Mostrando {filteredBenefits.length} de {benefits.length} benefícios
+        </p>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredBenefits.map((benefit) => (
           <BenefitCard
             key={benefit.id}
