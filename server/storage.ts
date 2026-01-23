@@ -6729,7 +6729,7 @@ export class DbStorage implements IStorage {
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas
         FROM "Conta Azul".caz_parcelas
-        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+        WHERE TO_CHAR(data_quitacao, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
           AND status = 'QUITADO'
       ),
       fluxo_mes_anterior AS (
@@ -6737,7 +6737,7 @@ export class DbStorage implements IStorage {
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as receitas,
           COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas
         FROM "Conta Azul".caz_parcelas
-        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE - INTERVAL '1 month', 'YYYY-MM')
+        WHERE TO_CHAR(data_quitacao, 'YYYY-MM') = TO_CHAR(CURRENT_DATE - INTERVAL '1 month', 'YYYY-MM')
           AND status = 'QUITADO'
       )
       SELECT 
