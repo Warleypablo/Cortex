@@ -13868,15 +13868,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Geração de Caixa = Receitas - Despesas (mesma lógica do DFC)
           const geracaoCaixaResult = await db.execute(sql`
             SELECT 
+              COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as entradas,
+              COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as saidas,
               COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
               COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as geracao_caixa
             FROM "Conta Azul".caz_parcelas
             WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
               AND status = 'QUITADO'
           `);
+          const entradas = parseFloat((geracaoCaixaResult.rows[0] as any)?.entradas || "0");
           const geracaoCaixa = parseFloat((geracaoCaixaResult.rows[0] as any)?.geracao_caixa || "0");
           if (!actualsByMetric["cash_generation"]) actualsByMetric["cash_generation"] = {};
           actualsByMetric["cash_generation"][currentMonthKey] = geracaoCaixa;
+          
+          // Margem de Geração de Caixa % = (Entradas - Saídas) / Entradas
+          const margemGeracaoCaixa = entradas > 0 ? geracaoCaixa / entradas : 0;
+          if (!actualsByMetric["cash_generation_margin_pct"]) actualsByMetric["cash_generation_margin_pct"] = {};
+          actualsByMetric["cash_generation_margin_pct"][currentMonthKey] = margemGeracaoCaixa;
           
           const outrasReceitasResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total
