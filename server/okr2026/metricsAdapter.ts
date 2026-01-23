@@ -688,15 +688,18 @@ export async function getValorEntreguePontual(): Promise<number> {
 
 export async function getGeracaoCaixa(): Promise<number> {
   try {
-    // Geração de Caixa = Entradas - Saídas do mês atual (mesma lógica do card "Saldo" no DFC)
-    // Soma receitas e subtrai despesas com status QUITADO, usando data_quitacao
+    // Geração de Caixa = Entradas - Saídas desde início do ano (mesma lógica do card "Saldo" no DFC)
+    // DFC usa: data_vencimento >= início_ano E data_quitacao >= início_ano E status = 'QUITADO'
     const result = await db.execute(sql`
       SELECT 
         COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
         COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as saldo
       FROM "Conta Azul".caz_parcelas
-      WHERE TO_CHAR(data_quitacao, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+      WHERE categoria_id IS NOT NULL 
+        AND categoria_id != ''
         AND status = 'QUITADO'
+        AND data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+        AND data_quitacao >= DATE_TRUNC('year', CURRENT_DATE)
     `);
     return parseFloat((result.rows[0] as any)?.saldo || "0");
   } catch (error) {
