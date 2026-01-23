@@ -12569,6 +12569,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Conhecimentos Module - Courses API
   // ============================================
 
+  // Ensure courses table exists with correct structure
+  try {
+    await db.execute(sql`DROP TABLE IF EXISTS cortex_core.courses CASCADE`);
+    await db.execute(sql`DROP TYPE IF EXISTS cortex_core.course_status CASCADE`);
+    await db.execute(sql`
+      CREATE TABLE cortex_core.courses (
+        id TEXT PRIMARY KEY,
+        nome TEXT NOT NULL,
+        status TEXT DEFAULT 'sem_status',
+        tema_principal TEXT,
+        plataforma TEXT,
+        url TEXT,
+        login TEXT,
+        senha TEXT,
+        created_by TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log("[conhecimentos] Courses table created successfully");
+  } catch (e) {
+    console.log("[conhecimentos] Table already exists or error:", e);
+  }
+
   // GET all courses with filters
   app.get("/api/conhecimentos", async (req, res) => {
     try {
