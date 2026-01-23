@@ -2407,67 +2407,126 @@ function ClientsTab() {
 
   const linkedCount = clients.filter(c => c.cazClienteId != null).length;
   const totalCount = clients.length;
+  const activeCount = sortedAndFilteredClients.filter(c => c.status === 'ativo').length;
+  const inactiveCount = sortedAndFilteredClients.filter(c => c.status !== 'ativo').length;
 
   return (
     <>
-      <div className="mb-4 flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Buscar por empresa ou plataforma..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-clients"
-          />
+      <div className="mb-6 space-y-4">
+        <div className="grid grid-cols-4 gap-3">
+          <div className="bg-muted/30 rounded-lg p-3 border">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1">
+              <Building2 className="w-3.5 h-3.5" />
+              Total de Clientes
+            </div>
+            <div className="text-2xl font-bold">{totalCount}</div>
+          </div>
+          <div className="bg-muted/30 rounded-lg p-3 border">
+            <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1">
+              <Link2 className="w-3.5 h-3.5" />
+              Linkados ao TP
+            </div>
+            <div className="text-2xl font-bold text-primary">{linkedCount}</div>
+          </div>
+          <div className="bg-green-500/10 rounded-lg p-3 border border-green-500/20">
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-xs font-medium mb-1">
+              <Check className="w-3.5 h-3.5" />
+              Ativos
+            </div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{activeCount}</div>
+          </div>
+          <div className="bg-destructive/10 rounded-lg p-3 border border-destructive/20">
+            <div className="flex items-center gap-2 text-destructive text-xs font-medium mb-1">
+              <X className="w-3.5 h-3.5" />
+              Inativos
+            </div>
+            <div className="text-2xl font-bold text-destructive">{inactiveCount}</div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={showOnlyLinked && !searchQuery ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowOnlyLinked(true)}
-            disabled={!!searchQuery}
-            data-testid="filter-linked"
-          >
-            <Link2 className="w-4 h-4 mr-1.5" />
-            Linkados ({linkedCount})
-          </Button>
-          <Button
-            variant={!showOnlyLinked && !searchQuery ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowOnlyLinked(false)}
-            disabled={!!searchQuery}
-            data-testid="filter-all"
-          >
-            Todos ({totalCount})
-          </Button>
-        </div>
-        <Separator orientation="vertical" className="h-6" />
-        <div className="flex items-center gap-2">
-          <Button
-            variant={statusFilter === "ativos" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter("ativos")}
-            data-testid="filter-ativos"
-          >
-            Ativos
-          </Button>
-          <Button
-            variant={statusFilter === "inativos" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter("inativos")}
-            data-testid="filter-inativos"
-          >
-            Inativos
-          </Button>
-          <Button
-            variant={statusFilter === "todos" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setStatusFilter("todos")}
-            data-testid="filter-status-todos"
-          >
-            Todos
-          </Button>
+
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="relative flex-1 min-w-[250px]">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Buscar por empresa ou plataforma..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-clients"
+            />
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Vínculo:</span>
+              <div className="flex rounded-md border p-0.5 bg-muted/30">
+                <Button
+                  variant={showOnlyLinked && !searchQuery ? "default" : "ghost"}
+                  size="sm"
+                  className={cn("h-7 px-2.5 text-xs", !showOnlyLinked && "hover:bg-transparent")}
+                  onClick={() => setShowOnlyLinked(true)}
+                  disabled={!!searchQuery}
+                  data-testid="filter-linked"
+                >
+                  <Link2 className="w-3 h-3 mr-1" />
+                  Linkados
+                </Button>
+                <Button
+                  variant={!showOnlyLinked && !searchQuery ? "default" : "ghost"}
+                  size="sm"
+                  className={cn("h-7 px-2.5 text-xs", showOnlyLinked && "hover:bg-transparent")}
+                  onClick={() => setShowOnlyLinked(false)}
+                  disabled={!!searchQuery}
+                  data-testid="filter-all"
+                >
+                  Todos
+                </Button>
+              </div>
+            </div>
+            
+            <Separator orientation="vertical" className="h-6" />
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Status:</span>
+              <div className="flex rounded-md border p-0.5 bg-muted/30">
+                <Button
+                  variant={statusFilter === "ativos" ? "default" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "h-7 px-2.5 text-xs",
+                    statusFilter === "ativos" && "bg-green-600 hover:bg-green-700",
+                    statusFilter !== "ativos" && "hover:bg-transparent"
+                  )}
+                  onClick={() => setStatusFilter("ativos")}
+                  data-testid="filter-ativos"
+                >
+                  Ativos
+                </Button>
+                <Button
+                  variant={statusFilter === "inativos" ? "default" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "h-7 px-2.5 text-xs",
+                    statusFilter === "inativos" && "bg-destructive hover:bg-destructive/90",
+                    statusFilter !== "inativos" && "hover:bg-transparent"
+                  )}
+                  onClick={() => setStatusFilter("inativos")}
+                  data-testid="filter-inativos"
+                >
+                  Inativos
+                </Button>
+                <Button
+                  variant={statusFilter === "todos" ? "default" : "ghost"}
+                  size="sm"
+                  className={cn("h-7 px-2.5 text-xs", statusFilter !== "todos" && "hover:bg-transparent")}
+                  onClick={() => setStatusFilter("todos")}
+                  data-testid="filter-status-todos"
+                >
+                  Todos
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2486,17 +2545,30 @@ function ClientsTab() {
         </div>
       )}
 
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm text-muted-foreground">
+          Exibindo <span className="font-medium text-foreground">{sortedAndFilteredClients.length}</span> clientes
+          {statusFilter !== "todos" && (
+            <span> ({statusFilter === "ativos" ? "ativos" : "inativos"})</span>
+          )}
+        </p>
+      </div>
+
       {sortedAndFilteredClients.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="flex flex-col items-center justify-center py-16 text-center border rounded-lg bg-muted/10">
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
             <Building2 className="w-8 h-8 text-muted-foreground" />
           </div>
           <p className="text-lg font-medium">
             {searchQuery 
               ? "Nenhum cliente encontrado" 
-              : showOnlyLinked 
-                ? "Nenhum cliente linkado" 
-                : "Nenhum cliente cadastrado"}
+              : statusFilter === "inativos"
+                ? "Nenhum cliente inativo"
+                : statusFilter === "ativos"
+                  ? "Nenhum cliente ativo"
+                  : showOnlyLinked 
+                    ? "Nenhum cliente linkado" 
+                    : "Nenhum cliente cadastrado"}
           </p>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm">
             {searchQuery 
@@ -2507,10 +2579,10 @@ function ClientsTab() {
           </p>
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-hidden shadow-sm">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/30">
+              <TableRow className="bg-muted/50">
                 <TableHead className="w-[40px]"></TableHead>
                 <TableHead>
                   <SortableHeader field="name">Empresa</SortableHeader>
