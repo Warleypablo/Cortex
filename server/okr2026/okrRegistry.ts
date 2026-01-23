@@ -345,6 +345,16 @@ export const krs: KRDef[] = [
     targets: { Q1: 394897, Q2: 663357, Q3: 825594, Q4: 1204199 }
   },
   {
+    id: "Ox_KR11",
+    objectiveId: "Ox",
+    title: "Margem Geração Caixa %",
+    metricKey: "geracao_caixa_margem",
+    unit: "PCT",
+    direction: "gte",
+    aggregation: "quarter_avg",
+    targets: { Q1: 30, Q2: 30, Q3: 30, Q4: 30 }
+  },
+  {
     id: "Ox_KR8",
     objectiveId: "Ox",
     title: "Caixa fim quarter",

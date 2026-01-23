@@ -1960,6 +1960,7 @@ export function getTargets() {
     year: 2026,
     company: {
       mrr_ativo: getQuarterlyTargets("mrr_active"),
+      geracao_caixa_margem_min: getTarget("geracao_caixa_margem"),
       receita_liquida_anual: getTarget("revenue_net"),
       ebitda_anual: getTarget("ebitda"),
       inadimplencia_max: getTarget("inadimplencia_pct"),
@@ -2118,6 +2119,10 @@ export async function getKRProgress(krId: string): Promise<KRProgress> {
       actual = metrics.mrr_por_head;
       target = kr.targets.FY || kr.targets.Q4 || null;
       break;
+    case "geracao_caixa_margem":
+      actual = metrics.geracao_caixa_margem;
+      target = kr.targets[quarterKey] || kr.targets.FY || null;
+      break;
     default:
       actual = null;
       target = kr.targets[quarterKey] || kr.targets.FY || kr.targets.Q4 || null;
@@ -2195,7 +2200,8 @@ export async function getMetricValue(metricKey: string): Promise<MetricValue> {
     tech_freelancers_pct: metrics.tech_freelancers_percentual,
     revenue_per_head: metrics.receita_por_head,
     mrr_por_head: metrics.mrr_por_head,
-    headcount_total: metrics.headcount
+    headcount_total: metrics.headcount,
+    geracao_caixa_margem: metrics.geracao_caixa_margem
   };
 
   const value = metricMap[metricKey] ?? null;
