@@ -688,12 +688,17 @@ export async function getValorEntreguePontual(): Promise<number> {
 
 export async function getGeracaoCaixa(): Promise<number> {
   try {
-    // Geração de Caixa = Saldo atual dos bancos (mesma query do DFC)
+    // Geração de Caixa = Entradas - Saídas do mês atual (mesma lógica do card "Saldo" no DFC)
+    // Soma receitas e subtrai despesas com status QUITADO, usando data_quitacao
     const result = await db.execute(sql`
-      SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
-      FROM "Conta Azul".caz_bancos
+      SELECT 
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as saldo
+      FROM "Conta Azul".caz_parcelas
+      WHERE TO_CHAR(data_quitacao, 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
+        AND status = 'QUITADO'
     `);
-    return parseFloat((result.rows[0] as any)?.saldo_total || "0");
+    return parseFloat((result.rows[0] as any)?.saldo || "0");
   } catch (error) {
     console.error("[OKR] Error fetching Geração de Caixa:", error);
     return 0;
