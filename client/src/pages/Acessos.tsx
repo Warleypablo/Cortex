@@ -2598,55 +2598,75 @@ function ClientsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedAndFilteredClients.map((client) => (
+              {sortedAndFilteredClients.map((client, index) => (
                 <Fragment key={client.id}>
                   <TableRow 
                     className={cn(
-                      "cursor-pointer hover-elevate",
-                      isTurboClient(client.name) && "bg-primary/5 border-l-2 border-l-primary"
+                      "cursor-pointer transition-colors group",
+                      isTurboClient(client.name) && "bg-primary/5",
+                      expandedClient === client.id && "bg-muted/50",
+                      index % 2 === 0 ? "bg-background" : "bg-muted/20"
                     )}
                     onClick={() => toggleExpand(client.id)}
                     data-testid={`row-client-${client.id}`}
                   >
-                    <TableCell>
-                      <Button size="icon" variant="ghost" className="h-6 w-6">
+                    <TableCell className="py-3">
+                      <div className={cn(
+                        "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
+                        expandedClient === client.id ? "bg-primary/10" : "bg-muted group-hover:bg-muted/80"
+                      )}>
                         {expandedClient === client.id ? (
-                          <ChevronDown className="w-4 h-4" />
+                          <ChevronDown className="w-4 h-4 text-primary" />
                         ) : (
-                          <ChevronRight className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {client.name}
-                        {isTurboClient(client.name) && (
-                          <Badge variant="default" className="text-xs">
-                            Turbo
-                          </Badge>
-                        )}
-                        {client.linkedClientCnpj && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Link 
-                                href={`/cliente/${encodeURIComponent(client.linkedClientCnpj)}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex hover:scale-110 transition-transform"
-                                data-testid={`link-client-page-${client.id}`}
-                              >
-                                <Link2 className="w-4 h-4 text-primary" data-testid={`icon-linked-${client.id}`} />
-                              </Link>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Ver página do cliente: {getCupClienteName(client.linkedClientCnpj)}</p>
-                            </TooltipContent>
-                          </Tooltip>
+                          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0",
+                          isTurboClient(client.name) 
+                            ? "bg-primary text-primary-foreground" 
+                            : client.status === 'ativo'
+                              ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20"
+                              : "bg-muted text-muted-foreground"
+                        )}>
+                          {client.name?.charAt(0)?.toUpperCase() || "?"}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{client.name}</span>
+                            {isTurboClient(client.name) && (
+                              <Badge variant="default" className="text-xs shrink-0">
+                                Turbo
+                              </Badge>
+                            )}
+                          </div>
+                          {client.linkedClientCnpj && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Link 
+                                  href={`/cliente/${encodeURIComponent(client.linkedClientCnpj)}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-xs text-primary hover:underline flex items-center gap-1 w-fit"
+                                  data-testid={`link-client-page-${client.id}`}
+                                >
+                                  <Link2 className="w-3 h-3" data-testid={`icon-linked-${client.id}`} />
+                                  <span className="truncate max-w-[180px]">{getCupClienteName(client.linkedClientCnpj)}</span>
+                                </Link>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Ver página do cliente</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
                       {client.platforms && client.platforms.length > 0 ? (
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        <div className="flex flex-wrap gap-1.5 max-w-[220px]">
                           {client.platforms.slice(0, 3).map((platform, idx) => {
                             const isMatch = searchQuery && platform.toLowerCase().includes(searchQuery.toLowerCase());
                             return (
@@ -2654,8 +2674,8 @@ function ClientsTab() {
                                 key={idx} 
                                 variant="outline" 
                                 className={cn(
-                                  "text-xs",
-                                  isMatch && "border-primary bg-primary/10 text-primary"
+                                  "text-xs font-normal",
+                                  isMatch && "border-primary bg-primary/10 text-primary font-medium"
                                 )}
                               >
                                 {platform}
@@ -2663,48 +2683,74 @@ function ClientsTab() {
                             );
                           })}
                           {client.platforms.length > 3 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{client.platforms.length - 3}
-                            </Badge>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="secondary" className="text-xs cursor-help">
+                                  +{client.platforms.length - 3}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">{client.platforms.slice(3).join(", ")}</p>
+                              </TooltipContent>
+                            </Tooltip>
                           )}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-xs">-</span>
+                        <span className="text-muted-foreground text-xs italic">Sem plataformas</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3">
                       {!isTurboClient(client.name) && (
-                        <Badge 
-                          variant={client.status === 'cancelado' ? 'destructive' : 'outline'}
-                          className={client.status !== 'cancelado' ? 'border-green-500 text-green-600 dark:text-green-400' : ''}
-                        >
-                          {client.status === 'cancelado' ? 'Cancelado' : 'Ativo'}
-                        </Badge>
+                        <div className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+                          client.status === 'ativo' 
+                            ? "bg-green-500/10 text-green-600 dark:text-green-400" 
+                            : "bg-destructive/10 text-destructive"
+                        )}>
+                          <span className={cn(
+                            "w-1.5 h-1.5 rounded-full",
+                            client.status === 'ativo' ? "bg-green-500" : "bg-destructive"
+                          )} />
+                          {client.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                        </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="secondary">
-                        {client.credential_count || 0}
-                      </Badge>
+                    <TableCell className="text-center py-3">
+                      <div className="inline-flex items-center gap-1.5 bg-muted/50 px-2.5 py-1 rounded-md">
+                        <Key className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-sm font-medium">{client.credential_count || 0}</span>
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setEditingClient(client)}
-                          data-testid={`button-edit-client-${client.id}`}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => setDeletingClient(client)}
-                          data-testid={`button-delete-client-${client.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </Button>
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => setEditingClient(client)}
+                              data-testid={`button-edit-client-${client.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar cliente</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setDeletingClient(client)}
+                              data-testid={`button-delete-client-${client.id}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Excluir cliente</TooltipContent>
+                        </Tooltip>
                       </div>
                     </TableCell>
                   </TableRow>
