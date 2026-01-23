@@ -1541,7 +1541,7 @@ export async function initializeDfcSnapshotsTable(): Promise<void> {
 export async function initializeSalesGoalsTable(): Promise<void> {
   try {
     await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS staging.sales_goals (
+      CREATE TABLE IF NOT EXISTS cortex_core.sales_goals (
         id SERIAL PRIMARY KEY,
         goal_type VARCHAR(50) NOT NULL,
         goal_key VARCHAR(100) NOT NULL,
@@ -1556,7 +1556,7 @@ export async function initializeSalesGoalsTable(): Promise<void> {
     
     await db.execute(sql`
       CREATE INDEX IF NOT EXISTS idx_sales_goals_type_key 
-      ON staging.sales_goals(goal_type, goal_key)
+      ON cortex_core.sales_goals(goal_type, goal_key)
     `);
     
     console.log('[database] Sales Goals table initialized');
