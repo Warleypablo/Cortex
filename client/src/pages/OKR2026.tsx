@@ -34,7 +34,8 @@ import {
   XCircle, Banknote, PiggyBank, ClipboardCheck, MessageSquare, History,
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
   LayoutGrid, List, Search, Loader2, Database, FileText, ListChecks, Calendar,
-  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap, ShoppingCart, UserMinus, Wallet, Briefcase
+  ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap, ShoppingCart, UserMinus, Wallet, Briefcase,
+  Percent
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -2150,7 +2151,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         <HeroCard
           title="Margem Geração Caixa %"
           value={metrics.geracao_caixa_margem}
-          target={targets?.company?.geracao_caixa_margem_min || 30}
+          target={17}
           format="percent"
           direction="higher"
           icon={Percent}
