@@ -776,18 +776,16 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
   app.post("/api/acessos/credentials", async (req, res) => {
     try {
       const { clientId, platform, username, password, accessUrl, observations } = req.body;
-      const createdBy = (req as any).user?.email || null;
       
       if (!clientId || !platform) {
         return res.status(400).json({ error: "clientId and platform are required" });
       }
       
-      // Use existing pool from db.ts
       const result = await pool.query(
-        `INSERT INTO cortex_core.credentials (client_id, platform, username, password, access_url, observations, created_by)
-         VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO cortex_core.credentials (client_id, platform, username, password, access_url, observations)
+         VALUES ($1::uuid, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [clientId, platform, username || null, password || null, accessUrl || null, observations || null, createdBy]
+        [clientId, platform, username || null, password || null, accessUrl || null, observations || null]
       );
       
       res.status(201).json(mapCredential(result.rows[0]));
