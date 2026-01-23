@@ -2147,16 +2147,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
         currentQuarter={currentQuarter}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <HeroCard
-          title="Margem Geração Caixa %"
-          value={metrics.geracao_caixa_margem}
-          target={17}
-          format="percent"
-          direction="higher"
-          icon={Percent}
-          tooltip="Margem de Geração de Caixa (Receita - Despesa) / Receita (Mês Atual)"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <HeroCard
           title="MRR Ativo"
           value={viewMode === "month" 
@@ -2211,18 +2202,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           href="/dashboard/churn-detalhamento"
         />
         <HeroCard
-          title="Geração de Caixa"
-          value={viewMode === "month" && isSelectedMonthFuture ? null : metrics.geracao_caixa_ytd}
-          target={cashGenTarget}
-          format="currency"
-          direction="higher"
-          icon={PiggyBank}
-          tooltip={viewMode === "month"
-            ? `${selectedMonthData?.label}: Meta ${formatCurrency(cashGenTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
-            : `Meta ${selectedQuarter}: ${formatCurrency(cashGenTarget)}`}
-          href="/dashboard/dfc"
-        />
-        <HeroCard
           title="Vendas Pontuais"
           value={viewMode === "month" && isSelectedMonthFuture ? null : (metrics.aquisicao_pontual ?? 0)}
           target={null}
@@ -2239,34 +2218,6 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           direction="higher"
           icon={Target}
           tooltip="Projetos pontuais entregues no mês"
-        />
-        <HeroCard
-          title="Folha + Benefícios"
-          value={viewMode === "month" && isSelectedMonthFuture ? null : (metrics.folha_beneficios ?? 0)}
-          target={null}
-          format="currency"
-          direction="lower"
-          icon={Briefcase}
-          tooltip="Despesas de folha de pagamento e benefícios do mês"
-        />
-        <HeroCard
-          title="Saldo Atual"
-          value={metrics.caixa_atual ?? 0}
-          target={null}
-          format="currency"
-          direction="higher"
-          icon={Banknote}
-          tooltip="Saldo atual em contas bancárias"
-        />
-        <HeroCard
-          title="Saldo Projetado (Fim do Mês)"
-          value={metrics.saldo_projetado ?? 0}
-          target={null}
-          format="currency"
-          direction="higher"
-          icon={TrendingUp}
-          href="/dashboard/dfc"
-          tooltip="Saldo projetado ao fim do mês (saldo atual + entradas - saídas)"
         />
       </div>
 
