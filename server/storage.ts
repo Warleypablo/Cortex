@@ -3372,7 +3372,7 @@ export class DbStorage implements IStorage {
           SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_periodo,
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_periodo
         FROM "Conta Azul".caz_parcelas
-        WHERE status NOT IN ('QUITADO', 'PERDIDO')
+        WHERE status != 'PERDIDO'
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
       ),
       vencidos AS (
