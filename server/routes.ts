@@ -13851,7 +13851,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             SELECT COALESCE(SUM(nao_pago::numeric), 0) as inadimplencia
             FROM "Conta Azul".caz_parcelas
             WHERE tipo_evento = 'RECEITA'
-              AND TO_CHAR(data_vencimento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+              AND data_vencimento >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_vencimento < ${today.toISOString().split("T")[0]}
               AND nao_pago::numeric > 0
           `);
           const inadimplencia = parseFloat((inadResult.rows[0] as any)?.inadimplencia || "0");
@@ -13861,7 +13862,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const churnResult = await db.execute(sql`
             SELECT COALESCE(SUM(valorr::numeric), 0) as churn
             FROM "Clickup".cup_contratos
-            WHERE TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+            WHERE data_solicitacao_encerramento >= ${startOfMonth.toISOString().split("T")[0]}
+              AND data_solicitacao_encerramento < ${today.toISOString().split("T")[0]}
           `);
           const churnMrr = parseFloat((churnResult.rows[0] as any)?.churn || "0");
           if (!actualsByMetric["churn_mrr_month"]) actualsByMetric["churn_mrr_month"] = {};
