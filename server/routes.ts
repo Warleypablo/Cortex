@@ -12920,9 +12920,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let result;
       if (conditions.length > 0) {
         const whereClause = sql.join(conditions, sql` AND `);
-        result = await db.execute(sql`SELECT * FROM benefits WHERE ${whereClause} ORDER BY created_at DESC`);
+        result = await db.execute(sql`SELECT * FROM cortex_core.benefits WHERE ${whereClause} ORDER BY created_at DESC`);
       } else {
-        result = await db.execute(sql`SELECT * FROM benefits ORDER BY created_at DESC`);
+        result = await db.execute(sql`SELECT * FROM cortex_core.benefits ORDER BY created_at DESC`);
       }
       
       res.json(result.rows);
@@ -12936,7 +12936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/beneficios/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await db.execute(sql`SELECT * FROM benefits WHERE id = ${id}`);
+      const result = await db.execute(sql`SELECT * FROM cortex_core.benefits WHERE id = ${id}`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Benefit not found" });
@@ -12960,7 +12960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const result = await db.execute(sql`
-        INSERT INTO benefits (empresa, cupom, desconto, site, segmento, created_by)
+        INSERT INTO cortex_core.benefits (empresa, cupom, desconto, site, segmento, created_by)
         VALUES (${empresa}, ${cupom || null}, ${desconto || null}, ${site || null}, ${segmento || null}, ${createdBy})
         RETURNING *
       `);
@@ -12979,7 +12979,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { empresa, cupom, desconto, site, segmento } = req.body;
       
       const result = await db.execute(sql`
-        UPDATE benefits 
+        UPDATE cortex_core.benefits 
         SET empresa = COALESCE(${empresa}, empresa),
             cupom = COALESCE(${cupom}, cupom),
             desconto = COALESCE(${desconto}, desconto),
@@ -13005,7 +13005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/beneficios/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await db.execute(sql`DELETE FROM benefits WHERE id = ${id} RETURNING id`);
+      const result = await db.execute(sql`DELETE FROM cortex_core.benefits WHERE id = ${id} RETURNING id`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Benefit not found" });
