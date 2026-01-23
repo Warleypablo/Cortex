@@ -171,7 +171,6 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/revenue-goals': PERMISSION_KEYS.FIN.REVENUE_GOALS,
   '/dashboard/inadimplencia': PERMISSION_KEYS.FIN.INADIMPLENCIA,
   '/dashboard/auditoria-sistemas': PERMISSION_KEYS.FIN.AUDITORIA,
-  '/dashboard/contribuicao-colaborador': PERMISSION_KEYS.FIN.CONTRIBUICAO_COLABORADOR,
   '/dashboard/contribuicao-operador': PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR,
   '/dashboard/margem-cliente': PERMISSION_KEYS.FIN.MARGEM_CLIENTE,
   // Gestão
@@ -330,7 +329,6 @@ export const NAV_CONFIG = {
         { title: 'Revenue Goals', url: '/dashboard/revenue-goals', icon: 'Target', permissionKey: PERMISSION_KEYS.FIN.REVENUE_GOALS },
         { title: 'Inadimplência', url: '/dashboard/inadimplencia', icon: 'AlertTriangle', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
         { title: 'Auditoria de Sistemas', url: '/dashboard/auditoria-sistemas', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.FIN.AUDITORIA },
-        { title: 'Contribuição por Colaborador', url: '/dashboard/contribuicao-colaborador', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_COLABORADOR },
         { title: 'Contribuição por Squad', url: '/dashboard/contribuicao-operador', icon: 'Users2', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR },
         { title: 'Margem por Cliente', url: '/dashboard/margem-cliente', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.FIN.MARGEM_CLIENTE },
       ],
