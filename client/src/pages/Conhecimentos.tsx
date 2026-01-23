@@ -3,7 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Course, InsertCourse } from "@shared/schema";
 import { insertCourseSchema, courseStatusEnum } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen, LayoutGrid, Table2, ArrowUpDown, Star } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen, LayoutGrid, Table2, ArrowUpDown, Star, Tag, Gift, Percent, Store, ShoppingBag, Sparkles } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Badge } from "@/components/ui/badge";
@@ -60,11 +61,37 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+interface Benefit {
+  id: string;
+  empresa: string | null;
+  descricao: string | null;
+  cupom: string | null;
+  categoria: string | null;
+  url: string | null;
+  observacao: string | null;
+}
+
 const statusColors: Record<string, string> = {
   ativo: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   vitalicio: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   cancelado: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   sem_status: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+};
+
+const categoryIcons: Record<string, typeof Gift> = {
+  "Alimentação": ShoppingBag,
+  "Saúde": Gift,
+  "Educação": GraduationCap,
+  "Tecnologia": Store,
+  "Lazer": Sparkles,
+};
+
+const categoryColors: Record<string, string> = {
+  "Alimentação": "from-orange-500 to-amber-400",
+  "Saúde": "from-emerald-500 to-green-400",
+  "Educação": "from-blue-500 to-cyan-400",
+  "Tecnologia": "from-purple-500 to-violet-400",
+  "Lazer": "from-pink-500 to-rose-400",
 };
 
 const statusLabels: Record<string, string> = {
@@ -668,6 +695,196 @@ function CourseCard({
   );
 }
 
+function BenefitCard({
+  benefit,
+  onCopy,
+}: {
+  benefit: Benefit;
+  onCopy: (text: string, label: string) => void;
+}) {
+  const CategoryIcon = categoryIcons[benefit.categoria || ""] || Tag;
+  const gradientClass = categoryColors[benefit.categoria || ""] || "from-gray-500 to-slate-400";
+
+  return (
+    <Card
+      className="group overflow-hidden hover-elevate"
+      data-testid={`card-benefit-${benefit.id}`}
+    >
+      <div className={`h-2 bg-gradient-to-r ${gradientClass}`} />
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className={`p-2.5 rounded-xl bg-gradient-to-br ${gradientClass} text-white shadow-lg`}>
+              <CategoryIcon className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <CardTitle className="text-lg font-semibold truncate">
+                {benefit.empresa || "Empresa"}
+              </CardTitle>
+              {benefit.categoria && (
+                <span className="text-sm text-muted-foreground">{benefit.categoria}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {benefit.descricao && (
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {benefit.descricao}
+          </p>
+        )}
+
+        {benefit.cupom && (
+          <div className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 rounded-lg" />
+            <div className="relative flex items-center justify-between gap-3 px-4 py-3 border-2 border-dashed border-primary/30 rounded-lg bg-primary/5">
+              <div className="flex items-center gap-2">
+                <Percent className="w-4 h-4 text-primary" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Cupom</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <code className="px-3 py-1.5 bg-background rounded-md font-mono text-sm font-bold tracking-wider text-primary">
+                  {benefit.cupom}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => onCopy(benefit.cupom!, "Cupom")}
+                  data-testid={`button-copy-cupom-${benefit.id}`}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {benefit.observacao && (
+          <div className="flex items-start gap-2 p-3 bg-muted/50 rounded-lg">
+            <Sparkles className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">{benefit.observacao}</p>
+          </div>
+        )}
+
+        {benefit.url && (
+          <Button
+            variant="outline"
+            className="w-full"
+            asChild
+          >
+            <a
+              href={benefit.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid={`link-benefit-url-${benefit.id}`}
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Acessar Benefício
+            </a>
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BenefitsTab() {
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const { toast } = useToast();
+
+  const { data: benefits = [], isLoading } = useQuery<Benefit[]>({
+    queryKey: ["/api/beneficios"],
+  });
+
+  const uniqueCategories = useMemo(() => {
+    const categories = new Set(benefits.map((b) => b.categoria).filter(Boolean));
+    return Array.from(categories).sort();
+  }, [benefits]);
+
+  const filteredBenefits = useMemo(() => {
+    return benefits.filter((benefit) => {
+      const matchesSearch =
+        !search ||
+        benefit.empresa?.toLowerCase().includes(search.toLowerCase()) ||
+        benefit.descricao?.toLowerCase().includes(search.toLowerCase()) ||
+        benefit.cupom?.toLowerCase().includes(search.toLowerCase());
+
+      const matchesCategory = categoryFilter === "all" || benefit.categoria === categoryFilter;
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [benefits, search, categoryFilter]);
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiado!",
+      description: `${label} copiado para a área de transferência`,
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64" data-testid="loading-benefits">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar benefícios, empresas ou cupons..."
+            className="pl-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            data-testid="input-search-benefits"
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-48" data-testid="select-filter-categoria">
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Categorias</SelectItem>
+            {uniqueCategories.map((cat) => (
+              <SelectItem key={cat} value={cat!}>
+                {cat}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {filteredBenefits.map((benefit) => (
+          <BenefitCard
+            key={benefit.id}
+            benefit={benefit}
+            onCopy={copyToClipboard}
+          />
+        ))}
+      </div>
+
+      {filteredBenefits.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Gift className="w-12 h-12 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-medium text-muted-foreground">Nenhum benefício encontrado</h3>
+          <p className="text-sm text-muted-foreground/70 mt-1">
+            Tente ajustar os filtros de busca
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Conhecimentos() {
   usePageTitle("Base de Conhecimentos");
   useSetPageInfo("Conhecimentos", "Gerenciamento de cursos e formações");
@@ -806,70 +1023,83 @@ export default function Conhecimentos() {
     </Button>
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64" data-testid="loading-courses">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar cursos..."
-              className="pl-9 w-64"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              data-testid="input-search-courses"
-            />
-          </div>
+      <Tabs defaultValue="cursos" className="w-full">
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+          <TabsList className="grid w-full sm:w-auto grid-cols-2 h-11">
+            <TabsTrigger value="cursos" className="flex items-center gap-2 px-6" data-testid="tab-cursos">
+              <GraduationCap className="w-4 h-4" />
+              Cursos
+            </TabsTrigger>
+            <TabsTrigger value="beneficios" className="flex items-center gap-2 px-6" data-testid="tab-beneficios">
+              <Gift className="w-4 h-4" />
+              Benefícios
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40" data-testid="select-filter-status">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Status</SelectItem>
-              {courseStatusEnum.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {statusLabels[status]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <TabsContent value="cursos" className="mt-0 space-y-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64" data-testid="loading-courses">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row gap-4 justify-between">
+                <div className="flex flex-wrap gap-3 items-center">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar cursos..."
+                      className="pl-9 w-64"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      data-testid="input-search-courses"
+                    />
+                  </div>
 
-          <Select value={temaFilter} onValueChange={setTemaFilter}>
-            <SelectTrigger className="w-40" data-testid="select-filter-tema">
-              <SelectValue placeholder="Tema" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Temas</SelectItem>
-              {uniqueTemas.map((tema) => (
-                <SelectItem key={tema} value={tema!}>
-                  {tema}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-filter-status">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos Status</SelectItem>
+                      {courseStatusEnum.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {statusLabels[status]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-          <Select value={plataformaFilter} onValueChange={setPlataformaFilter}>
-            <SelectTrigger className="w-40" data-testid="select-filter-plataforma">
-              <SelectValue placeholder="Plataforma" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas Plataformas</SelectItem>
-              {uniquePlataformas.map((plataforma) => (
-                <SelectItem key={plataforma} value={plataforma!}>
-                  {plataforma}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                  <Select value={temaFilter} onValueChange={setTemaFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-filter-tema">
+                      <SelectValue placeholder="Tema" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos Temas</SelectItem>
+                      {uniqueTemas.map((tema) => (
+                        <SelectItem key={tema} value={tema!}>
+                          {tema}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={plataformaFilter} onValueChange={setPlataformaFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-filter-plataforma">
+                      <SelectValue placeholder="Plataforma" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas Plataformas</SelectItem>
+                      {uniquePlataformas.map((plataforma) => (
+                        <SelectItem key={plataforma} value={plataforma!}>
+                          {plataforma}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -1102,44 +1332,52 @@ export default function Conhecimentos() {
               })}
             </TableBody>
           </Table>
-        </div>
-      )}
+              </div>
+            )}
 
-      {editingCourse && (
-        <EditCourseDialog
-          course={editingCourse}
-          open={!!editingCourse}
-          onOpenChange={(open) => !open && setEditingCourse(null)}
-        />
-      )}
+            {editingCourse && (
+              <EditCourseDialog
+                course={editingCourse}
+                open={!!editingCourse}
+                onOpenChange={(open) => !open && setEditingCourse(null)}
+              />
+            )}
 
-      <AlertDialog open={!!deletingCourse} onOpenChange={(open) => !open && setDeletingCourse(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Curso</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o curso "{deletingCourse?.nome}"? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete-course">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deletingCourse && deleteMutation.mutate(deletingCourse.id)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete-course"
-            >
-              {deleteMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Excluindo...
-                </>
-              ) : (
-                "Excluir"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <AlertDialog open={!!deletingCourse} onOpenChange={(open) => !open && setDeletingCourse(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir Curso</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Tem certeza que deseja excluir o curso "{deletingCourse?.nome}"? Esta ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-cancel-delete-course">Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deletingCourse && deleteMutation.mutate(deletingCourse.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    data-testid="button-confirm-delete-course"
+                  >
+                    {deleteMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Excluindo...
+                      </>
+                    ) : (
+                      "Excluir"
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="beneficios" className="mt-0">
+          <BenefitsTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
