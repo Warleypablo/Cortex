@@ -12646,7 +12646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await db.execute(sql`
         INSERT INTO cortex_core.courses (id, nome, status, tema_principal, plataforma, url, login, senha, created_by)
-        VALUES (${id}::text, ${nome}::text, ${statusVal}::text, ${temaVal}::text, ${plataformaVal}::text, ${urlVal}::text, ${loginVal}::text, ${senhaVal}::text, ${createdByVal}::text)
+        VALUES (${id}::uuid, ${nome}::text, ${statusVal}::text, ${temaVal}::text, ${plataformaVal}::text, ${urlVal}::text, ${loginVal}::text, ${senhaVal}::text, ${createdByVal}::text)
         RETURNING *
       `);
       
