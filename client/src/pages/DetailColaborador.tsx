@@ -5062,9 +5062,9 @@ function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, 
       case 'pendente':
         return <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300">Pendente</Badge>;
       case 'aprovado':
-        return <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300">Aprovado</Badge>;
+        return <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300">Alinhado</Badge>;
       case 'reprovado':
-        return <Badge variant="outline" className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300">Reprovado</Badge>;
+        return <Badge variant="outline" className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300">Não Alinhado</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -5091,28 +5091,37 @@ function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, 
         <Card className="p-4 mb-6 bg-muted/50" data-testid="form-indisponibilidade">
           <h3 className="font-medium mb-4">Solicitar Período de Indisponibilidade</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Você pode solicitar até 7 dias de indisponibilidade. O pedido será enviado para aprovação do G&G.
+            Você pode solicitar até 7 dias de indisponibilidade. O pedido será enviado para alinhamento com o G&G.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Data de Início</label>
+              <label className="text-sm font-medium mb-2 block">Data de Início *</label>
               <Input
                 type="date"
                 value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
+                onChange={(e) => {
+                  setDataInicio(e.target.value);
+                  if (!dataFim || new Date(e.target.value) > new Date(dataFim)) {
+                    setDataFim(e.target.value);
+                  }
+                }}
                 min={new Date().toISOString().split('T')[0]}
+                className="cursor-pointer"
                 data-testid="input-data-inicio"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Data de Fim</label>
+              <label className="text-sm font-medium mb-2 block">Data de Fim *</label>
               <Input
                 type="date"
                 value={dataFim}
                 onChange={(e) => setDataFim(e.target.value)}
                 min={dataInicio || new Date().toISOString().split('T')[0]}
+                disabled={!dataInicio}
+                className={`cursor-pointer ${!dataInicio ? 'opacity-50' : ''}`}
                 data-testid="input-data-fim"
               />
+              {!dataInicio && <p className="text-xs text-muted-foreground mt-1">Selecione a data de início primeiro</p>}
             </div>
           </div>
           <div className="mb-4">
