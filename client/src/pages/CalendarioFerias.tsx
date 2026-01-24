@@ -9,8 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Calendar, CalendarDays, Clock, User, CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight, Plus, ChevronsUpDown, Check, Search } from "lucide-react";
+import { Calendar, CalendarDays, Clock, User, CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight, Plus, ChevronsUpDown, Check, Search, Pencil, Trash2, UserCheck, Users, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -31,11 +32,20 @@ interface UnavailabilityRequest {
   data_fim: string;
   motivo: string | null;
   status: 'pendente' | 'aprovado' | 'reprovado';
+  status_rh: 'pendente' | 'aprovado' | 'reprovado';
+  status_lider: 'pendente' | 'aprovado' | 'reprovado';
+  aprovador_rh_nome: string | null;
+  aprovador_lider_nome: string | null;
+  data_aprovacao_rh: string | null;
+  data_aprovacao_lider: string | null;
+  observacao_rh: string | null;
+  observacao_lider: string | null;
   aprovador_nome: string | null;
   data_aprovacao: string | null;
   observacao_aprovador: string | null;
   data_admissao: string | null;
   meses_empresa: number | null;
+  squad_nome: string | null;
   created_at: string;
 }
 
@@ -43,6 +53,7 @@ interface Colaborador {
   id: number;
   nome: string;
   status: string | null;
+  squad?: string | null;
 }
 
 const COLORS = [
@@ -78,12 +89,28 @@ export default function CalendarioFerias() {
   const [novaDataFim, setNovaDataFim] = useState('');
   const [novoMotivo, setNovoMotivo] = useState('');
   const [comboboxOpen, setComboboxOpen] = useState(false);
+  
+  const [squadFilter, setSquadFilter] = useState<string>('all');
+  const [approvalType, setApprovalType] = useState<'rh' | 'lider' | null>(null);
+  
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<UnavailabilityRequest | null>(null);
+  const [editDataInicio, setEditDataInicio] = useState('');
+  const [editDataFim, setEditDataFim] = useState('');
+  const [editMotivo, setEditMotivo] = useState('');
+  
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingRequest, setDeletingRequest] = useState<UnavailabilityRequest | null>(null);
 
-  const { data: pendingRequests = [], isLoading: isLoadingPending, refetch: refetchPending } = useQuery<UnavailabilityRequest[]>({
-    queryKey: ["/api/unavailability-requests", { status: "pendente" }],
+  const { data: squads = [] } = useQuery<string[]>({
+    queryKey: ["/api/unavailability-requests/squads"],
   });
 
-  const { data: approvedRequests = [], isLoading: isLoadingApproved } = useQuery<UnavailabilityRequest[]>({
+  const { data: pendingRequests = [], isLoading: isLoadingPending, refetch: refetchPending } = useQuery<UnavailabilityRequest[]>({
+    queryKey: ["/api/unavailability-requests", { status: "pendente", squadNome: squadFilter !== 'all' ? squadFilter : undefined }],
+  });
+
+  const { data: approvedRequests = [], isLoading: isLoadingApproved, refetch: refetchApproved } = useQuery<UnavailabilityRequest[]>({
     queryKey: ["/api/unavailability-requests", { status: "aprovado" }],
   });
 
@@ -95,20 +122,60 @@ export default function CalendarioFerias() {
     return colaboradores.filter(c => c.status?.toLowerCase() === 'ativo');
   }, [colaboradores]);
 
-  const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; status: string; aprovadorEmail?: string; aprovadorNome?: string; observacaoAprovador?: string }) => {
-      return await apiRequest("PATCH", `/api/unavailability-requests/${data.id}`, data);
+  const approvalMutation = useMutation({
+    mutationFn: async (data: { id: number; approvalType: 'rh' | 'lider'; status: string; aprovadorEmail?: string; aprovadorNome?: string; observacao?: string }) => {
+      return await apiRequest("PATCH", `/api/unavailability-requests/${data.id}/approve`, data);
     },
     onSuccess: () => {
+      const typeLabel = approvalType === 'rh' ? 'RH' : 'Líder';
       toast({ 
-        title: actionType === 'aprovar' ? "Solicitação alinhada" : "Solicitação não alinhada",
-        description: `A solicitação foi ${actionType === 'aprovar' ? 'alinhada' : 'marcada como não alinhada'} com sucesso.`,
+        title: actionType === 'aprovar' ? `Alinhamento ${typeLabel} confirmado` : `Alinhamento ${typeLabel} negado`,
+        description: `O alinhamento do ${typeLabel} foi ${actionType === 'aprovar' ? 'confirmado' : 'negado'} com sucesso.`,
       });
       setSelectedRequest(null);
       setActionType(null);
+      setApprovalType(null);
       setObservacao('');
       queryClient.invalidateQueries({ queryKey: ["/api/unavailability-requests"] });
       refetchPending();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async (data: { id: number; dataInicio: string; dataFim: string; motivo?: string }) => {
+      return await apiRequest("PUT", `/api/unavailability-requests/${data.id}`, data);
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Período atualizado",
+        description: "As datas do período foram atualizadas com sucesso.",
+      });
+      setShowEditDialog(false);
+      setEditingRequest(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/unavailability-requests"] });
+      refetchApproved();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/unavailability-requests/${id}?fromCalendar=true`);
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Período excluído",
+        description: "O período foi removido do calendário.",
+      });
+      setShowDeleteDialog(false);
+      setDeletingRequest(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/unavailability-requests"] });
+      refetchApproved();
     },
     onError: (error: Error) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -141,22 +208,53 @@ export default function CalendarioFerias() {
     setComboboxOpen(false);
   };
 
-  const handleAction = (req: UnavailabilityRequest, action: 'aprovar' | 'reprovar') => {
+  const handleAction = (req: UnavailabilityRequest, action: 'aprovar' | 'reprovar', type: 'rh' | 'lider') => {
     setSelectedRequest(req);
     setActionType(action);
+    setApprovalType(type);
     setObservacao('');
   };
 
   const handleConfirm = () => {
-    if (!selectedRequest || !actionType) return;
+    if (!selectedRequest || !actionType || !approvalType) return;
     
-    updateMutation.mutate({
+    approvalMutation.mutate({
       id: selectedRequest.id,
+      approvalType: approvalType,
       status: actionType === 'aprovar' ? 'aprovado' : 'reprovado',
       aprovadorEmail: user?.email || undefined,
       aprovadorNome: user?.name || undefined,
-      observacaoAprovador: observacao || undefined,
+      observacao: observacao || undefined,
     });
+  };
+
+  const handleEditClick = (req: UnavailabilityRequest) => {
+    setEditingRequest(req);
+    setEditDataInicio(req.data_inicio.split('T')[0]);
+    setEditDataFim(req.data_fim.split('T')[0]);
+    setEditMotivo(req.motivo || '');
+    setShowEditDialog(true);
+  };
+
+  const handleEditSubmit = () => {
+    if (!editingRequest || !editDataInicio || !editDataFim) return;
+    
+    editMutation.mutate({
+      id: editingRequest.id,
+      dataInicio: editDataInicio,
+      dataFim: editDataFim,
+      motivo: editMotivo || undefined,
+    });
+  };
+
+  const handleDeleteClick = (req: UnavailabilityRequest) => {
+    setDeletingRequest(req);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!deletingRequest) return;
+    deleteMutation.mutate(deletingRequest.id);
   };
 
   const handleAddSubmit = () => {
@@ -403,11 +501,87 @@ export default function CalendarioFerias() {
                       </div>
                     </div>
                   )}
+
+                  {approvedRequests.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-sm font-medium mb-3 text-muted-foreground flex items-center gap-2">
+                        <CalendarDays className="w-4 h-4" />
+                        Períodos Aprovados (editar/excluir)
+                      </h3>
+                      <div className="space-y-2">
+                        {approvedRequests.map((req) => (
+                          <div 
+                            key={req.id} 
+                            className="flex items-center justify-between p-3 bg-muted/20 rounded-lg border border-border/50"
+                            data-testid={`period-${req.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-3 h-3 rounded ${colaboradorColors.get(req.colaborador_id)}`} />
+                              <div>
+                                <span className="font-medium">{req.colaborador_nome}</span>
+                                <p className="text-sm text-muted-foreground">
+                                  {format(new Date(req.data_inicio), "dd/MM/yyyy", { locale: ptBR })} - {format(new Date(req.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+                                  {req.motivo && <span className="ml-2">• {req.motivo}</span>}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => handleEditClick(req)}
+                                    data-testid={`button-edit-${req.id}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Editar período</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="text-red-600 hover:text-red-700"
+                                    onClick={() => handleDeleteClick(req)}
+                                    data-testid={`button-delete-${req.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Excluir período</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>
 
             <TabsContent value="pendentes">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Filtrar por Squad:</span>
+                </div>
+                <Select value={squadFilter} onValueChange={setSquadFilter}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-squad-filter">
+                    <SelectValue placeholder="Todos os squads" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os squads</SelectItem>
+                    {squads.map((squad) => (
+                      <SelectItem key={squad} value={squad}>{squad}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
               {isLoadingPending ? (
                 <div className="flex items-center justify-center py-6">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -415,7 +589,7 @@ export default function CalendarioFerias() {
               ) : pendingRequests.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>Nenhuma solicitação pendente de alinhamento.</p>
+                  <p>Nenhuma solicitação pendente de alinhamento{squadFilter !== 'all' ? ` para o squad ${squadFilter}` : ''}.</p>
                 </div>
               ) : (
                 <Table data-testid="table-unavailability-approvals">
@@ -423,7 +597,7 @@ export default function CalendarioFerias() {
                     <TableRow>
                       <TableHead>Solicitante</TableHead>
                       <TableHead>Período</TableHead>
-                      <TableHead>Tempo de Empresa</TableHead>
+                      <TableHead>Status de Alinhamento</TableHead>
                       <TableHead>Motivo</TableHead>
                       <TableHead>Solicitado em</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
@@ -437,8 +611,8 @@ export default function CalendarioFerias() {
                             <User className="w-4 h-4 text-muted-foreground" />
                             <div>
                               <span className="font-medium">{req.colaborador_nome}</span>
-                              {req.colaborador_email && (
-                                <p className="text-xs text-muted-foreground">{req.colaborador_email}</p>
+                              {req.squad_nome && (
+                                <p className="text-xs text-muted-foreground">{req.squad_nome}</p>
                               )}
                             </div>
                           </div>
@@ -452,36 +626,111 @@ export default function CalendarioFerias() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300">
-                            {formatTempoEmpresa(req.meses_empresa)}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5">
+                              <UserCheck className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">RH:</span>
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-xs",
+                                  req.status_rh === 'aprovado' && "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300",
+                                  req.status_rh === 'pendente' && "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300",
+                                  req.status_rh === 'reprovado' && "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300"
+                                )}
+                              >
+                                {req.status_rh === 'aprovado' ? 'Alinhado' : req.status_rh === 'pendente' ? 'Pendente' : 'Não Alinhado'}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">Líder:</span>
+                              <Badge 
+                                variant="outline" 
+                                className={cn(
+                                  "text-xs",
+                                  req.status_lider === 'aprovado' && "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300",
+                                  req.status_lider === 'pendente' && "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300",
+                                  req.status_lider === 'reprovado' && "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300"
+                                )}
+                              >
+                                {req.status_lider === 'aprovado' ? 'Alinhado' : req.status_lider === 'pendente' ? 'Pendente' : 'Não Alinhado'}
+                              </Badge>
+                            </div>
+                          </div>
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate">{req.motivo || '-'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {format(new Date(req.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1 text-green-600"
-                              onClick={() => handleAction(req, 'aprovar')}
-                              data-testid={`button-alinhar-${req.id}`}
-                            >
-                              <CheckCircle className="w-4 h-4" />
-                              Alinhar
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1 text-red-600"
-                              onClick={() => handleAction(req, 'reprovar')}
-                              data-testid={`button-nao-alinhar-${req.id}`}
-                            >
-                              <XCircle className="w-4 h-4" />
-                              Não Alinhar
-                            </Button>
+                          <div className="flex flex-col gap-2">
+                            {req.status_rh === 'pendente' && (
+                              <div className="flex gap-1 justify-end">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1 text-green-600"
+                                      onClick={() => handleAction(req, 'aprovar', 'rh')}
+                                      data-testid={`button-alinhar-rh-${req.id}`}
+                                    >
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                      RH
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Alinhar como RH</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1 text-red-600"
+                                      onClick={() => handleAction(req, 'reprovar', 'rh')}
+                                      data-testid={`button-nao-alinhar-rh-${req.id}`}
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Não alinhar como RH</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            )}
+                            {req.status_lider === 'pendente' && (
+                              <div className="flex gap-1 justify-end">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1 text-green-600"
+                                      onClick={() => handleAction(req, 'aprovar', 'lider')}
+                                      data-testid={`button-alinhar-lider-${req.id}`}
+                                    >
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                      Líder
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Alinhar como Líder</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1 text-red-600"
+                                      onClick={() => handleAction(req, 'reprovar', 'lider')}
+                                      data-testid={`button-nao-alinhar-lider-${req.id}`}
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Não alinhar como Líder</TooltipContent>
+                                </Tooltip>
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -610,11 +859,11 @@ export default function CalendarioFerias() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedRequest && !!actionType} onOpenChange={() => { setSelectedRequest(null); setActionType(null); }}>
+      <Dialog open={!!selectedRequest && !!actionType && !!approvalType} onOpenChange={() => { setSelectedRequest(null); setActionType(null); setApprovalType(null); }}>
         <DialogContent data-testid="dialog-confirm-action">
           <DialogHeader>
             <DialogTitle>
-              {actionType === 'aprovar' ? 'Alinhar' : 'Não Alinhar'} Solicitação
+              {actionType === 'aprovar' ? 'Alinhar' : 'Não Alinhar'} como {approvalType === 'rh' ? 'RH' : 'Líder'}
             </DialogTitle>
             <DialogDescription>
               {selectedRequest && (
@@ -622,6 +871,11 @@ export default function CalendarioFerias() {
                   <strong>{selectedRequest.colaborador_nome}</strong> solicitou indisponibilidade de{' '}
                   <strong>{format(new Date(selectedRequest.data_inicio), "dd/MM/yyyy", { locale: ptBR })}</strong>{' '}
                   a <strong>{format(new Date(selectedRequest.data_fim), "dd/MM/yyyy", { locale: ptBR })}</strong>.
+                  <br /><br />
+                  <span className="text-muted-foreground">
+                    Você está {actionType === 'aprovar' ? 'alinhando' : 'não alinhando'} esta solicitação como <strong>{approvalType === 'rh' ? 'RH' : 'Líder'}</strong>.
+                    {actionType === 'aprovar' && ' O período só será adicionado ao calendário após ambos os alinhamentos (RH e Líder) serem confirmados.'}
+                  </span>
                 </>
               )}
             </DialogDescription>
@@ -637,17 +891,121 @@ export default function CalendarioFerias() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setSelectedRequest(null); setActionType(null); }} data-testid="button-cancelar-dialog">
+            <Button variant="outline" onClick={() => { setSelectedRequest(null); setActionType(null); setApprovalType(null); }} data-testid="button-cancelar-dialog">
               Cancelar
             </Button>
             <Button
               onClick={handleConfirm}
-              disabled={updateMutation.isPending}
+              disabled={approvalMutation.isPending}
               className={actionType === 'aprovar' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}
               data-testid="button-confirmar-acao"
             >
-              {updateMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              {approvalMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Confirmar {actionType === 'aprovar' ? 'Alinhamento' : 'Não Alinhamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={(open) => { setShowEditDialog(open); if (!open) setEditingRequest(null); }}>
+        <DialogContent data-testid="dialog-edit-unavailability">
+          <DialogHeader>
+            <DialogTitle>Editar Período</DialogTitle>
+            <DialogDescription>
+              {editingRequest && (
+                <>
+                  Editando período de indisponibilidade de <strong>{editingRequest.colaborador_nome}</strong>.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="editDataInicio">Data Início *</Label>
+                <Input
+                  id="editDataInicio"
+                  type="date"
+                  value={editDataInicio}
+                  onChange={(e) => setEditDataInicio(e.target.value)}
+                  data-testid="input-edit-data-inicio"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editDataFim">Data Fim *</Label>
+                <Input
+                  id="editDataFim"
+                  type="date"
+                  value={editDataFim}
+                  onChange={(e) => setEditDataFim(e.target.value)}
+                  min={editDataInicio}
+                  max={editDataInicio ? format(addDays(parseISO(editDataInicio), 7), 'yyyy-MM-dd') : undefined}
+                  data-testid="input-edit-data-fim"
+                />
+              </div>
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              Período máximo: 7 dias
+            </p>
+            
+            <div className="space-y-2">
+              <Label htmlFor="editMotivo">Motivo (opcional)</Label>
+              <Textarea
+                id="editMotivo"
+                value={editMotivo}
+                onChange={(e) => setEditMotivo(e.target.value)}
+                placeholder="Ex: Férias, viagem, compromisso pessoal..."
+                rows={2}
+                data-testid="input-edit-motivo"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowEditDialog(false); setEditingRequest(null); }} data-testid="button-cancelar-edit">
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleEditSubmit}
+              disabled={editMutation.isPending || !editDataInicio || !editDataFim}
+              data-testid="button-confirmar-edit"
+            >
+              {editMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Salvar Alterações
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => { setShowDeleteDialog(open); if (!open) setDeletingRequest(null); }}>
+        <DialogContent data-testid="dialog-delete-unavailability">
+          <DialogHeader>
+            <DialogTitle>Excluir Período</DialogTitle>
+            <DialogDescription>
+              {deletingRequest && (
+                <>
+                  Tem certeza que deseja excluir o período de indisponibilidade de <strong>{deletingRequest.colaborador_nome}</strong>?
+                  <br /><br />
+                  Período: <strong>{format(new Date(deletingRequest.data_inicio), "dd/MM/yyyy", { locale: ptBR })}</strong>{' '}
+                  a <strong>{format(new Date(deletingRequest.data_fim), "dd/MM/yyyy", { locale: ptBR })}</strong>
+                  <br /><br />
+                  <span className="text-red-500">Esta ação não pode ser desfeita.</span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowDeleteDialog(false); setDeletingRequest(null); }} data-testid="button-cancelar-delete">
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirmar-delete"
+            >
+              {deleteMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Excluir
             </Button>
           </DialogFooter>
         </DialogContent>
