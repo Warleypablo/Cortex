@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, TrendingUp, TrendingDown, UserPlus, UserMinus, Clock, Cake, Award, Gift, Calendar, AlertTriangle, PieChart as PieChartIcon, BarChart2, Building, DollarSign, Wallet, Filter, Info, X, MapPin, Heart, Activity, ShieldCheck, Eye, CheckCircle, XCircle, ExternalLink, Loader2, CalendarDays, User } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -344,9 +345,14 @@ function UnavailabilityApprovalSection() {
   const [selectedRequest, setSelectedRequest] = useState<UnavailabilityRequestGG | null>(null);
   const [actionType, setActionType] = useState<'aprovar' | 'reprovar' | null>(null);
   const [observacao, setObservacao] = useState('');
+  const [activeTab, setActiveTab] = useState('calendario');
 
-  const { data: pendingRequests = [], isLoading, refetch } = useQuery<UnavailabilityRequestGG[]>({
+  const { data: pendingRequests = [], isLoading: isLoadingPending, refetch: refetchPending } = useQuery<UnavailabilityRequestGG[]>({
     queryKey: ["/api/unavailability-requests", { status: "pendente" }],
+  });
+
+  const { data: approvedRequests = [], isLoading: isLoadingApproved } = useQuery<UnavailabilityRequestGG[]>({
+    queryKey: ["/api/unavailability-requests", { status: "aprovado" }],
   });
 
   const updateMutation = useMutation({
@@ -362,7 +368,7 @@ function UnavailabilityApprovalSection() {
       setActionType(null);
       setObservacao('');
       queryClient.invalidateQueries({ queryKey: ["/api/unavailability-requests"] });
-      refetch();
+      refetchPending();
     },
     onError: (error: Error) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -396,6 +402,13 @@ function UnavailabilityApprovalSection() {
     return `${anos}a ${mesesRestantes}m`;
   };
 
+  const groupedByMonth = approvedRequests.reduce((acc, req) => {
+    const monthKey = format(new Date(req.data_inicio), "MMMM yyyy", { locale: ptBR });
+    if (!acc[monthKey]) acc[monthKey] = [];
+    acc[monthKey].push(req);
+    return acc;
+  }, {} as Record<string, UnavailabilityRequestGG[]>);
+
   return (
     <>
       <Card className="mb-6 border-orange-200 dark:border-orange-800" data-testid="card-unavailability-approvals">
@@ -403,11 +416,11 @@ function UnavailabilityApprovalSection() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
-                <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                <Calendar className="w-5 h-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
-                <CardTitle className="text-lg">Alinhamento de Indisponibilidade</CardTitle>
-                <CardDescription>Alinhar períodos de indisponibilidade dos prestadores</CardDescription>
+                <CardTitle className="text-lg">Calendário de Indisponibilidade</CardTitle>
+                <CardDescription>Visualizar e alinhar períodos de indisponibilidade dos prestadores</CardDescription>
               </div>
             </div>
             {pendingRequests.length > 0 && (
@@ -418,87 +431,160 @@ function UnavailabilityApprovalSection() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : pendingRequests.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>Nenhuma solicitação pendente de alinhamento.</p>
-            </div>
-          ) : (
-            <Table data-testid="table-unavailability-approvals">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Solicitante</TableHead>
-                  <TableHead>Período</TableHead>
-                  <TableHead>Tempo de Empresa</TableHead>
-                  <TableHead>Motivo</TableHead>
-                  <TableHead>Solicitado em</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pendingRequests.map((req) => (
-                  <TableRow key={req.id} data-testid={`row-approval-${req.id}`}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <span className="font-medium">{req.colaborador_nome}</span>
-                          {req.colaborador_email && (
-                            <p className="text-xs text-muted-foreground">{req.colaborador_email}</p>
-                          )}
-                        </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="calendario" className="gap-2" data-testid="tab-calendario">
+                <CalendarDays className="w-4 h-4" />
+                Calendário
+              </TabsTrigger>
+              <TabsTrigger value="pendentes" className="gap-2" data-testid="tab-pendentes">
+                <Clock className="w-4 h-4" />
+                Pendentes
+                {pendingRequests.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                    {pendingRequests.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="calendario">
+              {isLoadingApproved ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : approvedRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>Nenhuma indisponibilidade alinhada registrada.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(groupedByMonth).map(([month, requests]) => (
+                    <div key={month}>
+                      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                        <CalendarDays className="w-4 h-4" />
+                        {month}
+                      </h3>
+                      <div className="grid gap-3">
+                        {requests.map((req) => (
+                          <div 
+                            key={req.id} 
+                            className="flex items-center justify-between p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+                            data-testid={`calendar-item-${req.id}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/50">
+                                <User className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{req.colaborador_nome}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {format(new Date(req.data_inicio), "dd/MM", { locale: ptBR })} - {format(new Date(req.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300">
+                                Alinhado
+                              </Badge>
+                              {req.motivo && (
+                                <p className="text-xs text-muted-foreground mt-1 max-w-[150px] truncate">{req.motivo}</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <CalendarDays className="w-4 h-4 text-muted-foreground" />
-                        <span>
-                          {format(new Date(req.data_inicio), "dd/MM/yyyy", { locale: ptBR })} - {format(new Date(req.data_fim), "dd/MM/yyyy", { locale: ptBR })}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300">
-                        {formatTempoEmpresa(req.meses_empresa)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">{req.motivo || '-'}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(req.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1 text-green-600"
-                          onClick={() => handleAction(req, 'aprovar')}
-                          data-testid={`button-alinhar-${req.id}`}
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Alinhar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1 text-red-600"
-                          onClick={() => handleAction(req, 'reprovar')}
-                          data-testid={`button-nao-alinhar-${req.id}`}
-                        >
-                          <XCircle className="w-4 h-4" />
-                          Não Alinhar
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="pendentes">
+              {isLoadingPending ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : pendingRequests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>Nenhuma solicitação pendente de alinhamento.</p>
+                </div>
+              ) : (
+                <Table data-testid="table-unavailability-approvals">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Solicitante</TableHead>
+                      <TableHead>Período</TableHead>
+                      <TableHead>Tempo de Empresa</TableHead>
+                      <TableHead>Motivo</TableHead>
+                      <TableHead>Solicitado em</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingRequests.map((req) => (
+                      <TableRow key={req.id} data-testid={`row-approval-${req.id}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <div>
+                              <span className="font-medium">{req.colaborador_nome}</span>
+                              {req.colaborador_email && (
+                                <p className="text-xs text-muted-foreground">{req.colaborador_email}</p>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                            <span>
+                              {format(new Date(req.data_inicio), "dd/MM/yyyy", { locale: ptBR })} - {format(new Date(req.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300">
+                            {formatTempoEmpresa(req.meses_empresa)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate">{req.motivo || '-'}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {format(new Date(req.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 text-green-600"
+                              onClick={() => handleAction(req, 'aprovar')}
+                              data-testid={`button-alinhar-${req.id}`}
+                            >
+                              <CheckCircle className="w-4 h-4" />
+                              Alinhar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 text-red-600"
+                              onClick={() => handleAction(req, 'reprovar')}
+                              data-testid={`button-nao-alinhar-${req.id}`}
+                            >
+                              <XCircle className="w-4 h-4" />
+                              Não Alinhar
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
