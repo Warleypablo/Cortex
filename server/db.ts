@@ -658,14 +658,14 @@ export async function initializeSysSchema(): Promise<void> {
         aprovador_nome VARCHAR(255),
         data_aprovacao TIMESTAMP,
         observacao_aprovador TEXT,
-        rh_aprovador_email VARCHAR(255),
-        rh_aprovador_nome VARCHAR(255),
-        rh_aprovado_em TIMESTAMP,
-        rh_observacao TEXT,
-        lider_aprovador_email VARCHAR(255),
-        lider_aprovador_nome VARCHAR(255),
-        lider_aprovado_em TIMESTAMP,
-        lider_observacao TEXT,
+        aprovador_rh_email VARCHAR(255),
+        aprovador_rh_nome VARCHAR(255),
+        aprovado_rh_em TIMESTAMP,
+        observacao_rh TEXT,
+        aprovador_lider_email VARCHAR(255),
+        aprovador_lider_nome VARCHAR(255),
+        aprovado_lider_em TIMESTAMP,
+        observacao_lider TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT chk_max_days CHECK ((data_fim - data_inicio) <= 7)
@@ -677,14 +677,14 @@ export async function initializeSysSchema(): Promise<void> {
       ALTER TABLE cortex_core.unavailability_requests 
       ADD COLUMN IF NOT EXISTS status_rh VARCHAR(20) DEFAULT 'pendente',
       ADD COLUMN IF NOT EXISTS status_lider VARCHAR(20) DEFAULT 'pendente',
-      ADD COLUMN IF NOT EXISTS rh_aprovador_email VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS rh_aprovador_nome VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS rh_aprovado_em TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS rh_observacao TEXT,
-      ADD COLUMN IF NOT EXISTS lider_aprovador_email VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS lider_aprovador_nome VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS lider_aprovado_em TIMESTAMP,
-      ADD COLUMN IF NOT EXISTS lider_observacao TEXT
+      ADD COLUMN IF NOT EXISTS aprovador_rh_email VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS aprovador_rh_nome VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS aprovado_rh_em TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS observacao_rh TEXT,
+      ADD COLUMN IF NOT EXISTS aprovador_lider_email VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS aprovador_lider_nome VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS aprovado_lider_em TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS observacao_lider TEXT
     `);
 
     console.log('[database] cortex_core schema tables created');
