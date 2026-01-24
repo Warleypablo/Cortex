@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, CalendarDays, Clock, User, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Calendar, CalendarDays, Clock, User, CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isWithinInterval, parseISO, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface UnavailabilityRequest {
@@ -34,6 +35,21 @@ interface UnavailabilityRequest {
   created_at: string;
 }
 
+const COLORS = [
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-purple-500',
+  'bg-orange-500',
+  'bg-pink-500',
+  'bg-teal-500',
+  'bg-indigo-500',
+  'bg-rose-500',
+  'bg-cyan-500',
+  'bg-amber-500',
+];
+
+const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 export default function CalendarioFerias() {
   usePageTitle("Calendário de Férias");
   useSetPageInfo("Calendário de Férias", "Visualizar e alinhar períodos de indisponibilidade dos prestadores");
@@ -44,6 +60,7 @@ export default function CalendarioFerias() {
   const [actionType, setActionType] = useState<'aprovar' | 'reprovar' | null>(null);
   const [observacao, setObservacao] = useState('');
   const [activeTab, setActiveTab] = useState('calendario');
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const { data: pendingRequests = [], isLoading: isLoadingPending, refetch: refetchPending } = useQuery<UnavailabilityRequest[]>({
     queryKey: ["/api/unavailability-requests", { status: "pendente" }],
@@ -100,12 +117,46 @@ export default function CalendarioFerias() {
     return `${anos}a ${mesesRestantes}m`;
   };
 
-  const groupedByMonth = approvedRequests.reduce((acc, req) => {
-    const monthKey = format(new Date(req.data_inicio), "MMMM yyyy", { locale: ptBR });
-    if (!acc[monthKey]) acc[monthKey] = [];
-    acc[monthKey].push(req);
-    return acc;
-  }, {} as Record<string, UnavailabilityRequest[]>);
+  const colaboradorColors = useMemo(() => {
+    const colorMap = new Map<number, string>();
+    approvedRequests.forEach((req, index) => {
+      if (!colorMap.has(req.colaborador_id)) {
+        colorMap.set(req.colaborador_id, COLORS[colorMap.size % COLORS.length]);
+      }
+    });
+    return colorMap;
+  }, [approvedRequests]);
+
+  const calendarData = useMemo(() => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
+    const startPadding = getDay(monthStart);
+    
+    return { days, startPadding, monthStart, monthEnd };
+  }, [currentDate]);
+
+  const getVacationsForDay = (date: Date) => {
+    return approvedRequests.filter(req => {
+      const start = parseISO(req.data_inicio);
+      const end = parseISO(req.data_fim);
+      return isWithinInterval(date, { start, end });
+    });
+  };
+
+  const goToPreviousMonth = () => setCurrentDate(subMonths(currentDate, 1));
+  const goToNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+  const goToToday = () => setCurrentDate(new Date());
+
+  const uniqueCollaborators = useMemo(() => {
+    const seen = new Set<number>();
+    return approvedRequests.filter(req => {
+      if (seen.has(req.colaborador_id)) return false;
+      seen.add(req.colaborador_id);
+      return true;
+    });
+  }, [approvedRequests]);
 
   return (
     <div className="p-6 space-y-6" data-testid="page-calendario-ferias">
@@ -151,50 +202,109 @@ export default function CalendarioFerias() {
                 <div className="flex items-center justify-center py-6">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : approvedRequests.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p>Nenhuma indisponibilidade alinhada registrada.</p>
-                </div>
               ) : (
-                <div className="space-y-6">
-                  {Object.entries(groupedByMonth).map(([month, requests]) => (
-                    <div key={month}>
-                      <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-                        <CalendarDays className="w-4 h-4" />
-                        {month}
-                      </h3>
-                      <div className="grid gap-3">
-                        {requests.map((req) => (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="icon" onClick={goToPreviousMonth} data-testid="button-prev-month">
+                        <ChevronLeft className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" onClick={goToNextMonth} data-testid="button-next-month">
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
+                      <h2 className="text-lg font-semibold capitalize ml-2">
+                        {format(currentDate, "MMMM yyyy", { locale: ptBR })}
+                      </h2>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={goToToday} data-testid="button-today">
+                      Hoje
+                    </Button>
+                  </div>
+
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="grid grid-cols-7 bg-muted/50">
+                      {WEEKDAYS.map((day) => (
+                        <div key={day} className="p-2 text-center text-sm font-medium text-muted-foreground border-b">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-7">
+                      {Array.from({ length: calendarData.startPadding }).map((_, i) => (
+                        <div key={`empty-${i}`} className="min-h-[80px] p-1 border-b border-r bg-muted/20" />
+                      ))}
+                      {calendarData.days.map((day) => {
+                        const vacations = getVacationsForDay(day);
+                        const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                        const isWeekend = getDay(day) === 0 || getDay(day) === 6;
+                        
+                        return (
                           <div 
-                            key={req.id} 
-                            className="flex items-center justify-between p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
-                            data-testid={`calendar-item-${req.id}`}
+                            key={day.toISOString()} 
+                            className={`min-h-[80px] p-1 border-b border-r relative ${isWeekend ? 'bg-muted/30' : ''}`}
+                            data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
                           >
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/50">
-                                <User className="w-4 h-4 text-green-600 dark:text-green-400" />
-                              </div>
-                              <div>
-                                <p className="font-medium">{req.colaborador_nome}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  {format(new Date(req.data_inicio), "dd/MM", { locale: ptBR })} - {format(new Date(req.data_fim), "dd/MM/yyyy", { locale: ptBR })}
-                                </p>
-                              </div>
+                            <div className={`text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-orange-500 text-white' : ''}`}>
+                              {format(day, 'd')}
                             </div>
-                            <div className="text-right">
-                              <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300">
-                                Alinhado
-                              </Badge>
-                              {req.motivo && (
-                                <p className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate">{req.motivo}</p>
+                            <div className="space-y-0.5 overflow-hidden">
+                              {vacations.slice(0, 3).map((vac) => (
+                                <Tooltip key={vac.id}>
+                                  <TooltipTrigger asChild>
+                                    <div 
+                                      className={`text-xs text-white px-1 py-0.5 rounded truncate cursor-pointer ${colaboradorColors.get(vac.colaborador_id)}`}
+                                      data-testid={`vacation-badge-${vac.id}`}
+                                    >
+                                      {vac.colaborador_nome.split(' ')[0]}
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    <div className="text-sm">
+                                      <p className="font-medium">{vac.colaborador_nome}</p>
+                                      <p className="text-muted-foreground">
+                                        {format(parseISO(vac.data_inicio), "dd/MM", { locale: ptBR })} - {format(parseISO(vac.data_fim), "dd/MM", { locale: ptBR })}
+                                      </p>
+                                      {vac.motivo && <p className="text-xs mt-1">{vac.motivo}</p>}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ))}
+                              {vacations.length > 3 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="text-xs text-muted-foreground px-1 cursor-pointer">
+                                      +{vacations.length - 3} mais
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    <div className="space-y-1">
+                                      {vacations.slice(3).map((vac) => (
+                                        <p key={vac.id} className="text-sm">{vac.colaborador_nome}</p>
+                                      ))}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
                               )}
                             </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {uniqueCollaborators.length > 0 && (
+                    <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+                      <h3 className="text-sm font-medium mb-2 text-muted-foreground">Legenda</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {uniqueCollaborators.map((req) => (
+                          <div key={req.colaborador_id} className="flex items-center gap-1.5">
+                            <div className={`w-3 h-3 rounded ${colaboradorColors.get(req.colaborador_id)}`} />
+                            <span className="text-sm">{req.colaborador_nome}</span>
                           </div>
                         ))}
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </TabsContent>
