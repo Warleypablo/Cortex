@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { Calendar, CalendarDays, Clock, User, CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Calendar, CalendarDays, Clock, User, CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight, Plus, ChevronsUpDown, Check, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Label } from "@/components/ui/label";
@@ -75,6 +77,7 @@ export default function CalendarioFerias() {
   const [novaDataInicio, setNovaDataInicio] = useState('');
   const [novaDataFim, setNovaDataFim] = useState('');
   const [novoMotivo, setNovoMotivo] = useState('');
+  const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const { data: pendingRequests = [], isLoading: isLoadingPending, refetch: refetchPending } = useQuery<UnavailabilityRequest[]>({
     queryKey: ["/api/unavailability-requests", { status: "pendente" }],
@@ -135,6 +138,7 @@ export default function CalendarioFerias() {
     setNovaDataInicio('');
     setNovaDataFim('');
     setNovoMotivo('');
+    setComboboxOpen(false);
   };
 
   const handleAction = (req: UnavailabilityRequest, action: 'aprovar' | 'reprovar') => {
@@ -501,18 +505,51 @@ export default function CalendarioFerias() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="colaborador">Colaborador *</Label>
-              <Select value={selectedColaboradorId} onValueChange={setSelectedColaboradorId}>
-                <SelectTrigger data-testid="select-colaborador">
-                  <SelectValue placeholder="Selecione um colaborador" />
-                </SelectTrigger>
-                <SelectContent>
-                  {colaboradoresAtivos.map((colab) => (
-                    <SelectItem key={colab.id} value={colab.id.toString()}>
-                      {colab.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={comboboxOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="select-colaborador"
+                  >
+                    {selectedColaboradorId
+                      ? colaboradoresAtivos.find((c) => c.id.toString() === selectedColaboradorId)?.nome
+                      : "Pesquisar colaborador..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar por nome..." data-testid="input-search-colaborador" />
+                    <CommandList>
+                      <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {colaboradoresAtivos.map((colab) => (
+                          <CommandItem
+                            key={colab.id}
+                            value={colab.nome}
+                            onSelect={() => {
+                              setSelectedColaboradorId(colab.id.toString());
+                              setComboboxOpen(false);
+                            }}
+                            data-testid={`option-colaborador-${colab.id}`}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selectedColaboradorId === colab.id.toString() ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {colab.nome}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
