@@ -17156,9 +17156,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // UNAVAILABILITY REQUESTS API ENDPOINTS
   // ========================================
   
+  // Get squads list for filtering
+  app.get("/api/unavailability-requests/squads", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT squad 
+        FROM "Inhire".rh_pessoal 
+        WHERE squad IS NOT NULL AND squad != '' AND status = 'Ativo'
+        ORDER BY squad
+      `);
+      res.json(result.rows.map(r => r.squad));
+    } catch (error: any) {
+      console.error("[unavailability] Error fetching squads:", error);
+      res.status(500).json({ error: error.message || "Erro ao buscar squads" });
+    }
+  });
+  
   app.get("/api/unavailability-requests", isAuthenticated, async (req, res) => {
     try {
-      const { status, colaboradorId } = req.query;
+      const { status, colaboradorId, squadNome } = req.query;
       
       let query = sql`
         SELECT ur.*, 
@@ -17172,11 +17188,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE 1=1
       `;
       
-      if (status) {
+      // For pending, check if either RH or Lider hasn't approved yet
+      if (status === 'pendente') {
+        query = sql`${query} AND (ur.status_rh = 'pendente' OR ur.status_lider = 'pendente') AND ur.status_rh != 'reprovado' AND ur.status_lider != 'reprovado'`;
+      } else if (status === 'aprovado') {
+        // Only fully approved (both RH and Lider approved)
+        query = sql`${query} AND ur.status_rh = 'aprovado' AND ur.status_lider = 'aprovado'`;
+      } else if (status === 'reprovado') {
+        query = sql`${query} AND (ur.status_rh = 'reprovado' OR ur.status_lider = 'reprovado')`;
+      } else if (status) {
         query = sql`${query} AND ur.status = ${status as string}`;
       }
+      
       if (colaboradorId) {
         query = sql`${query} AND ur.colaborador_id = ${parseInt(colaboradorId as string, 10)}`;
+      }
+      
+      if (squadNome) {
+        query = sql`${query} AND ur.squad_nome = ${squadNome as string}`;
       }
       
       query = sql`${query} ORDER BY ur.created_at DESC`;
@@ -17191,7 +17220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/unavailability-requests", isAuthenticated, async (req, res) => {
     try {
-      const { colaboradorId, colaboradorNome, colaboradorEmail, dataInicio, dataFim, motivo, dataAdmissao } = req.body;
+      const { colaboradorId, colaboradorNome, colaboradorEmail, dataInicio, dataFim, motivo, dataAdmissao, squadNome } = req.body;
       
       if (!colaboradorId || !colaboradorNome || !dataInicio || !dataFim) {
         return res.status(400).json({ error: "Campos obrigatórios: colaboradorId, colaboradorNome, dataInicio, dataFim" });
@@ -17210,8 +17239,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await db.execute(sql`
         INSERT INTO cortex_core.unavailability_requests 
-        (colaborador_id, colaborador_nome, colaborador_email, data_inicio, data_fim, motivo, data_admissao, status)
-        VALUES (${colaboradorId}, ${colaboradorNome}, ${colaboradorEmail || null}, ${dataInicio}, ${dataFim}, ${motivo || null}, ${dataAdmissao || null}, 'pendente')
+        (colaborador_id, colaborador_nome, colaborador_email, data_inicio, data_fim, motivo, data_admissao, status, status_rh, status_lider, squad_nome)
+        VALUES (${colaboradorId}, ${colaboradorNome}, ${colaboradorEmail || null}, ${dataInicio}, ${dataFim}, ${motivo || null}, ${dataAdmissao || null}, 'pendente', 'pendente', 'pendente', ${squadNome || null})
         RETURNING *
       `);
       
@@ -17219,6 +17248,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("[unavailability] Error creating request:", error);
       res.status(500).json({ error: error.message || "Erro ao criar solicitação" });
+    }
+  });
+
+  // Dual approval endpoint - handles RH and Lider separately
+  app.patch("/api/unavailability-requests/:id/approve", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { approvalType, status, aprovadorEmail, aprovadorNome, observacao } = req.body;
+      
+      if (!approvalType || !['rh', 'lider'].includes(approvalType)) {
+        return res.status(400).json({ error: "approvalType deve ser 'rh' ou 'lider'" });
+      }
+      
+      if (!status || !['aprovado', 'reprovado'].includes(status)) {
+        return res.status(400).json({ error: "Status deve ser 'aprovado' ou 'reprovado'" });
+      }
+      
+      let updateQuery;
+      if (approvalType === 'rh') {
+        updateQuery = sql`
+          UPDATE cortex_core.unavailability_requests 
+          SET status_rh = ${status}, 
+              aprovador_rh_email = ${aprovadorEmail || null}, 
+              aprovador_rh_nome = ${aprovadorNome || null},
+              data_aprovacao_rh = CURRENT_TIMESTAMP,
+              observacao_rh = ${observacao || null},
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ${parseInt(id, 10)}
+          RETURNING *
+        `;
+      } else {
+        updateQuery = sql`
+          UPDATE cortex_core.unavailability_requests 
+          SET status_lider = ${status}, 
+              aprovador_lider_email = ${aprovadorEmail || null}, 
+              aprovador_lider_nome = ${aprovadorNome || null},
+              data_aprovacao_lider = CURRENT_TIMESTAMP,
+              observacao_lider = ${observacao || null},
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ${parseInt(id, 10)}
+          RETURNING *
+        `;
+      }
+      
+      const result = await db.execute(updateQuery);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Solicitação não encontrada" });
+      }
+      
+      // Check if both are approved, then update main status
+      const row = result.rows[0] as any;
+      if (row.status_rh === 'aprovado' && row.status_lider === 'aprovado') {
+        await db.execute(sql`
+          UPDATE cortex_core.unavailability_requests 
+          SET status = 'aprovado', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ${parseInt(id, 10)}
+        `);
+        row.status = 'aprovado';
+      } else if (row.status_rh === 'reprovado' || row.status_lider === 'reprovado') {
+        await db.execute(sql`
+          UPDATE cortex_core.unavailability_requests 
+          SET status = 'reprovado', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ${parseInt(id, 10)}
+        `);
+        row.status = 'reprovado';
+      }
+      
+      res.json(row);
+    } catch (error: any) {
+      console.error("[unavailability] Error updating approval:", error);
+      res.status(500).json({ error: error.message || "Erro ao atualizar aprovação" });
+    }
+  });
+
+  // Edit period (only for approved periods in calendar)
+  app.put("/api/unavailability-requests/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { dataInicio, dataFim, motivo } = req.body;
+      
+      if (!dataInicio || !dataFim) {
+        return res.status(400).json({ error: "Campos obrigatórios: dataInicio, dataFim" });
+      }
+      
+      const inicio = new Date(dataInicio);
+      const fim = new Date(dataFim);
+      const diffDays = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays < 0) {
+        return res.status(400).json({ error: "Data de fim deve ser posterior à data de início" });
+      }
+      if (diffDays > 7) {
+        return res.status(400).json({ error: "Período máximo de 7 dias" });
+      }
+      
+      const result = await db.execute(sql`
+        UPDATE cortex_core.unavailability_requests 
+        SET data_inicio = ${dataInicio}, 
+            data_fim = ${dataFim},
+            motivo = ${motivo || null},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${parseInt(id, 10)}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Solicitação não encontrada" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      console.error("[unavailability] Error editing request:", error);
+      res.status(500).json({ error: error.message || "Erro ao editar solicitação" });
     }
   });
 
