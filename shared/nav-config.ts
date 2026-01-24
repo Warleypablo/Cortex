@@ -65,11 +65,12 @@ export const PERMISSION_KEYS = {
   // G&G (Pessoas)
   GG: {
     VISAO_GERAL: 'gg.visao_geral',
+    COLABORADORES: 'gg.colaboradores',
     RECRUTAMENTO: 'gg.recrutamento',
     ONBOARDING: 'gg.onboarding',
     PESQUISAS: 'gg.pesquisas',
-    COLABORADORES: 'gg.colaboradores',
     PATRIMONIO: 'gg.patrimonio',
+    CALENDARIO_FERIAS: 'gg.calendario_ferias',
   },
   // Jurídico
   JUR: {
@@ -210,6 +211,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/colaboradores': PERMISSION_KEYS.GG.COLABORADORES,
   '/colaboradores/analise': PERMISSION_KEYS.GG.COLABORADORES,
   '/patrimonio': PERMISSION_KEYS.GG.PATRIMONIO,
+  '/gg/calendario-ferias': PERMISSION_KEYS.GG.CALENDARIO_FERIAS,
   // Jurídico
   '/juridico/clientes': PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES,
   '/contratos-module': PERMISSION_KEYS.JUR.CONTRATOS_MODULE,
@@ -395,6 +397,7 @@ export const NAV_CONFIG = {
       { title: 'Onboarding', url: '/rh/onboarding', icon: 'ClipboardList', permissionKey: PERMISSION_KEYS.GG.ONBOARDING },
       { title: 'Pesquisas', url: '/rh/pesquisas', icon: 'BarChart2', permissionKey: PERMISSION_KEYS.GG.PESQUISAS },
       { title: 'Patrimônio', url: '/patrimonio', icon: 'Building2', permissionKey: PERMISSION_KEYS.GG.PATRIMONIO },
+      { title: 'Calendário de Férias', url: '/gg/calendario-ferias', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GG.CALENDARIO_FERIAS },
     ],
   },
 
@@ -569,6 +572,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GG.PESQUISAS]: 'Pesquisas',
   [PERMISSION_KEYS.GG.COLABORADORES]: 'Colaboradores',
   [PERMISSION_KEYS.GG.PATRIMONIO]: 'Patrimônio',
+  [PERMISSION_KEYS.GG.CALENDARIO_FERIAS]: 'Calendário de Férias',
   [PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES]: 'Clientes Inadimplentes',
   [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',

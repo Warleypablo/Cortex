@@ -31,6 +31,7 @@ const Atendimento = lazy(() => import("@/pages/Atendimento"));
 const VisaoGeral = lazy(() => import("@/pages/VisaoGeral"));
 const DashboardFinanceiro = lazy(() => import("@/pages/DashboardFinanceiro"));
 const DashboardGeG = lazy(() => import("@/pages/DashboardGeG"));
+const CalendarioFerias = lazy(() => import("@/pages/CalendarioFerias"));
 const DashboardRetencao = lazy(() => import("@/pages/DashboardRetencao"));
 const Cohort = lazy(() => import("@/pages/Cohort"));
 const ChurnDetalhamento = lazy(() => import("@/pages/ChurnDetalhamento"));
@@ -207,6 +208,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
       <Route path="/rh/onboarding">{() => <ProtectedRoute path="/rh/onboarding" component={OnboardingRH} />}</Route>
       <Route path="/rh/pesquisas">{() => <ProtectedRoute path="/rh/pesquisas" component={PesquisasGG} />}</Route>
+      <Route path="/gg/calendario-ferias">{() => <ProtectedRoute path="/gg/calendario-ferias" component={CalendarioFerias} />}</Route>
 
       {/* Operação */}
       <Route path="/operacao/onboardings">{() => <ProtectedRoute path="/operacao/onboardings" component={OnboardingsClientes} />}</Route>
