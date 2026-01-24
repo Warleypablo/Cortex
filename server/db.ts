@@ -640,6 +640,28 @@ export async function initializeSysSchema(): Promise<void> {
       )
     `);
 
+    // 7. cortex_core.unavailability_requests - PJ unavailability period requests
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.unavailability_requests (
+        id SERIAL PRIMARY KEY,
+        colaborador_id INTEGER NOT NULL,
+        colaborador_nome VARCHAR(255) NOT NULL,
+        colaborador_email VARCHAR(255),
+        data_inicio DATE NOT NULL,
+        data_fim DATE NOT NULL,
+        motivo TEXT,
+        data_admissao DATE,
+        status VARCHAR(20) DEFAULT 'pendente' CHECK (status IN ('pendente', 'aprovado', 'reprovado')),
+        aprovador_email VARCHAR(255),
+        aprovador_nome VARCHAR(255),
+        data_aprovacao TIMESTAMP,
+        observacao_aprovador TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT chk_max_days CHECK ((data_fim - data_inicio) <= 7)
+      )
+    `);
+
     console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
