@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Calendar, CalendarDays, Clock, User, CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Calendar, CalendarDays, Clock, User, CheckCircle, XCircle, Loader2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Label } from "@/components/ui/label";
@@ -15,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isWithinInterval, parseISO, isSameMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isWithinInterval, parseISO, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface UnavailabilityRequest {
@@ -33,6 +35,12 @@ interface UnavailabilityRequest {
   data_admissao: string | null;
   meses_empresa: number | null;
   created_at: string;
+}
+
+interface Colaborador {
+  id: number;
+  nome: string;
+  status: string | null;
 }
 
 const COLORS = [
@@ -61,6 +69,12 @@ export default function CalendarioFerias() {
   const [observacao, setObservacao] = useState('');
   const [activeTab, setActiveTab] = useState('calendario');
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [selectedColaboradorId, setSelectedColaboradorId] = useState<string>('');
+  const [novaDataInicio, setNovaDataInicio] = useState('');
+  const [novaDataFim, setNovaDataFim] = useState('');
+  const [novoMotivo, setNovoMotivo] = useState('');
 
   const { data: pendingRequests = [], isLoading: isLoadingPending, refetch: refetchPending } = useQuery<UnavailabilityRequest[]>({
     queryKey: ["/api/unavailability-requests", { status: "pendente" }],
@@ -69,6 +83,14 @@ export default function CalendarioFerias() {
   const { data: approvedRequests = [], isLoading: isLoadingApproved } = useQuery<UnavailabilityRequest[]>({
     queryKey: ["/api/unavailability-requests", { status: "aprovado" }],
   });
+
+  const { data: colaboradores = [] } = useQuery<Colaborador[]>({
+    queryKey: ["/api/colaboradores/dropdown"],
+  });
+
+  const colaboradoresAtivos = useMemo(() => {
+    return colaboradores.filter(c => c.status?.toLowerCase() === 'ativo');
+  }, [colaboradores]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: { id: number; status: string; aprovadorEmail?: string; aprovadorNome?: string; observacaoAprovador?: string }) => {
@@ -90,6 +112,31 @@ export default function CalendarioFerias() {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: async (data: { colaboradorId: number; colaboradorNome: string; dataInicio: string; dataFim: string; motivo?: string }) => {
+      return await apiRequest("POST", "/api/unavailability-requests", data);
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Indisponibilidade registrada",
+        description: "O período de indisponibilidade foi adicionado ao calendário.",
+      });
+      setShowAddDialog(false);
+      resetAddForm();
+      queryClient.invalidateQueries({ queryKey: ["/api/unavailability-requests"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetAddForm = () => {
+    setSelectedColaboradorId('');
+    setNovaDataInicio('');
+    setNovaDataFim('');
+    setNovoMotivo('');
+  };
+
   const handleAction = (req: UnavailabilityRequest, action: 'aprovar' | 'reprovar') => {
     setSelectedRequest(req);
     setActionType(action);
@@ -108,6 +155,47 @@ export default function CalendarioFerias() {
     });
   };
 
+  const handleAddSubmit = () => {
+    if (!selectedColaboradorId || !novaDataInicio || !novaDataFim) {
+      toast({ title: "Erro", description: "Preencha todos os campos obrigatórios", variant: "destructive" });
+      return;
+    }
+
+    const colaborador = colaboradoresAtivos.find(c => c.id === parseInt(selectedColaboradorId));
+    if (!colaborador) {
+      toast({ title: "Erro", description: "Colaborador não encontrado", variant: "destructive" });
+      return;
+    }
+
+    const inicio = new Date(novaDataInicio);
+    const fim = new Date(novaDataFim);
+    const diffDays = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) {
+      toast({ title: "Erro", description: "Data de fim deve ser posterior à data de início", variant: "destructive" });
+      return;
+    }
+    if (diffDays > 7) {
+      toast({ title: "Erro", description: "Período máximo de 7 dias", variant: "destructive" });
+      return;
+    }
+
+    createMutation.mutate({
+      colaboradorId: colaborador.id,
+      colaboradorNome: colaborador.nome,
+      dataInicio: novaDataInicio,
+      dataFim: novaDataFim,
+      motivo: novoMotivo || undefined,
+    });
+  };
+
+  const handleDataInicioChange = (value: string) => {
+    setNovaDataInicio(value);
+    if (value && !novaDataFim) {
+      setNovaDataFim(value);
+    }
+  };
+
   const formatTempoEmpresa = (meses: number | null) => {
     if (meses === null) return 'N/A';
     if (meses < 12) return `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
@@ -119,7 +207,7 @@ export default function CalendarioFerias() {
 
   const colaboradorColors = useMemo(() => {
     const colorMap = new Map<number, string>();
-    approvedRequests.forEach((req, index) => {
+    approvedRequests.forEach((req) => {
       if (!colorMap.has(req.colaborador_id)) {
         colorMap.set(req.colaborador_id, COLORS[colorMap.size % COLORS.length]);
       }
@@ -162,7 +250,7 @@ export default function CalendarioFerias() {
     <div className="p-6 space-y-6" data-testid="page-calendario-ferias">
       <Card className="border-orange-200 dark:border-orange-800">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
                 <Calendar className="w-5 h-5 text-orange-600 dark:text-orange-400" />
@@ -172,11 +260,17 @@ export default function CalendarioFerias() {
                 <CardDescription>Visualizar e alinhar períodos de indisponibilidade dos prestadores</CardDescription>
               </div>
             </div>
-            {pendingRequests.length > 0 && (
-              <Badge variant="outline" className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300">
-                {pendingRequests.length} pendente{pendingRequests.length > 1 ? 's' : ''}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {pendingRequests.length > 0 && (
+                <Badge variant="outline" className="bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300">
+                  {pendingRequests.length} pendente{pendingRequests.length > 1 ? 's' : ''}
+                </Badge>
+              )}
+              <Button onClick={() => setShowAddDialog(true)} className="gap-2" data-testid="button-add-unavailability">
+                <Plus className="w-4 h-4" />
+                Adicionar
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -395,6 +489,89 @@ export default function CalendarioFerias() {
           </Tabs>
         </CardContent>
       </Card>
+
+      <Dialog open={showAddDialog} onOpenChange={(open) => { setShowAddDialog(open); if (!open) resetAddForm(); }}>
+        <DialogContent data-testid="dialog-add-unavailability">
+          <DialogHeader>
+            <DialogTitle>Adicionar Período de Indisponibilidade</DialogTitle>
+            <DialogDescription>
+              Registre manualmente um período de férias ou indisponibilidade para um colaborador.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="colaborador">Colaborador *</Label>
+              <Select value={selectedColaboradorId} onValueChange={setSelectedColaboradorId}>
+                <SelectTrigger data-testid="select-colaborador">
+                  <SelectValue placeholder="Selecione um colaborador" />
+                </SelectTrigger>
+                <SelectContent>
+                  {colaboradoresAtivos.map((colab) => (
+                    <SelectItem key={colab.id} value={colab.id.toString()}>
+                      {colab.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dataInicio">Data Início *</Label>
+                <Input
+                  id="dataInicio"
+                  type="date"
+                  value={novaDataInicio}
+                  onChange={(e) => handleDataInicioChange(e.target.value)}
+                  data-testid="input-data-inicio"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dataFim">Data Fim *</Label>
+                <Input
+                  id="dataFim"
+                  type="date"
+                  value={novaDataFim}
+                  onChange={(e) => setNovaDataFim(e.target.value)}
+                  min={novaDataInicio}
+                  max={novaDataInicio ? format(addDays(parseISO(novaDataInicio), 7), 'yyyy-MM-dd') : undefined}
+                  disabled={!novaDataInicio}
+                  data-testid="input-data-fim"
+                />
+              </div>
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              Período máximo: 7 dias
+            </p>
+            
+            <div className="space-y-2">
+              <Label htmlFor="motivo">Motivo (opcional)</Label>
+              <Textarea
+                id="motivo"
+                value={novoMotivo}
+                onChange={(e) => setNovoMotivo(e.target.value)}
+                placeholder="Ex: Férias, viagem, compromisso pessoal..."
+                rows={2}
+                data-testid="input-motivo"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowAddDialog(false); resetAddForm(); }} data-testid="button-cancelar-add">
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleAddSubmit}
+              disabled={createMutation.isPending || !selectedColaboradorId || !novaDataInicio || !novaDataFim}
+              data-testid="button-confirmar-add"
+            >
+              {createMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedRequest && !!actionType} onOpenChange={() => { setSelectedRequest(null); setActionType(null); }}>
         <DialogContent data-testid="dialog-confirm-action">
