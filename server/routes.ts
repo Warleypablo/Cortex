@@ -17152,6 +17152,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================
+  // UNAVAILABILITY REQUESTS API ENDPOINTS
+  // ========================================
+  
+  app.get("/api/unavailability-requests", isAuthenticated, async (req, res) => {
+    try {
+      const { status, colaboradorId } = req.query;
+      
+      let query = sql`
+        SELECT ur.*, 
+               CASE 
+                 WHEN ur.data_admissao IS NOT NULL THEN 
+                   EXTRACT(YEAR FROM AGE(CURRENT_DATE, ur.data_admissao)) * 12 + 
+                   EXTRACT(MONTH FROM AGE(CURRENT_DATE, ur.data_admissao))
+                 ELSE NULL 
+               END as meses_empresa
+        FROM cortex_core.unavailability_requests ur
+        WHERE 1=1
+      `;
+      
+      if (status) {
+        query = sql`${query} AND ur.status = ${status as string}`;
+      }
+      if (colaboradorId) {
+        query = sql`${query} AND ur.colaborador_id = ${parseInt(colaboradorId as string, 10)}`;
+      }
+      
+      query = sql`${query} ORDER BY ur.created_at DESC`;
+      
+      const result = await db.execute(query);
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("[unavailability] Error fetching requests:", error);
+      res.status(500).json({ error: error.message || "Erro ao buscar solicitações" });
+    }
+  });
+
+  app.post("/api/unavailability-requests", isAuthenticated, async (req, res) => {
+    try {
+      const { colaboradorId, colaboradorNome, colaboradorEmail, dataInicio, dataFim, motivo, dataAdmissao } = req.body;
+      
+      if (!colaboradorId || !colaboradorNome || !dataInicio || !dataFim) {
+        return res.status(400).json({ error: "Campos obrigatórios: colaboradorId, colaboradorNome, dataInicio, dataFim" });
+      }
+      
+      const inicio = new Date(dataInicio);
+      const fim = new Date(dataFim);
+      const diffDays = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays < 0) {
+        return res.status(400).json({ error: "Data de fim deve ser posterior à data de início" });
+      }
+      if (diffDays > 7) {
+        return res.status(400).json({ error: "Período máximo de 7 dias" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.unavailability_requests 
+        (colaborador_id, colaborador_nome, colaborador_email, data_inicio, data_fim, motivo, data_admissao, status)
+        VALUES (${colaboradorId}, ${colaboradorNome}, ${colaboradorEmail || null}, ${dataInicio}, ${dataFim}, ${motivo || null}, ${dataAdmissao || null}, 'pendente')
+        RETURNING *
+      `);
+      
+      res.status(201).json(result.rows[0]);
+    } catch (error: any) {
+      console.error("[unavailability] Error creating request:", error);
+      res.status(500).json({ error: error.message || "Erro ao criar solicitação" });
+    }
+  });
+
+  app.patch("/api/unavailability-requests/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, aprovadorEmail, aprovadorNome, observacaoAprovador } = req.body;
+      
+      if (!status || !['aprovado', 'reprovado'].includes(status)) {
+        return res.status(400).json({ error: "Status deve ser 'aprovado' ou 'reprovado'" });
+      }
+      
+      const result = await db.execute(sql`
+        UPDATE cortex_core.unavailability_requests 
+        SET status = ${status}, 
+            aprovador_email = ${aprovadorEmail || null}, 
+            aprovador_nome = ${aprovadorNome || null},
+            data_aprovacao = CURRENT_TIMESTAMP,
+            observacao_aprovador = ${observacaoAprovador || null},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${parseInt(id, 10)}
+        RETURNING *
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Solicitação não encontrada" });
+      }
+      
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      console.error("[unavailability] Error updating request:", error);
+      res.status(500).json({ error: error.message || "Erro ao atualizar solicitação" });
+    }
+  });
+
+  app.delete("/api/unavailability-requests/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const result = await db.execute(sql`
+        DELETE FROM cortex_core.unavailability_requests 
+        WHERE id = ${parseInt(id, 10)} AND status = 'pendente'
+        RETURNING id
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Solicitação não encontrada ou já foi processada" });
+      }
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[unavailability] Error deleting request:", error);
+      res.status(500).json({ error: error.message || "Erro ao excluir solicitação" });
+    }
+  });
+
   const httpServer = createServer(app);
   
   setupDealNotifications(httpServer);
