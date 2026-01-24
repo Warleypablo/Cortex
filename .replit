@@ -50,4 +50,4 @@ CENTRAL_TAB_NAME = "Automacao-Report"
 FORCE_REPORT_FOLDER_ID = "1O1VMxN7CL0GEWRtglmz862X85btgARTE"
 
 [agent]
-integrations = ["javascript_object_storage:2.0.0"]
+integrations = ["javascript_object_storage:2.0.0", "javascript_openai_ai_integrations:2.0.0"]
