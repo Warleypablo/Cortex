@@ -355,8 +355,8 @@ function UnavailabilityApprovalSection() {
     },
     onSuccess: () => {
       toast({ 
-        title: actionType === 'aprovar' ? "Solicitação aprovada" : "Solicitação reprovada",
-        description: `A solicitação foi ${actionType === 'aprovar' ? 'aprovada' : 'reprovada'} com sucesso.`,
+        title: actionType === 'aprovar' ? "Solicitação alinhada" : "Solicitação não alinhada",
+        description: `A solicitação foi ${actionType === 'aprovar' ? 'alinhada' : 'marcada como não alinhada'} com sucesso.`,
       });
       setSelectedRequest(null);
       setActionType(null);
@@ -396,10 +396,6 @@ function UnavailabilityApprovalSection() {
     return `${anos}a ${mesesRestantes}m`;
   };
 
-  if (pendingRequests.length === 0 && !isLoading) {
-    return null;
-  }
-
   return (
     <>
       <Card className="mb-6 border-orange-200 dark:border-orange-800" data-testid="card-unavailability-approvals">
@@ -410,8 +406,8 @@ function UnavailabilityApprovalSection() {
                 <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
-                <CardTitle className="text-lg">Solicitações de Indisponibilidade</CardTitle>
-                <CardDescription>Aprovar ou reprovar períodos de indisponibilidade dos prestadores</CardDescription>
+                <CardTitle className="text-lg">Alinhamento de Indisponibilidade</CardTitle>
+                <CardDescription>Alinhar períodos de indisponibilidade dos prestadores</CardDescription>
               </div>
             </div>
             {pendingRequests.length > 0 && (
@@ -425,6 +421,11 @@ function UnavailabilityApprovalSection() {
           {isLoading ? (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : pendingRequests.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>Nenhuma solicitação pendente de alinhamento.</p>
             </div>
           ) : (
             <Table data-testid="table-unavailability-approvals">
@@ -474,22 +475,22 @@ function UnavailabilityApprovalSection() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/30"
+                          className="gap-1 text-green-600"
                           onClick={() => handleAction(req, 'aprovar')}
-                          data-testid={`button-aprovar-${req.id}`}
+                          data-testid={`button-alinhar-${req.id}`}
                         >
                           <CheckCircle className="w-4 h-4" />
-                          Aprovar
+                          Alinhar
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30"
+                          className="gap-1 text-red-600"
                           onClick={() => handleAction(req, 'reprovar')}
-                          data-testid={`button-reprovar-${req.id}`}
+                          data-testid={`button-nao-alinhar-${req.id}`}
                         >
                           <XCircle className="w-4 h-4" />
-                          Reprovar
+                          Não Alinhar
                         </Button>
                       </div>
                     </TableCell>
@@ -505,7 +506,7 @@ function UnavailabilityApprovalSection() {
         <DialogContent data-testid="dialog-confirm-action">
           <DialogHeader>
             <DialogTitle>
-              {actionType === 'aprovar' ? 'Aprovar' : 'Reprovar'} Solicitação
+              {actionType === 'aprovar' ? 'Alinhar' : 'Não Alinhar'} Solicitação
             </DialogTitle>
             <DialogDescription>
               {selectedRequest && (
@@ -522,7 +523,7 @@ function UnavailabilityApprovalSection() {
             <Textarea
               value={observacao}
               onChange={(e) => setObservacao(e.target.value)}
-              placeholder={actionType === 'aprovar' ? 'Aprovado conforme solicitado...' : 'Motivo da reprovação...'}
+              placeholder={actionType === 'aprovar' ? 'Alinhado conforme solicitado...' : 'Motivo do não alinhamento...'}
               rows={3}
               data-testid="input-observacao-aprovador"
             />
@@ -538,7 +539,7 @@ function UnavailabilityApprovalSection() {
               data-testid="button-confirmar-acao"
             >
               {updateMutation.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Confirmar {actionType === 'aprovar' ? 'Aprovação' : 'Reprovação'}
+              Confirmar {actionType === 'aprovar' ? 'Alinhamento' : 'Não Alinhamento'}
             </Button>
           </DialogFooter>
         </DialogContent>
