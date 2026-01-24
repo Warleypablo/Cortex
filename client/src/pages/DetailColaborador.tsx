@@ -4964,6 +4964,243 @@ function TimelineCard({ colaboradorId }: { colaboradorId: string }) {
   );
 }
 
+interface UnavailabilityRequest {
+  id: number;
+  colaborador_id: number;
+  colaborador_nome: string;
+  data_inicio: string;
+  data_fim: string;
+  motivo: string | null;
+  status: 'pendente' | 'aprovado' | 'reprovado';
+  aprovador_nome: string | null;
+  data_aprovacao: string | null;
+  observacao_aprovador: string | null;
+  created_at: string;
+}
+
+interface UnavailabilityCardProps {
+  colaboradorId: string;
+  colaboradorNome: string;
+  colaboradorEmail?: string | null;
+  dataAdmissao?: string | null;
+}
+
+function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, dataAdmissao }: UnavailabilityCardProps) {
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
+  const [motivo, setMotivo] = useState('');
+
+  const { data: requests = [], isLoading, refetch } = useQuery<UnavailabilityRequest[]>({
+    queryKey: ["/api/unavailability-requests", { colaboradorId }],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { colaboradorId: number; colaboradorNome: string; colaboradorEmail?: string | null; dataInicio: string; dataFim: string; motivo: string; dataAdmissao?: string | null }) => {
+      return await apiRequest("/api/unavailability-requests", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Solicitação enviada", description: "Seu pedido foi enviado para aprovação do G&G." });
+      setShowForm(false);
+      setDataInicio('');
+      setDataFim('');
+      setMotivo('');
+      queryClient.invalidateQueries({ queryKey: ["/api/unavailability-requests"] });
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest(`/api/unavailability-requests/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      toast({ title: "Solicitação cancelada" });
+      queryClient.invalidateQueries({ queryKey: ["/api/unavailability-requests"] });
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!dataInicio || !dataFim) {
+      toast({ title: "Erro", description: "Selecione as datas de início e fim.", variant: "destructive" });
+      return;
+    }
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    const diffDays = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      toast({ title: "Erro", description: "Data de fim deve ser posterior à data de início.", variant: "destructive" });
+      return;
+    }
+    if (diffDays > 7) {
+      toast({ title: "Erro", description: "Período máximo permitido é de 7 dias.", variant: "destructive" });
+      return;
+    }
+
+    createMutation.mutate({
+      colaboradorId: parseInt(colaboradorId),
+      colaboradorNome,
+      colaboradorEmail,
+      dataInicio,
+      dataFim,
+      motivo,
+      dataAdmissao,
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pendente':
+        return <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-300">Pendente</Badge>;
+      case 'aprovado':
+        return <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300">Aprovado</Badge>;
+      case 'reprovado':
+        return <Badge variant="outline" className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300">Reprovado</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  return (
+    <Card className="p-6" data-testid="card-unavailability">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-semibold flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+            <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+          </div>
+          Períodos de Indisponibilidade
+        </h2>
+        {!showForm && (
+          <Button onClick={() => setShowForm(true)} size="sm" className="gap-2" data-testid="button-nova-indisponibilidade">
+            <Plus className="w-4 h-4" />
+            Nova Solicitação
+          </Button>
+        )}
+      </div>
+
+      {showForm && (
+        <Card className="p-4 mb-6 bg-muted/50" data-testid="form-indisponibilidade">
+          <h3 className="font-medium mb-4">Solicitar Período de Indisponibilidade</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Você pode solicitar até 7 dias de indisponibilidade. O pedido será enviado para aprovação do G&G.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="text-sm font-medium mb-1 block">Data de Início</label>
+              <Input
+                type="date"
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                data-testid="input-data-inicio"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Data de Fim</label>
+              <Input
+                type="date"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                min={dataInicio || new Date().toISOString().split('T')[0]}
+                data-testid="input-data-fim"
+              />
+            </div>
+          </div>
+          <div className="mb-4">
+            <label className="text-sm font-medium mb-1 block">Motivo (opcional)</label>
+            <Textarea
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              placeholder="Descreva o motivo da indisponibilidade..."
+              rows={3}
+              data-testid="input-motivo"
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setShowForm(false)} data-testid="button-cancelar-form">
+              Cancelar
+            </Button>
+            <Button onClick={handleSubmit} disabled={createMutation.isPending} data-testid="button-enviar-solicitacao">
+              {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Enviar Solicitação
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : requests.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">
+          <Clock className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p>Nenhuma solicitação de indisponibilidade registrada.</p>
+        </div>
+      ) : (
+        <Table data-testid="table-unavailability">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Período</TableHead>
+              <TableHead>Motivo</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Observação</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {requests.map((req) => (
+              <TableRow key={req.id} data-testid={`row-unavailability-${req.id}`}>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                    <span>
+                      {format(new Date(req.data_inicio), "dd/MM/yyyy", { locale: ptBR })} - {format(new Date(req.data_fim), "dd/MM/yyyy", { locale: ptBR })}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell className="max-w-[200px] truncate">{req.motivo || '-'}</TableCell>
+                <TableCell>{getStatusBadge(req.status)}</TableCell>
+                <TableCell className="max-w-[200px] truncate">
+                  {req.observacao_aprovador || '-'}
+                  {req.aprovador_nome && req.status !== 'pendente' && (
+                    <span className="text-xs text-muted-foreground block">por {req.aprovador_nome}</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {req.status === 'pendente' && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => cancelMutation.mutate(req.id)}
+                      disabled={cancelMutation.isPending}
+                      data-testid={`button-cancelar-${req.id}`}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </Card>
+  );
+}
+
 function HealthCard({ colaboradorId }: { colaboradorId: string }) {
   const [showEvolutionDialog, setShowEvolutionDialog] = useState(false);
   
@@ -5553,6 +5790,10 @@ export default function DetailColaborador() {
               <TrendingUp className="w-4 h-4" />
               Desenvolvimento
             </TabsTrigger>
+            <TabsTrigger value="indisponibilidade" className="gap-2" data-testid="tab-indisponibilidade">
+              <Clock className="w-4 h-4" />
+              Indisponibilidade
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="informacoes" data-testid="tab-content-informacoes">
@@ -5972,6 +6213,15 @@ export default function DetailColaborador() {
               <ComentariosCard colaboradorId={colaboradorId} />
               <TimelineCard colaboradorId={colaboradorId} />
             </div>
+          </TabsContent>
+
+          <TabsContent value="indisponibilidade" data-testid="tab-content-indisponibilidade">
+            <UnavailabilityCard 
+              colaboradorId={colaboradorId} 
+              colaboradorNome={colaborador.nome}
+              colaboradorEmail={colaborador.email}
+              dataAdmissao={colaborador.admissao}
+            />
           </TabsContent>
 
         </Tabs>
