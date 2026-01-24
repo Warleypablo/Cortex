@@ -660,11 +660,11 @@ export async function initializeSysSchema(): Promise<void> {
         observacao_aprovador TEXT,
         aprovador_rh_email VARCHAR(255),
         aprovador_rh_nome VARCHAR(255),
-        aprovado_rh_em TIMESTAMP,
+        data_aprovacao_rh TIMESTAMP,
         observacao_rh TEXT,
         aprovador_lider_email VARCHAR(255),
         aprovador_lider_nome VARCHAR(255),
-        aprovado_lider_em TIMESTAMP,
+        data_aprovacao_lider TIMESTAMP,
         observacao_lider TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -679,11 +679,11 @@ export async function initializeSysSchema(): Promise<void> {
       ADD COLUMN IF NOT EXISTS status_lider VARCHAR(20) DEFAULT 'pendente',
       ADD COLUMN IF NOT EXISTS aprovador_rh_email VARCHAR(255),
       ADD COLUMN IF NOT EXISTS aprovador_rh_nome VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS aprovado_rh_em TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS data_aprovacao_rh TIMESTAMP,
       ADD COLUMN IF NOT EXISTS observacao_rh TEXT,
       ADD COLUMN IF NOT EXISTS aprovador_lider_email VARCHAR(255),
       ADD COLUMN IF NOT EXISTS aprovador_lider_nome VARCHAR(255),
-      ADD COLUMN IF NOT EXISTS aprovado_lider_em TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS data_aprovacao_lider TIMESTAMP,
       ADD COLUMN IF NOT EXISTS observacao_lider TEXT
     `);
 
