@@ -17400,12 +17400,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/unavailability-requests/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
+      const { fromCalendar } = req.query;
       
-      const result = await db.execute(sql`
-        DELETE FROM cortex_core.unavailability_requests 
-        WHERE id = ${parseInt(id, 10)} AND status = 'pendente'
-        RETURNING id
-      `);
+      let result;
+      if (fromCalendar === 'true') {
+        // Allow deleting approved periods from calendar
+        result = await db.execute(sql`
+          DELETE FROM cortex_core.unavailability_requests 
+          WHERE id = ${parseInt(id, 10)}
+          RETURNING id
+        `);
+      } else {
+        // Only allow deleting pending requests
+        result = await db.execute(sql`
+          DELETE FROM cortex_core.unavailability_requests 
+          WHERE id = ${parseInt(id, 10)} AND (status = 'pendente' OR (status_rh = 'pendente' AND status_lider = 'pendente'))
+          RETURNING id
+        `);
+      }
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Solicitação não encontrada ou já foi processada" });
