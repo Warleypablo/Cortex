@@ -4998,10 +4998,7 @@ function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, 
 
   const createMutation = useMutation({
     mutationFn: async (data: { colaboradorId: number; colaboradorNome: string; colaboradorEmail?: string | null; dataInicio: string; dataFim: string; motivo: string; dataAdmissao?: string | null }) => {
-      return await apiRequest("/api/unavailability-requests", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/unavailability-requests", data);
     },
     onSuccess: () => {
       toast({ title: "Solicitação enviada", description: "Seu pedido foi enviado para aprovação do G&G." });
@@ -5019,7 +5016,7 @@ function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, 
 
   const cancelMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/unavailability-requests/${id}`, { method: "DELETE" });
+      return await apiRequest("DELETE", `/api/unavailability-requests/${id}`);
     },
     onSuccess: () => {
       toast({ title: "Solicitação cancelada" });
