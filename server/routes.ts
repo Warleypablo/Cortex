@@ -8312,6 +8312,242 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contribuição por Squad - BULK endpoint otimizado (todos os 12 meses em uma chamada)
+  app.get("/api/contribuicao-squad/dfc/bulk", async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
+      const squad = req.query.squad as string | undefined;
+      const squadFilter = squad && squad !== 'todos' ? squad : null;
+      
+      const dataInicio = `${ano}-01-01`;
+      const dataFim = `${ano}-12-31 23:59:59`;
+      
+      // Query única para todo o ano com agregação por mês
+      const result = await db.execute(sql`
+        WITH cnpj_normalizado AS (
+          SELECT 
+            ids,
+            nome,
+            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+          FROM "Conta Azul".caz_clientes
+          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+        ),
+        cup_cnpj_normalizado AS (
+          SELECT 
+            task_id,
+            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+          FROM "Clickup".cup_clientes
+          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+        ),
+        contrato_unico AS (
+          SELECT DISTINCT ON (cc.cnpj_limpo)
+            cc.cnpj_limpo,
+            ct.squad,
+            ct.servico,
+            ct.id_subtask
+          FROM cup_cnpj_normalizado cc
+          INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
+          WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
+          ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
+        )
+        SELECT 
+          TO_CHAR(p.data_quitacao, 'YYYY-MM') as mes,
+          COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
+          COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
+          COALESCE(caz.nome, 'Cliente não identificado') as cliente_nome,
+          COALESCE(cu.servico, 'Serviço não identificado') as servico_nome,
+          COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
+          p.id as parcela_id,
+          p.valor_pago::numeric as valor,
+          p.data_quitacao,
+          p.link_nfse,
+          p.num_nfse
+        FROM "Conta Azul".caz_parcelas p
+        LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
+        WHERE p.status = 'QUITADO'
+          AND p.tipo_evento = 'RECEITA'
+          AND p.data_quitacao >= ${dataInicio}::date
+          AND p.data_quitacao <= ${dataFim}::timestamp
+          AND p.valor_pago::numeric > 0
+          AND (
+            ${squadFilter}::text IS NULL 
+            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') = ${squadFilter}
+            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter}, '^[^a-zA-Z]+', '', 'g')
+            OR ${squadFilter} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+          )
+        ORDER BY mes, categoria_id, cliente_nome, servico_nome
+      `);
+      
+      // Processar dados agrupados por mês
+      type ParcelaInfo = {
+        id: string;
+        valor: number;
+        dataQuitacao: string;
+        linkNfse: string | null;
+        numNfse: string | null;
+        clienteNome: string;
+        servicoNome: string;
+        squad: string;
+      };
+      
+      type ServicoInfo = { valor: number; squad: string; parcelas: ParcelaInfo[] };
+      type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
+      type CategoriaInfo = { nome: string; valorTotal: number; clientes: Map<string, ClienteInfo> };
+      type MesData = { 
+        categorias: Map<string, CategoriaInfo>; 
+        receitaTotal: number;
+        totalParcelas: number;
+      };
+      
+      const mesesMap = new Map<string, MesData>();
+      const squadsSet = new Set<string>();
+      
+      for (const row of result.rows as any[]) {
+        const mes = row.mes;
+        const categoriaId = row.categoria_id;
+        const categoriaNome = row.categoria_nome;
+        const clienteNome = row.cliente_nome;
+        const servicoNome = row.servico_nome;
+        const squadNome = row.squad;
+        const valor = Number(row.valor) || 0;
+        
+        squadsSet.add(squadNome);
+        
+        if (!mesesMap.has(mes)) {
+          mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
+        }
+        
+        const mesData = mesesMap.get(mes)!;
+        mesData.receitaTotal += valor;
+        mesData.totalParcelas += 1;
+        
+        if (!mesData.categorias.has(categoriaId)) {
+          mesData.categorias.set(categoriaId, {
+            nome: categoriaNome,
+            valorTotal: 0,
+            clientes: new Map()
+          });
+        }
+        
+        const cat = mesData.categorias.get(categoriaId)!;
+        cat.valorTotal += valor;
+        
+        if (!cat.clientes.has(clienteNome)) {
+          cat.clientes.set(clienteNome, { valorTotal: 0, servicos: new Map() });
+        }
+        
+        const cliente = cat.clientes.get(clienteNome)!;
+        cliente.valorTotal += valor;
+        
+        const chaveServico = `${servicoNome}|${squadNome}`;
+        if (!cliente.servicos.has(chaveServico)) {
+          cliente.servicos.set(chaveServico, { valor: 0, squad: squadNome, parcelas: [] });
+        }
+        
+        const servico = cliente.servicos.get(chaveServico)!;
+        servico.valor += valor;
+        servico.parcelas.push({
+          id: row.parcela_id,
+          valor,
+          dataQuitacao: row.data_quitacao,
+          linkNfse: row.link_nfse,
+          numNfse: row.num_nfse,
+          clienteNome,
+          servicoNome,
+          squad: squadNome
+        });
+      }
+      
+      // Converter para formato de resposta
+      const mesesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      
+      const monthlyData = [];
+      for (let m = 0; m < 12; m++) {
+        const mesKey = `${ano}-${String(m + 1).padStart(2, '0')}`;
+        const mesData = mesesMap.get(mesKey);
+        
+        if (!mesData) {
+          monthlyData.push({
+            mes: mesKey,
+            mesLabel: `${mesesLabels[m]}. de ${String(ano).slice(-2)}`,
+            data: null
+          });
+          continue;
+        }
+        
+        const receitas: { categoriaId: string; categoriaNome: string; valor: number; nivel: number; parcelas?: ParcelaInfo[] }[] = [];
+        let totalContratos = 0;
+        
+        // Primeiro nível: RECEITAS
+        receitas.push({
+          categoriaId: 'RECEITAS',
+          categoriaNome: 'Receitas',
+          valor: mesData.receitaTotal,
+          nivel: 0
+        });
+        
+        for (const [categoriaId, cat] of Array.from(mesData.categorias.entries())) {
+          // Nível 1: Categoria
+          receitas.push({
+            categoriaId: `RECEITAS.${categoriaId}`,
+            categoriaNome: cat.nome,
+            valor: cat.valorTotal,
+            nivel: 1
+          });
+          
+          for (const [clienteNome, cliente] of Array.from(cat.clientes.entries())) {
+            // Nível 2: Cliente
+            receitas.push({
+              categoriaId: `RECEITAS.${categoriaId}.${clienteNome}`,
+              categoriaNome: clienteNome,
+              valor: cliente.valorTotal,
+              nivel: 2
+            });
+            
+            for (const [chaveServico, servico] of Array.from(cliente.servicos.entries())) {
+              const [servicoNome] = chaveServico.split('|');
+              totalContratos++;
+              
+              // Nível 3: Serviço com parcelas
+              receitas.push({
+                categoriaId: `RECEITAS.${categoriaId}.${clienteNome}.${servicoNome}`,
+                categoriaNome: `${servicoNome} (${servico.squad})`,
+                valor: servico.valor,
+                nivel: 3,
+                parcelas: servico.parcelas
+              });
+            }
+          }
+        }
+        
+        monthlyData.push({
+          mes: mesKey,
+          mesLabel: `${mesesLabels[m]}. de ${String(ano).slice(-2)}`,
+          data: {
+            squads: Array.from(squadsSet).sort(),
+            receitas,
+            totais: {
+              receitaTotal: mesData.receitaTotal,
+              quantidadeParcelas: mesData.totalParcelas,
+              quantidadeContratos: totalContratos
+            }
+          }
+        });
+      }
+      
+      res.json({
+        ano,
+        squad: squadFilter || 'todos',
+        squads: Array.from(squadsSet).sort(),
+        meses: monthlyData
+      });
+    } catch (error) {
+      console.error("[api] Error fetching contribuição squad DFC bulk:", error);
+      res.status(500).json({ error: "Falha ao buscar dados de contribuição squad DFC (bulk)" });
+    }
+  });
+
   // Contribuição por Squad - Receitas atribuídas por squad do contrato
   app.get("/api/contribuicao-squad/dfc", async (req, res) => {
     try {
