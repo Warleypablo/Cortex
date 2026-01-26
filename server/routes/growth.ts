@@ -499,7 +499,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         : sql``;
       
       // Buscar totais de MQL/Leads por canal para o funil (coluna mql é text) com RM/RR stages
-      // Vendas são filtradas por data_fechamento (quando o negócio foi ganho)
+      // Vendas MQL são filtradas por data_fechamento E mql = '1'
       const mqlTotaisPorCanalResult = await db.execute(sql`
         WITH leads_mqls AS (
           SELECT 
@@ -513,7 +513,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             ${canalFilterSQL}
           GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
         ),
-        vendas AS (
+        vendas_mql AS (
           SELECT 
             COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
             COUNT(DISTINCT id) as vendas,
@@ -521,6 +521,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           FROM "Bitrix".crm_deal
           WHERE stage_name = 'Negócio Ganho'
             AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
+            AND (mql::text = '1' OR LOWER(mql::text) = 'true')
             ${canalFilterSQL}
           GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
         )
@@ -533,7 +534,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(v.vendas, 0) as vendas,
           COALESCE(v.valor_vendas, 0) as valor_vendas
         FROM leads_mqls lm
-        FULL OUTER JOIN vendas v ON lm.canal = v.canal
+        FULL OUTER JOIN vendas_mql v ON lm.canal = v.canal
         ORDER BY COALESCE(lm.mqls, 0) DESC
       `);
       
