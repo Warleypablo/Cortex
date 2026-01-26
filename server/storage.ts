@@ -11981,6 +11981,15 @@ export class DbStorage implements IStorage {
     // Debug: mostrar todos os freelancers e seus squads para identificar problemas de join
     if (salarioSquadFilterValue) {
       console.log('[freelas] Filtro de squad aplicado:', salarioSquadFilterValue);
+      
+      // Debug: buscar nomes similares para encontrar variações
+      const similarNamesDebug = await db.execute(sql`
+        SELECT nome, squad FROM "Inhire".rh_pessoal 
+        WHERE LOWER(nome) LIKE '%livia%' OR LOWER(nome) LIKE '%lívia%' OR LOWER(nome) LIKE '%scalon%'
+           OR LOWER(nome) LIKE '%ana%lello%' OR LOWER(nome) LIKE '%vinicius%' OR LOWER(nome) LIKE '%ichinoseki%'
+      `);
+      console.log('[freelas-debug] Pessoas com nome similar no RH:', similarNamesDebug.rows);
+      
       // Buscar todos os freelas SEM filtro de squad para debug (com join robusto)
       const allFreelasDebug = await db.execute(sql`
         SELECT 
