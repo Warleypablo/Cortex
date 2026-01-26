@@ -11952,6 +11952,21 @@ export class DbStorage implements IStorage {
         OR
         -- Match se o nome de rp começa com o responsavel
         LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(f.responsavel)) || '%'
+        OR
+        -- Match flexível: primeiro nome igual E segundo nome do responsavel aparece no nome completo
+        -- Ex: "Livia Scalon" → "Livia de Oliveira Scalon" (primeiro=Livia, "Scalon" está no nome)
+        (
+          LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
+          AND LOWER(TRIM(rp.nome)) LIKE '%' || LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)) || '%'
+        )
+        OR
+        -- Match por similaridade de primeiro nome e sobrenome aproximado (para typos como Ichinoseki vs Ichinosek)
+        (
+          LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
+          AND (
+            LOWER(TRIM(rp.nome)) LIKE '%' || LEFT(LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)), 8) || '%'
+          )
+        )
       )
       WHERE f.data_pagamento >= ${dataInicio}::date
         AND f.data_pagamento <= ${dataFimComHora}::timestamp
@@ -12002,6 +12017,14 @@ export class DbStorage implements IStorage {
           LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
           OR LOWER(TRIM(f.responsavel)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2))
           OR LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(f.responsavel)) || '%'
+          OR (
+            LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
+            AND LOWER(TRIM(rp.nome)) LIKE '%' || LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)) || '%'
+          )
+          OR (
+            LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
+            AND LOWER(TRIM(rp.nome)) LIKE '%' || LEFT(LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)), 8) || '%'
+          )
         )
         WHERE f.data_pagamento >= ${dataInicio}::date
           AND f.data_pagamento <= ${dataFimComHora}::timestamp
