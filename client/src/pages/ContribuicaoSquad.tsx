@@ -409,7 +409,9 @@ export default function ContribuicaoSquad() {
                         const valor = col.valorPorCategoria.get(category.id) || 0;
                         const parcelaKey = `${category.id}|${col.mes}`;
                         const parcelas = hierarchicalData.parcelasPorCategoriaEMes.get(parcelaKey);
-                        const hasLinks = parcelas?.some((p: ParcelaInfo) => p.linkNfse);
+                        const hasLinks = parcelas?.some((p: ParcelaInfo) => p.urlCobranca || p.linkNfse);
+                        const firstFaturaLink = parcelas?.find((p: ParcelaInfo) => p.urlCobranca)?.urlCobranca;
+                        const firstNfseLink = parcelas?.find((p: ParcelaInfo) => p.linkNfse)?.linkNfse;
                         
                         return (
                           <div key={col.mes} className="px-2 py-1 text-right text-xs flex items-center justify-end gap-1">
@@ -418,10 +420,10 @@ export default function ContribuicaoSquad() {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <a 
-                                    href={parcelas.find((p: ParcelaInfo) => p.linkNfse)?.linkNfse || '#'}
+                                    href={firstFaturaLink || firstNfseLink || '#'}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-blue-500 hover-elevate"
+                                    className={firstFaturaLink ? "text-green-500 hover-elevate" : "text-blue-500 hover-elevate"}
                                     onClick={(e) => e.stopPropagation()}
                                   >
                                     <ExternalLink className="h-3 w-3" />
