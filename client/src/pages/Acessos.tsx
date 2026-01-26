@@ -2905,8 +2905,8 @@ function TurboTab() {
     if (!searchQuery) return tools;
     const query = searchQuery.toLowerCase();
     return tools.filter(tool => 
-      tool.platform.toLowerCase().includes(query) ||
-      tool.username.toLowerCase().includes(query) ||
+      (tool.platform && tool.platform.toLowerCase().includes(query)) ||
+      (tool.username && tool.username.toLowerCase().includes(query)) ||
       (tool.accessUrl && tool.accessUrl.toLowerCase().includes(query))
     );
   }, [tools, searchQuery]);
