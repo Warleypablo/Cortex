@@ -7,7 +7,7 @@ import type { Client, Credential, InsertClient, InsertCredential, AccessLog, Cli
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown, Check, ChevronsUpDown, UserPlus, Wand2, Link2, X } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Key, Lock, Loader2, ChevronDown, ChevronRight, Building2, History, ArrowUpDown, Check, ChevronsUpDown, UserPlus, Wand2, Link2, X, Zap } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -1337,7 +1337,7 @@ function CredentialRow({
   );
 }
 
-interface TurboTool {
+interface TurboToolItem {
   id: string;
   platform: string;
   username: string | null;
@@ -1346,12 +1346,12 @@ interface TurboTool {
   observations: string | null;
 }
 
-function EditTurboToolDialog({
+function EditTurboToolItemDialog({
   tool,
   open,
   onOpenChange,
 }: {
-  tool: TurboTool;
+  tool: TurboToolItem;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -1462,13 +1462,13 @@ function EditTurboToolDialog({
   );
 }
 
-function TurboToolsSection() {
+function TurboToolItemsSection() {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  const [editingTool, setEditingTool] = useState<TurboTool | null>(null);
+  const [editingTool, setEditingTool] = useState<TurboToolItem | null>(null);
   const { toast } = useToast();
 
-  const { data: tools = [], isLoading } = useQuery<TurboTool[]>({
+  const { data: tools = [], isLoading } = useQuery<TurboToolItem[]>({
     queryKey: ["/api/acessos/turbo-tools"],
   });
 
@@ -1633,7 +1633,7 @@ function TurboToolsSection() {
       )}
 
       {editingTool && (
-        <EditTurboToolDialog
+        <EditTurboToolItemDialog
           tool={editingTool}
           open={!!editingTool}
           onOpenChange={(open) => !open && setEditingTool(null)}
@@ -2758,7 +2758,7 @@ function ClientsTab() {
                     <TableRow>
                       <TableCell colSpan={6} className="p-0">
                         {isTurboClient(client.name) ? (
-                          <TurboToolsSection />
+                          <TurboToolItemsSection />
                         ) : (
                           <ClientCredentialsSection 
                             clientIds={client.aggregatedIds} 
@@ -2819,6 +2819,291 @@ function ClientsTab() {
   );
 }
 
+type TurboAccessItem = {
+  id: number;
+  platform: string;
+  username: string;
+  password: string;
+  accessUrl: string | null;
+  observations: string | null;
+};
+
+function TurboTab() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<number>>(new Set());
+  const [editingTool, setEditingTool] = useState<TurboAccessItem | null>(null);
+  const [deletingTool, setDeletingTool] = useState<TurboAccessItem | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const { data: tools = [], isLoading } = useQuery<TurboAccessItem[]>({
+    queryKey: ["/api/acessos/turbo-tools"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: Omit<TurboAccessItem, 'id'>) => {
+      const response = await apiRequest("POST", "/api/acessos/turbo-tools", data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/turbo-tools"] });
+      toast({ title: "Ferramenta adicionada", description: "A ferramenta foi adicionada com sucesso." });
+      setIsAddDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao adicionar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, ...data }: Partial<TurboAccessItem> & { id: number }) => {
+      const response = await apiRequest("PATCH", `/api/acessos/turbo-tools/${id}`, data);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/turbo-tools"] });
+      toast({ title: "Ferramenta atualizada", description: "A ferramenta foi atualizada com sucesso." });
+      setEditingTool(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/acessos/turbo-tools/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/acessos/turbo-tools"] });
+      toast({ title: "Ferramenta removida", description: "A ferramenta foi removida com sucesso." });
+      setDeletingTool(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao remover", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const togglePassword = (id: number) => {
+    setVisiblePasswords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copiado!", description: "Texto copiado para a área de transferência." });
+  };
+
+  const filteredTools = useMemo(() => {
+    if (!searchQuery) return tools;
+    const query = searchQuery.toLowerCase();
+    return tools.filter(tool => 
+      tool.platform.toLowerCase().includes(query) ||
+      tool.username.toLowerCase().includes(query) ||
+      (tool.accessUrl && tool.accessUrl.toLowerCase().includes(query))
+    );
+  }, [tools, searchQuery]);
+
+  const TurboToolItemForm = ({ tool, onSubmit, onCancel, isPending }: { 
+    tool?: TurboAccessItem; 
+    onSubmit: (data: Omit<TurboAccessItem, 'id'>) => void; 
+    onCancel: () => void;
+    isPending: boolean;
+  }) => {
+    const [platform, setPlatform] = useState(tool?.platform || "");
+    const [username, setUsername] = useState(tool?.username || "");
+    const [password, setPassword] = useState(tool?.password || "");
+    const [accessUrl, setAccessUrl] = useState(tool?.accessUrl || "");
+    const [observations, setObservations] = useState(tool?.observations || "");
+
+    const handleSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      onSubmit({ platform, username, password, accessUrl: accessUrl || null, observations: observations || null });
+    };
+
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Plataforma *</label>
+          <Input value={platform} onChange={e => setPlatform(e.target.value)} placeholder="Ex: Google Workspace" required data-testid="input-turbo-platform" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Login/Usuário *</label>
+          <Input value={username} onChange={e => setUsername(e.target.value)} placeholder="Email ou usuário" required data-testid="input-turbo-username" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Senha *</label>
+          <Input value={password} onChange={e => setPassword(e.target.value)} placeholder="Senha" required data-testid="input-turbo-password" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">URL de Acesso</label>
+          <Input value={accessUrl} onChange={e => setAccessUrl(e.target.value)} placeholder="https://..." data-testid="input-turbo-url" />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Observações</label>
+          <Textarea value={observations} onChange={e => setObservations(e.target.value)} placeholder="Notas adicionais" data-testid="input-turbo-observations" />
+        </div>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} data-testid="button-cancel-turbo">Cancelar</Button>
+          <Button type="submit" disabled={isPending} data-testid="button-save-turbo">
+            {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            Salvar
+          </Button>
+        </div>
+      </form>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col sm:flex-row gap-3 justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar ferramentas..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-turbo"
+          />
+        </div>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="button-add-turbo-tool">
+              <Plus className="w-4 h-4 mr-2" />
+              Nova Ferramenta
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Adicionar Ferramenta Turbo</DialogTitle>
+              <DialogDescription>Adicione uma nova credencial de ferramenta interna.</DialogDescription>
+            </DialogHeader>
+            <TurboToolItemForm 
+              onSubmit={(data) => createMutation.mutate(data)} 
+              onCancel={() => setIsAddDialogOpen(false)}
+              isPending={createMutation.isPending}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {isLoading ? (
+        <TableSkeleton columns={5} rows={5} />
+      ) : filteredTools.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Lock className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p className="text-lg font-medium">Nenhuma ferramenta encontrada</p>
+          <p className="text-sm">Adicione ferramentas internas da Turbo Partners</p>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Plataforma</TableHead>
+              <TableHead>Login</TableHead>
+              <TableHead>Senha</TableHead>
+              <TableHead>URL</TableHead>
+              <TableHead className="w-[100px]">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredTools.map((tool) => (
+              <TableRow key={tool.id} data-testid={`row-turbo-${tool.id}`}>
+                <TableCell className="font-medium">{tool.platform}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm">{tool.username}</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(tool.username)} data-testid={`button-copy-username-${tool.id}`}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm">
+                      {visiblePasswords.has(tool.id) ? tool.password : "••••••••"}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => togglePassword(tool.id)} data-testid={`button-toggle-password-${tool.id}`}>
+                      {visiblePasswords.has(tool.id) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyToClipboard(tool.password)} data-testid={`button-copy-password-${tool.id}`}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  {tool.accessUrl ? (
+                    <a href={tool.accessUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1">
+                      <ExternalLink className="h-3 w-3" />
+                      Acessar
+                    </a>
+                  ) : "-"}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingTool(tool)} data-testid={`button-edit-turbo-${tool.id}`}>
+                      <Edit className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeletingTool(tool)} data-testid={`button-delete-turbo-${tool.id}`}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <Dialog open={!!editingTool} onOpenChange={() => setEditingTool(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Ferramenta</DialogTitle>
+            <DialogDescription>Atualize as informações da ferramenta.</DialogDescription>
+          </DialogHeader>
+          {editingTool && (
+            <TurboToolItemForm 
+              tool={editingTool}
+              onSubmit={(data) => updateMutation.mutate({ id: editingTool.id, ...data })} 
+              onCancel={() => setEditingTool(null)}
+              isPending={updateMutation.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!deletingTool} onOpenChange={() => setDeletingTool(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover ferramenta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover a ferramenta "{deletingTool?.platform}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => deletingTool && deleteMutation.mutate(deletingTool.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 export default function Acessos() {
   usePageTitle("Acessos");
   useSetPageInfo("Acessos", "Gerenciamento de credenciais de clientes");
@@ -2851,6 +3136,10 @@ export default function Acessos() {
                 <Building2 className="w-4 h-4" />
                 Clientes
               </TabsTrigger>
+              <TabsTrigger value="turbo" data-testid="tab-turbo" className="gap-2">
+                <Zap className="w-4 h-4" />
+                Turbo
+              </TabsTrigger>
               <TabsTrigger value="logs" data-testid="tab-logs" className="gap-2">
                 <History className="w-4 h-4" />
                 Histórico
@@ -2860,6 +3149,9 @@ export default function Acessos() {
           <CardContent className="pt-6">
             <TabsContent value="clientes" className="m-0">
               <ClientsTab />
+            </TabsContent>
+            <TabsContent value="turbo" className="m-0">
+              <TurboTab />
             </TabsContent>
             <TabsContent value="logs" className="m-0">
               <LogsTab />
