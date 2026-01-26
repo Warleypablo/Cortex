@@ -112,6 +112,25 @@ const ORCADO_NAO_MQL = {
   faturamentoImplantacao: 131217.12,
 };
 
+const ORCADO_TOTAL = {
+  percRA: 0.2317,
+  reunioesAgendadas: ORCADO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.reunioesAgendadas,
+  reunioesRealizadas: ORCADO_MQL.reunioesRealizadas + ORCADO_NAO_MQL.reunioesRealizadas,
+  percNoShow: 0.05,
+  percConversaoRRV: 0.28,
+  novosClientes: ORCADO_MQL.novosClientes + ORCADO_NAO_MQL.novosClientes,
+  contratosAceleracao: ORCADO_MQL.contratosAceleracao + ORCADO_NAO_MQL.contratosAceleracao,
+  contratosImplantacao: ORCADO_MQL.contratosImplantacao + ORCADO_NAO_MQL.contratosImplantacao,
+  faturamentoAceleracao: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao,
+  faturamentoImplantacao: ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
+  faturamentoTotal: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
+  taxaConversaoFunil: 0.0561,
+  taxaConversaoMQL: 0.0812,
+  ticketMedioGeral: 4192.07,
+  ticketMedioAceleracao: 4000,
+  ticketMedioImplantacao: 8500,
+};
+
 export default function GrowthOrcadoRealizado() {
   usePageTitle("Orçado x Realizado");
   useSetPageInfo("Orçado x Realizado", "Controle de Métricas de Marketing e Vendas");
@@ -499,34 +518,205 @@ export default function GrowthOrcadoRealizado() {
     ],
   };
 
+  const totalMetrics: Metric[] = useMemo(() => {
+    const mql = mqlData || {} as MQLMetrics;
+    const naoMql = naoMqlData || {} as NaoMQLMetrics;
+    
+    const totalReunioesAgendadas = (mql.reunioesAgendadas ?? 0) + (naoMql.reunioesAgendadas ?? 0);
+    const totalReunioesRealizadas = (mql.reunioesRealizadas ?? 0) + (naoMql.reunioesRealizadas ?? 0);
+    const totalNovosClientes = (mql.novosClientes ?? 0) + (naoMql.novosClientes ?? 0);
+    const totalContratosAceleracao = (mql.contratosAceleracao ?? 0) + (naoMql.contratosAceleracao ?? 0);
+    const totalContratosImplantacao = (mql.contratosImplantacao ?? 0) + (naoMql.contratosImplantacao ?? 0);
+    const totalFatAceleracao = (mql.faturamentoAceleracao ?? 0) + (naoMql.faturamentoAceleracao ?? 0);
+    const totalFatImplantacao = (mql.faturamentoImplantacao ?? 0) + (naoMql.faturamentoImplantacao ?? 0);
+    const totalFaturamento = totalFatAceleracao + totalFatImplantacao;
+    
+    const totalMqls = mql.totalMqls ?? 0;
+    const totalLeads = totalMqls + (naoMql.totalNaoMqls ?? 0);
+    
+    const percNoShowReal = totalReunioesAgendadas > 0 
+      ? (totalReunioesAgendadas - totalReunioesRealizadas) / totalReunioesAgendadas 
+      : null;
+    const percConversaoRRV = totalReunioesRealizadas > 0 
+      ? totalNovosClientes / totalReunioesRealizadas 
+      : null;
+    const taxaConversaoMQL = totalMqls > 0 
+      ? (mql.novosClientes ?? 0) / totalMqls 
+      : null;
+    
+    const ticketMedioGeral = totalNovosClientes > 0 
+      ? totalFaturamento / totalNovosClientes 
+      : null;
+    const ticketMedioAceleracao = totalContratosAceleracao > 0 
+      ? totalFatAceleracao / totalContratosAceleracao 
+      : null;
+    const ticketMedioImplantacao = totalContratosImplantacao > 0 
+      ? totalFatImplantacao / totalContratosImplantacao 
+      : null;
+    
+    const percRA = totalLeads > 0 
+      ? totalReunioesAgendadas / totalLeads 
+      : null;
+    const taxaConversaoFunil = totalLeads > 0 
+      ? totalNovosClientes / totalLeads 
+      : null;
+    
+    return [
+      { 
+        id: 'total_perc_ra', 
+        name: '% RA', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.percRA, 
+        realizado: percRA, 
+        percentual: calcPercentual(ORCADO_TOTAL.percRA, percRA), 
+        format: 'percent' 
+      },
+      { 
+        id: 'total_ra', 
+        name: 'Reuniões Agendadas', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.reunioesAgendadas, 
+        realizado: totalReunioesAgendadas, 
+        percentual: calcPercentual(ORCADO_TOTAL.reunioesAgendadas, totalReunioesAgendadas), 
+        format: 'number' 
+      },
+      { 
+        id: 'total_rr', 
+        name: 'Reuniões Realizadas', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.reunioesRealizadas, 
+        realizado: totalReunioesRealizadas, 
+        percentual: calcPercentual(ORCADO_TOTAL.reunioesRealizadas, totalReunioesRealizadas), 
+        format: 'number' 
+      },
+      { 
+        id: 'total_noshow', 
+        name: 'No show', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.percNoShow, 
+        realizado: percNoShowReal, 
+        percentual: calcPercentual(ORCADO_TOTAL.percNoShow, percNoShowReal), 
+        format: 'percent' 
+      },
+      { 
+        id: 'total_conv_rrv', 
+        name: 'Conversão de RR/V (%)', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.percConversaoRRV, 
+        realizado: percConversaoRRV, 
+        percentual: calcPercentual(ORCADO_TOTAL.percConversaoRRV, percConversaoRRV), 
+        format: 'percent' 
+      },
+      { 
+        id: 'total_novos_clientes', 
+        name: 'Novos Clientes', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.novosClientes, 
+        realizado: totalNovosClientes, 
+        percentual: calcPercentual(ORCADO_TOTAL.novosClientes, totalNovosClientes), 
+        format: 'number' 
+      },
+      { 
+        id: 'total_ganhos_acel', 
+        name: 'Negócios Ganhos Aceleração', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.contratosAceleracao, 
+        realizado: totalContratosAceleracao, 
+        percentual: calcPercentual(ORCADO_TOTAL.contratosAceleracao, totalContratosAceleracao), 
+        format: 'number', 
+        emoji: '🏎️' 
+      },
+      { 
+        id: 'total_ganhos_impl', 
+        name: 'Negócios Ganhos Implantação', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.contratosImplantacao, 
+        realizado: totalContratosImplantacao, 
+        percentual: calcPercentual(ORCADO_TOTAL.contratosImplantacao, totalContratosImplantacao), 
+        format: 'number', 
+        emoji: '🔧' 
+      },
+      { 
+        id: 'total_faturamento', 
+        name: 'Faturamento Total', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.faturamentoTotal, 
+        realizado: totalFaturamento, 
+        percentual: calcPercentual(ORCADO_TOTAL.faturamentoTotal, totalFaturamento), 
+        format: 'currency' 
+      },
+      { 
+        id: 'total_fat_acel', 
+        name: 'Faturamento A', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.faturamentoAceleracao, 
+        realizado: totalFatAceleracao, 
+        percentual: calcPercentual(ORCADO_TOTAL.faturamentoAceleracao, totalFatAceleracao), 
+        format: 'currency', 
+        emoji: '🏎️' 
+      },
+      { 
+        id: 'total_fat_impl', 
+        name: 'Faturamento I', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.faturamentoImplantacao, 
+        realizado: totalFatImplantacao, 
+        percentual: calcPercentual(ORCADO_TOTAL.faturamentoImplantacao, totalFatImplantacao), 
+        format: 'currency', 
+        emoji: '🔧' 
+      },
+      { 
+        id: 'total_conv_funil', 
+        name: 'Taxa de Conversão do Funil inteiro', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.taxaConversaoFunil, 
+        realizado: taxaConversaoFunil, 
+        percentual: calcPercentual(ORCADO_TOTAL.taxaConversaoFunil, taxaConversaoFunil), 
+        format: 'percent' 
+      },
+      { 
+        id: 'total_conv_mql', 
+        name: 'Tx de conversão MQL', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.taxaConversaoMQL, 
+        realizado: taxaConversaoMQL, 
+        percentual: calcPercentual(ORCADO_TOTAL.taxaConversaoMQL, taxaConversaoMQL), 
+        format: 'percent' 
+      },
+      { 
+        id: 'total_ticket_geral', 
+        name: 'Ticket Médio Geral', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.ticketMedioGeral, 
+        realizado: ticketMedioGeral, 
+        percentual: calcPercentual(ORCADO_TOTAL.ticketMedioGeral, ticketMedioGeral), 
+        format: 'currency' 
+      },
+      { 
+        id: 'total_ticket_acel', 
+        name: 'Ticket Médio Aceleração', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.ticketMedioAceleracao, 
+        realizado: ticketMedioAceleracao, 
+        percentual: calcPercentual(ORCADO_TOTAL.ticketMedioAceleracao, ticketMedioAceleracao), 
+        format: 'currency' 
+      },
+      { 
+        id: 'total_ticket_impl', 
+        name: 'Ticket Médio Implantação', 
+        type: 'formula', 
+        orcado: ORCADO_TOTAL.ticketMedioImplantacao, 
+        realizado: ticketMedioImplantacao, 
+        percentual: calcPercentual(ORCADO_TOTAL.ticketMedioImplantacao, ticketMedioImplantacao), 
+        format: 'currency' 
+      },
+    ];
+  }, [mqlData, naoMqlData]);
+  
   const totalSection: MetricSection = {
     title: 'Total',
     icon: <BarChart3 className="w-5 h-5" />,
-    metrics: [
-      { id: 'total_ra_perc', name: '% RA', type: 'formula', orcado: 0.2317, realizado: null, percentual: null, format: 'percent' },
-      { id: 'total_ra', name: 'Reuniões Agendadas', type: 'formula', orcado: 305, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'total_cpra', name: 'R$/Reunião Agendadas (CPRA)', type: 'formula', orcado: 313, realizado: null, percentual: 0, format: 'currency' },
-      { id: 'total_rr', name: 'Reuniões Realizadas', type: 'formula', orcado: 290, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'total_cprr', name: 'R$/Reunião Realizadas (CPRR)', type: 'formula', orcado: 330, realizado: null, percentual: null, format: 'currency' },
-      { id: 'total_noshow', name: 'No show', type: 'formula', orcado: 0.05, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'total_conv_rrv', name: 'Conversão de RR/V (%)', type: 'formula', orcado: 0.28, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'total_novos_clientes', name: 'Novos Clientes', type: 'formula', orcado: 74, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'total_ganhos_acel', name: 'Negócios Ganhos Aceleração', type: 'formula', orcado: 47, realizado: 0, percentual: 0, format: 'number', emoji: '🏎️' },
-      { id: 'total_ganhos_impl', name: 'Negócios Ganhos Implantação', type: 'formula', orcado: 33, realizado: 0, percentual: 0, format: 'number', emoji: '🔧' },
-      { id: 'total_faturamento', name: 'Faturamento Total', type: 'formula', orcado: 470146, realizado: 0, percentual: 0, format: 'currency' },
-      { id: 'total_fat_acel', name: 'Faturamento A', type: 'formula', orcado: 188039, realizado: 0, percentual: 0, format: 'currency', emoji: '🏎️' },
-      { id: 'total_fat_impl', name: 'Faturamento I', type: 'formula', orcado: 282107, realizado: 0, percentual: 0, format: 'currency', emoji: '🔧' },
-      { id: 'total_conv_funil', name: 'Taxa de Conversão do Funil inteiro', type: 'formula', orcado: 0.0561, realizado: null, percentual: null, format: 'percent' },
-      { id: 'total_conv_mql', name: 'Tx de conversão MQL', type: 'formula', orcado: 0.0812, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'total_roas', name: 'ROAS', type: 'formula', orcado: 4.92, realizado: null, percentual: 0, format: 'number' },
-      { id: 'total_roas_acel', name: 'ROAS Aceleração', type: 'formula', orcado: 1.97, realizado: null, percentual: 0, format: 'number' },
-      { id: 'total_cac_ads', name: 'CAC ADS', type: 'formula', orcado: 1805.10, realizado: null, percentual: 0, format: 'currency' },
-      { id: 'total_ticket_geral', name: 'Ticket Médio Geral', type: 'formula', orcado: 4192.07, realizado: null, percentual: 0, format: 'currency' },
-      { id: 'total_ticket_acel', name: 'Ticket Médio Aceleração', type: 'formula', orcado: 4000, realizado: null, percentual: 0, format: 'currency' },
-      { id: 'total_ticket_impl', name: 'Ticket Médio Implantação', type: 'formula', orcado: 8500, realizado: null, percentual: 0, format: 'currency' },
-      { id: 'total_cac_acel', name: 'CAC Aceleração', type: 'formula', orcado: 2031.50, realizado: null, percentual: 0, format: 'currency', emoji: '🏎️' },
-      { id: 'total_cac_impl', name: 'CAC Implantação', type: 'formula', orcado: 2877.46, realizado: null, percentual: 0, format: 'currency' },
-    ],
+    metrics: totalMetrics,
   };
 
   const allSections: MetricSection[] = [
