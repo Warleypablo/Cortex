@@ -11918,6 +11918,7 @@ export class DbStorage implements IStorage {
     // Buscar freelancers do período selecionado, cruzando com rh_pessoal para obter squad
     // O valor está em custom_fields->>'Valor' formatado como "R$ 2.500,00"
     // Precisa limpar formatação: remover R$, pontos de milhar, e trocar vírgula por ponto
+    // JOIN mais robusto: compara primeiro + segundo nome (pois cup_freelas tem nomes curtos)
     const freelaResult = await db.execute(sql`
       SELECT 
         f.responsavel,
@@ -11940,7 +11941,18 @@ export class DbStorage implements IStorage {
         f.data_pagamento,
         COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
       FROM "Clickup".cup_freelas f
-      LEFT JOIN "Inhire".rh_pessoal rp ON LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
+      LEFT JOIN "Inhire".rh_pessoal rp ON (
+        -- Match exato
+        LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
+        OR
+        -- Match por primeiro + segundo nome (para nomes curtos em cup_freelas)
+        LOWER(TRIM(f.responsavel)) = LOWER(
+          SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2)
+        )
+        OR
+        -- Match se o nome de rp começa com o responsavel
+        LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(f.responsavel)) || '%'
+      )
       WHERE f.data_pagamento >= ${dataInicio}::date
         AND f.data_pagamento <= ${dataFimComHora}::timestamp
         AND (
@@ -11969,7 +11981,7 @@ export class DbStorage implements IStorage {
     // Debug: mostrar todos os freelancers e seus squads para identificar problemas de join
     if (salarioSquadFilterValue) {
       console.log('[freelas] Filtro de squad aplicado:', salarioSquadFilterValue);
-      // Buscar todos os freelas SEM filtro de squad para debug
+      // Buscar todos os freelas SEM filtro de squad para debug (com join robusto)
       const allFreelasDebug = await db.execute(sql`
         SELECT 
           f.responsavel,
@@ -11977,12 +11989,16 @@ export class DbStorage implements IStorage {
           rp.squad as squad_rh,
           CASE WHEN rp.nome IS NULL THEN 'NAO ENCONTRADO' ELSE 'OK' END as match_status
         FROM "Clickup".cup_freelas f
-        LEFT JOIN "Inhire".rh_pessoal rp ON LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
+        LEFT JOIN "Inhire".rh_pessoal rp ON (
+          LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
+          OR LOWER(TRIM(f.responsavel)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2))
+          OR LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(f.responsavel)) || '%'
+        )
         WHERE f.data_pagamento >= ${dataInicio}::date
           AND f.data_pagamento <= ${dataFimComHora}::timestamp
         ORDER BY f.responsavel
       `);
-      console.log('[freelas-debug] Todos os freelancers do período (sem filtro):', 
+      console.log('[freelas-debug] Todos os freelancers do período (join robusto):', 
         (allFreelasDebug.rows as any[]).map(r => ({
           responsavel: r.responsavel,
           nome_rh: r.nome_rh,
