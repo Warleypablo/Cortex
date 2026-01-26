@@ -1299,32 +1299,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // Query para buscar métricas de vendas MQL do Bitrix
       // MQL = leads onde mql = '1' ou 'true'
+      // Usando data_fechamento como referência de data para negócios ganhos
       const result = await db.execute(sql`
-        WITH mql_data AS (
-          SELECT 
-            d.id,
-            d.stage_name,
-            d.mql::text as mql_status,
-            d.valor_recorrente,
-            d.valor_pontual,
-            d.date_create,
-            d.data_reuniao,
-            d.data_fechamento,
-            CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN true ELSE false END as is_mql
-          FROM "Bitrix".crm_deal d
-          WHERE d.date_create >= ${startDate}::date 
-            AND d.date_create <= ${endDate}::date
-            AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
-        )
         SELECT
-          -- Total MQLs
+          -- Total MQLs com data_fechamento no período
           COUNT(*) as total_mqls,
           
-          -- Reuniões Agendadas MQL (stage_name contém 'Reunião Marcada' ou similar)
-          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada') THEN 1 END) as reunioes_agendadas_mql,
+          -- Reuniões Agendadas MQL (deals que passaram por RM ou stages superiores)
+          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada', 
+            'Reunião Realizada', 'RR - Reunião Realizada', 'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_agendadas_mql,
           
-          -- Reuniões Realizadas MQL
-          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada', 'Negócio Ganho', 'Negócio Perdido', 'Proposta Enviada') THEN 1 END) as reunioes_realizadas_mql,
+          -- Reuniões Realizadas MQL (deals que passaram por RR ou stages superiores)
+          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada', 
+            'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_realizadas_mql,
           
           -- Novos Clientes MQL (Negócio Ganho)
           COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as novos_clientes_mql,
@@ -1340,7 +1327,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           
           -- Faturamento Implantação (soma valor_pontual dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_mql
-        FROM mql_data
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_fechamento >= ${startDate}::date 
+          AND d.data_fechamento <= ${endDate}::date
+          AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
       `);
 
       const row = result.rows[0] as any;
