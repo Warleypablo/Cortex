@@ -11966,6 +11966,32 @@ export class DbStorage implements IStorage {
     
     console.log('[freelas] Total rows:', freelaResult.rows.length, 'Primeiro:', freelaResult.rows[0]);
     
+    // Debug: mostrar todos os freelancers e seus squads para identificar problemas de join
+    if (salarioSquadFilterValue) {
+      console.log('[freelas] Filtro de squad aplicado:', salarioSquadFilterValue);
+      // Buscar todos os freelas SEM filtro de squad para debug
+      const allFreelasDebug = await db.execute(sql`
+        SELECT 
+          f.responsavel,
+          rp.nome as nome_rh,
+          rp.squad as squad_rh,
+          CASE WHEN rp.nome IS NULL THEN 'NAO ENCONTRADO' ELSE 'OK' END as match_status
+        FROM "Clickup".cup_freelas f
+        LEFT JOIN "Inhire".rh_pessoal rp ON LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
+        WHERE f.data_pagamento >= ${dataInicio}::date
+          AND f.data_pagamento <= ${dataFimComHora}::timestamp
+        ORDER BY f.responsavel
+      `);
+      console.log('[freelas-debug] Todos os freelancers do período (sem filtro):', 
+        (allFreelasDebug.rows as any[]).map(r => ({
+          responsavel: r.responsavel,
+          nome_rh: r.nome_rh,
+          squad_rh: r.squad_rh,
+          match: r.match_status
+        }))
+      );
+    }
+    
     for (const row of freelaResult.rows as any[]) {
       const responsavel = row.responsavel || 'Não identificado';
       const valor = Number(row.valor) || 0;
