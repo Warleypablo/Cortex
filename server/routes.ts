@@ -8405,12 +8405,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const mesesMap = new Map<string, MesData>();
       const squadsSet = new Set<string>();
       
-      // Log first 3 rows to debug url_cobranca
-      const firstRows = (result.rows as any[]).slice(0, 3);
-      console.log("[contribuicao-squad] Primeiros 3 registros (verificando url_cobranca):", 
-        firstRows.map(r => ({ id: r.parcela_id, url_cobranca: r.url_cobranca, link_nfse: r.link_nfse }))
-      );
-      
       for (const row of result.rows as any[]) {
         const mes = row.mes;
         const categoriaId = row.categoria_id;
