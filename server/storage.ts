@@ -11713,7 +11713,12 @@ export class DbStorage implements IStorage {
           AND p.data_quitacao >= ${dataInicio}::date
           AND p.data_quitacao <= ${dataFimComHora}::timestamp
           AND p.valor_pago::numeric > 0
-          AND (${squadFilterValue}::text IS NULL OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') = ${squadFilterValue})
+          AND (
+            ${squadFilterValue}::text IS NULL 
+            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') = ${squadFilterValue}
+            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilterValue}, '^[^a-zA-Z]+', '', 'g')
+            OR ${squadFilterValue} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+          )
       )
       SELECT 
         COALESCE(categoria_id, 'SEM_CATEGORIA') as categoria_id,
