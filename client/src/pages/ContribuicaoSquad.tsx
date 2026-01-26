@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { ChevronRight, ChevronDown, DollarSign, Users, TrendingUp, CirclePlus, FileText } from "lucide-react";
+import { ChevronRight, ChevronDown, DollarSign, Users, TrendingUp, CirclePlus, FileText, Percent, PieChart } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import { format, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -196,9 +198,72 @@ export default function ContribuicaoSquad() {
     return monthlyResults.reduce((acc, m) => acc + (m.data?.totais?.quantidadeContratos || 0), 0);
   }, [monthlyResults]);
 
+  const TAXA_IMPOSTO = 0.18;
+
+  interface SquadContribuicao {
+    squad: string;
+    valorBruto: number;
+    valorLiquido: number;
+    percentualBruto: number;
+    percentualLiquido: number;
+    quantidadeParcelas?: number;
+  }
+
+  const { data: totaisPorSquadData, isLoading: loadingTotaisPorSquad } = useQuery<{
+    squads: SquadContribuicao[];
+    totalBruto: number;
+    totalLiquido: number;
+  }>({
+    queryKey: ["/api/contribuicao-squad/totais-por-squad", anoSelecionado],
+    queryFn: async () => {
+      const dataInicio = `${anoSelecionado}-01-01`;
+      const dataFim = `${anoSelecionado}-12-31`;
+      const response = await fetch(`/api/contribuicao-squad/totais-por-squad?dataInicio=${dataInicio}&dataFim=${dataFim}`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Falha ao buscar totais por squad");
+      return response.json();
+    },
+  });
+
+  const contribuicaoPorSquad = useMemo(() => {
+    if (squadSelecionado === 'todos') {
+      return totaisPorSquadData?.squads || [];
+    } else {
+      const squadData = totaisPorSquadData?.squads?.find(s => s.squad === squadSelecionado);
+      if (squadData) {
+        return [{
+          ...squadData,
+          percentualBruto: 100,
+          percentualLiquido: 100
+        }];
+      }
+      return [];
+    }
+  }, [totaisPorSquadData, squadSelecionado]);
+
+  const totalReceitaLiquida = useMemo(() => {
+    return totaisPorSquadData?.totalLiquido || totalReceitas * (1 - TAXA_IMPOSTO);
+  }, [totaisPorSquadData, totalReceitas]);
+  
+  const totalReceitaBruta = useMemo(() => {
+    return totaisPorSquadData?.totalBruto || totalReceitas;
+  }, [totaisPorSquadData, totalReceitas]);
+
   const formatMesLabel = (label: string) => {
     return label.charAt(0).toUpperCase() + label.slice(1);
   };
+  
+  const squadColors = [
+    'hsl(142, 76%, 36%)',
+    'hsl(217, 91%, 60%)', 
+    'hsl(262, 83%, 58%)',
+    'hsl(24, 95%, 53%)',
+    'hsl(340, 82%, 52%)',
+    'hsl(47, 96%, 53%)',
+    'hsl(173, 80%, 40%)',
+    'hsl(291, 64%, 42%)',
+  ];
 
   return (
     <div className="p-4 space-y-4">
@@ -323,6 +388,110 @@ export default function ContribuicaoSquad() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="px-4 py-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <PieChart className="h-4 w-4 text-blue-500" />
+            Contribuição Percentual por Squad
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          {isLoading || loadingTotaisPorSquad ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : (
+            <Tabs defaultValue="bruto" className="w-full">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <TabsList>
+                  <TabsTrigger value="bruto" data-testid="tab-bruto">
+                    <DollarSign className="h-3.5 w-3.5 mr-1" />
+                    Antes dos Impostos
+                  </TabsTrigger>
+                  <TabsTrigger value="liquido" data-testid="tab-liquido">
+                    <Percent className="h-3.5 w-3.5 mr-1" />
+                    Após Impostos (-18%)
+                  </TabsTrigger>
+                </TabsList>
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium">Total Bruto:</span> {formatCurrencyNoDecimals(totalReceitaBruta)}
+                  <span className="mx-2">|</span>
+                  <span className="font-medium">Total Líquido:</span> {formatCurrencyNoDecimals(totalReceitaLiquida)}
+                </div>
+              </div>
+              
+              <TabsContent value="bruto" className="space-y-3">
+                {contribuicaoPorSquad.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum squad com receitas no período</p>
+                ) : (
+                  contribuicaoPorSquad.map((item, index) => (
+                    <div key={item.squad} className="space-y-1.5" data-testid={`contrib-bruto-${index}`}>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-sm" 
+                            style={{ backgroundColor: squadColors[index % squadColors.length] }}
+                          />
+                          <span className="font-medium">{item.squad}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground">{formatCurrencyNoDecimals(item.valorBruto)}</span>
+                          <span className="font-bold text-emerald-500 min-w-[50px] text-right">
+                            {item.percentualBruto.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                      <Progress 
+                        value={item.percentualBruto} 
+                        className="h-2"
+                        style={{ 
+                          ['--progress-background' as any]: squadColors[index % squadColors.length]
+                        }}
+                      />
+                    </div>
+                  ))
+                )}
+              </TabsContent>
+              
+              <TabsContent value="liquido" className="space-y-3">
+                {contribuicaoPorSquad.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">Nenhum squad com receitas no período</p>
+                ) : (
+                  contribuicaoPorSquad.map((item, index) => (
+                    <div key={item.squad} className="space-y-1.5" data-testid={`contrib-liquido-${index}`}>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-sm" 
+                            style={{ backgroundColor: squadColors[index % squadColors.length] }}
+                          />
+                          <span className="font-medium">{item.squad}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-muted-foreground">{formatCurrencyNoDecimals(item.valorLiquido)}</span>
+                          <span className="font-bold text-blue-500 min-w-[50px] text-right">
+                            {item.percentualLiquido.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                      <Progress 
+                        value={item.percentualLiquido} 
+                        className="h-2"
+                        style={{ 
+                          ['--progress-background' as any]: squadColors[index % squadColors.length]
+                        }}
+                      />
+                    </div>
+                  ))
+                )}
+              </TabsContent>
+            </Tabs>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="px-4 py-3">
