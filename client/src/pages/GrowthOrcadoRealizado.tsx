@@ -821,8 +821,7 @@ export default function GrowthOrcadoRealizado() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40%]">Métrica</TableHead>
-                    <TableHead className="text-center w-[15%]">Tipo</TableHead>
+                    <TableHead className="w-[55%]">Métrica</TableHead>
                     <TableHead className="text-right w-[15%]">Orçado</TableHead>
                     <TableHead className="text-right w-[15%]">Realizado</TableHead>
                     <TableHead className="text-right w-[15%]">%</TableHead>
@@ -834,11 +833,6 @@ export default function GrowthOrcadoRealizado() {
                       <TableCell className="font-medium">
                         {metric.emoji && <span className="mr-2">{metric.emoji}</span>}
                         {metric.name}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={metric.type === 'manual' ? 'outline' : 'secondary'}>
-                          {metric.type === 'manual' ? 'Manual' : 'Fórmula'}
-                        </Badge>
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatValue(metric.orcado, metric.format)}
