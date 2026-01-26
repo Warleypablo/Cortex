@@ -1378,4 +1378,96 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       res.status(500).json({ error: "Failed to fetch MQL metrics" });
     }
   });
+
+  // Growth - Orçado x Realizado - Métricas de Vendas Não-MQL
+  app.get("/api/growth/orcado-realizado/nao-mql", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Query para buscar métricas de vendas Não-MQL do Bitrix
+      // Não-MQL = leads onde mql != '1' e mql != 'true' (ou mql é null)
+      // Usando data_fechamento como referência de data para negócios ganhos
+      const result = await db.execute(sql`
+        SELECT
+          -- Total Não-MQLs com data_fechamento no período
+          COUNT(*) as total_nao_mqls,
+          
+          -- Reuniões Agendadas Não-MQL (deals que passaram por RM ou stages superiores)
+          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada', 
+            'Reunião Realizada', 'RR - Reunião Realizada', 'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_agendadas,
+          
+          -- Reuniões Realizadas Não-MQL (deals que passaram por RR ou stages superiores)
+          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada', 
+            'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_realizadas,
+          
+          -- Novos Clientes Não-MQL (Negócio Ganho)
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as novos_clientes,
+          
+          -- Contratos Aceleração (valor_recorrente > 0 e Negócio Ganho)
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END) as contratos_aceleracao,
+          
+          -- Contratos Implantação (valor_pontual > 0 e Negócio Ganho)
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END) as contratos_implantacao,
+          
+          -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao,
+          
+          -- Faturamento Implantação (soma valor_pontual dos ganhos)
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_fechamento >= ${startDate}::date 
+          AND d.data_fechamento <= ${endDate}::date
+          AND (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
+      `);
+
+      const row = result.rows[0] as any;
+      
+      const totalNaoMqls = parseInt(row.total_nao_mqls) || 0;
+      const reunioesAgendadas = parseInt(row.reunioes_agendadas) || 0;
+      const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
+      const novosClientes = parseInt(row.novos_clientes) || 0;
+      const contratosAceleracao = parseInt(row.contratos_aceleracao) || 0;
+      const contratosImplantacao = parseInt(row.contratos_implantacao) || 0;
+      const faturamentoAceleracao = parseFloat(row.faturamento_aceleracao) || 0;
+      const faturamentoImplantacao = parseFloat(row.faturamento_implantacao) || 0;
+      
+      // Calcular taxas
+      const percReuniaoAgendada = totalNaoMqls > 0 ? reunioesAgendadas / totalNaoMqls : 0;
+      const percNoShow = reunioesAgendadas > 0 ? (reunioesAgendadas - reunioesRealizadas) / reunioesAgendadas : 0;
+      const taxaVendas = reunioesRealizadas > 0 ? novosClientes / reunioesRealizadas : 0;
+      const txContratosRecorrentes = novosClientes > 0 ? contratosAceleracao / novosClientes : 0;
+      const txContratosImplantacao = novosClientes > 0 ? contratosImplantacao / novosClientes : 0;
+      const ticketMedioAceleracao = contratosAceleracao > 0 ? faturamentoAceleracao / contratosAceleracao : 0;
+      const ticketMedioImplantacao = contratosImplantacao > 0 ? faturamentoImplantacao / contratosImplantacao : 0;
+
+      res.json({
+        // Métricas brutas
+        totalNaoMqls,
+        reunioesAgendadas,
+        reunioesRealizadas,
+        novosClientes,
+        contratosAceleracao,
+        contratosImplantacao,
+        faturamentoAceleracao,
+        faturamentoImplantacao,
+        
+        // Taxas calculadas
+        percReuniaoAgendada,
+        percNoShow,
+        taxaVendas,
+        txContratosRecorrentes,
+        txContratosImplantacao,
+        ticketMedioAceleracao,
+        ticketMedioImplantacao
+      });
+    } catch (error) {
+      console.error("[api] Error fetching Não-MQL metrics:", error);
+      res.status(500).json({ error: "Failed to fetch Não-MQL metrics" });
+    }
+  });
 }
