@@ -3,6 +3,9 @@ import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { format } from "date-fns";
 
+// Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
+const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
+
 export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Growth - Investment Data (Google Ads + Meta Ads)
   app.get("/api/growth/investimento", async (req, res) => {
@@ -92,6 +95,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(clicks), 0) as total_clicks
             FROM meta_ads.meta_insights_daily
             WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
+              AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
           `);
           
           const metaDailyResult = await db.execute(sql`
@@ -102,6 +106,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(clicks), 0) as clicks
             FROM meta_ads.meta_insights_daily
             WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
+              AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
             GROUP BY date_start
             ORDER BY date_start
           `);
@@ -194,7 +199,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let metaData: any[] = [];
       let googleData: any[] = [];
       
-      // Buscar dados do Meta Ads se canal é Todos ou Facebook
+      // Buscar dados do Meta Ads se canal é Todos ou Facebook (apenas conta interna Turbo Partners)
       if (canal === 'Todos' || canal === 'Facebook') {
         const metaByAdResult = await db.execute(sql`
           SELECT 
@@ -204,6 +209,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             SUM(clicks::numeric) as clicks
           FROM meta_ads.meta_insights_daily
           WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
+            AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
           GROUP BY ad_id
         `);
         metaData = metaByAdResult.rows as any[];
@@ -682,10 +688,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Growth - Criativos - Listar campanhas disponíveis
   app.get("/api/growth/criativos/campanhas", async (req, res) => {
     try {
+      // Buscar apenas campanhas da conta interna Turbo Partners
       const result = await db.execute(sql`
         SELECT DISTINCT c.campaign_id, c.campaign_name
         FROM meta_ads.meta_campaigns c
         WHERE c.campaign_name IS NOT NULL AND c.campaign_name != ''
+          AND c.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
         ORDER BY c.campaign_name
       `);
       
@@ -723,7 +731,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.json([]);
       }
       
-      // Buscar dados agregados por anúncio do Meta Ads com info do anúncio e campanha
+      // Buscar dados agregados por anúncio do Meta Ads com info do anúncio e campanha (apenas conta interna Turbo Partners)
       const adsDataResult = await db.execute(sql`
         SELECT 
           i.ad_id,
@@ -748,6 +756,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+          AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
         GROUP BY i.ad_id, a.ad_name, a.status, a.created_time, a.preview_shareable_link, a.campaign_id, c.campaign_name
         ORDER BY SUM(i.spend::numeric) DESC
       `);
@@ -907,7 +916,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
       }
       
-      // Buscar dados agregados por campanha do Meta Ads
+      // Buscar dados agregados por campanha do Meta Ads (apenas conta interna Turbo Partners)
       const campaignsDataResult = await db.execute(sql`
         SELECT 
           c.campaign_id,
@@ -922,11 +931,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM meta_ads.meta_campaigns c
         LEFT JOIN meta_ads.meta_insights_daily i ON c.campaign_id = i.campaign_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+          AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
         GROUP BY c.campaign_id, c.campaign_name, c.status
         ORDER BY SUM(i.spend::numeric) DESC
       `);
       
-      // Buscar dados agregados por adset do Meta Ads
+      // Buscar dados agregados por adset do Meta Ads (apenas conta interna Turbo Partners)
       const adsetsDataResult = await db.execute(sql`
         SELECT 
           aset.adset_id,
@@ -942,11 +952,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM meta_ads.meta_adsets aset
         LEFT JOIN meta_ads.meta_insights_daily i ON aset.adset_id = i.adset_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+          AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
         GROUP BY aset.adset_id, aset.adset_name, aset.campaign_id, aset.status
         ORDER BY SUM(i.spend::numeric) DESC
       `);
       
-      // Buscar dados agregados por anúncio do Meta Ads
+      // Buscar dados agregados por anúncio do Meta Ads (apenas conta interna Turbo Partners)
       const adsDataResult = await db.execute(sql`
         SELECT 
           a.ad_id,
@@ -965,6 +976,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM meta_ads.meta_ads a
         LEFT JOIN meta_ads.meta_insights_daily i ON a.ad_id = i.ad_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+          AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
         GROUP BY a.ad_id, a.ad_name, a.adset_id, a.campaign_id, a.status, a.created_time, a.preview_shareable_link
         ORDER BY SUM(i.spend::numeric) DESC
       `);
