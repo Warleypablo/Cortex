@@ -7806,17 +7806,17 @@ export class DbStorage implements IStorage {
       acima90dias: { ...faixasMap.acima90dias, percentual: totalInadimplente > 0 ? (faixasMap.acima90dias.valor / totalInadimplente) * 100 : 0 },
     };
     
-    // Evolução mensal (últimos 12 meses)
+    // Evolução mensal (últimos 12 meses) - usando mesmo critério do Revenue Goals para consistência
     const evolucaoResult = await db.execute(sql.raw(`
       SELECT 
         TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
-        COALESCE(SUM(nao_pago::numeric), 0) as valor,
+        COALESCE(SUM(GREATEST(valor_bruto::numeric - COALESCE(valor_pago::numeric, 0), 0)), 0) as valor,
         COUNT(*) as quantidade
       FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
-        AND data_vencimento < '${dataHoje}'
+        AND data_vencimento <= '${dataHoje}'
         AND data_vencimento >= '${dataHoje}'::date - INTERVAL '12 months'
-        AND nao_pago::numeric > 0
+        AND COALESCE(valor_pago::numeric, 0) < valor_bruto::numeric
         ${whereDataInicio}
         ${whereDataFim}
       GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
