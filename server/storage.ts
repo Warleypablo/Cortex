@@ -9059,7 +9059,7 @@ export class DbStorage implements IStorage {
     if (!clienteIds.length) return {};
     
     const escapedIds = clienteIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
-    const result = await db.execute(sql.raw(`SELECT * FROM inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
+    const result = await db.execute(sql.raw(`SELECT * FROM cortex_core.inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
     
     const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null }> = {};
     for (const row of result.rows as any[]) {
@@ -9085,7 +9085,7 @@ export class DbStorage implements IStorage {
 
   async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null } | null> {
     const escapedId = clienteId.replace(/'/g, "''");
-    const result = await db.execute(sql.raw(`SELECT * FROM inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
+    const result = await db.execute(sql.raw(`SELECT * FROM cortex_core.inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
     
     if (!result.rows.length) return null;
     const row = result.rows[0] as any;
@@ -9117,14 +9117,14 @@ export class DbStorage implements IStorage {
     const escapedAtualizadoPor = data.atualizadoPor.replace(/'/g, "''");
     
     const result = await db.execute(sql.raw(`
-      INSERT INTO inadimplencia_contextos (cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em)
+      INSERT INTO cortex_core.inadimplencia_contextos (cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em)
       VALUES ('${escapedClienteId}', '${escapedContexto}', '${escapedEvidencias}', NULLIF('${escapedAcao}', ''), NULLIF('${escapedStatusFinanceiro}', ''), NULLIF('${escapedDetalheFinanceiro}', ''), '${escapedAtualizadoPor}', NOW())
       ON CONFLICT (cliente_id) DO UPDATE SET
         contexto = EXCLUDED.contexto,
         evidencias = EXCLUDED.evidencias,
-        acao = COALESCE(EXCLUDED.acao, inadimplencia_contextos.acao),
-        status_financeiro = COALESCE(EXCLUDED.status_financeiro, inadimplencia_contextos.status_financeiro),
-        detalhe_financeiro = COALESCE(EXCLUDED.detalhe_financeiro, inadimplencia_contextos.detalhe_financeiro),
+        acao = COALESCE(EXCLUDED.acao, cortex_core.inadimplencia_contextos.acao),
+        status_financeiro = COALESCE(EXCLUDED.status_financeiro, cortex_core.inadimplencia_contextos.status_financeiro),
+        detalhe_financeiro = COALESCE(EXCLUDED.detalhe_financeiro, cortex_core.inadimplencia_contextos.detalhe_financeiro),
         atualizado_por = EXCLUDED.atualizado_por,
         atualizado_em = NOW()
       RETURNING cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em
@@ -9153,7 +9153,7 @@ export class DbStorage implements IStorage {
     
     // Primeiro tenta atualizar se já existe
     let result = await db.execute(sql.raw(`
-      UPDATE inadimplencia_contextos SET
+      UPDATE cortex_core.inadimplencia_contextos SET
         contexto_juridico = NULLIF('${escapedContexto}', ''),
         procedimento_juridico = NULLIF('${escapedProcedimento}', ''),
         status_juridico = NULLIF('${escapedStatus}', ''),
@@ -9167,9 +9167,9 @@ export class DbStorage implements IStorage {
     
     // Se não existe, insere um novo registro com valores padrão para campos obrigatórios
     if (!result.rows.length) {
-      console.log(`[storage] Cliente ${data.clienteId} não existe em inadimplencia_contextos, criando registro...`);
+      console.log(`[storage] Cliente ${data.clienteId} não existe em cortex_core.inadimplencia_contextos, criando registro...`);
       result = await db.execute(sql.raw(`
-        INSERT INTO inadimplencia_contextos (
+        INSERT INTO cortex_core.inadimplencia_contextos (
           cliente_id, 
           contexto,
           evidencias,
@@ -9228,7 +9228,7 @@ export class DbStorage implements IStorage {
       // Query sem valor_acordado para compatibilidade com produção
       // Filtrar apenas registros manuais antigos que não deveriam aparecer (com "Registro manual" no contexto)
       const result = await db.execute(sql.raw(`
-        SELECT cliente_id FROM inadimplencia_contextos 
+        SELECT cliente_id FROM cortex_core.inadimplencia_contextos 
         WHERE (contexto_juridico IS NOT NULL 
            OR procedimento_juridico IS NOT NULL 
            OR status_juridico IS NOT NULL)

@@ -2083,7 +2083,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { cnpj } = req.params;
       
-      // Query both inadimplencia_contextos and juridico_clientes in parallel
+      // Query both cortex_core.inadimplencia_contextos and juridico_clientes in parallel
       const [inadimplenciaResult, juridicoResult] = await Promise.all([
         db.execute(sql`
           SELECT 
@@ -2097,7 +2097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             atualizado_em,
             valor_acordado,
             data_acordo
-          FROM inadimplencia_contextos 
+          FROM cortex_core.inadimplencia_contextos 
           WHERE cliente_id = ${cnpj}
         `),
         db.execute(sql`
@@ -4765,12 +4765,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
   
-  // Ensure tipo_inadimplencia column exists in inadimplencia_contextos table
+  // Ensure tipo_inadimplencia column exists in cortex_core.inadimplencia_contextos table
   async function ensureTipoInadimplenciaColumn() {
     try {
       // Add column if not exists
       await db.execute(sql`
-        ALTER TABLE inadimplencia_contextos 
+        ALTER TABLE cortex_core.inadimplencia_contextos 
         ADD COLUMN IF NOT EXISTS tipo_inadimplencia TEXT DEFAULT NULL
       `);
       console.log("[juridico] tipo_inadimplencia column ensured");
@@ -5009,7 +5009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const cliente of clientesManuais) {
         await db.execute(sql`
-          INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por)
+          INSERT INTO cortex_core.inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por)
           VALUES (${cliente.id}, 'acordo', 'concluido', ${cliente.valor}, ${cliente.nome + ' - Cliente recuperado manualmente'}, 'acordo_manual', 'Cliente recuperado com acordo', 'Sistema')
           ON CONFLICT (cliente_id) DO UPDATE SET
             procedimento_juridico = 'acordo',
@@ -5033,7 +5033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Atualizar GO COFFEE com valor R$ 3.283
       await db.execute(sql`
-        UPDATE inadimplencia_contextos ic
+        UPDATE cortex_core.inadimplencia_contextos ic
         SET valor_acordado = 3283
         FROM "Conta Azul".caz_clientes c
         WHERE ic.cliente_id = c.id::text
@@ -5053,7 +5053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Remover TODOS os registros de erro operacional (antigos e novos, incluindo os com NULL)
       await db.execute(sql`
-        DELETE FROM inadimplencia_contextos 
+        DELETE FROM cortex_core.inadimplencia_contextos 
         WHERE tipo_inadimplencia = 'erro_operacional'
            OR cliente_id LIKE 'erro_%'
            OR contexto_juridico ILIKE '%Registro manual%'
@@ -5091,7 +5091,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const cliente of clientesErroOperacional) {
         await db.execute(sql`
-          INSERT INTO inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por, tipo_inadimplencia)
+          INSERT INTO cortex_core.inadimplencia_contextos (cliente_id, procedimento_juridico, status_juridico, valor_acordado, contexto_juridico, acao, contexto, atualizado_por, tipo_inadimplencia)
           VALUES (${cliente.nome}, 'baixa', 'concluido', ${cliente.valor}, ${cliente.nome}, 'erro_operacional', 'Classificado como erro operacional', 'Sistema', 'erro_operacional')
           ON CONFLICT (cliente_id) DO UPDATE SET
             tipo_inadimplencia = 'erro_operacional',
@@ -13587,7 +13587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ic.procedimento_juridico,
                 p.max_atraso,
                 c.nome as cliente_nome
-              FROM inadimplencia_contextos ic
+              FROM cortex_core.inadimplencia_contextos ic
               JOIN "Conta Azul".caz_clientes c ON ic.cliente_id = c.ids OR ic.cliente_id = CAST(c.id AS TEXT)
               JOIN (
                 SELECT 
