@@ -59,6 +59,7 @@ const AnaliseVendas = lazy(() => import("@/pages/AnaliseVendas"));
 const PresentationMode = lazy(() => import("@/pages/PresentationMode"));
 const DetalhamentoVendas = lazy(() => import("@/pages/DetalhamentoVendas"));
 const Criativos = lazy(() => import("@/pages/Criativos"));
+const GrowthOrcadoRealizado = lazy(() => import("@/pages/GrowthOrcadoRealizado"));
 const GrowthVisaoGeral = lazy(() => import("@/pages/GrowthVisaoGeral"));
 const PerformancePlataformas = lazy(() => import("@/pages/PerformancePlataformas"));
 const RevenueGoals = lazy(() => import("@/pages/RevenueGoals"));
@@ -231,6 +232,7 @@ function ProtectedRouter() {
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
       <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
       <Route path="/growth/performance-plataformas">{() => <ProtectedRoute path="/growth/performance-plataformas" component={PerformancePlataformas} />}</Route>
+      <Route path="/growth/orcado-realizado">{() => <ProtectedRoute path="/growth/orcado-realizado" component={GrowthOrcadoRealizado} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
       
       {/* Jurídico */}

@@ -61,6 +61,7 @@ export const PERMISSION_KEYS = {
     PLATAFORMA: 'growth.plataforma',
     CRIATIVOS: 'growth.criativos',
     AUTO_REPORT: 'growth.auto_report',
+    ORCADO_REALIZADO: 'growth.orcado_realizado',
   },
   // G&G (Pessoas)
   GG: {
@@ -203,6 +204,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/performance-plataformas': PERMISSION_KEYS.GROWTH.PLATAFORMA,
   '/growth/criativos': PERMISSION_KEYS.GROWTH.CRIATIVOS,
   '/growth/auto-report': PERMISSION_KEYS.GROWTH.AUTO_REPORT,
+  '/growth/orcado-realizado': PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO,
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
   '/dashboard/recrutamento': PERMISSION_KEYS.GG.RECRUTAMENTO,
@@ -381,6 +383,7 @@ export const NAV_CONFIG = {
         { title: 'Meta Ads', url: '/dashboard/meta-ads', icon: 'Target', permissionKey: PERMISSION_KEYS.GROWTH.META_ADS },
         { title: 'Por Plataforma', url: '/growth/performance-plataformas', icon: 'Layers', permissionKey: PERMISSION_KEYS.GROWTH.PLATAFORMA },
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
+        { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Auto Report', url: '/growth/auto-report', icon: 'FileText', permissionKey: PERMISSION_KEYS.GROWTH.AUTO_REPORT },
       ],
     },
