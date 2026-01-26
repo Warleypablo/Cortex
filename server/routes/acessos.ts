@@ -334,6 +334,89 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
     }
   });
 
+  app.post("/api/acessos/turbo-tools", async (req, res) => {
+    try {
+      const { platform, username, password, accessUrl, observations } = req.body;
+      
+      if (!platform || !username || !password) {
+        return res.status(400).json({ error: "Platform, username and password are required" });
+      }
+      
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.turbo_tools (name, login, password, site, observations)
+        VALUES (${platform}, ${username}, ${password}, ${accessUrl || null}, ${observations || null})
+        RETURNING id, name, login, password, site, observations
+      `);
+      
+      const row = result.rows[0] as any;
+      res.status(201).json({
+        id: row.id,
+        platform: row.name,
+        username: row.login,
+        password: row.password,
+        accessUrl: row.site,
+        observations: row.observations,
+      });
+    } catch (error) {
+      console.error("[api] Error creating turbo_tool:", error);
+      res.status(500).json({ error: "Failed to create turbo_tool" });
+    }
+  });
+
+  app.patch("/api/acessos/turbo-tools/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { platform, username, password, accessUrl, observations } = req.body;
+      
+      const result = await db.execute(sql`
+        UPDATE cortex_core.turbo_tools 
+        SET name = COALESCE(${platform}, name),
+            login = COALESCE(${username}, login),
+            password = COALESCE(${password}, password),
+            site = COALESCE(${accessUrl}, site),
+            observations = COALESCE(${observations}, observations)
+        WHERE id = ${parseInt(id)}
+        RETURNING id, name, login, password, site, observations
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Turbo tool not found" });
+      }
+      
+      const row = result.rows[0] as any;
+      res.json({
+        id: row.id,
+        platform: row.name,
+        username: row.login,
+        password: row.password,
+        accessUrl: row.site,
+        observations: row.observations,
+      });
+    } catch (error) {
+      console.error("[api] Error updating turbo_tool:", error);
+      res.status(500).json({ error: "Failed to update turbo_tool" });
+    }
+  });
+
+  app.delete("/api/acessos/turbo-tools/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const result = await db.execute(sql`
+        DELETE FROM cortex_core.turbo_tools WHERE id = ${parseInt(id)} RETURNING id
+      `);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Turbo tool not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting turbo_tool:", error);
+      res.status(500).json({ error: "Failed to delete turbo_tool" });
+    }
+  });
+
   app.patch("/api/acessos/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
