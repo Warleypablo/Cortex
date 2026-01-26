@@ -500,14 +500,25 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       
       // Buscar totais de MQL/Leads por canal para o funil (coluna mql é text) com RM/RR stages
       // Vendas MQL são filtradas por data_fechamento E mql = '1'
+      // RM e RR contam deals que PASSARAM por esses estágios (incluindo os que já fecharam)
       const mqlTotaisPorCanalResult = await db.execute(sql`
         WITH leads_mqls AS (
           SELECT 
             COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
             COUNT(*) as leads,
-            SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-            SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado') THEN 1 ELSE 0 END) as rm,
-            SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado') THEN 1 ELSE 0 END) as rr
+            SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
+          FROM "Bitrix".crm_deal
+          WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+            ${canalFilterSQL}
+          GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
+        ),
+        rm_rr_counts AS (
+          SELECT 
+            COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
+            SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado', 'Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho') 
+                     AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm,
+            SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho') 
+                     AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr
           FROM "Bitrix".crm_deal
           WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
             ${canalFilterSQL}
@@ -526,15 +537,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
         )
         SELECT 
-          COALESCE(lm.canal, v.canal) as canal,
+          COALESCE(lm.canal, COALESCE(rr.canal, v.canal)) as canal,
           COALESCE(lm.leads, 0) as leads,
           COALESCE(lm.mqls, 0) as mqls,
-          COALESCE(lm.rm, 0) as rm,
-          COALESCE(lm.rr, 0) as rr,
+          COALESCE(rr.rm, 0) as rm,
+          COALESCE(rr.rr, 0) as rr,
           COALESCE(v.vendas, 0) as vendas,
           COALESCE(v.valor_vendas, 0) as valor_vendas
         FROM leads_mqls lm
-        FULL OUTER JOIN vendas_mql v ON lm.canal = v.canal
+        FULL OUTER JOIN rm_rr_counts rr ON lm.canal = rr.canal
+        FULL OUTER JOIN vendas_mql v ON COALESCE(lm.canal, rr.canal) = v.canal
         ORDER BY COALESCE(lm.mqls, 0) DESC
       `);
       
