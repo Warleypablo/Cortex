@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { startOfMonth, endOfMonth, format, parse } from "date-fns";
 
 type MetricType = 'manual' | 'formula';
 
@@ -27,6 +29,24 @@ interface MetricSection {
   title: string;
   icon: React.ReactNode;
   metrics: Metric[];
+}
+
+interface MQLMetrics {
+  totalMqls: number;
+  reunioesAgendadas: number;
+  reunioesRealizadas: number;
+  novosClientes: number;
+  contratosAceleracao: number;
+  contratosImplantacao: number;
+  faturamentoAceleracao: number;
+  faturamentoImplantacao: number;
+  percReuniaoAgendada: number;
+  percNoShow: number;
+  taxaVendas: number;
+  txContratosRecorrentes: number;
+  txContratosImplantacao: number;
+  ticketMedioAceleracao: number;
+  ticketMedioImplantacao: number;
 }
 
 function formatValue(value: number | string | null, format: 'currency' | 'number' | 'percent'): string {
@@ -52,65 +72,230 @@ function getVarianceColor(percentual: number | null): string {
   return 'text-red-500';
 }
 
-function getVarianceBadge(percentual: number | null) {
-  if (percentual === null) return null;
-  const isPositive = percentual >= 100;
-  return (
-    <Badge variant={isPositive ? 'default' : 'destructive'} className="ml-2">
-      {isPositive ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-      {percentual.toFixed(1)}%
-    </Badge>
-  );
+function calcPercentual(orcado: number | null, realizado: number | null): number | null {
+  if (orcado === null || realizado === null || orcado === 0) return null;
+  return (realizado / orcado) * 100;
 }
 
-const mockData: MetricSection[] = [
-  {
-    title: 'Métricas de Marketing: Ads',
-    icon: <Megaphone className="w-5 h-5" />,
-    metrics: [
-      { id: 'investimento', name: 'Investimento', type: 'manual', orcado: 95500, realizado: 0, percentual: 0, format: 'currency' },
-      { id: 'cpm', name: 'CPM', type: 'formula', orcado: 100, realizado: null, percentual: 0, format: 'currency' },
-      { id: 'impressoes', name: 'Impressões', type: 'formula', orcado: 955000, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'ctr', name: 'CTR', type: 'manual', orcado: 0.009, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: 8595, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'visualizacao_pagina', name: 'Visualização de Página', type: 'formula', orcado: 7306, realizado: null, percentual: null, format: 'number' },
-      { id: 'cps', name: 'CPS', type: 'formula', orcado: 13.07, realizado: null, percentual: null, format: 'currency' },
-    ],
-  },
-  {
-    title: 'Métricas de Marketing: Site',
-    icon: <LineChart className="w-5 h-5" />,
-    metrics: [
-      { id: 'connect_rate', name: 'Connect Rate', type: 'manual', orcado: 0.85, realizado: null, percentual: null, format: 'percent' },
-      { id: 'conversao_pagina', name: 'Conversão da Página', type: 'manual', orcado: 0.18, realizado: null, percentual: null, format: 'percent' },
-      { id: 'cpl', name: 'CPL', type: 'formula', orcado: 73, realizado: null, percentual: null, format: 'currency' },
-      { id: 'leads', name: 'Leads', type: 'formula', orcado: 1315, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'mql', name: 'MQL', type: 'formula', orcado: 229, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'mql_perc', name: 'MQL (%)', type: 'manual', orcado: 0.22, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: 417, realizado: null, percentual: 0, format: 'currency' },
-    ],
-  },
-  {
-    title: 'Métricas de Vendas: MQL',
-    icon: <Users className="w-5 h-5" />,
-    metrics: [
-      { id: 'mql_ra_perc', name: '% Reunião agendadas MQL', type: 'manual', orcado: 0.30, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'mql_ra_num', name: 'Nº Reunião agendada MQL', type: 'formula', orcado: 69, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'mql_rr_num', name: 'Nº Reunião realizada MQL', type: 'formula', orcado: 65, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'mql_noshow', name: '% No-show', type: 'manual', orcado: 0.05, realizado: 1.0, percentual: 2000, format: 'percent' },
-      { id: 'mql_taxa_vendas', name: 'Taxa RR/Vendas MQL', type: 'manual', orcado: 0.30, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'mql_novos_clientes', name: 'Novos Clientes MQL', type: 'formula', orcado: 19, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'mql_tx_recorrente', name: 'Tx de Contratos Recorrentes', type: 'manual', orcado: 0.60, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'mql_tx_implantacao', name: 'Tx de Contratos Implantação', type: 'manual', orcado: 0.45, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'mql_contratos_acel', name: 'Nº Novos Contratos Aceleração MQL', type: 'formula', orcado: 11, realizado: 0, percentual: 0, format: 'number', emoji: '🏎️' },
-      { id: 'mql_ticket_acel', name: 'Ticket Médio Aceleração MQL', type: 'manual', orcado: 4000, realizado: null, percentual: 0, format: 'currency', emoji: '🏎️' },
-      { id: 'mql_fat_acel', name: 'Faturamento Aceleração (MRR novo) de MQL', type: 'formula', orcado: 44641, realizado: 0, percentual: 0, format: 'currency', emoji: '🏎️' },
-      { id: 'mql_contratos_impl', name: 'Nº Novos Contratos Implantação MQL', type: 'formula', orcado: 8, realizado: 0, percentual: 0, format: 'number', emoji: '🔧' },
-      { id: 'mql_ticket_impl', name: 'Ticket Médio Implantação MQL', type: 'manual', orcado: 8500, realizado: null, percentual: 0, format: 'currency', emoji: '🔧' },
-      { id: 'mql_fat_impl', name: 'Faturamento Implantação MQL', type: 'formula', orcado: 71147, realizado: 0, percentual: 0, format: 'currency', emoji: '🔧' },
-    ],
-  },
-  {
+// Valores orçados (budget) - por enquanto fixos, depois podem vir de uma tabela
+const ORCADO_MQL = {
+  percReuniaoAgendada: 0.30,
+  reunioesAgendadas: 69,
+  reunioesRealizadas: 65,
+  percNoShow: 0.05,
+  taxaVendas: 0.30,
+  novosClientes: 19,
+  txContratosRecorrentes: 0.60,
+  txContratosImplantacao: 0.45,
+  contratosAceleracao: 11,
+  ticketMedioAceleracao: 4000,
+  faturamentoAceleracao: 44641,
+  contratosImplantacao: 8,
+  ticketMedioImplantacao: 8500,
+  faturamentoImplantacao: 71147,
+};
+
+export default function GrowthOrcadoRealizado() {
+  usePageTitle("Orçado x Realizado");
+  useSetPageInfo("Orçado x Realizado", "Controle de Métricas de Marketing e Vendas");
+  
+  const [selectedMonth, setSelectedMonth] = useState("2026-01");
+  
+  const months = [
+    { value: "2026-01", label: "Janeiro 2026" },
+    { value: "2026-02", label: "Fevereiro 2026" },
+    { value: "2026-03", label: "Março 2026" },
+    { value: "2025-12", label: "Dezembro 2025" },
+    { value: "2025-11", label: "Novembro 2025" },
+    { value: "2025-10", label: "Outubro 2025" },
+  ];
+
+  const dateRange = useMemo(() => {
+    const monthDate = parse(selectedMonth, 'yyyy-MM', new Date());
+    return {
+      startDate: format(startOfMonth(monthDate), 'yyyy-MM-dd'),
+      endDate: format(endOfMonth(monthDate), 'yyyy-MM-dd'),
+    };
+  }, [selectedMonth]);
+
+  const { data: mqlData, isLoading: mqlLoading } = useQuery<MQLMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      if (!res.ok) throw new Error('Failed to fetch MQL metrics');
+      return res.json();
+    },
+  });
+
+  const mqlMetrics: Metric[] = useMemo(() => {
+    const data = mqlData || {} as MQLMetrics;
+    return [
+      { 
+        id: 'mql_ra_perc', 
+        name: '% Reunião agendadas MQL', 
+        type: 'manual', 
+        orcado: ORCADO_MQL.percReuniaoAgendada, 
+        realizado: data.percReuniaoAgendada ?? null, 
+        percentual: calcPercentual(ORCADO_MQL.percReuniaoAgendada, data.percReuniaoAgendada), 
+        format: 'percent' 
+      },
+      { 
+        id: 'mql_ra_num', 
+        name: 'Nº Reunião agendada MQL', 
+        type: 'formula', 
+        orcado: ORCADO_MQL.reunioesAgendadas, 
+        realizado: data.reunioesAgendadas ?? 0, 
+        percentual: calcPercentual(ORCADO_MQL.reunioesAgendadas, data.reunioesAgendadas), 
+        format: 'number' 
+      },
+      { 
+        id: 'mql_rr_num', 
+        name: 'Nº Reunião realizada MQL', 
+        type: 'formula', 
+        orcado: ORCADO_MQL.reunioesRealizadas, 
+        realizado: data.reunioesRealizadas ?? 0, 
+        percentual: calcPercentual(ORCADO_MQL.reunioesRealizadas, data.reunioesRealizadas), 
+        format: 'number' 
+      },
+      { 
+        id: 'mql_noshow', 
+        name: '% No-show', 
+        type: 'manual', 
+        orcado: ORCADO_MQL.percNoShow, 
+        realizado: data.percNoShow ?? null, 
+        percentual: calcPercentual(ORCADO_MQL.percNoShow, data.percNoShow), 
+        format: 'percent' 
+      },
+      { 
+        id: 'mql_taxa_vendas', 
+        name: 'Taxa RR/Vendas MQL', 
+        type: 'manual', 
+        orcado: ORCADO_MQL.taxaVendas, 
+        realizado: data.taxaVendas ?? null, 
+        percentual: calcPercentual(ORCADO_MQL.taxaVendas, data.taxaVendas), 
+        format: 'percent' 
+      },
+      { 
+        id: 'mql_novos_clientes', 
+        name: 'Novos Clientes MQL', 
+        type: 'formula', 
+        orcado: ORCADO_MQL.novosClientes, 
+        realizado: data.novosClientes ?? 0, 
+        percentual: calcPercentual(ORCADO_MQL.novosClientes, data.novosClientes), 
+        format: 'number' 
+      },
+      { 
+        id: 'mql_tx_recorrente', 
+        name: 'Tx de Contratos Recorrentes', 
+        type: 'manual', 
+        orcado: ORCADO_MQL.txContratosRecorrentes, 
+        realizado: data.txContratosRecorrentes ?? null, 
+        percentual: calcPercentual(ORCADO_MQL.txContratosRecorrentes, data.txContratosRecorrentes), 
+        format: 'percent' 
+      },
+      { 
+        id: 'mql_tx_implantacao', 
+        name: 'Tx de Contratos Implantação', 
+        type: 'manual', 
+        orcado: ORCADO_MQL.txContratosImplantacao, 
+        realizado: data.txContratosImplantacao ?? null, 
+        percentual: calcPercentual(ORCADO_MQL.txContratosImplantacao, data.txContratosImplantacao), 
+        format: 'percent' 
+      },
+      { 
+        id: 'mql_contratos_acel', 
+        name: 'Nº Novos Contratos Aceleração MQL', 
+        type: 'formula', 
+        orcado: ORCADO_MQL.contratosAceleracao, 
+        realizado: data.contratosAceleracao ?? 0, 
+        percentual: calcPercentual(ORCADO_MQL.contratosAceleracao, data.contratosAceleracao), 
+        format: 'number', 
+        emoji: '🏎️' 
+      },
+      { 
+        id: 'mql_ticket_acel', 
+        name: 'Ticket Médio Aceleração MQL', 
+        type: 'manual', 
+        orcado: ORCADO_MQL.ticketMedioAceleracao, 
+        realizado: data.ticketMedioAceleracao ?? null, 
+        percentual: calcPercentual(ORCADO_MQL.ticketMedioAceleracao, data.ticketMedioAceleracao), 
+        format: 'currency', 
+        emoji: '🏎️' 
+      },
+      { 
+        id: 'mql_fat_acel', 
+        name: 'Faturamento Aceleração (MRR novo) de MQL', 
+        type: 'formula', 
+        orcado: ORCADO_MQL.faturamentoAceleracao, 
+        realizado: data.faturamentoAceleracao ?? 0, 
+        percentual: calcPercentual(ORCADO_MQL.faturamentoAceleracao, data.faturamentoAceleracao), 
+        format: 'currency', 
+        emoji: '🏎️' 
+      },
+      { 
+        id: 'mql_contratos_impl', 
+        name: 'Nº Novos Contratos Implantação MQL', 
+        type: 'formula', 
+        orcado: ORCADO_MQL.contratosImplantacao, 
+        realizado: data.contratosImplantacao ?? 0, 
+        percentual: calcPercentual(ORCADO_MQL.contratosImplantacao, data.contratosImplantacao), 
+        format: 'number', 
+        emoji: '🔧' 
+      },
+      { 
+        id: 'mql_ticket_impl', 
+        name: 'Ticket Médio Implantação MQL', 
+        type: 'manual', 
+        orcado: ORCADO_MQL.ticketMedioImplantacao, 
+        realizado: data.ticketMedioImplantacao ?? null, 
+        percentual: calcPercentual(ORCADO_MQL.ticketMedioImplantacao, data.ticketMedioImplantacao), 
+        format: 'currency', 
+        emoji: '🔧' 
+      },
+      { 
+        id: 'mql_fat_impl', 
+        name: 'Faturamento Implantação MQL', 
+        type: 'formula', 
+        orcado: ORCADO_MQL.faturamentoImplantacao, 
+        realizado: data.faturamentoImplantacao ?? 0, 
+        percentual: calcPercentual(ORCADO_MQL.faturamentoImplantacao, data.faturamentoImplantacao), 
+        format: 'currency', 
+        emoji: '🔧' 
+      },
+    ];
+  }, [mqlData]);
+
+  // Dados mockados para outras seções (a serem desmockados depois)
+  const mockSections: MetricSection[] = [
+    {
+      title: 'Métricas de Marketing: Ads',
+      icon: <Megaphone className="w-5 h-5" />,
+      metrics: [
+        { id: 'investimento', name: 'Investimento', type: 'manual', orcado: 95500, realizado: 0, percentual: 0, format: 'currency' },
+        { id: 'cpm', name: 'CPM', type: 'formula', orcado: 100, realizado: null, percentual: 0, format: 'currency' },
+        { id: 'impressoes', name: 'Impressões', type: 'formula', orcado: 955000, realizado: 0, percentual: 0, format: 'number' },
+        { id: 'ctr', name: 'CTR', type: 'manual', orcado: 0.009, realizado: null, percentual: 0, format: 'percent' },
+        { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: 8595, realizado: 0, percentual: 0, format: 'number' },
+        { id: 'visualizacao_pagina', name: 'Visualização de Página', type: 'formula', orcado: 7306, realizado: null, percentual: null, format: 'number' },
+        { id: 'cps', name: 'CPS', type: 'formula', orcado: 13.07, realizado: null, percentual: null, format: 'currency' },
+      ],
+    },
+    {
+      title: 'Métricas de Marketing: Site',
+      icon: <LineChart className="w-5 h-5" />,
+      metrics: [
+        { id: 'connect_rate', name: 'Connect Rate', type: 'manual', orcado: 0.85, realizado: null, percentual: null, format: 'percent' },
+        { id: 'conversao_pagina', name: 'Conversão da Página', type: 'manual', orcado: 0.18, realizado: null, percentual: null, format: 'percent' },
+        { id: 'cpl', name: 'CPL', type: 'formula', orcado: 73, realizado: null, percentual: null, format: 'currency' },
+        { id: 'leads', name: 'Leads', type: 'formula', orcado: 1315, realizado: 0, percentual: 0, format: 'number' },
+        { id: 'mql', name: 'MQL', type: 'formula', orcado: 229, realizado: mqlData?.totalMqls ?? 0, percentual: calcPercentual(229, mqlData?.totalMqls ?? null), format: 'number' },
+        { id: 'mql_perc', name: 'MQL (%)', type: 'manual', orcado: 0.22, realizado: null, percentual: 0, format: 'percent' },
+        { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: 417, realizado: null, percentual: 0, format: 'currency' },
+      ],
+    },
+  ];
+
+  const naoMqlSection: MetricSection = {
     title: 'Métricas de Vendas: Não-MQL',
     icon: <Users className="w-5 h-5" />,
     metrics: [
@@ -129,8 +314,9 @@ const mockData: MetricSection[] = [
       { id: 'nmql_ticket_impl', name: 'Ticket Médio Implantação não-MQL', type: 'manual', orcado: 8500, realizado: null, percentual: null, format: 'currency', emoji: '🔧' },
       { id: 'nmql_fat_impl', name: 'Faturamento Implantação não-MQL', type: 'formula', orcado: 131217.12, realizado: 0, percentual: 0, format: 'currency', emoji: '🔧' },
     ],
-  },
-  {
+  };
+
+  const outboundSection: MetricSection = {
     title: 'Métricas de Vendas: Outbound',
     icon: <Target className="w-5 h-5" />,
     metrics: [
@@ -138,7 +324,7 @@ const mockData: MetricSection[] = [
       { id: 'out_ra_perc', name: '% Reunião agendadas MQL', type: 'manual', orcado: 0.10, realizado: null, percentual: 0, format: 'percent' },
       { id: 'out_ra_num', name: 'Nº Reunião agendada MQL', type: 'formula', orcado: 84, realizado: 0, percentual: 0, format: 'number' },
       { id: 'out_rr_num', name: 'Nº Reunião realizada MQL', type: 'formula', orcado: 80, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'out_noshow', name: '% No-show', type: 'manual', orcado: 0.05, realizado: 1.0, percentual: 2000, format: 'percent' },
+      { id: 'out_noshow', name: '% No-show', type: 'manual', orcado: 0.05, realizado: null, percentual: 0, format: 'percent' },
       { id: 'out_taxa_vendas', name: 'Taxa RR/Vendas MQL', type: 'manual', orcado: 0.275, realizado: null, percentual: 0, format: 'percent' },
       { id: 'out_novos_clientes', name: 'Novos Clientes não MQL', type: 'formula', orcado: 21, realizado: 0, percentual: 0, format: 'number' },
       { id: 'out_tx_recorrente', name: 'Tx de Contratos Recorrentes', type: 'manual', orcado: 0.65, realizado: null, percentual: 0, format: 'percent' },
@@ -150,8 +336,9 @@ const mockData: MetricSection[] = [
       { id: 'out_ticket_impl', name: 'Ticket Médio Implantação não-MQL', type: 'manual', orcado: 8500, realizado: null, percentual: null, format: 'currency', emoji: '🔧' },
       { id: 'out_fat_impl', name: 'Faturamento Implantação não-MQL', type: 'formula', orcado: 79742.64, realizado: 0, percentual: 0, format: 'currency', emoji: '🔧' },
     ],
-  },
-  {
+  };
+
+  const totalSection: MetricSection = {
     title: 'Total',
     icon: <BarChart3 className="w-5 h-5" />,
     metrics: [
@@ -179,19 +366,18 @@ const mockData: MetricSection[] = [
       { id: 'total_cac_acel', name: 'CAC Aceleração', type: 'formula', orcado: 2031.50, realizado: null, percentual: 0, format: 'currency', emoji: '🏎️' },
       { id: 'total_cac_impl', name: 'CAC Implantação', type: 'formula', orcado: 2877.46, realizado: null, percentual: 0, format: 'currency' },
     ],
-  },
-];
+  };
 
-export default function GrowthOrcadoRealizado() {
-  usePageTitle("Orçado x Realizado");
-  useSetPageInfo("Orçado x Realizado", "Controle de Métricas de Marketing e Vendas");
-  
-  const [selectedMonth, setSelectedMonth] = useState("2026-01");
-  
-  const months = [
-    { value: "2026-01", label: "Janeiro 2026" },
-    { value: "2026-02", label: "Fevereiro 2026" },
-    { value: "2026-03", label: "Março 2026" },
+  const allSections: MetricSection[] = [
+    ...mockSections,
+    {
+      title: 'Métricas de Vendas: MQL',
+      icon: <Users className="w-5 h-5" />,
+      metrics: mqlMetrics,
+    },
+    naoMqlSection,
+    outboundSection,
+    totalSection,
   ];
 
   return (
@@ -231,40 +417,49 @@ export default function GrowthOrcadoRealizado() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Leads Gerados</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">MQLs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1.315</div>
-            <p className="text-xs text-muted-foreground">Meta de leads</p>
+            <div className="text-2xl font-bold flex items-center gap-2">
+              {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mqlData?.totalMqls ?? 0}
+            </div>
+            <p className="text-xs text-muted-foreground">Leads qualificados no período</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Novos Clientes</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Novos Clientes MQL</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">74</div>
-            <p className="text-xs text-muted-foreground">Meta de novos clientes</p>
+            <div className="text-2xl font-bold flex items-center gap-2">
+              {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mqlData?.novosClientes ?? 0}
+            </div>
+            <p className="text-xs text-muted-foreground">Negócios ganhos de MQL</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Faturamento</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Faturamento MQL</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 470.146</div>
-            <p className="text-xs text-muted-foreground">Meta de faturamento</p>
+            <div className="text-2xl font-bold flex items-center gap-2">
+              {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatValue((mqlData?.faturamentoAceleracao ?? 0) + (mqlData?.faturamentoImplantacao ?? 0), 'currency')}
+            </div>
+            <p className="text-xs text-muted-foreground">Aceleração + Implantação</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="space-y-6">
-        {mockData.map((section) => (
+        {allSections.map((section) => (
           <Card key={section.title}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 {section.icon}
                 {section.title}
+                {section.title === 'Métricas de Vendas: MQL' && mqlLoading && (
+                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
