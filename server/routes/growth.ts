@@ -516,6 +516,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         investimentoPorCanal[String(row.canal)] = parseFloat(row.investimento) || 0;
       }
       
+      console.log("[api] Investimento por canal encontrado:", JSON.stringify(investimentoPorCanal));
+      console.log("[api] Total investimento disponível:", totalInvestimento);
+      
       // Buscar totais de MQL/Leads por canal para o funil (coluna mql é text) com RM/RR stages
       // Vendas MQL são filtradas por data_fechamento E mql = '1'
       // RM e RR contam deals que PASSARAM por esses estágios (incluindo os que já fecharam)
@@ -568,15 +571,39 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ORDER BY COALESCE(lm.mqls, 0) DESC
       `);
       
-      const mqlPorCanal = (mqlTotaisPorCanalResult.rows as any[]).map(row => {
-        const canalNome = String(row.canal || 'Outros');
-        const leads = parseInt(row.leads) || 0;
-        const mqls = parseInt(row.mqls) || 0;
-        const rm = parseInt(row.rm) || 0;
-        const rr = parseInt(row.rr) || 0;
-        const vendas = parseInt(row.vendas) || 0;
-        const valorVendas = parseFloat(row.valor_vendas) || 0;
-        const investimentoCanal = investimentoPorCanal[canalNome] || 0;
+      // Primeiro, calcular totais para distribuir proporcionalmente se necessário
+      const tempMqlData = (mqlTotaisPorCanalResult.rows as any[]).map(row => ({
+        canal: String(row.canal || 'Outros'),
+        leads: parseInt(row.leads) || 0,
+        mqls: parseInt(row.mqls) || 0,
+        rm: parseInt(row.rm) || 0,
+        rr: parseInt(row.rr) || 0,
+        vendas: parseInt(row.vendas) || 0,
+        valorVendas: parseFloat(row.valor_vendas) || 0
+      }));
+      
+      const totalMqlsForProportion = tempMqlData.reduce((sum, c) => sum + c.mqls, 0);
+      const totalLeadsForProportion = tempMqlData.reduce((sum, c) => sum + c.leads, 0);
+      
+      // Verificar se temos investimento por canal via join, senão usar proporção do total
+      const hasInvestimentoPorCanal = Object.keys(investimentoPorCanal).length > 0;
+      console.log("[api] Usando investimento por canal via join:", hasInvestimentoPorCanal);
+      
+      const mqlPorCanal = tempMqlData.map(row => {
+        const canalNome = row.canal;
+        const leads = row.leads;
+        const mqls = row.mqls;
+        const rm = row.rm;
+        const rr = row.rr;
+        const vendas = row.vendas;
+        const valorVendas = row.valorVendas;
+        
+        // Se temos investimento por canal específico, usar. Senão, distribuir proporcionalmente.
+        let investimentoCanal = investimentoPorCanal[canalNome] || 0;
+        if (!hasInvestimentoPorCanal && totalMqlsForProportion > 0 && mqls > 0) {
+          // Distribuir investimento total proporcionalmente aos MQLs do canal
+          investimentoCanal = (mqls / totalMqlsForProportion) * totalInvestimento;
+        }
         
         return {
           canal: canalNome,
