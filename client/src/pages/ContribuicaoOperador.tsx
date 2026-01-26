@@ -190,13 +190,16 @@ export default function ContribuicaoOperador() {
       despesasByLevel.push({ ...cat, parentId });
     });
     
-    // Ordenar hierarquicamente: Salários > CXCS > Freelancers > Impostos
+    // Ordenar hierarquicamente: Salários > CXCS > Freelancers > Benefícios (SEM IMPOSTOS - vai ser linha separada)
     const despesaOrder: Record<string, number> = {
       'SALARIOS': 1,
       'CXCS': 2,
       'FREELANCERS': 3,
-      'IMPOSTOS': 4
+      'BENEFICIOS': 4
     };
+    
+    // Filtrar IMPOSTOS das despesas - será exibido como linha principal separada
+    const despesasSemImpostos = despesasByLevel.filter(d => !d.id.toUpperCase().includes('IMPOSTOS'));
     
     despesasByLevel.sort((a, b) => {
       const partsA = a.id.split(".");
@@ -215,15 +218,33 @@ export default function ContribuicaoOperador() {
       return partsA.length - partsB.length;
     });
 
-    const monthColumns = monthlyResults.map(m => ({
-      mes: m.mes,
-      mesLabel: m.mesLabel,
-      valorPorCategoria: new Map<string, number>(),
-      valorPorDespesa: new Map<string, number>(),
-      receitaTotal: m.data?.totais?.receitaTotal || 0,
-      despesaTotal: m.data?.totais?.despesaTotal || 0,
-      resultado: m.data?.totais?.resultado || 0
-    }));
+    const monthColumns = monthlyResults.map(m => {
+      // Calcular despesa SEM impostos
+      let despesaSemImpostos = 0;
+      if (m.data?.despesas) {
+        for (const despesa of m.data.despesas) {
+          if (!despesa.categoriaId.toUpperCase().includes('IMPOSTOS')) {
+            despesaSemImpostos += despesa.valor;
+          }
+        }
+      }
+      const receita = m.data?.totais?.receitaTotal || 0;
+      const resultadoBruto = receita - despesaSemImpostos;
+      const impostos = resultadoBruto * 0.18; // 18% sobre Resultado Bruto
+      const resultadoLiquido = resultadoBruto - impostos;
+      
+      return {
+        mes: m.mes,
+        mesLabel: m.mesLabel,
+        valorPorCategoria: new Map<string, number>(),
+        valorPorDespesa: new Map<string, number>(),
+        receitaTotal: receita,
+        despesaTotal: despesaSemImpostos, // Despesas SEM impostos
+        resultadoBruto,
+        impostos,
+        resultadoLiquido
+      };
+    });
     
     for (let i = 0; i < monthlyResults.length; i++) {
       const monthData = monthlyResults[i];
@@ -241,7 +262,7 @@ export default function ContribuicaoOperador() {
     
     return {
       categories: categoriesByLevel,
-      despesas: despesasByLevel,
+      despesas: despesasSemImpostos, // Usar despesas SEM impostos
       monthColumns
     };
   }, [monthlyResults]);
@@ -586,26 +607,73 @@ export default function ContribuicaoOperador() {
                   );
                 })}
 
+                {/* RESULTADO BRUTO = Receitas - Despesas */}
                 <div 
-                  className="grid border-t-2 border-primary/50 bg-primary/10 mt-4"
+                  className="grid border-t-2 border-amber-500/50 bg-amber-500/10 mt-4"
                   style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                  data-testid="row-resultado"
+                  data-testid="row-resultado-bruto"
                 >
-                  <div className="p-3 font-bold text-primary flex items-center gap-2 sticky left-0 z-10 bg-primary/10">
+                  <div className="p-3 font-bold text-amber-500 flex items-center gap-2 sticky left-0 z-10 bg-amber-500/10">
                     <TrendingUp className="h-4 w-4" />
-                    Resultado
+                    Resultado Bruto
                   </div>
                   {hierarchicalData.monthColumns.map((col) => {
-                    const isPositive = col.resultado >= 0;
+                    const isPositive = col.resultadoBruto >= 0;
                     return (
                       <div 
                         key={col.mes} 
                         className={cn(
                           "p-3 text-right font-bold",
-                          isPositive ? "text-emerald-500" : "text-red-500"
+                          isPositive ? "text-amber-500" : "text-red-500"
                         )}
                       >
-                        {formatCurrencyNoDecimals(col.resultado)}
+                        {formatCurrencyNoDecimals(col.resultadoBruto)}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* IMPOSTOS (18%) - Linha principal separada */}
+                <div 
+                  className="grid border-t-2 border-purple-500/50 bg-purple-500/10 mt-2"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  data-testid="row-impostos"
+                >
+                  <div className="p-3 font-bold text-purple-500 flex items-center gap-2 sticky left-0 z-10 bg-purple-500/10">
+                    <DollarSign className="h-4 w-4" />
+                    Impostos (18%)
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => (
+                    <div 
+                      key={col.mes} 
+                      className="p-3 text-right font-bold text-purple-500"
+                    >
+                      {col.impostos > 0 ? formatCurrencyNoDecimals(col.impostos) : "-"}
+                    </div>
+                  ))}
+                </div>
+
+                {/* RESULTADO LÍQUIDO = Resultado Bruto - Impostos */}
+                <div 
+                  className="grid border-t-2 border-blue-500/50 bg-blue-500/10 mt-2"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  data-testid="row-resultado-liquido"
+                >
+                  <div className="p-3 font-bold text-blue-500 flex items-center gap-2 sticky left-0 z-10 bg-blue-500/10">
+                    <TrendingUp className="h-4 w-4" />
+                    Resultado Líquido
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => {
+                    const isPositive = col.resultadoLiquido >= 0;
+                    return (
+                      <div 
+                        key={col.mes} 
+                        className={cn(
+                          "p-3 text-right font-bold",
+                          isPositive ? "text-blue-500" : "text-red-500"
+                        )}
+                      >
+                        {formatCurrencyNoDecimals(col.resultadoLiquido)}
                       </div>
                     );
                   })}
@@ -620,7 +688,7 @@ export default function ContribuicaoOperador() {
                     Contribuição (%)
                   </div>
                   {hierarchicalData.monthColumns.map((col) => {
-                    const percent = col.receitaTotal > 0 ? (col.resultado / col.receitaTotal) * 100 : 0;
+                    const percent = col.receitaTotal > 0 ? (col.resultadoLiquido / col.receitaTotal) * 100 : 0;
                     const hasReceita = col.receitaTotal > 0;
                     const isPositive = percent >= 0;
                     return (

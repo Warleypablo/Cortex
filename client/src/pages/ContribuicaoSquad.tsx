@@ -436,55 +436,49 @@ export default function ContribuicaoSquad() {
                   );
                 })}
 
-                {/* DESPESAS - Seção de despesas com Impostos */}
+                {/* RESULTADO BRUTO = Receitas (sem despesas operacionais nesta view) */}
                 <div 
-                  className="grid border-b-2 border-red-500/50 bg-red-500/10 cursor-pointer hover-elevate mt-2"
+                  className="grid border-b-2 border-amber-500/50 bg-amber-500/10 mt-2"
                   style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                  onClick={() => toggleExpand("DESPESAS")}
-                  data-testid="row-despesas-total"
+                  data-testid="row-resultado-bruto"
                 >
-                  <div className="px-2 py-1.5 font-bold text-sm text-red-500 flex items-center gap-1.5 sticky left-0 z-10 bg-red-500/10">
-                    {expanded.has("DESPESAS") ? (
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    ) : (
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    )}
-                    <CirclePlus className="h-3.5 w-3.5 rotate-45" />
-                    Despesas
+                  <div className="px-2 py-1.5 font-bold text-sm text-amber-500 flex items-center gap-1.5 sticky left-0 z-10 bg-amber-500/10">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Resultado Bruto
                   </div>
                   {hierarchicalData.monthColumns.map((col) => (
-                    <div key={col.mes} className="px-2 py-1.5 text-right text-sm font-bold text-red-500">
+                    <div key={col.mes} className="px-2 py-1.5 text-right text-sm font-bold text-amber-500">
+                      {col.receitaTotal > 0 ? formatCurrencyNoDecimals(col.receitaTotal) : "-"}
+                    </div>
+                  ))}
+                </div>
+
+                {/* IMPOSTOS (18%) - Linha principal */}
+                <div 
+                  className="grid border-b-2 border-purple-500/50 bg-purple-500/10 mt-2"
+                  style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  data-testid="row-impostos"
+                >
+                  <div className="px-2 py-1.5 font-bold text-sm text-purple-500 flex items-center gap-1.5 sticky left-0 z-10 bg-purple-500/10">
+                    <DollarSign className="h-3.5 w-3.5" />
+                    Impostos (18%)
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => (
+                    <div key={col.mes} className="px-2 py-1.5 text-right text-sm font-bold text-purple-500">
                       {col.receitaTotal > 0 ? formatCurrencyNoDecimals(col.receitaTotal * 0.18) : "-"}
                     </div>
                   ))}
                 </div>
 
-                {expanded.has("DESPESAS") && (
-                  <div 
-                    className="grid border-b border-border/50"
-                    style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                  >
-                    <div className="px-2 py-1 flex items-center gap-1.5 sticky left-0 z-10 bg-background pl-8">
-                      <span className="w-3.5" />
-                      <span className="text-xs">Impostos (18%)</span>
-                    </div>
-                    {hierarchicalData.monthColumns.map((col) => (
-                      <div key={col.mes} className="px-2 py-1 text-right text-xs">
-                        {col.receitaTotal > 0 ? formatCurrencyNoDecimals(col.receitaTotal * 0.18) : "-"}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* RESULTADO - Receitas - Despesas (Impostos) */}
+                {/* RESULTADO LÍQUIDO = Resultado Bruto - Impostos */}
                 <div 
                   className="grid border-b-2 border-blue-500/50 bg-blue-500/10 mt-2"
                   style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                  data-testid="row-resultado"
+                  data-testid="row-resultado-liquido"
                 >
                   <div className="px-2 py-1.5 font-bold text-sm text-blue-500 flex items-center gap-1.5 sticky left-0 z-10 bg-blue-500/10">
                     <TrendingUp className="h-3.5 w-3.5" />
-                    Resultado
+                    Resultado Líquido
                   </div>
                   {hierarchicalData.monthColumns.map((col) => (
                     <div key={col.mes} className="px-2 py-1.5 text-right text-sm font-bold text-blue-500">
