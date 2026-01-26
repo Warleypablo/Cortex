@@ -1,0 +1,119 @@
+Métricas de Marketing: Ads		Orçado	Realizado	
+Investimento	Manual	R$ 95.500	R$ 0	0,00%
+CPM	Fórmula	R$ 100		0,00%
+Impressões	Fórmula	955.000	0	0,00%
+CTR	Manual	0,90%		0,00%
+Cliques de Saída	Fórmula	8.595	0	0,00%
+Visualizacao de Pagina	Fórmula	7.306		
+CPS	Fórmula	R$ 13,07		
+Métricas de Marketing: Site				
+Connect Rate	Manual	85%		
+Conversão da Página	Manual	18,00%		
+CPL	Fórmula	R$ 73	#DIV/0!	#DIV/0!
+S1				
+S2				
+S3				
+S4				
+Leads 	Fórmula	1315	0	0,00%
+MQL	Fórmula	229	0	0,00%
+MQL (%)	Manual	22%		0,00%
+S1				
+S2				
+S3				
+S4				
+CPMQL 	Fórmula	R$ 417		0,00%
+S1				
+S2				
+S3				
+S4				
+Métricas de Vendas				
+MQL				
+% Reunião agendadas MQL	Manual	30%		0,00%
+Nº Reunião agendada MQL	Fórmula	69	0	0,00%
+Nº Reunião realizada MQL	Fórmula	65	0	0,00%
+S1		17	14	
+S2		34		
+S3		51		
+S4		68		
+% No-show	Manual	5,00%	100,00%	2000,00%
+Taxa RR/Vendas MQL	Manual	30,00%		0,00%
+Novos Clientes MQL	Fórmula	19	0	0,00%
+Tx de Contratos Recorrentes	Manual	60,00%		0,00%
+Tx de Contratos Implantação	Manual	45,00%		0,00%
+🏎️  Nº Novos Contratos Aceleração MQL	Fórmula	11	0	0,00%
+🏎️ Ticket Médio Aceleração MQL	Manual	R$ 4.000		0,00%
+🏎️ Faturamento Aceleração (MRR novo) de MQL	Fórmula	R$ 44.641	R$ 0,00	0,00%
+🔧 Nº Novos Contratos Implantação MQL	Fórmula	8	0	0,00%
+🔧 Ticket Médio Implantação MQL	Manual	R$ 8.500		0,00%
+🔧 Faturamento Implantação MQL	Fórmula	R$ 71.147	R$ 0,00	0,00%
+Não-MQL				
+% Reunião agendadas não-MQL	Manual	14%		0,00%
+Nº Reunião agendada não-MQL	Fórmula	152	0	0,00%
+Nº Reunião realizada não-MQL	Fórmula	144	0	0,00%
+% No-show	Manual	5%		0,00%
+Taxa RR/Vendas não MQL	Manual	25,00%	#DIV/0!	-
+Novos Clientes não MQL	Fórmula	34	0	0,00%
+Tx de Contratos Recorrentes	Manual	65,00%		0,00%
+Tx de Contratos Implantação	Manual	45,00%		0,00%
+🏎️ Nº Novos Contratos Aceleração não-MQL	Fórmula	22	0	0,00%
+🏎️ Ticket Médio Aceleração não-MQL	Manual	R$ 4.000,00		0,00%
+🏎️ Faturamento Aceleração (MRR novo) de não-MQL	Fórmula	R$ 89.193,34	R$ 0,00	0,00%
+S1				
+S2				
+S3				
+S4				
+🔧 Nº Novos Contratos Implantação não-MQL	Fórmula	15	0	0,00%
+🔧 Ticket Médio Implantação não-MQL	Manual	R$ 8.500,00	-	-
+🔧 Faturamento Implantação não-MQL	Fórmula	R$ 131.217,12	R$ 0,00	0,00%
+S1				
+S2				
+S3				
+S4				
+Outbound				
+Leads	Manual	800		0,00%
+% Reunião agendadas MQL	Manual	10%		0,00%
+Nº Reunião agendada MQL	Fórmula	84	0	0,00%
+Nº Reunião realizada MQL	Fórmula	80	0	0,00%
+% No-show	Manual	5,00%	100,00%	2000,00%
+Taxa RR/Vendas MQL	Manual	27,50%		0,00%
+Novos Clientes não MQL	Fórmula	21	0	0,00%
+Tx de Contratos Recorrentes	Manual	65,00%		0,00%
+Tx de Contratos Implantação	Manual	45,00%		0,00%
+🏎️ Nº Novos Contratos Aceleração não-MQL	Fórmula	14	0	0,00%
+🏎️ Ticket Médio Aceleração não-MQL	Manual	R$ 4.000,00		0,00%
+🏎️ Faturamento Aceleração (MRR novo) de não-MQL	Fórmula	R$ 54.204,15	R$ 0,00	0,00%
+S1				
+S2				
+S3				
+S4				
+🔧 Nº Novos Contratos Implantação não-MQL	Fórmula	9	0	0,00%
+🔧 Ticket Médio Implantação não-MQL	Manual	R$ 8.500,00	-	-
+🔧 Faturamento Implantação não-MQL	Fórmula	R$ 79.742,64	R$ 0,00	0,00%
+S1				
+S2				
+S3				
+S4				
+Total				
+% RA	Fórmula	23,17%	-	-
+Reuniões Agendadas	Fórmula	305	0	0,00%
+R$/Reunião Agendadas (CPRA)	Fórmula	R$ 313		0,00%
+Reuniões Relizadas	Fórmula	290	0	0,00%
+R$/Reunião Realizadas (CPRR)	Fórmula	R$ 330	#DIV/0!	-
+No show	Fórmula	5,00%		0,00%
+Conversão de RR/V (%)	Fórmula	28%		0,00%
+Novos Clientes	Fórmula	74	0	0,00%
+🏎️ Negócios Ganhos Aceleração	Fórmula	47	0	0,00%
+🔧 Negócios Ganhos Implantação	Fórmula	33	0	0,00%
+Faturamento Total	Fórmula	R$ 470.146	R$ 0,00	0,00%
+🏎️ Faturamento A	Fórmula	R$ 188.039	R$ 0,00	0,00%
+🔧 Faturamento I	Fórmula	R$ 282.107	R$ 0,00	0,00%
+Taxa de Conversão do Funil inteiro	Fórmula	5,61%	#DIV/0!	-
+Tx de conversão MQL	Fórmula	8,12%		0,00%
+ROAS	Fórmula	4,92		0,00%
+ROAS Aceleração	Fórmula	1,97		0,00%
+CAC ADS	Fórmula	R$ 1.805,10		0,00%
+Ticket Médio Geral	Fórmula	R$ 4.192,07		0,00%
+Ticket Médio Aceleração	Fórmula	R$ 4.000,00		0,00%
+Ticket Médio Implantação	Fórmula	R$ 8.500,00		0,00%
+🏎️ CAC Aceleração	Fórmula	R$ 2.031,50		0,00%
+CAC Implantação	Fórmula	R$ 2.877,46		0,00%
