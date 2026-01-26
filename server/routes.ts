@@ -8335,6 +8335,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/contribuicao-squad/totais-por-squad", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string;
+      const dataFim = req.query.dataFim as string;
+      
+      if (!dataInicio || !dataFim) {
+        return res.status(400).json({ error: "Parâmetros dataInicio e dataFim são obrigatórios" });
+      }
+      
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+        return res.status(400).json({ error: "Formato inválido. Esperado: YYYY-MM-DD" });
+      }
+      
+      const dataFimComHora = `${dataFim} 23:59:59`;
+      
+      const result = await db.execute(sql`
+        WITH cnpj_normalizado AS (
+          SELECT 
+            ids,
+            nome,
+            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+          FROM "Conta Azul".caz_clientes
+          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+        ),
+        cup_cnpj_normalizado AS (
+          SELECT 
+            task_id,
+            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+          FROM "Clickup".cup_clientes
+          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+        ),
+        contrato_unico AS (
+          SELECT DISTINCT ON (cc.cnpj_limpo)
+            cc.cnpj_limpo,
+            ct.squad,
+            ct.id_subtask
+          FROM cup_cnpj_normalizado cc
+          INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
+          WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
+          ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
+        )
+        SELECT 
+          COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
+          SUM(p.valor_pago::numeric) as valor_bruto,
+          COUNT(DISTINCT p.id) as quantidade_parcelas
+        FROM "Conta Azul".caz_parcelas p
+        LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
+        WHERE p.status = 'QUITADO'
+          AND p.tipo_evento = 'RECEITA'
+          AND p.data_quitacao >= ${dataInicio}::date
+          AND p.data_quitacao <= ${dataFimComHora}::timestamp
+          AND p.valor_pago::numeric > 0
+        GROUP BY COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad')
+        ORDER BY SUM(p.valor_pago::numeric) DESC
+      `);
+      
+      const totalGeral = (result.rows as any[]).reduce((sum, row) => sum + (parseFloat(row.valor_bruto) || 0), 0);
+      
+      const squadsComContribuicao = (result.rows as any[]).map(row => {
+        const valorBruto = parseFloat(row.valor_bruto) || 0;
+        const valorLiquido = valorBruto * 0.82;
+        return {
+          squad: row.squad,
+          valorBruto,
+          valorLiquido,
+          percentualBruto: totalGeral > 0 ? (valorBruto / totalGeral) * 100 : 0,
+          percentualLiquido: totalGeral > 0 ? (valorBruto / totalGeral) * 100 : 0,
+          quantidadeParcelas: parseInt(row.quantidade_parcelas) || 0
+        };
+      });
+      
+      res.json({
+        squads: squadsComContribuicao,
+        totalBruto: totalGeral,
+        totalLiquido: totalGeral * 0.82
+      });
+    } catch (error) {
+      console.error("[api] Error fetching totais por squad:", error);
+      res.status(500).json({ error: "Falha ao buscar totais por squad" });
+    }
+  });
+
   // ========================================
   // GPTURBO CHAT API ENDPOINT (powered by OpenAI)
   // ========================================
