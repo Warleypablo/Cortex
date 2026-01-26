@@ -16,6 +16,7 @@ interface ParcelaInfo {
   dataQuitacao: string;
   linkNfse: string | null;
   numNfse: string | null;
+  urlCobranca: string | null;
   clienteNome: string;
   servicoNome: string;
   squad: string;
@@ -430,9 +431,19 @@ export default function ContribuicaoSquad() {
                                   <div className="text-xs space-y-1">
                                     <p className="font-medium">Parcelas ({parcelas.length}):</p>
                                     {parcelas.slice(0, 5).map((p: ParcelaInfo, idx: number) => (
-                                      <div key={idx} className="flex items-center gap-1">
+                                      <div key={idx} className="flex items-center gap-1 flex-wrap">
                                         <span>{formatCurrencyNoDecimals(p.valor)}</span>
                                         {p.numNfse && <span className="text-muted-foreground">NF {p.numNfse}</span>}
+                                        {p.urlCobranca && (
+                                          <a 
+                                            href={p.urlCobranca} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-green-500 hover:underline"
+                                          >
+                                            Fatura
+                                          </a>
+                                        )}
                                         {p.linkNfse && (
                                           <a 
                                             href={p.linkNfse} 
@@ -440,7 +451,7 @@ export default function ContribuicaoSquad() {
                                             rel="noopener noreferrer"
                                             className="text-blue-500 hover:underline"
                                           >
-                                            Ver
+                                            NF-e
                                           </a>
                                         )}
                                       </div>

@@ -8361,7 +8361,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           p.valor_pago::numeric as valor,
           p.data_quitacao,
           p.link_nfse,
-          p.num_nfse
+          p.num_nfse,
+          p.url_cobranca
         FROM "Conta Azul".caz_parcelas p
         LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
         LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
@@ -8386,6 +8387,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dataQuitacao: string;
         linkNfse: string | null;
         numNfse: string | null;
+        urlCobranca: string | null;
         clienteNome: string;
         servicoNome: string;
         squad: string;
@@ -8453,6 +8455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           dataQuitacao: row.data_quitacao,
           linkNfse: row.link_nfse,
           numNfse: row.num_nfse,
+          urlCobranca: row.url_cobranca,
           clienteNome,
           servicoNome,
           squad: squadNome
