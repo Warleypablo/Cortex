@@ -498,6 +498,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ? sql`AND (LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads' OR LOWER(utm_source) LIKE '%ads%')`
         : sql``;
       
+      // Buscar investimento por canal (via utm_content = ad_id)
+      const investimentoPorCanalResult = await db.execute(sql`
+        SELECT 
+          COALESCE(NULLIF(TRIM(d.utm_source), ''), 'Outros') as canal,
+          SUM(i.spend::numeric) as investimento
+        FROM meta_ads.meta_insights_daily i
+        INNER JOIN "Bitrix".crm_deal d ON i.ad_id = d.utm_content
+        WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+          AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+          ${canalFilterSQL}
+        GROUP BY COALESCE(NULLIF(TRIM(d.utm_source), ''), 'Outros')
+      `);
+      
+      const investimentoPorCanal: Record<string, number> = {};
+      for (const row of investimentoPorCanalResult.rows as any[]) {
+        investimentoPorCanal[String(row.canal)] = parseFloat(row.investimento) || 0;
+      }
+      
       // Buscar totais de MQL/Leads por canal para o funil (coluna mql é text) com RM/RR stages
       // Vendas MQL são filtradas por data_fechamento E mql = '1'
       // RM e RR contam deals que PASSARAM por esses estágios (incluindo os que já fecharam)
@@ -551,21 +569,26 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       `);
       
       const mqlPorCanal = (mqlTotaisPorCanalResult.rows as any[]).map(row => {
+        const canalNome = String(row.canal || 'Outros');
         const leads = parseInt(row.leads) || 0;
         const mqls = parseInt(row.mqls) || 0;
         const rm = parseInt(row.rm) || 0;
         const rr = parseInt(row.rr) || 0;
         const vendas = parseInt(row.vendas) || 0;
         const valorVendas = parseFloat(row.valor_vendas) || 0;
+        const investimentoCanal = investimentoPorCanal[canalNome] || 0;
         
         return {
-          canal: String(row.canal || 'Outros'),
+          canal: canalNome,
           leads,
           mqls,
           rm,
           rr,
           vendas,
           valorVendas,
+          investimento: investimentoCanal,
+          cpl: leads > 0 && investimentoCanal > 0 ? Math.round(investimentoCanal / leads) : null,
+          cpmql: mqls > 0 && investimentoCanal > 0 ? Math.round(investimentoCanal / mqls) : null,
           leadMql: leads > 0 ? Math.round((mqls / leads) * 100) : 0,
           mqlRm: mqls > 0 ? Math.round((rm / mqls) * 100) : 0,
           mqlRr: mqls > 0 ? Math.round((rr / mqls) * 100) : 0,
