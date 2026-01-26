@@ -95,6 +95,23 @@ const ORCADO_MQL = {
   faturamentoImplantacao: 71147,
 };
 
+const ORCADO_NAO_MQL = {
+  percReuniaoAgendada: 0.14,
+  reunioesAgendadas: 152,
+  reunioesRealizadas: 144,
+  percNoShow: 0.05,
+  taxaVendas: 0.25,
+  novosClientes: 34,
+  txContratosRecorrentes: 0.65,
+  txContratosImplantacao: 0.45,
+  contratosAceleracao: 22,
+  ticketMedioAceleracao: 4000,
+  faturamentoAceleracao: 89193.34,
+  contratosImplantacao: 15,
+  ticketMedioImplantacao: 8500,
+  faturamentoImplantacao: 131217.12,
+};
+
 export default function GrowthOrcadoRealizado() {
   usePageTitle("Orçado x Realizado");
   useSetPageInfo("Orçado x Realizado", "Controle de Métricas de Marketing e Vendas");
@@ -123,6 +140,33 @@ export default function GrowthOrcadoRealizado() {
     queryFn: async () => {
       const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
       if (!res.ok) throw new Error('Failed to fetch MQL metrics');
+      return res.json();
+    },
+  });
+
+  interface NaoMQLMetrics {
+    totalNaoMqls: number;
+    reunioesAgendadas: number;
+    reunioesRealizadas: number;
+    novosClientes: number;
+    contratosAceleracao: number;
+    contratosImplantacao: number;
+    faturamentoAceleracao: number;
+    faturamentoImplantacao: number;
+    percReuniaoAgendada: number;
+    percNoShow: number;
+    taxaVendas: number;
+    txContratosRecorrentes: number;
+    txContratosImplantacao: number;
+    ticketMedioAceleracao: number;
+    ticketMedioImplantacao: number;
+  }
+
+  const { data: naoMqlData, isLoading: naoMqlLoading } = useQuery<NaoMQLMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      if (!res.ok) throw new Error('Failed to fetch Não-MQL metrics');
       return res.json();
     },
   });
@@ -295,26 +339,143 @@ export default function GrowthOrcadoRealizado() {
     },
   ];
 
-  const naoMqlSection: MetricSection = {
-    title: 'Métricas de Vendas: Não-MQL',
-    icon: <Users className="w-5 h-5" />,
-    metrics: [
-      { id: 'nmql_ra_perc', name: '% Reunião agendadas não-MQL', type: 'manual', orcado: 0.14, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'nmql_ra_num', name: 'Nº Reunião agendada não-MQL', type: 'formula', orcado: 152, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'nmql_rr_num', name: 'Nº Reunião realizada não-MQL', type: 'formula', orcado: 144, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'nmql_noshow', name: '% No-show', type: 'manual', orcado: 0.05, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'nmql_taxa_vendas', name: 'Taxa RR/Vendas não MQL', type: 'manual', orcado: 0.25, realizado: null, percentual: null, format: 'percent' },
-      { id: 'nmql_novos_clientes', name: 'Novos Clientes não MQL', type: 'formula', orcado: 34, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'nmql_tx_recorrente', name: 'Tx de Contratos Recorrentes', type: 'manual', orcado: 0.65, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'nmql_tx_implantacao', name: 'Tx de Contratos Implantação', type: 'manual', orcado: 0.45, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'nmql_contratos_acel', name: 'Nº Novos Contratos Aceleração não-MQL', type: 'formula', orcado: 22, realizado: 0, percentual: 0, format: 'number', emoji: '🏎️' },
-      { id: 'nmql_ticket_acel', name: 'Ticket Médio Aceleração não-MQL', type: 'manual', orcado: 4000, realizado: null, percentual: 0, format: 'currency', emoji: '🏎️' },
-      { id: 'nmql_fat_acel', name: 'Faturamento Aceleração (MRR novo) de não-MQL', type: 'formula', orcado: 89193.34, realizado: 0, percentual: 0, format: 'currency', emoji: '🏎️' },
-      { id: 'nmql_contratos_impl', name: 'Nº Novos Contratos Implantação não-MQL', type: 'formula', orcado: 15, realizado: 0, percentual: 0, format: 'number', emoji: '🔧' },
-      { id: 'nmql_ticket_impl', name: 'Ticket Médio Implantação não-MQL', type: 'manual', orcado: 8500, realizado: null, percentual: null, format: 'currency', emoji: '🔧' },
-      { id: 'nmql_fat_impl', name: 'Faturamento Implantação não-MQL', type: 'formula', orcado: 131217.12, realizado: 0, percentual: 0, format: 'currency', emoji: '🔧' },
-    ],
-  };
+  const naoMqlMetrics: Metric[] = useMemo(() => {
+    const data = naoMqlData || {} as NaoMQLMetrics;
+    return [
+      { 
+        id: 'nmql_ra_perc', 
+        name: '% Reunião agendadas não-MQL', 
+        type: 'manual', 
+        orcado: ORCADO_NAO_MQL.percReuniaoAgendada, 
+        realizado: data.percReuniaoAgendada ?? null, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.percReuniaoAgendada, data.percReuniaoAgendada), 
+        format: 'percent' 
+      },
+      { 
+        id: 'nmql_ra_num', 
+        name: 'Nº Reunião agendada não-MQL', 
+        type: 'formula', 
+        orcado: ORCADO_NAO_MQL.reunioesAgendadas, 
+        realizado: data.reunioesAgendadas ?? 0, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.reunioesAgendadas, data.reunioesAgendadas), 
+        format: 'number' 
+      },
+      { 
+        id: 'nmql_rr_num', 
+        name: 'Nº Reunião realizada não-MQL', 
+        type: 'formula', 
+        orcado: ORCADO_NAO_MQL.reunioesRealizadas, 
+        realizado: data.reunioesRealizadas ?? 0, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.reunioesRealizadas, data.reunioesRealizadas), 
+        format: 'number' 
+      },
+      { 
+        id: 'nmql_noshow', 
+        name: '% No-show', 
+        type: 'manual', 
+        orcado: ORCADO_NAO_MQL.percNoShow, 
+        realizado: data.percNoShow ?? null, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.percNoShow, data.percNoShow), 
+        format: 'percent' 
+      },
+      { 
+        id: 'nmql_taxa_vendas', 
+        name: 'Taxa RR/Vendas não MQL', 
+        type: 'manual', 
+        orcado: ORCADO_NAO_MQL.taxaVendas, 
+        realizado: data.taxaVendas ?? null, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.taxaVendas, data.taxaVendas), 
+        format: 'percent' 
+      },
+      { 
+        id: 'nmql_novos_clientes', 
+        name: 'Novos Clientes não MQL', 
+        type: 'formula', 
+        orcado: ORCADO_NAO_MQL.novosClientes, 
+        realizado: data.novosClientes ?? 0, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.novosClientes, data.novosClientes), 
+        format: 'number' 
+      },
+      { 
+        id: 'nmql_tx_recorrente', 
+        name: 'Tx de Contratos Recorrentes', 
+        type: 'manual', 
+        orcado: ORCADO_NAO_MQL.txContratosRecorrentes, 
+        realizado: data.txContratosRecorrentes ?? null, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.txContratosRecorrentes, data.txContratosRecorrentes), 
+        format: 'percent' 
+      },
+      { 
+        id: 'nmql_tx_implantacao', 
+        name: 'Tx de Contratos Implantação', 
+        type: 'manual', 
+        orcado: ORCADO_NAO_MQL.txContratosImplantacao, 
+        realizado: data.txContratosImplantacao ?? null, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.txContratosImplantacao, data.txContratosImplantacao), 
+        format: 'percent' 
+      },
+      { 
+        id: 'nmql_contratos_acel', 
+        name: 'Nº Novos Contratos Aceleração não-MQL', 
+        type: 'formula', 
+        orcado: ORCADO_NAO_MQL.contratosAceleracao, 
+        realizado: data.contratosAceleracao ?? 0, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.contratosAceleracao, data.contratosAceleracao), 
+        format: 'number', 
+        emoji: '🏎️' 
+      },
+      { 
+        id: 'nmql_ticket_acel', 
+        name: 'Ticket Médio Aceleração não-MQL', 
+        type: 'manual', 
+        orcado: ORCADO_NAO_MQL.ticketMedioAceleracao, 
+        realizado: data.ticketMedioAceleracao ?? null, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.ticketMedioAceleracao, data.ticketMedioAceleracao), 
+        format: 'currency', 
+        emoji: '🏎️' 
+      },
+      { 
+        id: 'nmql_fat_acel', 
+        name: 'Faturamento Aceleração (MRR novo) de não-MQL', 
+        type: 'formula', 
+        orcado: ORCADO_NAO_MQL.faturamentoAceleracao, 
+        realizado: data.faturamentoAceleracao ?? 0, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.faturamentoAceleracao, data.faturamentoAceleracao), 
+        format: 'currency', 
+        emoji: '🏎️' 
+      },
+      { 
+        id: 'nmql_contratos_impl', 
+        name: 'Nº Novos Contratos Implantação não-MQL', 
+        type: 'formula', 
+        orcado: ORCADO_NAO_MQL.contratosImplantacao, 
+        realizado: data.contratosImplantacao ?? 0, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.contratosImplantacao, data.contratosImplantacao), 
+        format: 'number', 
+        emoji: '🔧' 
+      },
+      { 
+        id: 'nmql_ticket_impl', 
+        name: 'Ticket Médio Implantação não-MQL', 
+        type: 'manual', 
+        orcado: ORCADO_NAO_MQL.ticketMedioImplantacao, 
+        realizado: data.ticketMedioImplantacao ?? null, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.ticketMedioImplantacao, data.ticketMedioImplantacao), 
+        format: 'currency', 
+        emoji: '🔧' 
+      },
+      { 
+        id: 'nmql_fat_impl', 
+        name: 'Faturamento Implantação não-MQL', 
+        type: 'formula', 
+        orcado: ORCADO_NAO_MQL.faturamentoImplantacao, 
+        realizado: data.faturamentoImplantacao ?? 0, 
+        percentual: calcPercentual(ORCADO_NAO_MQL.faturamentoImplantacao, data.faturamentoImplantacao), 
+        format: 'currency', 
+        emoji: '🔧' 
+      },
+    ];
+  }, [naoMqlData]);
 
   const outboundSection: MetricSection = {
     title: 'Métricas de Vendas: Outbound',
@@ -375,7 +536,11 @@ export default function GrowthOrcadoRealizado() {
       icon: <Users className="w-5 h-5" />,
       metrics: mqlMetrics,
     },
-    naoMqlSection,
+    {
+      title: 'Métricas de Vendas: Não-MQL',
+      icon: <Users className="w-5 h-5" />,
+      metrics: naoMqlMetrics,
+    },
     outboundSection,
     totalSection,
   ];
