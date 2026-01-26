@@ -609,25 +609,26 @@ export default function ContribuicaoOperador() {
 
                 {/* RESULTADO BRUTO = Receitas - Despesas */}
                 <div 
-                  className="grid border-t-2 border-amber-500/50 bg-amber-500/10 mt-4"
+                  className="grid border-b border-amber-500/30 bg-amber-500/5 mt-3"
                   style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
                   data-testid="row-resultado-bruto"
                 >
-                  <div className="p-3 font-bold text-amber-500 flex items-center gap-2 sticky left-0 z-10 bg-amber-500/10">
-                    <TrendingUp className="h-4 w-4" />
+                  <div className="p-2.5 font-semibold text-sm text-amber-400 flex items-center gap-2 sticky left-0 z-10 bg-amber-500/5">
+                    <TrendingUp className="h-3.5 w-3.5" />
                     Resultado Bruto
                   </div>
                   {hierarchicalData.monthColumns.map((col) => {
+                    const hasData = col.receitaTotal > 0 || col.despesaTotal > 0;
                     const isPositive = col.resultadoBruto >= 0;
                     return (
                       <div 
                         key={col.mes} 
                         className={cn(
-                          "p-3 text-right font-bold",
-                          isPositive ? "text-amber-500" : "text-red-500"
+                          "p-2.5 text-right text-sm font-semibold",
+                          !hasData ? "text-muted-foreground" : isPositive ? "text-amber-400" : "text-red-400"
                         )}
                       >
-                        {formatCurrencyNoDecimals(col.resultadoBruto)}
+                        {hasData ? formatCurrencyNoDecimals(col.resultadoBruto) : "-"}
                       </div>
                     );
                   })}
@@ -635,56 +636,64 @@ export default function ContribuicaoOperador() {
 
                 {/* IMPOSTOS (18%) - Linha principal separada */}
                 <div 
-                  className="grid border-t-2 border-purple-500/50 bg-purple-500/10 mt-2"
+                  className="grid border-b border-purple-500/30 bg-purple-500/5"
                   style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
                   data-testid="row-impostos"
                 >
-                  <div className="p-3 font-bold text-purple-500 flex items-center gap-2 sticky left-0 z-10 bg-purple-500/10">
-                    <DollarSign className="h-4 w-4" />
+                  <div className="p-2.5 font-semibold text-sm text-purple-400 flex items-center gap-2 sticky left-0 z-10 bg-purple-500/5">
+                    <DollarSign className="h-3.5 w-3.5" />
                     Impostos (18%)
                   </div>
-                  {hierarchicalData.monthColumns.map((col) => (
-                    <div 
-                      key={col.mes} 
-                      className="p-3 text-right font-bold text-purple-500"
-                    >
-                      {col.impostos > 0 ? formatCurrencyNoDecimals(col.impostos) : "-"}
-                    </div>
-                  ))}
-                </div>
-
-                {/* RESULTADO LÍQUIDO = Resultado Bruto - Impostos */}
-                <div 
-                  className="grid border-t-2 border-blue-500/50 bg-blue-500/10 mt-2"
-                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                  data-testid="row-resultado-liquido"
-                >
-                  <div className="p-3 font-bold text-blue-500 flex items-center gap-2 sticky left-0 z-10 bg-blue-500/10">
-                    <TrendingUp className="h-4 w-4" />
-                    Resultado Líquido
-                  </div>
                   {hierarchicalData.monthColumns.map((col) => {
-                    const isPositive = col.resultadoLiquido >= 0;
+                    const hasData = col.receitaTotal > 0 || col.despesaTotal > 0;
                     return (
                       <div 
                         key={col.mes} 
                         className={cn(
-                          "p-3 text-right font-bold",
-                          isPositive ? "text-blue-500" : "text-red-500"
+                          "p-2.5 text-right text-sm font-semibold",
+                          hasData ? "text-purple-400" : "text-muted-foreground"
                         )}
                       >
-                        {formatCurrencyNoDecimals(col.resultadoLiquido)}
+                        {hasData && col.impostos > 0 ? formatCurrencyNoDecimals(col.impostos) : "-"}
                       </div>
                     );
                   })}
                 </div>
 
+                {/* RESULTADO LÍQUIDO = Resultado Bruto - Impostos */}
+                <div 
+                  className="grid border-b-2 border-emerald-500/40 bg-emerald-500/10"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  data-testid="row-resultado-liquido"
+                >
+                  <div className="p-2.5 font-bold text-sm text-emerald-400 flex items-center gap-2 sticky left-0 z-10 bg-emerald-500/10">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Resultado Líquido
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => {
+                    const hasData = col.receitaTotal > 0 || col.despesaTotal > 0;
+                    const isPositive = col.resultadoLiquido >= 0;
+                    return (
+                      <div 
+                        key={col.mes} 
+                        className={cn(
+                          "p-2.5 text-right text-sm font-bold",
+                          !hasData ? "text-muted-foreground" : isPositive ? "text-emerald-400" : "text-red-400"
+                        )}
+                      >
+                        {hasData ? formatCurrencyNoDecimals(col.resultadoLiquido) : "-"}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* CONTRIBUIÇÃO % */}
                 <div
-                  className="grid border-t border-border/50 bg-muted/30"
+                  className="grid bg-muted/20 mt-2"
                   style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
                   data-testid="row-contribuicao-percentual"
                 >
-                  <div className="p-3 font-semibold text-muted-foreground sticky left-0 z-10 bg-muted/30">
+                  <div className="p-2.5 text-sm text-muted-foreground sticky left-0 z-10 bg-muted/20">
                     Contribuição (%)
                   </div>
                   {hierarchicalData.monthColumns.map((col) => {
@@ -695,8 +704,8 @@ export default function ContribuicaoOperador() {
                       <div
                         key={col.mes}
                         className={cn(
-                          "p-3 text-right font-semibold text-sm",
-                          hasReceita ? (isPositive ? "text-emerald-600" : "text-red-600") : "text-muted-foreground"
+                          "p-2.5 text-right text-sm",
+                          hasReceita ? (isPositive ? "text-emerald-500" : "text-red-500") : "text-muted-foreground"
                         )}
                       >
                         {hasReceita ? formatPercent(percent, 1) : "-"}
