@@ -634,6 +634,33 @@ export default function ContribuicaoOperador() {
                   })}
                 </div>
 
+                {/* CONTRIBUIÇÃO BRUTA % */}
+                <div
+                  className="grid border-b border-border/30 bg-amber-500/5"
+                  style={{ gridTemplateColumns: `250px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                  data-testid="row-contribuicao-bruta"
+                >
+                  <div className="p-2 pl-8 text-xs text-muted-foreground sticky left-0 z-10 bg-amber-500/5">
+                    Contribuição Bruta (%)
+                  </div>
+                  {hierarchicalData.monthColumns.map((col) => {
+                    const percentBruto = col.receitaTotal > 0 ? (col.resultadoBruto / col.receitaTotal) * 100 : 0;
+                    const hasReceita = col.receitaTotal > 0;
+                    const isPositive = percentBruto >= 0;
+                    return (
+                      <div
+                        key={col.mes}
+                        className={cn(
+                          "p-2 text-right text-xs",
+                          hasReceita ? (isPositive ? "text-amber-400/80" : "text-red-400/80") : "text-muted-foreground"
+                        )}
+                      >
+                        {hasReceita ? formatPercent(percentBruto, 1) : "-"}
+                      </div>
+                    );
+                  })}
+                </div>
+
                 {/* IMPOSTOS (18%) - Linha principal separada */}
                 <div 
                   className="grid border-b border-purple-500/30 bg-purple-500/5"
