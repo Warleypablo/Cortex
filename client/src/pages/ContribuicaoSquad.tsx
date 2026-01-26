@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { ChevronRight, ChevronDown, Users, TrendingUp, CirclePlus, FileText } from "lucide-react";
+import { ChevronRight, ChevronDown, Users, TrendingUp, CirclePlus, FileText, DollarSign } from "lucide-react";
 import { format, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
