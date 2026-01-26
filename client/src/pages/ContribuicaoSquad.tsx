@@ -7,18 +7,31 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { ChevronRight, ChevronDown, Users, TrendingUp, CirclePlus, FileText, DollarSign } from "lucide-react";
-import { format, endOfMonth } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { ChevronRight, ChevronDown, Users, TrendingUp, CirclePlus, FileText, DollarSign, ExternalLink } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+interface ParcelaInfo {
+  id: string;
+  valor: number;
+  dataQuitacao: string;
+  linkNfse: string | null;
+  numNfse: string | null;
+  clienteNome: string;
+  servicoNome: string;
+  squad: string;
+}
+
+interface ReceitaItem {
+  categoriaId: string;
+  categoriaNome: string;
+  valor: number;
+  nivel: number;
+  parcelas?: ParcelaInfo[];
+}
 
 interface ContribuicaoSquadData {
   squads: string[];
-  receitas: {
-    categoriaId: string;
-    categoriaNome: string;
-    valor: number;
-    nivel: number;
-  }[];
+  receitas: ReceitaItem[];
   totais: {
     receitaTotal: number;
     quantidadeParcelas: number;
@@ -32,6 +45,13 @@ interface MonthlyData {
   data: ContribuicaoSquadData | null;
 }
 
+interface BulkResponse {
+  ano: number;
+  squad: string;
+  squads: string[];
+  meses: MonthlyData[];
+}
+
 export default function ContribuicaoSquad() {
   usePageTitle("Contribuição por Squad");
   useSetPageInfo("Contribuição por Squad", "Receitas atribuídas por squad do contrato");
@@ -41,79 +61,33 @@ export default function ContribuicaoSquad() {
   const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(["RECEITAS"]));
   
-  const meses = useMemo(() => {
-    const result: { mes: string; mesLabel: string; dataInicio: string; dataFim: string }[] = [];
-    for (let m = 0; m < 12; m++) {
-      const start = new Date(anoSelecionado, m, 1);
-      const end = endOfMonth(start);
-      result.push({
-        mes: format(start, "yyyy-MM"),
-        mesLabel: format(start, "MMM. 'de' yy", { locale: ptBR }),
-        dataInicio: format(start, "yyyy-MM-dd"),
-        dataFim: format(end, "yyyy-MM-dd")
-      });
-    }
-    return result;
-  }, [anoSelecionado]);
-  
   const anos = Array.from({ length: 5 }, (_, i) => hoje.getFullYear() - i);
   
-  const { data: squadsData, isLoading: loadingSquads } = useQuery<string[]>({
-    queryKey: ["/api/contribuicao-squad/dfc/squads", anoSelecionado],
+  // Query bulk otimizada - uma única chamada para todos os 12 meses
+  const { data: bulkData, isLoading } = useQuery<BulkResponse>({
+    queryKey: ["/api/contribuicao-squad/dfc/bulk", anoSelecionado, squadSelecionado],
     queryFn: async () => {
-      const dataInicio = `${anoSelecionado}-01-01`;
-      const dataFim = `${anoSelecionado}-12-31`;
-      const response = await fetch(`/api/contribuicao-squad/dfc?dataInicio=${dataInicio}&dataFim=${dataFim}`, {
+      const params = new URLSearchParams({ ano: anoSelecionado.toString() });
+      if (squadSelecionado !== "todos") {
+        params.append("squad", squadSelecionado);
+      }
+      const response = await fetch(`/api/contribuicao-squad/dfc/bulk?${params.toString()}`, {
         credentials: "include"
       });
-      if (!response.ok) throw new Error("Falha ao buscar squads");
-      const data = await response.json();
-      return data.squads || [];
+      if (!response.ok) throw new Error("Falha ao buscar dados");
+      return response.json();
     },
   });
 
-  const { data: monthlyResults, isLoading } = useQuery<MonthlyData[]>({
-    queryKey: ["/api/contribuicao-squad/dfc/monthly", anoSelecionado, squadSelecionado],
-    queryFn: async () => {
-      const results: MonthlyData[] = [];
-      
-      for (const mes of meses) {
-        try {
-          const params = new URLSearchParams({
-            dataInicio: mes.dataInicio,
-            dataFim: mes.dataFim
-          });
-          if (squadSelecionado !== "todos") {
-            params.append("squad", squadSelecionado);
-          }
-          
-          const response = await fetch(`/api/contribuicao-squad/dfc?${params.toString()}`, {
-            credentials: "include"
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            results.push({
-              mes: mes.mes,
-              mesLabel: mes.mesLabel,
-              data
-            });
-          } else {
-            results.push({ mes: mes.mes, mesLabel: mes.mesLabel, data: null });
-          }
-        } catch {
-          results.push({ mes: mes.mes, mesLabel: mes.mesLabel, data: null });
-        }
-      }
-      
-      return results;
-    },
-  });
+  const squadsData = bulkData?.squads || [];
+  const monthlyResults = bulkData?.meses || [];
 
   const hierarchicalData = useMemo(() => {
-    if (!monthlyResults) return { categories: [], monthColumns: [] };
+    if (!monthlyResults || monthlyResults.length === 0) return { categories: [], monthColumns: [], parcelasPorCategoriaEMes: new Map() };
     
     const allCategoriesMap = new Map<string, { id: string; nome: string; nivel: number }>();
+    // Mapa: "categoriaId|mes" -> ParcelaInfo[]
+    const parcelasPorCategoriaEMes = new Map<string, ParcelaInfo[]>();
     
     for (const monthData of monthlyResults) {
       if (monthData.data?.receitas) {
@@ -124,6 +98,11 @@ export default function ContribuicaoSquad() {
               nome: receita.categoriaNome,
               nivel: receita.nivel
             });
+          }
+          // Armazena parcelas se disponíveis
+          if (receita.parcelas && receita.parcelas.length > 0) {
+            const key = `${receita.categoriaId}|${monthData.mes}`;
+            parcelasPorCategoriaEMes.set(key, receita.parcelas);
           }
         }
       }
@@ -160,7 +139,8 @@ export default function ContribuicaoSquad() {
     
     return {
       categories: categoriesByLevel,
-      monthColumns
+      monthColumns,
+      parcelasPorCategoriaEMes
     };
   }, [monthlyResults]);
 
@@ -426,9 +406,52 @@ export default function ContribuicaoSquad() {
                       </div>
                       {hierarchicalData.monthColumns.map((col) => {
                         const valor = col.valorPorCategoria.get(category.id) || 0;
+                        const parcelaKey = `${category.id}|${col.mes}`;
+                        const parcelas = hierarchicalData.parcelasPorCategoriaEMes.get(parcelaKey);
+                        const hasLinks = parcelas?.some((p: ParcelaInfo) => p.linkNfse);
+                        
                         return (
-                          <div key={col.mes} className="px-2 py-1 text-right text-xs">
+                          <div key={col.mes} className="px-2 py-1 text-right text-xs flex items-center justify-end gap-1">
                             {valor > 0 ? formatCurrencyNoDecimals(valor) : "-"}
+                            {hasLinks && parcelas && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <a 
+                                    href={parcelas.find((p: ParcelaInfo) => p.linkNfse)?.linkNfse || '#'}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-500 hover-elevate"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="max-w-xs">
+                                  <div className="text-xs space-y-1">
+                                    <p className="font-medium">Parcelas ({parcelas.length}):</p>
+                                    {parcelas.slice(0, 5).map((p: ParcelaInfo, idx: number) => (
+                                      <div key={idx} className="flex items-center gap-1">
+                                        <span>{formatCurrencyNoDecimals(p.valor)}</span>
+                                        {p.numNfse && <span className="text-muted-foreground">NF {p.numNfse}</span>}
+                                        {p.linkNfse && (
+                                          <a 
+                                            href={p.linkNfse} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="text-blue-500 hover:underline"
+                                          >
+                                            Ver
+                                          </a>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {parcelas.length > 5 && (
+                                      <p className="text-muted-foreground">+{parcelas.length - 5} mais...</p>
+                                    )}
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </div>
                         );
                       })}
