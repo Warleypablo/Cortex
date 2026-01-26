@@ -90,7 +90,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(spend), 0) as total_investimento,
               COALESCE(SUM(impressions), 0) as total_impressions,
               COALESCE(SUM(clicks), 0) as total_clicks
-            FROM meta_insights_daily
+            FROM meta_ads.meta_insights_daily
             WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
           `);
           
@@ -100,7 +100,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(spend), 0) as investimento,
               COALESCE(SUM(impressions), 0) as impressions,
               COALESCE(SUM(clicks), 0) as clicks
-            FROM meta_insights_daily
+            FROM meta_ads.meta_insights_daily
             WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
             GROUP BY date_start
             ORDER BY date_start
@@ -202,7 +202,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             SUM(spend::numeric) as investimento,
             SUM(impressions::numeric) as impressions,
             SUM(clicks::numeric) as clicks
-          FROM meta_insights_daily
+          FROM meta_ads.meta_insights_daily
           WHERE date_start >= ${startDate}::date AND date_start <= ${endDate}::date
           GROUP BY ad_id
         `);
@@ -684,7 +684,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     try {
       const result = await db.execute(sql`
         SELECT DISTINCT c.campaign_id, c.campaign_name
-        FROM meta_campaigns c
+        FROM meta_ads.meta_campaigns c
         WHERE c.campaign_name IS NOT NULL AND c.campaign_name != ''
         ORDER BY c.campaign_name
       `);
@@ -744,9 +744,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(i.video_p50_watched_actions) as video_p50,
           SUM(i.video_p75_watched_actions) as video_p75,
           SUM(i.video_p100_watched_actions) as video_p100
-        FROM meta_insights_daily i
-        LEFT JOIN meta_ads a ON i.ad_id = a.ad_id
-        LEFT JOIN meta_campaigns c ON a.campaign_id = c.campaign_id
+        FROM meta_ads.meta_insights_daily i
+        LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
+        LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
         GROUP BY i.ad_id, a.ad_name, a.status, a.created_time, a.preview_shareable_link, a.campaign_id, c.campaign_name
         ORDER BY SUM(i.spend::numeric) DESC
@@ -919,8 +919,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(i.reach) as reach,
           AVG(i.ctr::numeric) as ctr,
           AVG(i.cpm::numeric) as cpm
-        FROM meta_campaigns c
-        LEFT JOIN meta_insights_daily i ON c.campaign_id = i.campaign_id
+        FROM meta_ads.meta_campaigns c
+        LEFT JOIN meta_ads.meta_insights_daily i ON c.campaign_id = i.campaign_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
         GROUP BY c.campaign_id, c.campaign_name, c.status
         ORDER BY SUM(i.spend::numeric) DESC
@@ -939,8 +939,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(i.reach) as reach,
           AVG(i.ctr::numeric) as ctr,
           AVG(i.cpm::numeric) as cpm
-        FROM meta_adsets aset
-        LEFT JOIN meta_insights_daily i ON aset.adset_id = i.adset_id
+        FROM meta_ads.meta_adsets aset
+        LEFT JOIN meta_ads.meta_insights_daily i ON aset.adset_id = i.adset_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
         GROUP BY aset.adset_id, aset.adset_name, aset.campaign_id, aset.status
         ORDER BY SUM(i.spend::numeric) DESC
@@ -962,8 +962,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(i.reach) as reach,
           AVG(i.ctr::numeric) as ctr,
           AVG(i.cpm::numeric) as cpm
-        FROM meta_ads a
-        LEFT JOIN meta_insights_daily i ON a.ad_id = i.ad_id
+        FROM meta_ads.meta_ads a
+        LEFT JOIN meta_ads.meta_insights_daily i ON a.ad_id = i.ad_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
         GROUP BY a.ad_id, a.ad_name, a.adset_id, a.campaign_id, a.status, a.created_time, a.preview_shareable_link
         ORDER BY SUM(i.spend::numeric) DESC
