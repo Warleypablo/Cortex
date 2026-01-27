@@ -250,15 +250,15 @@ export default function VisaoGeral() {
                 <TrendingDown className="w-4 h-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="flex items-baseline gap-2">
-                  <div className="text-2xl font-bold text-red-600" data-testid="text-churn">
-                    {isLoadingMetricas ? "..." : formatCurrency(metricas?.churn || 0)}
-                  </div>
-                  <div className="text-sm font-semibold text-red-500" data-testid="text-churn-rate">
-                    {isLoadingMetricas ? "" : `(${(metricas?.churnRate || 0).toFixed(1)}%)`}
-                  </div>
+                <div className="text-2xl font-bold text-red-600" data-testid="text-churn">
+                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.churn || 0)}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Contratos encerrados</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Contratos encerrados{" "}
+                  <span className="font-semibold text-red-500" data-testid="text-churn-rate">
+                    {isLoadingMetricas ? "" : `(${(metricas?.churnRate || 0).toFixed(1)}%)`}
+                  </span>
+                </p>
               </CardContent>
             </Card>
 
