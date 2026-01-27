@@ -126,6 +126,7 @@ export interface CohortRetentionData {
 export interface VisaoGeralMetricas {
   receitaTotal: number;
   mrr: number;
+  mrrMesAnterior: number;
   aquisicaoMrr: number;
   aquisicaoPontual: number;
   aquisicaoPontualCommerce: number;
@@ -135,6 +136,7 @@ export interface VisaoGeralMetricas {
   clientesUnicos: number;
   ticketMedio: number;
   churn: number;
+  churnRate: number;
   pausados: number;
 }
 
@@ -3858,6 +3860,7 @@ export class DbStorage implements IStorage {
         clientesUnicos: 0,
         ticketMedio: 0,
         churn: 0,
+        churnRate: 0,
         pausados: 0,
       };
     }
@@ -3994,6 +3997,9 @@ export class DbStorage implements IStorage {
     const valorEntreguePontual = parseFloat(valorEntreguePontualRow?.valor_entregue_pontual || '0');
     const clientesUnicos = parseInt(transRow.clientes_unicos || '0');
     const ticketMedio = clientesUnicos > 0 ? mrr / clientesUnicos : 0;
+    
+    // Calcular churn rate: (valor churn / MRR mês anterior) * 100
+    const churnRate = mrrMesAnterior > 0 ? (churn / mrrMesAnterior) * 100 : 0;
 
     return {
       receitaTotal: mrr + aquisicaoPontual,
@@ -4008,6 +4014,7 @@ export class DbStorage implements IStorage {
       clientesUnicos,
       ticketMedio,
       churn,
+      churnRate,
       pausados,
     };
   }
