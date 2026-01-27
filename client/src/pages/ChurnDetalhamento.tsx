@@ -331,7 +331,9 @@ export default function ChurnDetalhamento() {
     
     const totalChurned = churnContratos.length;
     const totalPausados = pausadoContratos.length;
-    const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    // Ajuste artificial de R$ 9.878 para 2 contratos faltantes no banco (squad Makers)
+    const CHURN_ADJUSTMENT = 9878;
+    const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0) + CHURN_ADJUSTMENT;
     const mrrPausado = pausadoContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const ltvTotal = churnContratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
     const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
@@ -367,6 +369,18 @@ export default function ChurnDetalhamento() {
       }
       squadData[squad].mrr_perdido += c.valorr || 0;
     });
+    
+    // Ajuste artificial de R$ 9.878 para o squad Makers (2 contratos faltantes no banco)
+    const CHURN_ADJUSTMENT_MAKERS = 9878;
+    if (squadData['Makers']) {
+      squadData['Makers'].mrr_perdido += CHURN_ADJUSTMENT_MAKERS;
+    } else {
+      const makersOriginal = data.metricas.churn_por_squad?.find(s => s.squad === 'Makers');
+      squadData['Makers'] = { 
+        mrr_perdido: CHURN_ADJUSTMENT_MAKERS, 
+        mrr_base: makersOriginal?.mrr_ativo || 0 
+      };
+    }
     
     return Object.entries(squadData)
       .map(([squad, info]) => ({
