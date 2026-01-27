@@ -297,11 +297,13 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         return res.status(400).json({ error: "Name is required" });
       }
       
-      const result = await db.execute(sql`
-        INSERT INTO cortex_core.clients (name, cnpj, status, additional_info, created_by)
-        VALUES (${name}, ${cnpj || null}, ${status || 'ativo'}, ${additionalInfo || null}, ${createdBy})
-        RETURNING *
-      `);
+      // Usando pool diretamente para evitar problemas de tipo com drizzle
+      const result = await pool.query(
+        `INSERT INTO cortex_core.clients (name, cnpj, status, additional_info, created_by)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [name, cnpj || null, status || 'ativo', additionalInfo || null, createdBy]
+      );
       
       res.status(201).json(mapClient(result.rows[0]));
     } catch (error) {
