@@ -148,6 +148,7 @@ const ALL_ROUTES = [
   '/conhecimentos',
   '/beneficios',
   '/cases/chat',
+  '/sugestoes',
   '/visao-geral',
   '/okr-2026',
   '/dashboard/financeiro',
@@ -199,6 +200,8 @@ const DEFAULT_USER_ROUTES = [
   '/atendimento',
   // GPTurbo
   '/cases/chat',
+  // Sugestões (padrão para todos)
+  '/sugestoes',
   // Conhecimento
   '/conhecimentos',
   // Clube de Benefícios
@@ -247,6 +250,11 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
     if (!migratedRoutes.includes('/presentation')) {
       migratedRoutes.push('/presentation');
     }
+  }
+  
+  // Auto-adicionar /sugestoes para todos os usuários (rota padrão)
+  if (!migratedRoutes.includes('/sugestoes')) {
+    migratedRoutes.push('/sugestoes');
   }
   
   return migratedRoutes;
