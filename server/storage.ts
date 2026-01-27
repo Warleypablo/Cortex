@@ -8933,6 +8933,7 @@ export class DbStorage implements IStorage {
       squad: string | null;
       servico: string | null;
       statusClickup: string | null;
+      telefone: string | null;
     }[];
   }> {
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -8952,7 +8953,8 @@ export class DbStorage implements IStorage {
           cup.nome as nome_clickup,
           cup.status as status_clickup,
           cup.responsavel,
-          cup.task_id
+          cup.task_id,
+          cup.telefone
         FROM "Conta Azul".caz_clientes cc
         LEFT JOIN "Clickup".cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
@@ -8982,6 +8984,7 @@ export class DbStorage implements IStorage {
         cli.cnpj,
         cli.responsavel,
         cli.status_clickup,
+        cli.telefone,
         cont.squad,
         cont.servico,
         CASE
@@ -9039,6 +9042,7 @@ export class DbStorage implements IStorage {
         squad: row.squad || null,
         servico: row.servico || null,
         statusClickup: row.status_clickup || null,
+        telefone: row.telefone || null,
       };
     });
     
