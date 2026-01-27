@@ -347,23 +347,6 @@ export const NAV_CONFIG = {
       ],
     },
     {
-      title: 'Operação',
-      icon: 'ListTodo',
-      items: [
-        { title: 'Projetos Pontuais', url: '/operacao/projetos', icon: 'Folder', permissionKey: PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS },
-        { title: 'Tasks de Clientes', url: '/operacao/tasks', icon: 'CheckSquare', permissionKey: PERMISSION_KEYS.OPS.TASKS_CLIENTES },
-        { title: 'Onboardings', url: '/operacao/onboardings', icon: 'UserPlus', permissionKey: PERMISSION_KEYS.OPS.ONBOARDINGS },
-      ],
-    },
-    {
-      title: 'Tech',
-      icon: 'Monitor',
-      items: [
-        { title: 'Visão Geral', url: '/dashboard/tech', icon: 'Eye', permissionKey: PERMISSION_KEYS.TECH.VISAO_GERAL },
-        { title: 'Projetos', url: '/tech/projetos', icon: 'Rocket', permissionKey: PERMISSION_KEYS.TECH.PROJETOS },
-      ],
-    },
-    {
       title: 'Comercial',
       icon: 'Handshake',
       items: [
