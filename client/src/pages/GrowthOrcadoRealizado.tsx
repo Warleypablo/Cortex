@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
 
@@ -765,11 +766,45 @@ export default function GrowthOrcadoRealizado() {
     totalSection,
   ];
 
+  // Helper para calcular progresso seguro (0-100)
+  const getProgressValue = (percentual: number | null) => {
+    if (percentual === null) return 0;
+    return Math.min(Math.max(percentual, 0), 100);
+  };
+
+  // Helper para ícone de tendência
+  const getTrendIcon = (percentual: number | null) => {
+    if (percentual === null) return <Minus className="w-4 h-4 text-muted-foreground" />;
+    if (percentual >= 100) return <ArrowUpRight className="w-4 h-4 text-emerald-500" />;
+    if (percentual >= 80) return <ArrowUpRight className="w-4 h-4 text-amber-500" />;
+    return <ArrowDownRight className="w-4 h-4 text-red-500" />;
+  };
+
+  // Calcular métricas dos cards de resumo
+  const investimentoRealizado = adsData?.investimento ?? 0;
+  const investimentoOrcado = 95500;
+  const investimentoPerc = (investimentoRealizado / investimentoOrcado) * 100;
+  
+  const mqlsRealizado = mqlData?.totalMqls ?? 0;
+  const mqlsOrcado = 229;
+  const mqlsPerc = (mqlsRealizado / mqlsOrcado) * 100;
+  
+  const clientesRealizado = mqlData?.novosClientes ?? 0;
+  const clientesOrcado = 12;
+  const clientesPerc = (clientesRealizado / clientesOrcado) * 100;
+  
+  const faturamentoRealizado = (mqlData?.faturamentoAceleracao ?? 0) + (mqlData?.faturamentoImplantacao ?? 0);
+  const faturamentoOrcado = 201429;
+  const faturamentoPerc = (faturamentoRealizado / faturamentoOrcado) * 100;
+
   return (
     <div className="p-6 space-y-6" data-testid="growth-orcado-realizado-page">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <DollarSign className="w-8 h-8 text-primary" />
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Target className="w-6 h-6 text-primary" />
+          </div>
           <div>
             <h1 className="text-2xl font-bold">Orçado x Realizado</h1>
             <p className="text-muted-foreground text-sm">Acompanhamento de metas de marketing e vendas</p>
@@ -790,93 +825,186 @@ export default function GrowthOrcadoRealizado() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
+      {/* Cards de Resumo */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Investimento</CardTitle>
+            <div className="p-1.5 rounded-md bg-blue-500/10">
+              <Wallet className="w-4 h-4 text-blue-500" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">R$ 95.500</div>
-            <p className="text-xs text-muted-foreground">Orçado para o período</p>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-2xl font-bold">
+                {adsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatValue(investimentoRealizado, 'currency')}
+              </span>
+              <Badge variant={investimentoPerc >= 80 ? "default" : "secondary"} className="text-xs">
+                {investimentoPerc.toFixed(0)}%
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <Progress value={getProgressValue(investimentoPerc)} className="h-1.5" />
+              <p className="text-xs text-muted-foreground">Meta: {formatValue(investimentoOrcado, 'currency')}</p>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">MQLs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold flex items-center gap-2">
-              {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mqlData?.totalMqls ?? 0}
+            <div className="p-1.5 rounded-md bg-purple-500/10">
+              <Users className="w-4 h-4 text-purple-500" />
             </div>
-            <p className="text-xs text-muted-foreground">Leads qualificados no período</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-2xl font-bold">
+                {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mqlsRealizado}
+              </span>
+              <Badge variant={mqlsPerc >= 80 ? "default" : "secondary"} className="text-xs">
+                {mqlsPerc.toFixed(0)}%
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <Progress value={getProgressValue(mqlsPerc)} className="h-1.5" />
+              <p className="text-xs text-muted-foreground">Meta: {mqlsOrcado} leads</p>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Novos Clientes MQL</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold flex items-center gap-2">
-              {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mqlData?.novosClientes ?? 0}
+
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Novos Clientes</CardTitle>
+            <div className="p-1.5 rounded-md bg-emerald-500/10">
+              <UserCheck className="w-4 h-4 text-emerald-500" />
             </div>
-            <p className="text-xs text-muted-foreground">Negócios ganhos de MQL</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-2xl font-bold">
+                {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : clientesRealizado}
+              </span>
+              <Badge variant={clientesPerc >= 80 ? "default" : "secondary"} className="text-xs">
+                {clientesPerc.toFixed(0)}%
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <Progress value={getProgressValue(clientesPerc)} className="h-1.5" />
+              <p className="text-xs text-muted-foreground">Meta: {clientesOrcado} clientes</p>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Faturamento MQL</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold flex items-center gap-2">
-              {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatValue((mqlData?.faturamentoAceleracao ?? 0) + (mqlData?.faturamentoImplantacao ?? 0), 'currency')}
+
+        <Card className="overflow-hidden">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Faturamento</CardTitle>
+            <div className="p-1.5 rounded-md bg-amber-500/10">
+              <Receipt className="w-4 h-4 text-amber-500" />
             </div>
-            <p className="text-xs text-muted-foreground">Aceleração + Implantação</p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-2xl font-bold">
+                {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatValue(faturamentoRealizado, 'currency')}
+              </span>
+              <Badge variant={faturamentoPerc >= 80 ? "default" : "secondary"} className="text-xs">
+                {faturamentoPerc.toFixed(0)}%
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <Progress value={getProgressValue(faturamentoPerc)} className="h-1.5" />
+              <p className="text-xs text-muted-foreground">Meta: {formatValue(faturamentoOrcado, 'currency')}</p>
+            </div>
           </CardContent>
         </Card>
       </div>
 
+      {/* Tabelas de Métricas */}
       <div className="space-y-6">
         {allSections.map((section) => (
           <Card key={section.title}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {section.icon}
-                {section.title}
-                {section.title === 'Métricas de Vendas: MQL' && mqlLoading && (
-                  <Loader2 className="w-4 h-4 animate-spin ml-2" />
-                )}
-              </CardTitle>
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <div className="p-1.5 rounded-md bg-muted">
+                    {section.icon}
+                  </div>
+                  {section.title}
+                  {(section.title === 'Métricas de Vendas: MQL' && mqlLoading) ||
+                   (section.title === 'Métricas de Marketing: Ads' && adsLoading) ? (
+                    <Loader2 className="w-4 h-4 animate-spin ml-2 text-muted-foreground" />
+                  ) : null}
+                </CardTitle>
+              </div>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[55%]">Métrica</TableHead>
-                    <TableHead className="text-right w-[15%]">Orçado</TableHead>
-                    <TableHead className="text-right w-[15%]">Realizado</TableHead>
-                    <TableHead className="text-right w-[15%]">%</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {section.metrics.map((metric) => (
-                    <TableRow key={metric.id} data-testid={`metric-row-${metric.id}`}>
-                      <TableCell className="font-medium">
-                        {metric.emoji && <span className="mr-2">{metric.emoji}</span>}
-                        {metric.name}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatValue(metric.orcado, metric.format)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatValue(metric.realizado, metric.format)}
-                      </TableCell>
-                      <TableCell className={cn("text-right font-mono", getVarianceColor(metric.percentual))}>
-                        {metric.percentual !== null ? `${metric.percentual.toFixed(2)}%` : '-'}
-                      </TableCell>
+            <CardContent className="pt-0">
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-[40%] font-semibold">Métrica</TableHead>
+                      <TableHead className="text-right w-[15%] font-semibold">Orçado</TableHead>
+                      <TableHead className="text-right w-[15%] font-semibold">Realizado</TableHead>
+                      <TableHead className="text-center w-[20%] font-semibold">Progresso</TableHead>
+                      <TableHead className="text-right w-[10%] font-semibold">%</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {section.metrics.map((metric, idx) => (
+                      <TableRow 
+                        key={metric.id} 
+                        data-testid={`metric-row-${metric.id}`}
+                        className={cn(
+                          "transition-colors",
+                          idx % 2 === 0 ? "bg-background" : "bg-muted/20"
+                        )}
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {getTrendIcon(metric.percentual)}
+                            <span className={cn(metric.indent && `pl-${metric.indent * 4}`)}>
+                              {metric.name}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {formatValue(metric.orcado, metric.format)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm font-medium">
+                          {formatValue(metric.realizado, metric.format)}
+                        </TableCell>
+                        <TableCell className="px-4">
+                          <div className="flex items-center gap-2">
+                            <Progress 
+                              value={getProgressValue(metric.percentual)} 
+                              className={cn(
+                                "h-2 flex-1",
+                                metric.percentual !== null && metric.percentual >= 100 && "[&>div]:bg-emerald-500",
+                                metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "[&>div]:bg-amber-500",
+                                metric.percentual !== null && metric.percentual < 80 && "[&>div]:bg-red-500"
+                              )}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge 
+                            variant="outline" 
+                            className={cn(
+                              "font-mono text-xs min-w-[60px] justify-center",
+                              metric.percentual !== null && metric.percentual >= 100 && "border-emerald-500/50 text-emerald-600 bg-emerald-500/10",
+                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "border-amber-500/50 text-amber-600 bg-amber-500/10",
+                              metric.percentual !== null && metric.percentual < 80 && "border-red-500/50 text-red-600 bg-red-500/10"
+                            )}
+                          >
+                            {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         ))}
