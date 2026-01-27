@@ -2,11 +2,12 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus, Calendar, Phone, Globe, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
 
@@ -967,34 +968,316 @@ export default function GrowthOrcadoRealizado() {
         </Card>
       </div>
 
-      {/* Tabelas de Métricas */}
-      <div className="space-y-6">
-        {allSections.map((section, sectionIdx) => {
-          const sectionColors = [
-            { gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/10', text: 'text-blue-500' },
-            { gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-500/10', text: 'text-purple-500' },
-            { gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-500/10', text: 'text-emerald-500' },
-            { gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-500/10', text: 'text-amber-500' },
-            { gradient: 'from-rose-500 to-red-500', bg: 'bg-rose-500/10', text: 'text-rose-500' },
-            { gradient: 'from-indigo-500 to-violet-500', bg: 'bg-indigo-500/10', text: 'text-indigo-500' },
-          ];
-          const color = sectionColors[sectionIdx % sectionColors.length];
-          
-          return (
-          <Card key={section.title} className="overflow-hidden">
-            <div className={`h-1 bg-gradient-to-r ${color.gradient}`} />
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="flex items-center gap-3 text-lg">
-                  <div className={`p-2 rounded-lg ${color.bg}`}>
-                    <div className={color.text}>{section.icon}</div>
+      {/* Tabs de Métricas */}
+      <Tabs defaultValue="marketing" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid lg:grid-cols-3 gap-1 h-auto p-1">
+          <TabsTrigger value="marketing" className="flex items-center gap-2 py-2.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-500 data-[state=active]:text-white">
+            <Megaphone className="w-4 h-4" />
+            <span className="hidden sm:inline">Marketing</span>
+          </TabsTrigger>
+          <TabsTrigger value="vendas" className="flex items-center gap-2 py-2.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white">
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">Vendas</span>
+          </TabsTrigger>
+          <TabsTrigger value="total" className="flex items-center gap-2 py-2.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-500 data-[state=active]:text-white">
+            <BarChart3 className="w-4 h-4" />
+            <span className="hidden sm:inline">Consolidado</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="marketing" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* Ads */}
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-blue-500 to-cyan-500" />
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500/20 to-cyan-500/20">
+                    <Megaphone className="w-5 h-5 text-blue-500" />
                   </div>
-                  <span>{section.title}</span>
-                  {(section.title === 'Métricas de Vendas: MQL' && mqlLoading) ||
-                   (section.title === 'Métricas de Marketing: Ads' && adsLoading) ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                  ) : null}
-                </CardTitle>
+                  <div>
+                    <CardTitle className="text-base">Métricas de Ads</CardTitle>
+                    <CardDescription>Investimento e performance de anúncios</CardDescription>
+                  </div>
+                  {adsLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-auto" />}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-3">
+                  {adsMetrics.map((metric) => (
+                    <div key={metric.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                      <div className="flex items-center gap-3">
+                        {getTrendIcon(metric.percentual)}
+                        <span className="text-sm font-medium">{metric.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-sm font-semibold">{formatValue(metric.realizado, metric.format)}</div>
+                          <div className="text-xs text-muted-foreground">de {formatValue(metric.orcado, metric.format)}</div>
+                        </div>
+                        <div className="w-24">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all duration-500",
+                                  metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500",
+                                  metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-amber-500",
+                                  metric.percentual !== null && metric.percentual < 80 && "bg-red-500",
+                                  metric.percentual === null && "bg-muted-foreground/20"
+                                )}
+                                style={{ width: `${getProgressValue(metric.percentual)}%` }}
+                              />
+                            </div>
+                            <span className={cn(
+                              "text-xs font-medium w-8 text-right",
+                              metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
+                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
+                              metric.percentual !== null && metric.percentual < 80 && "text-red-500"
+                            )}>
+                              {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Site */}
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
+                    <Globe className="w-5 h-5 text-purple-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Métricas de Site</CardTitle>
+                    <CardDescription>Conversões e leads do site</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-3">
+                  {siteMetrics.map((metric) => (
+                    <div key={metric.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                      <div className="flex items-center gap-3">
+                        {getTrendIcon(metric.percentual)}
+                        <span className="text-sm font-medium">{metric.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-sm font-semibold">{formatValue(metric.realizado, metric.format)}</div>
+                          <div className="text-xs text-muted-foreground">de {formatValue(metric.orcado, metric.format)}</div>
+                        </div>
+                        <div className="w-24">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all duration-500",
+                                  metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500",
+                                  metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-amber-500",
+                                  metric.percentual !== null && metric.percentual < 80 && "bg-red-500",
+                                  metric.percentual === null && "bg-muted-foreground/20"
+                                )}
+                                style={{ width: `${getProgressValue(metric.percentual)}%` }}
+                              />
+                            </div>
+                            <span className={cn(
+                              "text-xs font-medium w-8 text-right",
+                              metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
+                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
+                              metric.percentual !== null && metric.percentual < 80 && "text-red-500"
+                            )}>
+                              {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="vendas" className="space-y-6 mt-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* MQL */}
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20">
+                    <Users className="w-5 h-5 text-emerald-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Vendas: MQL</CardTitle>
+                    <CardDescription>Leads qualificados de marketing</CardDescription>
+                  </div>
+                  {mqlLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-auto" />}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  {mqlMetrics.map((metric) => (
+                    <div key={metric.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {getTrendIcon(metric.percentual)}
+                        <span className="text-sm font-medium truncate">{metric.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <div className="text-right">
+                          <div className="text-sm font-semibold">{formatValue(metric.realizado, metric.format)}</div>
+                          <div className="text-xs text-muted-foreground">de {formatValue(metric.orcado, metric.format)}</div>
+                        </div>
+                        <div className="w-20">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all duration-500",
+                                  metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500",
+                                  metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-amber-500",
+                                  metric.percentual !== null && metric.percentual < 80 && "bg-red-500"
+                                )}
+                                style={{ width: `${getProgressValue(metric.percentual)}%` }}
+                              />
+                            </div>
+                            <span className={cn(
+                              "text-xs font-medium w-8 text-right",
+                              metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
+                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
+                              metric.percentual !== null && metric.percentual < 80 && "text-red-500"
+                            )}>
+                              {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Não-MQL */}
+            <Card className="overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20">
+                    <Phone className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Vendas: Não-MQL</CardTitle>
+                    <CardDescription>Leads de outras fontes</CardDescription>
+                  </div>
+                  {naoMqlLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-auto" />}
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                  {naoMqlMetrics.map((metric) => (
+                    <div key={metric.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {getTrendIcon(metric.percentual)}
+                        <span className="text-sm font-medium truncate">{metric.name}</span>
+                      </div>
+                      <div className="flex items-center gap-4 shrink-0">
+                        <div className="text-right">
+                          <div className="text-sm font-semibold">{formatValue(metric.realizado, metric.format)}</div>
+                          <div className="text-xs text-muted-foreground">de {formatValue(metric.orcado, metric.format)}</div>
+                        </div>
+                        <div className="w-20">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all duration-500",
+                                  metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500",
+                                  metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-amber-500",
+                                  metric.percentual !== null && metric.percentual < 80 && "bg-red-500"
+                                )}
+                                style={{ width: `${getProgressValue(metric.percentual)}%` }}
+                              />
+                            </div>
+                            <span className={cn(
+                              "text-xs font-medium w-8 text-right",
+                              metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
+                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
+                              metric.percentual !== null && metric.percentual < 80 && "text-red-500"
+                            )}>
+                              {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Outbound */}
+          <Card className="overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-rose-500 to-red-500" />
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-500/20 to-red-500/20">
+                  <Phone className="w-5 h-5 text-rose-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Vendas: Outbound</CardTitle>
+                  <CardDescription>Prospecção ativa</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {outboundSection.metrics.map((metric) => (
+                  <div key={metric.id} className="p-4 rounded-lg bg-muted/30 border border-border/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      {getTrendIcon(metric.percentual)}
+                      <span className="text-sm font-medium">{metric.name}</span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-2xl font-bold">{formatValue(metric.realizado, metric.format)}</span>
+                      <span className={cn(
+                        "text-sm font-medium",
+                        metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
+                        metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
+                        metric.percentual !== null && metric.percentual < 80 && "text-red-500"
+                      )}>
+                        {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">Meta: {formatValue(metric.orcado, metric.format)}</div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="total" className="space-y-6 mt-6">
+          <Card className="overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-indigo-500/20 to-violet-500/20">
+                  <BarChart3 className="w-5 h-5 text-indigo-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Consolidado Geral</CardTitle>
+                  <CardDescription>Visão geral de todas as métricas</CardDescription>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="pt-0">
@@ -1002,18 +1285,17 @@ export default function GrowthOrcadoRealizado() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableHead className="w-[35%] font-semibold text-foreground">Métrica</TableHead>
-                      <TableHead className="text-right w-[15%] font-semibold text-foreground">Orçado</TableHead>
-                      <TableHead className="text-right w-[15%] font-semibold text-foreground">Realizado</TableHead>
-                      <TableHead className="text-center w-[25%] font-semibold text-foreground">Progresso</TableHead>
-                      <TableHead className="text-right w-[10%] font-semibold text-foreground">Status</TableHead>
+                      <TableHead className="font-semibold text-foreground">Métrica</TableHead>
+                      <TableHead className="text-right font-semibold text-foreground">Orçado</TableHead>
+                      <TableHead className="text-right font-semibold text-foreground">Realizado</TableHead>
+                      <TableHead className="text-center font-semibold text-foreground">Progresso</TableHead>
+                      <TableHead className="text-center font-semibold text-foreground">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {section.metrics.map((metric, idx) => (
+                    {totalMetrics.map((metric, idx) => (
                       <TableRow 
                         key={metric.id} 
-                        data-testid={`metric-row-${metric.id}`}
                         className={cn(
                           "transition-all duration-200 hover:bg-muted/40",
                           idx % 2 === 0 ? "bg-background" : "bg-muted/10"
@@ -1021,18 +1303,8 @@ export default function GrowthOrcadoRealizado() {
                       >
                         <TableCell className="font-medium py-3">
                           <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                              metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500/10",
-                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-amber-500/10",
-                              metric.percentual !== null && metric.percentual < 80 && "bg-red-500/10",
-                              metric.percentual === null && "bg-muted"
-                            )}>
-                              {getTrendIcon(metric.percentual)}
-                            </div>
-                            <span className={cn(metric.indent && `pl-${metric.indent * 4}`)}>
-                              {metric.name}
-                            </span>
+                            {getTrendIcon(metric.percentual)}
+                            <span>{metric.name}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm text-muted-foreground">
@@ -1049,8 +1321,7 @@ export default function GrowthOrcadoRealizado() {
                                   "h-full rounded-full transition-all duration-500",
                                   metric.percentual !== null && metric.percentual >= 100 && "bg-gradient-to-r from-emerald-400 to-emerald-600",
                                   metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-gradient-to-r from-amber-400 to-amber-600",
-                                  metric.percentual !== null && metric.percentual < 80 && "bg-gradient-to-r from-red-400 to-red-600",
-                                  metric.percentual === null && "bg-muted-foreground/20"
+                                  metric.percentual !== null && metric.percentual < 80 && "bg-gradient-to-r from-red-400 to-red-600"
                                 )}
                                 style={{ width: `${getProgressValue(metric.percentual)}%` }}
                               />
@@ -1059,8 +1330,7 @@ export default function GrowthOrcadoRealizado() {
                               "text-xs font-medium w-10 text-right",
                               metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
                               metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
-                              metric.percentual !== null && metric.percentual < 80 && "text-red-500",
-                              metric.percentual === null && "text-muted-foreground"
+                              metric.percentual !== null && metric.percentual < 80 && "text-red-500"
                             )}>
                               {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
                             </span>
@@ -1073,8 +1343,7 @@ export default function GrowthOrcadoRealizado() {
                               "font-medium text-xs px-2.5 py-0.5",
                               metric.percentual !== null && metric.percentual >= 100 && "border-emerald-500/50 text-emerald-600 bg-emerald-500/10",
                               metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "border-amber-500/50 text-amber-600 bg-amber-500/10",
-                              metric.percentual !== null && metric.percentual < 80 && "border-red-500/50 text-red-600 bg-red-500/10",
-                              metric.percentual === null && "border-muted-foreground/30 text-muted-foreground"
+                              metric.percentual !== null && metric.percentual < 80 && "border-red-500/50 text-red-600 bg-red-500/10"
                             )}
                           >
                             {metric.percentual !== null && metric.percentual >= 100 ? 'Atingido' : 
@@ -1089,9 +1358,8 @@ export default function GrowthOrcadoRealizado() {
               </div>
             </CardContent>
           </Card>
-        );
-        })}
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
