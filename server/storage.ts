@@ -3991,12 +3991,16 @@ export class DbStorage implements IStorage {
     const mrr = parseFloat(mrrRow.mrr || '0');
     const aquisicaoMrr = parseFloat(aquisicaoMrrRow.aquisicao_mrr || '0');
     const aquisicaoPontual = parseFloat(aquisicaoPontualRow.aquisicao_pontual_crm || '0');
-    const churn = parseFloat(transRow.churn || '0');
+    const churnBase = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
     const receitaPontualEntregue = parseFloat(transRow.receita_pontual_entregue || '0');
     const valorEntreguePontual = parseFloat(valorEntreguePontualRow?.valor_entregue_pontual || '0');
     const clientesUnicos = parseInt(transRow.clientes_unicos || '0');
     const ticketMedio = clientesUnicos > 0 ? mrr / clientesUnicos : 0;
+    
+    // Ajuste artificial: 2 contratos não puxados automaticamente (valor = 9878)
+    const CHURN_AJUSTE_ARTIFICIAL = 9878;
+    const churn = churnBase + CHURN_AJUSTE_ARTIFICIAL;
     
     // Calcular churn rate: (valor churn / MRR mês anterior) * 100
     const churnRate = mrrMesAnterior > 0 ? (churn / mrrMesAnterior) * 100 : 0;
