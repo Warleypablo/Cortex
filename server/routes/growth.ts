@@ -1545,4 +1545,64 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       res.status(500).json({ error: "Failed to fetch Não-MQL metrics" });
     }
   });
+
+  // Growth - Orçado x Realizado - Métricas de Marketing Ads (Meta)
+  app.get("/api/growth/orcado-realizado/ads", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Query para buscar métricas de Meta Ads para Turbo Partners
+      const result = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(spend), 0) as investimento,
+          COALESCE(SUM(impressions), 0) as impressoes,
+          COALESCE(SUM(clicks), 0) as cliques,
+          COALESCE(SUM(inline_link_clicks), 0) as cliques_saida,
+          CASE WHEN SUM(impressions) > 0 
+            THEN (SUM(spend)::numeric / SUM(impressions)::numeric * 1000)
+            ELSE 0 
+          END as cpm,
+          CASE WHEN SUM(impressions) > 0 
+            THEN (SUM(clicks)::numeric / SUM(impressions)::numeric)
+            ELSE 0 
+          END as ctr
+        FROM meta_ads.meta_insights_daily
+        WHERE date_start >= ${startDate}::date 
+          AND date_start <= ${endDate}::date
+          AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+      `);
+
+      const row = result.rows[0] as any;
+      
+      const investimento = parseFloat(row.investimento) || 0;
+      const impressoes = parseInt(row.impressoes) || 0;
+      const cliques = parseInt(row.cliques) || 0;
+      const cliquesSaida = parseInt(row.cliques_saida) || 0;
+      const cpm = parseFloat(row.cpm) || 0;
+      const ctr = parseFloat(row.ctr) || 0;
+      
+      // CPS = Custo por Clique de Saída
+      const cps = cliquesSaida > 0 ? investimento / cliquesSaida : 0;
+
+      res.json({
+        investimento,
+        impressoes,
+        cliques,
+        cliquesSaida,
+        cpm,
+        ctr,
+        cps,
+        // Placeholders para métricas que dependem do site (GA4 ou outra fonte)
+        visualizacaoPagina: null,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching Ads metrics:", error);
+      res.status(500).json({ error: "Failed to fetch Ads metrics" });
+    }
+  });
 }

@@ -190,6 +190,26 @@ export default function GrowthOrcadoRealizado() {
     },
   });
 
+  interface AdsMetrics {
+    investimento: number;
+    impressoes: number;
+    cliques: number;
+    cliquesSaida: number;
+    cpm: number;
+    ctr: number;
+    cps: number;
+    visualizacaoPagina: number | null;
+  }
+
+  const { data: adsData, isLoading: adsLoading } = useQuery<AdsMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/ads', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      if (!res.ok) throw new Error('Failed to fetch Ads metrics');
+      return res.json();
+    },
+  });
+
   const mqlMetrics: Metric[] = useMemo(() => {
     const data = mqlData || {} as MQLMetrics;
     return [
@@ -328,33 +348,43 @@ export default function GrowthOrcadoRealizado() {
     ];
   }, [mqlData]);
 
-  // Dados mockados para outras seções (a serem desmockados depois)
-  const mockSections: MetricSection[] = [
+  // Métricas de Marketing Ads (usando dados reais da API)
+  const adsMetrics: Metric[] = useMemo(() => {
+    const data = adsData || {} as AdsMetrics;
+    return [
+      { id: 'investimento', name: 'Investimento', type: 'manual', orcado: 95500, realizado: data.investimento ?? 0, percentual: calcPercentual(95500, data.investimento), format: 'currency' },
+      { id: 'cpm', name: 'CPM', type: 'formula', orcado: 100, realizado: data.cpm ?? null, percentual: calcPercentual(100, data.cpm), format: 'currency' },
+      { id: 'impressoes', name: 'Impressões', type: 'formula', orcado: 955000, realizado: data.impressoes ?? 0, percentual: calcPercentual(955000, data.impressoes), format: 'number' },
+      { id: 'ctr', name: 'CTR', type: 'manual', orcado: 0.009, realizado: data.ctr ?? null, percentual: calcPercentual(0.009, data.ctr), format: 'percent' },
+      { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: 8595, realizado: data.cliquesSaida ?? 0, percentual: calcPercentual(8595, data.cliquesSaida), format: 'number' },
+      { id: 'visualizacao_pagina', name: 'Visualização de Página', type: 'formula', orcado: 7306, realizado: data.visualizacaoPagina ?? null, percentual: calcPercentual(7306, data.visualizacaoPagina), format: 'number' },
+      { id: 'cps', name: 'CPS', type: 'formula', orcado: 13.07, realizado: data.cps ?? null, percentual: calcPercentual(13.07, data.cps), format: 'currency' },
+    ];
+  }, [adsData]);
+
+  // Métricas de Site (ainda mockadas - depende de GA4 ou outra fonte)
+  const siteMetrics: Metric[] = useMemo(() => {
+    return [
+      { id: 'connect_rate', name: 'Connect Rate', type: 'manual', orcado: 0.85, realizado: null, percentual: null, format: 'percent' },
+      { id: 'conversao_pagina', name: 'Conversão da Página', type: 'manual', orcado: 0.18, realizado: null, percentual: null, format: 'percent' },
+      { id: 'cpl', name: 'CPL', type: 'formula', orcado: 73, realizado: null, percentual: null, format: 'currency' },
+      { id: 'leads', name: 'Leads', type: 'formula', orcado: 1315, realizado: 0, percentual: 0, format: 'number' },
+      { id: 'mql', name: 'MQL', type: 'formula', orcado: 229, realizado: mqlData?.totalMqls ?? 0, percentual: calcPercentual(229, mqlData?.totalMqls ?? null), format: 'number' },
+      { id: 'mql_perc', name: 'MQL (%)', type: 'manual', orcado: 0.22, realizado: null, percentual: 0, format: 'percent' },
+      { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: 417, realizado: null, percentual: 0, format: 'currency' },
+    ];
+  }, [mqlData]);
+
+  const marketingSections: MetricSection[] = [
     {
       title: 'Métricas de Marketing: Ads',
       icon: <Megaphone className="w-5 h-5" />,
-      metrics: [
-        { id: 'investimento', name: 'Investimento', type: 'manual', orcado: 95500, realizado: 0, percentual: 0, format: 'currency' },
-        { id: 'cpm', name: 'CPM', type: 'formula', orcado: 100, realizado: null, percentual: 0, format: 'currency' },
-        { id: 'impressoes', name: 'Impressões', type: 'formula', orcado: 955000, realizado: 0, percentual: 0, format: 'number' },
-        { id: 'ctr', name: 'CTR', type: 'manual', orcado: 0.009, realizado: null, percentual: 0, format: 'percent' },
-        { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: 8595, realizado: 0, percentual: 0, format: 'number' },
-        { id: 'visualizacao_pagina', name: 'Visualização de Página', type: 'formula', orcado: 7306, realizado: null, percentual: null, format: 'number' },
-        { id: 'cps', name: 'CPS', type: 'formula', orcado: 13.07, realizado: null, percentual: null, format: 'currency' },
-      ],
+      metrics: adsMetrics,
     },
     {
       title: 'Métricas de Marketing: Site',
       icon: <LineChart className="w-5 h-5" />,
-      metrics: [
-        { id: 'connect_rate', name: 'Connect Rate', type: 'manual', orcado: 0.85, realizado: null, percentual: null, format: 'percent' },
-        { id: 'conversao_pagina', name: 'Conversão da Página', type: 'manual', orcado: 0.18, realizado: null, percentual: null, format: 'percent' },
-        { id: 'cpl', name: 'CPL', type: 'formula', orcado: 73, realizado: null, percentual: null, format: 'currency' },
-        { id: 'leads', name: 'Leads', type: 'formula', orcado: 1315, realizado: 0, percentual: 0, format: 'number' },
-        { id: 'mql', name: 'MQL', type: 'formula', orcado: 229, realizado: mqlData?.totalMqls ?? 0, percentual: calcPercentual(229, mqlData?.totalMqls ?? null), format: 'number' },
-        { id: 'mql_perc', name: 'MQL (%)', type: 'manual', orcado: 0.22, realizado: null, percentual: 0, format: 'percent' },
-        { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: 417, realizado: null, percentual: 0, format: 'currency' },
-      ],
+      metrics: siteMetrics,
     },
   ];
 
@@ -720,7 +750,7 @@ export default function GrowthOrcadoRealizado() {
   };
 
   const allSections: MetricSection[] = [
-    ...mockSections,
+    ...marketingSections,
     {
       title: 'Métricas de Vendas: MQL',
       icon: <Users className="w-5 h-5" />,
