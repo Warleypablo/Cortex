@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
 import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
@@ -825,95 +824,143 @@ export default function GrowthOrcadoRealizado() {
         </Select>
       </div>
 
-      {/* Cards de Resumo */}
+      {/* Cards de Resumo com Gradientes */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+        <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600" />
+          <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Investimento</CardTitle>
-            <div className="p-1.5 rounded-md bg-blue-500/10">
+            <div className="p-2 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-600/20 group-hover:scale-110 transition-transform duration-300">
               <Wallet className="w-4 h-4 text-blue-500" />
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-2xl font-bold">
-                {adsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatValue(investimentoRealizado, 'currency')}
+              <span className="text-3xl font-bold tracking-tight">
+                {adsLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : formatValue(investimentoRealizado, 'currency')}
               </span>
-              <Badge variant={investimentoPerc >= 80 ? "default" : "secondary"} className="text-xs">
-                {investimentoPerc.toFixed(0)}%
-              </Badge>
             </div>
-            <div className="space-y-1">
-              <Progress value={getProgressValue(investimentoPerc)} className="h-1.5" />
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Progresso</span>
+                <span className={cn(
+                  "font-semibold",
+                  investimentoPerc >= 100 ? "text-emerald-500" : investimentoPerc >= 80 ? "text-amber-500" : "text-red-500"
+                )}>
+                  {investimentoPerc.toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
+                  style={{ width: `${getProgressValue(investimentoPerc)}%` }}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">Meta: {formatValue(investimentoOrcado, 'currency')}</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+        <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-400 to-purple-600" />
+          <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">MQLs</CardTitle>
-            <div className="p-1.5 rounded-md bg-purple-500/10">
+            <div className="p-2 rounded-full bg-gradient-to-br from-purple-400/20 to-purple-600/20 group-hover:scale-110 transition-transform duration-300">
               <Users className="w-4 h-4 text-purple-500" />
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-2xl font-bold">
-                {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mqlsRealizado}
+              <span className="text-3xl font-bold tracking-tight">
+                {mqlLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : mqlsRealizado}
               </span>
-              <Badge variant={mqlsPerc >= 80 ? "default" : "secondary"} className="text-xs">
-                {mqlsPerc.toFixed(0)}%
-              </Badge>
             </div>
-            <div className="space-y-1">
-              <Progress value={getProgressValue(mqlsPerc)} className="h-1.5" />
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Progresso</span>
+                <span className={cn(
+                  "font-semibold",
+                  mqlsPerc >= 100 ? "text-emerald-500" : mqlsPerc >= 80 ? "text-amber-500" : "text-red-500"
+                )}>
+                  {mqlsPerc.toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all duration-500"
+                  style={{ width: `${getProgressValue(mqlsPerc)}%` }}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">Meta: {mqlsOrcado} leads</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+        <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600" />
+          <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Novos Clientes</CardTitle>
-            <div className="p-1.5 rounded-md bg-emerald-500/10">
+            <div className="p-2 rounded-full bg-gradient-to-br from-emerald-400/20 to-emerald-600/20 group-hover:scale-110 transition-transform duration-300">
               <UserCheck className="w-4 h-4 text-emerald-500" />
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-2xl font-bold">
-                {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : clientesRealizado}
+              <span className="text-3xl font-bold tracking-tight">
+                {mqlLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : clientesRealizado}
               </span>
-              <Badge variant={clientesPerc >= 80 ? "default" : "secondary"} className="text-xs">
-                {clientesPerc.toFixed(0)}%
-              </Badge>
             </div>
-            <div className="space-y-1">
-              <Progress value={getProgressValue(clientesPerc)} className="h-1.5" />
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Progresso</span>
+                <span className={cn(
+                  "font-semibold",
+                  clientesPerc >= 100 ? "text-emerald-500" : clientesPerc >= 80 ? "text-amber-500" : "text-red-500"
+                )}>
+                  {clientesPerc.toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-500"
+                  style={{ width: `${getProgressValue(clientesPerc)}%` }}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">Meta: {clientesOrcado} clientes</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden">
-          <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
+        <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+          <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Faturamento</CardTitle>
-            <div className="p-1.5 rounded-md bg-amber-500/10">
+            <div className="p-2 rounded-full bg-gradient-to-br from-amber-400/20 to-orange-500/20 group-hover:scale-110 transition-transform duration-300">
               <Receipt className="w-4 h-4 text-amber-500" />
             </div>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-2xl font-bold">
-                {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatValue(faturamentoRealizado, 'currency')}
+              <span className="text-3xl font-bold tracking-tight">
+                {mqlLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : formatValue(faturamentoRealizado, 'currency')}
               </span>
-              <Badge variant={faturamentoPerc >= 80 ? "default" : "secondary"} className="text-xs">
-                {faturamentoPerc.toFixed(0)}%
-              </Badge>
             </div>
-            <div className="space-y-1">
-              <Progress value={getProgressValue(faturamentoPerc)} className="h-1.5" />
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs">
+                <span className="text-muted-foreground">Progresso</span>
+                <span className={cn(
+                  "font-semibold",
+                  faturamentoPerc >= 100 ? "text-emerald-500" : faturamentoPerc >= 80 ? "text-amber-500" : "text-red-500"
+                )}>
+                  {faturamentoPerc.toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-muted overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
+                  style={{ width: `${getProgressValue(faturamentoPerc)}%` }}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">Meta: {formatValue(faturamentoOrcado, 'currency')}</p>
             </div>
           </CardContent>
@@ -922,18 +969,30 @@ export default function GrowthOrcadoRealizado() {
 
       {/* Tabelas de Métricas */}
       <div className="space-y-6">
-        {allSections.map((section) => (
-          <Card key={section.title}>
+        {allSections.map((section, sectionIdx) => {
+          const sectionColors = [
+            { gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-500/10', text: 'text-blue-500' },
+            { gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-500/10', text: 'text-purple-500' },
+            { gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-500/10', text: 'text-emerald-500' },
+            { gradient: 'from-amber-500 to-orange-500', bg: 'bg-amber-500/10', text: 'text-amber-500' },
+            { gradient: 'from-rose-500 to-red-500', bg: 'bg-rose-500/10', text: 'text-rose-500' },
+            { gradient: 'from-indigo-500 to-violet-500', bg: 'bg-indigo-500/10', text: 'text-indigo-500' },
+          ];
+          const color = sectionColors[sectionIdx % sectionColors.length];
+          
+          return (
+          <Card key={section.title} className="overflow-hidden">
+            <div className={`h-1 bg-gradient-to-r ${color.gradient}`} />
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between gap-2">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <div className="p-1.5 rounded-md bg-muted">
-                    {section.icon}
+                <CardTitle className="flex items-center gap-3 text-lg">
+                  <div className={`p-2 rounded-lg ${color.bg}`}>
+                    <div className={color.text}>{section.icon}</div>
                   </div>
-                  {section.title}
+                  <span>{section.title}</span>
                   {(section.title === 'Métricas de Vendas: MQL' && mqlLoading) ||
                    (section.title === 'Métricas de Marketing: Ads' && adsLoading) ? (
-                    <Loader2 className="w-4 h-4 animate-spin ml-2 text-muted-foreground" />
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                   ) : null}
                 </CardTitle>
               </div>
@@ -942,12 +1001,12 @@ export default function GrowthOrcadoRealizado() {
               <div className="rounded-lg border overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="w-[40%] font-semibold">Métrica</TableHead>
-                      <TableHead className="text-right w-[15%] font-semibold">Orçado</TableHead>
-                      <TableHead className="text-right w-[15%] font-semibold">Realizado</TableHead>
-                      <TableHead className="text-center w-[20%] font-semibold">Progresso</TableHead>
-                      <TableHead className="text-right w-[10%] font-semibold">%</TableHead>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="w-[35%] font-semibold text-foreground">Métrica</TableHead>
+                      <TableHead className="text-right w-[15%] font-semibold text-foreground">Orçado</TableHead>
+                      <TableHead className="text-right w-[15%] font-semibold text-foreground">Realizado</TableHead>
+                      <TableHead className="text-center w-[25%] font-semibold text-foreground">Progresso</TableHead>
+                      <TableHead className="text-right w-[10%] font-semibold text-foreground">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -956,48 +1015,71 @@ export default function GrowthOrcadoRealizado() {
                         key={metric.id} 
                         data-testid={`metric-row-${metric.id}`}
                         className={cn(
-                          "transition-colors",
-                          idx % 2 === 0 ? "bg-background" : "bg-muted/20"
+                          "transition-all duration-200 hover:bg-muted/40",
+                          idx % 2 === 0 ? "bg-background" : "bg-muted/10"
                         )}
                       >
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {getTrendIcon(metric.percentual)}
+                        <TableCell className="font-medium py-3">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                              metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500/10",
+                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-amber-500/10",
+                              metric.percentual !== null && metric.percentual < 80 && "bg-red-500/10",
+                              metric.percentual === null && "bg-muted"
+                            )}>
+                              {getTrendIcon(metric.percentual)}
+                            </div>
                             <span className={cn(metric.indent && `pl-${metric.indent * 4}`)}>
                               {metric.name}
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm">
+                        <TableCell className="text-right font-mono text-sm text-muted-foreground">
                           {formatValue(metric.orcado, metric.format)}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm font-medium">
                           {formatValue(metric.realizado, metric.format)}
                         </TableCell>
                         <TableCell className="px-4">
-                          <div className="flex items-center gap-2">
-                            <Progress 
-                              value={getProgressValue(metric.percentual)} 
-                              className={cn(
-                                "h-2 flex-1",
-                                metric.percentual !== null && metric.percentual >= 100 && "[&>div]:bg-emerald-500",
-                                metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "[&>div]:bg-amber-500",
-                                metric.percentual !== null && metric.percentual < 80 && "[&>div]:bg-red-500"
-                              )}
-                            />
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all duration-500",
+                                  metric.percentual !== null && metric.percentual >= 100 && "bg-gradient-to-r from-emerald-400 to-emerald-600",
+                                  metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-gradient-to-r from-amber-400 to-amber-600",
+                                  metric.percentual !== null && metric.percentual < 80 && "bg-gradient-to-r from-red-400 to-red-600",
+                                  metric.percentual === null && "bg-muted-foreground/20"
+                                )}
+                                style={{ width: `${getProgressValue(metric.percentual)}%` }}
+                              />
+                            </div>
+                            <span className={cn(
+                              "text-xs font-medium w-10 text-right",
+                              metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
+                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
+                              metric.percentual !== null && metric.percentual < 80 && "text-red-500",
+                              metric.percentual === null && "text-muted-foreground"
+                            )}>
+                              {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                            </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-center">
                           <Badge 
                             variant="outline" 
                             className={cn(
-                              "font-mono text-xs min-w-[60px] justify-center",
+                              "font-medium text-xs px-2.5 py-0.5",
                               metric.percentual !== null && metric.percentual >= 100 && "border-emerald-500/50 text-emerald-600 bg-emerald-500/10",
                               metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "border-amber-500/50 text-amber-600 bg-amber-500/10",
-                              metric.percentual !== null && metric.percentual < 80 && "border-red-500/50 text-red-600 bg-red-500/10"
+                              metric.percentual !== null && metric.percentual < 80 && "border-red-500/50 text-red-600 bg-red-500/10",
+                              metric.percentual === null && "border-muted-foreground/30 text-muted-foreground"
                             )}
                           >
-                            {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                            {metric.percentual !== null && metric.percentual >= 100 ? 'Atingido' : 
+                             metric.percentual !== null && metric.percentual >= 80 ? 'Próximo' : 
+                             metric.percentual !== null ? 'Abaixo' : 'N/A'}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -1007,7 +1089,8 @@ export default function GrowthOrcadoRealizado() {
               </div>
             </CardContent>
           </Card>
-        ))}
+        );
+        })}
       </div>
     </div>
   );
