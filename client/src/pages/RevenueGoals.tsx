@@ -28,7 +28,8 @@ import {
   Building2,
   User,
   FileText,
-  Briefcase
+  Briefcase,
+  MessageCircle
 } from "lucide-react";
 import { 
   ComposedChart, 
@@ -92,6 +93,7 @@ interface DiaDetalhesData {
     squad: string | null;
     servico: string | null;
     statusClickup: string | null;
+    telefone: string | null;
   }[];
 }
 
@@ -817,14 +819,29 @@ function ParcelasList({ parcelas }: { parcelas: DiaDetalhesData['parcelas'] }) {
                 )}
               </div>
 
-              {parcela.statusClickup && (
-                <div className="flex items-center gap-1.5">
-                  <Badge variant="secondary" className="text-xs">
-                    {parcela.statusClickup}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">{parcela.empresa}</span>
-                </div>
-              )}
+              <div className="flex items-center justify-between gap-2">
+                {parcela.statusClickup && (
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant="secondary" className="text-xs">
+                      {parcela.statusClickup}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{parcela.empresa}</span>
+                  </div>
+                )}
+                {parcela.status === 'inadimplente' && parcela.telefone && (
+                  <a
+                    href={`https://wa.me/55${parcela.telefone.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-md transition-colors"
+                    data-testid={`btn-whatsapp-${parcela.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    WhatsApp
+                  </a>
+                )}
+              </div>
             </div>
           </Card>
         ))}
