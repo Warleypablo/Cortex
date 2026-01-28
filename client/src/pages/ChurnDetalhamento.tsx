@@ -372,11 +372,14 @@ export default function ChurnDetalhamento() {
     
     // Ajuste artificial de R$ 9.878 para o squad Makers (2 contratos faltantes no banco)
     const CHURN_ADJUSTMENT_MAKERS = 9878;
-    if (squadData['Makers']) {
-      squadData['Makers'].mrr_perdido += CHURN_ADJUSTMENT_MAKERS;
+    // Encontrar o squad Makers (com ou sem emoji)
+    const makersKey = Object.keys(squadData).find(s => s.toLowerCase().includes('makers') && !s.toLowerCase().includes('off'));
+    if (makersKey) {
+      squadData[makersKey].mrr_perdido += CHURN_ADJUSTMENT_MAKERS;
     } else {
-      const makersOriginal = data.metricas.churn_por_squad?.find(s => s.squad === 'Makers');
-      squadData['Makers'] = { 
+      // Se não existe, criar com o nome padrão com emoji
+      const makersOriginal = data.metricas.churn_por_squad?.find(s => s.squad.toLowerCase().includes('makers'));
+      squadData['⚡ Makers'] = { 
         mrr_perdido: CHURN_ADJUSTMENT_MAKERS, 
         mrr_base: makersOriginal?.mrr_ativo || 0 
       };
