@@ -28,8 +28,6 @@ export const PERMISSION_KEYS = {
   // Gestão (antigo Operação)
   GESTAO: {
     VISAO_GERAL: 'gestao.visao_geral',
-    RETENCAO: 'gestao.retencao',
-    COHORT: 'gestao.cohort',
     CLIENTES_CONTRATOS: 'gestao.clientes_contratos',
     CHURN_DETALHAMENTO: 'gestao.churn_detalhamento',
   },
@@ -177,8 +175,6 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/margem-cliente': PERMISSION_KEYS.FIN.MARGEM_CLIENTE,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
-  '/dashboard/retencao': PERMISSION_KEYS.GESTAO.RETENCAO,
-  '/dashboard/cohort': PERMISSION_KEYS.GESTAO.COHORT,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   '/contratos': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
@@ -340,8 +336,6 @@ export const NAV_CONFIG = {
       items: [
         { title: 'Visão Geral', url: '/visao-geral', icon: 'Eye', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
         { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS },
-        { title: 'Análise de Retenção', url: '/dashboard/retencao', icon: 'UserCheck', permissionKey: PERMISSION_KEYS.GESTAO.RETENCAO },
-        { title: 'Cohort de Retenção', url: '/dashboard/cohort', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.COHORT },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
       ],
     },
@@ -532,8 +526,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.FIN.INADIMPLENCIA]: 'Inadimplência',
   [PERMISSION_KEYS.FIN.AUDITORIA]: 'Auditoria de Sistemas',
   [PERMISSION_KEYS.GESTAO.VISAO_GERAL]: 'Visão Geral',
-  [PERMISSION_KEYS.GESTAO.RETENCAO]: 'Análise de Retenção',
-  [PERMISSION_KEYS.GESTAO.COHORT]: 'Cohort de Retenção',
   [PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
   [PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
