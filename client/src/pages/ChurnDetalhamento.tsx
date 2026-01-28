@@ -1086,8 +1086,8 @@ export default function ChurnDetalhamento() {
               </div>
               
               {/* Coluna 2: Métricas principais */}
-              <div className="flex flex-col gap-3 justify-center">
-                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50">
+              <div className="flex flex-col gap-3">
+                <div className="flex-1 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase">MRR Perdido</span>
                     <DollarSign className="h-4 w-4 text-red-500" />
@@ -1096,7 +1096,7 @@ export default function ChurnDetalhamento() {
                   <div className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">{filteredMetricas.total_churned} contratos encerrados</div>
                 </div>
                 
-                <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50">
+                <div className="flex-1 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">MRR Pausado</span>
                     <Pause className="h-4 w-4 text-amber-500" />
@@ -1105,7 +1105,7 @@ export default function ChurnDetalhamento() {
                   <div className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">{filteredMetricas.total_pausados} contratos pausados</div>
                 </div>
                 
-                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                <div className="flex-1 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">MRR Base Referência</span>
                     <Target className="h-4 w-4 text-blue-500" />
