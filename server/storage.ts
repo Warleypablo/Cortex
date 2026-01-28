@@ -8832,7 +8832,7 @@ export class DbStorage implements IStorage {
     
     const resumoResult = await db.execute(sql.raw(`
       SELECT 
-        COALESCE(SUM(valor_bruto::numeric), 0) as total_previsto,
+        COALESCE(SUM(valor_liquido::numeric), 0) as total_previsto,
         COALESCE(SUM(COALESCE(valor_pago::numeric, 0)), 0) as total_recebido,
         COALESCE(SUM(CASE 
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date 
@@ -8862,7 +8862,7 @@ export class DbStorage implements IStorage {
       SELECT 
         EXTRACT(DAY FROM data_vencimento) as dia,
         TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_completa,
-        COALESCE(SUM(valor_bruto::numeric), 0) as previsto,
+        COALESCE(SUM(valor_liquido::numeric), 0) as previsto,
         COALESCE(SUM(COALESCE(valor_pago::numeric, 0)), 0) as recebido,
         COALESCE(SUM(CASE 
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date 
