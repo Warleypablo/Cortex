@@ -44,8 +44,19 @@ import {
   CheckCircle,
   AlertCircle,
   Zap,
+  Cake,
+  Gift,
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
+
+interface Aniversariante {
+  id: number;
+  nome: string;
+  aniversario: string;
+  cargo: string | null;
+  squad: string | null;
+  diasAteAniversario: number;
+}
 
 interface Aviso {
   id: number;
@@ -380,6 +391,95 @@ function MeusClientes({ clientes, mrrTotal, contratosAtivos }: {
   );
 }
 
+function AniversariantesWidget({ aniversariantes }: { aniversariantes: Aniversariante[] }) {
+  const mesAtual = format(new Date(), 'MMMM', { locale: ptBR });
+  
+  if (!aniversariantes || aniversariantes.length === 0) {
+    return (
+      <Card data-testid="card-aniversariantes-empty" className="h-full flex flex-col">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Cake className="w-4 h-4" />
+              Aniversariantes de {mesAtual.charAt(0).toUpperCase() + mesAtual.slice(1)}
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground text-center py-8">
+            Nenhum aniversariante este mês
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-testid="card-aniversariantes" className="h-full flex flex-col">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Cake className="w-4 h-4" />
+            Aniversariantes de {mesAtual.charAt(0).toUpperCase() + mesAtual.slice(1)}
+            <Badge variant="secondary" className="ml-1 text-xs">
+              {aniversariantes.length}
+            </Badge>
+          </CardTitle>
+          <Link href="/dashboard/geg">
+            <Button variant="ghost" size="sm" data-testid="button-ver-aniversariantes">
+              Ver todos
+              <ExternalLink className="w-3 h-3 ml-1" />
+            </Button>
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2 flex-1 overflow-auto">
+        {aniversariantes.slice(0, 5).map((pessoa) => {
+          const dataAniversario = parseISO(pessoa.aniversario);
+          const diaAniversario = format(dataAniversario, 'dd', { locale: ptBR });
+          const isHoje = pessoa.diasAteAniversario === 0;
+          
+          return (
+            <div 
+              key={pessoa.id}
+              className={`flex items-center gap-3 p-2 rounded-md transition-colors ${
+                isHoje ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50'
+              }`}
+              data-testid={`aniversariante-item-${pessoa.id}`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                isHoje 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {isHoje ? (
+                  <Gift className="w-4 h-4" />
+                ) : (
+                  <span className="text-sm font-medium">{diaAniversario}</span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium truncate ${isHoje ? 'text-primary' : ''}`}>
+                  {pessoa.nome}
+                  {isHoje && <span className="ml-2 text-xs">Hoje!</span>}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {pessoa.cargo || pessoa.squad || ''}
+                </p>
+              </div>
+              {!isHoje && pessoa.diasAteAniversario > 0 && (
+                <Badge variant="outline" className="text-xs">
+                  {pessoa.diasAteAniversario}d
+                </Badge>
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
 function AlertasWidget({ alertas }: { alertas: HomeOverview['alertas'] }) {
   if (!alertas || alertas.length === 0) {
     return (
@@ -639,6 +739,10 @@ function DashboardAdmin() {
     },
   });
 
+  const { data: aniversariantes } = useQuery<Aniversariante[]>({
+    queryKey: ['/api/geg/aniversariantes-mes'],
+  });
+
   if (isLoadingVisaoGeral || isLoadingInadimplencia || isLoadingClosers || isLoadingOverview) {
     return <LoadingSkeleton />;
   }
@@ -739,13 +843,14 @@ function DashboardAdmin() {
       </div>
 
       {/* Widgets personalizados */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
         <MeusClientes 
           clientes={homeOverview?.clientes || []} 
           mrrTotal={homeOverview?.mrrTotal || 0}
           contratosAtivos={homeOverview?.contratosAtivos || 0}
         />
         <AlertasWidget alertas={homeOverview?.alertas || []} />
+        <AniversariantesWidget aniversariantes={aniversariantes || []} />
         <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
       </div>
 
