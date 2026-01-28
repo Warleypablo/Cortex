@@ -369,9 +369,9 @@ export default function RevenueGoals() {
           {/* KPIs Principais */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <KPICard
-              title="Meta do Mês"
+              title="Total a Receber"
               value={formatCurrency(data.resumo.totalPrevisto)}
-              subtitle={`${data.resumo.quantidadeParcelas} parcelas previstas`}
+              subtitle={`${data.resumo.quantidadeParcelas} parcelas no mês`}
               icon={<Target className="w-5 h-5" />}
               color="default"
             />
