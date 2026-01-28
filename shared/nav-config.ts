@@ -58,7 +58,6 @@ export const PERMISSION_KEYS = {
     META_ADS: 'growth.meta_ads',
     PLATAFORMA: 'growth.plataforma',
     CRIATIVOS: 'growth.criativos',
-    AUTO_REPORT: 'growth.auto_report',
     ORCADO_REALIZADO: 'growth.orcado_realizado',
   },
   // G&G (Pessoas)
@@ -80,6 +79,7 @@ export const PERMISSION_KEYS = {
   // Reports
   REPORTS: {
     INVESTORS: 'reports.investors',
+    AUTO_REPORT: 'reports.auto_report',
   },
   // Administração
   ADMIN: {
@@ -199,7 +199,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/meta-ads': PERMISSION_KEYS.GROWTH.META_ADS,
   '/growth/performance-plataformas': PERMISSION_KEYS.GROWTH.PLATAFORMA,
   '/growth/criativos': PERMISSION_KEYS.GROWTH.CRIATIVOS,
-  '/growth/auto-report': PERMISSION_KEYS.GROWTH.AUTO_REPORT,
+  '/growth/auto-report': PERMISSION_KEYS.REPORTS.AUTO_REPORT,
   '/growth/orcado-realizado': PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO,
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
@@ -360,7 +360,6 @@ export const NAV_CONFIG = {
         { title: 'Por Plataforma', url: '/growth/performance-plataformas', icon: 'Layers', permissionKey: PERMISSION_KEYS.GROWTH.PLATAFORMA },
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
         { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
-        { title: 'Auto Report', url: '/growth/auto-report', icon: 'FileText', permissionKey: PERMISSION_KEYS.GROWTH.AUTO_REPORT },
       ],
     },
   ],
@@ -398,6 +397,7 @@ export const NAV_CONFIG = {
       icon: 'FileText',
       items: [
         { title: 'Investors Report', url: '/investors-report', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.REPORTS.INVESTORS },
+        { title: 'Auto Report', url: '/growth/auto-report', icon: 'FileText', permissionKey: PERMISSION_KEYS.REPORTS.AUTO_REPORT },
       ],
     },
   ],
@@ -553,5 +553,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES]: 'Clientes Inadimplentes',
   [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
+  [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
   [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
 };
