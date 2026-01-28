@@ -451,7 +451,7 @@ export default function ChurnDetalhamento() {
       }))
       .filter(s => s.mrr_perdido > 0) // Remover squads com valor zerado
       .filter(s => !squadsIrrelevantes.includes(s.squad.toLowerCase().trim())) // Remover squads irrelevantes
-      .sort((a, b) => b.percentual - a.percentual);
+      .sort((a, b) => b.mrr_perdido - a.mrr_perdido); // Ordenar por valor (R$) ao invés de percentual
   }, [filteredContratos, data?.metricas?.churn_por_squad]);
 
   const filteredTaxaChurn = useMemo(() => {
