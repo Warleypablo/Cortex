@@ -71,12 +71,15 @@ interface ChurnContract {
   produto: string;
   squad: string;
   responsavel: string;
+  cs_responsavel: string;
+  vendedor: string;
   valorr: number;
   data_inicio: string;
   data_encerramento: string | null;
   data_pausa: string | null;
   status: string;
   servico: string;
+  motivo_cancelamento?: string;
   tipo: 'churn' | 'pausado';
   lifetime_meses: number;
   ltv: number;
@@ -557,6 +560,152 @@ export default function ChurnDetalhamento() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 6);
   }, [filteredContratos]);
+
+  // Análise de Churn por Tipo de Erro (Erro Operacional, Erro Operacional Indireto, Falta de Resultado)
+  type ChurnTipoErro = {
+    tipo: string;
+    count: number;
+    mrr: number;
+    porSquad: Record<string, { count: number; mrr: number }>;
+    porResponsavel: Record<string, { count: number; mrr: number }>;
+    porVendedor: Record<string, { count: number; mrr: number }>;
+    porCsResponsavel: Record<string, { count: number; mrr: number }>;
+  };
+
+  const churnPorTipoErro = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+    
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+    if (churnContratos.length === 0) return [];
+    
+    const tiposErro: Record<string, ChurnTipoErro> = {};
+    
+    // Categorias de motivo que representam erro operacional
+    const erroOperacionalMotivos = [
+      'erro operacional',
+      'erro interno',
+      'falha operacional',
+      'problema interno',
+      'erro de operação'
+    ];
+    
+    const erroOperacionalIndiretoMotivos = [
+      'erro operacional indireto',
+      'erro indireto',
+      'falha indireta'
+    ];
+    
+    const faltaResultadoMotivos = [
+      'falta de resultado',
+      'sem resultado',
+      'resultado insatisfatório',
+      'não atingiu meta',
+      'baixa performance',
+      'performance'
+    ];
+    
+    churnContratos.forEach(c => {
+      const motivo = (c.motivo_cancelamento || '').toLowerCase().trim();
+      
+      let categoria = 'Outros';
+      if (erroOperacionalMotivos.some(m => motivo.includes(m))) {
+        categoria = 'Erro Operacional';
+      } else if (erroOperacionalIndiretoMotivos.some(m => motivo.includes(m))) {
+        categoria = 'Erro Operacional Indireto';
+      } else if (faltaResultadoMotivos.some(m => motivo.includes(m))) {
+        categoria = 'Falta de Resultado';
+      }
+      
+      if (!tiposErro[categoria]) {
+        tiposErro[categoria] = {
+          tipo: categoria,
+          count: 0,
+          mrr: 0,
+          porSquad: {},
+          porResponsavel: {},
+          porVendedor: {},
+          porCsResponsavel: {}
+        };
+      }
+      
+      tiposErro[categoria].count++;
+      tiposErro[categoria].mrr += c.valorr || 0;
+      
+      // Agregar por Squad
+      const squad = c.squad || 'Não especificado';
+      if (!tiposErro[categoria].porSquad[squad]) {
+        tiposErro[categoria].porSquad[squad] = { count: 0, mrr: 0 };
+      }
+      tiposErro[categoria].porSquad[squad].count++;
+      tiposErro[categoria].porSquad[squad].mrr += c.valorr || 0;
+      
+      // Agregar por Responsável
+      const resp = c.responsavel || 'Não especificado';
+      if (!tiposErro[categoria].porResponsavel[resp]) {
+        tiposErro[categoria].porResponsavel[resp] = { count: 0, mrr: 0 };
+      }
+      tiposErro[categoria].porResponsavel[resp].count++;
+      tiposErro[categoria].porResponsavel[resp].mrr += c.valorr || 0;
+      
+      // Agregar por Vendedor
+      const vendedor = c.vendedor || 'Não especificado';
+      if (!tiposErro[categoria].porVendedor[vendedor]) {
+        tiposErro[categoria].porVendedor[vendedor] = { count: 0, mrr: 0 };
+      }
+      tiposErro[categoria].porVendedor[vendedor].count++;
+      tiposErro[categoria].porVendedor[vendedor].mrr += c.valorr || 0;
+      
+      // Agregar por CS Responsável
+      const csResp = c.cs_responsavel || 'Não especificado';
+      if (!tiposErro[categoria].porCsResponsavel[csResp]) {
+        tiposErro[categoria].porCsResponsavel[csResp] = { count: 0, mrr: 0 };
+      }
+      tiposErro[categoria].porCsResponsavel[csResp].count++;
+      tiposErro[categoria].porCsResponsavel[csResp].mrr += c.valorr || 0;
+    });
+    
+    return Object.values(tiposErro)
+      .filter(t => t.tipo !== 'Outros')
+      .sort((a, b) => b.mrr - a.mrr);
+  }, [filteredContratos]);
+
+  const [tipoErroTab, setTipoErroTab] = useState<'squad' | 'responsavel' | 'vendedor' | 'cs_responsavel'>('squad');
+  const [tipoErroSelecionado, setTipoErroSelecionado] = useState<string>('');
+
+  const dadosTipoErroAtual = useMemo(() => {
+    if (churnPorTipoErro.length === 0) return [];
+    
+    const tipoSelecionado = tipoErroSelecionado || churnPorTipoErro[0]?.tipo || '';
+    const tipoData = churnPorTipoErro.find(t => t.tipo === tipoSelecionado);
+    if (!tipoData) return [];
+    
+    let dados: Record<string, { count: number; mrr: number }> = {};
+    
+    switch (tipoErroTab) {
+      case 'squad':
+        dados = tipoData.porSquad;
+        break;
+      case 'responsavel':
+        dados = tipoData.porResponsavel;
+        break;
+      case 'vendedor':
+        dados = tipoData.porVendedor;
+        break;
+      case 'cs_responsavel':
+        dados = tipoData.porCsResponsavel;
+        break;
+    }
+    
+    return Object.entries(dados)
+      .map(([name, info]) => ({
+        name: name.length > 20 ? name.substring(0, 20) + '...' : name,
+        fullName: name,
+        count: info.count,
+        mrr: info.mrr
+      }))
+      .sort((a, b) => b.mrr - a.mrr)
+      .slice(0, 10);
+  }, [churnPorTipoErro, tipoErroTab, tipoErroSelecionado]);
 
   const churnPorMes = useMemo(() => {
     if (filteredContratos.length === 0) return [];
@@ -1579,122 +1728,145 @@ export default function ChurnDetalhamento() {
         </TechChartCard>
       </div>
 
-      {/* Distribuição de Lifetime */}
-      <Card className="border-emerald-200 dark:border-emerald-900/40">
+      {/* Análise de Churn por Tipo de Erro */}
+      <Card className="border-orange-200 dark:border-orange-900/40">
         <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg">
-              <Target className="h-5 w-5 text-white" />
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 shadow-lg">
+                <AlertTriangle className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Churn por Tipo de Erro</CardTitle>
+                <CardDescription>Erro Operacional, Indireto e Falta de Resultado</CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-base">Distribuição de Lifetime</CardTitle>
-              <CardDescription>Quanto tempo os clientes permaneceram antes de sair</CardDescription>
-            </div>
+            {churnPorTipoErro.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {churnPorTipoErro.map((tipo) => (
+                  <Button
+                    key={tipo.tipo}
+                    variant={tipoErroSelecionado === tipo.tipo || (!tipoErroSelecionado && tipo.tipo === churnPorTipoErro[0]?.tipo) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTipoErroSelecionado(tipo.tipo)}
+                    data-testid={`btn-tipo-erro-${tipo.tipo.toLowerCase().replace(/\s+/g, '-')}`}
+                    className="text-xs"
+                  >
+                    {tipo.tipo}
+                    <Badge variant="secondary" className="ml-1.5 text-[10px]">{tipo.count}</Badge>
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <Skeleton className="h-[280px] w-full" />
-          ) : lifetimeCurve.length === 0 ? (
-            <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">
-              Nenhum dado disponível
+            <Skeleton className="h-[320px] w-full" />
+          ) : churnPorTipoErro.length === 0 ? (
+            <div className="h-[320px] flex items-center justify-center text-muted-foreground text-sm">
+              Nenhum dado de erro operacional encontrado no período
             </div>
           ) : (
             <div className="space-y-4">
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={lifetimeCurve} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                  <defs>
-                    <linearGradient id="retentionGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.4}/>
-                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.05}/>
-                    </linearGradient>
-                    <linearGradient id="mrrRetentionGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.4}/>
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.05}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis 
-                    dataKey="monthIndex" 
-                    tick={{ fontSize: 11 }} 
-                    axisLine={false}
-                    tickLine={false}
-                    tickFormatter={(v) => `${v}m`}
-                    className="fill-muted-foreground"
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 11 }} 
-                    axisLine={false}
-                    tickLine={false}
-                    domain={[0, 100]}
-                    tickFormatter={(v) => `${v}%`}
-                    className="fill-muted-foreground"
-                  />
-                  <Tooltip 
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length) return null;
-                      const point = payload[0]?.payload as RetentionPoint;
-                      return (
-                        <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-700/50 rounded-lg shadow-xl p-3 min-w-[200px]">
-                          <p className="text-xs font-medium text-gray-600 dark:text-zinc-300 mb-2 uppercase tracking-wider">
-                            Mês {label}
-                          </p>
-                          <div className="space-y-1 text-sm">
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                <span className="text-gray-500 dark:text-zinc-400">Contratos {label}+ meses</span>
-                              </span>
-                              <span className="font-bold text-emerald-600 dark:text-emerald-400">{point?.retainedPct?.toFixed(1)}%</span>
+              {/* Resumo do tipo selecionado */}
+              {(() => {
+                const tipoAtual = churnPorTipoErro.find(t => t.tipo === tipoErroSelecionado) || churnPorTipoErro[0];
+                if (!tipoAtual) return null;
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{tipoAtual.count}</p>
+                      <p className="text-xs text-muted-foreground">Contratos</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrencyNoDecimals(tipoAtual.mrr)}</p>
+                      <p className="text-xs text-muted-foreground">MRR Perdido</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{Object.keys(tipoAtual.porSquad).length}</p>
+                      <p className="text-xs text-muted-foreground">Squads Afetados</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{Object.keys(tipoAtual.porResponsavel).length}</p>
+                      <p className="text-xs text-muted-foreground">Responsáveis</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tabs de visualização */}
+              <div className="flex items-center gap-2 border-b border-gray-200 dark:border-zinc-700 pb-2">
+                {[
+                  { key: 'squad', label: 'Por Squad' },
+                  { key: 'responsavel', label: 'Por Responsável' },
+                  { key: 'vendedor', label: 'Por Vendedor' },
+                  { key: 'cs_responsavel', label: 'Por CS' }
+                ].map(tab => (
+                  <Button
+                    key={tab.key}
+                    variant={tipoErroTab === tab.key ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setTipoErroTab(tab.key as any)}
+                    data-testid={`tab-tipo-erro-${tab.key}`}
+                    className="text-xs"
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Lista de ranking */}
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {dadosTipoErroAtual.length === 0 ? (
+                  <div className="text-center text-muted-foreground text-sm py-8">
+                    Nenhum dado disponível para esta visualização
+                  </div>
+                ) : (
+                  dadosTipoErroAtual.map((item, index) => {
+                    const maxMrr = Math.max(...dadosTipoErroAtual.map(d => d.mrr));
+                    const percentage = maxMrr > 0 ? (item.mrr / maxMrr) * 100 : 0;
+                    const isTop3 = index < 3;
+                    const medalColors = ['bg-amber-500', 'bg-gray-400', 'bg-amber-700'];
+                    
+                    return (
+                      <div 
+                        key={item.fullName}
+                        data-testid={`tipo-erro-item-${index}`}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                          isTop3 
+                            ? 'bg-orange-50/80 dark:bg-orange-950/40 border border-orange-100 dark:border-orange-900/50' 
+                            : 'bg-gray-50/50 dark:bg-zinc-900/30 border border-gray-100/50 dark:border-zinc-800/50'
+                        }`}
+                      >
+                        <div className="w-6 text-center flex-shrink-0">
+                          {isTop3 ? (
+                            <div className={`w-5 h-5 rounded-full ${medalColors[index]} flex items-center justify-center`}>
+                              <span className="text-[10px] font-bold text-white">{index + 1}</span>
                             </div>
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                <span className="text-gray-500 dark:text-zinc-400">MRR {label}+ meses</span>
-                              </span>
-                              <span className="font-bold text-blue-600 dark:text-blue-400">{point?.mrrRetainedPct?.toFixed(1)}%</span>
-                            </div>
-                            <div className="border-t border-gray-200 dark:border-zinc-700 pt-1 mt-2">
-                              <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>Contratos que viveram {label}+ meses</span>
-                                <span>{point?.retainedCount?.toLocaleString('pt-BR')} de {point?.totalStarted?.toLocaleString('pt-BR')}</span>
-                              </div>
-                              <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>Saíram entre {label}-{Number(label)+1} meses</span>
-                                <span className="text-red-500">{point?.churnedCount?.toLocaleString('pt-BR')}</span>
-                              </div>
+                          ) : (
+                            <span className="text-xs font-medium text-muted-foreground">{index + 1}º</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-sm font-medium truncate" title={item.fullName}>{item.fullName}</span>
+                            <div className="flex items-center gap-3 text-sm">
+                              <span className="text-muted-foreground">{item.count} contratos</span>
+                              <span className="font-bold text-red-600 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(item.mrr)}</span>
                             </div>
                           </div>
+                          <div className="h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
                         </div>
-                      );
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="retainedPct" 
-                    stroke="#10b981" 
-                    strokeWidth={2}
-                    fill="url(#retentionGradient)" 
-                    name="Retenção Clientes (%)"
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="mrrRetainedPct" 
-                    stroke="#3b82f6" 
-                    strokeWidth={2}
-                    fill="url(#mrrRetentionGradient)" 
-                    name="Retenção MRR (%)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-              <div className="flex items-center justify-center gap-6 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                  <span className="text-muted-foreground">% Contratos que viveram X+ meses</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span className="text-muted-foreground">% MRR que viveu X+ meses</span>
-                </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
