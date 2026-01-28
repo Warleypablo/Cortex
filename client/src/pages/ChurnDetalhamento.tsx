@@ -989,7 +989,7 @@ export default function ChurnDetalhamento() {
                 <span>% do MRR</span>
               </div>
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {(data.metricas.churn_por_squad || []).map((squad, index) => (
+                {filteredChurnPorSquad.map((squad, index) => (
                   <div 
                     key={squad.squad} 
                     className="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-zinc-900/30"
