@@ -436,6 +436,9 @@ export default function ChurnDetalhamento() {
       };
     }
     
+    // Lista de squads irrelevantes a serem excluídos
+    const squadsIrrelevantes = ['turbo interno', 'squad x', 'interno', 'x'];
+    
     return Object.entries(squadData)
       .map(([squad, info]) => ({
         squad,
@@ -444,6 +447,7 @@ export default function ChurnDetalhamento() {
         percentual: info.mrr_base > 0 ? (info.mrr_perdido / info.mrr_base) * 100 : 0
       }))
       .filter(s => s.mrr_perdido > 0) // Remover squads com valor zerado
+      .filter(s => !squadsIrrelevantes.includes(s.squad.toLowerCase().trim())) // Remover squads irrelevantes
       .sort((a, b) => b.percentual - a.percentual);
   }, [filteredContratos, data?.metricas?.churn_por_squad]);
 
@@ -963,12 +967,12 @@ export default function ChurnDetalhamento() {
               </div>
               
               {/* Coluna 3: Ranking de Churn por Squad */}
-              <div className="bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50 p-4">
-                <div className="flex items-center justify-between mb-3">
+              <div className="bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50 p-4 flex flex-col">
+                <div className="flex items-center justify-between gap-2 mb-3">
                   <h3 className="text-sm font-semibold text-foreground">Churn por Squad</h3>
                   <Badge variant="outline" className="text-xs">Top {filteredChurnPorSquad.length}</Badge>
                 </div>
-                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                <div className="space-y-2 flex-1 overflow-y-auto pr-1">
                   {filteredChurnPorSquad.map((squad, index) => {
                     const isTop3 = index < 3;
                     const medalColors = ['bg-amber-500', 'bg-gray-400', 'bg-amber-700'];
