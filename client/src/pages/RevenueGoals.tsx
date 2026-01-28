@@ -380,10 +380,7 @@ export default function RevenueGoals() {
               value={formatCurrency(data.resumo.totalRecebido)}
               subtitle={`${data.resumo.quantidadeRecebidas} parcelas`}
               icon={<CheckCircle className="w-5 h-5" />}
-              trend={atingimentoMeta >= 80 ? 'up' : atingimentoMeta >= 50 ? 'neutral' : 'down'}
-              trendValue={`${atingimentoMeta.toFixed(1)}% da meta`}
               color="success"
-              progress={Math.min(atingimentoMeta, 100)}
             />
             <KPICard
               title="Pendente"
