@@ -9004,15 +9004,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const ranking = Array.from(consolidatedMap.values()).map(({ displayName, receita, despesa }) => {
-        const resultadoBruto = receita - despesa;
         const impostos = receita * 0.18; // 18% sobre receita (consistente com DFC)
-        const contribuicao = resultadoBruto - impostos;
+        // Despesa total inclui impostos (consistente com DFC)
+        const despesaTotal = despesa + impostos;
+        const resultadoBruto = receita - despesa;
+        const contribuicao = receita - despesaTotal; // Receita - (Despesa + Impostos)
         const margem = receita > 0 ? (contribuicao / receita) * 100 : 0;
         
         return {
           squad: displayName,
           receita,
-          despesa,
+          despesa: despesaTotal, // Agora inclui impostos (igual ao DFC)
           resultadoBruto,
           impostos,
           contribuicao,
