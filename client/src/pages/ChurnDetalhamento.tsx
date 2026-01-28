@@ -166,29 +166,66 @@ const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
   );
 };
 
-const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, shadowColor }: {
+const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, shadowColor, size = "normal" }: {
   title: string;
   value: string;
   subtitle: string;
   icon: any;
   gradient: string;
   shadowColor: string;
+  size?: "normal" | "large";
 }) => (
-  <Card className="relative overflow-hidden border-border/50 hover:border-border transition-colors">
-    <CardContent className="p-4">
+  <Card className={`relative overflow-hidden border-border/50 hover:border-border transition-all hover:shadow-lg ${size === "large" ? "col-span-2" : ""}`}>
+    <CardContent className={size === "large" ? "p-5" : "p-4"}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+        <span className={`font-semibold text-muted-foreground uppercase tracking-wider ${size === "large" ? "text-xs" : "text-[10px]"}`}>
           {title}
         </span>
-        <div className={`p-1.5 rounded-md ${gradient}`}>
-          <Icon className="h-3 w-3 text-white" />
+        <div className={`rounded-md ${gradient} ${size === "large" ? "p-2" : "p-1.5"}`}>
+          <Icon className={`text-white ${size === "large" ? "h-4 w-4" : "h-3 w-3"}`} />
         </div>
       </div>
-      <div className="text-xl font-bold text-foreground tracking-tight">{value}</div>
-      <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>
+      <div className={`font-bold text-foreground tracking-tight ${size === "large" ? "text-2xl" : "text-xl"}`}>{value}</div>
+      <p className={`text-muted-foreground mt-0.5 ${size === "large" ? "text-xs" : "text-[10px]"}`}>{subtitle}</p>
     </CardContent>
   </Card>
 );
+
+// Componente de Gauge visual para taxa de churn
+const ChurnGauge = ({ value, maxValue = 10 }: { value: number; maxValue?: number }) => {
+  const percentage = Math.min((value / maxValue) * 100, 100);
+  const getColor = () => {
+    if (value <= 2) return { color: "text-emerald-500", bg: "from-emerald-500 to-green-500", status: "Excelente", dotBg: "bg-emerald-500" };
+    if (value <= 4) return { color: "text-yellow-500", bg: "from-yellow-500 to-amber-500", status: "Atenção", dotBg: "bg-yellow-500" };
+    if (value <= 6) return { color: "text-orange-500", bg: "from-orange-500 to-red-500", status: "Crítico", dotBg: "bg-orange-500" };
+    return { color: "text-red-600", bg: "from-red-600 to-rose-700", status: "Emergência", dotBg: "bg-red-600" };
+  };
+  const config = getColor();
+  
+  return (
+    <div className="flex flex-col items-center">
+      <div className="relative w-40 h-20 overflow-hidden">
+        {/* Background arc */}
+        <div className="absolute inset-0 bg-gray-200 dark:bg-zinc-800 rounded-t-full" />
+        {/* Colored arc */}
+        <div 
+          className={`absolute inset-0 bg-gradient-to-r ${config.bg} rounded-t-full origin-bottom transition-transform duration-1000`}
+          style={{ 
+            clipPath: `polygon(0 100%, 0 ${100 - percentage}%, 100% ${100 - percentage}%, 100% 100%)`,
+          }}
+        />
+        {/* Center circle */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-24 h-12 bg-white dark:bg-zinc-900 rounded-t-full flex items-end justify-center pb-1">
+          <span className={`text-2xl font-bold ${config.color}`}>{value.toFixed(1)}%</span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        <div className={`w-3 h-3 rounded-full ${config.dotBg} animate-pulse`} />
+        <span className={`text-sm font-semibold ${config.color}`}>{config.status}</span>
+      </div>
+    </div>
+  );
+};
 
 const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
   title: string;
@@ -226,7 +263,7 @@ export default function ChurnDetalhamento() {
   const [dataFim, setDataFim] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [isFiltersOpen, setIsFiltersOpen] = useState(true);
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Fechado por padrão, dados principais no hero
   const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
 
   const { data, isLoading, error } = useQuery<ChurnDetalhamentoData>({
@@ -859,18 +896,133 @@ export default function ChurnDetalhamento() {
               />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(3)}>3M</Button>
-              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(6)}>6M</Button>
-              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(12)}>12M</Button>
-              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(24)}>24M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(3)} data-testid="button-period-3m">3M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(6)} data-testid="button-period-6m">6M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(12)} data-testid="button-period-12m">12M</Button>
+              <Button variant="outline" size="sm" onClick={() => setQuickPeriod(24)} data-testid="button-period-24m">24M</Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+      {/* Painel Executivo Hero - Taxa de Churn */}
+      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
+        <Card className="relative overflow-hidden border-2 border-red-200/50 dark:border-red-900/30 bg-gradient-to-br from-slate-50 via-white to-red-50/30 dark:from-zinc-900 dark:via-zinc-900 dark:to-red-950/20">
+          {/* Background pattern */}
+          <div className="absolute inset-0 opacity-5">
+            <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '24px 24px' }} />
+          </div>
+          
+          <CardContent className="relative p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Coluna 1: Gauge e status */}
+              <div className="flex flex-col items-center justify-center p-4 bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Taxa de Churn</h3>
+                <ChurnGauge value={data.metricas.churn_percentual || 0} />
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  Base: {data.metricas.periodo_referencia ? format(parseISO(data.metricas.periodo_referencia), "MMMM/yyyy", { locale: ptBR }) : "mês anterior"}
+                </p>
+              </div>
+              
+              {/* Coluna 2: Métricas principais */}
+              <div className="flex flex-col gap-3">
+                <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase">MRR Perdido</span>
+                    <DollarSign className="h-4 w-4 text-red-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-red-700 dark:text-red-300">{formatCurrency(filteredMetricas.mrr_perdido)}</div>
+                  <div className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">{filteredMetricas.total_churned} contratos encerrados</div>
+                </div>
+                
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">MRR Pausado</span>
+                    <Pause className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(filteredMetricas.mrr_pausado)}</div>
+                  <div className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">{filteredMetricas.total_pausados} contratos pausados</div>
+                </div>
+                
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">MRR Base Referência</span>
+                    <Target className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(data.metricas.mrr_ativo_ref || 0)}</div>
+                  <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base para cálculo do churn</div>
+                </div>
+              </div>
+              
+              {/* Coluna 3: Ranking de Churn por Squad */}
+              <div className="bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-foreground">Churn por Squad</h3>
+                  <Badge variant="outline" className="text-xs">Top {filteredChurnPorSquad.length}</Badge>
+                </div>
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {filteredChurnPorSquad.map((squad, index) => {
+                    const isTop3 = index < 3;
+                    const medalColors = ['bg-amber-500', 'bg-gray-400', 'bg-amber-700'];
+                    
+                    return (
+                      <div 
+                        key={squad.squad} 
+                        data-testid={`squad-ranking-${index}`}
+                        className={`flex items-center gap-2 p-2.5 rounded-lg transition-all ${
+                          isTop3 
+                            ? 'bg-red-50/80 dark:bg-red-950/40 border border-red-100 dark:border-red-900/50' 
+                            : 'bg-gray-50/50 dark:bg-zinc-900/30 border border-gray-100/50 dark:border-zinc-800/50'
+                        }`}
+                      >
+                        <div className="w-6 text-center flex-shrink-0">
+                          {isTop3 ? (
+                            <div className={`w-5 h-5 rounded-full ${medalColors[index]} flex items-center justify-center`}>
+                              <span className="text-[10px] font-bold text-white">{index + 1}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium text-muted-foreground">{index + 1}º</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium truncate">{squad.squad}</span>
+                            <span className={`text-sm font-bold tabular-nums ${
+                              squad.percentual >= 5 ? 'text-red-600 dark:text-red-400' : 
+                              squad.percentual >= 2 ? 'text-orange-600 dark:text-orange-400' : 
+                              'text-emerald-600 dark:text-emerald-400'
+                            }`}>
+                              {squad.percentual.toFixed(1)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  squad.percentual >= 5 ? 'bg-red-500' : 
+                                  squad.percentual >= 2 ? 'bg-orange-500' : 
+                                  'bg-emerald-500'
+                                }`}
+                                style={{ width: `${Math.min(squad.percentual * 10, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{formatCurrencyNoDecimals(squad.mrr_perdido)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Métricas Secundárias */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {isLoading ? (
-          Array.from({ length: 8 }).map((_, i) => (
+          Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="rounded-xl bg-white dark:bg-zinc-900/50 border border-gray-100 dark:border-zinc-800/50 p-4 shadow">
               <Skeleton className="h-4 w-20 mb-3" />
               <Skeleton className="h-7 w-24" />
@@ -879,57 +1031,17 @@ export default function ChurnDetalhamento() {
         ) : (
           <>
             <TechKpiCard
-              title="Total Churned"
-              value={filteredMetricas.total_churned.toString()}
-              subtitle="contratos encerrados"
-              icon={TrendingDown}
-              gradient="bg-gradient-to-r from-red-500 to-rose-600"
-              shadowColor="rgba(239,68,68,0.25)"
-            />
-            <TechKpiCard
-              title="MRR Perdido"
-              value={formatCurrency(filteredMetricas.mrr_perdido)}
-              subtitle="receita mensal perdida"
-              icon={DollarSign}
-              gradient="bg-gradient-to-r from-orange-500 to-amber-600"
-              shadowColor="rgba(249,115,22,0.25)"
-            />
-            <TechKpiCard
-              title="Taxa de Churn"
-              value={`${(data?.metricas?.churn_percentual || 0).toFixed(2)}%`}
-              subtitle={`de ${formatCurrencyNoDecimals(data?.metricas?.mrr_ativo_ref || 0)}`}
-              icon={Percent}
-              gradient="bg-gradient-to-r from-rose-500 to-pink-600"
-              shadowColor="rgba(244,63,94,0.25)"
-            />
-            <TechKpiCard
-              title="Total Pausados"
-              value={filteredMetricas.total_pausados.toString()}
-              subtitle="contratos pausados"
-              icon={Pause}
-              gradient="bg-gradient-to-r from-yellow-500 to-amber-500"
-              shadowColor="rgba(234,179,8,0.25)"
-            />
-            <TechKpiCard
-              title="MRR Pausado"
-              value={formatCurrency(filteredMetricas.mrr_pausado)}
-              subtitle="receita mensal pausada"
-              icon={Pause}
-              gradient="bg-gradient-to-r from-yellow-600 to-orange-500"
-              shadowColor="rgba(202,138,4,0.25)"
-            />
-            <TechKpiCard
               title="LTV Total"
               value={formatCurrencyNoDecimals(filteredMetricas.ltv_total)}
               subtitle="valor gerado antes do churn"
               icon={Target}
-              gradient="bg-gradient-to-r from-amber-500 to-yellow-600"
-              shadowColor="rgba(245,158,11,0.25)"
+              gradient="bg-gradient-to-r from-emerald-500 to-teal-600"
+              shadowColor="rgba(16,185,129,0.25)"
             />
             <TechKpiCard
               title="Lifetime Médio"
-              value={`${filteredMetricas.lt_medio.toFixed(1)}m`}
-              subtitle="meses em média"
+              value={`${filteredMetricas.lt_medio.toFixed(1)} meses`}
+              subtitle="tempo médio de permanência"
               icon={Clock}
               gradient="bg-gradient-to-r from-blue-500 to-cyan-600"
               shadowColor="rgba(59,130,246,0.25)"
@@ -948,83 +1060,13 @@ export default function ChurnDetalhamento() {
                 ? formatCurrencyNoDecimals(filteredMetricas.ltv_total / filteredMetricas.total_churned)
                 : "R$ 0"}
               subtitle="por contrato churned"
-              icon={Percent}
-              gradient="bg-gradient-to-r from-emerald-500 to-teal-600"
-              shadowColor="rgba(16,185,129,0.25)"
+              icon={DollarSign}
+              gradient="bg-gradient-to-r from-indigo-500 to-purple-600"
+              shadowColor="rgba(99,102,241,0.25)"
             />
           </>
         )}
       </div>
-
-      {/* Seção de Percentual de Churn - usa dados da API (já vem filtrado pelo período) */}
-      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && data.metricas.mrr_perdido > 0 && (
-        <Card className="border-2 border-red-200 dark:border-red-900/40 bg-gradient-to-br from-red-50/50 to-orange-50/30 dark:from-red-950/20 dark:to-orange-950/10">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 shadow-lg">
-                  <Percent className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg">Taxa de Churn</CardTitle>
-                  <CardDescription>
-                    MRR perdido ÷ MRR base ({data.metricas.periodo_referencia ? format(parseISO(data.metricas.periodo_referencia), "MMM/yyyy", { locale: ptBR }) : "mês anterior"})
-                  </CardDescription>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-                  {(data.metricas.churn_percentual || 0).toFixed(2)}%
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {formatCurrency(data.metricas.mrr_perdido)} de {formatCurrency(data.metricas.mrr_ativo_ref || 0)}
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between text-sm font-medium text-muted-foreground">
-                <span>Churn por Squad</span>
-                <span>% do MRR</span>
-              </div>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto">
-                {filteredChurnPorSquad.map((squad, index) => (
-                  <div 
-                    key={squad.squad} 
-                    className="flex items-center gap-3 p-2 rounded-lg bg-white/50 dark:bg-zinc-900/30"
-                  >
-                    <div 
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: REFINED_COLORS[index % REFINED_COLORS.length] }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium truncate">{squad.squad}</span>
-                        <span className={`text-sm font-bold tabular-nums ${
-                          squad.percentual >= 5 ? 'text-red-600 dark:text-red-400' : 
-                          squad.percentual >= 2 ? 'text-orange-600 dark:text-orange-400' : 
-                          'text-emerald-600 dark:text-emerald-400'
-                        }`}>
-                          {squad.percentual.toFixed(2)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                        <span>Perdido: {formatCurrency(squad.mrr_perdido)}</span>
-                        <span>Base: {formatCurrency(squad.mrr_ativo)}</span>
-                      </div>
-                      <Progress 
-                        value={Math.min(squad.percentual * 10, 100)} 
-                        className="h-1.5 mt-1"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TechChartCard
@@ -1654,14 +1696,23 @@ export default function ChurnDetalhamento() {
         </Card>
       )}
 
-      <Card>
+      <Card className="border-border/50">
         <Collapsible open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
-          <CardHeader className="pb-3">
+          <CardHeader className="py-3">
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="w-full justify-between p-0 h-auto hover:bg-transparent">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4" />
-                  <CardTitle className="text-base">Filtros Avançados</CardTitle>
+              <Button variant="ghost" className="w-full justify-between p-0 h-auto no-default-hover-elevate" data-testid="button-toggle-filters">
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 rounded-md bg-gradient-to-r from-slate-500 to-gray-600">
+                    <Filter className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Filtros Avançados</span>
+                    {(searchTerm || filterSquads.length > 0 || filterProdutos.length > 0 || filterResponsaveis.length > 0 || filterServicos.length > 0) && (
+                      <Badge variant="secondary" className="text-[10px] h-5">
+                        {[searchTerm ? 1 : 0, filterSquads.length, filterProdutos.length, filterResponsaveis.length, filterServicos.length].reduce((a, b) => a + (b > 0 ? 1 : 0), 0)} ativo(s)
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 {isFiltersOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               </Button>
