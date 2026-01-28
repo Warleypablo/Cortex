@@ -8946,16 +8946,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         allSquads.add(row.squad);
       }
       
-      const ranking = Array.from(allSquads).map(squad => {
+      // Função para normalizar nome do squad (remover emojis e caracteres especiais no início)
+      const normalizeSquadName = (name: string): string => {
+        // Remove emojis e caracteres especiais do início, mantém o texto principal
+        return name.replace(/^[^\p{L}\p{N}]+/u, '').trim();
+      };
+      
+      // Consolidar squads com nomes similares (ex: "⚡ Makers" e "Makers")
+      const consolidatedMap = new Map<string, { displayName: string; receita: number; despesa: number }>();
+      
+      for (const squad of allSquads) {
+        const normalized = normalizeSquadName(squad);
         const receita = receitasMap.get(squad) || 0;
         const despesa = despesasMap.get(squad) || 0;
+        
+        const existing = consolidatedMap.get(normalized);
+        if (existing) {
+          existing.receita += receita;
+          existing.despesa += despesa;
+          // Manter o displayName com emoji se existir
+          if (squad.length > existing.displayName.length) {
+            existing.displayName = squad;
+          }
+        } else {
+          consolidatedMap.set(normalized, { displayName: squad, receita, despesa });
+        }
+      }
+      
+      const ranking = Array.from(consolidatedMap.values()).map(({ displayName, receita, despesa }) => {
         const resultadoBruto = receita - despesa;
         const impostos = resultadoBruto * 0.18; // 18% sobre resultado bruto
         const contribuicao = resultadoBruto - impostos;
         const margem = receita > 0 ? (contribuicao / receita) * 100 : 0;
         
         return {
-          squad,
+          squad: displayName,
           receita,
           despesa,
           resultadoBruto,
