@@ -4776,6 +4776,7 @@ export class DbStorage implements IStorage {
         aniversario,
         cargo,
         squad,
+        email_turbo,
         EXTRACT(DAY FROM aniversario) as dia_aniversario,
         EXTRACT(DAY FROM CURRENT_DATE) as dia_atual
       FROM "Inhire".rh_pessoal
@@ -4794,6 +4795,7 @@ export class DbStorage implements IStorage {
       aniversario: row.aniversario as string,
       cargo: row.cargo as string || null,
       squad: row.squad as string || null,
+      emailTurbo: row.email_turbo as string || null,
       diaAniversario: parseInt(row.dia_aniversario as string),
     }));
   }

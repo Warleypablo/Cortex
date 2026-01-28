@@ -5,6 +5,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
@@ -55,6 +56,7 @@ interface Aniversariante {
   aniversario: string;
   cargo: string | null;
   squad: string | null;
+  emailTurbo: string | null;
   diasAteAniversario: number;
 }
 
@@ -391,8 +393,24 @@ function MeusClientes({ clientes, mrrTotal, contratosAtivos }: {
   );
 }
 
-function AniversariantesWidget({ aniversariantes }: { aniversariantes: Aniversariante[] }) {
+function AniversariantesWidget({ aniversariantes, userPhotos }: { aniversariantes: Aniversariante[]; userPhotos: Record<string, string> }) {
   const mesAtual = format(new Date(), 'MMMM', { locale: ptBR });
+  
+  const getInitials = (nome: string) => {
+    const parts = nome.split(' ').filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    }
+    return parts[0]?.substring(0, 2).toUpperCase() || '??';
+  };
+  
+  const getPhoto = (pessoa: Aniversariante) => {
+    const email = pessoa.emailTurbo?.toLowerCase().trim();
+    if (email && userPhotos[email]) {
+      return userPhotos[email];
+    }
+    return null;
+  };
   
   if (!aniversariantes || aniversariantes.length === 0) {
     return (
@@ -432,6 +450,7 @@ function AniversariantesWidget({ aniversariantes }: { aniversariantes: Aniversar
           const dataAniversario = parseISO(pessoa.aniversario);
           const diaAniversario = format(dataAniversario, 'dd', { locale: ptBR });
           const isHoje = pessoa.diasAteAniversario === 0;
+          const photo = getPhoto(pessoa);
           
           return (
             <div 
@@ -441,17 +460,12 @@ function AniversariantesWidget({ aniversariantes }: { aniversariantes: Aniversar
               }`}
               data-testid={`aniversariante-item-${pessoa.id}`}
             >
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                isHoje 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-muted text-muted-foreground'
-              }`}>
-                {isHoje ? (
-                  <Gift className="w-4 h-4" />
-                ) : (
-                  <span className="text-sm font-medium">{diaAniversario}</span>
-                )}
-              </div>
+              <Avatar className={`h-10 w-10 flex-shrink-0 ${isHoje ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}>
+                <AvatarImage src={photo || undefined} alt={pessoa.nome} />
+                <AvatarFallback className={isHoje ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}>
+                  {getInitials(pessoa.nome)}
+                </AvatarFallback>
+              </Avatar>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${isHoje ? 'text-primary' : ''}`}>
                   {pessoa.nome}
@@ -461,11 +475,17 @@ function AniversariantesWidget({ aniversariantes }: { aniversariantes: Aniversar
                   {pessoa.cargo || pessoa.squad || ''}
                 </p>
               </div>
-              {!isHoje && pessoa.diasAteAniversario > 0 && (
-                <Badge variant="outline" className="text-xs">
-                  {pessoa.diasAteAniversario}d
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                <Badge variant={isHoje ? "default" : "outline"} className="text-xs">
+                  {isHoje ? <Gift className="w-3 h-3 mr-1" /> : null}
+                  {diaAniversario}
                 </Badge>
-              )}
+                {!isHoje && pessoa.diasAteAniversario > 0 && (
+                  <span className="text-[10px] text-muted-foreground">
+                    em {pessoa.diasAteAniversario}d
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
@@ -737,6 +757,10 @@ function DashboardAdmin() {
     queryKey: ['/api/geg/aniversariantes-mes'],
   });
 
+  const { data: userPhotos = {} } = useQuery<Record<string, string>>({
+    queryKey: ['/api/user-photos'],
+  });
+
   if (isLoadingVisaoGeral || isLoadingInadimplencia || isLoadingClosers || isLoadingOverview) {
     return <LoadingSkeleton />;
   }
@@ -845,7 +869,7 @@ function DashboardAdmin() {
         />
         <AlertasWidget alertas={homeOverview?.alertas || []} />
         <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
-        <AniversariantesWidget aniversariantes={aniversariantes || []} />
+        <AniversariantesWidget aniversariantes={aniversariantes || []} userPhotos={userPhotos} />
       </div>
 
       <div>
