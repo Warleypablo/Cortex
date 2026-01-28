@@ -1611,3 +1611,88 @@ export async function initializeSalesGoalsTable(): Promise<void> {
     console.error('[database] Error initializing Sales Goals table:', error);
   }
 }
+
+export async function initializeCupDataHistTable(): Promise<void> {
+  try {
+    // Verificar se a tabela existe
+    const tableExists = await db.execute(sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'Clickup' 
+        AND table_name = 'cup_data_hist'
+      )
+    `);
+    
+    const exists = (tableExists.rows[0] as any)?.exists;
+    
+    if (!exists) {
+      // Criar tabela nova com estrutura alinhada com cup_contratos
+      await db.execute(sql`
+        CREATE TABLE "Clickup".cup_data_hist (
+          id SERIAL PRIMARY KEY,
+          data_snapshot TIMESTAMP NOT NULL DEFAULT NOW(),
+          servico TEXT,
+          status TEXT,
+          valorr TEXT,
+          valorp TEXT,
+          id_task TEXT,
+          id_subtask TEXT,
+          data_inicio TEXT,
+          data_encerramento TEXT,
+          data_pausa TEXT,
+          squad TEXT,
+          produto TEXT,
+          responsavel TEXT,
+          cs_responsavel TEXT,
+          vendedor TEXT
+        )
+      `);
+      
+      await db.execute(sql`
+        CREATE INDEX idx_cup_data_hist_snapshot 
+        ON "Clickup".cup_data_hist(DATE(data_snapshot))
+      `);
+      
+      await db.execute(sql`
+        CREATE INDEX idx_cup_data_hist_snapshot_status 
+        ON "Clickup".cup_data_hist(DATE(data_snapshot), status)
+      `);
+      
+      console.log('[database] Cup Data Hist table created');
+    } else {
+      // Tabela existe - garantir colunas necessárias existem
+      const requiredColumns = [
+        { name: 'data_snapshot', type: 'TIMESTAMP DEFAULT NOW()' },
+        { name: 'servico', type: 'TEXT' },
+        { name: 'status', type: 'TEXT' },
+        { name: 'valorr', type: 'TEXT' },
+        { name: 'valorp', type: 'TEXT' },
+        { name: 'id_task', type: 'TEXT' },
+        { name: 'id_subtask', type: 'TEXT' },
+        { name: 'data_inicio', type: 'TEXT' },
+        { name: 'data_encerramento', type: 'TEXT' },
+        { name: 'data_pausa', type: 'TEXT' },
+        { name: 'squad', type: 'TEXT' },
+        { name: 'produto', type: 'TEXT' },
+        { name: 'responsavel', type: 'TEXT' },
+        { name: 'cs_responsavel', type: 'TEXT' },
+        { name: 'vendedor', type: 'TEXT' }
+      ];
+      
+      for (const col of requiredColumns) {
+        try {
+          await db.execute(sql.raw(`
+            ALTER TABLE "Clickup".cup_data_hist 
+            ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}
+          `));
+        } catch (e) {
+          // Ignorar se coluna já existe
+        }
+      }
+      
+      console.log('[database] Cup Data Hist table columns ensured');
+    }
+  } catch (error) {
+    console.error('[database] Error initializing Cup Data Hist table:', error);
+  }
+}

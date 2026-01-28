@@ -1735,6 +1735,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint para gerar snapshot diário de contratos
+  app.post("/api/admin/contratos-snapshot", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Verificar se já existe snapshot para hoje
+      const existingSnapshot = await db.execute(sql`
+        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist 
+        WHERE DATE(data_snapshot) = ${today}::date
+      `);
+      
+      if (parseInt((existingSnapshot.rows[0] as any)?.count || '0') > 0) {
+        return res.json({ 
+          success: true, 
+          message: `Snapshot já existe para ${today}`,
+          skipped: true 
+        });
+      }
+      
+      // Inserir snapshot dos contratos atuais
+      await db.execute(sql`
+        INSERT INTO "Clickup".cup_data_hist (data_snapshot, servico, status, valorr, valorp, id_task, id_subtask, 
+                                   data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor)
+        SELECT 
+          CURRENT_TIMESTAMP,
+          servico, status, valorr, valorp, id_task, id_subtask,
+          data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor
+        FROM "Clickup".cup_contratos
+      `);
+      
+      // Contar quantos registros foram inseridos
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist 
+        WHERE DATE(data_snapshot) = CURRENT_DATE
+      `);
+      
+      const recordCount = parseInt((countResult.rows[0] as any)?.count || '0');
+      
+      console.log(`[snapshot] Snapshot criado para ${today} com ${recordCount} contratos`);
+      
+      res.json({ 
+        success: true, 
+        message: `Snapshot criado para ${today}`,
+        records: recordCount
+      });
+    } catch (error) {
+      console.error("[api] Error creating contracts snapshot:", error);
+      res.status(500).json({ error: "Failed to create contracts snapshot" });
+    }
+  });
+  
+  // Endpoint para consultar MRR histórico (último dia do mês anterior)
+  app.get("/api/admin/mrr-historico", isAuthenticated, async (req, res) => {
+    try {
+      const { mes, ano } = req.query;
+      
+      // Se não informado, pega último dia do mês anterior
+      const targetDate = mes && ano 
+        ? new Date(parseInt(ano as string), parseInt(mes as string), 0) // último dia do mês informado
+        : new Date(new Date().getFullYear(), new Date().getMonth(), 0); // último dia do mês anterior
+      
+      const dateStr = targetDate.toISOString().split('T')[0];
+      
+      // Buscar snapshot mais recente até a data target
+      const result = await db.execute(sql`
+        SELECT 
+          DATE(data_snapshot) as snapshot_date,
+          COALESCE(SUM(valorr), 0) as mrr_total,
+          COUNT(*) as total_contratos,
+          COUNT(DISTINCT id_task) as total_clientes
+        FROM "Clickup".cup_data_hist
+        WHERE DATE(data_snapshot) <= ${dateStr}::date
+          AND status IN ('ativo', 'onboarding', 'triagem')
+        GROUP BY DATE(data_snapshot)
+        ORDER BY DATE(data_snapshot) DESC
+        LIMIT 1
+      `);
+      
+      if (result.rows.length === 0) {
+        // Fallback: usar valor fixo de dezembro 2025 = R$ 1.030.000
+        return res.json({
+          snapshot_date: '2025-12-31',
+          mrr_total: 1030000,
+          total_contratos: 0,
+          total_clientes: 0,
+          is_fallback: true,
+          message: 'Usando valor de referência de dezembro 2025'
+        });
+      }
+      
+      res.json({
+        ...result.rows[0],
+        is_fallback: false
+      });
+    } catch (error) {
+      console.error("[api] Error fetching MRR histórico:", error);
+      res.status(500).json({ error: "Failed to fetch MRR histórico" });
+    }
+  });
+
   app.get("/api/clientes", async (req, res) => {
     try {
       const clientes = await storage.getClientes();
@@ -15418,61 +15518,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         empresaClientesAtivos = parseInt((empresaClientesQuery.rows[0] as any).clientes_total || '0');
       }
       
-      // Calcular variação MRR comparando com mês anterior (baseado em data_inicio dos contratos)
-      // Usamos contratos que iniciaram no mês passado vs mês atual para calcular aquisição
+      // Calcular variação MRR comparando com histórico (cup_data_hist) do último dia do mês anterior
+      // Fallback: R$ 1.030.000 para dezembro 2025 se não houver histórico
       try {
-        const variacaoQuery = await db.execute(sql`
-          WITH mrr_atual AS (
-            SELECT COALESCE(SUM(valorr::numeric), 0) as total
-            FROM "Clickup".cup_contratos
-            WHERE status IN ('ativo', 'onboarding', 'triagem')
-          ),
-          mrr_mes_passado AS (
-            SELECT COALESCE(SUM(valorr::numeric), 0) as total
-            FROM "Clickup".cup_contratos
-            WHERE status IN ('ativo', 'onboarding', 'triagem')
-              AND (data_inicio IS NULL OR data_inicio::date < date_trunc('month', CURRENT_DATE))
-          ),
-          clientes_atual AS (
-            SELECT COUNT(DISTINCT c.id) as total
-            FROM "Clickup".cup_clientes c
-            INNER JOIN "Clickup".cup_contratos ct ON c.task_id = ct.id_task
-            WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
-          ),
-          clientes_mes_passado AS (
-            SELECT COUNT(DISTINCT c.id) as total
-            FROM "Clickup".cup_clientes c
-            INNER JOIN "Clickup".cup_contratos ct ON c.task_id = ct.id_task
-            WHERE ct.status IN ('ativo', 'onboarding', 'triagem')
-              AND (ct.data_inicio IS NULL OR ct.data_inicio::date < date_trunc('month', CURRENT_DATE))
-          )
+        // Valor de referência de dezembro 2025 = R$ 1.030.000
+        const MRR_DEZEMBRO_2025_FALLBACK = 1030000;
+        
+        // Calcular último dia do mês anterior
+        const now = new Date();
+        const lastDayPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        const lastDayPrevMonthStr = lastDayPrevMonth.toISOString().split('T')[0];
+        
+        // Buscar MRR do histórico (último snapshot disponível até o último dia do mês anterior)
+        const historicMrrQuery = await db.execute(sql`
           SELECT 
-            (SELECT total FROM mrr_atual) as mrr_atual,
-            (SELECT total FROM mrr_mes_passado) as mrr_anterior,
-            (SELECT total FROM clientes_atual) as clientes_atual,
-            (SELECT total FROM clientes_mes_passado) as clientes_anterior
+            DATE(data_snapshot) as snapshot_date,
+            COALESCE(SUM(valorr), 0) as mrr_total,
+            COUNT(DISTINCT id_task) as clientes_total
+          FROM "Clickup".cup_data_hist
+          WHERE DATE(data_snapshot) <= ${lastDayPrevMonthStr}::date
+            AND status IN ('ativo', 'onboarding', 'triagem')
+          GROUP BY DATE(data_snapshot)
+          ORDER BY DATE(data_snapshot) DESC
+          LIMIT 1
         `);
         
-        if (variacaoQuery.rows.length > 0) {
-          const row = variacaoQuery.rows[0] as any;
-          const mrrAtual = parseFloat(row.mrr_atual || '0');
-          const mrrAnterior = parseFloat(row.mrr_anterior || '0');
-          const clientesAtual = parseInt(row.clientes_atual || '0');
-          const clientesAnterior = parseInt(row.clientes_anterior || '0');
-          
-          // Calcular variação MRR
-          if (mrrAnterior > 0) {
-            mrrVariacao = ((mrrAtual - mrrAnterior) / mrrAnterior) * 100;
-          }
-          
-          // Calcular variação Ticket Médio
-          const ticketAtual = clientesAtual > 0 ? mrrAtual / clientesAtual : 0;
-          const ticketAnterior = clientesAnterior > 0 ? mrrAnterior / clientesAnterior : 0;
-          
-          if (ticketAnterior > 0) {
-            ticketMedioVariacao = ((ticketAtual - ticketAnterior) / ticketAnterior) * 100;
-          }
+        let mrrAnterior = MRR_DEZEMBRO_2025_FALLBACK;
+        let clientesAnterior = 0;
+        
+        if (historicMrrQuery.rows.length > 0) {
+          const histRow = historicMrrQuery.rows[0] as any;
+          mrrAnterior = parseFloat(histRow.mrr_total || '0') || MRR_DEZEMBRO_2025_FALLBACK;
+          clientesAnterior = parseInt(histRow.clientes_total || '0');
         }
+        
+        // Calcular variação MRR usando histórico
+        const mrrAtual = empresaMrrTotal;
+        const clientesAtual = empresaClientesAtivos;
+        
+        if (mrrAnterior > 0) {
+          mrrVariacao = ((mrrAtual - mrrAnterior) / mrrAnterior) * 100;
+        }
+        
+        // Calcular variação Ticket Médio
+        const ticketAtual = clientesAtual > 0 ? mrrAtual / clientesAtual : 0;
+        const ticketAnterior = clientesAnterior > 0 ? mrrAnterior / clientesAnterior : 0;
+        
+        if (ticketAnterior > 0) {
+          ticketMedioVariacao = ((ticketAtual - ticketAnterior) / ticketAnterior) * 100;
+        }
+        
+        console.log(`[home-overview] MRR variação: ${mrrVariacao.toFixed(2)}% (atual: ${mrrAtual}, anterior: ${mrrAnterior})`);
       } catch (e) {
         // Ignorar erro de cálculo de variação
         console.error("Error calculating MRR variation:", e);
