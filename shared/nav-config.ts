@@ -330,7 +330,6 @@ export const NAV_CONFIG = {
         { title: 'Fluxo de Caixa', url: '/dashboard/fluxo-caixa', icon: 'Wallet', permissionKey: PERMISSION_KEYS.FIN.FLUXO_CAIXA },
         { title: 'Revenue Goals', url: '/dashboard/revenue-goals', icon: 'Target', permissionKey: PERMISSION_KEYS.FIN.REVENUE_GOALS },
         { title: 'Inadimplência', url: '/dashboard/inadimplencia', icon: 'AlertTriangle', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
-        { title: 'Auditoria de Sistemas', url: '/dashboard/auditoria-sistemas', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.FIN.AUDITORIA },
         { title: 'Contribuição por Squad', url: '/dashboard/contribuicao-operador', icon: 'Users2', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR },
         { title: 'Margem por Cliente', url: '/dashboard/margem-cliente', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.FIN.MARGEM_CLIENTE },
       ],
