@@ -425,12 +425,6 @@ function AniversariantesWidget({ aniversariantes }: { aniversariantes: Aniversar
               {aniversariantes.length}
             </Badge>
           </CardTitle>
-          <Link href="/dashboard/geg">
-            <Button variant="ghost" size="sm" data-testid="button-ver-aniversariantes">
-              Ver todos
-              <ExternalLink className="w-3 h-3 ml-1" />
-            </Button>
-          </Link>
         </div>
       </CardHeader>
       <CardContent className="space-y-2 flex-1 overflow-auto">
