@@ -8816,10 +8816,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         GROUP BY COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad')
       `);
       
-      // Buscar despesas por squad (colaboradores)
-      const despesasResult = await db.execute(sql`
+      // Buscar despesas por squad (salários + benefícios + CXCS + freelancers)
+      // 1. Salários e contagem de colaboradores por squad
+      const salariosPorSquadResult = await db.execute(sql`
         WITH salarios_normalizados AS (
           SELECT 
+            rp.id,
             COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
             LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
             CASE
@@ -8848,7 +8850,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
         SELECT 
           squad,
-          SUM(COALESCE(salario, 0)) as despesa
+          SUM(COALESCE(salario, 0)) as total_salarios,
+          COUNT(DISTINCT id) as qtd_colaboradores
         FROM salarios_normalizados
         WHERE status_norm = 'ativo'
           AND salario IS NOT NULL
@@ -8856,18 +8859,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
         GROUP BY squad
       `);
       
-      // Mesclar receitas e despesas
+      // 2. Média CXCS (será rateada por squad)
+      const cxcsResult = await db.execute(sql`
+        SELECT AVG(
+          CASE
+            WHEN salario IS NULL OR TRIM(salario::text) = '' THEN NULL
+            WHEN salario::text LIKE '%,%' THEN
+              NULLIF(REPLACE(REGEXP_REPLACE(salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
+            WHEN salario::text ~ '\\.[0-9]{1,2}$' THEN
+              NULLIF(REGEXP_REPLACE(salario::text, '[^0-9.]', '', 'g'), '')::numeric
+            ELSE
+              NULLIF(REGEXP_REPLACE(salario::text, '[^0-9]', '', 'g'), '')::numeric
+          END
+        ) as media_cxcs
+        FROM "Inhire".rh_pessoal
+        WHERE UPPER(TRIM(cargo)) = 'CXCS'
+          AND UPPER(TRIM(status)) = 'ATIVO'
+          AND salario IS NOT NULL
+      `);
+      const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
+      const totalSquadsAtivos = (salariosPorSquadResult.rows as any[]).filter(r => r.squad !== 'Sem Squad').length || 1;
+      const cxcsPorSquad = mediaCxcs / totalSquadsAtivos;
+      
+      // 3. Freelancers por squad no período
+      const freelasPorSquadResult = await db.execute(sql`
+        SELECT 
+          COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
+          SUM(COALESCE(
+            f.valor_projeto::numeric,
+            NULLIF(
+              REPLACE(
+                REPLACE(
+                  REGEXP_REPLACE(f.custom_fields->>'Valor', '[^0-9,.]', '', 'g'),
+                  '.', ''
+                ),
+                ',', '.'
+              ),
+              ''
+            )::numeric,
+            0
+          )) as total_freelancers
+        FROM "Clickup".cup_freelas f
+        LEFT JOIN "Inhire".rh_pessoal rp ON (
+          LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
+          OR LOWER(TRIM(f.responsavel)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2))
+          OR LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(f.responsavel)) || '%'
+          OR (
+            LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
+            AND LOWER(TRIM(rp.nome)) LIKE '%' || LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)) || '%'
+          )
+        )
+        WHERE f.data_pagamento >= ${dataInicio}::date
+          AND f.data_pagamento <= ${dataFimComHora}::timestamp
+        GROUP BY COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad')
+      `);
+      
+      // Consolidar despesas e receitas por squad
       const receitasMap = new Map<string, number>();
       const despesasMap = new Map<string, number>();
       const allSquads = new Set<string>();
+      const BENEFICIO_POR_COLABORADOR = 400;
       
-      for (const row of receitasResult.rows as any[]) {
-        receitasMap.set(row.squad, parseFloat(row.receita) || 0);
-        allSquads.add(row.squad);
+      for (const row of salariosPorSquadResult.rows as any[]) {
+        const squad = row.squad;
+        const salarios = parseFloat(row.total_salarios) || 0;
+        const qtdColabs = parseInt(row.qtd_colaboradores) || 0;
+        const beneficios = qtdColabs * BENEFICIO_POR_COLABORADOR;
+        const cxcs = squad !== 'Sem Squad' ? cxcsPorSquad : 0;
+        
+        despesasMap.set(squad, salarios + beneficios + cxcs);
+        allSquads.add(squad);
       }
       
-      for (const row of despesasResult.rows as any[]) {
-        despesasMap.set(row.squad, parseFloat(row.despesa) || 0);
+      // Adicionar freelancers às despesas
+      for (const row of freelasPorSquadResult.rows as any[]) {
+        const squad = row.squad;
+        const freelancers = parseFloat(row.total_freelancers) || 0;
+        const existing = despesasMap.get(squad) || 0;
+        despesasMap.set(squad, existing + freelancers);
+        allSquads.add(squad);
+      }
+      
+      // Adicionar receitas
+      for (const row of receitasResult.rows as any[]) {
+        receitasMap.set(row.squad, parseFloat(row.receita) || 0);
         allSquads.add(row.squad);
       }
       
