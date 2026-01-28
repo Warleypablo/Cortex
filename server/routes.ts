@@ -8763,6 +8763,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint de ranking de contribuição por squad (receitas - despesas - impostos)
+  app.get("/api/contribuicao-squad/ranking", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string;
+      const dataFim = req.query.dataFim as string;
+      
+      if (!dataInicio || !dataFim) {
+        return res.status(400).json({ error: "Parâmetros dataInicio e dataFim são obrigatórios" });
+      }
+      
+      const dataFimComHora = `${dataFim} 23:59:59`;
+      
+      // Buscar receitas por squad
+      const receitasResult = await db.execute(sql`
+        WITH cnpj_normalizado AS (
+          SELECT 
+            ids,
+            nome,
+            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+          FROM "Conta Azul".caz_clientes
+          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+        ),
+        cup_cnpj_normalizado AS (
+          SELECT 
+            task_id,
+            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
+          FROM "Clickup".cup_clientes
+          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+        ),
+        contrato_unico AS (
+          SELECT DISTINCT ON (cc.cnpj_limpo)
+            cc.cnpj_limpo,
+            ct.squad,
+            ct.id_subtask
+          FROM cup_cnpj_normalizado cc
+          INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
+          WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
+          ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
+        )
+        SELECT 
+          COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
+          SUM(p.valor_pago::numeric) as receita
+        FROM "Conta Azul".caz_parcelas p
+        LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
+        WHERE p.status = 'QUITADO'
+          AND p.tipo_evento = 'RECEITA'
+          AND p.data_quitacao >= ${dataInicio}::date
+          AND p.data_quitacao <= ${dataFimComHora}::timestamp
+          AND p.valor_pago::numeric > 0
+        GROUP BY COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad')
+      `);
+      
+      // Buscar despesas por squad (colaboradores)
+      const despesasResult = await db.execute(sql`
+        SELECT 
+          COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') as squad,
+          SUM(
+            COALESCE(c.salario::numeric, 0) + 
+            COALESCE(c.cxcs::numeric, 0) + 
+            COALESCE(c.freelancer::numeric, 0) + 
+            COALESCE(c.beneficios::numeric, 0)
+          ) as despesa
+        FROM "Inhire".rh_colaboradores c
+        WHERE c.status = 'Ativo'
+          AND c.squad IS NOT NULL AND TRIM(c.squad) != ''
+        GROUP BY COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad')
+      `);
+      
+      // Mesclar receitas e despesas
+      const receitasMap = new Map<string, number>();
+      const despesasMap = new Map<string, number>();
+      const allSquads = new Set<string>();
+      
+      for (const row of receitasResult.rows as any[]) {
+        receitasMap.set(row.squad, parseFloat(row.receita) || 0);
+        allSquads.add(row.squad);
+      }
+      
+      for (const row of despesasResult.rows as any[]) {
+        despesasMap.set(row.squad, parseFloat(row.despesa) || 0);
+        allSquads.add(row.squad);
+      }
+      
+      const ranking = Array.from(allSquads).map(squad => {
+        const receita = receitasMap.get(squad) || 0;
+        const despesa = despesasMap.get(squad) || 0;
+        const resultadoBruto = receita - despesa;
+        const impostos = resultadoBruto * 0.18; // 18% sobre resultado bruto
+        const contribuicao = resultadoBruto - impostos;
+        const margem = receita > 0 ? (contribuicao / receita) * 100 : 0;
+        
+        return {
+          squad,
+          receita,
+          despesa,
+          resultadoBruto,
+          impostos,
+          contribuicao,
+          margem
+        };
+      })
+      .filter(s => s.receita > 0 || s.despesa > 0) // Filtrar squads sem dados
+      .sort((a, b) => b.contribuicao - a.contribuicao); // Ordenar por contribuição (maior primeiro)
+      
+      const totais = ranking.reduce((acc, s) => ({
+        receita: acc.receita + s.receita,
+        despesa: acc.despesa + s.despesa,
+        resultadoBruto: acc.resultadoBruto + s.resultadoBruto,
+        impostos: acc.impostos + s.impostos,
+        contribuicao: acc.contribuicao + s.contribuicao
+      }), { receita: 0, despesa: 0, resultadoBruto: 0, impostos: 0, contribuicao: 0 });
+      
+      res.json({ ranking, totais });
+    } catch (error) {
+      console.error("[api] Error fetching ranking contribuição:", error);
+      res.status(500).json({ error: "Falha ao buscar ranking de contribuição" });
+    }
+  });
+
   // ========================================
   // GPTURBO CHAT API ENDPOINT (powered by OpenAI)
   // ========================================
