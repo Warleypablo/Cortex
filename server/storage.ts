@@ -4002,6 +4002,8 @@ export class DbStorage implements IStorage {
     const CHURN_AJUSTE_ARTIFICIAL = 9878;
     const churn = churnBase + CHURN_AJUSTE_ARTIFICIAL;
     
+    console.log(`[visao-geral] Churn: base=${churnBase}, ajuste=${CHURN_AJUSTE_ARTIFICIAL}, total=${churn}`);
+    
     // Calcular churn rate: (valor churn / MRR mês anterior) * 100
     const churnRate = mrrMesAnterior > 0 ? (churn / mrrMesAnterior) * 100 : 0;
 
