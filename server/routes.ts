@@ -8818,18 +8818,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar despesas por squad (colaboradores)
       const despesasResult = await db.execute(sql`
+        WITH salarios_normalizados AS (
+          SELECT 
+            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
+            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
+            CASE
+              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
+              WHEN rp.salario::text LIKE '%,%' THEN
+                NULLIF(
+                  REPLACE(
+                    REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'),
+                    ',',
+                    '.'
+                  ),
+                  ''
+                )::numeric
+              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
+                NULLIF(
+                  REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'),
+                  ''
+                )::numeric
+              ELSE
+                NULLIF(
+                  REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'),
+                  ''
+                )::numeric
+            END as salario
+          FROM "Inhire".rh_pessoal rp
+        )
         SELECT 
-          COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') as squad,
-          SUM(
-            COALESCE(c.salario::numeric, 0) + 
-            COALESCE(c.cxcs::numeric, 0) + 
-            COALESCE(c.freelancer::numeric, 0) + 
-            COALESCE(c.beneficios::numeric, 0)
-          ) as despesa
-        FROM "Inhire".rh_colaboradores c
-        WHERE c.status = 'Ativo'
-          AND c.squad IS NOT NULL AND TRIM(c.squad) != ''
-        GROUP BY COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad')
+          squad,
+          SUM(COALESCE(salario, 0)) as despesa
+        FROM salarios_normalizados
+        WHERE status_norm = 'ativo'
+          AND salario IS NOT NULL
+          AND salario > 0
+        GROUP BY squad
       `);
       
       // Mesclar receitas e despesas
