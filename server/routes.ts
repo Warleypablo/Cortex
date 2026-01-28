@@ -8908,8 +8908,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND salario IS NOT NULL
       `);
       const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
-      const totalSquadsAtivos = (salariosPorSquadResult.rows as any[]).filter(r => r.squad !== 'Sem Squad').length || 1;
-      const cxcsPorSquad = mediaCxcs / totalSquadsAtivos;
+      // Cada squad recebe a média CXCS completa (consistente com DFC)
+      const cxcsPorSquad = mediaCxcs;
       
       // 3. Freelancers por squad no período
       const freelasPorSquadResult = await db.execute(sql`
@@ -9005,7 +9005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const ranking = Array.from(consolidatedMap.values()).map(({ displayName, receita, despesa }) => {
         const resultadoBruto = receita - despesa;
-        const impostos = resultadoBruto * 0.18; // 18% sobre resultado bruto
+        const impostos = receita * 0.18; // 18% sobre receita (consistente com DFC)
         const contribuicao = resultadoBruto - impostos;
         const margem = receita > 0 ? (contribuicao / receita) * 100 : 0;
         
