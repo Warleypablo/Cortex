@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { ChevronRight, ChevronDown, DollarSign, Users, TrendingUp, CirclePlus, CircleMinus, FileText } from "lucide-react";
+import { ChevronRight, ChevronDown, DollarSign, Users, TrendingUp, CirclePlus, CircleMinus, FileText, Trophy } from "lucide-react";
 import { format, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -38,6 +38,27 @@ interface MonthlyData {
   mes: string;
   mesLabel: string;
   data: ContribuicaoSquadData | null;
+}
+
+interface RankingSquadItem {
+  squad: string;
+  receita: number;
+  despesa: number;
+  resultadoBruto: number;
+  impostos: number;
+  contribuicao: number;
+  margem: number;
+}
+
+interface RankingData {
+  ranking: RankingSquadItem[];
+  totais: {
+    receita: number;
+    despesa: number;
+    resultadoBruto: number;
+    impostos: number;
+    contribuicao: number;
+  };
 }
 
 export default function ContribuicaoOperador() {
@@ -84,6 +105,22 @@ export default function ContribuicaoOperador() {
   const handleSquadChange = (value: string) => {
     setSquadSelecionado(value);
   };
+
+  // Query para ranking de todos os squads (exibido quando "todos" está selecionado)
+  const { data: rankingData, isLoading: loadingRanking } = useQuery<RankingData>({
+    queryKey: ["/api/contribuicao-squad/ranking", anoSelecionado],
+    queryFn: async () => {
+      const dataInicio = `${anoSelecionado}-01-01`;
+      const dataFim = `${anoSelecionado}-12-31`;
+      const params = new URLSearchParams({ dataInicio, dataFim });
+      const response = await fetch(`/api/contribuicao-squad/ranking?${params.toString()}`, {
+        credentials: "include"
+      });
+      if (!response.ok) throw new Error("Falha ao buscar ranking");
+      return response.json();
+    },
+    enabled: squadSelecionado === "todos",
+  });
 
   const { data: monthlyResults, isLoading } = useQuery<MonthlyData[]>({
     queryKey: ["/api/contribuicao-squad/dfc/monthly", anoSelecionado, squadSelecionado],
@@ -426,6 +463,119 @@ export default function ContribuicaoOperador() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tabela de Ranking - exibida apenas quando "todos" está selecionado */}
+      {squadSelecionado === "todos" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-amber-500" />
+              Ranking de Contribuição por Squad
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingRanking ? (
+              <div className="space-y-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : rankingData?.ranking && rankingData.ranking.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="p-3 text-left font-semibold">#</th>
+                      <th className="p-3 text-left font-semibold">Squad</th>
+                      <th className="p-3 text-right font-semibold">Receita</th>
+                      <th className="p-3 text-right font-semibold">Despesa</th>
+                      <th className="p-3 text-right font-semibold">Resultado Bruto</th>
+                      <th className="p-3 text-right font-semibold">Impostos (18%)</th>
+                      <th className="p-3 text-right font-semibold">Contribuição</th>
+                      <th className="p-3 text-right font-semibold">Margem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankingData.ranking.map((squad, index) => (
+                      <tr 
+                        key={squad.squad} 
+                        className={cn(
+                          "border-b border-border/50 hover-elevate cursor-pointer",
+                          index === 0 && "bg-amber-500/10",
+                          index === 1 && "bg-zinc-400/10",
+                          index === 2 && "bg-orange-400/10"
+                        )}
+                        onClick={() => setSquadSelecionado(squad.squad)}
+                        data-testid={`row-ranking-${index}`}
+                      >
+                        <td className="p-3 font-bold">
+                          {index === 0 && <span className="text-amber-500">🥇</span>}
+                          {index === 1 && <span className="text-zinc-400">🥈</span>}
+                          {index === 2 && <span className="text-orange-400">🥉</span>}
+                          {index > 2 && (index + 1)}
+                        </td>
+                        <td className="p-3 font-medium">{squad.squad}</td>
+                        <td className="p-3 text-right text-emerald-500 font-medium">
+                          {formatCurrencyNoDecimals(squad.receita)}
+                        </td>
+                        <td className="p-3 text-right text-red-500 font-medium">
+                          {formatCurrencyNoDecimals(squad.despesa)}
+                        </td>
+                        <td className="p-3 text-right font-medium">
+                          {formatCurrencyNoDecimals(squad.resultadoBruto)}
+                        </td>
+                        <td className="p-3 text-right text-orange-500 font-medium">
+                          {formatCurrencyNoDecimals(squad.impostos)}
+                        </td>
+                        <td className={cn(
+                          "p-3 text-right font-bold",
+                          squad.contribuicao >= 0 ? "text-emerald-500" : "text-red-500"
+                        )}>
+                          {formatCurrencyNoDecimals(squad.contribuicao)}
+                        </td>
+                        <td className={cn(
+                          "p-3 text-right font-medium",
+                          squad.margem >= 20 ? "text-emerald-500" : squad.margem >= 0 ? "text-amber-500" : "text-red-500"
+                        )}>
+                          {formatPercent(squad.margem)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-border bg-muted/50 font-bold">
+                      <td className="p-3" colSpan={2}>Total</td>
+                      <td className="p-3 text-right text-emerald-500">
+                        {formatCurrencyNoDecimals(rankingData.totais.receita)}
+                      </td>
+                      <td className="p-3 text-right text-red-500">
+                        {formatCurrencyNoDecimals(rankingData.totais.despesa)}
+                      </td>
+                      <td className="p-3 text-right">
+                        {formatCurrencyNoDecimals(rankingData.totais.resultadoBruto)}
+                      </td>
+                      <td className="p-3 text-right text-orange-500">
+                        {formatCurrencyNoDecimals(rankingData.totais.impostos)}
+                      </td>
+                      <td className={cn(
+                        "p-3 text-right",
+                        rankingData.totais.contribuicao >= 0 ? "text-emerald-500" : "text-red-500"
+                      )}>
+                        {formatCurrencyNoDecimals(rankingData.totais.contribuicao)}
+                      </td>
+                      <td className="p-3 text-right">-</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-center py-8">
+                Nenhum dado disponível para o período selecionado
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
