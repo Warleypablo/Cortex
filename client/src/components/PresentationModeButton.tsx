@@ -31,7 +31,6 @@ const DASHBOARD_CATEGORIES: DashboardCategory[] = [
     icon: BarChart3,
     dashboards: [
       { id: "visao-geral", label: "Visão Geral", description: "MRR, clientes ativos e métricas gerais" },
-      { id: "retencao", label: "Análise de Retenção", description: "Churn por serviço e responsável" },
     ],
   },
   {
