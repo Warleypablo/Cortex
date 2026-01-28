@@ -99,6 +99,13 @@ interface RetentionPoint {
   churnedCount: number;
 }
 
+interface ChurnPorMotivo {
+  motivo: string;
+  mrr_perdido: number;
+  quantidade: number;
+  percentual: number;
+}
+
 interface ChurnDetalhamentoData {
   contratos: ChurnContract[];
   metricas: {
@@ -111,6 +118,7 @@ interface ChurnDetalhamentoData {
     mrr_ativo_ref?: number;
     churn_percentual?: number;
     churn_por_squad?: ChurnPorSquad[];
+    churn_por_motivo?: ChurnPorMotivo[];
     periodo_referencia?: string;
   };
   filtros: {
@@ -1067,6 +1075,65 @@ export default function ChurnDetalhamento() {
           </>
         )}
       </div>
+
+      {/* MRR Perdido por Motivo de Cancelamento */}
+      {data?.metricas?.churn_por_motivo && data.metricas.churn_por_motivo.length > 0 && (
+        <Card className="border-border/50" data-testid="card-mrr-por-motivo">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-rose-500 to-pink-600 shadow-lg">
+                <AlertTriangle className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base" data-testid="title-mrr-por-motivo">MRR Perdido por Motivo de Cancelamento</CardTitle>
+                <p className="text-xs text-muted-foreground">Análise dos principais motivos de churn</p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {data.metricas.churn_por_motivo.slice(0, 10).map((item, index) => {
+                const maxMrr = data.metricas.churn_por_motivo?.[0]?.mrr_perdido || 1;
+                const barWidth = (item.mrr_perdido / maxMrr) * 100;
+                
+                return (
+                  <div key={item.motivo} className="group" data-testid={`motivo-ranking-${index}`}>
+                    <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          index < 3 
+                            ? 'bg-rose-500 text-white' 
+                            : 'bg-gray-100 dark:bg-zinc-800 text-muted-foreground'
+                        }`}>
+                          <span className="text-[10px] font-bold">{index + 1}</span>
+                        </div>
+                        <span className="text-sm font-medium truncate" data-testid={`text-motivo-${index}`}>{item.motivo}</span>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <Badge variant="outline" className="text-xs" data-testid={`badge-qtd-motivo-${index}`}>
+                          {item.quantidade} {item.quantidade === 1 ? 'contrato' : 'contratos'}
+                        </Badge>
+                        <span className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums" data-testid={`text-mrr-motivo-${index}`}>
+                          {formatCurrencyNoDecimals(item.mrr_perdido)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="ml-8 h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden" data-testid={`bar-motivo-${index}`}>
+                      <div 
+                        className="h-full rounded-full bg-gradient-to-r from-rose-500 to-pink-500 transition-all duration-500"
+                        style={{ width: `${barWidth}%` }}
+                      />
+                    </div>
+                    <div className="ml-8 mt-0.5 text-[10px] text-muted-foreground" data-testid={`text-percent-motivo-${index}`}>
+                      {item.percentual.toFixed(1)}% do total perdido
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TechChartCard

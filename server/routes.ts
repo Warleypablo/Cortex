@@ -7997,6 +7997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           NULL::timestamp as data_pausa,
           c.status,
           c.servico,
+          c.motivo_cancelamento,
           'churn' as tipo,
           CASE 
             WHEN c.data_inicio IS NOT NULL AND c.data_solicitacao_encerramento IS NOT NULL 
@@ -8042,6 +8043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data_pausa: null,
           status: row.status || 'encerrado',
           servico: row.servico || 'Não especificado',
+          motivo_cancelamento: row.motivo_cancelamento || 'Não especificado',
           tipo: 'churn',
           lifetime_meses: Number(row.lifetime_meses) || 0,
           ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
@@ -8220,6 +8222,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Calcular MRR perdido por motivo de cancelamento
+      const mrrPorMotivo: Record<string, { mrr: number; count: number }> = {};
+      for (const contrato of churnContratos) {
+        const motivo = (contrato as any).motivo_cancelamento || 'Não especificado';
+        if (!mrrPorMotivo[motivo]) {
+          mrrPorMotivo[motivo] = { mrr: 0, count: 0 };
+        }
+        mrrPorMotivo[motivo].mrr += contrato.valorr;
+        mrrPorMotivo[motivo].count += 1;
+      }
+      
+      // Converter para array e ordenar por MRR perdido
+      const churnPorMotivo = Object.entries(mrrPorMotivo)
+        .map(([motivo, data]) => ({
+          motivo,
+          mrr_perdido: data.mrr,
+          quantidade: data.count,
+          percentual: mrrPerdidoChurn > 0 ? (data.mrr / mrrPerdidoChurn) * 100 : 0,
+        }))
+        .sort((a, b) => b.mrr_perdido - a.mrr_perdido);
+      
       res.json({
         contratos: allContratos,
         metricas: {
@@ -8232,6 +8255,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           mrr_ativo_ref: mrrAtivoTotal,
           churn_percentual: churnPercentualGeral,
           churn_por_squad: churnPercentualPorSquad,
+          churn_por_motivo: churnPorMotivo,
           periodo_referencia: refDateStr,
         },
         filtros: {
