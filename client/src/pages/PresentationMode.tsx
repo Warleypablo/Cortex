@@ -185,9 +185,9 @@ interface MetaOverview {
   conversionRate: number;
 }
 
-type DashboardView = 'closers' | 'sdrs' | 'visao-geral' | 'retencao' | 'financeiro-resumo' | 'fluxo-caixa' | 'growth-visao-geral';
+type DashboardView = 'closers' | 'sdrs' | 'visao-geral' | 'financeiro-resumo' | 'fluxo-caixa' | 'growth-visao-geral';
 
-const ALL_DASHBOARD_VIEWS: DashboardView[] = ['closers', 'sdrs', 'visao-geral', 'retencao', 'financeiro-resumo', 'fluxo-caixa', 'growth-visao-geral'];
+const ALL_DASHBOARD_VIEWS: DashboardView[] = ['closers', 'sdrs', 'visao-geral', 'financeiro-resumo', 'fluxo-caixa', 'growth-visao-geral'];
 
 interface PresentationConfig {
   dashboards: string[];
@@ -604,7 +604,6 @@ export default function PresentationMode() {
       case 'closers': return 'Dashboard Closers';
       case 'sdrs': return 'Dashboard SDRs';
       case 'visao-geral': return 'Visão Geral';
-      case 'retencao': return 'Análise de Retenção';
       case 'financeiro-resumo': return 'Resumo Financeiro';
       case 'fluxo-caixa': return 'Fluxo de Caixa';
       case 'growth-visao-geral': return 'Growth Overview';
@@ -2044,175 +2043,6 @@ export default function PresentationMode() {
                     </motion.div>
                   </>
                 )}
-              </div>
-            </motion.div>
-          )}
-
-          {currentView === 'retencao' && (
-            <motion.div
-              key="retencao"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className="h-full flex flex-col gap-4"
-            >
-              <div className="flex-1 grid grid-cols-2 gap-4 lg:gap-6">
-                {/* Churn por Serviço - Left Column */}
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2 }}
-                  className="rounded-2xl bg-slate-900/70 border border-slate-700/50 p-5 flex flex-col"
-                  data-testid="card-churn-por-servico"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-2 rounded-lg bg-rose-500/30">
-                      <BarChart3 className="w-5 h-5 text-rose-400" />
-                    </div>
-                    <h2 className="text-xl font-bold text-white">Churn por Serviço</h2>
-                    <Badge className="bg-rose-500/20 text-rose-400 text-xs ml-auto">Top Serviços</Badge>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto space-y-3">
-                    {isLoadingChurnServico ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <Skeleton className="h-10 flex-1 bg-slate-800 rounded-lg" />
-                        </div>
-                      ))
-                    ) : churnPorServico && churnPorServico.length > 0 ? (
-                      [...churnPorServico]
-                        .sort((a, b) => b.valorTotal - a.valorTotal)
-                        .slice(0, 8)
-                        .map((item, index) => {
-                          const maxValue = Math.max(...churnPorServico.map(s => s.valorTotal));
-                          const widthPercent = maxValue > 0 ? (item.valorTotal / maxValue) * 100 : 0;
-                          
-                          return (
-                            <motion.div
-                              key={item.servico}
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.1 * index }}
-                              className="relative"
-                            >
-                              <div className="absolute inset-0 bg-rose-500/10 rounded-lg" />
-                              <motion.div
-                                className="absolute inset-y-0 left-0 bg-gradient-to-r from-rose-600/40 to-rose-500/20 rounded-lg"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${widthPercent}%` }}
-                                transition={{ delay: 0.3 + (0.1 * index), duration: 0.6 }}
-                              />
-                              <div className="relative flex items-center justify-between p-3">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <span className="text-slate-400 font-mono text-xs w-5">{index + 1}.</span>
-                                  <span className="text-white font-medium text-sm truncate">{item.servico}</span>
-                                </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <span className="text-rose-400 font-bold text-lg">
-                                    {formatCurrencyCompact(item.valorTotal)}
-                                  </span>
-                                  <Badge className="bg-slate-700/50 text-slate-300 text-xs">
-                                    {item.quantidade} contratos
-                                  </Badge>
-                                </div>
-                              </div>
-                            </motion.div>
-                          );
-                        })
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-slate-400">
-                        Nenhum dado de churn disponível
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-
-                {/* Churn por Responsável - Right Column */}
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="rounded-2xl bg-slate-900/70 border border-slate-700/50 p-5 flex flex-col"
-                  data-testid="card-churn-por-responsavel"
-                >
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="p-2 rounded-lg bg-amber-500/30">
-                      <Users className="w-5 h-5 text-amber-400" />
-                    </div>
-                    <h2 className="text-xl font-bold text-white">Churn por Responsável</h2>
-                    <Badge className="bg-amber-500/20 text-amber-400 text-xs ml-auto">Análise</Badge>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto space-y-3">
-                    {isLoadingChurnResponsavel ? (
-                      Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <Skeleton className="h-10 flex-1 bg-slate-800 rounded-lg" />
-                        </div>
-                      ))
-                    ) : churnPorResponsavel && churnPorResponsavel.length > 0 ? (
-                      [...churnPorResponsavel]
-                        .sort((a, b) => b.valorTotal - a.valorTotal)
-                        .slice(0, 8)
-                        .map((item, index) => {
-                          const maxValue = Math.max(...churnPorResponsavel.map(r => r.valorTotal));
-                          const widthPercent = maxValue > 0 ? (item.valorTotal / maxValue) * 100 : 0;
-                          
-                          return (
-                            <motion.div
-                              key={item.responsavel}
-                              initial={{ opacity: 0, x: 20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.1 * index }}
-                              className="relative"
-                            >
-                              <div className="absolute inset-0 bg-amber-500/10 rounded-lg" />
-                              <motion.div
-                                className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-600/40 to-amber-500/20 rounded-lg"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${widthPercent}%` }}
-                                transition={{ delay: 0.3 + (0.1 * index), duration: 0.6 }}
-                              />
-                              <div className="relative flex items-center justify-between p-3">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                                    index === 0 ? 'bg-rose-500/30' :
-                                    index === 1 ? 'bg-orange-500/30' :
-                                    index === 2 ? 'bg-amber-500/30' :
-                                    'bg-slate-700/50'
-                                  }`}>
-                                    <span className="text-xs font-bold text-white">{index + 1}</span>
-                                  </div>
-                                  <span className="text-white font-medium text-sm truncate">{item.responsavel}</span>
-                                </div>
-                                <div className="flex items-center gap-3 shrink-0">
-                                  <span className="text-amber-400 font-bold text-lg">
-                                    {formatCurrencyCompact(item.valorTotal)}
-                                  </span>
-                                  <div className="text-right">
-                                    <div className="text-slate-400 text-xs">{item.quantidadeContratos} contratos</div>
-                                    <div className={`text-xs font-semibold ${
-                                      item.percentualChurn > 10 ? 'text-rose-400' :
-                                      item.percentualChurn > 5 ? 'text-amber-400' :
-                                      'text-emerald-400'
-                                    }`}>
-                                      {formatPercent(item.percentualChurn)} churn
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </motion.div>
-                          );
-                        })
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-slate-400">
-                        Nenhum dado de churn disponível
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
               </div>
             </motion.div>
           )}

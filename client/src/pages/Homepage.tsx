@@ -903,9 +903,9 @@ function DashboardAdmin() {
             icon={<Receipt className="w-5 h-5" />}
           />
           <QuickLinkCard
-            title="Retenção"
-            description="Análise de cohort e churn"
-            href="/dashboard/retencao"
+            title="Churn"
+            description="Detalhamento de churns"
+            href="/dashboard/churn-detalhamento"
             icon={<Users className="w-5 h-5" />}
           />
           <QuickLinkCard
@@ -1230,7 +1230,7 @@ function DashboardOperacao() {
             value={formatCurrency(visaoGeralData?.churn || 0)}
             subtitle="Cancelamentos no mês"
             icon={<TrendingDown className="w-4 h-4" />}
-            href="/dashboard/retencao"
+            href="/dashboard/churn-detalhamento"
           />
           <MetricCard
             title="Pausados"
@@ -1276,9 +1276,9 @@ function DashboardOperacao() {
             icon={<Building2 className="w-5 h-5" />}
           />
           <QuickLinkCard
-            title="Análise de Retenção"
-            description="Cohort e churn"
-            href="/dashboard/retencao"
+            title="Churn Detalhamento"
+            description="Análise de churns"
+            href="/dashboard/churn-detalhamento"
             icon={<ShieldCheck className="w-5 h-5" />}
           />
           <QuickLinkCard

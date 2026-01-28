@@ -91,12 +91,6 @@ const PAGE_SUGGESTIONS: Record<string, string[]> = {
     "Quantos cases ativos temos?",
     "Quais são os cases mais recentes?",
   ],
-  "/dashboard/retencao": [
-    "Qual é a taxa de retenção atual?",
-    "Quais clientes estão em risco?",
-    "Como melhorar a retenção?",
-    "Qual é o NPS médio?",
-  ],
   "/dashboard/growth": [
     "Qual é o crescimento atual?",
     "Como está o CAC?",

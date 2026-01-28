@@ -39,8 +39,6 @@ const routeNameMap: Record<string, string> = {
   "geg": "G&G",
   "inhire": "Inhire",
   "recrutamento": "Recrutamento",
-  "retencao": "Retenção",
-  "cohort": "Cohort",
   "meta-ads": "Meta Ads",
   "tech": "Tech",
   "comercial": "Comercial",
