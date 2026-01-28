@@ -969,8 +969,12 @@ export default function GrowthOrcadoRealizado() {
       </div>
 
       {/* Tabs de Métricas */}
-      <Tabs defaultValue="marketing" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid lg:grid-cols-3 gap-1 h-auto p-1">
+      <Tabs defaultValue="visao-geral" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid lg:grid-cols-4 gap-1 h-auto p-1">
+          <TabsTrigger value="visao-geral" className="flex items-center gap-2 py-2.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-500 data-[state=active]:to-red-500 data-[state=active]:text-white">
+            <LineChart className="w-4 h-4" />
+            <span className="hidden sm:inline">Visão Geral</span>
+          </TabsTrigger>
           <TabsTrigger value="marketing" className="flex items-center gap-2 py-2.5 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-cyan-500 data-[state=active]:text-white">
             <Megaphone className="w-4 h-4" />
             <span className="hidden sm:inline">Marketing</span>
@@ -984,6 +988,89 @@ export default function GrowthOrcadoRealizado() {
             <span className="hidden sm:inline">Consolidado</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="visao-geral" className="space-y-6 mt-6">
+          <Card className="overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-orange-500 to-red-500" />
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-500/20">
+                  <LineChart className="w-5 h-5 text-orange-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Todas as Métricas - Orçado x Realizado</CardTitle>
+                  <CardDescription>Visão consolidada de todas as métricas de marketing e vendas</CardDescription>
+                </div>
+                {(adsLoading || mqlLoading || naoMqlLoading) && (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-auto" />
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">Categoria</TableHead>
+                      <TableHead className="font-semibold">Métrica</TableHead>
+                      <TableHead className="text-right font-semibold">Orçado</TableHead>
+                      <TableHead className="text-right font-semibold">Realizado</TableHead>
+                      <TableHead className="text-right font-semibold">%</TableHead>
+                      <TableHead className="text-center font-semibold">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allSections.map((section) => (
+                      section.metrics.map((metric, idx) => (
+                        <TableRow 
+                          key={metric.id} 
+                          className={cn(
+                            idx === 0 && "border-t-2",
+                            metric.isHeader && "bg-muted/30 font-semibold"
+                          )}
+                        >
+                          {idx === 0 && (
+                            <TableCell 
+                              rowSpan={section.metrics.length} 
+                              className="align-top font-medium bg-muted/20 border-r"
+                            >
+                              <div className="flex items-center gap-2">
+                                {section.icon}
+                                <span className="text-sm">{section.title}</span>
+                              </div>
+                            </TableCell>
+                          )}
+                          <TableCell className={cn("text-sm", metric.indent && `pl-${metric.indent * 4}`)}>
+                            {metric.name}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {formatValue(metric.orcado, metric.format)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-medium">
+                            {formatValue(metric.realizado, metric.format)}
+                          </TableCell>
+                          <TableCell className={cn(
+                            "text-right text-sm font-semibold",
+                            metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
+                            metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
+                            metric.percentual !== null && metric.percentual < 80 && "text-red-500"
+                          )}>
+                            {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              {getTrendIcon(metric.percentual)}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="marketing" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
