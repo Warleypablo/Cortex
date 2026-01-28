@@ -844,8 +844,8 @@ function DashboardAdmin() {
           contratosAtivos={homeOverview?.contratosAtivos || 0}
         />
         <AlertasWidget alertas={homeOverview?.alertas || []} />
-        <AniversariantesWidget aniversariantes={aniversariantes || []} />
         <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
+        <AniversariantesWidget aniversariantes={aniversariantes || []} />
       </div>
 
       <div>
