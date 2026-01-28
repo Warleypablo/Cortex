@@ -486,10 +486,10 @@ export default function ChurnDetalhamento() {
     
     const prodCounts: Record<string, { count: number; mrr: number }> = {};
     filteredContratos.forEach(c => {
-      const produto = c.produto || "Não especificado";
-      if (!prodCounts[produto]) prodCounts[produto] = { count: 0, mrr: 0 };
-      prodCounts[produto].count++;
-      prodCounts[produto].mrr += c.valorr || 0;
+      const servico = c.servico || "Não especificado";
+      if (!prodCounts[servico]) prodCounts[servico] = { count: 0, mrr: 0 };
+      prodCounts[servico].count++;
+      prodCounts[servico].mrr += c.valorr || 0;
     });
     
     const total = filteredContratos.length;
@@ -1182,8 +1182,8 @@ export default function ChurnDetalhamento() {
         </TechChartCard>
 
         <TechChartCard
-          title="Distribuição por Produto"
-          subtitle="Percentual de churn por produto"
+          title="Distribuição por Serviço"
+          subtitle="Percentual de churn por serviço"
           icon={PieChart}
           iconBg="bg-gradient-to-r from-blue-500 to-indigo-500"
         >
