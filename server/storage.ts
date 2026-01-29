@@ -1744,29 +1744,29 @@ export class DbStorage implements IStorage {
         COALESCE((
           SELECT ROUND(
             EXTRACT(EPOCH FROM (
-              MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
+              MAX(COALESCE(ct.data_encerramento, NOW())) - MIN(ct.data_inicio)
             )) / 86400
           )::double precision
           FROM "Clickup".cup_contratos ct
           INNER JOIN "Clickup".cup_clientes cc2 ON ct.id_task = cc2.task_id
           WHERE (cc2.cnpj = cu.cnpj OR cc2.task_id = cu.task_id)
-          AND data_inicio IS NOT NULL
+          AND ct.data_inicio IS NOT NULL
         ), 0) as "ltDias",
         COALESCE((
-          SELECT SUM(valorr::double precision)
+          SELECT SUM(ct.valorr::double precision)
           FROM "Clickup".cup_contratos ct
           INNER JOIN "Clickup".cup_clientes cc2 ON ct.id_task = cc2.task_id
           WHERE (cc2.cnpj = cu.cnpj OR cc2.task_id = cu.task_id)
             AND LOWER(ct.status) IN ('ativo', 'onboarding', 'triagem')
-            AND valorr IS NOT NULL
+            AND ct.valorr IS NOT NULL
         ), 0) as "totalRecorrente",
         COALESCE((
-          SELECT SUM(valorp::double precision)
+          SELECT SUM(ct.valorp::double precision)
           FROM "Clickup".cup_contratos ct
           INNER JOIN "Clickup".cup_clientes cc2 ON ct.id_task = cc2.task_id
           WHERE (cc2.cnpj = cu.cnpj OR cc2.task_id = cu.task_id)
             AND LOWER(ct.status) IN ('ativo', 'onboarding', 'triagem')
-            AND valorp IS NOT NULL
+            AND ct.valorp IS NOT NULL
         ), 0) as "totalPontual",
         NULL::text as "statusFinanceiro",
         NULL::text as "tipoNegocio",
