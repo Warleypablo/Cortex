@@ -18,9 +18,6 @@ import {
   Legend,
   ResponsiveContainer,
   ComposedChart,
-  Bar,
-  BarChart,
-  Cell,
 } from "recharts";
 
 interface MrrDataPoint {
@@ -532,23 +529,22 @@ export default function EvolucaoMensal() {
             <CardContent>
               <div className="h-[380px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
+                  <AreaChart 
                     data={chartData} 
                     margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                    barCategoryGap="25%"
                   >
                     <defs>
                       {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i) => {
                         const color = getSquadColor(squad, i);
                         return (
-                          <linearGradient key={`gradient-${squad}`} id={`gradient-${squad.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={color} stopOpacity={0.9}/>
-                            <stop offset="100%" stopColor={color} stopOpacity={0.6}/>
+                          <linearGradient key={`gradient-${squad}`} id={`gradientArea-${squad.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity={0.3}/>
+                            <stop offset="100%" stopColor={color} stopOpacity={0.05}/>
                           </linearGradient>
                         );
                       })}
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" opacity={0.5} vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" opacity={0.5} />
                     <XAxis 
                       dataKey="mes" 
                       tick={{ fontSize: 11, fill: '#71717a' }}
@@ -569,17 +565,23 @@ export default function EvolucaoMensal() {
                         <span className="text-xs text-zinc-300">{value}</span>
                       )}
                     />
-                    {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i, arr) => (
-                      <Bar 
-                        key={squad}
-                        dataKey={squad}
-                        name={squad}
-                        stackId="a"
-                        fill={`url(#gradient-${squad.replace(/[^a-zA-Z0-9]/g, '')})`}
-                        radius={i === arr.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
-                      />
-                    ))}
-                  </BarChart>
+                    {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i) => {
+                      const color = getSquadColor(squad, i);
+                      return (
+                        <Area
+                          key={squad}
+                          type="monotone"
+                          dataKey={squad}
+                          name={squad}
+                          stroke={color}
+                          strokeWidth={2}
+                          fill={`url(#gradientArea-${squad.replace(/[^a-zA-Z0-9]/g, '')})`}
+                          dot={{ fill: color, strokeWidth: 0, r: 3 }}
+                          activeDot={{ r: 5, stroke: color, strokeWidth: 2, fill: "#18181b" }}
+                        />
+                      );
+                    })}
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </CardContent>
