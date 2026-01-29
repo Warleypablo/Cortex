@@ -1696,3 +1696,29 @@ export async function initializeCupDataHistTable(): Promise<void> {
     console.error('[database] Error initializing Cup Data Hist table:', error);
   }
 }
+
+export async function createPerformanceIndexes(): Promise<void> {
+  try {
+    const indexes = [
+      { name: 'idx_cup_contratos_id_task', table: '"Clickup".cup_contratos', column: 'id_task' },
+      { name: 'idx_cup_contratos_id_subtask', table: '"Clickup".cup_contratos', column: 'id_subtask' },
+      { name: 'idx_cup_contratos_status', table: '"Clickup".cup_contratos', column: 'status' },
+      { name: 'idx_cup_clientes_task_id', table: '"Clickup".cup_clientes', column: 'task_id' },
+      { name: 'idx_cup_clientes_cnpj', table: '"Clickup".cup_clientes', column: 'cnpj' },
+      { name: 'idx_caz_clientes_cnpj', table: '"Conta Azul".caz_clientes', column: 'cnpj' },
+      { name: 'idx_caz_clientes_ids', table: '"Conta Azul".caz_clientes', column: 'ids' },
+    ];
+
+    for (const idx of indexes) {
+      try {
+        await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS ${idx.name} ON ${idx.table}(${idx.column})`));
+      } catch (e) {
+        // Ignorar se índice já existe
+      }
+    }
+    
+    console.log('[database] Performance indexes created/verified');
+  } catch (error) {
+    console.error('[database] Error creating performance indexes:', error);
+  }
+}
