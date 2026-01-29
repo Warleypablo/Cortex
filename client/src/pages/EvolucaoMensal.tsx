@@ -527,62 +527,94 @@ export default function EvolucaoMensal() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-[380px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart 
-                    data={chartData} 
-                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i) => {
-                        const color = getSquadColor(squad, i);
-                        return (
-                          <linearGradient key={`gradient-${squad}`} id={`gradientArea-${squad.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={color} stopOpacity={0.3}/>
-                            <stop offset="100%" stopColor={color} stopOpacity={0.05}/>
-                          </linearGradient>
-                        );
-                      })}
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" opacity={0.5} />
-                    <XAxis 
-                      dataKey="mes" 
-                      tick={{ fontSize: 11, fill: '#71717a' }}
-                      axisLine={{ stroke: '#3f3f46' }}
-                      tickLine={false}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 11, fill: '#71717a' }}
-                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                      axisLine={false}
-                      tickLine={false}
-                      width={50}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend 
-                      wrapperStyle={{ paddingTop: '10px' }}
-                      formatter={(value) => (
-                        <span className="text-xs text-zinc-300">{value}</span>
-                      )}
-                    />
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-700/50">
+                      <th className="text-left py-3 px-4 text-zinc-400 font-medium sticky left-0 bg-zinc-900/95 backdrop-blur-sm">
+                        Squad
+                      </th>
+                      {chartData.map((row) => (
+                        <th key={row.mes} className="text-right py-3 px-4 text-zinc-400 font-medium whitespace-nowrap">
+                          {row.mes}
+                        </th>
+                      ))}
+                      <th className="text-right py-3 px-4 text-cyan-400 font-semibold whitespace-nowrap border-l border-zinc-700/50">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i) => {
                       const color = getSquadColor(squad, i);
+                      const total = chartData.reduce((acc, row) => acc + (Number(row[squad]) || 0), 0);
+                      
                       return (
-                        <Area
-                          key={squad}
-                          type="monotone"
-                          dataKey={squad}
-                          name={squad}
-                          stroke={color}
-                          strokeWidth={2}
-                          fill={`url(#gradientArea-${squad.replace(/[^a-zA-Z0-9]/g, '')})`}
-                          dot={{ fill: color, strokeWidth: 0, r: 3 }}
-                          activeDot={{ r: 5, stroke: color, strokeWidth: 2, fill: "#18181b" }}
-                        />
+                        <tr 
+                          key={squad} 
+                          className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
+                        >
+                          <td className="py-3 px-4 sticky left-0 bg-zinc-900/95 backdrop-blur-sm">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
+                              />
+                              <span className="text-zinc-200 font-medium">{squad}</span>
+                            </div>
+                          </td>
+                          {chartData.map((row) => {
+                            const value = Number(row[squad]) || 0;
+                            const prevIndex = chartData.indexOf(row) - 1;
+                            const prevValue = prevIndex >= 0 ? (Number(chartData[prevIndex][squad]) || 0) : value;
+                            const trend = value > prevValue ? "up" : value < prevValue ? "down" : "same";
+                            
+                            return (
+                              <td key={row.mes} className="text-right py-3 px-4 font-mono">
+                                <span className={cn(
+                                  "text-zinc-300",
+                                  trend === "up" && "text-emerald-400",
+                                  trend === "down" && "text-rose-400"
+                                )}>
+                                  {formatCurrencyNoDecimals(value)}
+                                </span>
+                              </td>
+                            );
+                          })}
+                          <td className="text-right py-3 px-4 font-mono font-semibold text-cyan-400 border-l border-zinc-700/50">
+                            {formatCurrencyNoDecimals(total)}
+                          </td>
+                        </tr>
                       );
                     })}
-                  </AreaChart>
-                </ResponsiveContainer>
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-zinc-600/50 bg-zinc-800/30">
+                      <td className="py-3 px-4 sticky left-0 bg-zinc-800/95 backdrop-blur-sm text-zinc-200 font-semibold">
+                        Total
+                      </td>
+                      {chartData.map((row) => {
+                        const total = squads
+                          .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
+                          .reduce((acc, squad) => acc + (Number(row[squad]) || 0), 0);
+                        return (
+                          <td key={row.mes} className="text-right py-3 px-4 font-mono font-semibold text-zinc-200">
+                            {formatCurrencyNoDecimals(total)}
+                          </td>
+                        );
+                      })}
+                      <td className="text-right py-3 px-4 font-mono font-bold text-cyan-300 border-l border-zinc-700/50">
+                        {formatCurrencyNoDecimals(
+                          chartData.reduce((acc, row) => {
+                            return acc + squads
+                              .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
+                              .reduce((sum, squad) => sum + (Number(row[squad]) || 0), 0);
+                          }, 0)
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </CardContent>
           </Card>
