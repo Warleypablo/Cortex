@@ -3942,7 +3942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) as total_contratos
         FROM snapshots_mensais sm
         JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-        WHERE h.status IN ('in progress', 'pausado', 'ativo', 'onboarding')
+        WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ORDER BY mes, h.squad, h.responsavel
       `);
