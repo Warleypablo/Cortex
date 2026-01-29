@@ -3947,26 +3947,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY mes, h.squad, h.responsavel
       `);
       
-      // Buscar churns por mês
+      // Buscar churns por mês (usando cup_contratos com data_encerramento)
       const churnResult = await db.execute(sql`
-        WITH snapshots_mensais AS (
-          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
-            DATE_TRUNC('month', data_snapshot) as mes,
-            data_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE DATE(data_snapshot) >= ${startDateStr}::date
-          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
-        )
         SELECT 
-          TO_CHAR(sm.mes, 'YYYY-MM') as mes,
-          h.squad,
+          TO_CHAR(data_encerramento, 'YYYY-MM') as mes,
+          squad,
           COUNT(*) as churns,
-          COALESCE(SUM(h.valorr), 0) as mrr_churn
-        FROM snapshots_mensais sm
-        JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-        WHERE h.status IN ('encerrado', 'cancelado', 'churn')
-        GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad
-        ORDER BY mes, h.squad
+          COALESCE(SUM(valorr::numeric), 0) as mrr_churn
+        FROM "Clickup".cup_contratos
+        WHERE status = 'cancelado'
+          AND data_encerramento IS NOT NULL
+          AND data_encerramento >= ${startDateStr}::date
+          AND valorr IS NOT NULL
+          AND valorr > 0
+        GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM'), squad
+        ORDER BY mes, squad
       `);
       
       // Listar squads e operadores disponíveis
