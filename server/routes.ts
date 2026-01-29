@@ -3938,7 +3938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           TO_CHAR(sm.mes, 'YYYY-MM') as mes,
           h.squad,
           h.responsavel,
-          SUM(CAST(NULLIF(REGEXP_REPLACE(h.valorr, '[^0-9.]', '', 'g'), '') AS DECIMAL)) as mrr_total,
+          COALESCE(SUM(h.valorr), 0) as mrr_total,
           COUNT(*) as total_contratos
         FROM snapshots_mensais sm
         JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
@@ -3961,7 +3961,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           TO_CHAR(sm.mes, 'YYYY-MM') as mes,
           h.squad,
           COUNT(*) as churns,
-          SUM(CAST(NULLIF(REGEXP_REPLACE(h.valorr, '[^0-9.]', '', 'g'), '') AS DECIMAL)) as mrr_churn
+          COALESCE(SUM(h.valorr), 0) as mrr_churn
         FROM snapshots_mensais sm
         JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
         WHERE h.status IN ('encerrado', 'cancelado', 'churn')
