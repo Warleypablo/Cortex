@@ -1660,74 +1660,42 @@ export class DbStorage implements IStorage {
   }
 
   async getClientes(): Promise<ClienteCompleto[]> {
-    // Unificar clientes por CNPJ para evitar duplicação quando existe em ambos ERPs
     const result = await db.execute(sql`
-      WITH clientes_unificados AS (
-        SELECT DISTINCT ON (COALESCE(cc.cnpj, cc.task_id))
-          COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int) as id,
-          COALESCE(caz.nome, cc.nome) as nome,
-          COALESCE(cc.cnpj, caz.cnpj) as cnpj,
-          caz.endereco,
-          caz.ativo,
-          caz.created_at as "createdAt",
-          caz.empresa,
-          COALESCE(caz.ids, COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int)::text) as ids,
-          cc.nome as "nomeClickup",
-          cc.status as "statusClickup",
-          cc.telefone,
-          cc.responsavel,
-          cc.responsavel_geral as "responsavelGeral",
-          NULL::text as site,
-          NULL::text as email,
-          NULL::text as instagram,
-          NULL::text as "linksContrato",
-          NULL::text as "linkListaClickup",
-          cc.cluster,
-          cc.cnpj as "cnpjCliente",
-          cc.task_id,
-          cc.status_conta as "statusConta"
-        FROM "Clickup".cup_clientes cc
-        LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
-        ORDER BY COALESCE(cc.cnpj, cc.task_id), caz.id DESC NULLS LAST
-      )
-      SELECT 
-        cu.id,
-        cu.nome,
-        cu.cnpj,
-        cu.endereco,
-        cu.ativo,
-        cu."createdAt",
-        cu.empresa,
-        cu.ids,
-        cu."nomeClickup",
-        cu."statusClickup",
-        cu.telefone,
-        cu.responsavel,
-        cu."responsavelGeral",
-        cu.site,
-        cu.email,
-        cu.instagram,
-        cu."linksContrato",
-        cu."linkListaClickup",
-        cu.cluster,
-        cu."cnpjCliente",
+      SELECT DISTINCT ON (cc.task_id)
+        COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int) as id,
+        caz.nome,
+        caz.cnpj,
+        caz.endereco,
+        caz.ativo,
+        caz.created_at as "createdAt",
+        caz.empresa,
+        COALESCE(caz.ids, COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int)::text) as ids,
+        cc.nome as "nomeClickup",
+        cc.status as "statusClickup",
+        cc.telefone,
+        cc.responsavel,
+        cc.responsavel_geral as "responsavelGeral",
+        NULL::text as site,
+        NULL::text as email,
+        NULL::text as instagram,
+        NULL::text as "linksContrato",
+        NULL::text as "linkListaClickup",
+        cc.cluster,
+        cc.cnpj as "cnpjCliente",
         (
           SELECT string_agg(DISTINCT produto, ', ')
-          FROM "Clickup".cup_contratos ct
-          INNER JOIN "Clickup".cup_clientes cc2 ON ct.id_task = cc2.task_id
-          WHERE cc2.cnpj = cu.cnpj OR cc2.task_id = cu.task_id
+          FROM "Clickup".cup_contratos
+          WHERE id_task = cc.task_id
         ) as servicos,
         (
           SELECT MIN(data_inicio)
-          FROM "Clickup".cup_contratos ct
-          INNER JOIN "Clickup".cup_clientes cc2 ON ct.id_task = cc2.task_id
-          WHERE cc2.cnpj = cu.cnpj OR cc2.task_id = cu.task_id
+          FROM "Clickup".cup_contratos
+          WHERE id_task = cc.task_id
         ) as "dataInicio",
         (
           SELECT MIN(COALESCE(cr.data_vencimento, cr.data_criacao))
           FROM "Conta Azul".caz_receber cr
-          INNER JOIN "Conta Azul".caz_clientes caz2 ON cr.cliente_id = caz2.ids
-          WHERE caz2.cnpj = cu.cnpj
+          WHERE cr.cliente_id = caz.ids
             AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
         ) as "dataPrimeiroPagamento",
         COALESCE((
@@ -1736,45 +1704,42 @@ export class DbStorage implements IStorage {
             'YYYY-MM'
           ))::double precision
           FROM "Conta Azul".caz_receber cr
-          INNER JOIN "Conta Azul".caz_clientes caz2 ON cr.cliente_id = caz2.ids
-          WHERE caz2.cnpj = cu.cnpj
+          WHERE cr.cliente_id = caz.ids
             AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
             AND COALESCE(cr.data_vencimento, cr.data_criacao) IS NOT NULL
         ), 0) as "ltMeses",
         COALESCE((
           SELECT ROUND(
             EXTRACT(EPOCH FROM (
-              MAX(COALESCE(ct.data_encerramento, NOW())) - MIN(ct.data_inicio)
+              MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
             )) / 86400
           )::double precision
-          FROM "Clickup".cup_contratos ct
-          INNER JOIN "Clickup".cup_clientes cc2 ON ct.id_task = cc2.task_id
-          WHERE (cc2.cnpj = cu.cnpj OR cc2.task_id = cu.task_id)
-          AND ct.data_inicio IS NOT NULL
+          FROM "Clickup".cup_contratos
+          WHERE id_task = cc.task_id
+          AND data_inicio IS NOT NULL
         ), 0) as "ltDias",
         COALESCE((
-          SELECT SUM(ct.valorr::double precision)
-          FROM "Clickup".cup_contratos ct
-          INNER JOIN "Clickup".cup_clientes cc2 ON ct.id_task = cc2.task_id
-          WHERE (cc2.cnpj = cu.cnpj OR cc2.task_id = cu.task_id)
-            AND LOWER(ct.status) IN ('ativo', 'onboarding', 'triagem')
-            AND ct.valorr IS NOT NULL
+          SELECT SUM(valorr::double precision)
+          FROM "Clickup".cup_contratos
+          WHERE id_task = cc.task_id
+            AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
+            AND valorr IS NOT NULL
         ), 0) as "totalRecorrente",
         COALESCE((
-          SELECT SUM(ct.valorp::double precision)
-          FROM "Clickup".cup_contratos ct
-          INNER JOIN "Clickup".cup_clientes cc2 ON ct.id_task = cc2.task_id
-          WHERE (cc2.cnpj = cu.cnpj OR cc2.task_id = cu.task_id)
-            AND LOWER(ct.status) IN ('ativo', 'onboarding', 'triagem')
-            AND ct.valorp IS NOT NULL
+          SELECT SUM(valorp::double precision)
+          FROM "Clickup".cup_contratos
+          WHERE id_task = cc.task_id
+            AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
+            AND valorp IS NOT NULL
         ), 0) as "totalPontual",
         NULL::text as "statusFinanceiro",
         NULL::text as "tipoNegocio",
         NULL::text as "faturamentoMensal",
         NULL::text as "investimentoAds",
-        cu."statusConta"
-      FROM clientes_unificados cu
-      ORDER BY cu."nomeClickup"
+        cc.status_conta as "statusConta"
+      FROM "Clickup".cup_clientes cc
+      LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
+      ORDER BY cc.task_id, caz.id DESC NULLS LAST, cc.nome
     `);
 
     return result.rows as ClienteCompleto[];
@@ -2450,21 +2415,7 @@ export class DbStorage implements IStorage {
   }
 
   async getContratos(): Promise<ContratoCompleto[]> {
-    // Unifica dados financeiros pelo CNPJ para evitar duplicação
     const result = await db.execute(sql`
-      WITH clientes_unificados AS (
-        SELECT DISTINCT ON (COALESCE(cc.cnpj, cc.task_id))
-          cc.task_id,
-          cc.cnpj,
-          cc.nome,
-          cc.responsavel,
-          cc.responsavel_geral,
-          caz.ids as caz_ids,
-          caz.nome as caz_nome
-        FROM "Clickup".cup_clientes cc
-        LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
-        ORDER BY COALESCE(cc.cnpj, cc.task_id), caz.id DESC NULLS LAST
-      )
       SELECT DISTINCT ON (ct.id_subtask)
         ct.id_subtask as "idSubtask",
         ct.servico,
@@ -2477,17 +2428,17 @@ export class DbStorage implements IStorage {
         ct.data_solicitacao_encerramento as "dataSolicitacaoEncerramento",
         ct.squad,
         ct.id_task as "idTask",
-        COALESCE(cu.nome, cu.caz_nome) as "nomeCliente",
-        cu.cnpj as "cnpjCliente",
-        cu.caz_ids as "idCliente",
+        COALESCE(cc.nome, caz.nome) as "nomeCliente",
+        cc.cnpj as "cnpjCliente",
+        caz.ids as "idCliente",
         ct.responsavel,
         ct.cs_responsavel as "csResponsavel",
-        cu.responsavel as "responsavelCliente",
-        cu.responsavel_geral as "responsavelGeral"
+        cc.responsavel as "responsavelCliente",
+        cc.responsavel_geral as "responsavelGeral"
       FROM "Clickup".cup_contratos ct
-      LEFT JOIN "Clickup".cup_clientes cc_raw ON ct.id_task = cc_raw.task_id
-      LEFT JOIN clientes_unificados cu ON COALESCE(cc_raw.cnpj, cc_raw.task_id) = COALESCE(cu.cnpj, cu.task_id)
-      ORDER BY ct.id_subtask, cu.caz_ids DESC NULLS LAST, ct.data_inicio DESC
+      LEFT JOIN "Clickup".cup_clientes cc ON ct.id_task = cc.task_id
+      LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
+      ORDER BY ct.id_subtask, caz.id DESC NULLS LAST, ct.data_inicio DESC
     `);
 
     return result.rows as ContratoCompleto[];
@@ -9527,20 +9478,11 @@ export class DbStorage implements IStorage {
     const searchTerm = `%${query.replace(/'/g, "''")}%`;
     const results: import("@shared/schema").SearchResult[] = [];
 
-    // Search clientes - unify by CNPJ to avoid duplicates across ERPs
+    // Search clientes - exclude names that match colaboradores to avoid duplicates
     try {
       const clientesResult = await db.execute(sql`
-        WITH clientes_busca AS (
-          SELECT DISTINCT ON (COALESCE(cc.cnpj, cc.task_id))
-            COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int) as id,
-            COALESCE(caz.nome, cc.nome) as nome,
-            COALESCE(cc.cnpj, caz.cnpj) as cnpj
-          FROM "Clickup".cup_clientes cc
-          LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
-          ORDER BY COALESCE(cc.cnpj, cc.task_id), caz.id DESC NULLS LAST
-        )
         SELECT c.id::text, c.nome, c.cnpj
-        FROM clientes_busca c
+        FROM "Conta Azul".caz_clientes c
         WHERE (c.nome ILIKE ${searchTerm} OR c.cnpj ILIKE ${searchTerm})
           AND NOT EXISTS (
             SELECT 1 FROM "Inhire".rh_pessoal p 
