@@ -33,6 +33,7 @@ const DashboardFinanceiro = lazy(() => import("@/pages/DashboardFinanceiro"));
 const DashboardGeG = lazy(() => import("@/pages/DashboardGeG"));
 const CalendarioFerias = lazy(() => import("@/pages/CalendarioFerias"));
 const ChurnDetalhamento = lazy(() => import("@/pages/ChurnDetalhamento"));
+const EvolucaoMensal = lazy(() => import("@/pages/EvolucaoMensal"));
 const DashboardDFC = lazy(() => import("@/pages/DashboardDFC"));
 const DashboardInadimplencia = lazy(() => import("@/pages/DashboardInadimplencia"));
 const DashboardInhire = lazy(() => import("@/pages/DashboardInhire"));
@@ -184,6 +185,7 @@ function ProtectedRouter() {
       {/* Operação */}
       <Route path="/visao-geral">{() => <ProtectedRoute path="/visao-geral" component={VisaoGeral} />}</Route>
       <Route path="/dashboard/churn-detalhamento">{() => <ProtectedRoute path="/dashboard/churn-detalhamento" component={ChurnDetalhamento} />}</Route>
+      <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       
       {/* Financeiro */}
