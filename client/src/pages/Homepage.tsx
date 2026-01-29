@@ -255,7 +255,7 @@ function MiniCalendar({ eventos }: { eventos: HomeOverview['proximosEventos'] })
         </CardHeader>
         <CardContent className="flex-1 flex items-center justify-center">
           <p className="text-sm text-muted-foreground text-center py-8">
-            Nenhum evento nos próximos 14 dias
+            Nenhum evento nos próximos 30 dias
           </p>
         </CardContent>
       </Card>

@@ -16043,16 +16043,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Buscar próximos eventos (próximos 14 dias)
+      // Buscar próximos eventos (próximos 30 dias)
       const hoje = new Date();
-      const em14Dias = new Date();
-      em14Dias.setDate(em14Dias.getDate() + 14);
+      const em30Dias = new Date();
+      em30Dias.setDate(em30Dias.getDate() + 30);
       
       const eventosQuery = await db.execute(sql`
         SELECT id, titulo, tipo, data_inicio, data_fim, local, cor
         FROM cortex_core.turbo_eventos
         WHERE data_inicio >= ${hoje.toISOString()}
-          AND data_inicio <= ${em14Dias.toISOString()}
+          AND data_inicio <= ${em30Dias.toISOString()}
         ORDER BY data_inicio ASC
         LIMIT 5
       `);
