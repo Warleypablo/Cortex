@@ -629,16 +629,24 @@ function HeroCard({
   };
 
   let progress: number | null = null;
+  let displayPercent: number | null = null;
   let overshootPercent: number | null = null;
   if (value !== null && target !== null && target > 0) {
     if (direction === "higher") {
-      progress = Math.min(100, (value / target) * 100);
+      const rawPercent = (value / target) * 100;
+      displayPercent = rawPercent;
+      progress = Math.min(100, rawPercent);
+      if (rawPercent > 100) {
+        overshootPercent = rawPercent - 100;
+      }
     } else {
       if (value <= target) {
         progress = 100;
+        displayPercent = 100;
       } else {
         progress = Math.max(0, 100 - ((value - target) / target) * 100);
         overshootPercent = ((value - target) / target) * 100;
+        displayPercent = progress;
       }
     }
   }
@@ -715,9 +723,9 @@ function HeroCard({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Meta: {formatValue(target)}</span>
-              {progress !== null && (
+              {displayPercent !== null && (
                 <span className={`font-medium ${colors.text}`}>
-                  {overshootPercent !== null ? `+${overshootPercent.toFixed(0)}%` : `${progress.toFixed(0)}%`}
+                  {displayPercent.toFixed(0)}%
                 </span>
               )}
             </div>
