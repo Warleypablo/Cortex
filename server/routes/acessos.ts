@@ -305,9 +305,10 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       }
       
       // Usando pool diretamente para evitar problemas de tipo com drizzle
+      // Forçar tipos TEXT para evitar inferência incorreta de UUID
       const result = await pool.query(
         `INSERT INTO cortex_core.clients (name, cnpj, status, additional_info, created_by)
-         VALUES ($1, $2, $3, $4, $5)
+         VALUES ($1::text, $2::text, $3::text, $4::text, $5::text)
          RETURNING *`,
         [name, cnpj || null, status || 'ativo', additionalInfo || null, createdBy]
       );
