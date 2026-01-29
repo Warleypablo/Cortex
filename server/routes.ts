@@ -3914,6 +3914,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Evolução Mensal - MRR histórico por squad e operador com churn
+  app.get("/api/dashboard/evolucao-mensal", async (req, res) => {
+    try {
+      const { meses } = req.query;
+      const numMeses = Math.min(Math.max(parseInt(meses as string) || 6, 1), 36);
+      
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - numMeses);
+      const startDateStr = startDate.toISOString().split('T')[0];
+      
+      // Buscar evolução de MRR por mês
+      const mrrResult = await db.execute(sql`
+        WITH snapshots_mensais AS (
+          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
+            DATE_TRUNC('month', data_snapshot) as mes,
+            data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE DATE(data_snapshot) >= ${startDateStr}::date
+          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        )
+        SELECT 
+          TO_CHAR(sm.mes, 'YYYY-MM') as mes,
+          h.squad,
+          h.responsavel,
+          SUM(CAST(NULLIF(REGEXP_REPLACE(h.valorr, '[^0-9.]', '', 'g'), '') AS DECIMAL)) as mrr_total,
+          COUNT(*) as total_contratos
+        FROM snapshots_mensais sm
+        JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
+        WHERE h.status IN ('in progress', 'pausado', 'ativo', 'onboarding')
+        GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
+        ORDER BY mes, h.squad, h.responsavel
+      `);
+      
+      // Buscar churns por mês
+      const churnResult = await db.execute(sql`
+        WITH snapshots_mensais AS (
+          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
+            DATE_TRUNC('month', data_snapshot) as mes,
+            data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE DATE(data_snapshot) >= ${startDateStr}::date
+          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        )
+        SELECT 
+          TO_CHAR(sm.mes, 'YYYY-MM') as mes,
+          h.squad,
+          COUNT(*) as churns,
+          SUM(CAST(NULLIF(REGEXP_REPLACE(h.valorr, '[^0-9.]', '', 'g'), '') AS DECIMAL)) as mrr_churn
+        FROM snapshots_mensais sm
+        JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
+        WHERE h.status IN ('encerrado', 'cancelado', 'churn')
+        GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad
+        ORDER BY mes, h.squad
+      `);
+      
+      // Listar squads e operadores disponíveis
+      const squadsResult = await db.execute(sql`
+        SELECT DISTINCT squad FROM "Clickup".cup_data_hist 
+        WHERE squad IS NOT NULL AND squad != '' 
+        ORDER BY squad
+      `);
+      
+      const operadoresResult = await db.execute(sql`
+        SELECT DISTINCT responsavel FROM "Clickup".cup_data_hist 
+        WHERE responsavel IS NOT NULL AND responsavel != '' 
+        ORDER BY responsavel
+      `);
+      
+      res.json({
+        mrr: mrrResult.rows,
+        churns: churnResult.rows,
+        squads: squadsResult.rows.map((r: any) => r.squad),
+        operadores: operadoresResult.rows.map((r: any) => r.responsavel)
+      });
+    } catch (error) {
+      console.error("[api] Error fetching evolução mensal:", error);
+      res.status(500).json({ error: "Failed to fetch evolução mensal" });
+    }
+  });
+
   app.get("/api/fluxo-caixa/contas-bancos", async (req, res) => {
     try {
       const contas = await storage.getContasBancos();
