@@ -548,6 +548,11 @@ export default function EvolucaoMensal() {
                     {squads
                       .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
                       .filter(squad => chartData.reduce((acc, row) => acc + (Number(row[squad]) || 0), 0) > 0)
+                      .sort((a, b) => {
+                        const totalA = chartData.reduce((acc, row) => acc + (Number(row[a]) || 0), 0);
+                        const totalB = chartData.reduce((acc, row) => acc + (Number(row[b]) || 0), 0);
+                        return totalB - totalA;
+                      })
                       .map((squad, i) => {
                       const color = getSquadColor(squad, i);
                       const total = chartData.reduce((acc, row) => acc + (Number(row[squad]) || 0), 0);
@@ -657,6 +662,11 @@ export default function EvolucaoMensal() {
                     {operadores
                       .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
                       .filter(op => chartData.reduce((acc, row) => acc + (Number(row[op]) || 0), 0) > 0)
+                      .sort((a, b) => {
+                        const totalA = chartData.reduce((acc, row) => acc + (Number(row[a]) || 0), 0);
+                        const totalB = chartData.reduce((acc, row) => acc + (Number(row[b]) || 0), 0);
+                        return totalB - totalA;
+                      })
                       .map((operador, i) => {
                       const color = getSquadColor(operador, i);
                       const total = chartData.reduce((acc, row) => acc + (Number(row[operador]) || 0), 0);
