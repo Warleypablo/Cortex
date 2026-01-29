@@ -267,14 +267,21 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
   app.get("/api/acessos/clients/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const clientResult = await db.execute(sql`SELECT * FROM cortex_core.clients WHERE id = ${id}`);
+      
+      // Verificar se o id é um UUID válido antes de fazer a query
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        return res.status(400).json({ error: "Invalid client ID format" });
+      }
+      
+      const clientResult = await db.execute(sql`SELECT * FROM cortex_core.clients WHERE id::text = ${id}`);
       
       if (clientResult.rows.length === 0) {
         return res.status(404).json({ error: "Client not found" });
       }
       
       const credentialsResult = await db.execute(sql`
-        SELECT * FROM cortex_core.credentials WHERE client_id = ${id} ORDER BY platform
+        SELECT * FROM cortex_core.credentials WHERE client_id::text = ${id} ORDER BY platform
       `);
       
       const client = clientResult.rows[0] as any;
@@ -424,6 +431,12 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const { id } = req.params;
       const { name, cnpj, status, additionalInfo, linkedClientCnpj } = req.body;
       
+      // Verificar se o id é um UUID válido
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        return res.status(400).json({ error: "Invalid client ID format" });
+      }
+      
       const result = await db.execute(sql`
         UPDATE cortex_core.clients 
         SET name = COALESCE(${name}, name),
@@ -432,7 +445,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
             additional_info = COALESCE(${additionalInfo}, additional_info),
             linked_client_cnpj = ${linkedClientCnpj ?? null},
             updated_at = NOW()
-        WHERE id = ${id}
+        WHERE id::text = ${id}
         RETURNING *
       `);
       
@@ -830,9 +843,15 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
     try {
       const { id } = req.params;
       
-      await db.execute(sql`DELETE FROM cortex_core.credentials WHERE client_id = ${id}`);
+      // Verificar se o id é um UUID válido
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        return res.status(400).json({ error: "Invalid client ID format" });
+      }
       
-      const result = await db.execute(sql`DELETE FROM cortex_core.clients WHERE id = ${id} RETURNING id`);
+      await db.execute(sql`DELETE FROM cortex_core.credentials WHERE client_id::text = ${id}`);
+      
+      const result = await db.execute(sql`DELETE FROM cortex_core.clients WHERE id::text = ${id} RETURNING id`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Client not found" });
@@ -848,8 +867,15 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
   app.get("/api/acessos/credentials/:clientId", async (req, res) => {
     try {
       const { clientId } = req.params;
+      
+      // Verificar se o clientId é um UUID válido
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(clientId)) {
+        return res.status(400).json({ error: "Invalid client ID format" });
+      }
+      
       const result = await db.execute(sql`
-        SELECT * FROM cortex_core.credentials WHERE client_id = ${clientId} ORDER BY platform
+        SELECT * FROM cortex_core.credentials WHERE client_id::text = ${clientId} ORDER BY platform
       `);
       res.json(result.rows.map(mapCredential));
     } catch (error) {
@@ -864,6 +890,12 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       
       if (!clientId || !platform) {
         return res.status(400).json({ error: "clientId and platform are required" });
+      }
+      
+      // Verificar se o clientId é um UUID válido
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(clientId)) {
+        return res.status(400).json({ error: "Invalid clientId format - must be a valid UUID" });
       }
       
       const result = await pool.query(
@@ -885,6 +917,12 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const { id } = req.params;
       const { platform, username, password, accessUrl, observations } = req.body;
       
+      // Verificar se o id é um UUID válido
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        return res.status(400).json({ error: "Invalid credential ID format" });
+      }
+      
       const result = await db.execute(sql`
         UPDATE cortex_core.credentials 
         SET platform = COALESCE(${platform}, platform),
@@ -893,7 +931,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
             access_url = COALESCE(${accessUrl}, access_url),
             observations = COALESCE(${observations}, observations),
             updated_at = NOW()
-        WHERE id = ${id}
+        WHERE id::text = ${id}
         RETURNING *
       `);
       
@@ -911,7 +949,14 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
   app.delete("/api/acessos/credentials/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const result = await db.execute(sql`DELETE FROM cortex_core.credentials WHERE id = ${id} RETURNING id`);
+      
+      // Verificar se o id é um UUID válido
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(id)) {
+        return res.status(400).json({ error: "Invalid credential ID format" });
+      }
+      
+      const result = await db.execute(sql`DELETE FROM cortex_core.credentials WHERE id::text = ${id} RETURNING id`);
       
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Credential not found" });
