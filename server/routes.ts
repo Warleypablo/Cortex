@@ -16311,6 +16311,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Rota com path params para buscar eventos por período
+  app.get("/api/calendario/eventos/:startDate/:endDate", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.params;
+      const eventos = await storage.getTurboEventos(startDate, endDate);
+      res.json(eventos);
+    } catch (error) {
+      console.error("Error fetching eventos by date range:", error);
+      res.status(500).json({ error: "Failed to fetch eventos" });
+    }
+  });
+
   app.get("/api/calendario/eventos/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
