@@ -298,19 +298,17 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
   app.post("/api/acessos/clients", async (req, res) => {
     try {
       const { name, cnpj, status, additionalInfo } = req.body;
-      const createdBy = (req as any).user?.email || null;
       
       if (!name) {
         return res.status(400).json({ error: "Name is required" });
       }
       
       // Usando pool diretamente para evitar problemas de tipo com drizzle
-      // Forçar tipos TEXT para evitar inferência incorreta de UUID
       const result = await pool.query(
-        `INSERT INTO cortex_core.clients (name, cnpj, status, additional_info, created_by)
-         VALUES ($1::text, $2::text, $3::text, $4::text, $5::text)
+        `INSERT INTO cortex_core.clients (name, cnpj, status, additional_info)
+         VALUES ($1::text, $2::text, $3::text, $4::text)
          RETURNING *`,
-        [name, cnpj || null, status || 'ativo', additionalInfo || null, createdBy]
+        [name, cnpj || null, status || 'ativo', additionalInfo || null]
       );
       
       res.status(201).json(mapClient(result.rows[0]));
