@@ -34,6 +34,7 @@ interface TurboEvento {
 }
 
 const EVENT_TYPES = [
+  { value: "feriado", label: "Feriado", icon: CalendarIcon, color: "#ef4444" },
   { value: "confraternizacao", label: "Confraternização", icon: PartyPopper, color: "#ec4899" },
   { value: "reuniao_resultado", label: "Reunião de Resultado", icon: Target, color: "#3b82f6" },
   { value: "workshop", label: "Workshop", icon: GraduationCap, color: "#22c55e" },
