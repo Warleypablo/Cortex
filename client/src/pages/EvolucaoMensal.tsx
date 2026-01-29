@@ -6,7 +6,7 @@ import { formatCurrencyNoDecimals, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, DollarSign, BarChart3, Percent } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Activity, Percent, Zap } from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -20,6 +20,7 @@ import {
   ComposedChart,
   Bar,
   BarChart,
+  Cell,
 } from "recharts";
 
 interface MrrDataPoint {
@@ -45,33 +46,33 @@ interface EvolucaoMensalResponse {
 }
 
 const SQUAD_COLORS: Record<string, string> = {
-  "Aurea": "#f59e0b",
-  "Aurea (OFF)": "#fbbf24",
-  "Black": "#1e293b",
+  "Aurea": "#fbbf24",
+  "Aurea (OFF)": "#fcd34d",
+  "Black": "#475569",
   "Bloomfield": "#10b981",
-  "Chama": "#ef4444",
-  "Chama (OFF)": "#f87171",
-  "Comunicação (OFF)": "#94a3b8",
-  "Hunters": "#8b5cf6",
-  "Hunters (OFF)": "#a78bfa",
+  "Chama": "#f43f5e",
+  "Chama (OFF)": "#fb7185",
+  "Comunicação (OFF)": "#64748b",
+  "Hunters": "#a855f7",
+  "Hunters (OFF)": "#c084fc",
   "Makers": "#06b6d4",
   "Pulse": "#ec4899",
   "Selva": "#22c55e",
-  "Solar+ (OFF)": "#fcd34d",
+  "Solar+ (OFF)": "#facc15",
   "Squadra": "#3b82f6",
   "Squad X": "#6366f1",
   "Supreme": "#8b5cf6",
   "Supreme (OFF)": "#a78bfa",
   "Tech": "#0ea5e9",
-  "Tribo (OFF)": "#f97316",
-  "Turbo Interno": "#64748b",
+  "Tribo (OFF)": "#fb923c",
+  "Turbo Interno": "#94a3b8",
 };
 
 function getSquadColor(squad: string, index: number): string {
   if (SQUAD_COLORS[squad]) return SQUAD_COLORS[squad];
   const fallbackColors = [
-    "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-    "#ec4899", "#06b6d4", "#84cc16", "#f43f5e", "#6366f1"
+    "#06b6d4", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899",
+    "#3b82f6", "#10b981", "#f43f5e", "#6366f1", "#14b8a6"
   ];
   return fallbackColors[index % fallbackColors.length];
 }
@@ -237,6 +238,29 @@ export default function EvolucaoMensal() {
     return `${meses[parseInt(mesNum) - 1]}/${ano.slice(2)}`;
   }
 
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-zinc-900/95 backdrop-blur-sm border border-zinc-700/50 rounded-lg p-3 shadow-xl">
+          <p className="text-xs text-zinc-400 mb-2 font-medium">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <div 
+                className="w-2 h-2 rounded-full" 
+                style={{ backgroundColor: entry.color, boxShadow: `0 0 6px ${entry.color}` }}
+              />
+              <span className="text-zinc-300">{entry.name}:</span>
+              <span className="font-mono font-semibold text-white">
+                {formatCurrencyNoDecimals(entry.value)}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6" data-testid="evolucao-mensal-loading">
@@ -261,7 +285,7 @@ export default function EvolucaoMensal() {
     <div className="p-6 space-y-6" data-testid="evolucao-mensal-page">
       <div className="flex flex-wrap gap-3 items-center">
         <Select value={viewMode} onValueChange={(v) => setViewMode(v as "squad" | "operador")}>
-          <SelectTrigger className="w-[150px]" data-testid="select-view-mode">
+          <SelectTrigger className="w-[150px] bg-zinc-900/50 border-zinc-700/50" data-testid="select-view-mode">
             <SelectValue placeholder="Visão" />
           </SelectTrigger>
           <SelectContent>
@@ -271,7 +295,7 @@ export default function EvolucaoMensal() {
         </Select>
         
         <Select value={squadSelecionado} onValueChange={setSquadSelecionado}>
-          <SelectTrigger className="w-[180px]" data-testid="select-squad">
+          <SelectTrigger className="w-[180px] bg-zinc-900/50 border-zinc-700/50" data-testid="select-squad">
             <SelectValue placeholder="Squad" />
           </SelectTrigger>
           <SelectContent>
@@ -284,7 +308,7 @@ export default function EvolucaoMensal() {
         
         {viewMode === "operador" && (
           <Select value={operadorSelecionado} onValueChange={setOperadorSelecionado}>
-            <SelectTrigger className="w-[200px]" data-testid="select-operador">
+            <SelectTrigger className="w-[200px] bg-zinc-900/50 border-zinc-700/50" data-testid="select-operador">
               <SelectValue placeholder="Operador" />
             </SelectTrigger>
             <SelectContent>
@@ -297,7 +321,7 @@ export default function EvolucaoMensal() {
         )}
         
         <Select value={meses} onValueChange={setMeses}>
-          <SelectTrigger className="w-[130px]" data-testid="select-meses">
+          <SelectTrigger className="w-[130px] bg-zinc-900/50 border-zinc-700/50" data-testid="select-meses">
             <SelectValue placeholder="Meses" />
           </SelectTrigger>
           <SelectContent>
@@ -310,214 +334,257 @@ export default function EvolucaoMensal() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card data-testid="card-mrr-atual">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">MRR Atual</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{formatCurrencyNoDecimals(totais.mrrAtual)}</div>
-            <p className={cn(
-              "text-xs mt-1 flex items-center gap-1",
-              totais.variacaoMrr >= 0 ? "text-emerald-500" : "text-red-500"
-            )}>
-              {totais.variacaoMrr >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {totais.variacaoMrr >= 0 ? "+" : ""}{formatCurrencyNoDecimals(totais.variacaoMrr)} vs mês anterior
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative group" data-testid="card-mrr-atual">
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
+          <Card className="relative bg-zinc-900/80 border-zinc-700/50 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium text-zinc-400">MRR Atual</CardTitle>
+              <div className="p-2 rounded-lg bg-cyan-500/10">
+                <DollarSign className="h-4 w-4 text-cyan-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white font-mono">{formatCurrencyNoDecimals(totais.mrrAtual)}</div>
+              <p className={cn(
+                "text-xs mt-1 flex items-center gap-1",
+                totais.variacaoMrr >= 0 ? "text-emerald-400" : "text-rose-400"
+              )}>
+                {totais.variacaoMrr >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                {totais.variacaoMrr >= 0 ? "+" : ""}{formatCurrencyNoDecimals(totais.variacaoMrr)} vs anterior
+              </p>
+            </CardContent>
+          </Card>
+        </div>
         
-        <Card data-testid="card-variacao">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Variação MRR</CardTitle>
-            {totais.variacaoMrr >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className={cn(
-              "text-2xl font-bold",
-              totais.variacaoMrr >= 0 ? "text-emerald-500" : "text-red-500"
-            )}>
-              {totais.variacaoMrr >= 0 ? "+" : ""}{formatCurrencyNoDecimals(totais.variacaoMrr)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Último mês
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative group" data-testid="card-variacao">
+          <div className={cn(
+            "absolute inset-0 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50",
+            totais.variacaoMrr >= 0 ? "bg-gradient-to-r from-emerald-500/20 to-green-500/20" : "bg-gradient-to-r from-rose-500/20 to-red-500/20"
+          )} />
+          <Card className="relative bg-zinc-900/80 border-zinc-700/50 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium text-zinc-400">Variação MRR</CardTitle>
+              <div className={cn(
+                "p-2 rounded-lg",
+                totais.variacaoMrr >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10"
+              )}>
+                {totais.variacaoMrr >= 0 ? (
+                  <TrendingUp className="h-4 w-4 text-emerald-400" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-rose-400" />
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className={cn(
+                "text-2xl font-bold font-mono",
+                totais.variacaoMrr >= 0 ? "text-emerald-400" : "text-rose-400"
+              )}>
+                {totais.variacaoMrr >= 0 ? "+" : ""}{formatCurrencyNoDecimals(totais.variacaoMrr)}
+              </div>
+              <p className="text-xs text-zinc-500 mt-1">
+                Último mês
+              </p>
+            </CardContent>
+          </Card>
+        </div>
         
-        <Card data-testid="card-churn-total">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Churn Total</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-500">{formatCurrencyNoDecimals(totais.churnTotal)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Últimos {meses} meses
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative group" data-testid="card-churn-total">
+          <div className="absolute inset-0 bg-gradient-to-r from-rose-500/20 to-red-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
+          <Card className="relative bg-zinc-900/80 border-zinc-700/50 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium text-zinc-400">Churn Total</CardTitle>
+              <div className="p-2 rounded-lg bg-rose-500/10">
+                <TrendingDown className="h-4 w-4 text-rose-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-rose-400 font-mono">{formatCurrencyNoDecimals(totais.churnTotal)}</div>
+              <p className="text-xs text-zinc-500 mt-1">
+                Últimos {meses} meses
+              </p>
+            </CardContent>
+          </Card>
+        </div>
         
-        <Card data-testid="card-churn-rate">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Taxa de Churn</CardTitle>
-            <Percent className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-500">{totais.churnRate.toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Média do período
-            </p>
-          </CardContent>
-        </Card>
+        <div className="relative group" data-testid="card-churn-rate">
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
+          <Card className="relative bg-zinc-900/80 border-zinc-700/50 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium text-zinc-400">Taxa de Churn</CardTitle>
+              <div className="p-2 rounded-lg bg-amber-500/10">
+                <Percent className="h-4 w-4 text-amber-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-400 font-mono">{totais.churnRate.toFixed(1)}%</div>
+              <p className="text-xs text-zinc-500 mt-1">
+                Média do período
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      <Card data-testid="card-chart-main">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-primary" />
-            Evolução MRR e Churn
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[320px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={aggregatedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="mrrGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis 
-                  dataKey="mes" 
-                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                  axisLine={{ stroke: 'hsl(var(--border))' }}
-                  tickLine={false}
-                />
-                <YAxis 
-                  yAxisId="left"
-                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                  axisLine={false}
-                  tickLine={false}
-                  width={50}
-                />
-                <YAxis 
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                  tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
-                  axisLine={false}
-                  tickLine={false}
-                  width={50}
-                />
-                <Tooltip 
-                  formatter={(value: number, name: string) => [
-                    formatCurrencyNoDecimals(value),
-                    name === "mrr" ? "MRR" : "Churn"
-                  ]}
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                  }}
-                  labelStyle={{ color: 'hsl(var(--foreground))' }}
-                />
-                <Legend 
-                  wrapperStyle={{ paddingTop: '10px' }}
-                  formatter={(value) => <span className="text-xs text-muted-foreground">{value === "mrr" ? "MRR" : "Churn"}</span>}
-                />
-                <Area
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="mrr"
-                  name="mrr"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  fill="url(#mrrGradient)"
-                />
-                <Line 
-                  yAxisId="right"
-                  type="monotone" 
-                  dataKey="churn" 
-                  name="churn" 
-                  stroke="#ef4444" 
-                  strokeWidth={2}
-                  dot={{ fill: "#ef4444", strokeWidth: 0, r: 4 }}
-                  activeDot={{ r: 6, stroke: "#ef4444", strokeWidth: 2, fill: "hsl(var(--card))" }}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      {viewMode === "squad" && chartData.length > 0 && (
-        <Card data-testid="card-chart-by-squad">
+      <div className="relative" data-testid="card-chart-main">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-cyan-500/5 rounded-xl blur-2xl" />
+        <Card className="relative bg-zinc-900/80 border-zinc-700/50 backdrop-blur-sm overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-primary" />
-              MRR por Squad
+            <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
+              <Activity className="h-4 w-4 text-cyan-400" />
+              Evolução MRR e Churn
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[350px]">
+            <div className="h-[320px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={chartData} 
-                  margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                  barCategoryGap="20%"
-                >
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} vertical={false} />
+                <ComposedChart data={aggregatedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="mrrGradientTech" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4}/>
+                      <stop offset="50%" stopColor="#0891b2" stopOpacity={0.2}/>
+                      <stop offset="100%" stopColor="#06b6d4" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="churnGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={0}/>
+                    </linearGradient>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                      <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" opacity={0.5} />
                   <XAxis 
                     dataKey="mes" 
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tick={{ fontSize: 11, fill: '#71717a' }}
+                    axisLine={{ stroke: '#3f3f46' }}
                     tickLine={false}
                   />
                   <YAxis 
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    yAxisId="left"
+                    tick={{ fontSize: 11, fill: '#71717a' }}
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                     axisLine={false}
                     tickLine={false}
                     width={50}
                   />
-                  <Tooltip 
-                    formatter={(value: number, name: string) => [formatCurrencyNoDecimals(value), name]}
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                    }}
-                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    tick={{ fontSize: 11, fill: '#71717a' }}
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                    axisLine={false}
+                    tickLine={false}
+                    width={50}
                   />
+                  <Tooltip content={<CustomTooltip />} />
                   <Legend 
                     wrapperStyle={{ paddingTop: '10px' }}
-                    formatter={(value) => <span className="text-xs">{value}</span>}
+                    formatter={(value) => (
+                      <span className="text-xs text-zinc-400">
+                        {value === "mrr" ? "MRR" : "Churn"}
+                      </span>
+                    )}
                   />
-                  {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i) => (
-                    <Bar 
-                      key={squad}
-                      dataKey={squad}
-                      name={squad}
-                      stackId="a"
-                      fill={getSquadColor(squad, i)}
-                      radius={i === squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                    />
-                  ))}
-                </BarChart>
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="mrr"
+                    name="mrr"
+                    stroke="#06b6d4"
+                    strokeWidth={2}
+                    fill="url(#mrrGradientTech)"
+                    filter="url(#glow)"
+                  />
+                  <Line 
+                    yAxisId="right"
+                    type="monotone" 
+                    dataKey="churn" 
+                    name="churn" 
+                    stroke="#f43f5e" 
+                    strokeWidth={2}
+                    dot={{ fill: "#f43f5e", strokeWidth: 0, r: 4, filter: "url(#glow)" }}
+                    activeDot={{ r: 6, stroke: "#f43f5e", strokeWidth: 2, fill: "#18181b" }}
+                  />
+                </ComposedChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {viewMode === "squad" && chartData.length > 0 && (
+        <div className="relative" data-testid="card-chart-by-squad">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 via-pink-500/5 to-orange-500/5 rounded-xl blur-2xl" />
+          <Card className="relative bg-zinc-900/80 border-zinc-700/50 backdrop-blur-sm overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
+                <Zap className="h-4 w-4 text-purple-400" />
+                MRR por Squad
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[380px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart 
+                    data={chartData} 
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                    barCategoryGap="25%"
+                  >
+                    <defs>
+                      {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i) => {
+                        const color = getSquadColor(squad, i);
+                        return (
+                          <linearGradient key={`gradient-${squad}`} id={`gradient-${squad.replace(/[^a-zA-Z0-9]/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={color} stopOpacity={0.9}/>
+                            <stop offset="100%" stopColor={color} stopOpacity={0.6}/>
+                          </linearGradient>
+                        );
+                      })}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" opacity={0.5} vertical={false} />
+                    <XAxis 
+                      dataKey="mes" 
+                      tick={{ fontSize: 11, fill: '#71717a' }}
+                      axisLine={{ stroke: '#3f3f46' }}
+                      tickLine={false}
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 11, fill: '#71717a' }}
+                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                      axisLine={false}
+                      tickLine={false}
+                      width={50}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend 
+                      wrapperStyle={{ paddingTop: '10px' }}
+                      formatter={(value) => (
+                        <span className="text-xs text-zinc-300">{value}</span>
+                      )}
+                    />
+                    {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i, arr) => (
+                      <Bar 
+                        key={squad}
+                        dataKey={squad}
+                        name={squad}
+                        stackId="a"
+                        fill={`url(#gradient-${squad.replace(/[^a-zA-Z0-9]/g, '')})`}
+                        radius={i === arr.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
     </div>
   );
