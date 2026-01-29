@@ -16050,7 +16050,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const eventosQuery = await db.execute(sql`
         SELECT id, titulo, tipo, data_inicio, data_fim, local, cor
-        FROM turbo_eventos
+        FROM cortex_core.turbo_eventos
         WHERE data_inicio >= ${hoje.toISOString()}
           AND data_inicio <= ${em14Dias.toISOString()}
         ORDER BY data_inicio ASC
