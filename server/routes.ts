@@ -3947,20 +3947,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY mes, h.squad, h.responsavel
       `);
       
-      // Buscar churns por mês (usando cup_contratos com data_encerramento)
+      // Buscar churns por mês (usando data_solicitacao_encerramento - quando cliente pediu cancelamento)
       const churnResult = await db.execute(sql`
         SELECT 
-          TO_CHAR(data_encerramento, 'YYYY-MM') as mes,
+          TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           squad,
           COUNT(*) as churns,
-          COALESCE(SUM(valorr::numeric), 0) as mrr_churn
+          COALESCE(SUM(valorr), 0) as mrr_churn
         FROM "Clickup".cup_contratos
-        WHERE status = 'cancelado'
-          AND data_encerramento IS NOT NULL
-          AND data_encerramento >= ${startDateStr}::date
-          AND valorr IS NOT NULL
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valorr > 0
-        GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM'), squad
+        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad
         ORDER BY mes, squad
       `);
       
