@@ -545,7 +545,10 @@ export default function EvolucaoMensal() {
                     </tr>
                   </thead>
                   <tbody>
-                    {squads.filter(s => squadSelecionado === "todos" || s === squadSelecionado).map((squad, i) => {
+                    {squads
+                      .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
+                      .filter(squad => chartData.reduce((acc, row) => acc + (Number(row[squad]) || 0), 0) > 0)
+                      .map((squad, i) => {
                       const color = getSquadColor(squad, i);
                       const total = chartData.reduce((acc, row) => acc + (Number(row[squad]) || 0), 0);
                       
