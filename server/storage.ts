@@ -9527,11 +9527,20 @@ export class DbStorage implements IStorage {
     const searchTerm = `%${query.replace(/'/g, "''")}%`;
     const results: import("@shared/schema").SearchResult[] = [];
 
-    // Search clientes - exclude names that match colaboradores to avoid duplicates
+    // Search clientes - unify by CNPJ to avoid duplicates across ERPs
     try {
       const clientesResult = await db.execute(sql`
+        WITH clientes_busca AS (
+          SELECT DISTINCT ON (COALESCE(cc.cnpj, cc.task_id))
+            COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int) as id,
+            COALESCE(caz.nome, cc.nome) as nome,
+            COALESCE(cc.cnpj, caz.cnpj) as cnpj
+          FROM "Clickup".cup_clientes cc
+          LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
+          ORDER BY COALESCE(cc.cnpj, cc.task_id), caz.id DESC NULLS LAST
+        )
         SELECT c.id::text, c.nome, c.cnpj
-        FROM "Conta Azul".caz_clientes c
+        FROM clientes_busca c
         WHERE (c.nome ILIKE ${searchTerm} OR c.cnpj ILIKE ${searchTerm})
           AND NOT EXISTS (
             SELECT 1 FROM "Inhire".rh_pessoal p 
