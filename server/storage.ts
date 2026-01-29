@@ -1661,11 +1661,14 @@ export class DbStorage implements IStorage {
 
   async getClientes(): Promise<ClienteCompleto[]> {
     // Unificar clientes por CNPJ para evitar duplicação quando existe em ambos ERPs
+    // Usa UNION ALL para combinar ambas as fontes e depois DISTINCT ON para unificar
     const result = await db.execute(sql`
-      WITH clientes_unificados AS (
-        SELECT DISTINCT ON (COALESCE(cc.cnpj, cc.task_id))
+      WITH todas_fontes AS (
+        -- Clientes do ClickUp (fonte primária para dados operacionais)
+        SELECT 
           COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int) as id,
-          caz.nome,
+          caz.nome as nome_caz,
+          cc.nome as nome_cup,
           COALESCE(cc.cnpj, caz.cnpj) as cnpj,
           caz.endereco,
           caz.ativo,
@@ -1677,18 +1680,69 @@ export class DbStorage implements IStorage {
           cc.telefone,
           cc.responsavel,
           cc.responsavel_geral as "responsavelGeral",
+          cc.cluster,
+          cc.cnpj as "cnpjCliente",
+          cc.task_id,
+          cc.status_conta as "statusConta",
+          1 as prioridade -- ClickUp tem prioridade
+        FROM "Clickup".cup_clientes cc
+        LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
+        
+        UNION ALL
+        
+        -- Clientes APENAS do Conta Azul (sem correspondência no ClickUp)
+        SELECT 
+          caz.id as id,
+          caz.nome as nome_caz,
+          NULL as nome_cup,
+          caz.cnpj,
+          caz.endereco,
+          caz.ativo,
+          caz.created_at as "createdAt",
+          caz.empresa,
+          caz.ids,
+          NULL as "nomeClickup",
+          NULL as "statusClickup",
+          NULL as telefone,
+          NULL as responsavel,
+          NULL as "responsavelGeral",
+          NULL as cluster,
+          caz.cnpj as "cnpjCliente",
+          NULL as task_id,
+          NULL as "statusConta",
+          2 as prioridade -- Menor prioridade
+        FROM "Conta Azul".caz_clientes caz
+        WHERE caz.cnpj IS NOT NULL 
+          AND NOT EXISTS (
+            SELECT 1 FROM "Clickup".cup_clientes cc WHERE cc.cnpj = caz.cnpj
+          )
+      ),
+      clientes_unificados AS (
+        SELECT DISTINCT ON (COALESCE(cnpj, task_id))
+          id,
+          COALESCE(nome_caz, nome_cup) as nome,
+          cnpj,
+          endereco,
+          ativo,
+          "createdAt",
+          empresa,
+          ids,
+          "nomeClickup",
+          "statusClickup",
+          telefone,
+          responsavel,
+          "responsavelGeral",
           NULL::text as site,
           NULL::text as email,
           NULL::text as instagram,
           NULL::text as "linksContrato",
           NULL::text as "linkListaClickup",
-          cc.cluster,
-          cc.cnpj as "cnpjCliente",
-          cc.task_id,
-          cc.status_conta as "statusConta"
-        FROM "Clickup".cup_clientes cc
-        LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
-        ORDER BY COALESCE(cc.cnpj, cc.task_id), caz.id DESC NULLS LAST, cc.nome
+          cluster,
+          "cnpjCliente",
+          task_id,
+          "statusConta"
+        FROM todas_fontes
+        ORDER BY COALESCE(cnpj, task_id), prioridade, id DESC NULLS LAST
       )
       SELECT 
         cu.id,
