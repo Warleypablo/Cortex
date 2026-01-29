@@ -623,6 +623,115 @@ export default function EvolucaoMensal() {
           </Card>
         </div>
       )}
+
+      {viewMode === "operador" && chartData.length > 0 && (
+        <div className="relative" data-testid="card-chart-by-operador">
+          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-teal-500/5 to-emerald-500/5 rounded-xl blur-2xl" />
+          <Card className="relative bg-zinc-900/80 border-zinc-700/50 backdrop-blur-sm overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold flex items-center gap-2 text-white">
+                <Activity className="h-4 w-4 text-cyan-400" />
+                MRR por Operador
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-zinc-700/50">
+                      <th className="text-left py-3 px-4 text-zinc-400 font-medium sticky left-0 bg-zinc-900/95 backdrop-blur-sm">
+                        Operador
+                      </th>
+                      {chartData.map((row) => (
+                        <th key={row.mes} className="text-right py-3 px-4 text-zinc-400 font-medium whitespace-nowrap">
+                          {row.mes}
+                        </th>
+                      ))}
+                      <th className="text-right py-3 px-4 text-cyan-400 font-semibold whitespace-nowrap border-l border-zinc-700/50">
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {operadores
+                      .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
+                      .filter(op => chartData.reduce((acc, row) => acc + (Number(row[op]) || 0), 0) > 0)
+                      .map((operador, i) => {
+                      const color = getSquadColor(operador, i);
+                      const total = chartData.reduce((acc, row) => acc + (Number(row[operador]) || 0), 0);
+                      
+                      return (
+                        <tr 
+                          key={operador} 
+                          className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors"
+                        >
+                          <td className="py-3 px-4 sticky left-0 bg-zinc-900/95 backdrop-blur-sm">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-2 h-2 rounded-full" 
+                                style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
+                              />
+                              <span className="text-zinc-200 font-medium">{operador}</span>
+                            </div>
+                          </td>
+                          {chartData.map((row) => {
+                            const value = Number(row[operador]) || 0;
+                            const prevIndex = chartData.indexOf(row) - 1;
+                            const prevValue = prevIndex >= 0 ? (Number(chartData[prevIndex][operador]) || 0) : value;
+                            const trend = value > prevValue ? "up" : value < prevValue ? "down" : "same";
+                            
+                            return (
+                              <td key={row.mes} className="text-right py-3 px-4 font-mono">
+                                <span className={cn(
+                                  "text-zinc-300",
+                                  trend === "up" && "text-emerald-400",
+                                  trend === "down" && "text-rose-400"
+                                )}>
+                                  {formatCurrencyNoDecimals(value)}
+                                </span>
+                              </td>
+                            );
+                          })}
+                          <td className="text-right py-3 px-4 font-mono font-semibold text-cyan-400 border-l border-zinc-700/50">
+                            {formatCurrencyNoDecimals(total)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-zinc-600/50 bg-zinc-800/30">
+                      <td className="py-3 px-4 sticky left-0 bg-zinc-800/95 backdrop-blur-sm text-zinc-200 font-semibold">
+                        Total
+                      </td>
+                      {chartData.map((row) => {
+                        const total = operadores
+                          .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
+                          .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
+                        return (
+                          <td key={row.mes} className="text-right py-3 px-4 font-mono font-semibold text-zinc-200">
+                            {formatCurrencyNoDecimals(total)}
+                          </td>
+                        );
+                      })}
+                      <td className="text-right py-3 px-4 font-mono font-bold text-cyan-300 border-l border-zinc-700/50">
+                        {formatCurrencyNoDecimals(
+                          chartData.reduce((acc, row) => {
+                            return acc + operadores
+                              .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
+                              .reduce((sum, op) => sum + (Number(row[op]) || 0), 0);
+                          }, 0)
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
