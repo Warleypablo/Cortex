@@ -37,36 +37,7 @@ export function getCallbackURL(): string {
 }
 
 export function configurePassport() {
-  const clientID = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-  if (!clientID || !clientSecret) {
-    console.error("ERROR: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set for authentication");
-    console.error("Please configure these environment variables in your hosting platform");
-    return;
-  }
-
-  console.log("Google OAuth configured");
-
-  passport.use(
-    new GoogleStrategy(
-      {
-        clientID,
-        clientSecret,
-        callbackURL: getCallbackURL(),
-      },
-      async (_accessToken, _refreshToken, profile, done) => {
-        try {
-          const user = await createOrUpdateUser(profile);
-          return done(null, user);
-        } catch (error) {
-          console.error("OAuth error:", error);
-          return done(error as Error);
-        }
-      }
-    )
-  );
-
+  // SEMPRE registrar serializeUser/deserializeUser, independente do Google OAuth
   passport.serializeUser((user: Express.User, done) => {
     done(null, (user as User).id);
   });
@@ -106,13 +77,44 @@ export function configurePassport() {
         };
         return done(null, devUser);
       }
-      
+
       const user = await findUserById(id);
       done(null, user);
     } catch (error) {
       done(error);
     }
   });
+
+  // Google OAuth é opcional - só configura se tiver credenciais
+  const clientID = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  if (!clientID || !clientSecret) {
+    console.error("ERROR: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set for authentication");
+    console.error("Please configure these environment variables in your hosting platform");
+    return;
+  }
+
+  console.log("Google OAuth configured");
+
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID,
+        clientSecret,
+        callbackURL: getCallbackURL(),
+      },
+      async (_accessToken, _refreshToken, profile, done) => {
+        try {
+          const user = await createOrUpdateUser(profile);
+          return done(null, user);
+        } catch (error) {
+          console.error("OAuth error:", error);
+          return done(error as Error);
+        }
+      }
+    )
+  );
 }
 
 export function logOAuthSetupInstructions() {

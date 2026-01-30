@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx cross-env:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsx:*)",
+      "Bash(node_modules/.bin/tsx:*)",
+      "Bash(npm run dev:*)",
+      "Bash(dir node_modules.bintsx*)",
+      "Bash(npm cache clean:*)",
+      "Bash(npx vite:*)",
+      "Bash(npx:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(node -e \"const { Pool } = require\\(''pg''\\); const pool = new Pool\\({ host: ''34.95.249.110'', port: 5432, database: ''dados_turbo'', user: ''postgres'', password: ''Ap3gYn3yg23Uy'', ssl: false }\\); pool.query\\(''SELECT COUNT\\(DISTINCT c.id\\) as total FROM cup_clientes c INNER JOIN cup_contratos ct ON c.task_id = ct.id_task WHERE ct.status IN \\(\\\\''ativo\\\\'', \\\\''onboarding\\\\'', \\\\''triagem\\\\''\\)''\\).then\\(r => console.log\\(''Count with c.id:'', r.rows[0]\\)\\).catch\\(e => console.error\\(''Error:'', e.message\\)\\).finally\\(\\(\\) => pool.end\\(\\)\\);\")",
+      "Bash(timeout:*)",
+      "Bash(ping:*)",
+      "Bash(git pull:*)",
+      "Bash(git reset:*)",
+      "Bash(tsx:*)",
+      "Bash(npm ci:*)",
+      "Bash(test:*)",
+      "Bash(ls:*)",
+      "Bash(npm config:*)",
+      "Bash(export NODE_ENV=development)",
+      "Bash(pkill:*)",
+      "Bash(psql \"postgresql://postgres:Ap3gYn3yg23Uy@34.95.249.110:5432/dados_turbo\" -c \"DELETE FROM session;\")",
+      "Bash(node clearSessions.js:*)",
+      "Bash(del clearSessions.js)",
+      "Bash(git add:*)"
+    ]
+  }
+}

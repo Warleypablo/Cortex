@@ -472,7 +472,7 @@ export default function PresentationMode() {
 
   const getPositionGlow = (position: number) => {
     switch (position) {
-      case 1: return "animate-pulse shadow-[0_0_40px_rgba(249,115,22,0.5),0_0_80px_rgba(249,115,22,0.2)]";
+      case 1: return "shadow-[0_0_40px_rgba(249,115,22,0.5),0_0_80px_rgba(249,115,22,0.2)]";
       case 2: return "shadow-[0_0_25px_rgba(148,163,184,0.3)]";
       case 3: return "shadow-[0_0_25px_rgba(245,158,11,0.3)]";
       default: return "";
@@ -936,12 +936,9 @@ export default function PresentationMode() {
                       <Trophy className="w-6 h-6 text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.6)]" />
                     </div>
                     <h2 className="text-2xl font-bold text-white">Pódio dos Campeões</h2>
-                    <motion.div
-                      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
-                      transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 2 }}
-                    >
+                    <div>
                       <Flame className="w-6 h-6 text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
-                    </motion.div>
+                    </div>
                   </div>
 
                   {isLoadingClosers ? (
@@ -983,19 +980,17 @@ export default function PresentationMode() {
 
                               <div className="relative p-5 h-full flex flex-col">
                                 <div className="flex items-center justify-between mb-4">
-                                  <motion.div 
+                                  <div
                                     className={`flex items-center justify-center w-14 h-14 rounded-xl ${
                                       closer.position === 1 ? 'bg-gradient-to-br from-orange-500/30 to-amber-500/20 border border-orange-500/40' :
-                                      closer.position === 2 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/20 border border-slate-400/40' : 
+                                      closer.position === 2 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/20 border border-slate-400/40' :
                                       'bg-gradient-to-br from-amber-600/30 to-amber-700/20 border border-amber-500/40'
                                     }`}
-                                    animate={isFirst ? { scale: [1, 1.05, 1] } : {}}
-                                    transition={{ duration: 2, repeat: Infinity }}
                                   >
                                     {closer.position === 1 && <Crown className="w-8 h-8 text-orange-400 drop-shadow-[0_0_10px_rgba(251,146,60,0.8)]" />}
                                     {closer.position === 2 && <Medal className="w-7 h-7 text-slate-300 drop-shadow-[0_0_6px_rgba(203,213,225,0.6)]" />}
                                     {closer.position === 3 && <Medal className="w-7 h-7 text-amber-500 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]" />}
-                                  </motion.div>
+                                  </div>
                                   <div className={`text-sm font-black uppercase tracking-wider ${
                                     closer.position === 1 ? 'text-orange-400' :
                                     closer.position === 2 ? 'text-slate-300' : 'text-amber-500'
@@ -1243,13 +1238,11 @@ export default function PresentationMode() {
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
-                        <motion.div 
+                        <div
                           className="p-2.5 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 shadow-lg shadow-orange-500/40"
-                          animate={{ scale: [1, 1.05, 1] }}
-                          transition={{ duration: 2, repeat: Infinity }}
                         >
                           <Target className="w-4 h-4 text-white" />
-                        </motion.div>
+                        </div>
                         <div>
                           <h2 className="text-lg font-black text-white">META DO MÊS</h2>
                           <p className="text-slate-400 text-[10px]">Receita Recorrente (MRR)</p>
@@ -1458,12 +1451,9 @@ export default function PresentationMode() {
                       <Trophy className="w-6 h-6 text-orange-400 drop-shadow-[0_0_8px_rgba(251,146,60,0.6)]" />
                     </div>
                     <h2 className="text-2xl font-bold text-white">Pódio dos Campeões</h2>
-                    <motion.div
-                      animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
-                      transition={{ duration: 0.8, repeat: Infinity, repeatDelay: 2 }}
-                    >
+                    <div>
                       <Flame className="w-6 h-6 text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]" />
-                    </motion.div>
+                    </div>
                   </div>
                   
                   {isLoadingSDRs ? (
@@ -1505,19 +1495,17 @@ export default function PresentationMode() {
 
                               <div className="relative p-5 h-full flex flex-col">
                                 <div className="flex items-center justify-between mb-4">
-                                  <motion.div 
+                                  <div
                                     className={`flex items-center justify-center w-14 h-14 rounded-xl ${
                                       sdr.position === 1 ? 'bg-gradient-to-br from-orange-500/30 to-amber-500/20 border border-orange-500/40' :
-                                      sdr.position === 2 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/20 border border-slate-400/40' : 
+                                      sdr.position === 2 ? 'bg-gradient-to-br from-slate-400/30 to-slate-500/20 border border-slate-400/40' :
                                       'bg-gradient-to-br from-amber-600/30 to-amber-700/20 border border-amber-500/40'
                                     }`}
-                                    animate={isFirst ? { scale: [1, 1.05, 1] } : {}}
-                                    transition={{ duration: 2, repeat: Infinity }}
                                   >
                                     {sdr.position === 1 && <Crown className="w-8 h-8 text-orange-400 drop-shadow-[0_0_10px_rgba(251,146,60,0.8)]" />}
                                     {sdr.position === 2 && <Medal className="w-7 h-7 text-slate-300 drop-shadow-[0_0_6px_rgba(203,213,225,0.6)]" />}
                                     {sdr.position === 3 && <Medal className="w-7 h-7 text-amber-500 drop-shadow-[0_0_6px_rgba(245,158,11,0.6)]" />}
-                                  </motion.div>
+                                  </div>
                                   <div className={`text-sm font-black uppercase tracking-wider ${
                                     sdr.position === 1 ? 'text-orange-400' :
                                     sdr.position === 2 ? 'text-slate-300' : 'text-amber-500'
@@ -1717,13 +1705,11 @@ export default function PresentationMode() {
                   <div className="relative z-10">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <motion.div 
+                        <div
                           className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-teal-600 shadow-lg shadow-cyan-500/30"
-                          animate={{ scale: [1, 1.05, 1] }}
-                          transition={{ duration: 2, repeat: Infinity }}
                         >
                           <CalendarCheck className="w-4 h-4 text-white" />
-                        </motion.div>
+                        </div>
                         <div>
                           <h2 className="text-lg font-black text-white">META DE REUNIÕES</h2>
                           <p className="text-slate-400 text-[10px]">Reuniões Agendadas</p>
