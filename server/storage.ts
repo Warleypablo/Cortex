@@ -8836,25 +8836,26 @@ export class DbStorage implements IStorage {
       SELECT 
         COALESCE(SUM(valor_liquido::numeric), 0) as total_previsto,
         COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) <= 0 
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
+          WHEN status = 'QUITADO' 
+          THEN COALESCE(valor_pago::numeric, 0) ELSE 0 
         END), 0) as total_recebido,
         COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date 
+          WHEN status != 'QUITADO' AND data_vencimento::date >= '${dataReferencia}'::date 
           THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
         END), 0) as total_pendente,
         COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date 
+          WHEN status != 'QUITADO' AND data_vencimento::date < '${dataReferencia}'::date 
           THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
         END), 0) as total_inadimplente,
         COUNT(*) as quantidade_parcelas,
-        COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) <= 0 THEN 1 END) as quantidade_recebidas,
-        COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date THEN 1 END) as quantidade_pendentes,
-        COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date THEN 1 END) as quantidade_inadimplentes
+        COUNT(CASE WHEN status = 'QUITADO' THEN 1 END) as quantidade_recebidas,
+        COUNT(CASE WHEN status != 'QUITADO' AND data_vencimento::date >= '${dataReferencia}'::date THEN 1 END) as quantidade_pendentes,
+        COUNT(CASE WHEN status != 'QUITADO' AND data_vencimento::date < '${dataReferencia}'::date THEN 1 END) as quantidade_inadimplentes
       FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= '${primeiroDia}'
         AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
+        AND (status != 'QUITADO' OR (data_quitacao >= '${primeiroDia}' AND data_quitacao <= '${ultimoDiaStr} 23:59:59'))
     `));
     
     const resumoRow = resumoResult.rows[0] as any;
@@ -8869,21 +8870,22 @@ export class DbStorage implements IStorage {
         TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_completa,
         COALESCE(SUM(valor_liquido::numeric), 0) as previsto,
         COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) <= 0 
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
+          WHEN status = 'QUITADO' 
+          THEN COALESCE(valor_pago::numeric, 0) ELSE 0 
         END), 0) as recebido,
         COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date 
+          WHEN status != 'QUITADO' AND data_vencimento::date >= '${dataReferencia}'::date 
           THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
         END), 0) as pendente,
         COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date 
+          WHEN status != 'QUITADO' AND data_vencimento::date < '${dataReferencia}'::date 
           THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
         END), 0) as inadimplente
       FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= '${primeiroDia}'
         AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
+        AND (status != 'QUITADO' OR (data_quitacao >= '${primeiroDia}' AND data_quitacao <= '${ultimoDiaStr} 23:59:59'))
       GROUP BY EXTRACT(DAY FROM data_vencimento), TO_CHAR(data_vencimento, 'YYYY-MM-DD')
       ORDER BY dia
     `));
@@ -9009,8 +9011,8 @@ export class DbStorage implements IStorage {
         cont.squad,
         cont.servico,
         CASE
-          WHEN COALESCE(cp.nao_pago::numeric, 0) <= 0 THEN 'pago'
-          WHEN cp.data_vencimento::date < ${dataHoje}::date AND COALESCE(cp.nao_pago::numeric, 0) > 0 THEN 'inadimplente'
+          WHEN cp.status = 'QUITADO' THEN 'pago'
+          WHEN cp.data_vencimento::date < ${dataHoje}::date AND cp.status != 'QUITADO' THEN 'inadimplente'
           ELSE 'pendente'
         END as status_calculado
       FROM "Conta Azul".caz_parcelas cp
