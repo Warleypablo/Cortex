@@ -28,7 +28,10 @@
       "Bash(psql \"postgresql://postgres:Ap3gYn3yg23Uy@34.95.249.110:5432/dados_turbo\" -c \"DELETE FROM session;\")",
       "Bash(node clearSessions.js:*)",
       "Bash(del clearSessions.js)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nReview tudão 2.0\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(git commit:*)"
     ]
   }
 }
