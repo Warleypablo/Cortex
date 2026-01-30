@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -26,7 +27,7 @@ function createSessionStore() {
       database: process.env.DB_NAME,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
-      ssl: { rejectUnauthorized: false }
+      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
     });
     return new PgSession({
       pool: sessionPool,
@@ -208,7 +209,8 @@ app.use((req, res, next) => {
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
+    // reusePort disabled for Windows compatibility
+    // reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
     logOAuthSetupInstructions();
