@@ -3998,11 +3998,9 @@ export class DbStorage implements IStorage {
     const clientesUnicos = parseInt(transRow.clientes_unicos || '0');
     const ticketMedio = clientesUnicos > 0 ? mrr / clientesUnicos : 0;
     
-    // Ajuste artificial: 2 contratos não puxados automaticamente (valor = 9878)
-    const CHURN_AJUSTE_ARTIFICIAL = 9878;
-    const churn = churnBase + CHURN_AJUSTE_ARTIFICIAL;
+    const churn = churnBase;
     
-    console.log(`[visao-geral] Churn: base=${churnBase}, ajuste=${CHURN_AJUSTE_ARTIFICIAL}, total=${churn}`);
+    console.log(`[visao-geral] Churn: base=${churnBase}, total=${churn}`);
     
     // Calcular churn rate: (valor churn / MRR mês anterior) * 100
     const churnRate = mrrMesAnterior > 0 ? (churn / mrrMesAnterior) * 100 : 0;

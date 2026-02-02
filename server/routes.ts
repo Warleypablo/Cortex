@@ -8167,9 +8167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const totalChurned = churnContratos.length;
       const totalPausados = pausadoContratos.length;
-      // Ajuste artificial de R$ 9.878 para 2 contratos faltantes no banco (squad Makers)
-      const CHURN_ADJUSTMENT_VALUE = 9878;
-      const mrrPerdidoChurn = churnContratos.reduce((sum: number, c: any) => sum + c.valorr, 0) + CHURN_ADJUSTMENT_VALUE;
+      const mrrPerdidoChurn = churnContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
       const mrrPerdidoPausado = pausadoContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
       const ltvTotal = churnContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
       const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
@@ -8233,10 +8231,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const squadName = contrato.squad || 'Não especificado';
         mrrPerdidoPorSquad[squadName] = (mrrPerdidoPorSquad[squadName] || 0) + contrato.valorr;
       }
-      
-      // Ajuste artificial de R$ 9.878 para o squad Makers (2 contratos faltantes no banco)
-      const CHURN_ADJUSTMENT_MAKERS = 9878;
-      mrrPerdidoPorSquad['Makers'] = (mrrPerdidoPorSquad['Makers'] || 0) + CHURN_ADJUSTMENT_MAKERS;
       
       // Calcular percentual de churn geral e por squad
       const churnPercentualGeral = mrrAtivoTotal > 0 ? (mrrPerdidoChurn / mrrAtivoTotal) * 100 : 0;
