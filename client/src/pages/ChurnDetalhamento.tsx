@@ -379,9 +379,7 @@ export default function ChurnDetalhamento() {
     
     const totalChurned = churnContratos.length;
     const totalPausados = pausadoContratos.length;
-    // Ajuste artificial de R$ 9.878 para 2 contratos faltantes no banco (squad Makers)
-    const CHURN_ADJUSTMENT = 9878;
-    const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0) + CHURN_ADJUSTMENT;
+    const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const mrrPausado = pausadoContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const ltvTotal = churnContratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
     const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
@@ -417,27 +415,6 @@ export default function ChurnDetalhamento() {
       }
       squadData[squad].mrr_perdido += c.valorr || 0;
     });
-    
-    // Ajuste artificial de R$ 9.878 para o squad ⚡ Makers (2 contratos faltantes no banco)
-    const CHURN_ADJUSTMENT_MAKERS = 9878;
-    // Procurar ⚡ Makers ou variações (Makers sem emoji)
-    const makersKey = Object.keys(squadData).find(s => 
-      s === '⚡ Makers' || s === '⚡Makers' || (s.toLowerCase() === 'makers')
-    );
-    if (makersKey) {
-      squadData[makersKey].mrr_perdido += CHURN_ADJUSTMENT_MAKERS;
-    } else if (squadData['⚡ Makers']) {
-      squadData['⚡ Makers'].mrr_perdido += CHURN_ADJUSTMENT_MAKERS;
-    } else {
-      // Se não existe ⚡ Makers nos contratos de churn, criar entrada
-      const makersOriginal = data.metricas.churn_por_squad?.find(s => 
-        s.squad === '⚡ Makers' || s.squad.toLowerCase().includes('makers')
-      );
-      squadData['⚡ Makers'] = { 
-        mrr_perdido: CHURN_ADJUSTMENT_MAKERS, 
-        mrr_base: makersOriginal?.mrr_ativo || 265622 
-      };
-    }
     
     // Lista de squads irrelevantes a serem excluídos
     const squadsIrrelevantes = ['turbo interno', 'squad x', 'interno', 'x'];
