@@ -8232,10 +8232,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mrrPerdidoPorSquad[squadName] = (mrrPerdidoPorSquad[squadName] || 0) + contrato.valorr;
       }
       
-      // Ajuste artificial de R$ 9.878 para o squad Makers (2 contratos faltantes no banco)
-      const CHURN_ADJUSTMENT_MAKERS = 9878;
-      mrrPerdidoPorSquad['Makers'] = (mrrPerdidoPorSquad['Makers'] || 0) + CHURN_ADJUSTMENT_MAKERS;
-      
       // Calcular percentual de churn geral e por squad
       const churnPercentualGeral = mrrAtivoTotal > 0 ? (mrrPerdidoChurn / mrrAtivoTotal) * 100 : 0;
       
