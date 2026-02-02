@@ -3997,7 +3997,6 @@ export class DbStorage implements IStorage {
     const valorEntreguePontual = parseFloat(valorEntreguePontualRow?.valor_entregue_pontual || '0');
     const clientesUnicos = parseInt(transRow.clientes_unicos || '0');
     const ticketMedio = clientesUnicos > 0 ? mrr / clientesUnicos : 0;
-    
     const churn = churnBase;
     
     console.log(`[visao-geral] Churn: base=${churnBase}, total=${churn}`);
