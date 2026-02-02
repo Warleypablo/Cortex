@@ -1996,8 +1996,8 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
   const { metrics, highlights, series, initiatives, krs, objectives } = data;
   const currentQuarter = getCurrentQuarter();
   const [viewMode, setViewMode] = useState<ViewMode>("month");
-  const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">("Q1");
-  const [selectedMonth, setSelectedMonth] = useState<MonthKey>("jan");
+  const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">(() => currentQuarter);
+  const [selectedMonth, setSelectedMonth] = useState<MonthKey>(() => getCurrentMonth());
 
   const { data: latestCheckinsData } = useQuery<LatestCheckinsResponse>({
     queryKey: ["/api/okr2026/kr-checkins-latest"],
