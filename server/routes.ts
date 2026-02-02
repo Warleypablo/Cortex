@@ -15145,6 +15145,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["cash_balance"]) actualsByMetric["cash_balance"] = {};
           actualsByMetric["cash_balance"][currentMonthKey] = saldoCaixa;
           
+          // CSV (Custo Serviços Vendidos) - categoria 06.% exceto 06.13%
+          const csvResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_pago::numeric), 0) as csv
+            FROM "Conta Azul".caz_parcelas
+            WHERE status = 'QUITADO'
+              AND categoria_nome LIKE '06.%'
+              AND categoria_nome NOT LIKE '06.13%'
+              AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
+              AND data_quitacao::date <= CURRENT_DATE
+          `);
+          const csvTotal = parseFloat((csvResult.rows[0] as any)?.csv || "0");
+          if (!actualsByMetric["cogs_csv"]) actualsByMetric["cogs_csv"] = {};
+          actualsByMetric["cogs_csv"][currentMonthKey] = csvTotal;
+          
+          // CAC (Custo de Aquisição) - categorias 06.03% e 06.04%
+          const cacResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_pago::numeric), 0) as cac
+            FROM "Conta Azul".caz_parcelas
+            WHERE status = 'QUITADO'
+              AND (categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.04%')
+              AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
+              AND data_quitacao::date <= CURRENT_DATE
+          `);
+          const cacTotal = parseFloat((cacResult.rows[0] as any)?.cac || "0");
+          if (!actualsByMetric["cac_total"]) actualsByMetric["cac_total"] = {};
+          actualsByMetric["cac_total"][currentMonthKey] = cacTotal;
+          
+          // SG&A (Despesas Administrativas) - categorias 06.10%, 06.11%, 06.12%
+          const sgaResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_pago::numeric), 0) as sga
+            FROM "Conta Azul".caz_parcelas
+            WHERE status = 'QUITADO'
+              AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+              AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
+              AND data_quitacao::date <= CURRENT_DATE
+          `);
+          const sgaTotal = parseFloat((sgaResult.rows[0] as any)?.sga || "0");
+          if (!actualsByMetric["sga_total"]) actualsByMetric["sga_total"] = {};
+          actualsByMetric["sga_total"][currentMonthKey] = sgaTotal;
+          
+          // Margem Bruta = Receita Líquida - CSV
+          const margemBruta = receitaLiquida - csvTotal;
+          if (!actualsByMetric["gross_margin"]) actualsByMetric["gross_margin"] = {};
+          actualsByMetric["gross_margin"][currentMonthKey] = margemBruta;
+          
+          // EBITDA = Margem Bruta - CAC - SG&A
+          const ebitda = margemBruta - cacTotal - sgaTotal;
+          if (!actualsByMetric["ebitda"]) actualsByMetric["ebitda"] = {};
+          actualsByMetric["ebitda"][currentMonthKey] = ebitda;
+          
         } catch (liveError) {
           console.log("[api] BP financeiro: Could not fetch live metrics for current month", liveError);
         }
