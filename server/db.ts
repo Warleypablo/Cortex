@@ -1560,6 +1560,190 @@ export async function initializeRhComentariosTables(): Promise<void> {
   }
 }
 
+export async function initializeBpSnapshotsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.bp_snapshots (
+        id SERIAL PRIMARY KEY,
+        mes_ano VARCHAR(7) NOT NULL,
+        data_snapshot TIMESTAMP NOT NULL DEFAULT NOW(),
+        metricas JSONB NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(mes_ano)
+      )
+    `);
+    
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_bp_snapshots_mes_ano 
+      ON cortex_core.bp_snapshots(mes_ano)
+    `);
+    
+    console.log('[database] BP Snapshots table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing BP Snapshots table:', error);
+  }
+}
+
+export async function seedBpSnapshotJaneiro2026(): Promise<void> {
+  try {
+    const existing = await db.execute(sql`SELECT 1 FROM cortex_core.bp_snapshots WHERE mes_ano = '2026-01' LIMIT 1`);
+    if (existing.rows.length > 0) {
+      console.log('[bp-snapshot] Snapshot de janeiro 2026 já existe');
+      return;
+    }
+    
+    const startStr = '2026-01-01';
+    const endStr = '2026-01-31';
+    
+    const mrrResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(valorr), 0) as mrr
+      FROM "Clickup".cup_contratos
+      WHERE status IN ('ativo', 'onboarding', 'triagem')
+        AND (data_inicio IS NULL OR data_inicio <= '${endStr}')
+        AND (data_encerramento IS NULL OR data_encerramento > '${endStr}')
+    `));
+    const mrrAtivo = parseFloat((mrrResult.rows[0] as any)?.mrr || "0");
+    
+    const vendasResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(valor_recorrente::numeric), 0) as vendas_mrr
+      FROM "Bitrix".crm_deal
+      WHERE stage_name = 'Negócio Ganho'
+        AND data_fechamento IS NOT NULL
+        AND data_fechamento >= '${startStr}'
+        AND data_fechamento <= '${endStr}'
+        AND valor_recorrente IS NOT NULL
+        AND valor_recorrente > 0
+    `));
+    const vendasMrr = parseFloat((vendasResult.rows[0] as any)?.vendas_mrr || "0");
+    
+    const receitaPontualResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(valor_pontual::numeric), 0) as receita_pontual
+      FROM "Bitrix".crm_deal
+      WHERE stage_name = 'Negócio Ganho'
+        AND data_fechamento IS NOT NULL
+        AND data_fechamento >= '${startStr}'
+        AND data_fechamento <= '${endStr}'
+        AND valor_pontual IS NOT NULL
+        AND valor_pontual > 0
+    `));
+    const receitaPontual = parseFloat((receitaPontualResult.rows[0] as any)?.receita_pontual || "0");
+    
+    const outrasReceitasResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total
+      FROM "Conta Azul".caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND (
+          categoria_nome LIKE '03.02%' 
+          OR categoria_nome LIKE '03.03%' 
+          OR categoria_nome LIKE '04.01%' 
+          OR categoria_nome LIKE '04.03%'
+        )
+        AND data_quitacao::date >= '${startStr}'::date
+        AND data_quitacao::date <= '${endStr}'::date
+    `));
+    const outrasReceitas = parseFloat((outrasReceitasResult.rows[0] as any)?.total || "0");
+    
+    const inadResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(nao_pago::numeric), 0) as inadimplencia
+      FROM "Conta Azul".caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento >= '${startStr}'
+        AND data_vencimento <= '${endStr}'
+        AND nao_pago::numeric > 0
+    `));
+    const inadimplencia = parseFloat((inadResult.rows[0] as any)?.inadimplencia || "0");
+    
+    const impostosResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(valor_pago::numeric), 0) as impostos
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND categoria_nome LIKE '06.13%'
+        AND data_quitacao::date >= '${startStr}'::date
+        AND data_quitacao::date <= '${endStr}'::date
+    `));
+    const impostos = parseFloat((impostosResult.rows[0] as any)?.impostos || "0");
+    
+    const geracaoCaixaResult = await db.execute(sql.raw(`
+      SELECT 
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as entradas,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as saidas
+      FROM "Conta Azul".caz_parcelas
+      WHERE data_quitacao::date >= '${startStr}'::date
+        AND data_quitacao::date <= '${endStr}'::date
+        AND status = 'QUITADO'
+    `));
+    const entradas = parseFloat((geracaoCaixaResult.rows[0] as any)?.entradas || "0");
+    const saidas = parseFloat((geracaoCaixaResult.rows[0] as any)?.saidas || "0");
+    const geracaoCaixa = entradas - saidas;
+    const margemGeracaoCaixa = entradas > 0 ? geracaoCaixa / entradas : 0;
+    
+    const csvResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(valor_pago::numeric), 0) as csv
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND categoria_nome LIKE '06.%'
+        AND categoria_nome NOT LIKE '06.13%'
+        AND data_quitacao::date >= '${startStr}'::date
+        AND data_quitacao::date <= '${endStr}'::date
+    `));
+    const csv = parseFloat((csvResult.rows[0] as any)?.csv || "0");
+    
+    const sgaResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(valor_pago::numeric), 0) as sga
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+        AND data_quitacao::date >= '${startStr}'::date
+        AND data_quitacao::date <= '${endStr}'::date
+    `));
+    const sga = parseFloat((sgaResult.rows[0] as any)?.sga || "0");
+    
+    const cacResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM(valor_pago::numeric), 0) as cac
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND (categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.04%')
+        AND data_quitacao::date >= '${startStr}'::date
+        AND data_quitacao::date <= '${endStr}'::date
+    `));
+    const cac = parseFloat((cacResult.rows[0] as any)?.cac || "0");
+    
+    const receitaTotalFaturavel = mrrAtivo + receitaPontual + outrasReceitas;
+    const receitaLiquida = receitaTotalFaturavel - inadimplencia - impostos;
+    const margemBruta = receitaLiquida - csv;
+    const ebitda = margemBruta - cac - sga;
+    
+    const metricas = {
+      mrr_active: mrrAtivo,
+      sales_mrr: vendasMrr,
+      revenue_one_time: receitaPontual,
+      revenue_other: outrasReceitas,
+      revenue_billable_total: receitaTotalFaturavel,
+      bad_debt: inadimplencia,
+      taxes_on_revenue: impostos,
+      net_revenue: receitaLiquida,
+      csv: csv,
+      gross_margin: margemBruta,
+      cac: cac,
+      sga: sga,
+      ebitda: ebitda,
+      cash_generation: geracaoCaixa,
+      cash_generation_margin_pct: margemGeracaoCaixa,
+      receitas_dfc: entradas,
+      despesas_dfc: saidas,
+    };
+    
+    await db.execute(sql`
+      INSERT INTO cortex_core.bp_snapshots (mes_ano, data_snapshot, metricas)
+      VALUES ('2026-01', NOW(), ${JSON.stringify(metricas)}::jsonb)
+    `);
+    
+    console.log('[bp-snapshot] Snapshot de janeiro 2026 criado:', metricas);
+  } catch (error) {
+    console.error('[bp-snapshot] Erro ao criar snapshot de janeiro 2026:', error);
+  }
+}
+
 export async function initializeDfcSnapshotsTable(): Promise<void> {
   try {
     await db.execute(sql`
