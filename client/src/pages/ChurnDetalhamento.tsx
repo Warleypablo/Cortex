@@ -45,7 +45,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   ResponsiveContainer, 
@@ -203,7 +203,15 @@ const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, shadowColor
 );
 
 // Componente de Gauge visual para taxa de churn
-const ChurnGauge = ({ value, maxValue = 10 }: { value: number; maxValue?: number }) => {
+const ChurnGauge = ({
+  value,
+  maxValue = 10,
+  statusOverride,
+}: {
+  value: number;
+  maxValue?: number;
+  statusOverride?: { label: string; color: string; bg: string; dotBg: string };
+}) => {
   const percentage = Math.min((value / maxValue) * 100, 100);
   const getColor = () => {
     if (value <= 2) return { color: "text-emerald-500", bg: "from-emerald-500 to-green-500", status: "Excelente", dotBg: "bg-emerald-500" };
@@ -211,7 +219,9 @@ const ChurnGauge = ({ value, maxValue = 10 }: { value: number; maxValue?: number
     if (value <= 6) return { color: "text-orange-500", bg: "from-orange-500 to-red-500", status: "Crítico", dotBg: "bg-orange-500" };
     return { color: "text-red-600", bg: "from-red-600 to-rose-700", status: "Emergência", dotBg: "bg-red-600" };
   };
-  const config = getColor();
+  const config = statusOverride
+    ? { ...statusOverride, status: statusOverride.label }
+    : getColor();
   
   return (
     <div className="flex flex-col items-center">
@@ -264,6 +274,10 @@ const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
 export default function ChurnDetalhamento() {
   usePageTitle("Detalhamento de Churn");
   useSetPageInfo("Detalhamento de Churn", "Análise detalhada de contratos encerrados");
+
+  const MRR_BASE_OVERRIDE = 1119046;
+  const CHURN_MAX_TARGET = 102000;
+  const BASE_REFERENCE_DATE = new Date(2026, 0, 1);
   
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSquads, setFilterSquads] = useState<string[]>([]);
@@ -432,10 +446,123 @@ export default function ChurnDetalhamento() {
   }, [filteredContratos, data?.metricas?.churn_por_squad]);
 
   const filteredTaxaChurn = useMemo(() => {
-    const mrrBase = data?.metricas?.mrr_ativo_ref || 0;
+    const mrrBase = MRR_BASE_OVERRIDE;
     const mrrPerdido = filteredMetricas.mrr_perdido;
     return mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
-  }, [filteredMetricas.mrr_perdido, data?.metricas?.mrr_ativo_ref]);
+  }, [filteredMetricas.mrr_perdido]);
+
+  const churnDailyInsights = useMemo(() => {
+    const mrrBase = MRR_BASE_OVERRIDE;
+    const churnTarget = CHURN_MAX_TARGET;
+    const churnTargetPct = mrrBase > 0 ? (churnTarget / mrrBase) * 100 : 0;
+    const churnSpent = filteredMetricas.mrr_perdido || 0;
+
+    const periodStart = dataInicio ? parseISO(dataInicio) : null;
+    const periodEnd = dataFim ? parseISO(dataFim) : null;
+    let totalDays = 0;
+    if (periodStart && periodEnd) {
+      totalDays = differenceInCalendarDays(periodEnd, periodStart) + 1;
+      if (totalDays < 0) totalDays = 0;
+    }
+
+    const today = new Date();
+    let elapsedDays = 0;
+    if (periodStart && periodEnd && totalDays > 0) {
+      const effectiveEnd = today < periodStart ? periodStart : today > periodEnd ? periodEnd : today;
+      elapsedDays = differenceInCalendarDays(effectiveEnd, periodStart) + 1;
+      if (elapsedDays < 0) elapsedDays = 0;
+      if (elapsedDays > totalDays) elapsedDays = totalDays;
+    }
+
+    const remainingDays = Math.max(totalDays - elapsedDays, 0);
+    const remainingBudget = churnTarget - churnSpent;
+    const dailyCap = remainingDays > 0 ? remainingBudget / remainingDays : remainingBudget;
+    const dailyIdeal = totalDays > 0 ? churnTarget / totalDays : 0;
+    const dailyActual = elapsedDays > 0 ? churnSpent / elapsedDays : 0;
+    const progressPct = churnTarget > 0 ? (churnSpent / churnTarget) * 100 : 0;
+    const pacePct = dailyIdeal > 0 ? (dailyActual / dailyIdeal) * 100 : 0;
+
+    let status: "on_track" | "warning" | "critical" | "over_budget" | "future";
+    if (periodStart && today < periodStart) {
+      status = "future";
+    } else if (remainingBudget < 0) {
+      status = "over_budget";
+    } else if (pacePct <= 100) {
+      status = "on_track";
+    } else if (pacePct <= 115) {
+      status = "warning";
+    } else {
+      status = "critical";
+    }
+
+    return {
+      churnTargetPct,
+      churnTarget,
+      churnSpent,
+      remainingBudget,
+      totalDays,
+      elapsedDays,
+      remainingDays,
+      dailyCap,
+      dailyIdeal,
+      dailyActual,
+      progressPct,
+      pacePct,
+      status,
+    };
+  }, [filteredMetricas.mrr_perdido, dataInicio, dataFim]);
+
+  const dailyStatusConfig = {
+    on_track: {
+      label: "No alvo",
+      badgeClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+      barClass: "bg-emerald-500",
+      textClass: "text-emerald-600 dark:text-emerald-400",
+    },
+    warning: {
+      label: "AtenÃ§Ã£o",
+      badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
+      barClass: "bg-amber-500",
+      textClass: "text-amber-600 dark:text-amber-400",
+    },
+    critical: {
+      label: "CrÃ­tico",
+      badgeClass: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30",
+      barClass: "bg-orange-500",
+      textClass: "text-orange-600 dark:text-orange-400",
+    },
+    over_budget: {
+      label: "Meta estourada",
+      badgeClass: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30",
+      barClass: "bg-red-500",
+      textClass: "text-red-600 dark:text-red-400",
+    },
+    future: {
+      label: "PerÃ­odo futuro",
+      badgeClass: "bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/30",
+      barClass: "bg-slate-400",
+      textClass: "text-slate-600 dark:text-slate-300",
+    },
+  } as const;
+
+  const dailyStatus = dailyStatusConfig[churnDailyInsights.status as keyof typeof dailyStatusConfig];
+
+  const gaugeStatusOverride = useMemo(() => {
+    switch (churnDailyInsights.status) {
+      case "on_track":
+        return { label: "No alvo", color: "text-emerald-500", bg: "from-emerald-500 to-green-500", dotBg: "bg-emerald-500" };
+      case "warning":
+        return { label: "Atencao", color: "text-amber-500", bg: "from-amber-500 to-orange-500", dotBg: "bg-amber-500" };
+      case "critical":
+        return { label: "Critico", color: "text-orange-500", bg: "from-orange-500 to-red-500", dotBg: "bg-orange-500" };
+      case "over_budget":
+        return { label: "Fora da meta", color: "text-red-600", bg: "from-red-600 to-rose-700", dotBg: "bg-red-600" };
+      case "future":
+        return { label: "Periodo futuro", color: "text-slate-500", bg: "from-slate-500 to-slate-700", dotBg: "bg-slate-500" };
+      default:
+        return undefined;
+    }
+  }, [churnDailyInsights.status]);
 
   const distribuicaoPorSquad = useMemo(() => {
     if (filteredContratos.length === 0) return [];
@@ -1056,9 +1183,12 @@ export default function ChurnDetalhamento() {
               {/* Coluna 1: Gauge e status */}
               <div className="flex flex-col items-center justify-center p-4 bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Taxa de Churn</h3>
-                <ChurnGauge value={data.metricas.churn_percentual || 0} />
+                <ChurnGauge value={filteredTaxaChurn || 0} statusOverride={gaugeStatusOverride} />
                 <p className="text-xs text-muted-foreground mt-3 text-center">
-                  Base: {data.metricas.periodo_referencia ? format(parseISO(data.metricas.periodo_referencia), "MMMM/yyyy", { locale: ptBR }) : "mês anterior"}
+                  Base: {format(BASE_REFERENCE_DATE, "MMMM/yyyy", { locale: ptBR })}
+                </p>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  Status baseado na media diaria
                 </p>
               </div>
               
@@ -1087,7 +1217,7 @@ export default function ChurnDetalhamento() {
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">MRR Base Referência</span>
                     <Target className="h-4 w-4 text-blue-500" />
                   </div>
-                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(data.metricas.mrr_ativo_ref || 0)}</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(MRR_BASE_OVERRIDE)}</div>
                   <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base para cálculo do churn</div>
                 </div>
               </div>
@@ -1157,6 +1287,117 @@ export default function ChurnDetalhamento() {
         </Card>
       )}
 
+      {/* Observação de Churn Máximo Diário */}
+      {isLoading ? (
+        <Card className="border-border/50">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-xl border border-gray-100 dark:border-zinc-800/60 p-4 bg-white/70 dark:bg-zinc-900/40">
+                  <Skeleton className="h-4 w-32 mb-3" />
+                  <Skeleton className="h-7 w-40 mb-2" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-border/50 bg-gradient-to-br from-emerald-50 via-white to-amber-50/40 dark:from-zinc-900 dark:via-zinc-900 dark:to-emerald-950/30">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg">
+                  <Target className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-base">Observatório de Churn Diário</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Meta referência: {churnDailyInsights.churnTargetPct}% do MRR base no período selecionado
+                  </p>
+                </div>
+              </div>
+              <Badge variant="outline" className={`text-xs ${dailyStatus.badgeClass}`}>
+                {dailyStatus.label}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6 pt-2">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-white/70 dark:bg-zinc-900/40 p-4">
+                <div className="flex items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase">
+                  <span>Meta de churn do período</span>
+                  <Badge variant="outline" className="text-[10px]">MRR base</Badge>
+                </div>
+                <div className="mt-2 text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                  {formatCurrencyNoDecimals(churnDailyInsights.churnTarget)}
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Churn acumulado</span>
+                  <span className="font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
+                    {formatCurrencyNoDecimals(churnDailyInsights.churnSpent)}
+                  </span>
+                </div>
+                <Progress value={Math.min(Math.max(churnDailyInsights.progressPct, 0), 100)} className="h-2 mt-2" />
+                <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
+                  <span>{churnDailyInsights.progressPct.toFixed(1)}% da meta</span>
+                  <span className={churnDailyInsights.remainingBudget >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
+                    Saldo: {formatCurrencyNoDecimals(churnDailyInsights.remainingBudget)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-100 dark:border-amber-900/40 bg-white/70 dark:bg-zinc-900/40 p-4">
+                <div className="flex items-center justify-between text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase">
+                  <span>Churn máximo diário</span>
+                  <CalendarDays className="h-3.5 w-3.5" />
+                </div>
+                <div className="mt-2 text-3xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">
+                  {churnDailyInsights.remainingDays > 0 
+                    ? formatCurrencyNoDecimals(Math.max(churnDailyInsights.dailyCap, 0)) 
+                    : "R$ 0"}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {churnDailyInsights.remainingDays > 0 
+                    ? `restam ${churnDailyInsights.remainingDays} dias` 
+                    : "período encerrado"}
+                </div>
+                <div className="mt-3 p-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/40 text-[11px] text-amber-700 dark:text-amber-300">
+                  Limite diário sugerido para fechar no alvo sem estourar a meta.
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white/70 dark:bg-zinc-900/40 p-4">
+                <div className="flex items-center justify-between text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase">
+                  <span>Ritmo diário</span>
+                  <BarChart3 className="h-3.5 w-3.5" />
+                </div>
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Ideal</span>
+                    <span className="font-semibold tabular-nums">{formatCurrencyNoDecimals(churnDailyInsights.dailyIdeal)}/dia</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Atual</span>
+                    <span className={`font-semibold tabular-nums ${dailyStatus.textClass}`}>
+                      {formatCurrencyNoDecimals(churnDailyInsights.dailyActual)}/dia
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${dailyStatus.barClass}`}
+                      style={{ width: `${Math.min(churnDailyInsights.pacePct, 100)}%` }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Ritmo atual em {churnDailyInsights.pacePct.toFixed(0)}% do ideal
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Métricas Secundárias */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {isLoading ? (
@@ -2315,3 +2556,5 @@ export default function ChurnDetalhamento() {
     </div>
   );
 }
+
+

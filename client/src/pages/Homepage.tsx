@@ -57,7 +57,8 @@ interface Aniversariante {
   cargo: string | null;
   squad: string | null;
   emailTurbo: string | null;
-  diasAteAniversario: number;
+  diasAteAniversario?: number;
+  diaAniversario?: number;
 }
 
 interface Aviso {
@@ -395,6 +396,28 @@ function MeusClientes({ clientes, mrrTotal, contratosAtivos }: {
 
 function AniversariantesWidget({ aniversariantes, userPhotos }: { aniversariantes: Aniversariante[]; userPhotos: Record<string, string> }) {
   const mesAtual = format(new Date(), 'MMMM', { locale: ptBR });
+  const hoje = new Date();
+  const hojeDia = hoje.getDate();
+  const hojeMes = hoje.getMonth() + 1;
+  
+  const getDayMonthFromDateString = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null;
+    const isoMatch = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return {
+        day: parseInt(isoMatch[3], 10),
+        month: parseInt(isoMatch[2], 10),
+      };
+    }
+    const brMatch = dateStr.match(/(\d{2})\/(\d{2})/);
+    if (brMatch) {
+      return {
+        day: parseInt(brMatch[1], 10),
+        month: parseInt(brMatch[2], 10),
+      };
+    }
+    return null;
+  };
   
   const getInitials = (nome: string) => {
     const parts = nome.split(' ').filter(Boolean);
@@ -445,18 +468,24 @@ function AniversariantesWidget({ aniversariantes, userPhotos }: { aniversariante
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 flex-1 overflow-auto">
-        {aniversariantes.slice(0, 5).map((pessoa) => {
+      <CardContent className="space-y-2 flex-1 max-h-[320px] overflow-y-auto pr-2">
+        {aniversariantes.map((pessoa) => {
           const dataAniversario = parseISO(pessoa.aniversario);
-          const diaAniversario = format(dataAniversario, 'dd', { locale: ptBR });
-          const isHoje = pessoa.diasAteAniversario === 0;
+          const dateParts = getDayMonthFromDateString(pessoa.aniversario);
+          const diaAniversario = dateParts
+            ? String(dateParts.day).padStart(2, '0')
+            : format(dataAniversario, 'dd', { locale: ptBR });
+          const isHoje =
+            Number(pessoa.diasAteAniversario) === 0 ||
+            Number(pessoa.diaAniversario) === hojeDia ||
+            (!!dateParts && dateParts.day === hojeDia && dateParts.month === hojeMes);
           const photo = getPhoto(pessoa);
           
           return (
             <div 
               key={pessoa.id}
               className={`flex items-center gap-3 p-2 rounded-md transition-colors ${
-                isHoje ? 'bg-primary/10 border border-primary/30' : 'hover:bg-muted/50'
+                isHoje ? 'bg-primary/15 border border-primary/40 shadow-sm' : 'hover:bg-muted/50'
               }`}
               data-testid={`aniversariante-item-${pessoa.id}`}
             >
@@ -469,7 +498,11 @@ function AniversariantesWidget({ aniversariantes, userPhotos }: { aniversariante
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium truncate ${isHoje ? 'text-primary' : ''}`}>
                   {pessoa.nome}
-                  {isHoje && <span className="ml-2 text-xs">Hoje!</span>}
+                  {isHoje && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-0.5 text-[10px] font-semibold">
+                      Hoje
+                    </span>
+                  )}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {pessoa.cargo || pessoa.squad || ''}
