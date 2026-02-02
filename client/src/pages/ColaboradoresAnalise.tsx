@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Cake, Briefcase, TrendingUp, Clock, Users, Loader2, ArrowUpDown, ArrowUp, ArrowDown, Heart, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 import { formatDecimal } from "@/lib/utils";
@@ -22,6 +22,8 @@ interface AniversariantesMes {
   aniversario: string;
   cargo: string | null;
   squad: string | null;
+  emailTurbo: string | null;
+  fotoUrl?: string | null;
   diasAteAniversario: number;
 }
 
@@ -31,6 +33,8 @@ interface AniversarioEmpresaMes {
   admissao: string;
   cargo: string | null;
   squad: string | null;
+  emailTurbo: string | null;
+  fotoUrl?: string | null;
   anosDeEmpresa: number;
   diasAteAniversarioEmpresa: number;
 }
@@ -86,6 +90,13 @@ interface DashboardAnaliseData {
 function formatDate(date: string | null | undefined) {
   if (!date) return "-";
   try {
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+      return new Date(year, month, day).toLocaleDateString("pt-BR");
+    }
     return new Date(date).toLocaleDateString("pt-BR");
   } catch {
     return "-";
@@ -183,6 +194,14 @@ export default function ColaboradoresAnalise() {
   useSetPageInfo("Análise de Colaboradores", "Dashboard com métricas e indicadores de recursos humanos");
   const { data, isLoading } = useQuery<DashboardAnaliseData>({
     queryKey: ["/api/colaboradores/analise"],
+    staleTime: 0,
+    refetchOnMount: true,
+  });
+
+  const { data: userPhotos = {} } = useQuery<Record<string, string>>({
+    queryKey: ["/api/user-photos"],
+    staleTime: 0,
+    refetchOnMount: true,
   });
 
   const { data: healthData = [], isLoading: isLoadingHealth } = useQuery<ColaboradorSaude[]>({
@@ -193,6 +212,14 @@ export default function ColaboradoresAnalise() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [healthSquadFilter, setHealthSquadFilter] = useState<string>("all");
   const [healthSortOrder, setHealthSortOrder] = useState<"asc" | "desc">("asc");
+
+  const getPhoto = (emailTurbo?: string | null) => {
+    const email = emailTurbo?.toLowerCase().trim();
+    if (email && userPhotos[email]) {
+      return userPhotos[email];
+    }
+    return null;
+  };
 
   const uniqueSquads = useMemo(() => {
     const squads = new Set<string>();
@@ -391,7 +418,17 @@ export default function ColaboradoresAnalise() {
                     <TableBody>
                       {aniversariantesMes.map((pessoa) => (
                         <TableRow key={pessoa.id} data-testid={`row-aniversariante-${pessoa.id}`}>
-                          <TableCell className="font-medium">{pessoa.nome}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Avatar className="h-8 w-8 flex-shrink-0">
+                                <AvatarImage src={pessoa.fotoUrl || getPhoto(pessoa.emailTurbo) || undefined} alt={pessoa.nome} />
+                                <AvatarFallback className="text-[10px] bg-muted">
+                                  {getInitials(pessoa.nome)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="truncate">{pessoa.nome}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>{formatDate(pessoa.aniversario)}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {pessoa.cargo || "-"}
@@ -464,7 +501,17 @@ export default function ColaboradoresAnalise() {
                     <TableBody>
                       {aniversarioEmpresaMes.filter(a => a.anosDeEmpresa > 0).map((pessoa) => (
                         <TableRow key={pessoa.id} data-testid={`row-aniversario-empresa-${pessoa.id}`}>
-                          <TableCell className="font-medium">{pessoa.nome}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Avatar className="h-8 w-8 flex-shrink-0">
+                                <AvatarImage src={pessoa.fotoUrl || getPhoto(pessoa.emailTurbo) || undefined} alt={pessoa.nome} />
+                                <AvatarFallback className="text-[10px] bg-muted">
+                                  {getInitials(pessoa.nome)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="truncate">{pessoa.nome}</span>
+                            </div>
+                          </TableCell>
                           <TableCell>{formatDate(pessoa.admissao)}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {pessoa.cargo || "-"}

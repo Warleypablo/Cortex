@@ -37,6 +37,8 @@ export interface AniversariantesMes {
   aniversario: string;
   cargo: string | null;
   squad: string | null;
+  emailTurbo: string | null;
+  fotoUrl?: string | null;
   diasAteAniversario: number;
 }
 
@@ -46,6 +48,8 @@ export interface AniversarioEmpresaMes {
   admissao: string;
   cargo: string | null;
   squad: string | null;
+  emailTurbo: string | null;
+  fotoUrl?: string | null;
   anosDeEmpresa: number;
   diasAteAniversarioEmpresa: number;
 }
@@ -2795,11 +2799,19 @@ export class DbStorage implements IStorage {
 
     const aniversariantesResult = await db.execute(sql`
       SELECT 
-        id,
-        nome,
-        aniversario::text,
-        cargo,
-        squad,
+        r.id,
+        r.nome,
+        r.aniversario::text,
+        r.cargo,
+        r.squad,
+        r.email_turbo,
+        r.email_pessoal,
+        r.user_id,
+        COALESCE(
+          NULLIF(a_id.picture, ''),
+          NULLIF(a_turbo.picture, ''),
+          NULLIF(a_pessoal.picture, '')
+        ) as foto_url,
         (
           CASE
             WHEN EXTRACT(MONTH FROM aniversario) = 2 AND EXTRACT(DAY FROM aniversario) = 29 
@@ -2820,44 +2832,146 @@ export class DbStorage implements IStorage {
               )
           END - CURRENT_DATE
         )::int as dias_ate_aniversario
-      FROM ${schema.rhPessoal}
+      FROM ${schema.rhPessoal} r
+      LEFT JOIN cortex_core.auth_users a_id
+        ON r.user_id IS NOT NULL AND r.user_id = a_id.id
+      LEFT JOIN cortex_core.auth_users a_turbo
+        ON r.email_turbo IS NOT NULL AND LOWER(TRIM(r.email_turbo)) = LOWER(TRIM(a_turbo.email))
+      LEFT JOIN cortex_core.auth_users a_pessoal
+        ON r.email_pessoal IS NOT NULL AND LOWER(TRIM(r.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
       WHERE EXTRACT(MONTH FROM aniversario) = ${currentMonth}
         AND status = 'Ativo'
       ORDER BY EXTRACT(DAY FROM aniversario)
     `);
 
-    const aniversarioEmpresaResult = await db.execute(sql`
+    const authPhotosResult = await db.execute(sql`
       SELECT 
-        id,
-        nome,
-        admissao::text,
-        cargo,
-        squad,
-        EXTRACT(YEAR FROM AGE(CURRENT_DATE, admissao))::int as anos_de_empresa,
-        (
+        name,
+        LOWER(TRIM(name)) as name_key,
+        picture
+      FROM cortex_core.auth_users
+      WHERE name IS NOT NULL AND picture IS NOT NULL AND picture <> ''
+    `);
+
+    const normalizeName = (value: string | null | undefined) =>
+      (value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    const stopwords = new Set(['da', 'de', 'do', 'dos', 'das', 'e']);
+    const tokenizeName = (value: string | null | undefined) =>
+      normalizeName(value)
+        .split(' ')
+        .filter(token => token && !stopwords.has(token));
+
+    const buildNameKeys = (tokens: string[]) => {
+      if (tokens.length === 0) return [];
+      const keys = new Set<string>();
+      const full = tokens.join(' ');
+      keys.add(full);
+      const first = tokens[0];
+      const last = tokens[tokens.length - 1];
+      keys.add(`${first} ${last}`);
+      if (tokens.length > 2) {
+        const penultimate = tokens[tokens.length - 2];
+        keys.add(`${first} ${penultimate}`);
+        const second = tokens[1];
+        keys.add(`${first} ${second} ${last}`);
+      } else if (tokens.length > 1) {
+        const second = tokens[1];
+        keys.add(`${first} ${second}`);
+      }
+      return Array.from(keys);
+    };
+
+    const nameKeyStats = new Map<string, { count: number; picture: string }>();
+    for (const row of authPhotosResult.rows as any[]) {
+      const picture = row.picture as string | null;
+      if (!picture) continue;
+      const tokens = tokenizeName(row.name || row.name_key);
+      const keys = buildNameKeys(tokens);
+      for (const key of keys) {
+        const current = nameKeyStats.get(key);
+        if (!current) {
+          nameKeyStats.set(key, { count: 1, picture });
+        } else {
+          current.count += 1;
+        }
+      }
+    }
+
+    const resolvePhotoByName = (nameValue: string | null | undefined) => {
+      const tokens = tokenizeName(nameValue);
+      const keys = buildNameKeys(tokens);
+      for (const key of keys) {
+        const entry = nameKeyStats.get(key);
+        if (entry && entry.count === 1) {
+          return entry.picture;
+        }
+      }
+      return null;
+    };
+
+    const aniversarioEmpresaResult = await db.execute(sql`
+      WITH aniversarios AS (
+        SELECT 
+          id,
+          nome,
+          admissao::date as admissao,
+          cargo,
+          squad,
+          email_turbo,
+          email_pessoal,
+          user_id,
           CASE
             WHEN EXTRACT(MONTH FROM admissao) = 2 AND EXTRACT(DAY FROM admissao) = 29 
                  AND NOT (
-                   (EXTRACT(YEAR FROM CURRENT_DATE)::int % 4 = 0 AND EXTRACT(YEAR FROM CURRENT_DATE)::int % 100 != 0)
-                   OR EXTRACT(YEAR FROM CURRENT_DATE)::int % 400 = 0
+                   (${currentYear}::int % 4 = 0 AND ${currentYear}::int % 100 != 0)
+                   OR ${currentYear}::int % 400 = 0
                  ) THEN
               MAKE_DATE(
-                EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                ${currentYear}::int,
                 2,
                 28
               )
             ELSE
               MAKE_DATE(
-                EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                ${currentYear}::int,
                 EXTRACT(MONTH FROM admissao)::int,
                 EXTRACT(DAY FROM admissao)::int
               )
-          END - CURRENT_DATE
-        )::int as dias_ate_aniversario_empresa
-      FROM ${schema.rhPessoal}
-      WHERE EXTRACT(MONTH FROM admissao) = ${currentMonth}
-        AND status = 'Ativo'
-        AND admissao IS NOT NULL
+          END as aniversario_ano_atual
+        FROM ${schema.rhPessoal}
+        WHERE EXTRACT(MONTH FROM admissao) = ${currentMonth}
+          AND status = 'Ativo'
+          AND admissao IS NOT NULL
+      )
+      SELECT 
+        a.id,
+        a.nome,
+        a.admissao::text,
+        a.cargo,
+        a.squad,
+        a.email_turbo,
+        a.email_pessoal,
+        COALESCE(
+          NULLIF(u_id.picture, ''),
+          NULLIF(u_turbo.picture, ''),
+          NULLIF(u_pessoal.picture, '')
+        ) as foto_url,
+        (${currentYear} - EXTRACT(YEAR FROM admissao))::int as anos_de_empresa,
+        (aniversario_ano_atual - CURRENT_DATE)::int as dias_ate_aniversario_empresa
+      FROM aniversarios a
+      LEFT JOIN cortex_core.auth_users u_id
+        ON a.user_id IS NOT NULL AND a.user_id = u_id.id
+      LEFT JOIN cortex_core.auth_users u_turbo
+        ON a.email_turbo IS NOT NULL AND LOWER(TRIM(a.email_turbo)) = LOWER(TRIM(u_turbo.email))
+      LEFT JOIN cortex_core.auth_users u_pessoal
+        ON a.email_pessoal IS NOT NULL AND LOWER(TRIM(a.email_pessoal)) = LOWER(TRIM(u_pessoal.email))
       ORDER BY EXTRACT(DAY FROM admissao)
     `);
 
@@ -2897,24 +3011,34 @@ export class DbStorage implements IStorage {
       FROM ${schema.rhPessoal}
     `);
 
-    const aniversariantesMes: AniversariantesMes[] = (aniversariantesResult.rows as any[]).map((row: any) => ({
+    const aniversariantesMes: AniversariantesMes[] = (aniversariantesResult.rows as any[]).map((row: any) => {
+      const fotoUrl = row.foto_url || resolvePhotoByName(row.nome) || null;
+      return {
       id: row.id,
       nome: row.nome,
       aniversario: row.aniversario,
       cargo: row.cargo,
       squad: row.squad,
+      emailTurbo: row.email_turbo || null,
+      fotoUrl,
       diasAteAniversario: row.dias_ate_aniversario || 0,
-    }));
+      };
+    });
 
-    const aniversarioEmpresaMes: AniversarioEmpresaMes[] = (aniversarioEmpresaResult.rows as any[]).map((row: any) => ({
+    const aniversarioEmpresaMes: AniversarioEmpresaMes[] = (aniversarioEmpresaResult.rows as any[]).map((row: any) => {
+      const fotoUrl = row.foto_url || resolvePhotoByName(row.nome) || null;
+      return {
       id: row.id,
       nome: row.nome,
       admissao: row.admissao,
       cargo: row.cargo,
       squad: row.squad,
+      emailTurbo: row.email_turbo || null,
+      fotoUrl,
       anosDeEmpresa: row.anos_de_empresa || 0,
       diasAteAniversarioEmpresa: row.dias_ate_aniversario_empresa || 0,
-    }));
+      };
+    });
 
     const ultimasPromocoes: UltimaPromocao[] = (ultimasPromocoesResult.rows as any[]).map((row: any) => ({
       id: row.id,
@@ -4358,22 +4482,19 @@ export class DbStorage implements IStorage {
     
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
     
-    const whereClauses: string[] = ['categoria_id IS NOT NULL', "categoria_id != ''", "status = 'QUITADO'"];
+    const whereClauses: string[] = ["tipo_evento IN ('RECEITA', 'DESPESA')", "status IN ('QUITADO', 'RECEBIDO_PARCIAL')"];
     
     // Sempre filtrar a partir de janeiro de 2025 (mínimo)
     const dataMinima = '2025-01-01';
     
-    // Filtrar por data de vencimento E data de quitação (ambas devem ser >= 2025)
+    // Filtrar EXCLUSIVAMENTE pela data de quitação
     if (dataInicio && dataInicio >= dataMinima) {
-      whereClauses.push(`data_vencimento >= '${dataInicio}'`);
       whereClauses.push(`data_quitacao >= '${dataInicio}'`);
     } else {
-      whereClauses.push(`data_vencimento >= '${dataMinima}'`);
       whereClauses.push(`data_quitacao >= '${dataMinima}'`);
     }
     
     if (dataFim) {
-      whereClauses.push(`data_vencimento <= '${dataFim}'`);
       whereClauses.push(`data_quitacao <= '${dataFim}'`);
     }
     
@@ -4382,8 +4503,11 @@ export class DbStorage implements IStorage {
     const parcelas = await db.execute(sql.raw(`
       SELECT 
         id,
+        status,
         descricao,
         valor_pago,
+        valor_liquido,
+        metodo_pagamento,
         categoria_id,
         categoria_nome,
         valor_categoria,
@@ -4404,12 +4528,24 @@ export class DbStorage implements IStorage {
 
     for (const row of parcelas.rows) {
       parcelaIdsProcessadas.add(row.id as number);
-      const categoriaNomes = (row.categoria_nome as string || '').split(';').map(s => s.trim()).filter(Boolean);
+      let categoriaNomes = (row.categoria_nome as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const valorCategorias = (row.valor_categoria as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const tipoEvento = row.tipo_evento as string || '';
-      const valorPago = parseFloat(row.valor_pago as string || '0');
-      
-      if (categoriaNomes.length === 0) continue;
+      const tipoEventoNormalized = (tipoEvento || '').toUpperCase().trim();
+      const valorPagoRaw = parseFloat(row.valor_pago as string || '0');
+      const valorLiquidoRaw = parseFloat(row.valor_liquido as string || '0');
+      const metodoPagamento = (row.metodo_pagamento as string || '').trim().toUpperCase();
+      const statusParcela = (row.status as string || '').trim().toUpperCase();
+      const valorPago = Number.isFinite(valorPagoRaw) ? valorPagoRaw : 0;
+      const valorLiquido = Number.isFinite(valorLiquidoRaw) ? valorLiquidoRaw : 0;
+      const valorBase = (tipoEventoNormalized === 'RECEITA' && metodoPagamento === 'CARTAO_CREDITO_VIA_LINK' && valorLiquido > 0 && statusParcela === 'QUITADO')
+        ? valorLiquido
+        : valorPago;
+
+      if (categoriaNomes.length === 0) {
+        const fallbackPrefix = tipoEventoNormalized === 'DESPESA' ? '06.99' : '03.99';
+        categoriaNomes = [`${fallbackPrefix} Outros`];
+      }
 
       const dataQuitacao = new Date(row.data_quitacao as string);
       const mes = dataQuitacao.toISOString().substring(0, 7);
@@ -4425,16 +4561,16 @@ export class DbStorage implements IStorage {
         let valor: number;
         if (categoriaNomes.length === 1) {
           // Se há apenas uma categoria, usar o valor_pago total
-          valor = valorPago;
+          valor = valorBase;
         } else {
           // Se há múltiplas categorias, ratear proporcionalmente baseado em valor_categoria
           const valorCategoriaAtual = parseFloat(valorCategorias[i] || '0');
           if (somaValorCategorias > 0) {
             const proporcao = valorCategoriaAtual / somaValorCategorias;
-            valor = valorPago * proporcao;
+            valor = valorBase * proporcao;
           } else {
             // Se não houver soma de categorias, dividir igualmente
-            valor = valorPago / categoriaNomes.length;
+            valor = valorBase / categoriaNomes.length;
           }
         }
 
@@ -4446,8 +4582,7 @@ export class DbStorage implements IStorage {
 
         const categoriaId = codeMatch[1];
         const categoriaNome = codeMatch[2];
-        
-        const tipoEventoNormalized = (tipoEvento || '').toUpperCase().trim();
+        
         const twoDigitPrefix = categoriaId.substring(0, 2);
         const isCategoriaReceita = (twoDigitPrefix === '03' || twoDigitPrefix === '04');
         const isCategoriaDespesa = (twoDigitPrefix === '05' || twoDigitPrefix === '06' || twoDigitPrefix === '07' || twoDigitPrefix === '08');

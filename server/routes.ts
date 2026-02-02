@@ -12852,7 +12852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name,
           picture
         FROM cortex_core.auth_users
-        WHERE email IS NOT NULL AND picture IS NOT NULL
+        WHERE email IS NOT NULL AND picture IS NOT NULL AND picture <> ''
       `);
 
       const photoMap: Record<string, string> = {};

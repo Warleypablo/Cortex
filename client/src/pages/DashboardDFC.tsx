@@ -135,10 +135,13 @@ export default function DashboardDFC() {
       if (filterDataInicio) params.append("dataInicio", filterDataInicio);
       if (filterDataFim) params.append("dataFim", filterDataFim);
       
-      const res = await fetch(`/api/dfc?${params.toString()}`);
+      const res = await fetch(`/api/dfc?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch DFC data");
       return res.json();
     },
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const toggleExpand = (nodeId: string) => {
