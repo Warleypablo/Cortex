@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { Pool } from "pg";
-import { initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes } from "./db";
+import { initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026 } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 const app = express();
@@ -106,6 +106,7 @@ app.use((req, res, next) => {
     initializeDfcSnapshotsTable(),
     initializeSalesGoalsTable(),
     initializeCupDataHistTable(),
+    initializeBpSnapshotsTable(),
   ]);
   
   // Phase 2: Depends on catalogs being ready
@@ -116,6 +117,9 @@ app.use((req, res, next) => {
   
   // Phase 4: Create performance indexes on external database tables
   await createPerformanceIndexes();
+  
+  // Phase 5: Seed BP snapshot for January 2026
+  await seedBpSnapshotJaneiro2026();
   
   // Register Object Storage routes
   registerObjectStorageRoutes(app);
