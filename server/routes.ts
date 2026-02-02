@@ -14955,6 +14955,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ebitda: "ebitda",
           cash_generation: "cash_generation",
           cash_generation_margin_pct: "cash_generation_margin_pct",
+          cash_balance: "cash_balance",
+          headcount_total: "headcount_total",
+          clients_active: "clients_active",
+          contracts_active: "contracts_active",
+          churn_mrr_month: "churn_mrr_month",
         };
         
         for (const row of snapshotsResult.rows as any[]) {
