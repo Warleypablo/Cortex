@@ -8167,9 +8167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const totalChurned = churnContratos.length;
       const totalPausados = pausadoContratos.length;
-      // Ajuste artificial de R$ 9.878 para 2 contratos faltantes no banco (squad Makers)
-      const CHURN_ADJUSTMENT_VALUE = 9878;
-      const mrrPerdidoChurn = churnContratos.reduce((sum: number, c: any) => sum + c.valorr, 0) + CHURN_ADJUSTMENT_VALUE;
+      const mrrPerdidoChurn = churnContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
       const mrrPerdidoPausado = pausadoContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
       const ltvTotal = churnContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
       const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
