@@ -202,6 +202,31 @@ const TechKpiCard = ({ title, value, subtitle, icon: Icon, gradient, shadowColor
   </Card>
 );
 
+const StatPill = ({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "danger" | "warning" | "success" | "info";
+}) => {
+  const toneStyles = {
+    default: "border-border/60 bg-muted/40 text-foreground",
+    danger: "border-red-200/60 bg-red-50/70 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300",
+    warning: "border-amber-200/60 bg-amber-50/70 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300",
+    success: "border-emerald-200/60 bg-emerald-50/70 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300",
+    info: "border-blue-200/60 bg-blue-50/70 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300",
+  };
+
+  return (
+    <div className={`rounded-md border px-2.5 py-1 ${toneStyles[tone]}`}>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-xs font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+};
+
 // Componente de Gauge visual para taxa de churn
 const ChurnGauge = ({
   value,
@@ -248,27 +273,72 @@ const ChurnGauge = ({
   );
 };
 
-const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, children }: {
+const TechChartCard = ({ title, subtitle, icon: Icon, iconBg, meta, footer, children }: {
   title: string;
   subtitle: string;
   icon: any;
   iconBg: string;
+  meta?: React.ReactNode;
+  footer?: React.ReactNode;
   children: React.ReactNode;
 }) => (
-  <Card className="border-border/50">
-    <CardContent className="p-5">
-      <div className="flex items-center gap-3 mb-4">
-        <div className={`p-2 rounded-md ${iconBg}`}>
-          <Icon className="h-4 w-4 text-white" />
+  <Card className="border-border/50 bg-gradient-to-b from-white to-slate-50/80 dark:from-zinc-900/70 dark:to-zinc-950/40 shadow-sm hover:shadow-md transition-all">
+    <CardHeader className="pb-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-md ${iconBg} shadow-sm`}>
+            <Icon className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
+            <CardDescription className="text-xs text-muted-foreground">{subtitle}</CardDescription>
+          </div>
         </div>
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-          <p className="text-xs text-muted-foreground">{subtitle}</p>
-        </div>
+        {meta && (
+          <div className="hidden md:flex items-center gap-2">
+            {meta}
+          </div>
+        )}
       </div>
-      {children}
+    </CardHeader>
+    <CardContent className="pt-0">
+      <div className="rounded-lg border border-border/40 bg-white/80 dark:bg-zinc-900/50 p-3">
+        {children}
+      </div>
+      {footer && (
+        <div className="mt-3 text-[11px] text-muted-foreground">
+          {footer}
+        </div>
+      )}
     </CardContent>
   </Card>
+);
+
+const SectionBlock = ({
+  title,
+  subtitle,
+  icon: Icon,
+  accent,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  icon: any;
+  accent: string;
+  children: React.ReactNode;
+}) => (
+  <div className="rounded-2xl border border-border/60 bg-muted/20 p-4 shadow-sm space-y-4">
+    <div className="flex items-center gap-3">
+      <div className={`p-2 rounded-lg ${accent} shadow-sm`}>
+        <Icon className="h-4 w-4 text-white" />
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">{title}</p>
+        <p className="text-sm font-semibold text-foreground">{subtitle}</p>
+      </div>
+    </div>
+    {children}
+  </div>
 );
 
 export default function ChurnDetalhamento() {
@@ -1116,6 +1186,24 @@ export default function ChurnDetalhamento() {
     info: "text-blue-500",
   };
 
+  const churnPorMesTotal = churnPorMes.reduce((sum, item) => sum + item.count, 0);
+  const churnPorMesMedia = churnPorMes.length > 0 ? churnPorMesTotal / churnPorMes.length : 0;
+  const topServico = distribuicaoPorProduto[0];
+  const topLifetime = distribuicaoPorLifetime.length > 0
+    ? distribuicaoPorLifetime.reduce((best, item) => (item.count > best.count ? item : best))
+    : undefined;
+  const topTicket = distribuicaoPorTicket.length > 0
+    ? distribuicaoPorTicket.reduce((best, item) => (item.count > best.count ? item : best))
+    : undefined;
+  const mrrSquadTotal = distribuicaoPorSquad.reduce((sum, item) => sum + item.mrr, 0);
+  const mrrResponsavelTotal = distribuicaoPorResponsavel.reduce((sum, item) => sum + item.mrr, 0);
+  const mrrPerdidoTotal = mrrPerdidoPorMes.reduce((sum, item) => sum + item.mrr, 0);
+  const comparativoChurnTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrChurn, 0);
+  const comparativoPausadoTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrPausado, 0);
+  const cohortMediaGeral = cohortAnalysis.length > 0
+    ? cohortAnalysis.reduce((sum, item) => sum + item.avgLifetime, 0) / cohortAnalysis.length
+    : 0;
+
   if (error) {
     return (
       <div className="p-6">
@@ -1506,12 +1594,24 @@ export default function ChurnDetalhamento() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <SectionBlock
+        title="Volume e Mix"
+        subtitle="Como o churn se distribui no periodo"
+        icon={BarChart3}
+        accent="bg-gradient-to-r from-orange-500 to-amber-500"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <TechChartCard
           title="Churn por Mês"
           subtitle="Evolução mensal de contratos encerrados"
           icon={BarChart3}
           iconBg="bg-gradient-to-r from-orange-500 to-amber-500"
+          meta={
+            <div className="flex flex-wrap items-center gap-2">
+              <StatPill label="Total 12m" value={`${churnPorMesTotal} contratos`} />
+              <StatPill label="Media" value={`${churnPorMesMedia.toFixed(1)}/mes`} />
+            </div>
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
@@ -1553,6 +1653,13 @@ export default function ChurnDetalhamento() {
           subtitle="Percentual de churn por serviço"
           icon={PieChart}
           iconBg="bg-gradient-to-r from-blue-500 to-indigo-500"
+          meta={
+            <StatPill
+              label="Top servico"
+              value={topServico ? `${topServico.name} (${topServico.percentual.toFixed(0)}%)` : "-"}
+              tone="info"
+            />
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
@@ -1583,7 +1690,7 @@ export default function ChurnDetalhamento() {
               </ResponsiveContainer>
               <div className="flex-1 space-y-2 text-xs">
                 {distribuicaoPorProduto.slice(0, 5).map((item, i) => (
-                  <div key={item.name} className="space-y-0.5">
+                  <div key={item.name} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1 space-y-0.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <div 
@@ -1609,13 +1716,27 @@ export default function ChurnDetalhamento() {
           )}
         </TechChartCard>
       </div>
+      </SectionBlock>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <SectionBlock
+        title="Segmentacao"
+        subtitle="Onde o churn se concentra"
+        icon={Users}
+        accent="bg-gradient-to-r from-cyan-500 to-blue-500"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <TechChartCard
           title="MRR Perdido por Squad"
           subtitle="Valor mensal perdido (R$)"
           icon={DollarSign}
           iconBg="bg-gradient-to-r from-emerald-500 to-teal-500"
+          meta={
+            <StatPill
+              label="Top 8 MRR"
+              value={formatCurrencyNoDecimals(mrrSquadTotal)}
+              tone="success"
+            />
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
@@ -1659,6 +1780,13 @@ export default function ChurnDetalhamento() {
           subtitle="Tempo de permanência"
           icon={Clock}
           iconBg="bg-gradient-to-r from-violet-500 to-purple-500"
+          meta={
+            <StatPill
+              label="Faixa lider"
+              value={topLifetime ? `${topLifetime.name} (${topLifetime.count})` : "-"}
+              tone="info"
+            />
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
@@ -1690,7 +1818,7 @@ export default function ChurnDetalhamento() {
               </ResponsiveContainer>
               <div className="flex-1 space-y-2 text-xs">
                 {distribuicaoPorLifetime.filter(d => d.count > 0).map((item, i) => (
-                  <div key={item.name} className="space-y-0.5">
+                  <div key={item.name} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1 space-y-0.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <div 
@@ -1716,6 +1844,13 @@ export default function ChurnDetalhamento() {
           subtitle="Top 6 responsáveis (R$)"
           icon={DollarSign}
           iconBg="bg-gradient-to-r from-cyan-500 to-blue-500"
+          meta={
+            <StatPill
+              label="Top 6 MRR"
+              value={formatCurrencyNoDecimals(mrrResponsavelTotal)}
+              tone="info"
+            />
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[180px] w-full" />
@@ -1756,15 +1891,29 @@ export default function ChurnDetalhamento() {
           )}
         </TechChartCard>
       </div>
+      </SectionBlock>
 
       {/* Nova seção: Análises Avançadas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <SectionBlock
+        title="Evolucao Financeira"
+        subtitle="Impacto do MRR perdido e pausado"
+        icon={DollarSign}
+        accent="bg-gradient-to-r from-red-500 to-rose-500"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* MRR Perdido por Mês */}
         <TechChartCard
           title="Evolução do MRR Perdido"
           subtitle="Valor perdido mensalmente"
           icon={DollarSign}
           iconBg="bg-gradient-to-r from-red-500 to-rose-500"
+          meta={
+            <StatPill
+              label="Total 12m"
+              value={formatCurrencyNoDecimals(mrrPerdidoTotal)}
+              tone="danger"
+            />
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
@@ -1808,6 +1957,12 @@ export default function ChurnDetalhamento() {
           subtitle="Comparativo mensal de valor (R$)"
           icon={DollarSign}
           iconBg="bg-gradient-to-r from-amber-500 to-yellow-500"
+          meta={
+            <div className="flex flex-wrap items-center gap-2">
+              <StatPill label="Churn" value={formatCurrencyNoDecimals(comparativoChurnTotal)} tone="danger" />
+              <StatPill label="Pausado" value={formatCurrencyNoDecimals(comparativoPausadoTotal)} tone="warning" />
+            </div>
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
@@ -1841,15 +1996,29 @@ export default function ChurnDetalhamento() {
           )}
         </TechChartCard>
       </div>
+      </SectionBlock>
 
       {/* Distribuição por Ticket e Cohort */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <SectionBlock
+        title="Ticket e Cohort"
+        subtitle="Perfil de ticket e tempo ate churn"
+        icon={Clock}
+        accent="bg-gradient-to-r from-teal-500 to-emerald-500"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Distribuição por Faixa de Ticket */}
         <TechChartCard
           title="Churn por Faixa de Ticket"
           subtitle="Distribuição por valor do contrato"
           icon={DollarSign}
           iconBg="bg-gradient-to-r from-indigo-500 to-purple-500"
+          meta={
+            <StatPill
+              label="Faixa lider"
+              value={topTicket ? `${topTicket.name} (${topTicket.count})` : "-"}
+              tone="info"
+            />
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
@@ -1881,7 +2050,7 @@ export default function ChurnDetalhamento() {
               </ResponsiveContainer>
               <div className="flex-1 space-y-2 text-xs">
                 {distribuicaoPorTicket.map((item, i) => (
-                  <div key={item.name} className="space-y-0.5">
+                  <div key={item.name} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1 space-y-0.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <div 
@@ -1908,6 +2077,13 @@ export default function ChurnDetalhamento() {
           subtitle="Lifetime médio por mês de início"
           icon={Clock}
           iconBg="bg-gradient-to-r from-teal-500 to-emerald-500"
+          meta={
+            <StatPill
+              label="Media geral"
+              value={`${cohortMediaGeral.toFixed(1)}m`}
+              tone="success"
+            />
+          }
         >
           {isLoading ? (
             <Skeleton className="h-[200px] w-full" />
@@ -1945,6 +2121,7 @@ export default function ChurnDetalhamento() {
           )}
         </TechChartCard>
       </div>
+      </SectionBlock>
 
       {/* Análise de Churn por Tipo de Erro */}
       <Card className="border-orange-200 dark:border-orange-900/40">
@@ -2556,5 +2733,8 @@ export default function ChurnDetalhamento() {
     </div>
   );
 }
+
+
+
 
 
