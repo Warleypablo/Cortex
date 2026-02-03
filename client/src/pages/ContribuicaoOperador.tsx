@@ -542,9 +542,10 @@ export default function ContribuicaoOperador() {
                       <th className="p-3 text-right font-semibold">Receita</th>
                       <th className="p-3 text-right font-semibold">Despesa</th>
                       <th className="p-3 text-right font-semibold">Resultado Bruto</th>
+                      <th className="p-3 text-right font-semibold">Margem Bruta (%)</th>
                       <th className="p-3 text-right font-semibold">Impostos (18%)</th>
                       <th className="p-3 text-right font-semibold">Contribuição</th>
-                      <th className="p-3 text-right font-semibold">Margem</th>
+                      <th className="p-3 text-right font-semibold">Margem L�quida</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -576,6 +577,18 @@ export default function ContribuicaoOperador() {
                         <td className="p-3 text-right font-medium">
                           {formatCurrencyNoDecimals(squad.resultadoBruto)}
                         </td>
+                        <td className={cn(
+                          "p-3 text-right font-medium",
+                          squad.receita > 0
+                            ? squad.resultadoBruto / squad.receita >= 0.2
+                              ? "text-emerald-500"
+                              : squad.resultadoBruto / squad.receita >= 0
+                                ? "text-amber-500"
+                                : "text-red-500"
+                            : "text-muted-foreground"
+                        )}>
+                          {squad.receita > 0 ? formatPercent((squad.resultadoBruto / squad.receita) * 100, 1) : "-"}
+                        </td>
                         <td className="p-3 text-right text-orange-500 font-medium">
                           {formatCurrencyNoDecimals(squad.impostos)}
                         </td>
@@ -605,6 +618,11 @@ export default function ContribuicaoOperador() {
                       </td>
                       <td className="p-3 text-right">
                         {formatCurrencyNoDecimals(rankingData.totais.resultadoBruto)}
+                      </td>
+                      <td className="p-3 text-right">
+                        {rankingData.totais.receita > 0
+                          ? formatPercent((rankingData.totais.resultadoBruto / rankingData.totais.receita) * 100, 1)
+                          : "-"}
                       </td>
                       <td className="p-3 text-right text-orange-500">
                         {formatCurrencyNoDecimals(rankingData.totais.impostos)}
@@ -952,3 +970,5 @@ export default function ContribuicaoOperador() {
     </div>
   );
 }
+
+
