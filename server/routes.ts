@@ -8927,7 +8927,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         const resultadoBruto = receita - despesaSemImpostos;
-        const impostos = resultadoBruto * 0.18;
+        const impostos = receita * 0.18;
         const contribuicao = resultadoBruto - impostos;
         const margem = receita > 0 ? (contribuicao / receita) * 100 : 0;
 
