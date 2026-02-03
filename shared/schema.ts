@@ -290,9 +290,11 @@ export type ContratoCompleto = {
   valorp: string | null;
   dataInicio: Date | null;
   dataEncerramento: Date | null;
+  dataPausa: Date | null;
   dataSolicitacaoEncerramento: Date | null;
   squad: string | null;
   idTask: string | null;
+  vendedor: string | null;
   nomeCliente: string | null;
   cnpjCliente: string | null;
   idCliente: string | null;

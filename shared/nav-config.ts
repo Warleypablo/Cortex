@@ -31,6 +31,7 @@ export const PERMISSION_KEYS = {
     CLIENTES_CONTRATOS: 'gestao.clientes_contratos',
     CHURN_DETALHAMENTO: 'gestao.churn_detalhamento',
     EVOLUCAO_MENSAL: 'gestao.evolucao_mensal',
+    CONTRATOS_DETALHAMENTO: 'gestao.contratos_detalhamento',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -178,6 +179,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
+  '/dashboard/contratos-detalhamento': PERMISSION_KEYS.GESTAO.CONTRATOS_DETALHAMENTO,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   '/contratos': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   // Operação
@@ -338,6 +340,7 @@ export const NAV_CONFIG = {
       items: [
         { title: 'Visão Geral', url: '/visao-geral', icon: 'Eye', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
         { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS },
+        { title: 'Detalhamento Contratos', url: '/dashboard/contratos-detalhamento', icon: 'FileText', permissionKey: PERMISSION_KEYS.GESTAO.CONTRATOS_DETALHAMENTO },
         { title: 'Evolução Mensal', url: '/dashboard/evolucao-mensal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
       ],
@@ -532,6 +535,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
   [PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL]: 'Evolução Mensal',
   [PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
+  [PERMISSION_KEYS.GESTAO.CONTRATOS_DETALHAMENTO]: 'Detalhamento Contratos',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',
