@@ -2643,10 +2643,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Exportar colaboradores em Excel ou CSV
-  app.get("/api/colaboradores/exportar-excel", async (req, res) => {
+  const exportarColaboradores = async (req: any, res: any) => {
     try {
-      const formato = req.query.formato as string || 'xlsx';
+      const formatoRaw = (req.body?.formato ?? req.query.formato) as string | undefined;
+      const formato = formatoRaw === 'csv' ? 'csv' : 'xlsx';
       const XLSX = await import("xlsx");
+      const formatDatePt = (value: string | null | undefined) => value ? new Date(value).toLocaleDateString('pt-BR') : '';
+
+      const exportColumns = [
+        { key: "id", label: "ID", getValue: (c: any) => c.id },
+        { key: "status", label: "Status", getValue: (c: any) => c.status },
+        { key: "nome", label: "Nome", getValue: (c: any) => c.nome },
+        { key: "cpf", label: "CPF", getValue: (c: any) => c.cpf },
+        { key: "endereco", label: "Endereço", getValue: (c: any) => c.endereco },
+        { key: "estado", label: "Estado", getValue: (c: any) => c.estado },
+        { key: "telefone", label: "Telefone", getValue: (c: any) => c.telefone },
+        { key: "aniversario", label: "Aniversário", getValue: (c: any) => formatDatePt(c.aniversario) },
+        { key: "admissao", label: "Admissão", getValue: (c: any) => formatDatePt(c.admissao) },
+        { key: "demissao", label: "Demissão", getValue: (c: any) => formatDatePt(c.demissao) },
+        { key: "tipo_demissao", label: "Tipo Demissão", getValue: (c: any) => c.tipo_demissao },
+        { key: "motivo_demissao", label: "Motivo Demissão", getValue: (c: any) => c.motivo_demissao },
+        { key: "proporcional", label: "Proporcional", getValue: (c: any) => c.proporcional },
+        { key: "proporcional_caju", label: "Proporcional Caju", getValue: (c: any) => c.proporcional_caju },
+        { key: "setor", label: "Setor", getValue: (c: any) => c.setor },
+        { key: "squad", label: "Squad", getValue: (c: any) => c.squad },
+        { key: "cargo", label: "Cargo", getValue: (c: any) => c.cargo },
+        { key: "nivel", label: "Nível", getValue: (c: any) => c.nivel },
+        { key: "pix", label: "PIX", getValue: (c: any) => c.pix },
+        { key: "cnpj", label: "CNPJ", getValue: (c: any) => c.cnpj },
+        { key: "email_turbo", label: "Email Turbo", getValue: (c: any) => c.email_turbo },
+        { key: "email_pessoal", label: "Email Pessoal", getValue: (c: any) => c.email_pessoal },
+        { key: "meses_de_turbo", label: "Meses de Turbo", getValue: (c: any) => c.meses_de_turbo },
+        { key: "ultimo_aumento", label: "Último Aumento", getValue: (c: any) => formatDatePt(c.ultimo_aumento) },
+        { key: "meses_ult_aumento", label: "Meses Últ. Aumento", getValue: (c: any) => c.meses_ult_aumento },
+        { key: "salario", label: "Salário", getValue: (c: any) => c.salario },
+        { key: "user_id", label: "User ID", getValue: (c: any) => c.user_id },
+      ];
       
       // Busca todos os colaboradores diretamente da tabela rh_pessoal (colunas reais)
       const result = await db.execute(sql`
@@ -2683,46 +2715,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `);
       
       const colaboradores = result.rows as any[];
+
+      const rawQuery = req.originalUrl?.split("?")[1] ?? "";
+      const searchParams = new URLSearchParams(rawQuery);
+      const colunasFromUrl = searchParams.getAll("colunas").map((col) => col.trim()).filter(Boolean);
+
+      const colunasParam = req.body?.colunas
+        ?? (colunasFromUrl.length > 0 ? colunasFromUrl : req.query.colunas);
+
+      const requestedKeys = Array.isArray(colunasParam)
+        ? colunasParam.flatMap((col) => String(col).split(",")).map((col) => col.trim()).filter(Boolean)
+        : typeof colunasParam === "string"
+          ? colunasParam.split(",").map((col) => col.trim()).filter(Boolean)
+          : [];
+      const requestedSet = new Set(requestedKeys);
+      const selectedColumns = requestedKeys.length > 0
+        ? exportColumns.filter((col) => requestedSet.has(col.key))
+        : exportColumns;
+
+      if (requestedKeys.length > 0 && selectedColumns.length === 0) {
+        return res.status(400).json({ error: "Nenhuma coluna válida selecionada" });
+      }
       
       // Define os nomes das colunas em português
-      const headers = [
-        "ID", "Status", "Nome", "CPF", "Endereço", "Estado", "Telefone",
-        "Aniversário", "Admissão", "Demissão", "Tipo Demissão", "Motivo Demissão",
-        "Proporcional", "Proporcional Caju", "Setor", "Squad", "Cargo", "Nível",
-        "PIX", "CNPJ", "Email Turbo", "Email Pessoal", "Meses de Turbo",
-        "Último Aumento", "Meses Últ. Aumento", "Salário", "User ID"
-      ];
+      const headers = selectedColumns.map((column) => column.label);
       
       // Mapeia os dados para formato de array
-      const data = colaboradores.map(c => [
-        c.id,
-        c.status,
-        c.nome,
-        c.cpf,
-        c.endereco,
-        c.estado,
-        c.telefone,
-        c.aniversario ? new Date(c.aniversario).toLocaleDateString('pt-BR') : '',
-        c.admissao ? new Date(c.admissao).toLocaleDateString('pt-BR') : '',
-        c.demissao ? new Date(c.demissao).toLocaleDateString('pt-BR') : '',
-        c.tipo_demissao,
-        c.motivo_demissao,
-        c.proporcional,
-        c.proporcional_caju,
-        c.setor,
-        c.squad,
-        c.cargo,
-        c.nivel,
-        c.pix,
-        c.cnpj,
-        c.email_turbo,
-        c.email_pessoal,
-        c.meses_de_turbo,
-        c.ultimo_aumento ? new Date(c.ultimo_aumento).toLocaleDateString('pt-BR') : '',
-        c.meses_ult_aumento,
-        c.salario,
-        c.user_id
-      ]);
+      const data = colaboradores.map((c) => selectedColumns.map((column) => column.getValue(c)));
       
       // Adiciona headers no início
       data.unshift(headers);
@@ -2757,7 +2776,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("[api] Error exporting colaboradores:", error);
       res.status(500).json({ error: "Falha ao exportar colaboradores" });
     }
-  });
+  };
+
+  app.get("/api/colaboradores/exportar-excel", exportarColaboradores);
+  app.post("/api/colaboradores/exportar-excel", exportarColaboradores);
 
   app.get("/api/colaboradores/by-user/:userId", async (req, res) => {
     try {
@@ -8861,236 +8883,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Endpoint de ranking de contribuição por squad (receitas - despesas - impostos)
+  // Usa EXATAMENTE a mesma query da DFC (getContribuicaoSquadDfc) para consistência
   app.get("/api/contribuicao-squad/ranking", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string;
       const dataFim = req.query.dataFim as string;
-      
+
       if (!dataInicio || !dataFim) {
         return res.status(400).json({ error: "Parâmetros dataInicio e dataFim são obrigatórios" });
       }
-      
-      const dataFimComHora = `${dataFim} 23:59:59`;
-      
-      // Buscar receitas por squad
-      const receitasResult = await db.execute(sql`
-        WITH cnpj_normalizado AS (
-          SELECT 
-            ids,
-            nome,
-            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-          FROM "Conta Azul".caz_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
-        ),
-        cup_cnpj_normalizado AS (
-          SELECT 
-            task_id,
-            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-          FROM "Clickup".cup_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
-        ),
-        contrato_unico AS (
-          SELECT DISTINCT ON (cc.cnpj_limpo)
-            cc.cnpj_limpo,
-            ct.squad,
-            ct.id_subtask
-          FROM cup_cnpj_normalizado cc
-          INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
-          WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-          ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
-        )
-        SELECT 
-          COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
-          SUM(p.valor_pago::numeric) as receita
-        FROM "Conta Azul".caz_parcelas p
-        LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
-        WHERE p.status = 'QUITADO'
-          AND p.tipo_evento = 'RECEITA'
-          AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFimComHora}::timestamp
-          AND p.valor_pago::numeric > 0
-        GROUP BY COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad')
-      `);
-      
-      // Buscar despesas por squad (salários + benefícios + CXCS + freelancers)
-      // 1. Salários e contagem de colaboradores por squad
-      const salariosPorSquadResult = await db.execute(sql`
-        WITH salarios_normalizados AS (
-          SELECT 
-            rp.id,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
-            CASE
-              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
-              WHEN rp.salario::text LIKE '%,%' THEN
-                NULLIF(
-                  REPLACE(
-                    REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'),
-                    ',',
-                    '.'
-                  ),
-                  ''
-                )::numeric
-              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
-                NULLIF(
-                  REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'),
-                  ''
-                )::numeric
-              ELSE
-                NULLIF(
-                  REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'),
-                  ''
-                )::numeric
-            END as salario
-          FROM "Inhire".rh_pessoal rp
-        )
-        SELECT 
-          squad,
-          SUM(COALESCE(salario, 0)) as total_salarios,
-          COUNT(DISTINCT id) as qtd_colaboradores
-        FROM salarios_normalizados
-        WHERE status_norm = 'ativo'
-          AND salario IS NOT NULL
-          AND salario > 0
-        GROUP BY squad
-      `);
-      
-      // 2. Média CXCS (será rateada por squad)
-      const cxcsResult = await db.execute(sql`
-        SELECT AVG(
-          CASE
-            WHEN salario IS NULL OR TRIM(salario::text) = '' THEN NULL
-            WHEN salario::text LIKE '%,%' THEN
-              NULLIF(REPLACE(REGEXP_REPLACE(salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
-            WHEN salario::text ~ '\\.[0-9]{1,2}$' THEN
-              NULLIF(REGEXP_REPLACE(salario::text, '[^0-9.]', '', 'g'), '')::numeric
-            ELSE
-              NULLIF(REGEXP_REPLACE(salario::text, '[^0-9]', '', 'g'), '')::numeric
-          END
-        ) as media_cxcs
-        FROM "Inhire".rh_pessoal
-        WHERE UPPER(TRIM(cargo)) = 'CXCS'
-          AND UPPER(TRIM(status)) = 'ATIVO'
-          AND salario IS NOT NULL
-      `);
-      const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
-      // Cada squad recebe a média CXCS completa (consistente com DFC)
-      const cxcsPorSquad = mediaCxcs;
-      
-      // 3. Freelancers por squad no período
-      const freelasPorSquadResult = await db.execute(sql`
-        SELECT 
-          COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-          SUM(COALESCE(
-            f.valor_projeto::numeric,
-            NULLIF(
-              REPLACE(
-                REPLACE(
-                  REGEXP_REPLACE(f.custom_fields->>'Valor', '[^0-9,.]', '', 'g'),
-                  '.', ''
-                ),
-                ',', '.'
-              ),
-              ''
-            )::numeric,
-            0
-          )) as total_freelancers
-        FROM "Clickup".cup_freelas f
-        LEFT JOIN "Inhire".rh_pessoal rp ON (
-          LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
-          OR LOWER(TRIM(f.responsavel)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2))
-          OR LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(f.responsavel)) || '%'
-          OR (
-            LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
-            AND LOWER(TRIM(rp.nome)) LIKE '%' || LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)) || '%'
-          )
-        )
-        WHERE f.data_pagamento >= ${dataInicio}::date
-          AND f.data_pagamento <= ${dataFimComHora}::timestamp
-        GROUP BY COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad')
-      `);
-      
-      // Consolidar despesas e receitas por squad
-      const receitasMap = new Map<string, number>();
-      const despesasMap = new Map<string, number>();
-      const allSquads = new Set<string>();
-      const BENEFICIO_POR_COLABORADOR = 400;
-      
-      for (const row of salariosPorSquadResult.rows as any[]) {
-        const squad = row.squad;
-        const salarios = parseFloat(row.total_salarios) || 0;
-        const qtdColabs = parseInt(row.qtd_colaboradores) || 0;
-        const beneficios = qtdColabs * BENEFICIO_POR_COLABORADOR;
-        const cxcs = squad !== 'Sem Squad' ? cxcsPorSquad : 0;
-        
-        despesasMap.set(squad, salarios + beneficios + cxcs);
-        allSquads.add(squad);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dataInicio) || !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
+        return res.status(400).json({ error: "Formato inválido. Esperado: YYYY-MM-DD" });
       }
-      
-      // Adicionar freelancers às despesas
-      for (const row of freelasPorSquadResult.rows as any[]) {
-        const squad = row.squad;
-        const freelancers = parseFloat(row.total_freelancers) || 0;
-        const existing = despesasMap.get(squad) || 0;
-        despesasMap.set(squad, existing + freelancers);
-        allSquads.add(squad);
-      }
-      
-      // Adicionar receitas
-      for (const row of receitasResult.rows as any[]) {
-        receitasMap.set(row.squad, parseFloat(row.receita) || 0);
-        allSquads.add(row.squad);
-      }
-      
-      // Função para normalizar nome do squad (remover emojis e caracteres especiais no início)
-      const normalizeSquadName = (name: string): string => {
-        // Remove emojis e caracteres especiais do início, mantém o texto principal
-        return name.replace(/^[^\p{L}\p{N}]+/u, '').trim();
-      };
-      
-      // Consolidar squads com nomes similares (ex: "⚡ Makers" e "Makers")
-      const consolidatedMap = new Map<string, { displayName: string; receita: number; despesa: number }>();
-      
-      for (const squad of allSquads) {
-        const normalized = normalizeSquadName(squad);
-        const receita = receitasMap.get(squad) || 0;
-        const despesa = despesasMap.get(squad) || 0;
-        
-        const existing = consolidatedMap.get(normalized);
-        if (existing) {
-          existing.receita += receita;
-          existing.despesa += despesa;
-          // Manter o displayName com emoji se existir
-          if (squad.length > existing.displayName.length) {
-            existing.displayName = squad;
+
+      // Buscar lista de squads usando a mesma query da DFC
+      const baseData = await storage.getContribuicaoSquadDfc(dataInicio, dataFim);
+      const squads = baseData.squads || [];
+
+      // Buscar dados completos por squad (mesma query usada na DFC mensal)
+      const squadResults = await Promise.all(
+        squads.map(async (squad) => {
+          const data = await storage.getContribuicaoSquadDfc(dataInicio, dataFim, squad);
+          return { squad, data };
+        })
+      );
+
+      // Calcular ranking usando MESMA lógica do frontend DFC:
+      // despesaSemImpostos = soma das despesas excluindo IMPOSTOS
+      // resultadoBruto = receita - despesaSemImpostos
+      // impostos = resultadoBruto * 0.18
+      // contribuicao = resultadoBruto - impostos
+      const rankingData = squadResults.map(({ squad, data }) => {
+        const receita = data.totais?.receitaTotal || 0;
+
+        // Calcular despesa SEM impostos (mesma lógica do frontend linha 260-267)
+        let despesaSemImpostos = 0;
+        if (data.despesas) {
+          for (const despesa of data.despesas) {
+            if (!despesa.categoriaId.toUpperCase().includes('IMPOSTOS')) {
+              despesaSemImpostos += despesa.valor;
+            }
           }
-        } else {
-          consolidatedMap.set(normalized, { displayName: squad, receita, despesa });
         }
-      }
-      
-      const ranking = Array.from(consolidatedMap.values()).map(({ displayName, receita, despesa }) => {
-        const impostos = receita * 0.18; // 18% sobre receita (consistente com DFC)
-        // Despesa total inclui impostos (consistente com DFC)
-        const despesaTotal = despesa + impostos;
-        const resultadoBruto = receita - despesa;
-        const contribuicao = receita - despesaTotal; // Receita - (Despesa + Impostos)
+
+        const resultadoBruto = receita - despesaSemImpostos;
+        const impostos = resultadoBruto * 0.18;
+        const contribuicao = resultadoBruto - impostos;
         const margem = receita > 0 ? (contribuicao / receita) * 100 : 0;
-        
+
         return {
-          squad: displayName,
+          squad,
           receita,
-          despesa: despesaTotal, // Agora inclui impostos (igual ao DFC)
+          despesa: despesaSemImpostos,
           resultadoBruto,
           impostos,
           contribuicao,
           margem
         };
-      })
-      .filter(s => s.receita > 0 || s.despesa > 0) // Filtrar squads sem dados
-      .sort((a, b) => b.contribuicao - a.contribuicao); // Ordenar por contribuição (maior primeiro)
-      
+      });
+
+      const ranking = rankingData
+        .filter(s => s.receita > 0 || s.despesa > 0)
+        .sort((a, b) => b.contribuicao - a.contribuicao);
+
       const totais = ranking.reduce((acc, s) => ({
         receita: acc.receita + s.receita,
         despesa: acc.despesa + s.despesa,
@@ -9098,7 +8953,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         impostos: acc.impostos + s.impostos,
         contribuicao: acc.contribuicao + s.contribuicao
       }), { receita: 0, despesa: 0, resultadoBruto: 0, impostos: 0, contribuicao: 0 });
-      
+
       res.json({ ranking, totais });
     } catch (error) {
       console.error("[api] Error fetching ranking contribuição:", error);
