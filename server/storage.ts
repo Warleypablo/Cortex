@@ -11782,7 +11782,16 @@ export class DbStorage implements IStorage {
       quantidadeContratos: number;
     };
   }> {
-    const dataFimComHora = `${dataFim} 23:59:59`;
+    // Usar < (date + 1 day) em vez de <= 23:59:59 para evitar gaps com sub-segundos
+    // Isso garante que a soma mensal = total anual (consistência entre DFC e ranking)
+
+    const normalizeSquadKey = (value: string | null | undefined): string =>
+      (value || '')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]/gu, '');
+
+    const squadFilterValue = squad && squad !== 'todos' ? squad : null;
+    const squadFilterKey = squadFilterValue ? normalizeSquadKey(squadFilterValue) : null;
     
     // Lista de squads com receitas no período - usa LEFT JOINs e DISTINCT ON para evitar duplicação
     const squadsResult = await db.execute(sql`
@@ -11819,15 +11828,21 @@ export class DbStorage implements IStorage {
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${dataInicio}::date
-        AND p.data_quitacao <= ${dataFimComHora}::timestamp
+        AND p.data_quitacao < (${dataFim}::date + interval '1 day')
         AND p.valor_pago::numeric > 0
       ORDER BY squad
     `);
     
-    const squads = squadsResult.rows.map((r: any) => r.squad);
-    
-    // Filtro de squad com COALESCE aplicado corretamente
-    const squadFilterValue = squad && squad !== 'todos' ? squad : null;
+    const squadsByKey = new Map<string, string>();
+    for (const row of squadsResult.rows as any[]) {
+      const rawSquad = (row.squad as string) || 'Sem Squad';
+      const key = normalizeSquadKey(rawSquad);
+      const existing = squadsByKey.get(key);
+      if (!existing || rawSquad.length > existing.length) {
+        squadsByKey.set(key, rawSquad);
+      }
+    }
+    const squads = Array.from(squadsByKey.values()).sort();
     
     // Query principal - usa DISTINCT ON para evitar duplicação de valores
     const receitasResult = await db.execute(sql`
@@ -11872,13 +11887,16 @@ export class DbStorage implements IStorage {
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFimComHora}::timestamp
+          AND p.data_quitacao < (${dataFim}::date + interval '1 day')
           AND p.valor_pago::numeric > 0
           AND (
-            ${squadFilterValue}::text IS NULL 
-            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') = ${squadFilterValue}
-            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilterValue}, '^[^a-zA-Z]+', '', 'g')
-            OR ${squadFilterValue} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+            ${squadFilterKey}::text IS NULL 
+            OR REGEXP_REPLACE(
+              LOWER(COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad')),
+              '[^[:alnum:]]',
+              '',
+              'g'
+            ) = ${squadFilterKey}
           )
       )
       SELECT 
@@ -11996,8 +12014,6 @@ export class DbStorage implements IStorage {
     }
 
     // Query para calcular despesas (salarios ativos do squad)
-    const salarioSquadFilterValue = squad && squad !== 'todos' ? squad : null;
-    
     const salarioResult = await db.execute(sql`
       WITH salarios_normalizados AS (
         SELECT 
@@ -12039,18 +12055,13 @@ export class DbStorage implements IStorage {
         AND salario IS NOT NULL
         AND salario > 0
         AND (
-          ${salarioSquadFilterValue}::text IS NULL
+          ${squadFilterKey}::text IS NULL
           OR REGEXP_REPLACE(
             LOWER(COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')),
             '[^[:alnum:]]',
             '',
             'g'
-          ) = REGEXP_REPLACE(
-            LOWER(COALESCE(${salarioSquadFilterValue}, '')),
-            '[^[:alnum:]]',
-            '',
-            'g'
-          )
+          ) = ${squadFilterKey}
         )
       ORDER BY squad, colaborador_nome
     `);
@@ -12135,20 +12146,15 @@ export class DbStorage implements IStorage {
         )
       )
       WHERE f.data_pagamento >= ${dataInicio}::date
-        AND f.data_pagamento <= ${dataFimComHora}::timestamp
+        AND f.data_pagamento < (${dataFim}::date + interval '1 day')
         AND (
-          ${salarioSquadFilterValue}::text IS NULL
+          ${squadFilterKey}::text IS NULL
           OR REGEXP_REPLACE(
             LOWER(COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad')),
             '[^[:alnum:]]',
             '',
             'g'
-          ) = REGEXP_REPLACE(
-            LOWER(COALESCE(${salarioSquadFilterValue}, '')),
-            '[^[:alnum:]]',
-            '',
-            'g'
-          )
+          ) = ${squadFilterKey}
         )
       ORDER BY COALESCE(f.valor_projeto::numeric, 0) DESC
     `);
@@ -12160,8 +12166,8 @@ export class DbStorage implements IStorage {
     console.log('[freelas] Total rows:', freelaResult.rows.length, 'Primeiro:', freelaResult.rows[0]);
     
     // Debug: mostrar todos os freelancers e seus squads para identificar problemas de join
-    if (salarioSquadFilterValue) {
-      console.log('[freelas] Filtro de squad aplicado:', salarioSquadFilterValue);
+    if (squadFilterValue) {
+      console.log('[freelas] Filtro de squad aplicado:', squadFilterValue);
       
       // Debug: buscar nomes similares para encontrar variações
       const similarNamesDebug = await db.execute(sql`
@@ -12193,7 +12199,7 @@ export class DbStorage implements IStorage {
           )
         )
         WHERE f.data_pagamento >= ${dataInicio}::date
-          AND f.data_pagamento <= ${dataFimComHora}::timestamp
+          AND f.data_pagamento < (${dataFim}::date + interval '1 day')
         ORDER BY f.responsavel
       `);
       console.log('[freelas-debug] Todos os freelancers do período (join robusto):', 
