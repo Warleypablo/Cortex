@@ -286,7 +286,7 @@ export default function ContribuicaoOperador() {
       }
       const receita = m.data?.totais?.receitaTotal || 0;
       const resultadoBruto = receita - despesaSemImpostos;
-      const impostos = resultadoBruto * 0.18; // 18% sobre Resultado Bruto
+      const impostos = receita * 0.18; // 18% sobre Receita
       const resultadoLiquido = resultadoBruto - impostos;
       
       return {
