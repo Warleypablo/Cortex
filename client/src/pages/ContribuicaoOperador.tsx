@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { ChevronRight, ChevronDown, DollarSign, Users, TrendingUp, CirclePlus, CircleMinus, FileText, Trophy } from "lucide-react";
+import { ChevronRight, ChevronDown, DollarSign, Users, TrendingUp, CirclePlus, CircleMinus, FileText, Trophy, Calendar } from "lucide-react";
 import { format, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -67,6 +67,7 @@ export default function ContribuicaoOperador() {
   
   const hoje = new Date();
   const [anoSelecionado, setAnoSelecionado] = useState(hoje.getFullYear());
+  const [mesSelecionado, setMesSelecionado] = useState<string>("todos");
   const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(["RECEITAS"]));
   
@@ -86,6 +87,23 @@ export default function ContribuicaoOperador() {
   }, [anoSelecionado]);
   
   const anos = Array.from({ length: 5 }, (_, i) => hoje.getFullYear() - i);
+
+  // Datas do período selecionado (mês específico ou ano inteiro)
+  const periodoSelecionado = useMemo(() => {
+    if (mesSelecionado === "todos") {
+      return { dataInicio: `${anoSelecionado}-01-01`, dataFim: `${anoSelecionado}-12-31` };
+    }
+    const mesIndex = parseInt(mesSelecionado);
+    const mesData = meses[mesIndex];
+    return { dataInicio: mesData.dataInicio, dataFim: mesData.dataFim };
+  }, [anoSelecionado, mesSelecionado, meses]);
+
+  const labelPeriodo = useMemo(() => {
+    if (mesSelecionado === "todos") return "do Ano";
+    const mesIndex = parseInt(mesSelecionado);
+    const label = meses[mesIndex]?.mesLabel || "";
+    return `de ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+  }, [mesSelecionado, meses]);
   
   const { data: filterData, isLoading: loadingFilters } = useQuery<{ squads: string[] }>({
     queryKey: ["/api/contribuicao-squad/dfc/filters", anoSelecionado],
@@ -108,11 +126,12 @@ export default function ContribuicaoOperador() {
 
   // Query para ranking de todos os squads (exibido quando "todos" está selecionado)
   const { data: rankingData, isLoading: loadingRanking } = useQuery<RankingData>({
-    queryKey: ["/api/contribuicao-squad/ranking", anoSelecionado],
+    queryKey: ["/api/contribuicao-squad/ranking", anoSelecionado, mesSelecionado],
     queryFn: async () => {
-      const dataInicio = `${anoSelecionado}-01-01`;
-      const dataFim = `${anoSelecionado}-12-31`;
-      const params = new URLSearchParams({ dataInicio, dataFim });
+      const params = new URLSearchParams({
+        dataInicio: periodoSelecionado.dataInicio,
+        dataFim: periodoSelecionado.dataFim
+      });
       const response = await fetch(`/api/contribuicao-squad/ranking?${params.toString()}`, {
         credentials: "include"
       });
@@ -328,13 +347,26 @@ export default function ContribuicaoOperador() {
   };
 
   const totalReceitas = useMemo(() => {
+    if (mesSelecionado !== "todos") {
+      const mesIndex = parseInt(mesSelecionado);
+      const col = hierarchicalData.monthColumns[mesIndex];
+      return col?.receitaTotal || 0;
+    }
     return hierarchicalData.monthColumns.reduce((acc, col) => acc + col.receitaTotal, 0);
-  }, [hierarchicalData]);
+  }, [hierarchicalData, mesSelecionado]);
 
   const totalContratos = useMemo(() => {
     if (!monthlyResults) return 0;
+    if (mesSelecionado !== "todos") {
+      const mesIndex = parseInt(mesSelecionado);
+      return monthlyResults[mesIndex]?.data?.totais?.quantidadeContratos || 0;
+    }
     return monthlyResults.reduce((acc, m) => acc + (m.data?.totais?.quantidadeContratos || 0), 0);
-  }, [monthlyResults]);
+  }, [monthlyResults, mesSelecionado]);
+
+  const mesesComDados = useMemo(() => {
+    return hierarchicalData.monthColumns.filter(col => col.receitaTotal > 0).length;
+  }, [hierarchicalData]);
 
   const formatMesLabel = (label: string) => {
     return label.charAt(0).toUpperCase() + label.slice(1);
@@ -349,8 +381,8 @@ export default function ContribuicaoOperador() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Select 
-            value={squadSelecionado} 
+          <Select
+            value={squadSelecionado}
             onValueChange={handleSquadChange}
           >
             <SelectTrigger className="w-[180px]" data-testid="select-squad">
@@ -365,9 +397,27 @@ export default function ContribuicaoOperador() {
               ))}
             </SelectContent>
           </Select>
-          
-          <Select 
-            value={anoSelecionado.toString()} 
+
+          <Select
+            value={mesSelecionado}
+            onValueChange={setMesSelecionado}
+          >
+            <SelectTrigger className="w-[150px]" data-testid="select-mes">
+              <Calendar className="h-4 w-4 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="Todos os meses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Ano inteiro</SelectItem>
+              {meses.map((m, i) => (
+                <SelectItem key={m.mes} value={i.toString()}>
+                  {m.mesLabel.charAt(0).toUpperCase() + m.mesLabel.slice(1)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={anoSelecionado.toString()}
             onValueChange={(val) => setAnoSelecionado(parseInt(val))}
           >
             <SelectTrigger className="w-[100px]" data-testid="select-ano">
@@ -387,7 +437,7 @@ export default function ContribuicaoOperador() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita Total do Ano</CardTitle>
+            <CardTitle className="text-sm font-medium">Receita Total {labelPeriodo}</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -444,24 +494,26 @@ export default function ContribuicaoOperador() {
           </CardContent>
         </Card>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Média Mensal</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <Skeleton className="h-8 w-24" />
-            ) : (
-              <div className="text-2xl font-bold" data-testid="text-media-mensal">
-                {formatCurrencyNoDecimals(totalReceitas / 12)}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground mt-1">
-              Receita média por mês
-            </p>
-          </CardContent>
-        </Card>
+        {mesSelecionado === "todos" && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Média Mensal</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="text-2xl font-bold" data-testid="text-media-mensal">
+                  {formatCurrencyNoDecimals(mesesComDados > 0 ? totalReceitas / mesesComDados : 0)}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                Receita média por mês ({mesesComDados} meses com dados)
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Tabela de Ranking - exibida apenas quando "todos" está selecionado */}
