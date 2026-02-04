@@ -53,6 +53,8 @@ interface BulkResponse {
   meses: MonthlyData[];
 }
 
+const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
+
 export default function ContribuicaoSquad() {
   usePageTitle("Contribuição por Squad");
   useSetPageInfo("Contribuição por Squad", "Receitas atribuídas por squad do contrato");
@@ -81,6 +83,10 @@ export default function ContribuicaoSquad() {
   });
 
   const squadsData = bulkData?.squads || [];
+  const visibleSquads = useMemo(
+    () => squadsData.filter((squad) => !isOffSquad(squad)),
+    [squadsData]
+  );
   const monthlyResults = bulkData?.meses || [];
 
   const hierarchicalData = useMemo(() => {
@@ -209,7 +215,7 @@ export default function ContribuicaoSquad() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os squads</SelectItem>
-              {squadsData?.map((sq) => (
+              {visibleSquads.map((sq) => (
                 <SelectItem key={sq} value={sq}>
                   {sq}
                 </SelectItem>
@@ -266,7 +272,7 @@ export default function ContribuicaoSquad() {
             ) : (
               <div className="text-xl font-bold" data-testid="text-squads">
                 {squadSelecionado === "todos" 
-                  ? (squadsData?.length || 0) 
+                  ? (visibleSquads.length) 
                   : "1"}
               </div>
             )}

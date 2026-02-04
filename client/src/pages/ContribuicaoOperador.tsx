@@ -61,6 +61,8 @@ interface RankingData {
   };
 }
 
+const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
+
 export default function ContribuicaoOperador() {
   usePageTitle("Contribuição por Squad");
   useSetPageInfo("Contribuição por Squad", "Receitas atribuídas por squad do contrato");
@@ -119,7 +121,12 @@ export default function ContribuicaoOperador() {
       return { squads: data.squads || [] };
     },
   });
-  
+
+  const visibleSquads = useMemo(
+    () => (filterData?.squads ?? []).filter((squad) => !isOffSquad(squad)),
+    [filterData?.squads]
+  );
+
   const handleSquadChange = (value: string) => {
     setSquadSelecionado(value);
   };
@@ -140,6 +147,24 @@ export default function ContribuicaoOperador() {
     },
     enabled: squadSelecionado === "todos",
   });
+
+  const visibleRanking = useMemo(
+    () => (rankingData?.ranking ?? []).filter((item) => !isOffSquad(item.squad)),
+    [rankingData?.ranking]
+  );
+
+  const rankingTotals = useMemo(() => {
+    return visibleRanking.reduce(
+      (acc, item) => ({
+        receita: acc.receita + item.receita,
+        despesa: acc.despesa + item.despesa,
+        resultadoBruto: acc.resultadoBruto + item.resultadoBruto,
+        impostos: acc.impostos + item.impostos,
+        contribuicao: acc.contribuicao + item.contribuicao
+      }),
+      { receita: 0, despesa: 0, resultadoBruto: 0, impostos: 0, contribuicao: 0 }
+    );
+  }, [visibleRanking]);
 
   const { data: monthlyResults, isLoading } = useQuery<MonthlyData[]>({
     queryKey: ["/api/contribuicao-squad/dfc/monthly", anoSelecionado, squadSelecionado],
@@ -390,7 +415,7 @@ export default function ContribuicaoOperador() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os squads</SelectItem>
-              {filterData?.squads?.map((sq) => (
+              {visibleSquads.map((sq) => (
                 <SelectItem key={sq} value={sq}>
                   {sq}
                 </SelectItem>
@@ -465,7 +490,7 @@ export default function ContribuicaoOperador() {
             ) : (
               <div className="text-2xl font-bold" data-testid="text-squads">
                 {squadSelecionado === "todos" 
-                  ? (filterData?.squads?.length || 0) 
+                  ? (visibleSquads.length) 
                   : "1"}
               </div>
             )}
@@ -532,7 +557,7 @@ export default function ContribuicaoOperador() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : rankingData?.ranking && rankingData.ranking.length > 0 ? (
+            ) : visibleRanking.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -549,7 +574,7 @@ export default function ContribuicaoOperador() {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankingData.ranking.map((squad, index) => (
+                    {visibleRanking.map((squad, index) => (
                       <tr 
                         key={squad.squad} 
                         className={cn(
@@ -611,27 +636,27 @@ export default function ContribuicaoOperador() {
                     <tr className="border-t-2 border-border bg-muted/50 font-bold">
                       <td className="p-3" colSpan={2}>Total</td>
                       <td className="p-3 text-right text-emerald-500">
-                        {formatCurrencyNoDecimals(rankingData.totais.receita)}
+                        {formatCurrencyNoDecimals(rankingTotals.receita)}
                       </td>
                       <td className="p-3 text-right text-red-500">
-                        {formatCurrencyNoDecimals(rankingData.totais.despesa)}
+                        {formatCurrencyNoDecimals(rankingTotals.despesa)}
                       </td>
                       <td className="p-3 text-right">
-                        {formatCurrencyNoDecimals(rankingData.totais.resultadoBruto)}
+                        {formatCurrencyNoDecimals(rankingTotals.resultadoBruto)}
                       </td>
                       <td className="p-3 text-right">
-                        {rankingData.totais.receita > 0
-                          ? formatPercent((rankingData.totais.resultadoBruto / rankingData.totais.receita) * 100, 1)
+                        {rankingTotals.receita > 0
+                          ? formatPercent((rankingTotals.resultadoBruto / rankingTotals.receita) * 100, 1)
                           : "-"}
                       </td>
                       <td className="p-3 text-right text-orange-500">
-                        {formatCurrencyNoDecimals(rankingData.totais.impostos)}
+                        {formatCurrencyNoDecimals(rankingTotals.impostos)}
                       </td>
                       <td className={cn(
                         "p-3 text-right",
-                        rankingData.totais.contribuicao >= 0 ? "text-emerald-500" : "text-red-500"
+                        rankingTotals.contribuicao >= 0 ? "text-emerald-500" : "text-red-500"
                       )}>
-                        {formatCurrencyNoDecimals(rankingData.totais.contribuicao)}
+                        {formatCurrencyNoDecimals(rankingTotals.contribuicao)}
                       </td>
                       <td className="p-3 text-right">-</td>
                     </tr>
