@@ -1251,12 +1251,12 @@ export default function PresentationMode() {
                       
                       <div className="text-right">
                         <div className="text-[10px] text-slate-400 uppercase tracking-wider">Meta</div>
-                        <div className="text-xl font-black text-white">R$ 180k</div>
+                        <div className="text-xl font-black text-white">R$ 215k</div>
                       </div>
                     </div>
 
                     {(() => {
-                      const META_MRR = 180000;
+                      const META_MRR = 215000;
                       const mrrAtual = closerMetrics?.mrrObtido || 0;
                       const percentual = Math.min((mrrAtual / META_MRR) * 100, 100);
                       const faltam = Math.max(META_MRR - mrrAtual, 0);
