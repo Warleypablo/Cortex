@@ -180,7 +180,8 @@ const ALL_ROUTES = [
   '/investors-report',
   '/admin/usuarios',
   '/admin/regras-notificacoes',
-  '/admin/logs'
+  '/admin/logs',
+  '/rh/nps/responder'
 ];
 
 // Rotas padrão para novos usuários @turbopartners.com.br
@@ -229,6 +230,8 @@ const DEFAULT_USER_ROUTES = [
   '/growth/visao-geral',
   '/growth/criativos',
   '/growth/performance-plataformas',
+  // E-NPS (pesquisa anônima - acesso padrão para todos)
+  '/rh/nps/responder',
 ];
 
 // Migra permissões antigas automaticamente
@@ -256,7 +259,12 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
   if (!migratedRoutes.includes('/sugestoes')) {
     migratedRoutes.push('/sugestoes');
   }
-  
+
+  // Auto-adicionar /rh/nps/responder para todos os usuários
+  if (!migratedRoutes.includes('/rh/nps/responder')) {
+    migratedRoutes.push('/rh/nps/responder');
+  }
+
   return migratedRoutes;
 }
 
