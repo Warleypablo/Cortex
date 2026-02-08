@@ -200,8 +200,7 @@ export default function PesquisasGG() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6" data-testid="tabs-pesquisas">
           <TabsTrigger value="visao-geral" data-testid="tab-visao-geral">Visão Geral</TabsTrigger>
-          <TabsTrigger value="enps" data-testid="tab-enps">E-NPS</TabsTrigger>
-          <TabsTrigger value="nps-anonimo" data-testid="tab-nps-anonimo">E-NPS Anônimo</TabsTrigger>
+          <TabsTrigger value="nps-anonimo" data-testid="tab-nps-anonimo">E-NPS</TabsTrigger>
           <TabsTrigger value="1x1" data-testid="tab-1x1">1x1</TabsTrigger>
           <TabsTrigger value="pdi" data-testid="tab-pdi">PDI</TabsTrigger>
         </TabsList>
@@ -357,72 +356,6 @@ export default function PesquisasGG() {
                     <TableCell>
                       <Badge className={`${getEnpsBgColor(enps.score)}`}>
                         {enps.score}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-muted-foreground text-sm">
-                      {enps.comentario || "-"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {format(new Date(enps.data), "dd/MM/yyyy", { locale: ptBR })}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="enps" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="p-6 text-center" data-testid="card-enps-promotores">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 mb-3">
-                <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
-              </div>
-              <p className="text-4xl font-bold text-green-600 dark:text-green-400">{data.enps.promotores}</p>
-              <p className="text-sm text-muted-foreground mt-1">Promotores (9-10)</p>
-            </Card>
-            <Card className="p-6 text-center" data-testid="card-enps-neutros">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-yellow-100 dark:bg-yellow-900/30 mb-3">
-                <Users className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-              </div>
-              <p className="text-4xl font-bold text-yellow-600 dark:text-yellow-400">{data.enps.neutros}</p>
-              <p className="text-sm text-muted-foreground mt-1">Neutros (7-8)</p>
-            </Card>
-            <Card className="p-6 text-center" data-testid="card-enps-detratores">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 mb-3">
-                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
-              </div>
-              <p className="text-4xl font-bold text-red-600 dark:text-red-400">{data.enps.detratores}</p>
-              <p className="text-sm text-muted-foreground mt-1">Detratores (0-6)</p>
-            </Card>
-          </div>
-
-          <Card className="p-6" data-testid="card-enps-all">
-            <h3 className="font-semibold mb-4">Todas as Respostas E-NPS</h3>
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Colaborador</TableHead>
-                  <TableHead>Squad</TableHead>
-                  <TableHead>Score</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Comentário</TableHead>
-                  <TableHead>Data</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.recentEnps.map((enps) => (
-                  <TableRow key={enps.id} data-testid={`row-all-enps-${enps.id}`}>
-                    <TableCell>
-                      <Link href={`/colaborador/${enps.colaboradorId}`} className="font-medium hover:underline">
-                        {enps.nome}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{enps.squad || "-"}</TableCell>
-                    <TableCell className="font-bold">{enps.score}</TableCell>
-                    <TableCell>
-                      <Badge className={`${getEnpsBgColor(enps.score)}`}>
-                        {enps.score >= 9 ? "Promotor" : enps.score >= 7 ? "Neutro" : "Detrator"}
                       </Badge>
                     </TableCell>
                     <TableCell className="max-w-xs truncate text-muted-foreground text-sm">

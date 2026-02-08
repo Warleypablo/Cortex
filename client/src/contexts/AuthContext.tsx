@@ -21,6 +21,9 @@ interface AuthContextType {
   hasAccess: (path: string) => boolean;
 }
 
+// Rotas acessíveis a todos os usuários autenticados (sem precisar de permissão)
+const PUBLIC_ROUTES = ['/rh/nps/responder'];
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -34,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasAccess = (path: string): boolean => {
     if (!user) return false;
     if (user.role === 'admin') return true;
+    if (PUBLIC_ROUTES.includes(path)) return true;
     return user.allowedRoutes?.includes(path) ?? false;
   };
 
