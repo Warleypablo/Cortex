@@ -552,7 +552,8 @@ export default function GrowthOrcadoRealizado() {
   const totalMetrics: Metric[] = useMemo(() => {
     const mql = mqlData || {} as MQLMetrics;
     const naoMql = naoMqlData || {} as NaoMQLMetrics;
-    
+    const ads = adsData || {} as AdsMetrics;
+
     const totalReunioesAgendadas = (mql.reunioesAgendadas ?? 0) + (naoMql.reunioesAgendadas ?? 0);
     const totalReunioesRealizadas = (mql.reunioesRealizadas ?? 0) + (naoMql.reunioesRealizadas ?? 0);
     const totalNovosClientes = (mql.novosClientes ?? 0) + (naoMql.novosClientes ?? 0);
@@ -561,188 +562,63 @@ export default function GrowthOrcadoRealizado() {
     const totalFatAceleracao = (mql.faturamentoAceleracao ?? 0) + (naoMql.faturamentoAceleracao ?? 0);
     const totalFatImplantacao = (mql.faturamentoImplantacao ?? 0) + (naoMql.faturamentoImplantacao ?? 0);
     const totalFaturamento = totalFatAceleracao + totalFatImplantacao;
-    
+
     const totalMqls = mql.totalMqls ?? 0;
     const totalLeads = totalMqls + (naoMql.totalNaoMqls ?? 0);
-    
-    const percNoShowReal = totalReunioesAgendadas > 0 
-      ? (totalReunioesAgendadas - totalReunioesRealizadas) / totalReunioesAgendadas 
+
+    const percNoShowReal = totalReunioesAgendadas > 0
+      ? (totalReunioesAgendadas - totalReunioesRealizadas) / totalReunioesAgendadas
       : null;
-    const percConversaoRRV = totalReunioesRealizadas > 0 
-      ? totalNovosClientes / totalReunioesRealizadas 
+    const percConversaoRRV = totalReunioesRealizadas > 0
+      ? totalNovosClientes / totalReunioesRealizadas
       : null;
-    const taxaConversaoMQL = totalMqls > 0 
-      ? (mql.novosClientes ?? 0) / totalMqls 
+    const taxaConversaoMQL = totalMqls > 0
+      ? (mql.novosClientes ?? 0) / totalMqls
       : null;
-    
-    const ticketMedioGeral = totalNovosClientes > 0 
-      ? totalFaturamento / totalNovosClientes 
+
+    const ticketMedioGeral = totalNovosClientes > 0
+      ? totalFaturamento / totalNovosClientes
       : null;
-    const ticketMedioAceleracao = totalContratosAceleracao > 0 
-      ? totalFatAceleracao / totalContratosAceleracao 
+    const ticketMedioAceleracao = totalContratosAceleracao > 0
+      ? totalFatAceleracao / totalContratosAceleracao
       : null;
-    const ticketMedioImplantacao = totalContratosImplantacao > 0 
-      ? totalFatImplantacao / totalContratosImplantacao 
+    const ticketMedioImplantacao = totalContratosImplantacao > 0
+      ? totalFatImplantacao / totalContratosImplantacao
       : null;
-    
-    const percRA = totalLeads > 0 
-      ? totalReunioesAgendadas / totalLeads 
+
+    const percRA = totalLeads > 0
+      ? totalReunioesAgendadas / totalLeads
       : null;
-    const taxaConversaoFunil = totalLeads > 0 
-      ? totalNovosClientes / totalLeads 
+    const taxaConversaoFunil = totalLeads > 0
+      ? totalNovosClientes / totalLeads
       : null;
-    
+
+    const investimentoOrcado = 95500;
+    const cacAdsOrcado = investimentoOrcado / ORCADO_TOTAL.novosClientes;
+    const cacAdsReal = totalNovosClientes > 0
+      ? (ads.investimento ?? 0) / totalNovosClientes
+      : null;
+
     return [
-      { 
-        id: 'total_perc_ra', 
-        name: '% RA', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.percRA, 
-        realizado: percRA, 
-        percentual: calcPercentual(ORCADO_TOTAL.percRA, percRA), 
-        format: 'percent' 
-      },
-      { 
-        id: 'total_ra', 
-        name: 'Reuniões Agendadas', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.reunioesAgendadas, 
-        realizado: totalReunioesAgendadas, 
-        percentual: calcPercentual(ORCADO_TOTAL.reunioesAgendadas, totalReunioesAgendadas), 
-        format: 'number' 
-      },
-      { 
-        id: 'total_rr', 
-        name: 'Reuniões Realizadas', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.reunioesRealizadas, 
-        realizado: totalReunioesRealizadas, 
-        percentual: calcPercentual(ORCADO_TOTAL.reunioesRealizadas, totalReunioesRealizadas), 
-        format: 'number' 
-      },
-      { 
-        id: 'total_noshow', 
-        name: 'No show', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.percNoShow, 
-        realizado: percNoShowReal, 
-        percentual: calcPercentual(ORCADO_TOTAL.percNoShow, percNoShowReal), 
-        format: 'percent' 
-      },
-      { 
-        id: 'total_conv_rrv', 
-        name: 'Conversão de RR/V (%)', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.percConversaoRRV, 
-        realizado: percConversaoRRV, 
-        percentual: calcPercentual(ORCADO_TOTAL.percConversaoRRV, percConversaoRRV), 
-        format: 'percent' 
-      },
-      { 
-        id: 'total_novos_clientes', 
-        name: 'Novos Clientes', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.novosClientes, 
-        realizado: totalNovosClientes, 
-        percentual: calcPercentual(ORCADO_TOTAL.novosClientes, totalNovosClientes), 
-        format: 'number' 
-      },
-      { 
-        id: 'total_ganhos_acel', 
-        name: 'Negócios Ganhos Aceleração', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.contratosAceleracao, 
-        realizado: totalContratosAceleracao, 
-        percentual: calcPercentual(ORCADO_TOTAL.contratosAceleracao, totalContratosAceleracao), 
-        format: 'number', 
-        emoji: '🏎️' 
-      },
-      { 
-        id: 'total_ganhos_impl', 
-        name: 'Negócios Ganhos Implantação', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.contratosImplantacao, 
-        realizado: totalContratosImplantacao, 
-        percentual: calcPercentual(ORCADO_TOTAL.contratosImplantacao, totalContratosImplantacao), 
-        format: 'number', 
-        emoji: '🔧' 
-      },
-      { 
-        id: 'total_faturamento', 
-        name: 'Faturamento Total', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.faturamentoTotal, 
-        realizado: totalFaturamento, 
-        percentual: calcPercentual(ORCADO_TOTAL.faturamentoTotal, totalFaturamento), 
-        format: 'currency' 
-      },
-      { 
-        id: 'total_fat_acel', 
-        name: 'Faturamento A', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.faturamentoAceleracao, 
-        realizado: totalFatAceleracao, 
-        percentual: calcPercentual(ORCADO_TOTAL.faturamentoAceleracao, totalFatAceleracao), 
-        format: 'currency', 
-        emoji: '🏎️' 
-      },
-      { 
-        id: 'total_fat_impl', 
-        name: 'Faturamento I', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.faturamentoImplantacao, 
-        realizado: totalFatImplantacao, 
-        percentual: calcPercentual(ORCADO_TOTAL.faturamentoImplantacao, totalFatImplantacao), 
-        format: 'currency', 
-        emoji: '🔧' 
-      },
-      { 
-        id: 'total_conv_funil', 
-        name: 'Taxa de Conversão do Funil inteiro', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.taxaConversaoFunil, 
-        realizado: taxaConversaoFunil, 
-        percentual: calcPercentual(ORCADO_TOTAL.taxaConversaoFunil, taxaConversaoFunil), 
-        format: 'percent' 
-      },
-      { 
-        id: 'total_conv_mql', 
-        name: 'Tx de conversão MQL', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.taxaConversaoMQL, 
-        realizado: taxaConversaoMQL, 
-        percentual: calcPercentual(ORCADO_TOTAL.taxaConversaoMQL, taxaConversaoMQL), 
-        format: 'percent' 
-      },
-      { 
-        id: 'total_ticket_geral', 
-        name: 'Ticket Médio Geral', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.ticketMedioGeral, 
-        realizado: ticketMedioGeral, 
-        percentual: calcPercentual(ORCADO_TOTAL.ticketMedioGeral, ticketMedioGeral), 
-        format: 'currency' 
-      },
-      { 
-        id: 'total_ticket_acel', 
-        name: 'Ticket Médio Aceleração', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.ticketMedioAceleracao, 
-        realizado: ticketMedioAceleracao, 
-        percentual: calcPercentual(ORCADO_TOTAL.ticketMedioAceleracao, ticketMedioAceleracao), 
-        format: 'currency' 
-      },
-      { 
-        id: 'total_ticket_impl', 
-        name: 'Ticket Médio Implantação', 
-        type: 'formula', 
-        orcado: ORCADO_TOTAL.ticketMedioImplantacao, 
-        realizado: ticketMedioImplantacao, 
-        percentual: calcPercentual(ORCADO_TOTAL.ticketMedioImplantacao, ticketMedioImplantacao), 
-        format: 'currency' 
-      },
+      { id: 'total_perc_ra', name: '% RA', type: 'formula', orcado: ORCADO_TOTAL.percRA, realizado: percRA, percentual: calcPercentual(ORCADO_TOTAL.percRA, percRA), format: 'percent' },
+      { id: 'total_ra', name: 'Reuniões Agendadas', type: 'formula', orcado: ORCADO_TOTAL.reunioesAgendadas, realizado: totalReunioesAgendadas, percentual: calcPercentual(ORCADO_TOTAL.reunioesAgendadas, totalReunioesAgendadas), format: 'number' },
+      { id: 'total_rr', name: 'Reuniões Realizadas', type: 'formula', orcado: ORCADO_TOTAL.reunioesRealizadas, realizado: totalReunioesRealizadas, percentual: calcPercentual(ORCADO_TOTAL.reunioesRealizadas, totalReunioesRealizadas), format: 'number' },
+      { id: 'total_noshow', name: 'No show', type: 'formula', orcado: ORCADO_TOTAL.percNoShow, realizado: percNoShowReal, percentual: calcPercentual(ORCADO_TOTAL.percNoShow, percNoShowReal), format: 'percent' },
+      { id: 'total_conv_rrv', name: 'Conversão de RR/V (%)', type: 'formula', orcado: ORCADO_TOTAL.percConversaoRRV, realizado: percConversaoRRV, percentual: calcPercentual(ORCADO_TOTAL.percConversaoRRV, percConversaoRRV), format: 'percent' },
+      { id: 'total_novos_clientes', name: 'Novos Clientes', type: 'formula', orcado: ORCADO_TOTAL.novosClientes, realizado: totalNovosClientes, percentual: calcPercentual(ORCADO_TOTAL.novosClientes, totalNovosClientes), format: 'number' },
+      { id: 'total_ganhos_acel', name: 'Negócios Ganhos Aceleração', type: 'formula', orcado: ORCADO_TOTAL.contratosAceleracao, realizado: totalContratosAceleracao, percentual: calcPercentual(ORCADO_TOTAL.contratosAceleracao, totalContratosAceleracao), format: 'number', emoji: '🏎️' },
+      { id: 'total_ganhos_impl', name: 'Negócios Ganhos Implantação', type: 'formula', orcado: ORCADO_TOTAL.contratosImplantacao, realizado: totalContratosImplantacao, percentual: calcPercentual(ORCADO_TOTAL.contratosImplantacao, totalContratosImplantacao), format: 'number', emoji: '🔧' },
+      { id: 'total_faturamento', name: 'Faturamento Total', type: 'formula', orcado: ORCADO_TOTAL.faturamentoTotal, realizado: totalFaturamento, percentual: calcPercentual(ORCADO_TOTAL.faturamentoTotal, totalFaturamento), format: 'currency' },
+      { id: 'total_fat_acel', name: 'Faturamento A', type: 'formula', orcado: ORCADO_TOTAL.faturamentoAceleracao, realizado: totalFatAceleracao, percentual: calcPercentual(ORCADO_TOTAL.faturamentoAceleracao, totalFatAceleracao), format: 'currency', emoji: '🏎️' },
+      { id: 'total_fat_impl', name: 'Faturamento I', type: 'formula', orcado: ORCADO_TOTAL.faturamentoImplantacao, realizado: totalFatImplantacao, percentual: calcPercentual(ORCADO_TOTAL.faturamentoImplantacao, totalFatImplantacao), format: 'currency', emoji: '🔧' },
+      { id: 'total_conv_funil', name: 'Taxa de Conversão do Funil inteiro', type: 'formula', orcado: ORCADO_TOTAL.taxaConversaoFunil, realizado: taxaConversaoFunil, percentual: calcPercentual(ORCADO_TOTAL.taxaConversaoFunil, taxaConversaoFunil), format: 'percent' },
+      { id: 'total_conv_mql', name: 'Tx de conversão MQL', type: 'formula', orcado: ORCADO_TOTAL.taxaConversaoMQL, realizado: taxaConversaoMQL, percentual: calcPercentual(ORCADO_TOTAL.taxaConversaoMQL, taxaConversaoMQL), format: 'percent' },
+      { id: 'total_cac_ads', name: 'CAC ADS', type: 'formula', orcado: cacAdsOrcado, realizado: cacAdsReal, percentual: calcPercentual(cacAdsOrcado, cacAdsReal), format: 'currency' },
+      { id: 'total_ticket_geral', name: 'Ticket Médio Geral', type: 'formula', orcado: ORCADO_TOTAL.ticketMedioGeral, realizado: ticketMedioGeral, percentual: calcPercentual(ORCADO_TOTAL.ticketMedioGeral, ticketMedioGeral), format: 'currency' },
+      { id: 'total_ticket_acel', name: 'Ticket Médio Aceleração', type: 'formula', orcado: ORCADO_TOTAL.ticketMedioAceleracao, realizado: ticketMedioAceleracao, percentual: calcPercentual(ORCADO_TOTAL.ticketMedioAceleracao, ticketMedioAceleracao), format: 'currency' },
+      { id: 'total_ticket_impl', name: 'Ticket Médio Implantação', type: 'formula', orcado: ORCADO_TOTAL.ticketMedioImplantacao, realizado: ticketMedioImplantacao, percentual: calcPercentual(ORCADO_TOTAL.ticketMedioImplantacao, ticketMedioImplantacao), format: 'currency' },
     ];
-  }, [mqlData, naoMqlData]);
+  }, [mqlData, naoMqlData, adsData]);
   
   const totalSection: MetricSection = {
     title: 'Total',
@@ -765,6 +641,21 @@ export default function GrowthOrcadoRealizado() {
     outboundSection,
     totalSection,
   ];
+
+  // Métricas amarelas para a aba Consolidado (filtradas por seção)
+  const YELLOW_METRIC_IDS = new Set([
+    'mql_noshow', 'mql_ticket_acel', 'mql_ticket_impl',
+    'nmql_noshow', 'nmql_ticket_acel', 'nmql_ticket_impl',
+    'out_noshow', 'out_ticket_acel', 'out_ticket_impl',
+    'total_cac_ads', 'total_ticket_acel', 'total_ticket_impl',
+  ]);
+
+  const consolidadoSections: MetricSection[] = allSections
+    .map(section => ({
+      ...section,
+      metrics: section.metrics.filter(m => YELLOW_METRIC_IDS.has(m.id))
+    }))
+    .filter(section => section.metrics.length > 0);
 
   // Helper para calcular progresso seguro (0-100)
   const getProgressValue = (percentual: number | null) => {
@@ -1363,82 +1254,71 @@ export default function GrowthOrcadoRealizado() {
                 </div>
                 <div>
                   <CardTitle className="text-base">Consolidado Geral</CardTitle>
-                  <CardDescription>Visão geral de todas as métricas</CardDescription>
+                  <CardDescription>Métricas-chave de todas as seções</CardDescription>
                 </div>
+                {(adsLoading || mqlLoading || naoMqlLoading) && (
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-auto" />
+                )}
               </div>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="rounded-lg border overflow-hidden">
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableHead className="font-semibold text-foreground">Métrica</TableHead>
-                      <TableHead className="text-right font-semibold text-foreground">Orçado</TableHead>
-                      <TableHead className="text-right font-semibold text-foreground">Realizado</TableHead>
-                      <TableHead className="text-center font-semibold text-foreground">Progresso</TableHead>
-                      <TableHead className="text-center font-semibold text-foreground">Status</TableHead>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">Categoria</TableHead>
+                      <TableHead className="font-semibold">Métrica</TableHead>
+                      <TableHead className="text-right font-semibold">Orçado</TableHead>
+                      <TableHead className="text-right font-semibold">Realizado</TableHead>
+                      <TableHead className="text-right font-semibold">%</TableHead>
+                      <TableHead className="text-center font-semibold">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {totalMetrics.map((metric, idx) => (
-                      <TableRow 
-                        key={metric.id} 
-                        className={cn(
-                          "transition-all duration-200 hover:bg-muted/40",
-                          idx % 2 === 0 ? "bg-background" : "bg-muted/10"
-                        )}
-                      >
-                        <TableCell className="font-medium py-3">
-                          <div className="flex items-center gap-3">
-                            {getTrendIcon(metric.percentual)}
-                            <span>{metric.name}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                          {formatValue(metric.orcado, metric.format)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm font-medium">
-                          {formatValue(metric.realizado, metric.format)}
-                        </TableCell>
-                        <TableCell className="px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 h-2.5 rounded-full bg-muted overflow-hidden">
-                              <div 
-                                className={cn(
-                                  "h-full rounded-full transition-all duration-500",
-                                  metric.percentual !== null && metric.percentual >= 100 && "bg-gradient-to-r from-emerald-400 to-emerald-600",
-                                  metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-gradient-to-r from-amber-400 to-amber-600",
-                                  metric.percentual !== null && metric.percentual < 80 && "bg-gradient-to-r from-red-400 to-red-600"
-                                )}
-                                style={{ width: `${getProgressValue(metric.percentual)}%` }}
-                              />
+                    {consolidadoSections.map((section) => (
+                      section.metrics.map((metric, idx) => (
+                        <TableRow
+                          key={metric.id}
+                          className={cn(
+                            idx === 0 && "border-t-2",
+                            metric.isHeader && "bg-muted/30 font-semibold"
+                          )}
+                        >
+                          {idx === 0 && (
+                            <TableCell
+                              rowSpan={section.metrics.length}
+                              className="align-top font-medium bg-muted/20 border-r"
+                            >
+                              <div className="flex items-center gap-2">
+                                {section.icon}
+                                <span className="text-sm">{section.title}</span>
+                              </div>
+                            </TableCell>
+                          )}
+                          <TableCell className={cn("text-sm", metric.indent && `pl-${metric.indent * 4}`)}>
+                            {metric.name}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {formatValue(metric.orcado, metric.format)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-medium">
+                            {formatValue(metric.realizado, metric.format)}
+                          </TableCell>
+                          <TableCell className={cn(
+                            "text-right text-sm font-semibold",
+                            metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
+                            metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
+                            metric.percentual !== null && metric.percentual < 80 && "text-red-500"
+                          )}>
+                            {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex justify-center">
+                              {getTrendIcon(metric.percentual)}
                             </div>
-                            <span className={cn(
-                              "text-xs font-medium w-10 text-right",
-                              metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
-                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
-                              metric.percentual !== null && metric.percentual < 80 && "text-red-500"
-                            )}>
-                              {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge 
-                            variant="outline" 
-                            className={cn(
-                              "font-medium text-xs px-2.5 py-0.5",
-                              metric.percentual !== null && metric.percentual >= 100 && "border-emerald-500/50 text-emerald-600 bg-emerald-500/10",
-                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "border-amber-500/50 text-amber-600 bg-amber-500/10",
-                              metric.percentual !== null && metric.percentual < 80 && "border-red-500/50 text-red-600 bg-red-500/10"
-                            )}
-                          >
-                            {metric.percentual !== null && metric.percentual >= 100 ? 'Atingido' : 
-                             metric.percentual !== null && metric.percentual >= 80 ? 'Próximo' : 
-                             metric.percentual !== null ? 'Abaixo' : 'N/A'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     ))}
                   </TableBody>
                 </Table>

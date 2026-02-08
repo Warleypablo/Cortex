@@ -1554,6 +1554,7 @@ export default function ChurnDetalhamento() {
               {data.metricas.churn_por_motivo.slice(0, 10).map((item, index) => {
                 const maxMrr = data.metricas.churn_por_motivo?.[0]?.mrr_perdido || 1;
                 const barWidth = (item.mrr_perdido / maxMrr) * 100;
+                const ticketMedioMotivo = item.quantidade > 0 ? item.mrr_perdido / item.quantidade : 0;
                 
                 return (
                   <div key={item.motivo} className="group" data-testid={`motivo-ranking-${index}`}>
@@ -1572,9 +1573,14 @@ export default function ChurnDetalhamento() {
                         <Badge variant="outline" className="text-xs" data-testid={`badge-qtd-motivo-${index}`}>
                           {item.quantidade} {item.quantidade === 1 ? 'contrato' : 'contratos'}
                         </Badge>
-                        <span className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums" data-testid={`text-mrr-motivo-${index}`}>
-                          {formatCurrencyNoDecimals(item.mrr_perdido)}
-                        </span>
+                        <div className="flex flex-col items-end leading-tight">
+                          <span className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums" data-testid={`text-mrr-motivo-${index}`}>
+                            {formatCurrencyNoDecimals(item.mrr_perdido)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground tabular-nums" data-testid={`text-ticket-medio-motivo-${index}`}>
+                            Ticket médio: {formatCurrencyNoDecimals(ticketMedioMotivo)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="ml-8 h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden" data-testid={`bar-motivo-${index}`}>
@@ -1651,7 +1657,7 @@ export default function ChurnDetalhamento() {
         <TechChartCard
           title="Distribuição por Serviço"
           subtitle="Percentual de churn por serviço"
-          icon={PieChart}
+          icon={BarChart3}
           iconBg="bg-gradient-to-r from-blue-500 to-indigo-500"
           meta={
             <StatPill
@@ -1668,50 +1674,42 @@ export default function ChurnDetalhamento() {
               Nenhum dado disponível
             </div>
           ) : (
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width="55%" height={200}>
-                <RechartsPie>
-                  <Pie
-                    data={distribuicaoPorProduto}
-                    dataKey="count"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={75}
-                    strokeWidth={2}
-                    stroke="hsl(var(--card))"
-                  >
-                    {distribuicaoPorProduto.map((entry, index) => (
-                      <Cell key={entry.name} fill={REFINED_COLORS[index % REFINED_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                </RechartsPie>
-              </ResponsiveContainer>
-              <div className="flex-1 space-y-2 text-xs">
-                {distribuicaoPorProduto.slice(0, 5).map((item, i) => (
-                  <div key={item.name} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1 space-y-0.5">
+            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+              {distribuicaoPorProduto.map((item, i) => {
+                const color = REFINED_COLORS[i % REFINED_COLORS.length];
+                const barWidth = Math.max(item.percentual, 3);
+
+                return (
+                  <div key={item.name} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1.5 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <div 
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" 
-                          style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }}
+                        <div
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
+                          style={{ backgroundColor: color }}
                         />
-                        <span className="truncate text-muted-foreground">{item.fullName}</span>
+                        <span className="truncate text-xs text-muted-foreground">{item.fullName}</span>
                       </div>
-                      <span className="font-semibold text-foreground tabular-nums">{item.count}</span>
+                      <span className="text-xs font-semibold text-foreground tabular-nums whitespace-nowrap">
+                        {item.count} contratos
+                      </span>
                     </div>
-                    <div className="pl-4 text-[10px] text-red-500 dark:text-red-400">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${barWidth}%`, backgroundColor: color }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap">
+                        {item.percentual.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-red-500 dark:text-red-400">
                       {formatCurrencyNoDecimals(item.mrr)} MRR
                     </div>
                   </div>
-                ))}
-                {distribuicaoPorProduto.length > 5 && (
-                  <p className="text-[10px] text-muted-foreground pt-1">
-                    +{distribuicaoPorProduto.length - 5} outros
-                  </p>
-                )}
-              </div>
+                );
+              })}
             </div>
           )}
         </TechChartCard>
