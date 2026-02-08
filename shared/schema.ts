@@ -367,6 +367,30 @@ export type InsertPatrimonioHistorico = {
   data: Date;
 };
 
+// ===== E-NPS Anônimo =====
+export const rhNps = inhireSchema.table("rh_nps", {
+  id: serial("id").primaryKey(),
+  mesReferencia: varchar("mes_referencia", { length: 7 }).notNull(),
+  area: varchar("area", { length: 100 }).notNull(),
+  motivoPermanencia: text("motivo_permanencia").notNull(),
+  scoreEmpresa: integer("score_empresa").notNull(),
+  comentarioEmpresa: text("comentario_empresa").notNull(),
+  scoreLider: integer("score_lider").notNull(),
+  comentarioLider: text("comentario_lider").notNull(),
+  scoreProdutos: integer("score_produtos").notNull(),
+  comentarioProdutos: text("comentario_produtos").notNull(),
+  feedbackGeral: text("feedback_geral"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const insertRhNpsSchema = createInsertSchema(rhNps).omit({
+  id: true,
+  criadoEm: true,
+});
+
+export type RhNpsResponse = typeof rhNps.$inferSelect;
+export type InsertRhNps = z.infer<typeof insertRhNpsSchema>;
+
 export type FluxoCaixaItem = {
   dataVencimento: Date;
   tipoEvento: string;
