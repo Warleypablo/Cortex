@@ -12,6 +12,7 @@ export const PERMISSION_KEYS = {
     GPTURBO: 'general.gpturbo',
     TURBO_TOOLS: 'general.turbo_tools',
     SUGESTOES: 'general.sugestoes',
+    ENPS: 'general.enps',
   },
   // Financeiro
   FIN: {
@@ -165,6 +166,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/cases/chat': PERMISSION_KEYS.GENERAL.GPTURBO,
   '/ferramentas': PERMISSION_KEYS.GENERAL.TURBO_TOOLS,
   '/sugestoes': PERMISSION_KEYS.GENERAL.SUGESTOES,
+  '/rh/nps/responder': PERMISSION_KEYS.GENERAL.ENPS,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   // Financeiro
   '/dashboard/financeiro': PERMISSION_KEYS.FIN.VISAO_GERAL,
@@ -293,6 +295,7 @@ export const NAV_CONFIG = {
     { title: 'GPTurbo', url: '/cases/chat', icon: 'Sparkles', permissionKey: PERMISSION_KEYS.GENERAL.GPTURBO },
     { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
     { title: 'Sugestões', url: '/sugestoes', icon: 'Lightbulb', permissionKey: PERMISSION_KEYS.GENERAL.SUGESTOES },
+    { title: 'Pesquisa E-NPS', url: '/rh/nps/responder', icon: 'ClipboardCheck', permissionKey: PERMISSION_KEYS.GENERAL.ENPS },
   ],
   
   // Geral module

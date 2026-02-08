@@ -2056,4 +2056,66 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
       res.status(500).json({ error: "Failed to update progress" });
     }
   });
+
+  // ==================== E-NPS Anônimo (rh_nps) ====================
+
+  app.post("/api/rh/nps", async (req, res) => {
+    try {
+      const { mesReferencia, area, motivoPermanencia, scoreEmpresa, comentarioEmpresa, scoreLider, comentarioLider, scoreProdutos, comentarioProdutos, feedbackGeral } = req.body;
+
+      if (!mesReferencia || !area || !motivoPermanencia || scoreEmpresa == null || !comentarioEmpresa || scoreLider == null || !comentarioLider || scoreProdutos == null || !comentarioProdutos) {
+        return res.status(400).json({ error: "Todos os campos obrigatórios devem ser preenchidos" });
+      }
+
+      for (const [field, value] of [['scoreEmpresa', scoreEmpresa], ['scoreLider', scoreLider], ['scoreProdutos', scoreProdutos]]) {
+        if (typeof value !== 'number' || value < 0 || value > 10) {
+          return res.status(400).json({ error: `${field} deve ser um número entre 0 e 10` });
+        }
+      }
+
+      const resposta = await storage.createRhNpsResponse({
+        mesReferencia, area, motivoPermanencia,
+        scoreEmpresa, comentarioEmpresa,
+        scoreLider, comentarioLider,
+        scoreProdutos, comentarioProdutos,
+        feedbackGeral: feedbackGeral || null,
+      });
+      res.status(201).json(resposta);
+    } catch (error) {
+      console.error("[api] Error creating NPS response:", error);
+      res.status(500).json({ error: "Falha ao salvar resposta" });
+    }
+  });
+
+  app.get("/api/rh/nps/dashboard", async (req, res) => {
+    try {
+      const mes = req.query.mes as string | undefined;
+      const dashboard = await storage.getRhNpsDashboard(mes);
+      res.json(dashboard);
+    } catch (error) {
+      console.error("[api] Error fetching NPS dashboard:", error);
+      res.status(500).json({ error: "Falha ao buscar dashboard NPS" });
+    }
+  });
+
+  app.get("/api/rh/nps/respostas", async (req, res) => {
+    try {
+      const mes = req.query.mes as string | undefined;
+      const respostas = await storage.getRhNpsRespostas(mes);
+      res.json(respostas);
+    } catch (error) {
+      console.error("[api] Error fetching NPS responses:", error);
+      res.status(500).json({ error: "Falha ao buscar respostas NPS" });
+    }
+  });
+
+  app.get("/api/rh/nps/meses", async (req, res) => {
+    try {
+      const meses = await storage.getRhNpsMeses();
+      res.json(meses);
+    } catch (error) {
+      console.error("[api] Error fetching NPS months:", error);
+      res.status(500).json({ error: "Falha ao buscar meses disponíveis" });
+    }
+  });
 }

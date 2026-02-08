@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint, type TurboEvento, type InsertTurboEvento, type SystemSetting } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint, type TurboEvento, type InsertTurboEvento, type SystemSetting, type RhNpsResponse, type InsertRhNps } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -320,7 +320,13 @@ export interface IStorage {
   // E-NPS
   getEnpsResponses(colaboradorId: number): Promise<EnpsResponse[]>;
   createEnpsResponse(data: InsertEnps): Promise<EnpsResponse>;
-  
+
+  // E-NPS Anônimo (rh_nps)
+  createRhNpsResponse(data: InsertRhNps): Promise<RhNpsResponse>;
+  getRhNpsDashboard(mesReferencia?: string): Promise<any>;
+  getRhNpsRespostas(mesReferencia?: string): Promise<RhNpsResponse[]>;
+  getRhNpsMeses(): Promise<string[]>;
+
   // PDI (Plano de Desenvolvimento Individual)
   getPdiGoals(colaboradorId: number): Promise<PdiGoal[]>;
   createPdiGoal(data: InsertPdi): Promise<PdiGoal>;
@@ -1154,6 +1160,18 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
   async createEnpsResponse(data: InsertEnps): Promise<EnpsResponse> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async createRhNpsResponse(data: InsertRhNps): Promise<RhNpsResponse> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getRhNpsDashboard(mesReferencia?: string): Promise<any> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getRhNpsRespostas(mesReferencia?: string): Promise<RhNpsResponse[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getRhNpsMeses(): Promise<string[]> {
     throw new Error("Not implemented in MemStorage");
   }
   async getPdiGoals(colaboradorId: number): Promise<PdiGoal[]> {
@@ -10459,6 +10477,173 @@ export class DbStorage implements IStorage {
         feedback_geral as "feedbackGeral"
     `);
     return result.rows[0] as EnpsResponse;
+  }
+
+  // ==================== E-NPS Anônimo (rh_nps) ====================
+
+  async createRhNpsResponse(data: InsertRhNps): Promise<RhNpsResponse> {
+    const result = await db.execute(sql`
+      INSERT INTO "Inhire".rh_nps (
+        mes_referencia, area, motivo_permanencia,
+        score_empresa, comentario_empresa,
+        score_lider, comentario_lider,
+        score_produtos, comentario_produtos,
+        feedback_geral
+      )
+      VALUES (
+        ${data.mesReferencia}, ${data.area}, ${data.motivoPermanencia},
+        ${data.scoreEmpresa}, ${data.comentarioEmpresa},
+        ${data.scoreLider}, ${data.comentarioLider},
+        ${data.scoreProdutos}, ${data.comentarioProdutos},
+        ${data.feedbackGeral || null}
+      )
+      RETURNING id, mes_referencia as "mesReferencia", area, motivo_permanencia as "motivoPermanencia",
+        score_empresa as "scoreEmpresa", comentario_empresa as "comentarioEmpresa",
+        score_lider as "scoreLider", comentario_lider as "comentarioLider",
+        score_produtos as "scoreProdutos", comentario_produtos as "comentarioProdutos",
+        feedback_geral as "feedbackGeral", criado_em as "criadoEm"
+    `);
+    return result.rows[0] as RhNpsResponse;
+  }
+
+  async getRhNpsRespostas(mesReferencia?: string): Promise<RhNpsResponse[]> {
+    const whereClause = mesReferencia
+      ? sql`WHERE mes_referencia = ${mesReferencia}`
+      : sql``;
+    const result = await db.execute(sql`
+      SELECT id, mes_referencia as "mesReferencia", area, motivo_permanencia as "motivoPermanencia",
+        score_empresa as "scoreEmpresa", comentario_empresa as "comentarioEmpresa",
+        score_lider as "scoreLider", comentario_lider as "comentarioLider",
+        score_produtos as "scoreProdutos", comentario_produtos as "comentarioProdutos",
+        feedback_geral as "feedbackGeral", criado_em as "criadoEm"
+      FROM "Inhire".rh_nps
+      ${whereClause}
+      ORDER BY criado_em DESC
+    `);
+    return result.rows as RhNpsResponse[];
+  }
+
+  async getRhNpsMeses(): Promise<string[]> {
+    const result = await db.execute(sql`
+      SELECT DISTINCT mes_referencia
+      FROM "Inhire".rh_nps
+      ORDER BY mes_referencia DESC
+    `);
+    return result.rows.map((r: any) => r.mes_referencia);
+  }
+
+  async getRhNpsDashboard(mesReferencia?: string): Promise<any> {
+    const whereClause = mesReferencia
+      ? sql`WHERE mes_referencia = ${mesReferencia}`
+      : sql``;
+
+    // Scores médios e totais
+    const statsResult = await db.execute(sql`
+      SELECT
+        COUNT(*) as total_respostas,
+        ROUND(AVG(score_empresa)::numeric, 1) as media_empresa,
+        ROUND(AVG(score_lider)::numeric, 1) as media_lider,
+        ROUND(AVG(score_produtos)::numeric, 1) as media_produtos,
+        COUNT(CASE WHEN score_empresa >= 9 THEN 1 END) as promotores_empresa,
+        COUNT(CASE WHEN score_empresa BETWEEN 7 AND 8 THEN 1 END) as neutros_empresa,
+        COUNT(CASE WHEN score_empresa <= 6 THEN 1 END) as detratores_empresa,
+        COUNT(CASE WHEN score_lider >= 9 THEN 1 END) as promotores_lider,
+        COUNT(CASE WHEN score_lider BETWEEN 7 AND 8 THEN 1 END) as neutros_lider,
+        COUNT(CASE WHEN score_lider <= 6 THEN 1 END) as detratores_lider,
+        COUNT(CASE WHEN score_produtos >= 9 THEN 1 END) as promotores_produtos,
+        COUNT(CASE WHEN score_produtos BETWEEN 7 AND 8 THEN 1 END) as neutros_produtos,
+        COUNT(CASE WHEN score_produtos <= 6 THEN 1 END) as detratores_produtos
+      FROM "Inhire".rh_nps
+      ${whereClause}
+    `);
+
+    const stats = statsResult.rows[0] as any;
+    const total = parseInt(stats.total_respostas) || 0;
+
+    const calcNps = (promotores: number, detratores: number, total: number) => {
+      if (total === 0) return 0;
+      return Math.round(((promotores - detratores) / total) * 100);
+    };
+
+    // Breakdown por área
+    const porAreaResult = await db.execute(sql`
+      SELECT
+        area,
+        COUNT(*) as total,
+        ROUND(AVG(score_empresa)::numeric, 1) as media_empresa,
+        ROUND(AVG(score_lider)::numeric, 1) as media_lider,
+        ROUND(AVG(score_produtos)::numeric, 1) as media_produtos
+      FROM "Inhire".rh_nps
+      ${whereClause}
+      GROUP BY area
+      ORDER BY total DESC
+    `);
+
+    // Distribuição de motivo de permanência
+    const motivosResult = await db.execute(sql`
+      SELECT motivo_permanencia, COUNT(*) as total
+      FROM "Inhire".rh_nps
+      ${whereClause}
+      GROUP BY motivo_permanencia
+      ORDER BY total DESC
+    `);
+
+    // Evolução mensal (últimos 12 meses)
+    const evolucaoResult = await db.execute(sql`
+      SELECT
+        mes_referencia,
+        COUNT(*) as total,
+        ROUND(AVG(score_empresa)::numeric, 1) as media_empresa,
+        ROUND(AVG(score_lider)::numeric, 1) as media_lider,
+        ROUND(AVG(score_produtos)::numeric, 1) as media_produtos
+      FROM "Inhire".rh_nps
+      GROUP BY mes_referencia
+      ORDER BY mes_referencia DESC
+      LIMIT 12
+    `);
+
+    return {
+      totalRespostas: total,
+      empresa: {
+        media: parseFloat(stats.media_empresa) || 0,
+        nps: calcNps(parseInt(stats.promotores_empresa), parseInt(stats.detratores_empresa), total),
+        promotores: parseInt(stats.promotores_empresa) || 0,
+        neutros: parseInt(stats.neutros_empresa) || 0,
+        detratores: parseInt(stats.detratores_empresa) || 0,
+      },
+      lider: {
+        media: parseFloat(stats.media_lider) || 0,
+        nps: calcNps(parseInt(stats.promotores_lider), parseInt(stats.detratores_lider), total),
+        promotores: parseInt(stats.promotores_lider) || 0,
+        neutros: parseInt(stats.neutros_lider) || 0,
+        detratores: parseInt(stats.detratores_lider) || 0,
+      },
+      produtos: {
+        media: parseFloat(stats.media_produtos) || 0,
+        nps: calcNps(parseInt(stats.promotores_produtos), parseInt(stats.detratores_produtos), total),
+        promotores: parseInt(stats.promotores_produtos) || 0,
+        neutros: parseInt(stats.neutros_produtos) || 0,
+        detratores: parseInt(stats.detratores_produtos) || 0,
+      },
+      porArea: (porAreaResult.rows as any[]).map((r: any) => ({
+        area: r.area,
+        total: parseInt(r.total),
+        mediaEmpresa: parseFloat(r.media_empresa) || 0,
+        mediaLider: parseFloat(r.media_lider) || 0,
+        mediaProdutos: parseFloat(r.media_produtos) || 0,
+      })),
+      motivos: (motivosResult.rows as any[]).map((r: any) => ({
+        motivo: r.motivo_permanencia,
+        total: parseInt(r.total),
+      })),
+      evolucao: (evolucaoResult.rows as any[]).map((r: any) => ({
+        mes: r.mes_referencia,
+        total: parseInt(r.total),
+        mediaEmpresa: parseFloat(r.media_empresa) || 0,
+        mediaLider: parseFloat(r.media_lider) || 0,
+        mediaProdutos: parseFloat(r.media_produtos) || 0,
+      })).reverse(),
+    };
   }
 
   // ==================== PDI (Plano de Desenvolvimento Individual) ====================

@@ -1531,6 +1531,34 @@ export async function initializeRhPesquisasTables(): Promise<void> {
   }
 }
 
+export async function initializeRhNpsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "Inhire".rh_nps (
+        id SERIAL PRIMARY KEY,
+        mes_referencia VARCHAR(7) NOT NULL,
+        area VARCHAR(100) NOT NULL,
+        motivo_permanencia TEXT NOT NULL,
+        score_empresa INTEGER NOT NULL CHECK (score_empresa >= 0 AND score_empresa <= 10),
+        comentario_empresa TEXT NOT NULL,
+        score_lider INTEGER NOT NULL CHECK (score_lider >= 0 AND score_lider <= 10),
+        comentario_lider TEXT NOT NULL,
+        score_produtos INTEGER NOT NULL CHECK (score_produtos >= 0 AND score_produtos <= 10),
+        comentario_produtos TEXT NOT NULL,
+        feedback_geral TEXT,
+        criado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_nps_mes ON "Inhire".rh_nps(mes_referencia)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_nps_area ON "Inhire".rh_nps(area)`);
+
+    console.log('[database] RH NPS table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing RH NPS table:', error);
+  }
+}
+
 export async function initializeRhComentariosTables(): Promise<void> {
   try {
     // Criar tabela de comentários sobre colaboradores
