@@ -18,8 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -118,6 +121,36 @@ const findMatchingSquad = (colaboradorSquad: string | null, squads: SquadOption[
 };
 
 const statusOptions = ["Vai Começar", "Ativo", "Dispensado", "Em Desligamento"];
+
+const EXPORT_COLUMNS = [
+  { key: "id", label: "ID" },
+  { key: "status", label: "Status" },
+  { key: "nome", label: "Nome" },
+  { key: "cpf", label: "CPF" },
+  { key: "endereco", label: "Endereço" },
+  { key: "estado", label: "Estado" },
+  { key: "telefone", label: "Telefone" },
+  { key: "aniversario", label: "Aniversário" },
+  { key: "admissao", label: "Admissão" },
+  { key: "demissao", label: "Demissão" },
+  { key: "tipo_demissao", label: "Tipo Demissão" },
+  { key: "motivo_demissao", label: "Motivo Demissão" },
+  { key: "proporcional", label: "Proporcional" },
+  { key: "proporcional_caju", label: "Proporcional Caju" },
+  { key: "setor", label: "Setor" },
+  { key: "squad", label: "Squad" },
+  { key: "cargo", label: "Cargo" },
+  { key: "nivel", label: "Nível" },
+  { key: "pix", label: "PIX" },
+  { key: "cnpj", label: "CNPJ" },
+  { key: "email_turbo", label: "Email Turbo" },
+  { key: "email_pessoal", label: "Email Pessoal" },
+  { key: "meses_de_turbo", label: "Meses de Turbo" },
+  { key: "ultimo_aumento", label: "Último Aumento" },
+  { key: "meses_ult_aumento", label: "Meses Últ. Aumento" },
+  { key: "salario", label: "Salário" },
+  { key: "user_id", label: "User ID" },
+];
 
 interface CargoOption {
   id: number;
@@ -2133,6 +2166,55 @@ export default function Colaboradores() {
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [sortColumn, setSortColumn] = useState<string | null>("status");
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(
+    EXPORT_COLUMNS.map((column) => column.key),
+  );
+
+  const toggleExportColumn = useCallback((key: string) => {
+    setSelectedExportColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return EXPORT_COLUMNS.filter((column) => next.has(column.key)).map((column) => column.key);
+    });
+  }, []);
+
+  const selectAllExportColumns = useCallback(() => {
+    setSelectedExportColumns(EXPORT_COLUMNS.map((column) => column.key));
+  }, []);
+
+  const clearExportColumns = useCallback(() => {
+    setSelectedExportColumns([]);
+  }, []);
+
+  const canExport = selectedExportColumns.length > 0;
+  const allExportColumnsSelected = selectedExportColumns.length === EXPORT_COLUMNS.length;
+
+  const buildExportUrl = useCallback((format: "xlsx" | "csv") => {
+    const params = new URLSearchParams();
+    if (format === "csv") {
+      params.set("formato", "csv");
+    }
+    const exportKeys = selectedExportColumns.length > 0
+      ? selectedExportColumns
+      : EXPORT_COLUMNS.map((column) => column.key);
+    exportKeys.forEach((key) => params.append("colunas", key));
+    const query = params.toString();
+    return `/api/colaboradores/exportar-excel${query ? `?${query}` : ""}`;
+  }, [selectedExportColumns]);
+
+  const handleExport = useCallback((format: "xlsx" | "csv") => {
+    const url = buildExportUrl(format);
+    const link = document.createElement("a");
+    link.href = url;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }, [buildExportUrl]);
 
   const { data: colaboradoresResponse, isLoading } = useQuery<{ data: ColaboradorComPatrimonios[]; total: number; page: number; limit: number } | ColaboradorComPatrimonios[]>({
     queryKey: ["/api/colaboradores/com-patrimonios"],
@@ -2461,11 +2543,57 @@ export default function Colaboradores() {
                     Exportar
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => window.open('/api/colaboradores/exportar-excel', '_blank')}>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel className="flex items-center justify-between">
+                    Colunas
+                    <span className="text-xs text-muted-foreground">
+                      {selectedExportColumns.length}/{EXPORT_COLUMNS.length}
+                    </span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <div className="max-h-64 overflow-y-auto px-1">
+                    {EXPORT_COLUMNS.map((column) => (
+                      <DropdownMenuCheckboxItem
+                        key={column.key}
+                        checked={selectedExportColumns.includes(column.key)}
+                        onSelect={(event) => event.preventDefault()}
+                        onCheckedChange={() => toggleExportColumn(column.key)}
+                      >
+                        {column.label}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={allExportColumnsSelected}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      selectAllExportColumns();
+                    }}
+                  >
+                    Selecionar tudo
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={!canExport}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      clearExportColumns();
+                    }}
+                  >
+                    Limpar seleção
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>Download</DropdownMenuLabel>
+                  <DropdownMenuItem
+                    disabled={!canExport}
+                    onClick={() => handleExport("xlsx")}
+                  >
                     Excel (.xlsx)
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => window.open('/api/colaboradores/exportar-excel?formato=csv', '_blank')}>
+                  <DropdownMenuItem
+                    disabled={!canExport}
+                    onClick={() => handleExport("csv")}
+                  >
                     CSV (.csv)
                   </DropdownMenuItem>
                 </DropdownMenuContent>

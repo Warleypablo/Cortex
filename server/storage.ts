@@ -2589,7 +2589,9 @@ export class DbStorage implements IStorage {
   }
 
   async createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio> {
-    const [newPatrimonio] = await db.insert(schema.rhPatrimonio).values(patrimonio as any).returning();
+    const maxIdResult = await db.execute(sql`SELECT COALESCE(MAX(id), 0) + 1 as next_id FROM "Inhire".rh_patrimonio`);
+    const nextId = parseInt((maxIdResult.rows[0] as any).next_id);
+    const [newPatrimonio] = await db.insert(schema.rhPatrimonio).values({ ...patrimonio, id: nextId } as any).returning();
     return newPatrimonio;
   }
 
