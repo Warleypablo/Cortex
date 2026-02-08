@@ -17,20 +17,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  BarChart2, 
-  MessageSquare, 
-  Target, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Clock, 
-  Users, 
+import {
+  BarChart2,
+  MessageSquare,
+  Target,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Users,
   TrendingUp,
   Search,
   ExternalLink,
   Loader2,
-  XCircle
+  XCircle,
 } from "lucide-react";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -129,6 +130,7 @@ export default function PesquisasGG() {
   const [search1x1, setSearch1x1] = useState("");
   const [filter1x1, setFilter1x1] = useState("all");
   const [searchPdi, setSearchPdi] = useState("");
+  const [npsMes, setNpsMes] = useState("");
 
   useEffect(() => {
     setPageInfo("Pesquisas G&G", "Visão consolidada de e-NPS, 1x1 e PDI");
@@ -136,6 +138,33 @@ export default function PesquisasGG() {
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/rh/pesquisas/dashboard"],
+  });
+
+  const { data: npsMeses } = useQuery<string[]>({
+    queryKey: ["/api/rh/nps/meses"],
+    enabled: activeTab === "nps-anonimo",
+  });
+
+  const { data: npsDashboard, isLoading: npsLoading } = useQuery<any>({
+    queryKey: ["/api/rh/nps/dashboard", npsMes],
+    queryFn: async () => {
+      const url = npsMes ? `/api/rh/nps/dashboard?mes=${npsMes}` : "/api/rh/nps/dashboard";
+      const res = await fetch(url, { credentials: "include" });
+      return res.json();
+    },
+    enabled: activeTab === "nps-anonimo",
+    staleTime: 0,
+  });
+
+  const { data: npsRespostas } = useQuery<any[]>({
+    queryKey: ["/api/rh/nps/respostas", npsMes],
+    queryFn: async () => {
+      const url = npsMes ? `/api/rh/nps/respostas?mes=${npsMes}` : "/api/rh/nps/respostas";
+      const res = await fetch(url, { credentials: "include" });
+      return res.json();
+    },
+    enabled: activeTab === "nps-anonimo",
+    staleTime: 0,
   });
 
   const filtered1x1 = data?.oneOnOne.colaboradores.filter(c => {
@@ -172,6 +201,7 @@ export default function PesquisasGG() {
         <TabsList className="mb-6" data-testid="tabs-pesquisas">
           <TabsTrigger value="visao-geral" data-testid="tab-visao-geral">Visão Geral</TabsTrigger>
           <TabsTrigger value="enps" data-testid="tab-enps">E-NPS</TabsTrigger>
+          <TabsTrigger value="nps-anonimo" data-testid="tab-nps-anonimo">E-NPS Anônimo</TabsTrigger>
           <TabsTrigger value="1x1" data-testid="tab-1x1">1x1</TabsTrigger>
           <TabsTrigger value="pdi" data-testid="tab-pdi">PDI</TabsTrigger>
         </TabsList>
@@ -584,6 +614,266 @@ export default function PesquisasGG() {
               </TableBody>
             </Table>
           </Card>
+        </TabsContent>
+
+        {/* Tab E-NPS Anônimo */}
+        <TabsContent value="nps-anonimo" className="space-y-6">
+          {/* Header com filtro e link */}
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <Select value={npsMes || "todos"} onValueChange={(v) => setNpsMes(v === "todos" ? "" : v)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Todos os meses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os meses</SelectItem>
+                  {(npsMeses || []).map((m) => (
+                    <SelectItem key={m} value={m}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="sm" className="gap-2" asChild>
+              <Link href="/rh/nps/responder">
+                <ExternalLink className="w-4 h-4" />
+                Responder Pesquisa
+              </Link>
+            </Button>
+          </div>
+
+          {npsLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !npsDashboard || npsDashboard.totalRespostas === 0 ? (
+            <Card className="p-12 text-center text-muted-foreground">
+              <p>Nenhuma resposta encontrada {npsMes ? `para ${npsMes}` : ""}.</p>
+              <p className="mt-2 text-sm">Compartilhe o link da pesquisa com os colaboradores.</p>
+            </Card>
+          ) : (
+            <>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="p-5">
+                  <div className="text-sm text-muted-foreground mb-1">Total Respostas</div>
+                  <div className="text-3xl font-bold">{npsDashboard.totalRespostas}</div>
+                </Card>
+                {[
+                  { label: "NPS Empresa", data: npsDashboard.empresa, color: "blue" },
+                  { label: "NPS Líder", data: npsDashboard.lider, color: "purple" },
+                  { label: "NPS Produtos", data: npsDashboard.produtos, color: "amber" },
+                ].map(({ label, data: d, color }) => {
+                  const npsColor = d.nps >= 50 ? "text-green-600 dark:text-green-400"
+                    : d.nps >= 0 ? "text-yellow-600 dark:text-yellow-400"
+                    : "text-red-600 dark:text-red-400";
+                  return (
+                    <Card key={label} className="p-5">
+                      <div className="text-sm text-muted-foreground mb-1">{label}</div>
+                      <div className={`text-3xl font-bold ${npsColor}`}>{d.nps}</div>
+                      <div className="text-xs text-muted-foreground mt-1">Média: {d.media}</div>
+                      <div className="flex gap-3 mt-2 text-xs">
+                        <span className="text-green-600 dark:text-green-400">{d.promotores} promotores</span>
+                        <span className="text-yellow-600 dark:text-yellow-400">{d.neutros} neutros</span>
+                        <span className="text-red-600 dark:text-red-400">{d.detratores} detratores</span>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Charts row */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Distribuição por tipo */}
+                <Card className="p-5">
+                  <h3 className="text-sm font-semibold mb-4">Distribuição de Scores</h3>
+                  <div className="space-y-4">
+                    {[
+                      { label: "Empresa", data: npsDashboard.empresa },
+                      { label: "Líder", data: npsDashboard.lider },
+                      { label: "Produtos", data: npsDashboard.produtos },
+                    ].map(({ label, data: d }) => {
+                      const total = d.promotores + d.neutros + d.detratores || 1;
+                      return (
+                        <div key={label} className="space-y-1">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>{label}</span>
+                            <span>NPS: {d.nps}</span>
+                          </div>
+                          <div className="flex h-6 rounded-full overflow-hidden">
+                            <div
+                              className="bg-green-500 flex items-center justify-center text-[10px] text-white font-medium"
+                              style={{ width: `${(d.promotores / total) * 100}%` }}
+                            >
+                              {d.promotores > 0 ? `${Math.round((d.promotores / total) * 100)}%` : ""}
+                            </div>
+                            <div
+                              className="bg-yellow-500 flex items-center justify-center text-[10px] text-white font-medium"
+                              style={{ width: `${(d.neutros / total) * 100}%` }}
+                            >
+                              {d.neutros > 0 ? `${Math.round((d.neutros / total) * 100)}%` : ""}
+                            </div>
+                            <div
+                              className="bg-red-500 flex items-center justify-center text-[10px] text-white font-medium"
+                              style={{ width: `${(d.detratores / total) * 100}%` }}
+                            >
+                              {d.detratores > 0 ? `${Math.round((d.detratores / total) * 100)}%` : ""}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div className="flex gap-4 text-xs text-muted-foreground pt-2">
+                      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-500" /> Promotores (9-10)</span>
+                      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-500" /> Neutros (7-8)</span>
+                      <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-500" /> Detratores (0-6)</span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Motivos de permanência */}
+                <Card className="p-5">
+                  <h3 className="text-sm font-semibold mb-4">Motivo de Permanência</h3>
+                  <div className="space-y-3">
+                    {(npsDashboard.motivos || []).map((m: any) => {
+                      const pct = npsDashboard.totalRespostas > 0
+                        ? Math.round((m.total / npsDashboard.totalRespostas) * 100)
+                        : 0;
+                      return (
+                        <div key={m.motivo} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground truncate max-w-[75%]">{m.motivo}</span>
+                            <span className="font-medium">{m.total} ({pct}%)</span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              </div>
+
+              {/* Por Área */}
+              {(npsDashboard.porArea || []).length > 0 && (
+                <Card className="p-5">
+                  <h3 className="text-sm font-semibold mb-4">Médias por Área</h3>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Área</TableHead>
+                          <TableHead className="text-center">Respostas</TableHead>
+                          <TableHead className="text-center">Empresa</TableHead>
+                          <TableHead className="text-center">Líder</TableHead>
+                          <TableHead className="text-center">Produtos</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(npsDashboard.porArea || []).map((a: any) => (
+                          <TableRow key={a.area}>
+                            <TableCell className="font-medium">{a.area}</TableCell>
+                            <TableCell className="text-center">{a.total}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className={a.mediaEmpresa >= 9 ? "text-green-600" : a.mediaEmpresa >= 7 ? "text-yellow-600" : "text-red-600"}>
+                                {a.mediaEmpresa}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className={a.mediaLider >= 9 ? "text-green-600" : a.mediaLider >= 7 ? "text-yellow-600" : "text-red-600"}>
+                                {a.mediaLider}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className={a.mediaProdutos >= 9 ? "text-green-600" : a.mediaProdutos >= 7 ? "text-yellow-600" : "text-red-600"}>
+                                {a.mediaProdutos}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </Card>
+              )}
+
+              {/* Evolução mensal */}
+              {(npsDashboard.evolucao || []).length > 1 && (
+                <Card className="p-5">
+                  <h3 className="text-sm font-semibold mb-4">Evolução Mensal das Médias</h3>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={npsDashboard.evolucao}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                      <YAxis domain={[0, 10]} stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 12 }} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "0.5rem",
+                          color: "hsl(var(--card-foreground))",
+                        }}
+                      />
+                      <Legend />
+                      <Line type="monotone" dataKey="mediaEmpresa" name="Empresa" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="mediaLider" name="Líder" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4 }} />
+                      <Line type="monotone" dataKey="mediaProdutos" name="Produtos" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </Card>
+              )}
+
+              {/* Comentários recentes */}
+              <Card className="p-5">
+                <h3 className="text-sm font-semibold mb-4">Comentários Anônimos</h3>
+                <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                  {(npsRespostas || []).slice(0, 30).map((r: any) => (
+                    <div key={r.id} className="border-b border-border pb-4 last:border-0 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-xs">{r.area}</Badge>
+                        <Badge variant="outline" className={`text-xs ${r.scoreEmpresa >= 9 ? "text-green-600" : r.scoreEmpresa >= 7 ? "text-yellow-600" : "text-red-600"}`}>
+                          Empresa: {r.scoreEmpresa}
+                        </Badge>
+                        <Badge variant="outline" className={`text-xs ${r.scoreLider >= 9 ? "text-green-600" : r.scoreLider >= 7 ? "text-yellow-600" : "text-red-600"}`}>
+                          Líder: {r.scoreLider}
+                        </Badge>
+                        <Badge variant="outline" className={`text-xs ${r.scoreProdutos >= 9 ? "text-green-600" : r.scoreProdutos >= 7 ? "text-yellow-600" : "text-red-600"}`}>
+                          Produtos: {r.scoreProdutos}
+                        </Badge>
+                      </div>
+                      {r.comentarioEmpresa && (
+                        <div className="text-sm">
+                          <span className="text-xs text-muted-foreground font-medium">Sobre a empresa:</span>
+                          <p className="text-muted-foreground">{r.comentarioEmpresa}</p>
+                        </div>
+                      )}
+                      {r.comentarioLider && (
+                        <div className="text-sm">
+                          <span className="text-xs text-muted-foreground font-medium">Sobre o líder:</span>
+                          <p className="text-muted-foreground">{r.comentarioLider}</p>
+                        </div>
+                      )}
+                      {r.comentarioProdutos && (
+                        <div className="text-sm">
+                          <span className="text-xs text-muted-foreground font-medium">Sobre produtos:</span>
+                          <p className="text-muted-foreground">{r.comentarioProdutos}</p>
+                        </div>
+                      )}
+                      {r.feedbackGeral && (
+                        <div className="text-sm">
+                          <span className="text-xs text-muted-foreground font-medium">Feedback geral:</span>
+                          <p className="text-muted-foreground">{r.feedbackGeral}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>
