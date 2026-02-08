@@ -456,7 +456,7 @@ function AniversariantesWidget({ aniversariantes, userPhotos }: { aniversariante
   }
 
   return (
-    <Card data-testid="card-aniversariantes" className="h-full flex flex-col">
+    <Card data-testid="card-aniversariantes" className="h-full flex flex-col overflow-hidden">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
@@ -468,7 +468,7 @@ function AniversariantesWidget({ aniversariantes, userPhotos }: { aniversariante
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 flex-1 max-h-[320px] overflow-y-auto pr-2">
+      <CardContent className="space-y-2 flex-1 overflow-y-auto pr-2">
         {aniversariantes.map((pessoa) => {
           const dataAniversario = parseISO(pessoa.aniversario);
           const dateParts = getDayMonthFromDateString(pessoa.aniversario);
@@ -894,7 +894,7 @@ function DashboardAdmin() {
       </div>
 
       {/* Widgets personalizados */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 xl:grid-rows-[400px] auto-rows-[400px]">
         <MeusClientes 
           clientes={homeOverview?.clientes || []} 
           mrrTotal={homeOverview?.mrrTotal || 0}

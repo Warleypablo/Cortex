@@ -1267,9 +1267,9 @@ export default function PresentationMode() {
                           <div className="relative h-8 bg-slate-800/80 rounded-lg overflow-hidden border border-slate-700/50">
                             <motion.div
                               className={`absolute inset-y-0 left-0 rounded-lg ${
-                                atingida 
+                                atingida
                                   ? 'bg-gradient-to-r from-emerald-500 via-yellow-400 to-emerald-500'
-                                  : percentual >= 80 
+                                  : percentual >= 80
                                     ? 'bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-400'
                                     : percentual >= 50
                                       ? 'bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400'
@@ -1285,9 +1285,18 @@ export default function PresentationMode() {
                                 transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
                               />
                             </motion.div>
-                            
+
+                            {/* Divisórias de semana */}
+                            {[1, 2, 3].map((week) => (
+                              <div
+                                key={week}
+                                className="absolute top-0 bottom-0 w-px bg-slate-500/40"
+                                style={{ left: `${week * 25}%` }}
+                              />
+                            ))}
+
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <motion.span 
+                              <motion.span
                                 className="text-lg font-black text-white drop-shadow-lg"
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
@@ -1296,6 +1305,20 @@ export default function PresentationMode() {
                                 {formatPercent(percentual)}
                               </motion.span>
                             </div>
+                          </div>
+
+                          {/* Labels das semanas */}
+                          <div className="relative flex justify-between mt-1 px-0">
+                            {[1, 2, 3, 4].map((week) => {
+                              const metaSemanal = META_MRR / 4;
+                              const metaAcumulada = metaSemanal * week;
+                              return (
+                                <div key={week} className="flex flex-col items-center" style={{ width: '25%' }}>
+                                  <span className="text-[9px] font-bold text-slate-400">S{week}</span>
+                                  <span className="text-[9px] text-slate-500">{formatCurrencyCompact(metaAcumulada)}</span>
+                                </div>
+                              );
+                            })}
                           </div>
 
                           <div className="flex items-center justify-between mt-2">
