@@ -69,16 +69,19 @@ export function AppSidebar() {
     queryKey: ["/api/auth/me"],
   });
 
+  const PUBLIC_SIDEBAR_ROUTES = ['/rh/nps/responder'];
+
   const hasAccess = (url: string, permissionKey?: string) => {
     if (!user) return false;
     if (user.role === 'admin') return true;
-    
+    if (PUBLIC_SIDEBAR_ROUTES.includes(url)) return true;
+
     if (permissionKey && user.allowedRoutes) {
       if (user.allowedRoutes.includes(permissionKey)) return true;
     }
-    
+
     if (user.allowedRoutes && user.allowedRoutes.includes(url)) return true;
-    
+
     const relatedRoutes = permissionsToRoutes([permissionKey || '']);
     return relatedRoutes.some(route => user.allowedRoutes?.includes(route));
   };
