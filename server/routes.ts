@@ -15846,15 +15846,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         CLUSTER_OPTIONS,
         SQUAD_OPTIONS,
         CONTRACT_STATUS_OPTIONS,
-        COLLABORATOR_STATUS_OPTIONS
+        COLLABORATOR_STATUS_OPTIONS,
+        CHURN_REASON_OPTIONS
       } = await import("@shared/constants");
-      
-      const countResult = await db.execute(sql`SELECT COUNT(*) as count FROM system_field_options`);
-      const count = parseInt((countResult.rows[0] as any).count || '0');
-      
-      if (count > 0) {
-        return res.json({ message: "Table already has data, skipping seed", count });
-      }
       
       const seedData: { fieldType: string; options: { value: string; label: string; color?: string }[] }[] = [
         { fieldType: 'client_status', options: CLIENT_STATUS_OPTIONS },
@@ -15864,22 +15858,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { fieldType: 'squad', options: SQUAD_OPTIONS },
         { fieldType: 'contract_status', options: CONTRACT_STATUS_OPTIONS },
         { fieldType: 'collaborator_status', options: COLLABORATOR_STATUS_OPTIONS },
+        { fieldType: 'motivo_churn', options: CHURN_REASON_OPTIONS },
       ];
       
       let inserted = 0;
       for (const { fieldType, options } of seedData) {
         for (let i = 0; i < options.length; i++) {
           const opt = options[i];
-          await db.execute(sql`
+          const result = await db.execute(sql`
             INSERT INTO system_field_options (field_type, value, label, color, sort_order, is_active)
             VALUES (${fieldType}, ${opt.value}, ${opt.label}, ${opt.color || null}, ${i}, true)
             ON CONFLICT (field_type, value) DO NOTHING
+            RETURNING id
           `);
-          inserted++;
+          inserted += result.rows.length;
         }
       }
       
-      res.json({ success: true, message: `Seeded ${inserted} field options` });
+      res.json({ success: true, insertedCount: inserted, message: `Seeded ${inserted} field options` });
     } catch (error) {
       console.error("[api] Error seeding system field options:", error);
       res.status(500).json({ error: "Failed to seed field options" });
