@@ -80,6 +80,18 @@ export const CONTRACT_STATUS_OPTIONS: SelectOption[] = [
   { value: "entregue", label: "Entregue" },
 ];
 
+export const CHURN_REASON_OPTIONS: SelectOption[] = [
+  { value: "resultado_fraco", label: "Resultado fraco / ROI" },
+  { value: "falta_verba", label: "Falta de verba" },
+  { value: "in_house", label: "Contratou in-house / troca interna" },
+  { value: "concorrente", label: "Troca por concorrente" },
+  { value: "qualidade_entrega", label: "Problemas de entrega / qualidade" },
+  { value: "comunicacao", label: "Problemas de comunicação" },
+  { value: "timing", label: "Timing / pausa estratégica" },
+  { value: "inadimplencia", label: "Inadimplência" },
+  { value: "outros", label: "Outros" },
+];
+
 export const PRIORITY_OPTIONS: SelectOption[] = [
   { value: "baixa", label: "Baixa" },
   { value: "normal", label: "Normal" },
