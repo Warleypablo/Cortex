@@ -3947,6 +3947,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDateStr = startDate.toISOString().split('T')[0];
       
       // Buscar evolução de MRR por mês
+      // Para meses anteriores: usa snapshots históricos (cup_data_hist)
+      // Para o mês atual: usa dados ao vivo (cup_contratos) para evitar valores incompletos
       const mrrResult = await db.execute(sql`
         WITH snapshots_mensais AS (
           SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
@@ -3954,19 +3956,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             data_snapshot
           FROM "Clickup".cup_data_hist
           WHERE DATE(data_snapshot) >= ${startDateStr}::date
+            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
           ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        ),
+        historical_data AS (
+          SELECT
+            TO_CHAR(sm.mes, 'YYYY-MM') as mes,
+            h.squad,
+            h.responsavel,
+            COALESCE(SUM(h.valorr), 0) as mrr_total,
+            COUNT(*) as total_contratos
+          FROM snapshots_mensais sm
+          JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
+        ),
+        current_month_data AS (
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', CURRENT_DATE), 'YYYY-MM') as mes,
+            squad,
+            responsavel,
+            COALESCE(SUM(valorr), 0) as mrr_total,
+            COUNT(*) as total_contratos
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+          GROUP BY squad, responsavel
         )
-        SELECT 
-          TO_CHAR(sm.mes, 'YYYY-MM') as mes,
-          h.squad,
-          h.responsavel,
-          COALESCE(SUM(h.valorr), 0) as mrr_total,
-          COUNT(*) as total_contratos
-        FROM snapshots_mensais sm
-        JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-        WHERE h.status IN ('ativo', 'onboarding', 'triagem')
-        GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
-        ORDER BY mes, h.squad, h.responsavel
+        SELECT * FROM historical_data
+        UNION ALL
+        SELECT * FROM current_month_data
+        ORDER BY mes, squad, responsavel
       `);
       
       // Buscar churns por mês (usando data_solicitacao_encerramento - quando cliente pediu cancelamento)
@@ -3984,16 +4003,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY mes, squad
       `);
       
-      // Listar squads e operadores disponíveis
+      // Listar squads e operadores disponíveis (incluindo dados ao vivo)
       const squadsResult = await db.execute(sql`
-        SELECT DISTINCT squad FROM "Clickup".cup_data_hist 
-        WHERE squad IS NOT NULL AND squad != '' 
+        SELECT DISTINCT squad FROM (
+          SELECT squad FROM "Clickup".cup_data_hist WHERE squad IS NOT NULL AND squad != ''
+          UNION
+          SELECT squad FROM "Clickup".cup_contratos WHERE squad IS NOT NULL AND squad != ''
+        ) combined
         ORDER BY squad
       `);
-      
+
       const operadoresResult = await db.execute(sql`
-        SELECT DISTINCT responsavel FROM "Clickup".cup_data_hist 
-        WHERE responsavel IS NOT NULL AND responsavel != '' 
+        SELECT DISTINCT responsavel FROM (
+          SELECT responsavel FROM "Clickup".cup_data_hist WHERE responsavel IS NOT NULL AND responsavel != ''
+          UNION
+          SELECT responsavel FROM "Clickup".cup_contratos WHERE responsavel IS NOT NULL AND responsavel != ''
+        ) combined
         ORDER BY responsavel
       `);
       
