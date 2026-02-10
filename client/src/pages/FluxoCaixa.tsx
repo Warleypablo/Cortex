@@ -27,12 +27,12 @@ import {
   Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle,
   ArrowUpCircle, ArrowDownCircle, Banknote, CreditCard, Building2,
   ChevronRight, CircleDollarSign, CalendarDays, ArrowRight, Receipt,
-  Loader2, X
+  Loader2, X, Users, UserCheck, UserX, AlertTriangle
 } from "lucide-react";
 import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell, Area
 } from "recharts";
-import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco } from "@shared/schema";
+import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco, ClassificacaoClientesResponse } from "@shared/schema";
 
 interface FluxoDiaDetalhe {
   entradas: {
@@ -73,6 +73,12 @@ const getMesNome = (mes: number, ano: number) => {
   return `${meses[mes]} ${ano}`;
 };
 
+const classificacaoConfig: Record<string, { label: string; color: string }> = {
+  em_dia: { label: "Em dia", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" },
+  receoso: { label: "Receoso", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300" },
+  duvidoso: { label: "Duvidoso", color: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300" },
+};
+
 export default function FluxoCaixa() {
   usePageTitle("Fluxo de Caixa");
   useSetPageInfo("Fluxo de Caixa", "Análise de entradas e saídas do período");
@@ -108,17 +114,26 @@ export default function FluxoCaixa() {
     queryKey: ['/api/fluxo-caixa/contas-bancos'],
   });
 
+  const { data: classificacaoData, isLoading: isLoadingClassificacao } = useQuery<ClassificacaoClientesResponse>({
+    queryKey: ['/api/fluxo-caixa/classificacao-clientes'],
+  });
+
+  const [classificacaoFiltro, setClassificacaoFiltro] = useState<'todos' | 'em_dia' | 'receoso' | 'duvidoso'>('todos');
+
   const { data: fluxoDiarioResponse, isLoading: isLoadingFluxo } = useQuery<{ hasSnapshot: boolean; snapshotDate: string | null; dados: FluxoCaixaDiarioCompleto[] }>({
-    queryKey: ['/api/fluxo-caixa/diario-completo', { dataInicio, dataFim }],
+    queryKey: ['/api/fluxo-caixa/diario-completo', { dataInicio, dataFim, classificacao: classificacaoFiltro === 'todos' ? undefined : classificacaoFiltro }],
     queryFn: async () => {
       const params = new URLSearchParams({ dataInicio, dataFim });
-      const res = await fetch(`/api/fluxo-caixa/diario-completo?${params.toString()}`);
+      if (classificacaoFiltro !== 'todos') {
+        params.append('classificacao', classificacaoFiltro);
+      }
+      const res = await fetch(`/api/fluxo-caixa/diario-completo?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to fetch fluxo diario");
       return res.json();
     },
     enabled: !!dataInicio && !!dataFim,
   });
-  
+
   const fluxoDiario = fluxoDiarioResponse?.dados;
   const hasSnapshot = fluxoDiarioResponse?.hasSnapshot ?? false;
 
@@ -131,6 +146,12 @@ export default function FluxoCaixa() {
     },
     enabled: !!diaSelecionado,
   });
+
+  const clientesFiltrados = useMemo(() => {
+    if (!classificacaoData?.clientes) return [];
+    if (classificacaoFiltro === 'todos') return classificacaoData.clientes;
+    return classificacaoData.clientes.filter(c => c.classificacao === classificacaoFiltro);
+  }, [classificacaoData, classificacaoFiltro]);
 
   const chartData = useMemo(() => {
     if (!fluxoDiario) return [];
@@ -384,12 +405,91 @@ export default function FluxoCaixa() {
           </CardContent>
         </Card>
 
+        {/* Classificação de Clientes - Filtro do Gráfico */}
+        <div className="grid grid-cols-3 gap-4 mb-6" data-testid="filtro-classificacao">
+          {isLoadingClassificacao ? (
+            <>
+              {[1,2,3].map(i => <Skeleton key={i} className="h-20 rounded-lg" />)}
+            </>
+          ) : classificacaoData ? (
+            <>
+              <div
+                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                  classificacaoFiltro === 'em_dia'
+                    ? 'bg-green-500/20 border-green-500 ring-2 ring-green-500/30'
+                    : 'bg-green-500/10 border-green-500/20 hover:bg-green-500/15'
+                }`}
+                onClick={() => setClassificacaoFiltro(f => f === 'em_dia' ? 'todos' : 'em_dia')}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <UserCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <p className="text-xs font-medium text-muted-foreground">Em dia</p>
+                </div>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                  {classificacaoData.resumo.emDia} clientes
+                </p>
+              </div>
+
+              <div
+                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                  classificacaoFiltro === 'receoso'
+                    ? 'bg-amber-500/20 border-amber-500 ring-2 ring-amber-500/30'
+                    : 'bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15'
+                }`}
+                onClick={() => setClassificacaoFiltro(f => f === 'receoso' ? 'todos' : 'receoso')}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <p className="text-xs font-medium text-muted-foreground">Receosos (1 parcela vencida)</p>
+                </div>
+                <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                  {classificacaoData.resumo.receosos.count} clientes
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatCurrency(classificacaoData.resumo.receosos.totalVencido)} vencido
+                </p>
+              </div>
+
+              <div
+                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                  classificacaoFiltro === 'duvidoso'
+                    ? 'bg-red-500/20 border-red-500 ring-2 ring-red-500/30'
+                    : 'bg-red-500/10 border-red-500/20 hover:bg-red-500/15'
+                }`}
+                onClick={() => setClassificacaoFiltro(f => f === 'duvidoso' ? 'todos' : 'duvidoso')}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <UserX className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  <p className="text-xs font-medium text-muted-foreground">Duvidosos (2+ parcelas vencidas)</p>
+                </div>
+                <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                  {classificacaoData.resumo.duvidosos.count} clientes
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatCurrency(classificacaoData.resumo.duvidosos.totalVencido)} vencido
+                </p>
+              </div>
+            </>
+          ) : null}
+        </div>
+
         {/* Gráfico Principal */}
         <Card data-testid="card-fluxo-diario">
           <CardHeader className="pb-4">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <CardTitle className="text-lg">Fluxo Diário - {periodoLabel}</CardTitle>
+                <CardTitle className="text-lg">
+                  Fluxo Diário - {periodoLabel}
+                  {classificacaoFiltro !== 'todos' && (
+                    <Badge
+                      className={`ml-2 text-xs ${classificacaoConfig[classificacaoFiltro]?.color}`}
+                      variant="outline"
+                    >
+                      {classificacaoConfig[classificacaoFiltro]?.label}
+                      <X className="w-3 h-3 ml-1 cursor-pointer" onClick={() => setClassificacaoFiltro('todos')} />
+                    </Badge>
+                  )}
+                </CardTitle>
                 <CardDescription>Evolução do saldo no período selecionado</CardDescription>
               </div>
               
@@ -647,6 +747,66 @@ export default function FluxoCaixa() {
             )}
           </CardContent>
         </Card>
+
+        {/* Tabela de Clientes (visível quando filtro ativo) */}
+        {classificacaoFiltro !== 'todos' && clientesFiltrados.length > 0 && (
+          <Card className="mt-6" data-testid="card-clientes-filtrados">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-muted-foreground" />
+                  <CardTitle className="text-base">
+                    Clientes - {classificacaoConfig[classificacaoFiltro]?.label}
+                  </CardTitle>
+                </div>
+                <Badge className={`${classificacaoConfig[classificacaoFiltro]?.color} text-xs`} variant="outline">
+                  {clientesFiltrados.length} clientes
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>CNPJ</TableHead>
+                    <TableHead>Classificação</TableHead>
+                    <TableHead className="text-center">Parcelas Vencidas</TableHead>
+                    <TableHead className="text-right">Total Vencido</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientesFiltrados.map((cliente, idx) => (
+                    <TableRow key={`${cliente.nome}-${idx}`}>
+                      <TableCell className="font-medium">{cliente.nome}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {cliente.cnpj || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`${classificacaoConfig[cliente.classificacao]?.color} text-xs`}
+                          variant="outline"
+                        >
+                          {classificacaoConfig[cliente.classificacao]?.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {cliente.parcelasVencidas > 0 ? cliente.parcelasVencidas : '-'}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {cliente.totalVencido > 0 ? (
+                          <span className="text-red-600 dark:text-red-400">
+                            {formatCurrency(cliente.totalVencido)}
+                          </span>
+                        ) : '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Dialog de Detalhamento do Dia */}
