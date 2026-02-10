@@ -127,13 +127,18 @@ export default function EvolucaoMensal() {
               .reduce((acc, d) => acc + (Number(d.mrr_total) || 0), 0);
             row[squad] = mrrSquad;
             totalMrr += mrrSquad;
+
+            const churnSquad = churnMes
+              .filter(d => d.squad === squad)
+              .reduce((acc, d) => acc + (Number(d.mrr_churn) || 0), 0);
+            row[`churn_${squad}`] = churnSquad;
           }
         }
-        
+
         const churnTotal = churnMes
           .filter(d => squadSelecionado === "todos" || d.squad === squadSelecionado)
           .reduce((acc, d) => acc + (Number(d.mrr_churn) || 0), 0);
-        
+
         row.totalMrr = totalMrr;
         row.churn = churnTotal;
         
@@ -646,12 +651,13 @@ export default function EvolucaoMensal() {
                           </td>
                           {chartData.map((row) => {
                             const value = Number(row[squad]) || 0;
+                            const churnValue = Number(row[`churn_${squad}`]) || 0;
                             const prevIndex = chartData.indexOf(row) - 1;
                             const prevValue = prevIndex >= 0 ? (Number(chartData[prevIndex][squad]) || 0) : value;
                             const trend = value > prevValue ? "up" : value < prevValue ? "down" : "same";
 
                             return (
-                              <td key={row.mes} className="text-right py-3 px-4 font-mono">
+                              <td key={row.mes} className="text-right py-2 px-4 font-mono">
                                 <span className={cn(
                                   "text-gray-700 dark:text-zinc-300",
                                   trend === "up" && "text-emerald-600 dark:text-emerald-400",
@@ -659,11 +665,24 @@ export default function EvolucaoMensal() {
                                 )}>
                                   {formatCurrencyNoDecimals(value)}
                                 </span>
+                                {churnValue > 0 && (
+                                  <div className="text-[11px] text-rose-500 dark:text-rose-400/80 mt-0.5">
+                                    -{formatCurrencyNoDecimals(churnValue)}
+                                  </div>
+                                )}
                               </td>
                             );
                           })}
-                          <td className="text-right py-3 px-4 font-mono font-semibold text-cyan-600 dark:text-cyan-400 border-l border-gray-200 dark:border-zinc-700/50">
+                          <td className="text-right py-2 px-4 font-mono font-semibold text-cyan-600 dark:text-cyan-400 border-l border-gray-200 dark:border-zinc-700/50">
                             {formatCurrencyNoDecimals(total)}
+                            {(() => {
+                              const totalChurn = chartData.reduce((acc, row) => acc + (Number(row[`churn_${squad}`]) || 0), 0);
+                              return totalChurn > 0 ? (
+                                <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                  -{formatCurrencyNoDecimals(totalChurn)}
+                                </div>
+                              ) : null;
+                            })()}
                           </td>
                         </tr>
                       );
@@ -678,13 +697,19 @@ export default function EvolucaoMensal() {
                         const total = squads
                           .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
                           .reduce((acc, squad) => acc + (Number(row[squad]) || 0), 0);
+                        const churnTotal = Number(row.churn) || 0;
                         return (
-                          <td key={row.mes} className="text-right py-3 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
+                          <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
                             {formatCurrencyNoDecimals(total)}
+                            {churnTotal > 0 && (
+                              <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                -{formatCurrencyNoDecimals(churnTotal)}
+                              </div>
+                            )}
                           </td>
                         );
                       })}
-                      <td className="text-right py-3 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
+                      <td className="text-right py-2 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
                         {formatCurrencyNoDecimals(
                           chartData.reduce((acc, row) => {
                             return acc + squads
@@ -692,6 +717,11 @@ export default function EvolucaoMensal() {
                               .reduce((sum, squad) => sum + (Number(row[squad]) || 0), 0);
                           }, 0)
                         )}
+                        <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                          -{formatCurrencyNoDecimals(
+                            chartData.reduce((acc, row) => acc + (Number(row.churn) || 0), 0)
+                          )}
+                        </div>
                       </td>
                     </tr>
                   </tfoot>
@@ -792,13 +822,19 @@ export default function EvolucaoMensal() {
                         const total = operadores
                           .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
                           .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
+                        const churnTotal = Number(row.churn) || 0;
                         return (
-                          <td key={row.mes} className="text-right py-3 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
+                          <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
                             {formatCurrencyNoDecimals(total)}
+                            {churnTotal > 0 && (
+                              <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                -{formatCurrencyNoDecimals(churnTotal)}
+                              </div>
+                            )}
                           </td>
                         );
                       })}
-                      <td className="text-right py-3 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
+                      <td className="text-right py-2 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
                         {formatCurrencyNoDecimals(
                           chartData.reduce((acc, row) => {
                             return acc + operadores
@@ -806,6 +842,11 @@ export default function EvolucaoMensal() {
                               .reduce((sum, op) => sum + (Number(row[op]) || 0), 0);
                           }, 0)
                         )}
+                        <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                          -{formatCurrencyNoDecimals(
+                            chartData.reduce((acc, row) => acc + (Number(row.churn) || 0), 0)
+                          )}
+                        </div>
                       </td>
                     </tr>
                   </tfoot>
