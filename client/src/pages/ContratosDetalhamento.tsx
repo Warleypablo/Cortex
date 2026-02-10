@@ -35,6 +35,17 @@ const formatLT = (ltMeses: number, ltDias: number) => {
   return `${ltDias} d`;
 };
 
+const normalizeServico = (servico: string): string => {
+  const s = servico.trim();
+  const lower = s.toLowerCase();
+  if (/^e-?commerce$/.test(lower) || lower === "marketplace") return "E-commerce";
+  if (/^e-?mail\s*(marketing|mkt)?$/.test(lower)) return "E-mail Marketing";
+  if (/^perfo?r?mance$/.test(lower)) return "Performance";
+  if (/^social\s*media$/.test(lower)) return "Social Media";
+  if (/^gestao\s*de\s*perfo?r?mance$/i.test(lower.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) return "Gestão de Performance";
+  return s;
+};
+
 export default function ContratosDetalhamento() {
   usePageTitle("Detalhamento de Contratos");
   useSetPageInfo("Detalhamento de Contratos", "Dashboard completo de contratos (LT, LTV, serviços e produtos)");
@@ -177,6 +188,47 @@ export default function ContratosDetalhamento() {
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5);
+  }, [contratosFiltrados]);
+
+  const ltPorProduto = useMemo(() => {
+    const map = new Map<string, { ativos: number[]; cancelados: number[] }>();
+
+    contratosFiltrados.forEach((c) => {
+      const mrr = parseFloat(c.valorr || "0") || 0;
+      if (mrr <= 500) return;
+
+      const produto = c.produto || "Sem produto";
+      if (!map.has(produto)) map.set(produto, { ativos: [], cancelados: [] });
+      const entry = map.get(produto)!;
+
+      const inicio = c.dataInicio ? new Date(c.dataInicio) : null;
+      if (!inicio) return;
+
+      if (c.dataSolicitacaoEncerramento) {
+        const fim = new Date(c.dataSolicitacaoEncerramento);
+        const dias = Math.max(0, differenceInDays(fim, inicio));
+        entry.cancelados.push(dias);
+      } else {
+        const dias = Math.max(0, differenceInDays(new Date(), inicio));
+        entry.ativos.push(dias);
+      }
+    });
+
+    return Array.from(map.entries())
+      .map(([produto, { ativos, cancelados }]) => {
+        const avgAtivo = ativos.length > 0 ? ativos.reduce((a, b) => a + b, 0) / ativos.length : 0;
+        const avgCancelado = cancelados.length > 0 ? cancelados.reduce((a, b) => a + b, 0) / cancelados.length : 0;
+        return {
+          produto,
+          qtdAtivos: ativos.length,
+          qtdCancelados: cancelados.length,
+          ltMedioAtivoDias: Math.round(avgAtivo),
+          ltMedioAtivoMeses: Math.round((avgAtivo / 30) * 10) / 10,
+          ltMedioCanceladoDias: Math.round(avgCancelado),
+          ltMedioCanceladoMeses: Math.round((avgCancelado / 30) * 10) / 10,
+        };
+      })
+      .sort((a, b) => (b.qtdAtivos + b.qtdCancelados) - (a.qtdAtivos + a.qtdCancelados));
   }, [contratosFiltrados]);
 
   if (isLoading) {
@@ -367,6 +419,77 @@ export default function ContratosDetalhamento() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-muted-foreground" />
+                <CardTitle className="text-base">LT por Produto</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produto</TableHead>
+                      <TableHead className="text-center">Ativos</TableHead>
+                      <TableHead className="text-center">LT Médio Ativo</TableHead>
+                      <TableHead className="text-center">Cancelados</TableHead>
+                      <TableHead className="text-center">LT Médio Cancelado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ltPorProduto.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          Nenhum produto encontrado com os filtros atuais.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      ltPorProduto.map((item) => (
+                        <TableRow key={item.produto}>
+                          <TableCell className="font-medium">{item.produto}</TableCell>
+                          <TableCell className="text-center">
+                            {item.qtdAtivos > 0 ? (
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">{item.qtdAtivos}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {item.qtdAtivos > 0 ? (
+                              <span className="text-green-600 dark:text-green-400 font-semibold">
+                                {formatLT(item.ltMedioAtivoMeses, item.ltMedioAtivoDias)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {item.qtdCancelados > 0 ? (
+                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">{item.qtdCancelados}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {item.qtdCancelados > 0 ? (
+                              <span className="text-red-600 dark:text-red-400 font-semibold">
+                                {formatLT(item.ltMedioCanceladoMeses, item.ltMedioCanceladoDias)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
