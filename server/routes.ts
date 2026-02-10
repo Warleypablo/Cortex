@@ -4055,18 +4055,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Se tem filtro de classificação, calcula fluxo filtrado por clientes dessa classificação
-      if (classificacao && ['em_dia', 'receoso', 'duvidoso'].includes(classificacao)) {
+      const validClassificacoes = ['em_dia', 'receoso', 'duvidoso'];
+      const classificacoes = classificacao
+        ? classificacao.split(',').filter(c => validClassificacoes.includes(c))
+        : [];
+
+      if (classificacoes.length > 0) {
         const saldoAtual = await storage.getSaldoAtualBancos();
 
-        // Determina condição de contagem de parcelas vencidas por classificação
-        let havingCondition: string;
-        if (classificacao === 'em_dia') {
-          havingCondition = 'HAVING COALESCE(SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END), 0) = 0';
-        } else if (classificacao === 'receoso') {
-          havingCondition = 'HAVING SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END) = 1';
-        } else {
-          havingCondition = 'HAVING SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END) > 1';
+        // Determina condição de contagem de parcelas vencidas por classificação (suporta múltiplas)
+        const conditions: string[] = [];
+        if (classificacoes.includes('em_dia')) {
+          conditions.push('(COALESCE(SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END), 0) = 0)');
         }
+        if (classificacoes.includes('receoso')) {
+          conditions.push('(SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END) = 1)');
+        }
+        if (classificacoes.includes('duvidoso')) {
+          conditions.push('(SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END) > 1)');
+        }
+        const havingCondition = `HAVING ${conditions.join(' OR ')}`;
 
         const result = await db.execute(sql.raw(`
           WITH clientes_classificados AS (

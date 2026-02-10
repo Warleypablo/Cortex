@@ -118,14 +118,22 @@ export default function FluxoCaixa() {
     queryKey: ['/api/fluxo-caixa/classificacao-clientes'],
   });
 
-  const [classificacaoFiltro, setClassificacaoFiltro] = useState<'todos' | 'em_dia' | 'receoso' | 'duvidoso'>('todos');
+  const [classificacaoFiltro, setClassificacaoFiltro] = useState<string[]>([]);
+
+  const toggleClassificacao = (tipo: string) => {
+    setClassificacaoFiltro(prev =>
+      prev.includes(tipo) ? prev.filter(t => t !== tipo) : [...prev, tipo]
+    );
+  };
+
+  const classificacaoParam = classificacaoFiltro.length > 0 ? classificacaoFiltro.join(',') : undefined;
 
   const { data: fluxoDiarioResponse, isLoading: isLoadingFluxo } = useQuery<{ hasSnapshot: boolean; snapshotDate: string | null; dados: FluxoCaixaDiarioCompleto[] }>({
-    queryKey: ['/api/fluxo-caixa/diario-completo', { dataInicio, dataFim, classificacao: classificacaoFiltro === 'todos' ? undefined : classificacaoFiltro }],
+    queryKey: ['/api/fluxo-caixa/diario-completo', { dataInicio, dataFim, classificacao: classificacaoParam }],
     queryFn: async () => {
       const params = new URLSearchParams({ dataInicio, dataFim });
-      if (classificacaoFiltro !== 'todos') {
-        params.append('classificacao', classificacaoFiltro);
+      if (classificacaoParam) {
+        params.append('classificacao', classificacaoParam);
       }
       const res = await fetch(`/api/fluxo-caixa/diario-completo?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to fetch fluxo diario");
@@ -146,12 +154,6 @@ export default function FluxoCaixa() {
     },
     enabled: !!diaSelecionado,
   });
-
-  const clientesFiltrados = useMemo(() => {
-    if (!classificacaoData?.clientes) return [];
-    if (classificacaoFiltro === 'todos') return classificacaoData.clientes;
-    return classificacaoData.clientes.filter(c => c.classificacao === classificacaoFiltro);
-  }, [classificacaoData, classificacaoFiltro]);
 
   const chartData = useMemo(() => {
     if (!fluxoDiario) return [];
@@ -371,40 +373,6 @@ export default function FluxoCaixa() {
           </CardContent>
         </Card>
 
-        {/* Contas Bancárias */}
-        <Card className="mb-6" data-testid="card-contas-bancos">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-muted-foreground" />
-              <CardTitle className="text-base">Contas Bancárias</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoadingContas ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[1,2,3,4].map(i => <Skeleton key={i} className="h-16" />)}
-              </div>
-            ) : !contasBancos || contasBancos.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma conta bancária encontrada</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {contasBancos.map((conta, index) => (
-                  <div 
-                    key={conta.id || index}
-                    className="p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
-                    data-testid={`card-conta-${index}`}
-                  >
-                    <p className="text-xs font-medium text-muted-foreground truncate">{conta.nome}</p>
-                    <p className={`text-base font-bold ${conta.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(conta.saldo)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         {/* Classificação de Clientes - Filtro do Gráfico */}
         <div className="grid grid-cols-3 gap-4 mb-6" data-testid="filtro-classificacao">
           {isLoadingClassificacao ? (
@@ -415,11 +383,11 @@ export default function FluxoCaixa() {
             <>
               <div
                 className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                  classificacaoFiltro === 'em_dia'
+                  classificacaoFiltro.includes('em_dia')
                     ? 'bg-green-500/20 border-green-500 ring-2 ring-green-500/30'
                     : 'bg-green-500/10 border-green-500/20 hover:bg-green-500/15'
                 }`}
-                onClick={() => setClassificacaoFiltro(f => f === 'em_dia' ? 'todos' : 'em_dia')}
+                onClick={() => toggleClassificacao('em_dia')}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <UserCheck className="w-4 h-4 text-green-600 dark:text-green-400" />
@@ -432,11 +400,11 @@ export default function FluxoCaixa() {
 
               <div
                 className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                  classificacaoFiltro === 'receoso'
+                  classificacaoFiltro.includes('receoso')
                     ? 'bg-amber-500/20 border-amber-500 ring-2 ring-amber-500/30'
                     : 'bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/15'
                 }`}
-                onClick={() => setClassificacaoFiltro(f => f === 'receoso' ? 'todos' : 'receoso')}
+                onClick={() => toggleClassificacao('receoso')}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -452,11 +420,11 @@ export default function FluxoCaixa() {
 
               <div
                 className={`p-4 rounded-lg border cursor-pointer transition-colors ${
-                  classificacaoFiltro === 'duvidoso'
+                  classificacaoFiltro.includes('duvidoso')
                     ? 'bg-red-500/20 border-red-500 ring-2 ring-red-500/30'
                     : 'bg-red-500/10 border-red-500/20 hover:bg-red-500/15'
                 }`}
-                onClick={() => setClassificacaoFiltro(f => f === 'duvidoso' ? 'todos' : 'duvidoso')}
+                onClick={() => toggleClassificacao('duvidoso')}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <UserX className="w-4 h-4 text-red-600 dark:text-red-400" />
@@ -480,14 +448,23 @@ export default function FluxoCaixa() {
               <div>
                 <CardTitle className="text-lg">
                   Fluxo Diário - {periodoLabel}
-                  {classificacaoFiltro !== 'todos' && (
+                  {classificacaoFiltro.length > 0 && classificacaoFiltro.map(tipo => (
                     <Badge
-                      className={`ml-2 text-xs ${classificacaoConfig[classificacaoFiltro]?.color}`}
+                      key={tipo}
+                      className={`ml-2 text-xs ${classificacaoConfig[tipo]?.color}`}
                       variant="outline"
                     >
-                      {classificacaoConfig[classificacaoFiltro]?.label}
-                      <X className="w-3 h-3 ml-1 cursor-pointer" onClick={() => setClassificacaoFiltro('todos')} />
+                      {classificacaoConfig[tipo]?.label}
+                      <X className="w-3 h-3 ml-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleClassificacao(tipo); }} />
                     </Badge>
+                  ))}
+                  {classificacaoFiltro.length > 1 && (
+                    <span
+                      className="ml-2 text-xs text-muted-foreground cursor-pointer hover:underline"
+                      onClick={() => setClassificacaoFiltro([])}
+                    >
+                      Limpar filtros
+                    </span>
                   )}
                 </CardTitle>
                 <CardDescription>Evolução do saldo no período selecionado</CardDescription>
@@ -748,65 +725,39 @@ export default function FluxoCaixa() {
           </CardContent>
         </Card>
 
-        {/* Tabela de Clientes (visível quando filtro ativo) */}
-        {classificacaoFiltro !== 'todos' && clientesFiltrados.length > 0 && (
-          <Card className="mt-6" data-testid="card-clientes-filtrados">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="w-5 h-5 text-muted-foreground" />
-                  <CardTitle className="text-base">
-                    Clientes - {classificacaoConfig[classificacaoFiltro]?.label}
-                  </CardTitle>
-                </div>
-                <Badge className={`${classificacaoConfig[classificacaoFiltro]?.color} text-xs`} variant="outline">
-                  {clientesFiltrados.length} clientes
-                </Badge>
+        {/* Contas Bancárias */}
+        <Card className="mt-6" data-testid="card-contas-bancos">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-muted-foreground" />
+              <CardTitle className="text-base">Contas Bancárias</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingContas ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[1,2,3,4].map(i => <Skeleton key={i} className="h-16" />)}
               </div>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>CNPJ</TableHead>
-                    <TableHead>Classificação</TableHead>
-                    <TableHead className="text-center">Parcelas Vencidas</TableHead>
-                    <TableHead className="text-right">Total Vencido</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {clientesFiltrados.map((cliente, idx) => (
-                    <TableRow key={`${cliente.nome}-${idx}`}>
-                      <TableCell className="font-medium">{cliente.nome}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {cliente.cnpj || '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={`${classificacaoConfig[cliente.classificacao]?.color} text-xs`}
-                          variant="outline"
-                        >
-                          {classificacaoConfig[cliente.classificacao]?.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {cliente.parcelasVencidas > 0 ? cliente.parcelasVencidas : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold">
-                        {cliente.totalVencido > 0 ? (
-                          <span className="text-red-600 dark:text-red-400">
-                            {formatCurrency(cliente.totalVencido)}
-                          </span>
-                        ) : '-'}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+            ) : !contasBancos || contasBancos.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma conta bancária encontrada</p>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {contasBancos.map((conta, index) => (
+                  <div
+                    key={conta.id || index}
+                    className="p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
+                    data-testid={`card-conta-${index}`}
+                  >
+                    <p className="text-xs font-medium text-muted-foreground truncate">{conta.nome}</p>
+                    <p className={`text-base font-bold ${conta.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(conta.saldo)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Dialog de Detalhamento do Dia */}
