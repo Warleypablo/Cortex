@@ -220,20 +220,24 @@ export default function EvolucaoMensal() {
   }, [data, squadSelecionado, operadorSelecionado]);
 
   const totais = useMemo(() => {
-    if (!aggregatedData.length) return { mrrAtual: 0, churnTotal: 0, variacaoMrr: 0, churnRate: 0 };
-    
+    if (!aggregatedData.length) return { mrrAtual: 0, churnTotal: 0, variacaoMrr: 0, churnRate: 0, churnRateAtual: 0, churnRateAnterior: 0, churnMesAtual: 0, churnMesAnterior: 0 };
+
     const ultimo = aggregatedData[aggregatedData.length - 1];
     const penultimo = aggregatedData.length > 1 ? aggregatedData[aggregatedData.length - 2] : null;
-    
+
     const variacaoMrr = penultimo ? ultimo.mrr - penultimo.mrr : 0;
     const churnTotal = aggregatedData.reduce((acc, d) => acc + d.churn, 0);
     const avgChurnRate = aggregatedData.reduce((acc, d) => acc + d.churnRate, 0) / aggregatedData.length;
-    
+
     return {
       mrrAtual: ultimo.mrr,
       churnTotal,
       variacaoMrr,
       churnRate: avgChurnRate,
+      churnRateAtual: ultimo.churnRate,
+      churnRateAnterior: penultimo?.churnRate ?? 0,
+      churnMesAtual: ultimo.churn,
+      churnMesAnterior: penultimo?.churn ?? 0,
     };
   }, [aggregatedData]);
 
@@ -249,6 +253,7 @@ export default function EvolucaoMensal() {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const currentIndex = aggregatedData.findIndex(d => d.mes === label);
+      const currentData = currentIndex >= 0 ? aggregatedData[currentIndex] : null;
       const previousData = currentIndex > 0 ? aggregatedData[currentIndex - 1] : null;
 
       return (
@@ -275,6 +280,11 @@ export default function EvolucaoMensal() {
                   <div className="text-lg font-mono font-bold text-gray-900 dark:text-white">
                     {formatCurrencyNoDecimals(entry.value)}
                   </div>
+                  {!isMRR && currentData && (
+                    <div className="text-xs font-medium text-amber-500 dark:text-amber-400 mt-1">
+                      Taxa: {currentData.churnRate.toFixed(1)}% do MRR
+                    </div>
+                  )}
                   {previousValue !== null && (
                     <div className={cn(
                       "text-xs flex items-center gap-1 mt-1",
@@ -432,20 +442,26 @@ export default function EvolucaoMensal() {
           <div className="absolute inset-0 bg-gradient-to-r from-rose-500/20 to-red-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
           <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-zinc-400">Churn Total</CardTitle>
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-zinc-400">Churn do Mês</CardTitle>
               <div className="p-2 rounded-lg bg-rose-500/10">
                 <TrendingDown className="h-4 w-4 text-rose-600 dark:text-rose-400" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 font-mono">{formatCurrencyNoDecimals(totais.churnTotal)}</div>
-              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">
-                Últimos {meses} meses
-              </p>
+              <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 font-mono">{formatCurrencyNoDecimals(totais.churnMesAtual)}</div>
+              {totais.churnMesAnterior > 0 && (
+                <p className={cn(
+                  "text-xs mt-1 flex items-center gap-1",
+                  totais.churnMesAtual <= totais.churnMesAnterior ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                )}>
+                  {totais.churnMesAtual <= totais.churnMesAnterior ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                  {totais.churnMesAtual <= totais.churnMesAnterior ? "" : "+"}{formatCurrencyNoDecimals(totais.churnMesAtual - totais.churnMesAnterior)} vs anterior
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
-        
+
         <div className="relative group" data-testid="card-churn-rate">
           <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
           <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm">
@@ -456,9 +472,18 @@ export default function EvolucaoMensal() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">{totais.churnRate.toFixed(1)}%</div>
+              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">{totais.churnRateAtual.toFixed(1)}%</div>
+              {totais.churnRateAnterior > 0 && (
+                <p className={cn(
+                  "text-xs mt-1 flex items-center gap-1",
+                  totais.churnRateAtual <= totais.churnRateAnterior ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                )}>
+                  {totais.churnRateAtual <= totais.churnRateAnterior ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+                  {totais.churnRateAtual <= totais.churnRateAnterior ? "" : "+"}{(totais.churnRateAtual - totais.churnRateAnterior).toFixed(1)}pp vs anterior
+                </p>
+              )}
               <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">
-                Média do período
+                Média período: {totais.churnRate.toFixed(1)}%
               </p>
             </CardContent>
           </Card>
