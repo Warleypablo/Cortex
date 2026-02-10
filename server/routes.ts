@@ -4048,12 +4048,163 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const dataInicio = req.query.dataInicio as string;
       const dataFim = req.query.dataFim as string;
-      
+      const classificacao = req.query.classificacao as string | undefined;
+
       if (!dataInicio || !dataFim) {
         return res.status(400).json({ error: "dataInicio and dataFim are required" });
       }
 
+      // Se tem filtro de classificação, calcula fluxo filtrado por clientes dessa classificação
+      if (classificacao && ['em_dia', 'receoso', 'duvidoso'].includes(classificacao)) {
+        const saldoAtual = await storage.getSaldoAtualBancos();
+
+        // Determina condição de contagem de parcelas vencidas por classificação
+        let havingCondition: string;
+        if (classificacao === 'em_dia') {
+          havingCondition = 'HAVING COALESCE(SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END), 0) = 0';
+        } else if (classificacao === 'receoso') {
+          havingCondition = 'HAVING SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END) = 1';
+        } else {
+          havingCondition = 'HAVING SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END) > 1';
+        }
+
+        const result = await db.execute(sql.raw(`
+          WITH clientes_classificados AS (
+            SELECT p2.id_cliente
+            FROM "Conta Azul".caz_parcelas p2
+            INNER JOIN "Conta Azul".caz_clientes c2 ON p2.id_cliente::text = c2.ids::text
+            WHERE p2.tipo_evento = 'RECEITA'
+              AND p2.id_cliente IS NOT NULL
+            GROUP BY p2.id_cliente
+            ${havingCondition}
+          ),
+          dates AS (
+            SELECT generate_series(
+              '${dataInicio}'::date,
+              '${dataFim}'::date,
+              '1 day'::interval
+            )::date as data
+          ),
+          receitas_filtradas AS (
+            SELECT
+              p.data_vencimento::date as data,
+              SUM(p.valor_bruto::numeric) as entradas_previstas
+            FROM "Conta Azul".caz_parcelas p
+            INNER JOIN clientes_classificados cc ON p.id_cliente = cc.id_cliente
+            WHERE p.tipo_evento = 'RECEITA'
+              AND p.status NOT IN ('PERDIDO')
+              AND p.data_vencimento::date BETWEEN '${dataInicio}'::date AND '${dataFim}'::date
+            GROUP BY p.data_vencimento::date
+          ),
+          despesas_todas AS (
+            SELECT
+              data_vencimento::date as data,
+              SUM(valor_bruto::numeric) as saidas_previstas
+            FROM "Conta Azul".caz_parcelas
+            WHERE tipo_evento = 'DESPESA'
+              AND status NOT IN ('PERDIDO')
+              AND data_vencimento::date BETWEEN '${dataInicio}'::date AND '${dataFim}'::date
+            GROUP BY data_vencimento::date
+          )
+          SELECT
+            TO_CHAR(d.data, 'YYYY-MM-DD') as data,
+            COALESCE(rf.entradas_previstas, 0) as entradas_previstas,
+            COALESCE(dt.saidas_previstas, 0) as saidas_previstas
+          FROM dates d
+          LEFT JOIN receitas_filtradas rf ON d.data = rf.data
+          LEFT JOIN despesas_todas dt ON d.data = dt.data
+          ORDER BY d.data
+        `));
+
+        const saldoHoje = saldoAtual.saldoTotal;
+        const hojeStr = new Date().toISOString().split('T')[0];
+
+        // Primeiro, parsear todas as rows
+        const rows = (result.rows as any[]).map((row: any) => ({
+          data: row.data as string,
+          entradas: parseFloat(row.entradas_previstas || '0'),
+          saidas: parseFloat(row.saidas_previstas || '0'),
+        }));
+
+        // Encontrar o índice de hoje (ou o dia mais próximo passado)
+        let hojeIdx = rows.findIndex(r => r.data === hojeStr);
+        if (hojeIdx === -1) {
+          // Se hoje não está no range, encontrar último dia <= hoje
+          hojeIdx = rows.findLastIndex(r => r.data <= hojeStr);
+        }
+
+        // Calcular saldo acumulado ancorado no saldo real de hoje
+        const dados = rows.map((row, _idx) => ({
+          data: row.data,
+          entradas: row.entradas,
+          saidas: row.saidas,
+          saldoDia: row.entradas - row.saidas,
+          saldoAcumulado: 0,
+          saldoEsperado: 0,
+          entradasPagas: 0,
+          saidasPagas: 0,
+          entradasPrevistas: row.entradas,
+          saidasPrevistas: row.saidas,
+          entradasEsperadas: 0,
+          saidasEsperadas: 0,
+        }));
+
+        if (hojeIdx >= 0) {
+          // Hoje = saldo real dos bancos
+          dados[hojeIdx].saldoAcumulado = saldoHoje;
+
+          // Dias anteriores: retroceder subtraindo o fluxo de cada dia
+          let saldo = saldoHoje;
+          for (let i = hojeIdx - 1; i >= 0; i--) {
+            // O saldo do dia anterior é o saldo atual menos o fluxo do dia seguinte
+            saldo -= dados[i + 1].saldoDia;
+            dados[i].saldoAcumulado = saldo;
+          }
+
+          // Dias futuros: avançar somando o fluxo de cada dia
+          saldo = saldoHoje;
+          for (let i = hojeIdx + 1; i < dados.length; i++) {
+            saldo += dados[i].saldoDia;
+            dados[i].saldoAcumulado = saldo;
+          }
+        } else {
+          // Todos os dias são futuros, começar do saldo de hoje
+          let saldo = saldoHoje;
+          for (let i = 0; i < dados.length; i++) {
+            saldo += dados[i].saldoDia;
+            dados[i].saldoAcumulado = saldo;
+          }
+        }
+
+        return res.json({ hasSnapshot: false, snapshotDate: null, dados });
+      }
+
       const fluxo = await storage.getFluxoCaixaDiarioCompleto(dataInicio, dataFim);
+
+      // Reancora o saldo acumulado no saldo real de hoje (caz_bancos)
+      const saldoBancos = await storage.getSaldoAtualBancos();
+      const hojeAncora = new Date().toISOString().split('T')[0];
+      let hojeAIdx = fluxo.dados.findIndex(d => d.data === hojeAncora);
+      if (hojeAIdx === -1) {
+        hojeAIdx = fluxo.dados.findLastIndex(d => d.data <= hojeAncora);
+      }
+
+      if (hojeAIdx >= 0) {
+        fluxo.dados[hojeAIdx].saldoAcumulado = saldoBancos.saldoTotal;
+
+        let saldo = saldoBancos.saldoTotal;
+        for (let i = hojeAIdx - 1; i >= 0; i--) {
+          saldo -= fluxo.dados[i + 1].saldoDia;
+          fluxo.dados[i].saldoAcumulado = saldo;
+        }
+
+        saldo = saldoBancos.saldoTotal;
+        for (let i = hojeAIdx + 1; i < fluxo.dados.length; i++) {
+          saldo += fluxo.dados[i].saldoDia;
+          fluxo.dados[i].saldoAcumulado = saldo;
+        }
+      }
+
       res.json(fluxo);
     } catch (error) {
       console.error("[api] Error fetching fluxo caixa diario completo:", error);
@@ -4133,6 +4284,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error creating DFC snapshot:", error);
       res.status(500).json({ error: "Failed to create DFC snapshot" });
+    }
+  });
+
+  // Classificação de clientes por inadimplência
+  app.get("/api/fluxo-caixa/classificacao-clientes", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        WITH clientes_receita AS (
+          SELECT DISTINCT p.id_cliente, c.nome, c.cnpj
+          FROM "Conta Azul".caz_parcelas p
+          INNER JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
+          WHERE p.tipo_evento = 'RECEITA'
+            AND p.id_cliente IS NOT NULL
+        ),
+        vencidas AS (
+          SELECT
+            p.id_cliente,
+            COUNT(*) as parcelas_vencidas,
+            SUM(COALESCE(p.nao_pago, 0)) as total_vencido
+          FROM "Conta Azul".caz_parcelas p
+          WHERE COALESCE(p.nao_pago, 0) > 0
+            AND p.data_vencimento < CURRENT_DATE
+            AND p.tipo_evento = 'RECEITA'
+            AND p.id_cliente IS NOT NULL
+          GROUP BY p.id_cliente
+        )
+        SELECT
+          cr.id_cliente,
+          cr.nome,
+          cr.cnpj,
+          COALESCE(v.parcelas_vencidas, 0) as parcelas_vencidas,
+          COALESCE(v.total_vencido, 0) as total_vencido,
+          CASE
+            WHEN COALESCE(v.parcelas_vencidas, 0) = 0 THEN 'em_dia'
+            WHEN v.parcelas_vencidas = 1 THEN 'receoso'
+            ELSE 'duvidoso'
+          END as classificacao
+        FROM clientes_receita cr
+        LEFT JOIN vencidas v ON cr.id_cliente = v.id_cliente
+        ORDER BY COALESCE(v.total_vencido, 0) DESC, cr.nome
+      `);
+
+      const clientes = (result.rows as any[]).map(row => ({
+        idCliente: row.id_cliente,
+        nome: row.nome,
+        cnpj: row.cnpj || null,
+        classificacao: row.classificacao as 'em_dia' | 'receoso' | 'duvidoso',
+        parcelasVencidas: parseInt(row.parcelas_vencidas || '0'),
+        totalVencido: parseFloat(row.total_vencido || '0'),
+      }));
+
+      const resumo = {
+        emDia: clientes.filter(c => c.classificacao === 'em_dia').length,
+        receosos: {
+          count: clientes.filter(c => c.classificacao === 'receoso').length,
+          totalVencido: clientes
+            .filter(c => c.classificacao === 'receoso')
+            .reduce((sum, c) => sum + c.totalVencido, 0),
+        },
+        duvidosos: {
+          count: clientes.filter(c => c.classificacao === 'duvidoso').length,
+          totalVencido: clientes
+            .filter(c => c.classificacao === 'duvidoso')
+            .reduce((sum, c) => sum + c.totalVencido, 0),
+        },
+      };
+
+      res.json({ clientes, resumo });
+    } catch (error) {
+      console.error("[api] Error fetching classificacao clientes:", error);
+      res.status(500).json({ error: "Failed to fetch classificacao clientes" });
     }
   });
 

@@ -482,6 +482,24 @@ export type FluxoCaixaInsightsPeriodo = {
   transacoesPorCategoria: { categoria: string; tipo: 'RECEITA' | 'DESPESA'; valor: number }[];
 };
 
+export type ClassificacaoCliente = {
+  idCliente: string;
+  nome: string;
+  cnpj: string | null;
+  classificacao: 'em_dia' | 'receoso' | 'duvidoso';
+  parcelasVencidas: number;
+  totalVencido: number;
+};
+
+export type ClassificacaoClientesResponse = {
+  clientes: ClassificacaoCliente[];
+  resumo: {
+    emDia: number;
+    receosos: { count: number; totalVencido: number };
+    duvidosos: { count: number; totalVencido: number };
+  };
+};
+
 export type ChurnPorServico = {
   servico: string;
   mes: string;
