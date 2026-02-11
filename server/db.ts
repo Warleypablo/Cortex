@@ -1559,6 +1559,25 @@ export async function initializeRhNpsTable(): Promise<void> {
   }
 }
 
+export async function initializeRhNpsConfigTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "Inhire".rh_nps_config (
+        id SERIAL PRIMARY KEY,
+        mes_referencia VARCHAR(7) NOT NULL UNIQUE,
+        data_inicio DATE NOT NULL,
+        data_fim DATE NOT NULL,
+        ativo BOOLEAN DEFAULT TRUE,
+        criado_em TIMESTAMP DEFAULT NOW(),
+        atualizado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('[database] RH NPS Config table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing RH NPS Config table:', error);
+  }
+}
+
 export async function initializeRhComentariosTables(): Promise<void> {
   try {
     // Criar tabela de comentários sobre colaboradores
