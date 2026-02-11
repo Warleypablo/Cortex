@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { usePageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Send, ClipboardCheck } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CheckCircle2, Send, ClipboardCheck, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -113,6 +114,16 @@ export default function NpsPesquisa() {
   );
   const [submitted, setSubmitted] = useState(false);
 
+  const { data: npsConfigAtivo, isLoading: isLoadingConfig } = useQuery<any>({
+    queryKey: ["/api/rh/nps/config-ativo"],
+    queryFn: async () => {
+      const res = await fetch("/api/rh/nps/config-ativo", { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  const npsAtivo = npsConfigAtivo !== null && npsConfigAtivo !== undefined && npsConfigAtivo.dataInicio;
+
   const [area, setArea] = useState("");
   const [motivoPermanencia, setMotivoPermanencia] = useState("");
   const [scoreEmpresa, setScoreEmpresa] = useState<number | null>(null);
@@ -162,6 +173,35 @@ export default function NpsPesquisa() {
       comentarioProdutos: comentarioProdutos.trim(),
       feedbackGeral: feedbackGeral.trim() || null,
     });
+  }
+
+  if (isLoadingConfig) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4">
+        <Skeleton className="h-64 w-full rounded-lg" />
+      </div>
+    );
+  }
+
+  if (!npsAtivo) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 px-4">
+        <Card className="border-amber-200 dark:border-amber-800">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <Clock className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+            </div>
+            <h2 className="text-xl font-bold text-amber-700 dark:text-amber-400">
+              Pesquisa E-NPS não está ativa no momento
+            </h2>
+            <p className="text-muted-foreground max-w-md">
+              O período de resposta da pesquisa E-NPS ainda não foi aberto ou já foi encerrado.
+              Aguarde o G&G configurar o próximo período.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (alreadySubmitted || submitted) {
