@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { usePageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -17,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 import {
   BarChart2,
   MessageSquare,
@@ -30,6 +32,9 @@ import {
   ExternalLink,
   Loader2,
   XCircle,
+  Settings2,
+  CalendarDays,
+  Save,
 } from "lucide-react";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { format } from "date-fns";
@@ -126,11 +131,20 @@ export default function PesquisasGG() {
   const { setPageInfo } = usePageInfo();
   usePageTitle("Pesquisas G&G");
   
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("visao-geral");
   const [search1x1, setSearch1x1] = useState("");
   const [filter1x1, setFilter1x1] = useState("all");
   const [searchPdi, setSearchPdi] = useState("");
   const [npsMes, setNpsMes] = useState("");
+  const [showNpsConfig, setShowNpsConfig] = useState(false);
+
+  const hoje = new Date();
+  const mesAtual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+  const [configMesRef, setConfigMesRef] = useState(mesAtual);
+  const [configDataInicio, setConfigDataInicio] = useState("");
+  const [configDataFim, setConfigDataFim] = useState("");
 
   useEffect(() => {
     setPageInfo("Pesquisas G&G", "Visão consolidada de e-NPS, 1x1 e PDI");
@@ -165,6 +179,54 @@ export default function PesquisasGG() {
     },
     enabled: activeTab === "nps-anonimo",
     staleTime: 0,
+  });
+
+  const { data: npsConfigData } = useQuery<any>({
+    queryKey: ["/api/rh/nps/config", configMesRef],
+    queryFn: async () => {
+      const res = await fetch(`/api/rh/nps/config/${configMesRef}`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: showNpsConfig && !!configMesRef,
+  });
+
+  useEffect(() => {
+    if (npsConfigData && npsConfigData.dataInicio) {
+      setConfigDataInicio(npsConfigData.dataInicio);
+      setConfigDataFim(npsConfigData.dataFim);
+    } else if (npsConfigData === null) {
+      setConfigDataInicio("");
+      setConfigDataFim("");
+    }
+  }, [npsConfigData]);
+
+  const saveNpsConfig = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/rh/nps/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          mesReferencia: configMesRef,
+          dataInicio: configDataInicio,
+          dataFim: configDataFim,
+          ativo: true,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erro ao salvar");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Configuração salva", description: `Período de atividade do E-NPS para ${configMesRef} foi configurado.` });
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/nps/config"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/nps/config-ativo"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
   });
 
   const filtered1x1 = data?.oneOnOne.colaboradores.filter(c => {
@@ -566,13 +628,77 @@ export default function PesquisasGG() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" className="gap-2" asChild>
-              <Link href="/rh/nps/responder">
-                <ExternalLink className="w-4 h-4" />
-                Responder Pesquisa
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={showNpsConfig ? "secondary" : "outline"}
+                size="sm"
+                className="gap-2"
+                onClick={() => setShowNpsConfig(!showNpsConfig)}
+              >
+                <Settings2 className="w-4 h-4" />
+                Configurar Período
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" asChild>
+                <Link href="/rh/nps/responder">
+                  <ExternalLink className="w-4 h-4" />
+                  Responder Pesquisa
+                </Link>
+              </Button>
+            </div>
           </div>
+
+          {/* Configuração de Período de Atividade */}
+          {showNpsConfig && (
+            <Card className="p-5 border-blue-500/20 bg-blue-500/5">
+              <div className="flex items-center gap-2 mb-4">
+                <CalendarDays className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-sm font-semibold">Período de Atividade do E-NPS</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Mês Referência</Label>
+                  <Input
+                    type="month"
+                    value={configMesRef}
+                    onChange={(e) => setConfigMesRef(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Data Início</Label>
+                  <Input
+                    type="date"
+                    value={configDataInicio}
+                    onChange={(e) => setConfigDataInicio(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={configDataFim}
+                    onChange={(e) => setConfigDataFim(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="gap-2 h-9"
+                  disabled={!configMesRef || !configDataInicio || !configDataFim || saveNpsConfig.isPending}
+                  onClick={() => saveNpsConfig.mutate()}
+                >
+                  <Save className="w-4 h-4" />
+                  {saveNpsConfig.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </div>
+              {npsConfigData && npsConfigData.dataInicio && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  Configuração atual para {configMesRef}: {new Date(npsConfigData.dataInicio + 'T00:00:00').toLocaleDateString('pt-BR')} até {new Date(npsConfigData.dataFim + 'T00:00:00').toLocaleDateString('pt-BR')}
+                </p>
+              )}
+            </Card>
+          )}
 
           {npsLoading ? (
             <div className="flex justify-center py-12">

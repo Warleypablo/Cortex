@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint, type TurboEvento, type InsertTurboEvento, type SystemSetting, type RhNpsResponse, type InsertRhNps } from "@shared/schema";
+import { type User, type InsertUser, type Cliente, type ContaReceber, type ContaPagar, type Colaborador, type InsertColaborador, type ContratoCompleto, type UpdateContrato, type Patrimonio, type InsertPatrimonio, type PatrimonioHistorico, type InsertPatrimonioHistorico, type FluxoCaixaItem, type FluxoCaixaDiarioItem, type SaldoBancos, type TransacaoDiaItem, type DfcResponse, type DfcHierarchicalResponse, type DfcItem, type DfcNode, type DfcParcela, type InhireMetrics, type InhireStatusDistribution, type InhireStageDistribution, type InhireSourceDistribution, type InhireFunnel, type InhireVagaComCandidaturas, type MetaOverview, type CampaignPerformance, type AdsetPerformance, type AdPerformance, type CreativePerformance, type ConversionFunnel, type ContaBanco, type FluxoCaixaDiarioCompleto, type FluxoCaixaInsights, type RhPromocao, type InsertRhPromocao, type OneOnOne, type InsertOneOnOne, type OneOnOneAcao, type InsertOneOnOneAcao, type EnpsResponse, type InsertEnps, type PdiGoal, type InsertPdi, type PdiCheckpoint, type InsertPdiCheckpoint, type TurboEvento, type InsertTurboEvento, type SystemSetting, type RhNpsResponse, type InsertRhNps, type RhNpsConfig, type InsertRhNpsConfig } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db, schema } from "./db";
 import { eq, desc, and, or, gte, lte, sql, inArray, isNull } from "drizzle-orm";
@@ -196,6 +196,7 @@ export interface IStorage {
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
   getContasBancos(): Promise<ContaBanco[]>;
   getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse>;
+  getFluxoCaixaMensal(ano: number): Promise<import("@shared/schema").FluxoCaixaMensalResponse>;
   getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }>;
   getDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot | null>;
   createDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot>;
@@ -326,6 +327,11 @@ export interface IStorage {
   getRhNpsDashboard(mesReferencia?: string): Promise<any>;
   getRhNpsRespostas(mesReferencia?: string): Promise<RhNpsResponse[]>;
   getRhNpsMeses(): Promise<string[]>;
+
+  // E-NPS Config (período de atividade)
+  getNpsConfig(mesReferencia: string): Promise<RhNpsConfig | null>;
+  getNpsConfigAtivo(): Promise<RhNpsConfig | null>;
+  upsertNpsConfig(data: { mesReferencia: string; dataInicio: string; dataFim: string; ativo?: boolean }): Promise<RhNpsConfig>;
 
   // PDI (Plano de Desenvolvimento Individual)
   getPdiGoals(colaboradorId: number): Promise<PdiGoal[]>;
@@ -716,6 +722,10 @@ export class MemStorage implements IStorage {
   }
 
   async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getFluxoCaixaMensal(ano: number): Promise<import("@shared/schema").FluxoCaixaMensalResponse> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1172,6 +1182,15 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
   async getRhNpsMeses(): Promise<string[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getNpsConfig(mesReferencia: string): Promise<RhNpsConfig | null> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getNpsConfigAtivo(): Promise<RhNpsConfig | null> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async upsertNpsConfig(data: { mesReferencia: string; dataInicio: string; dataFim: string; ativo?: boolean }): Promise<RhNpsConfig> {
     throw new Error("Not implemented in MemStorage");
   }
   async getPdiGoals(colaboradorId: number): Promise<PdiGoal[]> {
@@ -3320,23 +3339,76 @@ export class DbStorage implements IStorage {
     };
   }
 
+  async getFluxoCaixaMensal(ano: number): Promise<import("@shared/schema").FluxoCaixaMensalResponse> {
+    const MESES_CURTOS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+    const result = await db.execute(sql.raw(`
+      WITH months AS (
+        SELECT generate_series(
+          '${ano}-01-01'::date,
+          '${ano}-12-31'::date,
+          '1 month'::interval
+        )::date as mes_inicio
+      ),
+      monthly_transactions AS (
+        SELECT
+          date_trunc('month', data_vencimento)::date as mes,
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+          AND status NOT IN ('PERDIDO')
+          AND data_vencimento::date BETWEEN '${ano}-01-01'::date AND '${ano}-12-31'::date
+        GROUP BY date_trunc('month', data_vencimento)::date
+      )
+      SELECT
+        TO_CHAR(m.mes_inicio, 'YYYY-MM') as mes,
+        EXTRACT(MONTH FROM m.mes_inicio)::int as mes_num,
+        COALESCE(mt.entradas, 0) as entradas,
+        COALESCE(mt.saidas, 0) as saidas
+      FROM months m
+      LEFT JOIN monthly_transactions mt ON m.mes_inicio = mt.mes
+      ORDER BY m.mes_inicio
+    `));
+
+    const rows = (result.rows as any[]).map((row: any) => ({
+      mes: row.mes as string,
+      mesNum: parseInt(row.mes_num),
+      entradas: parseFloat(row.entradas || '0'),
+      saidas: parseFloat(row.saidas || '0'),
+    }));
+
+    const dados = rows.map(row => ({
+      mes: row.mes,
+      mesLabel: MESES_CURTOS[row.mesNum - 1],
+      entradas: row.entradas,
+      saidas: row.saidas,
+      saldoMes: row.entradas - row.saidas,
+      saldoAcumulado: 0,
+    }));
+
+    return { ano, dados };
+  }
+
   async getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }> {
     const result = await db.execute(sql.raw(`
-      SELECT 
-        id,
-        COALESCE(descricao, 'Sem descrição') as descricao,
-        valor_bruto::numeric as valor,
-        tipo_evento,
-        status,
-        COALESCE(categoria_nome, 'Sem categoria') as categoria,
-        COALESCE(metodo_pagamento, 'Não informado') as metodo_pagamento,
-        TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_vencimento,
-        COALESCE(nome_conta_financeira, 'Não informado') as conta
-      FROM "Conta Azul".caz_parcelas
-      WHERE data_vencimento::date = '${data}'::date
-        AND status NOT IN ('PERDIDO')
-        AND valor_bruto::numeric > 0
-      ORDER BY tipo_evento DESC, valor_bruto::numeric DESC
+      SELECT
+        p.id,
+        COALESCE(p.descricao, 'Sem descrição') as descricao,
+        p.valor_bruto::numeric as valor,
+        p.tipo_evento,
+        p.status,
+        COALESCE(p.categoria_nome, 'Sem categoria') as categoria,
+        COALESCE(p.metodo_pagamento, 'Não informado') as metodo_pagamento,
+        TO_CHAR(p.data_vencimento, 'YYYY-MM-DD') as data_vencimento,
+        COALESCE(p.nome_conta_financeira, 'Não informado') as conta,
+        COALESCE(c.nome, c.empresa, 'Não identificado') as fornecedor
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = COALESCE(c.ids, c.id::text)
+      WHERE p.data_vencimento::date = '${data}'::date
+        AND p.status NOT IN ('PERDIDO')
+        AND p.valor_bruto::numeric > 0
+      ORDER BY p.tipo_evento DESC, p.valor_bruto::numeric DESC
     `));
     
     const rows = result.rows as any[];
@@ -3351,8 +3423,9 @@ export class DbStorage implements IStorage {
         categoria: r.categoria,
         meioPagamento: r.metodo_pagamento,
         conta: r.conta,
+        fornecedor: r.fornecedor,
       }));
-    
+
     const saidas = rows
       .filter(r => r.tipo_evento === 'DESPESA')
       .map(r => ({
@@ -3363,6 +3436,7 @@ export class DbStorage implements IStorage {
         categoria: r.categoria,
         meioPagamento: r.metodo_pagamento,
         conta: r.conta,
+        fornecedor: r.fornecedor,
       }));
     
     const totalEntradas = entradas.reduce((acc, e) => acc + e.valor, 0);
@@ -4506,40 +4580,42 @@ export class DbStorage implements IStorage {
     
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
     
-    const whereClauses: string[] = ["tipo_evento IN ('RECEITA', 'DESPESA')", "status IN ('QUITADO', 'RECEBIDO_PARCIAL')"];
-    
+    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status IN ('QUITADO', 'RECEBIDO_PARCIAL')"];
+
     // Sempre filtrar a partir de janeiro de 2025 (mínimo)
     const dataMinima = '2025-01-01';
-    
+
     // Filtrar EXCLUSIVAMENTE pela data de quitação
     if (dataInicio && dataInicio >= dataMinima) {
-      whereClauses.push(`data_quitacao >= '${dataInicio}'`);
+      whereClauses.push(`p.data_quitacao >= '${dataInicio}'`);
     } else {
-      whereClauses.push(`data_quitacao >= '${dataMinima}'`);
+      whereClauses.push(`p.data_quitacao >= '${dataMinima}'`);
     }
-    
+
     if (dataFim) {
-      whereClauses.push(`data_quitacao <= '${dataFim}'`);
+      whereClauses.push(`p.data_quitacao <= '${dataFim}'`);
     }
     
     const whereClause = whereClauses.join(' AND ');
     
     const parcelas = await db.execute(sql.raw(`
-      SELECT 
-        id,
-        status,
-        descricao,
-        valor_pago,
-        valor_liquido,
-        metodo_pagamento,
-        categoria_id,
-        categoria_nome,
-        valor_categoria,
-        data_quitacao,
-        tipo_evento
-      FROM "Conta Azul".caz_parcelas
+      SELECT
+        p.id,
+        p.status,
+        p.descricao,
+        p.valor_pago,
+        p.valor_liquido,
+        p.metodo_pagamento,
+        p.categoria_id,
+        p.categoria_nome,
+        p.valor_categoria,
+        p.data_quitacao,
+        p.tipo_evento,
+        COALESCE(c.nome, c.empresa, 'Não identificado') as fornecedor
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = COALESCE(c.ids, c.id::text)
       WHERE ${whereClause}
-      ORDER BY data_quitacao
+      ORDER BY p.data_quitacao
     `));
 
     const dfcMap = new Map<string, Map<string, number>>();
@@ -4637,6 +4713,7 @@ export class DbStorage implements IStorage {
         parcelasByCategory.get(key)!.push({
           id: row.id as number,
           descricao: row.descricao as string || '',
+          fornecedor: row.fornecedor as string || 'Não identificado',
           valorBruto: valor,
           dataQuitacao: dataQuitacao.toISOString(),
           mes: mes,
@@ -10530,6 +10607,46 @@ export class DbStorage implements IStorage {
       ORDER BY mes_referencia DESC
     `);
     return result.rows.map((r: any) => r.mes_referencia);
+  }
+
+  async getNpsConfig(mesReferencia: string): Promise<RhNpsConfig | null> {
+    const result = await db.execute(sql`
+      SELECT id, mes_referencia as "mesReferencia", data_inicio as "dataInicio",
+        data_fim as "dataFim", ativo, criado_em as "criadoEm", atualizado_em as "atualizadoEm"
+      FROM "Inhire".rh_nps_config
+      WHERE mes_referencia = ${mesReferencia}
+      LIMIT 1
+    `);
+    return (result.rows[0] as RhNpsConfig) || null;
+  }
+
+  async getNpsConfigAtivo(): Promise<RhNpsConfig | null> {
+    const hoje = new Date().toISOString().split('T')[0];
+    const result = await db.execute(sql`
+      SELECT id, mes_referencia as "mesReferencia", data_inicio as "dataInicio",
+        data_fim as "dataFim", ativo, criado_em as "criadoEm", atualizado_em as "atualizadoEm"
+      FROM "Inhire".rh_nps_config
+      WHERE ativo = true AND data_inicio <= ${hoje} AND data_fim >= ${hoje}
+      ORDER BY data_fim DESC
+      LIMIT 1
+    `);
+    return (result.rows[0] as RhNpsConfig) || null;
+  }
+
+  async upsertNpsConfig(data: { mesReferencia: string; dataInicio: string; dataFim: string; ativo?: boolean }): Promise<RhNpsConfig> {
+    const ativo = data.ativo !== undefined ? data.ativo : true;
+    const result = await db.execute(sql`
+      INSERT INTO "Inhire".rh_nps_config (mes_referencia, data_inicio, data_fim, ativo, atualizado_em)
+      VALUES (${data.mesReferencia}, ${data.dataInicio}, ${data.dataFim}, ${ativo}, NOW())
+      ON CONFLICT (mes_referencia) DO UPDATE SET
+        data_inicio = ${data.dataInicio},
+        data_fim = ${data.dataFim},
+        ativo = ${ativo},
+        atualizado_em = NOW()
+      RETURNING id, mes_referencia as "mesReferencia", data_inicio as "dataInicio",
+        data_fim as "dataFim", ativo, criado_em as "criadoEm", atualizado_em as "atualizadoEm"
+    `);
+    return result.rows[0] as RhNpsConfig;
   }
 
   async getRhNpsDashboard(mesReferencia?: string): Promise<any> {

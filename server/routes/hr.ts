@@ -2118,4 +2118,44 @@ Responda APENAS com o JSON válido, sem markdown ou texto adicional.`;
       res.status(500).json({ error: "Falha ao buscar meses disponíveis" });
     }
   });
+
+  // ==================== E-NPS Config (período de atividade) ====================
+
+  // IMPORTANTE: rota estática ANTES da rota com parâmetro para evitar conflito
+  app.get("/api/rh/nps/config-ativo", async (req, res) => {
+    try {
+      const config = await storage.getNpsConfigAtivo();
+      res.json(config);
+    } catch (error) {
+      console.error("[api] Error fetching active NPS config:", error);
+      res.status(500).json({ error: "Falha ao buscar configuração NPS ativa" });
+    }
+  });
+
+  app.get("/api/rh/nps/config/:mesReferencia", async (req, res) => {
+    try {
+      const config = await storage.getNpsConfig(req.params.mesReferencia);
+      res.json(config);
+    } catch (error) {
+      console.error("[api] Error fetching NPS config:", error);
+      res.status(500).json({ error: "Falha ao buscar configuração NPS" });
+    }
+  });
+
+  app.post("/api/rh/nps/config", async (req, res) => {
+    try {
+      const { mesReferencia, dataInicio, dataFim, ativo } = req.body;
+      if (!mesReferencia || !dataInicio || !dataFim) {
+        return res.status(400).json({ error: "mesReferencia, dataInicio e dataFim são obrigatórios" });
+      }
+      if (new Date(dataFim) < new Date(dataInicio)) {
+        return res.status(400).json({ error: "Data fim deve ser posterior à data início" });
+      }
+      const config = await storage.upsertNpsConfig({ mesReferencia, dataInicio, dataFim, ativo });
+      res.json(config);
+    } catch (error) {
+      console.error("[api] Error saving NPS config:", error);
+      res.status(500).json({ error: "Falha ao salvar configuração NPS" });
+    }
+  });
 }

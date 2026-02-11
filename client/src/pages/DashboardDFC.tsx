@@ -27,6 +27,7 @@ import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRange } from "react-day-picker";
 import { format, startOfYear } from "date-fns";
 import { Input } from "@/components/ui/input";
+import { Tooltip as TooltipUI, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, ComposedChart, Line, Cell, ReferenceLine
@@ -1009,9 +1010,18 @@ export default function DashboardDFC() {
                             >
                               <div className="flex items-center gap-2">
                                 <div className={`w-1 h-1 rounded-full ${isReceitaParcela ? 'bg-emerald-400' : 'bg-rose-400'}`} />
-                                <span className="text-muted-foreground truncate max-w-[200px]">
-                                  {parcela.descricao || `#${parcela.id}`}
-                                </span>
+                                <TooltipProvider delayDuration={200}>
+                                  <TooltipUI>
+                                    <TooltipTrigger asChild>
+                                      <span className="text-muted-foreground truncate max-w-[200px] block cursor-default">
+                                        {parcela.fornecedor || parcela.descricao || `#${parcela.id}`}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p className="max-w-[300px]">{parcela.descricao || 'Sem descrição'}</p>
+                                    </TooltipContent>
+                                  </TooltipUI>
+                                </TooltipProvider>
                               </div>
                             </div>
                             {/* Parcela Value Cells */}

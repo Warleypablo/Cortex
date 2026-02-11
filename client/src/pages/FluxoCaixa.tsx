@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import { YearPicker } from "@/components/ui/year-picker";
 import {
   Dialog,
   DialogContent,
@@ -23,16 +24,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip as TooltipUI, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle,
   ArrowUpCircle, ArrowDownCircle, Banknote, CreditCard, Building2,
   ChevronRight, CircleDollarSign, CalendarDays, ArrowRight, Receipt,
-  Loader2, X, Users, UserCheck, UserX, AlertTriangle
+  Loader2, X, Users, UserCheck, UserX, AlertTriangle, BarChart3
 } from "lucide-react";
 import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell, Area
 } from "recharts";
-import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco, ClassificacaoClientesResponse } from "@shared/schema";
+import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco, ClassificacaoClientesResponse, FluxoCaixaMensalResponse } from "@shared/schema";
+import { cn } from "@/lib/utils";
 
 interface FluxoDiaDetalhe {
   entradas: {
@@ -43,6 +46,7 @@ interface FluxoDiaDetalhe {
     categoria: string;
     meioPagamento: string;
     conta: string;
+    fornecedor: string;
   }[];
   saidas: {
     id: number;
@@ -52,6 +56,7 @@ interface FluxoDiaDetalhe {
     categoria: string;
     meioPagamento: string;
     conta: string;
+    fornecedor: string;
   }[];
   totalEntradas: number;
   totalSaidas: number;
@@ -84,30 +89,40 @@ export default function FluxoCaixa() {
   useSetPageInfo("Fluxo de Caixa", "Análise de entradas e saídas do período");
   
   const hoje = new Date();
+  const [viewMode, setViewMode] = useState<'diario' | 'mensal'>('diario');
   const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
+  const [selectedYear, setSelectedYear] = useState(hoje.getFullYear());
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
-  
+
   const dataInicio = useMemo(() => {
     return new Date(selectedMonth.year, selectedMonth.month - 1, 1).toISOString().split('T')[0];
   }, [selectedMonth]);
-  
+
   const dataFim = useMemo(() => {
     return new Date(selectedMonth.year, selectedMonth.month, 0).toISOString().split('T')[0];
   }, [selectedMonth]);
+
+  const insightsDataInicio = useMemo(() => {
+    return viewMode === 'diario' ? dataInicio : `${selectedYear}-01-01`;
+  }, [viewMode, dataInicio, selectedYear]);
+
+  const insightsDataFim = useMemo(() => {
+    return viewMode === 'diario' ? dataFim : `${selectedYear}-12-31`;
+  }, [viewMode, dataFim, selectedYear]);
 
   const periodoLabel = useMemo(() => {
     return getMesNome(selectedMonth.month - 1, selectedMonth.year);
   }, [selectedMonth]);
 
   const { data: insightsPeriodo, isLoading: isLoadingInsights } = useQuery<FluxoCaixaInsightsPeriodo>({
-    queryKey: ['/api/fluxo-caixa/insights-periodo', { dataInicio, dataFim }],
+    queryKey: ['/api/fluxo-caixa/insights-periodo', { dataInicio: insightsDataInicio, dataFim: insightsDataFim }],
     queryFn: async () => {
-      const params = new URLSearchParams({ dataInicio, dataFim });
+      const params = new URLSearchParams({ dataInicio: insightsDataInicio, dataFim: insightsDataFim });
       const res = await fetch(`/api/fluxo-caixa/insights-periodo?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch insights");
       return res.json();
     },
-    enabled: !!dataInicio && !!dataFim,
+    enabled: !!insightsDataInicio && !!insightsDataFim,
   });
 
   const { data: contasBancos, isLoading: isLoadingContas } = useQuery<ContaBanco[]>({
@@ -139,11 +154,26 @@ export default function FluxoCaixa() {
       if (!res.ok) throw new Error("Failed to fetch fluxo diario");
       return res.json();
     },
-    enabled: !!dataInicio && !!dataFim,
+    enabled: viewMode === 'diario' && !!dataInicio && !!dataFim,
+  });
+
+  const { data: fluxoMensalResponse, isLoading: isLoadingFluxoMensal } = useQuery<FluxoCaixaMensalResponse>({
+    queryKey: ['/api/fluxo-caixa/mensal', { ano: selectedYear, classificacao: classificacaoParam }],
+    queryFn: async () => {
+      const params = new URLSearchParams({ ano: String(selectedYear) });
+      if (classificacaoParam) {
+        params.append('classificacao', classificacaoParam);
+      }
+      const res = await fetch(`/api/fluxo-caixa/mensal?${params.toString()}`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch fluxo mensal");
+      return res.json();
+    },
+    enabled: viewMode === 'mensal',
   });
 
   const fluxoDiario = fluxoDiarioResponse?.dados;
   const hasSnapshot = fluxoDiarioResponse?.hasSnapshot ?? false;
+  const isLoadingChart = viewMode === 'diario' ? isLoadingFluxo : isLoadingFluxoMensal;
 
   const { data: diaDetalhe, isLoading: isLoadingDiaDetalhe } = useQuery<FluxoDiaDetalhe>({
     queryKey: ['/api/fluxo-caixa/dia-detalhe', diaSelecionado],
@@ -156,55 +186,99 @@ export default function FluxoCaixa() {
   });
 
   const chartData = useMemo(() => {
-    if (!fluxoDiario) return [];
-    return fluxoDiario.map(item => ({
-      ...item,
-      dataFormatada: formatDate(item.data),
-    }));
-  }, [fluxoDiario]);
+    if (viewMode === 'diario') {
+      if (!fluxoDiario) return [];
+      return fluxoDiario.map(item => ({
+        ...item,
+        dataFormatada: formatDate(item.data),
+      }));
+    } else {
+      if (!fluxoMensalResponse?.dados) return [];
+      return fluxoMensalResponse.dados.map(item => ({
+        ...item,
+        data: item.mes,
+        dataFormatada: item.mesLabel,
+        entradas: item.entradas,
+        saidas: item.saidas,
+        saldoDia: item.saldoMes,
+        saldoAcumulado: item.saldoAcumulado,
+      }));
+    }
+  }, [viewMode, fluxoDiario, fluxoMensalResponse]);
 
   const chartDomains = useMemo(() => {
     if (!chartData || chartData.length === 0) {
       return { barsMax: 100000, lineMin: 0, lineMax: 100000 };
     }
-    
+
     const maxEntrada = Math.max(...chartData.map(d => d.entradas || 0));
     const maxSaida = Math.max(...chartData.map(d => d.saidas || 0));
-    const barsMax = Math.max(maxEntrada, maxSaida) * 1.1 || 100000;
-    
+    const barsAbsMax = Math.max(maxEntrada, maxSaida) * 1.1 || 100000;
+    const barsMax = Math.ceil(barsAbsMax / 50000) * 50000;
+
     const saldosReal = chartData.map(d => d.saldoAcumulado || 0);
     const saldosEsperado = hasSnapshot ? chartData.map(d => d.saldoEsperado || 0) : [];
     const allSaldos = [...saldosReal, ...saldosEsperado];
     const lineMin = Math.min(...allSaldos);
     const lineMax = Math.max(...allSaldos);
     const linePadding = (lineMax - lineMin) * 0.1 || 100000;
-    
+
     return {
-      barsMax: Math.ceil(barsMax / 50000) * 50000,
+      barsMax,
       lineMin: Math.floor((lineMin - linePadding) / 100000) * 100000,
       lineMax: Math.ceil((lineMax + linePadding) / 100000) * 100000,
     };
   }, [chartData, hasSnapshot]);
 
   const totais = useMemo(() => {
-    if (!fluxoDiario || fluxoDiario.length === 0) {
+    if (!chartData || chartData.length === 0) {
       return { entradas: 0, saidas: 0, saldo: 0, saldoFinal: insightsPeriodo?.saldoAtual || 0 };
     }
-    const entradas = fluxoDiario.reduce((acc, item) => acc + item.entradas, 0);
-    const saidas = fluxoDiario.reduce((acc, item) => acc + item.saidas, 0);
-    const saldoFinal = fluxoDiario[fluxoDiario.length - 1]?.saldoAcumulado || insightsPeriodo?.saldoAtual || 0;
+    const entradas = chartData.reduce((acc, item) => acc + (item.entradas || 0), 0);
+    const saidas = chartData.reduce((acc, item) => acc + (item.saidas || 0), 0);
+    const saldoFinal = chartData[chartData.length - 1]?.saldoAcumulado || insightsPeriodo?.saldoAtual || 0;
     return { entradas, saidas, saldo: entradas - saidas, saldoFinal };
-  }, [fluxoDiario, insightsPeriodo]);
+  }, [chartData, insightsPeriodo]);
   
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
-        {/* Seletor de Mês */}
-        <div className="mb-6">
-          <MonthYearPicker
-            value={selectedMonth}
-            onChange={setSelectedMonth}
-          />
+        {/* Toggle Diário/Mensal + Seletor de Período */}
+        <div className="mb-6 flex items-center gap-4">
+          <div className="inline-flex h-10 items-center rounded-md bg-muted p-1">
+            <button
+              className={cn(
+                "inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                viewMode === 'diario' && "bg-background text-foreground shadow-sm"
+              )}
+              onClick={() => setViewMode('diario')}
+            >
+              <CalendarDays className="w-4 h-4 mr-2" />
+              Diário
+            </button>
+            <button
+              className={cn(
+                "inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                viewMode === 'mensal' && "bg-background text-foreground shadow-sm"
+              )}
+              onClick={() => setViewMode('mensal')}
+            >
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Mensal
+            </button>
+          </div>
+
+          {viewMode === 'diario' ? (
+            <MonthYearPicker
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+            />
+          ) : (
+            <YearPicker
+              value={selectedYear}
+              onChange={setSelectedYear}
+            />
+          )}
         </div>
 
         {/* KPIs Principais */}
@@ -228,7 +302,7 @@ export default function FluxoCaixa() {
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-saldo-final">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saldo Projetado (Fim do Mês)</span>
+                <span className="text-sm font-medium text-muted-foreground">{viewMode === 'diario' ? 'Saldo Projetado (Fim do Mês)' : 'Saldo Projetado (Fim do Ano)'}</span>
                 <TrendingUp className="w-5 h-5 text-blue-500" />
               </div>
               {isLoadingInsights ? (
@@ -244,7 +318,7 @@ export default function FluxoCaixa() {
           <Card data-testid="card-entradas-periodo">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Entradas do Mês</span>
+                <span className="text-sm font-medium text-muted-foreground">{viewMode === 'diario' ? 'Entradas do Mês' : 'Entradas do Ano'}</span>
                 <ArrowUpCircle className="w-5 h-5 text-green-500" />
               </div>
               {isLoadingInsights ? (
@@ -260,7 +334,7 @@ export default function FluxoCaixa() {
           <Card data-testid="card-saidas-periodo">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saídas do Mês</span>
+                <span className="text-sm font-medium text-muted-foreground">{viewMode === 'diario' ? 'Saídas do Mês' : 'Saídas do Ano'}</span>
                 <ArrowDownCircle className="w-5 h-5 text-red-500" />
               </div>
               {isLoadingInsights ? (
@@ -315,7 +389,7 @@ export default function FluxoCaixa() {
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
               <Receipt className="w-5 h-5 text-purple-500" />
-              <CardTitle className="text-base">Provisão Mensal - {periodoLabel}</CardTitle>
+              <CardTitle className="text-base">{viewMode === 'diario' ? `Provisão Mensal - ${periodoLabel}` : `Provisão Anual - ${selectedYear}`}</CardTitle>
             </div>
             <CardDescription>Projeção de geração de caixa considerando inadimplência de 6%</CardDescription>
           </CardHeader>
@@ -447,7 +521,7 @@ export default function FluxoCaixa() {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <CardTitle className="text-lg">
-                  Fluxo Diário - {periodoLabel}
+                  {viewMode === 'diario' ? `Fluxo Diário - ${periodoLabel}` : `Fluxo Mensal - ${selectedYear}`}
                   {classificacaoFiltro.length > 0 && classificacaoFiltro.map(tipo => (
                     <Badge
                       key={tipo}
@@ -494,7 +568,7 @@ export default function FluxoCaixa() {
           </CardHeader>
           
           <CardContent>
-            {isLoadingFluxo ? (
+            {isLoadingChart ? (
               <div className="flex items-center justify-center h-[400px]">
                 <Skeleton className="h-full w-full" />
               </div>
@@ -513,20 +587,26 @@ export default function FluxoCaixa() {
                     onClick={(chartEvent) => {
                       if (chartEvent) {
                         let targetData: string | null = null;
-                        
+
                         if (chartEvent.activePayload && chartEvent.activePayload.length > 0) {
                           const payload = chartEvent.activePayload[0].payload as typeof chartData[0];
                           if (payload?.data) {
                             targetData = payload.data;
                           }
                         }
-                        
+
                         if (!targetData && typeof chartEvent.activeTooltipIndex === 'number' && chartData[chartEvent.activeTooltipIndex]) {
                           targetData = chartData[chartEvent.activeTooltipIndex].data;
                         }
-                        
+
                         if (targetData) {
-                          setDiaSelecionado(targetData);
+                          if (viewMode === 'diario') {
+                            setDiaSelecionado(targetData);
+                          } else {
+                            const [year, month] = targetData.split('-').map(Number);
+                            setSelectedMonth({ month, year });
+                            setViewMode('diario');
+                          }
                         }
                       }
                     }}
@@ -574,19 +654,19 @@ export default function FluxoCaixa() {
                       vertical={false} 
                     />
                     
-                    <XAxis 
-                      dataKey="dataFormatada" 
-                      tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: 10, fontWeight: 500 }}
+                    <XAxis
+                      dataKey="dataFormatada"
+                      tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: viewMode === 'mensal' ? 12 : 10, fontWeight: 500 }}
                       tickLine={false}
                       axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1 }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={55}
-                      interval={chartData.length > 20 ? Math.floor(chartData.length / 10) : chartData.length > 10 ? 1 : 0}
-                      dy={12}
+                      angle={viewMode === 'mensal' ? 0 : -45}
+                      textAnchor={viewMode === 'mensal' ? 'middle' : 'end'}
+                      height={viewMode === 'mensal' ? 35 : 55}
+                      interval={viewMode === 'mensal' ? 0 : (chartData.length > 20 ? Math.floor(chartData.length / 10) : chartData.length > 10 ? 1 : 0)}
+                      dy={viewMode === 'mensal' ? 5 : 12}
                     />
                     
-                    <YAxis 
+                    <YAxis
                       yAxisId="bars"
                       tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: 10, fontWeight: 500 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
@@ -635,7 +715,7 @@ export default function FluxoCaixa() {
                                 <span className="text-sm font-semibold text-rose-400">{formatCurrency(data?.saidas || 0)}</span>
                               </div>
                               <div className="flex justify-between items-center pt-2 border-t border-slate-700 mt-2">
-                                <span className="text-sm font-medium text-slate-300">Saldo do Dia</span>
+                                <span className="text-sm font-medium text-slate-300">{viewMode === 'diario' ? 'Saldo do Dia' : 'Saldo do Mês'}</span>
                                 <span className={`text-sm font-bold ${saldo >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                                   {formatCurrency(saldo)}
                                 </span>
@@ -647,7 +727,7 @@ export default function FluxoCaixa() {
                                 </div>
                                 <span className="text-sm font-semibold text-cyan-400">{formatCurrency(data?.saldoAcumulado || 0)}</span>
                               </div>
-                              {hasSnapshot && (
+                              {viewMode === 'diario' && hasSnapshot && (
                                 <div className="flex justify-between items-center">
                                   <div className="flex items-center gap-2">
                                     <div className="w-2.5 h-2.5 rounded-full bg-amber-400" style={{ boxShadow: '0 0 6px rgba(251, 191, 36, 0.6)' }} />
@@ -658,30 +738,30 @@ export default function FluxoCaixa() {
                               )}
                             </div>
                             <p className="text-xs text-slate-500 mt-3 pt-2 border-t border-slate-700 text-center">
-                              Clique para ver detalhes
+                              {viewMode === 'diario' ? 'Clique para ver detalhes' : 'Clique para ver o mês'}
                             </p>
                           </div>
                         );
                       }}
                     />
                     
-                    <Bar 
+                    <Bar
                       yAxisId="bars"
-                      dataKey="entradas" 
+                      dataKey="entradas"
                       name="entradas"
                       fill="url(#gradientEntradas)"
                       radius={[8, 8, 2, 2]}
-                      maxBarSize={14}
+                      maxBarSize={viewMode === 'mensal' ? 32 : 14}
                       style={{ filter: 'url(#glowGreen)' }}
                     />
-                    
-                    <Bar 
+
+                    <Bar
                       yAxisId="bars"
-                      dataKey="saidas" 
+                      dataKey="saidas"
                       name="saidas"
                       fill="url(#gradientSaidas)"
                       radius={[8, 8, 2, 2]}
-                      maxBarSize={14}
+                      maxBarSize={viewMode === 'mensal' ? 32 : 14}
                       style={{ filter: 'url(#glowRed)' }}
                     />
                     
@@ -705,13 +785,13 @@ export default function FluxoCaixa() {
                       style={{ filter: 'url(#glowCyan)' }}
                     />
                     
-                    {hasSnapshot && (
-                      <Line 
+                    {viewMode === 'diario' && hasSnapshot && (
+                      <Line
                         yAxisId="line"
-                        type="monotone" 
-                        dataKey="saldoEsperado" 
+                        type="monotone"
+                        dataKey="saldoEsperado"
                         name="Saldo Esperado"
-                        stroke="#fbbf24" 
+                        stroke="#fbbf24"
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         dot={false}
@@ -820,7 +900,7 @@ export default function FluxoCaixa() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Descrição</TableHead>
+                            <TableHead>Fornecedor</TableHead>
                             <TableHead>Categoria</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Valor</TableHead>
@@ -829,8 +909,17 @@ export default function FluxoCaixa() {
                         <TableBody>
                           {diaDetalhe.entradas.map((entrada, idx) => (
                             <TableRow key={entrada.id || idx} data-testid={`row-entrada-${idx}`}>
-                              <TableCell className="font-medium max-w-[200px] truncate" title={entrada.descricao}>
-                                {entrada.descricao}
+                              <TableCell className="font-medium max-w-[200px]">
+                                <TooltipProvider delayDuration={200}>
+                                  <TooltipUI>
+                                    <TooltipTrigger asChild>
+                                      <span className="truncate block cursor-default">{entrada.fornecedor}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p className="max-w-[300px]">{entrada.descricao}</p>
+                                    </TooltipContent>
+                                  </TooltipUI>
+                                </TooltipProvider>
                               </TableCell>
                               <TableCell>
                                 <Badge variant="secondary" className="text-xs">
@@ -865,7 +954,7 @@ export default function FluxoCaixa() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Descrição</TableHead>
+                            <TableHead>Fornecedor</TableHead>
                             <TableHead>Categoria</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Valor</TableHead>
@@ -874,8 +963,17 @@ export default function FluxoCaixa() {
                         <TableBody>
                           {diaDetalhe.saidas.map((saida, idx) => (
                             <TableRow key={saida.id || idx} data-testid={`row-saida-${idx}`}>
-                              <TableCell className="font-medium max-w-[200px] truncate" title={saida.descricao}>
-                                {saida.descricao}
+                              <TableCell className="font-medium max-w-[200px]">
+                                <TooltipProvider delayDuration={200}>
+                                  <TooltipUI>
+                                    <TooltipTrigger asChild>
+                                      <span className="truncate block cursor-default">{saida.fornecedor}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p className="max-w-[300px]">{saida.descricao}</p>
+                                    </TooltipContent>
+                                  </TooltipUI>
+                                </TooltipProvider>
                               </TableCell>
                               <TableCell>
                                 <Badge variant="secondary" className="text-xs">

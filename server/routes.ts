@@ -4220,6 +4220,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/fluxo-caixa/mensal", async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string);
+      const classificacao = req.query.classificacao as string | undefined;
+
+      if (!ano || isNaN(ano)) {
+        return res.status(400).json({ error: "ano is required (e.g., 2025)" });
+      }
+
+      const validClassificacoes = ['em_dia', 'receoso', 'duvidoso'];
+      const classificacoes = classificacao
+        ? classificacao.split(',').filter(c => validClassificacoes.includes(c))
+        : [];
+
+      const saldoAtual = await storage.getSaldoAtualBancos();
+      const saldoHoje = saldoAtual.saldoTotal;
+      const MESES_CURTOS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+      let dados: import("@shared/schema").FluxoCaixaMensalItem[];
+
+      if (classificacoes.length > 0) {
+        const conditions: string[] = [];
+        if (classificacoes.includes('em_dia')) {
+          conditions.push('(COALESCE(SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END), 0) = 0)');
+        }
+        if (classificacoes.includes('receoso')) {
+          conditions.push('(SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END) = 1)');
+        }
+        if (classificacoes.includes('duvidoso')) {
+          conditions.push('(SUM(CASE WHEN p2.data_vencimento < CURRENT_DATE AND COALESCE(p2.nao_pago, 0) > 0 THEN 1 ELSE 0 END) > 1)');
+        }
+        const havingCondition = `HAVING ${conditions.join(' OR ')}`;
+
+        const result = await db.execute(sql.raw(`
+          WITH clientes_classificados AS (
+            SELECT p2.id_cliente
+            FROM "Conta Azul".caz_parcelas p2
+            INNER JOIN "Conta Azul".caz_clientes c2 ON p2.id_cliente::text = c2.ids::text
+            WHERE p2.tipo_evento = 'RECEITA'
+              AND p2.id_cliente IS NOT NULL
+            GROUP BY p2.id_cliente
+            ${havingCondition}
+          ),
+          months AS (
+            SELECT generate_series(
+              '${ano}-01-01'::date,
+              '${ano}-12-31'::date,
+              '1 month'::interval
+            )::date as mes_inicio
+          ),
+          receitas_filtradas AS (
+            SELECT
+              date_trunc('month', p.data_vencimento)::date as mes,
+              SUM(p.valor_bruto::numeric) as entradas
+            FROM "Conta Azul".caz_parcelas p
+            INNER JOIN clientes_classificados cc ON p.id_cliente = cc.id_cliente
+            WHERE p.tipo_evento = 'RECEITA'
+              AND p.status NOT IN ('PERDIDO')
+              AND p.data_vencimento::date BETWEEN '${ano}-01-01'::date AND '${ano}-12-31'::date
+            GROUP BY date_trunc('month', p.data_vencimento)::date
+          ),
+          despesas_todas AS (
+            SELECT
+              date_trunc('month', data_vencimento)::date as mes,
+              SUM(valor_bruto::numeric) as saidas
+            FROM "Conta Azul".caz_parcelas
+            WHERE tipo_evento = 'DESPESA'
+              AND status NOT IN ('PERDIDO')
+              AND data_vencimento::date BETWEEN '${ano}-01-01'::date AND '${ano}-12-31'::date
+            GROUP BY date_trunc('month', data_vencimento)::date
+          )
+          SELECT
+            TO_CHAR(m.mes_inicio, 'YYYY-MM') as mes,
+            EXTRACT(MONTH FROM m.mes_inicio)::int as mes_num,
+            COALESCE(rf.entradas, 0) as entradas,
+            COALESCE(dt.saidas, 0) as saidas
+          FROM months m
+          LEFT JOIN receitas_filtradas rf ON m.mes_inicio = rf.mes
+          LEFT JOIN despesas_todas dt ON m.mes_inicio = dt.mes
+          ORDER BY m.mes_inicio
+        `));
+
+        dados = (result.rows as any[]).map((row: any) => ({
+          mes: row.mes as string,
+          mesLabel: MESES_CURTOS[parseInt(row.mes_num) - 1],
+          entradas: parseFloat(row.entradas || '0'),
+          saidas: parseFloat(row.saidas || '0'),
+          saldoMes: parseFloat(row.entradas || '0') - parseFloat(row.saidas || '0'),
+          saldoAcumulado: 0,
+        }));
+      } else {
+        const result = await storage.getFluxoCaixaMensal(ano);
+        dados = result.dados;
+      }
+
+      // Ancorar saldoAcumulado no mês atual
+      const hojeDate = new Date();
+      const hojeMes = `${hojeDate.getFullYear()}-${String(hojeDate.getMonth() + 1).padStart(2, '0')}`;
+
+      let hojeIdx = dados.findIndex(d => d.mes === hojeMes);
+      if (hojeIdx === -1) {
+        hojeIdx = dados.findLastIndex(d => d.mes <= hojeMes);
+      }
+
+      if (hojeIdx >= 0) {
+        dados[hojeIdx].saldoAcumulado = saldoHoje;
+
+        let saldo = saldoHoje;
+        for (let i = hojeIdx - 1; i >= 0; i--) {
+          saldo -= dados[i + 1].saldoMes;
+          dados[i].saldoAcumulado = saldo;
+        }
+
+        saldo = saldoHoje;
+        for (let i = hojeIdx + 1; i < dados.length; i++) {
+          saldo += dados[i].saldoMes;
+          dados[i].saldoAcumulado = saldo;
+        }
+      } else {
+        let saldo = saldoHoje;
+        for (let i = 0; i < dados.length; i++) {
+          saldo += dados[i].saldoMes;
+          dados[i].saldoAcumulado = saldo;
+        }
+      }
+
+      res.json({ ano, dados });
+    } catch (error) {
+      console.error("[api] Error fetching fluxo caixa mensal:", error);
+      res.status(500).json({ error: "Failed to fetch fluxo caixa mensal" });
+    }
+  });
+
   app.get("/api/fluxo-caixa/insights", async (req, res) => {
     try {
       const insights = await storage.getFluxoCaixaInsights();
