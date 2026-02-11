@@ -175,6 +175,7 @@ export default function ClientDetail() {
   const [receitasItemsPerPage, setReceitasItemsPerPage] = useState(10);
   const [monthsFilter, setMonthsFilter] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [showAllReceitas, setShowAllReceitas] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const createLog = useCreateLog();
   const [contratosSortConfig, setContratosSortConfig] = useState<SortConfig | null>(null);
@@ -822,19 +823,36 @@ export default function ClientDetail() {
   }, [receitas, receitasSortConfig]);
 
   const filteredReceitas = useMemo(() => {
-    if (!selectedMonth) return sortedReceitas;
-    
-    return sortedReceitas.filter(r => {
-      const dataParaUsar = r.dataVencimento || r.dataCriacao;
-      if (!dataParaUsar) return false;
-      
-      const data = new Date(dataParaUsar);
-      if (isNaN(data.getTime())) return false;
-      
-      const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
-      return mesAno === selectedMonth;
-    });
-  }, [sortedReceitas, selectedMonth]);
+    if (selectedMonth) {
+      return sortedReceitas.filter(r => {
+        const dataParaUsar = r.dataVencimento || r.dataCriacao;
+        if (!dataParaUsar) return false;
+
+        const data = new Date(dataParaUsar);
+        if (isNaN(data.getTime())) return false;
+
+        const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+        return mesAno === selectedMonth;
+      });
+    }
+
+    if (!showAllReceitas) {
+      const hoje = new Date();
+      const limiteMax = new Date(hoje.getFullYear(), hoje.getMonth() + 3, 0);
+      return sortedReceitas.filter(r => {
+        const dataParaUsar = r.dataVencimento || r.dataCriacao;
+        if (!dataParaUsar) return false;
+        const data = new Date(dataParaUsar);
+        if (isNaN(data.getTime())) return false;
+        const statusUpper = r.status?.toUpperCase();
+        const naoQuitado = statusUpper !== "PAGO" && statusUpper !== "ACQUITTED" && statusUpper !== "QUITADO";
+        if (naoQuitado && data < hoje) return true;
+        return data <= limiteMax;
+      });
+    }
+
+    return sortedReceitas;
+  }, [sortedReceitas, selectedMonth, showAllReceitas]);
 
   const lt = useMemo(() => {
     if (!sortedReceitas || sortedReceitas.length === 0) return 0;
@@ -2733,21 +2751,33 @@ export default function ClientDetail() {
               <CreditCard className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold">Contas a Receber</h2>
             </div>
-            {selectedMonth && (
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" data-testid="badge-month-filter">
-                  Filtrado por: {selectedMonth}
-                </Badge>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setSelectedMonth(null)}
-                  data-testid="button-clear-month-filter"
+            <div className="flex items-center gap-2">
+              {selectedMonth && (
+                <>
+                  <Badge variant="secondary" data-testid="badge-month-filter">
+                    Filtrado por: {selectedMonth}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedMonth(null)}
+                    data-testid="button-clear-month-filter"
+                  >
+                    Limpar filtro
+                  </Button>
+                </>
+              )}
+              {!selectedMonth && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setShowAllReceitas(!showAllReceitas); setReceitasCurrentPage(1); }}
+                  className="text-xs text-muted-foreground"
                 >
-                  Limpar filtro
+                  {showAllReceitas ? 'Mostrar próximos 2 meses' : 'Ver todas'}
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
           <Card className="overflow-hidden">
             {isLoadingReceitas ? (

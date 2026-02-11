@@ -391,6 +391,20 @@ export const insertRhNpsSchema = createInsertSchema(rhNps).omit({
 export type RhNpsResponse = typeof rhNps.$inferSelect;
 export type InsertRhNps = z.infer<typeof insertRhNpsSchema>;
 
+// ===== Configuração E-NPS (período de atividade) =====
+export const rhNpsConfig = inhireSchema.table("rh_nps_config", {
+  id: serial("id").primaryKey(),
+  mesReferencia: varchar("mes_referencia", { length: 7 }).notNull().unique(),
+  dataInicio: date("data_inicio").notNull(),
+  dataFim: date("data_fim").notNull(),
+  ativo: boolean("ativo").default(true),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type RhNpsConfig = typeof rhNpsConfig.$inferSelect;
+export type InsertRhNpsConfig = typeof rhNpsConfig.$inferInsert;
+
 export type FluxoCaixaItem = {
   dataVencimento: Date;
   tipoEvento: string;
@@ -454,6 +468,20 @@ export type FluxoCaixaDiarioCompletoResponse = {
   hasSnapshot: boolean;
   snapshotDate: string | null;
   dados: FluxoCaixaDiarioCompleto[];
+};
+
+export type FluxoCaixaMensalItem = {
+  mes: string;
+  mesLabel: string;
+  entradas: number;
+  saidas: number;
+  saldoMes: number;
+  saldoAcumulado: number;
+};
+
+export type FluxoCaixaMensalResponse = {
+  ano: number;
+  dados: FluxoCaixaMensalItem[];
 };
 
 export type FluxoCaixaInsights = {
@@ -532,6 +560,7 @@ export type DfcResponse = {
 export type DfcParcela = {
   id: number;
   descricao: string;
+  fornecedor: string;
   valorBruto: number;
   dataQuitacao: string;
   mes: string;
