@@ -9076,9 +9076,9 @@ export class DbStorage implements IStorage {
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date 
           THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
         END), 0) as total_pendente,
-        COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date 
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
+        COALESCE(SUM(CASE
+          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date
+          THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as total_inadimplente,
         COUNT(*) as quantidade_parcelas,
         COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) <= 0 THEN 1 END) as quantidade_recebidas,
@@ -9109,9 +9109,9 @@ export class DbStorage implements IStorage {
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date 
           THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
         END), 0) as pendente,
-        COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date 
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
+        COALESCE(SUM(CASE
+          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date
+          THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as inadimplente
       FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'

@@ -31,6 +31,7 @@ export const PERMISSION_KEYS = {
   GESTAO: {
     VISAO_GERAL: 'gestao.visao_geral',
     CLIENTES_CONTRATOS: 'gestao.clientes_contratos',
+    CHURN_VISAO_GERAL: 'gestao.churn_visao_geral',
     CHURN_DETALHAMENTO: 'gestao.churn_detalhamento',
     EVOLUCAO_MENSAL: 'gestao.evolucao_mensal',
     CONTRATOS_DETALHAMENTO: 'gestao.contratos_detalhamento',
@@ -181,6 +182,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/margem-cliente': PERMISSION_KEYS.FIN.MARGEM_CLIENTE,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
+  '/dashboard/churn-visao-geral': PERMISSION_KEYS.GESTAO.CHURN_VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/contratos-detalhamento': PERMISSION_KEYS.GESTAO.CONTRATOS_DETALHAMENTO,
@@ -348,6 +350,7 @@ export const NAV_CONFIG = {
         { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS },
         { title: 'Detalhamento Contratos', url: '/dashboard/contratos-detalhamento', icon: 'FileText', permissionKey: PERMISSION_KEYS.GESTAO.CONTRATOS_DETALHAMENTO },
         { title: 'Evolução Mensal', url: '/dashboard/evolucao-mensal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL },
+        { title: 'Visão Geral Churn', url: '/dashboard/churn-visao-geral', icon: 'Activity', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_VISAO_GERAL },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
       ],
     },
@@ -538,6 +541,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.FIN.INADIMPLENCIA]: 'Inadimplência',
   [PERMISSION_KEYS.FIN.AUDITORIA]: 'Auditoria de Sistemas',
   [PERMISSION_KEYS.GESTAO.VISAO_GERAL]: 'Visão Geral',
+  [PERMISSION_KEYS.GESTAO.CHURN_VISAO_GERAL]: 'Visão Geral Churn',
   [PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
   [PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL]: 'Evolução Mensal',
   [PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
