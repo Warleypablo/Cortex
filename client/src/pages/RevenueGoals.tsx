@@ -416,6 +416,113 @@ export default function RevenueGoals() {
             />
           </div>
 
+          {/* Metas de Inadimplência */}
+          {(() => {
+            const pctInad = data.resumo.percentualInadimplencia;
+            const totalInad = data.resumo.totalInadimplente;
+            const totalPrev = data.resumo.totalPrevisto;
+
+            const metas = [
+              { label: "Meta Ideal", target: 4 },
+              { label: "Meta Máxima", target: 6 },
+            ];
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {metas.map(({ label, target }) => {
+                  const limiteReais = totalPrev * (target / 100);
+                  const progressoPct = totalPrev > 0 ? Math.min((pctInad / target) * 100, 100) : 0;
+                  const dentroMeta = pctInad <= target;
+                  const excedente = totalInad - limiteReais;
+
+                  return (
+                    <Card
+                      key={target}
+                      className={`relative overflow-hidden border ${
+                        dentroMeta
+                          ? "border-emerald-200 dark:border-emerald-800"
+                          : "border-red-200 dark:border-red-800"
+                      }`}
+                    >
+                      <div
+                        className={`absolute inset-0 bg-gradient-to-br ${
+                          dentroMeta
+                            ? "from-emerald-500/5 to-emerald-500/10"
+                            : "from-red-500/5 to-red-500/10"
+                        } opacity-50`}
+                      />
+                      <CardContent className="relative p-5">
+                        <div className="flex items-start justify-between gap-3 mb-4">
+                          <div>
+                            <p className="text-sm text-muted-foreground font-medium">{label}</p>
+                            <div className="flex items-baseline gap-2 mt-1">
+                              <span className="text-3xl font-bold">{pctInad.toFixed(2)}%</span>
+                              <span className="text-sm text-muted-foreground">/ {target}%</span>
+                            </div>
+                          </div>
+                          <div
+                            className={`p-2.5 rounded-xl ${
+                              dentroMeta
+                                ? "bg-emerald-100 dark:bg-emerald-900/30"
+                                : "bg-red-100 dark:bg-red-900/30"
+                            }`}
+                          >
+                            {dentroMeta ? (
+                              <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>Progresso</span>
+                            <span>{progressoPct.toFixed(0)}% do limite</span>
+                          </div>
+                          <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`absolute inset-y-0 left-0 rounded-full transition-all ${
+                                dentroMeta ? "bg-emerald-500" : "bg-red-500"
+                              }`}
+                              style={{ width: `${Math.min(progressoPct, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 mt-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Inadimplente Atual</p>
+                            <p className="text-sm font-semibold mt-0.5">{formatCurrency(totalInad)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Limite ({target}%)</p>
+                            <p className="text-sm font-semibold mt-0.5">{formatCurrency(limiteReais)}</p>
+                          </div>
+                        </div>
+
+                        {!dentroMeta && (
+                          <div className="mt-3 px-3 py-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
+                            <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                              Excedente: {formatCurrency(excedente)} acima do limite
+                            </p>
+                          </div>
+                        )}
+                        {dentroMeta && (
+                          <div className="mt-3 px-3 py-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg">
+                            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                              Folga: {formatCurrency(Math.abs(excedente))} abaixo do limite
+                            </p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           {/* Gráfico Principal */}
           <Card className="overflow-hidden">
             <CardHeader className="pb-2">
