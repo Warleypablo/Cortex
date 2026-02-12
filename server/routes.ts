@@ -8442,6 +8442,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Churn Visão Geral - tendência mensal de churn (últimos 12 meses)
+  app.get("/api/analytics/churn-visao-geral", async (req, res) => {
+    try {
+      const meses = parseInt(req.query.meses as string) || 12;
+
+      // Últimos N meses de churn agregado por mês
+      // Usa data_solicitacao_encerramento como data de referência do churn
+      const churnMensalResult = await db.execute(sql`
+        WITH meses AS (
+          SELECT generate_series(
+            DATE_TRUNC('month', NOW() - INTERVAL '${sql.raw(String(meses - 1))} months'),
+            DATE_TRUNC('month', NOW()),
+            '1 month'::interval
+          )::date AS mes
+        ),
+        churn_mensal AS (
+          SELECT
+            DATE_TRUNC('month', c.data_solicitacao_encerramento)::date AS mes,
+            COUNT(*) AS total_churned,
+            COALESCE(SUM(c.valorr::numeric), 0) AS mrr_perdido
+          FROM "Clickup".cup_contratos c
+          WHERE c.data_solicitacao_encerramento IS NOT NULL
+            AND c.valorr IS NOT NULL
+            AND c.valorr > 0
+            AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+            AND c.data_solicitacao_encerramento >= DATE_TRUNC('month', NOW() - INTERVAL '${sql.raw(String(meses - 1))} months')
+          GROUP BY DATE_TRUNC('month', c.data_solicitacao_encerramento)
+        ),
+        ultimo_snapshot_mes AS (
+          SELECT
+            DATE_TRUNC('month', data_snapshot)::date AS mes,
+            MAX(data_snapshot) AS ultimo_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= DATE_TRUNC('month', NOW() - INTERVAL '${sql.raw(String(meses))} months')
+          GROUP BY DATE_TRUNC('month', data_snapshot)
+        ),
+        mrr_ativo_mensal AS (
+          SELECT
+            usm.mes,
+            COALESCE(SUM(h.valorr::numeric), 0) AS mrr_ativo
+          FROM ultimo_snapshot_mes usm
+          JOIN "Clickup".cup_data_hist h ON h.data_snapshot = usm.ultimo_snapshot
+          WHERE LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
+            AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+          GROUP BY usm.mes
+        )
+        SELECT
+          m.mes,
+          COALESCE(cm.total_churned, 0) AS total_churned,
+          COALESCE(cm.mrr_perdido, 0) AS mrr_perdido,
+          COALESCE(ma.mrr_ativo, 0) AS mrr_ativo,
+          CASE
+            WHEN COALESCE(ma.mrr_ativo, 0) > 0
+            THEN ROUND((COALESCE(cm.mrr_perdido, 0) / ma.mrr_ativo) * 100, 2)
+            ELSE 0
+          END AS churn_rate
+        FROM meses m
+        LEFT JOIN churn_mensal cm ON cm.mes = m.mes
+        LEFT JOIN mrr_ativo_mensal ma ON ma.mes = DATE_TRUNC('month', m.mes - INTERVAL '1 month')::date
+        ORDER BY m.mes ASC
+      `);
+
+      res.json({
+        tendencia: churnMensalResult.rows.map((row: any) => ({
+          mes: row.mes,
+          totalChurned: Number(row.total_churned) || 0,
+          mrrPerdido: Number(row.mrr_perdido) || 0,
+          mrrAtivo: Number(row.mrr_ativo) || 0,
+          churnRate: Number(row.churn_rate) || 0,
+        })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching churn visao geral:", error);
+      res.status(500).json({ error: "Failed to fetch churn visao geral data" });
+    }
+  });
+
   // Churn Detalhamento - lista de contratos encerrados/churned e pausados com detalhes
   app.get("/api/analytics/churn-detalhamento", async (req, res) => {
     try {
