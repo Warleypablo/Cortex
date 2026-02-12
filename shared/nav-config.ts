@@ -13,6 +13,7 @@ export const PERMISSION_KEYS = {
     TURBO_TOOLS: 'general.turbo_tools',
     SUGESTOES: 'general.sugestoes',
     ENPS: 'general.enps',
+    PROCESSOS_INTERNOS: 'general.processos_internos',
   },
   // Financeiro
   FIN: {
@@ -167,6 +168,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/ferramentas': PERMISSION_KEYS.GENERAL.TURBO_TOOLS,
   '/sugestoes': PERMISSION_KEYS.GENERAL.SUGESTOES,
   '/rh/nps/responder': PERMISSION_KEYS.GENERAL.ENPS,
+  '/processos-internos': PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   // Financeiro
   '/dashboard/financeiro': PERMISSION_KEYS.FIN.VISAO_GERAL,
@@ -296,6 +298,7 @@ export const NAV_CONFIG = {
     { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
     { title: 'Sugestões', url: '/sugestoes', icon: 'Lightbulb', permissionKey: PERMISSION_KEYS.GENERAL.SUGESTOES },
     { title: 'Pesquisa E-NPS', url: '/rh/nps/responder', icon: 'ClipboardCheck', permissionKey: PERMISSION_KEYS.GENERAL.ENPS },
+    { title: 'Processos Internos', url: '/processos-internos', icon: 'FolderOpen', permissionKey: PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS },
   ],
   
   // Geral module
@@ -565,5 +568,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
+  [PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS]: 'Processos Internos',
   [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
 };

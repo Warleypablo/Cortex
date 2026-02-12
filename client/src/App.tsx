@@ -83,6 +83,7 @@ const Avisos = lazy(() => import("@/pages/Avisos"));
 const AdminHealth = lazy(() => import("@/pages/AdminHealth"));
 const AdminOverrides = lazy(() => import("@/pages/AdminOverrides"));
 const Sugestoes = lazy(() => import("@/pages/Sugestoes"));
+const ProcessosInternos = lazy(() => import("@/pages/ProcessosInternos"));
 const ContratosModule = lazy(() => import("@/pages/ContratosModule"));
 const MargemCliente = lazy(() => import("@/pages/MargemCliente"));
 const AutoReport = lazy(() => import("@/pages/AutoReport"));
@@ -182,6 +183,7 @@ function ProtectedRouter() {
       <Route path="/conhecimentos">{() => <ProtectedRoute path="/conhecimentos" component={Conhecimentos} />}</Route>
       <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
       <Route path="/sugestoes">{() => <ProtectedRoute path="/sugestoes" component={Sugestoes} />}</Route>
+      <Route path="/processos-internos">{() => <ProtectedRoute path="/processos-internos" component={ProcessosInternos} />}</Route>
       <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       
       {/* Operação */}
