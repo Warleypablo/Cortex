@@ -300,11 +300,17 @@ export default function ContribuicaoOperador() {
     });
 
     const monthColumns = monthlyResults.map(m => {
-      // Calcular despesa SEM impostos
+      // Calcular despesa SEM impostos - somente categorias principais (nivel 1)
+      // Identifica nivel 1 por categoriaId com apenas 1 segmento (ex: "DESP.SALARIOS" mas não "DESP.SALARIOS.123")
       let despesaSemImpostos = 0;
       if (m.data?.despesas) {
         for (const despesa of m.data.despesas) {
-          if (!despesa.categoriaId.toUpperCase().includes('IMPOSTOS')) {
+          const categoriaId = (despesa.categoriaId || '').toUpperCase();
+          const isImposto = categoriaId.includes('IMPOSTO');
+          // Nivel 1 = categorias com no máximo 2 segmentos (ex: DESP.SALARIOS, não DESP.SALARIOS.123)
+          const segments = categoriaId.split('.').length;
+          const isNivel1 = Number(despesa.nivel) === 1 || segments <= 2;
+          if (!isImposto && isNivel1) {
             despesaSemImpostos += despesa.valor;
           }
         }
@@ -570,7 +576,7 @@ export default function ContribuicaoOperador() {
                       <th className="p-3 text-right font-semibold">Margem Bruta (%)</th>
                       <th className="p-3 text-right font-semibold">Impostos (18%)</th>
                       <th className="p-3 text-right font-semibold">Contribuição</th>
-                      <th className="p-3 text-right font-semibold">Margem L�quida</th>
+                      <th className="p-3 text-right font-semibold">Margem L�quida</th>
                     </tr>
                   </thead>
                   <tbody>

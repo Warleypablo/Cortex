@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus, Calendar, Phone, Globe, ShoppingCart } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus, Calendar, Phone, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
 
@@ -41,6 +41,8 @@ interface MQLMetrics {
   contratosImplantacao: number;
   faturamentoAceleracao: number;
   faturamentoImplantacao: number;
+  faturamentoAceleracaoTrafego: number;
+  faturamentoImplantacaoTrafego: number;
   percReuniaoAgendada: number;
   percNoShow: number;
   taxaVendas: number;
@@ -137,6 +139,8 @@ export default function GrowthOrcadoRealizado() {
   useSetPageInfo("Orçado x Realizado", "Controle de Métricas de Marketing e Vendas");
   
   const [selectedMonth, setSelectedMonth] = useState("2026-01");
+  const [cardFilter, setCardFilter] = useState<'todos' | 'mql' | 'nao-mql'>('todos');
+  const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   
   const months = [
     { value: "2026-01", label: "Janeiro 2026" },
@@ -173,6 +177,8 @@ export default function GrowthOrcadoRealizado() {
     contratosImplantacao: number;
     faturamentoAceleracao: number;
     faturamentoImplantacao: number;
+    faturamentoAceleracaoTrafego: number;
+    faturamentoImplantacaoTrafego: number;
     percReuniaoAgendada: number;
     percNoShow: number;
     taxaVendas: number;
@@ -363,29 +369,11 @@ export default function GrowthOrcadoRealizado() {
     ];
   }, [adsData]);
 
-  // Métricas de Site (ainda mockadas - depende de GA4 ou outra fonte)
-  const siteMetrics: Metric[] = useMemo(() => {
-    return [
-      { id: 'connect_rate', name: 'Connect Rate', type: 'manual', orcado: 0.85, realizado: null, percentual: null, format: 'percent' },
-      { id: 'conversao_pagina', name: 'Conversão da Página', type: 'manual', orcado: 0.18, realizado: null, percentual: null, format: 'percent' },
-      { id: 'cpl', name: 'CPL', type: 'formula', orcado: 73, realizado: null, percentual: null, format: 'currency' },
-      { id: 'leads', name: 'Leads', type: 'formula', orcado: 1315, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'mql', name: 'MQL', type: 'formula', orcado: 229, realizado: mqlData?.totalMqls ?? 0, percentual: calcPercentual(229, mqlData?.totalMqls ?? null), format: 'number' },
-      { id: 'mql_perc', name: 'MQL (%)', type: 'manual', orcado: 0.22, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: 417, realizado: null, percentual: 0, format: 'currency' },
-    ];
-  }, [mqlData]);
-
   const marketingSections: MetricSection[] = [
     {
       title: 'Métricas de Marketing: Ads',
       icon: <Megaphone className="w-5 h-5" />,
       metrics: adsMetrics,
-    },
-    {
-      title: 'Métricas de Marketing: Site',
-      icon: <LineChart className="w-5 h-5" />,
-      metrics: siteMetrics,
     },
   ];
 
@@ -527,28 +515,6 @@ export default function GrowthOrcadoRealizado() {
     ];
   }, [naoMqlData]);
 
-  const outboundSection: MetricSection = {
-    title: 'Métricas de Vendas: Outbound',
-    icon: <Target className="w-5 h-5" />,
-    metrics: [
-      { id: 'out_leads', name: 'Leads', type: 'manual', orcado: 800, realizado: null, percentual: 0, format: 'number' },
-      { id: 'out_ra_perc', name: '% Reunião agendadas MQL', type: 'manual', orcado: 0.10, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'out_ra_num', name: 'Nº Reunião agendada MQL', type: 'formula', orcado: 84, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'out_rr_num', name: 'Nº Reunião realizada MQL', type: 'formula', orcado: 80, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'out_noshow', name: '% No-show', type: 'manual', orcado: 0.05, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'out_taxa_vendas', name: 'Taxa RR/Vendas MQL', type: 'manual', orcado: 0.275, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'out_novos_clientes', name: 'Novos Clientes não MQL', type: 'formula', orcado: 21, realizado: 0, percentual: 0, format: 'number' },
-      { id: 'out_tx_recorrente', name: 'Tx de Contratos Recorrentes', type: 'manual', orcado: 0.65, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'out_tx_implantacao', name: 'Tx de Contratos Implantação', type: 'manual', orcado: 0.45, realizado: null, percentual: 0, format: 'percent' },
-      { id: 'out_contratos_acel', name: 'Nº Novos Contratos Aceleração não-MQL', type: 'formula', orcado: 14, realizado: 0, percentual: 0, format: 'number', emoji: '🏎️' },
-      { id: 'out_ticket_acel', name: 'Ticket Médio Aceleração não-MQL', type: 'manual', orcado: 4000, realizado: null, percentual: 0, format: 'currency', emoji: '🏎️' },
-      { id: 'out_fat_acel', name: 'Faturamento Aceleração (MRR novo) de não-MQL', type: 'formula', orcado: 54204.15, realizado: 0, percentual: 0, format: 'currency', emoji: '🏎️' },
-      { id: 'out_contratos_impl', name: 'Nº Novos Contratos Implantação não-MQL', type: 'formula', orcado: 9, realizado: 0, percentual: 0, format: 'number', emoji: '🔧' },
-      { id: 'out_ticket_impl', name: 'Ticket Médio Implantação não-MQL', type: 'manual', orcado: 8500, realizado: null, percentual: null, format: 'currency', emoji: '🔧' },
-      { id: 'out_fat_impl', name: 'Faturamento Implantação não-MQL', type: 'formula', orcado: 79742.64, realizado: 0, percentual: 0, format: 'currency', emoji: '🔧' },
-    ],
-  };
-
   const totalMetrics: Metric[] = useMemo(() => {
     const mql = mqlData || {} as MQLMetrics;
     const naoMql = naoMqlData || {} as NaoMQLMetrics;
@@ -638,7 +604,6 @@ export default function GrowthOrcadoRealizado() {
       icon: <Users className="w-5 h-5" />,
       metrics: naoMqlMetrics,
     },
-    outboundSection,
     totalSection,
   ];
 
@@ -646,7 +611,6 @@ export default function GrowthOrcadoRealizado() {
   const YELLOW_METRIC_IDS = new Set([
     'mql_noshow', 'mql_ticket_acel', 'mql_ticket_impl',
     'nmql_noshow', 'nmql_ticket_acel', 'nmql_ticket_impl',
-    'out_noshow', 'out_ticket_acel', 'out_ticket_impl',
     'total_cac_ads', 'total_ticket_acel', 'total_ticket_impl',
   ]);
 
@@ -671,22 +635,64 @@ export default function GrowthOrcadoRealizado() {
     return <ArrowDownRight className="w-4 h-4 text-red-500" />;
   };
 
-  // Calcular métricas dos cards de resumo
+  // Calcular métricas dos cards de resumo (reativas ao filtro)
   const investimentoRealizado = adsData?.investimento ?? 0;
   const investimentoOrcado = 95500;
   const investimentoPerc = (investimentoRealizado / investimentoOrcado) * 100;
-  
-  const mqlsRealizado = mqlData?.totalMqls ?? 0;
-  const mqlsOrcado = 229;
-  const mqlsPerc = (mqlsRealizado / mqlsOrcado) * 100;
-  
-  const clientesRealizado = mqlData?.novosClientes ?? 0;
-  const clientesOrcado = 12;
-  const clientesPerc = (clientesRealizado / clientesOrcado) * 100;
-  
-  const faturamentoRealizado = (mqlData?.faturamentoAceleracao ?? 0) + (mqlData?.faturamentoImplantacao ?? 0);
-  const faturamentoOrcado = 201429;
-  const faturamentoPerc = (faturamentoRealizado / faturamentoOrcado) * 100;
+
+  const mqlsRealizado = cardFilter === 'nao-mql'
+    ? (naoMqlData?.totalNaoMqls ?? 0)
+    : cardFilter === 'mql'
+    ? (mqlData?.totalMqls ?? 0)
+    : (mqlData?.totalMqls ?? 0) + (naoMqlData?.totalNaoMqls ?? 0);
+  const mqlsOrcado = cardFilter === 'nao-mql' ? 1085 : cardFilter === 'mql' ? 229 : 229 + 1085;
+  const mqlsPerc = mqlsOrcado > 0 ? (mqlsRealizado / mqlsOrcado) * 100 : 0;
+  const mqlsLabel = cardFilter === 'nao-mql' ? 'Leads Não-MQL' : cardFilter === 'mql' ? 'MQLs' : 'Leads Totais';
+
+  // Helper para somar valores de MQL e/ou Não-MQL conforme cardFilter
+  const sumByCardFilter = (mqlVal: number, naoMqlVal: number) => {
+    if (cardFilter === 'mql') return mqlVal;
+    if (cardFilter === 'nao-mql') return naoMqlVal;
+    return mqlVal + naoMqlVal;
+  };
+
+  // Clientes: reage a cardFilter + revenueFilter
+  const clientesRealizado = revenueFilter === 'recorrente'
+    ? sumByCardFilter(mqlData?.contratosAceleracao ?? 0, naoMqlData?.contratosAceleracao ?? 0)
+    : revenueFilter === 'pontual'
+    ? sumByCardFilter(mqlData?.contratosImplantacao ?? 0, naoMqlData?.contratosImplantacao ?? 0)
+    : sumByCardFilter(mqlData?.novosClientes ?? 0, naoMqlData?.novosClientes ?? 0);
+  const clientesOrcado = revenueFilter === 'recorrente'
+    ? sumByCardFilter(ORCADO_MQL.contratosAceleracao, ORCADO_NAO_MQL.contratosAceleracao)
+    : revenueFilter === 'pontual'
+    ? sumByCardFilter(ORCADO_MQL.contratosImplantacao, ORCADO_NAO_MQL.contratosImplantacao)
+    : sumByCardFilter(ORCADO_MQL.novosClientes, ORCADO_NAO_MQL.novosClientes);
+  const clientesPerc = clientesOrcado > 0 ? (clientesRealizado / clientesOrcado) * 100 : 0;
+  const clientesLabel = revenueFilter === 'recorrente' ? 'Contratos Recorrentes'
+    : revenueFilter === 'pontual' ? 'Contratos Implantação'
+    : 'Novos Clientes';
+
+  // Faturamento: usa apenas dados de tráfego (utm_source = facebook/google), reage a cardFilter + revenueFilter
+  const faturamentoRealizado = revenueFilter === 'recorrente'
+    ? sumByCardFilter(mqlData?.faturamentoAceleracaoTrafego ?? 0, naoMqlData?.faturamentoAceleracaoTrafego ?? 0)
+    : revenueFilter === 'pontual'
+    ? sumByCardFilter(mqlData?.faturamentoImplantacaoTrafego ?? 0, naoMqlData?.faturamentoImplantacaoTrafego ?? 0)
+    : sumByCardFilter(
+        (mqlData?.faturamentoAceleracaoTrafego ?? 0) + (mqlData?.faturamentoImplantacaoTrafego ?? 0),
+        (naoMqlData?.faturamentoAceleracaoTrafego ?? 0) + (naoMqlData?.faturamentoImplantacaoTrafego ?? 0)
+      );
+  const faturamentoOrcado = revenueFilter === 'recorrente'
+    ? sumByCardFilter(ORCADO_MQL.faturamentoAceleracao, ORCADO_NAO_MQL.faturamentoAceleracao)
+    : revenueFilter === 'pontual'
+    ? sumByCardFilter(ORCADO_MQL.faturamentoImplantacao, ORCADO_NAO_MQL.faturamentoImplantacao)
+    : sumByCardFilter(
+        ORCADO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao,
+        ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoImplantacao
+      );
+  const faturamentoPerc = faturamentoOrcado > 0 ? (faturamentoRealizado / faturamentoOrcado) * 100 : 0;
+  const faturamentoLabel = revenueFilter === 'recorrente' ? 'Faturamento Recorrente'
+    : revenueFilter === 'pontual' ? 'Faturamento Implantação'
+    : 'Faturamento';
 
   return (
     <div className="p-6 space-y-6" data-testid="growth-orcado-realizado-page">
@@ -716,7 +722,44 @@ export default function GrowthOrcadoRealizado() {
         </Select>
       </div>
 
-      {/* Cards de Resumo com Gradientes */}
+      {/* Filtros + Cards de Resumo */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium mr-1">Origem:</span>
+          {(['todos', 'mql', 'nao-mql'] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setCardFilter(filter)}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-all border",
+                cardFilter === filter
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+              )}
+            >
+              {filter === 'todos' ? 'Todos' : filter === 'mql' ? 'MQL' : 'Não-MQL'}
+            </button>
+          ))}
+        </div>
+        <div className="h-5 w-px bg-border" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium mr-1">Tipo:</span>
+          {(['todos', 'recorrente', 'pontual'] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setRevenueFilter(filter)}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-all border",
+                revenueFilter === filter
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+              )}
+            >
+              {filter === 'todos' ? 'Todos' : filter === 'recorrente' ? 'Recorrente' : 'Pontual'}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600" />
@@ -756,7 +799,7 @@ export default function GrowthOrcadoRealizado() {
         <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-400 to-purple-600" />
           <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">MQLs</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{mqlsLabel}</CardTitle>
             <div className="p-2 rounded-full bg-gradient-to-br from-purple-400/20 to-purple-600/20 group-hover:scale-110 transition-transform duration-300">
               <Users className="w-4 h-4 text-purple-500" />
             </div>
@@ -783,7 +826,7 @@ export default function GrowthOrcadoRealizado() {
                   style={{ width: `${getProgressValue(mqlsPerc)}%` }}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Meta: {mqlsOrcado} leads</p>
+              <p className="text-xs text-muted-foreground">Meta: {mqlsOrcado.toLocaleString('pt-BR')} leads</p>
             </div>
           </CardContent>
         </Card>
@@ -791,7 +834,7 @@ export default function GrowthOrcadoRealizado() {
         <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600" />
           <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Novos Clientes</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{clientesLabel}</CardTitle>
             <div className="p-2 rounded-full bg-gradient-to-br from-emerald-400/20 to-emerald-600/20 group-hover:scale-110 transition-transform duration-300">
               <UserCheck className="w-4 h-4 text-emerald-500" />
             </div>
@@ -818,7 +861,7 @@ export default function GrowthOrcadoRealizado() {
                   style={{ width: `${getProgressValue(clientesPerc)}%` }}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Meta: {clientesOrcado} clientes</p>
+              <p className="text-xs text-muted-foreground">Meta: {clientesOrcado} {revenueFilter === 'recorrente' ? 'contratos' : revenueFilter === 'pontual' ? 'contratos' : 'clientes'}</p>
             </div>
           </CardContent>
         </Card>
@@ -826,7 +869,7 @@ export default function GrowthOrcadoRealizado() {
         <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
           <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Faturamento</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{faturamentoLabel}</CardTitle>
             <div className="p-2 rounded-full bg-gradient-to-br from-amber-400/20 to-orange-500/20 group-hover:scale-110 transition-transform duration-300">
               <Receipt className="w-4 h-4 text-amber-500" />
             </div>
@@ -1024,63 +1067,6 @@ export default function GrowthOrcadoRealizado() {
               </CardContent>
             </Card>
 
-            {/* Site */}
-            <Card className="overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-purple-500 to-pink-500" />
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500/20 to-pink-500/20">
-                    <Globe className="w-5 h-5 text-purple-500" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Métricas de Site</CardTitle>
-                    <CardDescription>Conversões e leads do site</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  {siteMetrics.map((metric) => (
-                    <div key={metric.id} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
-                      <div className="flex items-center gap-3">
-                        {getTrendIcon(metric.percentual)}
-                        <span className="text-sm font-medium">{metric.name}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="text-sm font-semibold">{formatValue(metric.realizado, metric.format)}</div>
-                          <div className="text-xs text-muted-foreground">de {formatValue(metric.orcado, metric.format)}</div>
-                        </div>
-                        <div className="w-24">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                              <div 
-                                className={cn(
-                                  "h-full rounded-full transition-all duration-500",
-                                  metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500",
-                                  metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "bg-amber-500",
-                                  metric.percentual !== null && metric.percentual < 80 && "bg-red-500",
-                                  metric.percentual === null && "bg-muted-foreground/20"
-                                )}
-                                style={{ width: `${getProgressValue(metric.percentual)}%` }}
-                              />
-                            </div>
-                            <span className={cn(
-                              "text-xs font-medium w-8 text-right",
-                              metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
-                              metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
-                              metric.percentual !== null && metric.percentual < 80 && "text-red-500"
-                            )}>
-                              {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </TabsContent>
 
@@ -1203,45 +1189,6 @@ export default function GrowthOrcadoRealizado() {
             </Card>
           </div>
 
-          {/* Outbound */}
-          <Card className="overflow-hidden">
-            <div className="h-1 bg-gradient-to-r from-rose-500 to-red-500" />
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-rose-500/20 to-red-500/20">
-                  <Phone className="w-5 h-5 text-rose-500" />
-                </div>
-                <div>
-                  <CardTitle className="text-base">Vendas: Outbound</CardTitle>
-                  <CardDescription>Prospecção ativa</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {outboundSection.metrics.map((metric) => (
-                  <div key={metric.id} className="p-4 rounded-lg bg-muted/30 border border-border/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      {getTrendIcon(metric.percentual)}
-                      <span className="text-sm font-medium">{metric.name}</span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-2xl font-bold">{formatValue(metric.realizado, metric.format)}</span>
-                      <span className={cn(
-                        "text-sm font-medium",
-                        metric.percentual !== null && metric.percentual >= 100 && "text-emerald-500",
-                        metric.percentual !== null && metric.percentual >= 80 && metric.percentual < 100 && "text-amber-500",
-                        metric.percentual !== null && metric.percentual < 80 && "text-red-500"
-                      )}>
-                        {metric.percentual !== null ? `${metric.percentual.toFixed(0)}%` : '-'}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">Meta: {formatValue(metric.orcado, metric.format)}</div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="total" className="space-y-6 mt-6">
