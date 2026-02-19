@@ -30,7 +30,7 @@ export const AI_PROVIDERS = {
 export type AIProvider = keyof typeof AI_PROVIDERS;
 export type AIModel = 'gpt-4o' | 'gemini-2.5-flash' | 'gemini-2.5-pro';
 
-async function getAIConfig(): Promise<{ provider: AIProvider; model: AIModel }> {
+export async function getAIConfig(): Promise<{ provider: AIProvider; model: AIModel }> {
   const providerSetting = await storage.getSystemSetting('ai_provider');
   const modelSetting = await storage.getSystemSetting('ai_model');
   
@@ -50,7 +50,7 @@ async function getAIConfig(): Promise<{ provider: AIProvider; model: AIModel }> 
   return { provider, model };
 }
 
-function getAIClient(provider: AIProvider): OpenAI {
+export function getAIClient(provider: AIProvider): OpenAI {
   if (provider === 'gemini' && gemini) {
     return gemini;
   }
@@ -161,11 +161,12 @@ Contextos disponíveis:
 - "financeiro": Perguntas sobre DFC, fluxo de caixa, receitas, despesas, lucros, margens, resultados financeiros, faturamento, inadimplência
 - "cases": Perguntas sobre cases de sucesso, projetos realizados, estratégias de marketing implementadas, resultados de campanhas
 - "clientes": Perguntas sobre clientes específicos, contratos, retenção, churm, LTV, quantidade de clientes
+- "churn": Perguntas sobre risco de churn, predição de cancelamento, clientes em risco, prevenção de churn, score de risco, retenção proativa
 - "geral": Perguntas gerais sobre a Turbo Partners, serviços oferecidos, equipe, processos internos, ou qualquer outra coisa
 
 Também considere o contexto da página atual do usuário (se fornecido).
 
-Responda APENAS com o nome do contexto em minúsculas: "financeiro", "cases", "clientes" ou "geral".
+Responda APENAS com o nome do contexto em minúsculas: "financeiro", "cases", "clientes", "churn" ou "geral".
 Não adicione explicações, apenas a palavra do contexto.`;
 
 const TURBO_PARTNERS_SYSTEM_PROMPT = `Você é o GPTurbo, assistente virtual interno da Turbo Partners integrado ao Turbo Cortex.
@@ -491,6 +492,84 @@ async function chatCases(request: UnifiedAssistantRequest): Promise<UnifiedAssis
   }
 }
 
+const CHURN_SYSTEM_PROMPT = `${TURBO_PARTNERS_SYSTEM_PROMPT}
+
+Contexto adicional: Você está analisando RISCO DE CHURN de contratos da Turbo Partners.
+- Use APENAS os dados de risco fornecidos abaixo
+- NÃO invente scores, nomes de clientes ou valores
+- Forneça recomendações práticas de retenção baseadas nos fatores de risco identificados
+- Priorize ações por impacto no MRR`;
+
+async function chatChurn(request: UnifiedAssistantRequest): Promise<UnifiedAssistantResponse> {
+  try {
+    const { getRiskScores, getRiskSummary } = await import("./churnRiskEngine");
+
+    const [topRiscos, summary] = await Promise.all([
+      getRiskScores({ limit: 30 }),
+      getRiskSummary(),
+    ]);
+
+    const riscosFormatados = topRiscos.map((r, i) => {
+      const fatoresStr = r.fatores
+        .filter((f: any) => f.valor > 0)
+        .map((f: any) => `  - ${f.sinal}: ${f.descricao} (${f.valor}/${f.peso} pts)`)
+        .join('\n');
+      return `${i + 1}. ${r.clienteNome || 'N/A'} (${r.contratoId}) - Score: ${r.score}/100 [${r.tier.toUpperCase()}] | MRR: R$ ${r.mrr.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} | Squad: ${r.squad || 'N/A'} | Produto: ${r.produto || 'N/A'}\n${fatoresStr}`;
+    }).join('\n\n');
+
+    const resumoContext = `
+RESUMO DE RISCO DE CHURN:
+- Total de contratos analisados: ${summary.totalContratos}
+- Críticos (76-100): ${summary.critico} contratos | MRR: R$ ${summary.mrrCritico.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+- Alto risco (51-75): ${summary.alto} contratos | MRR: R$ ${summary.mrrAlto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+- Moderado (31-50): ${summary.moderado} contratos
+- Baixo (0-30): ${summary.baixo} contratos
+- MRR total em risco (crítico + alto): R$ ${summary.mrrEmRisco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+
+TOP 30 CONTRATOS EM RISCO (ordenados por score):
+${riscosFormatados}
+
+IMPORTANTE: Use APENAS estes dados para responder. Se o usuário perguntar sobre um contrato que não está na lista, informe que tem acesso aos top 30 por score de risco.
+Para ações de retenção, considere os fatores de risco específicos de cada contrato.`;
+
+    const systemPromptComDados = CHURN_SYSTEM_PROMPT + resumoContext;
+
+    const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: systemPromptComDados }
+    ];
+
+    if (request.historico) {
+      for (const msg of request.historico) {
+        messages.push({ role: msg.role, content: msg.content });
+      }
+    }
+
+    messages.push({ role: "user", content: request.message });
+
+    const config = await getAIConfig();
+    const client = getAIClient(config.provider);
+
+    const response = await client.chat.completions.create({
+      model: config.model,
+      messages,
+      max_tokens: 1500,
+    });
+
+    const resposta = response.choices[0].message.content || "Não consegui processar sua mensagem.";
+
+    return {
+      resposta,
+      context: request.context,
+    };
+  } catch (error) {
+    console.error("[UnifiedAssistant] Error in chatChurn:", error);
+    return {
+      resposta: "Desculpe, ocorreu um erro ao analisar os riscos de churn. Verifique se os scores foram calculados recentemente.",
+      context: request.context,
+    };
+  }
+}
+
 async function detectContext(message: string, pageContext?: string): Promise<AssistantContext> {
   try {
     const userMessage = pageContext 
@@ -512,7 +591,7 @@ async function detectContext(message: string, pageContext?: string): Promise<Ass
 
     const detected = response.choices[0].message.content?.toLowerCase().trim() || "geral";
     
-    if (["financeiro", "cases", "clientes", "geral"].includes(detected)) {
+    if (["financeiro", "cases", "clientes", "churn", "geral"].includes(detected)) {
       console.log(`[UnifiedAssistant] Auto-detected context: ${detected}`);
       return detected as AssistantContext;
     }
@@ -544,6 +623,9 @@ export async function chat(request: UnifiedAssistantRequest): Promise<UnifiedAss
       break;
     case "clientes":
       response = await chatClientes({ ...request, context: effectiveContext });
+      break;
+    case "churn":
+      response = await chatChurn({ ...request, context: effectiveContext });
       break;
     case "geral":
     default:

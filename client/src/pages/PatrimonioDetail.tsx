@@ -64,6 +64,7 @@ interface PatrimonioComResponsavel {
   valorVenda: string | null;
   descricao: string | null;
   senhaAtivo: string | null;
+  empresa: string | null;
   colaborador?: Colaborador;
 }
 
@@ -89,6 +90,7 @@ const editPatrimonioSchema = z.object({
   valorPago: z.string().optional(),
   valorMercado: z.string().optional(),
   senhaAtivo: z.string().optional(),
+  empresa: z.string().optional(),
 });
 
 type EditPatrimonioForm = z.infer<typeof editPatrimonioSchema>;
@@ -143,6 +145,7 @@ export default function PatrimonioDetail() {
       valorPago: "",
       valorMercado: "",
       senhaAtivo: "",
+      empresa: "",
     },
   });
 
@@ -157,6 +160,7 @@ export default function PatrimonioDetail() {
         valorPago: patrimonio.valorPago || "",
         valorMercado: patrimonio.valorMercado || "",
         senhaAtivo: patrimonio.senhaAtivo || "",
+        empresa: patrimonio.empresa || "Turbo Partners",
       });
     }
   }, [patrimonio, editDialogOpen, form]);
@@ -445,6 +449,23 @@ export default function PatrimonioDetail() {
                   <Separator />
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1">
+                      <div className="text-sm font-medium text-muted-foreground">Empresa</div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          patrimonio.empresa === "TurboOH"
+                            ? "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300 border-violet-200 dark:border-violet-800"
+                            : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                        }
+                        data-testid="empresa-patrimonio"
+                      >
+                        {patrimonio.empresa || "Turbo Partners"}
+                      </Badge>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-1">
                       <div className="text-sm font-medium text-muted-foreground">Tipo de Bem</div>
                       <div className="text-base font-medium" data-testid="tipo-bem">{patrimonio.ativo || "-"}</div>
                     </div>
@@ -704,6 +725,27 @@ export default function PatrimonioDetail() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmitEdit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="empresa"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Empresa</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "Turbo Partners"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-empresa">
+                          <SelectValue placeholder="Selecione a empresa" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Turbo Partners">Turbo Partners</SelectItem>
+                        <SelectItem value="TurboOH">TurboOH</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
