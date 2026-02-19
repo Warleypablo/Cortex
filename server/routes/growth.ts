@@ -1399,11 +1399,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           
           -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao_mql,
-          
+
           -- Faturamento Implantação (soma valor_pontual dos ganhos)
-          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_mql
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_mql,
+
+          -- Faturamento via Tráfego (utm_source = facebook/google)
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' AND (
+            LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%'
+            OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%'
+            OR LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads'
+          ) THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao_trafego,
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' AND (
+            LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%'
+            OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%'
+            OR LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads'
+          ) THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_trafego
         FROM "Bitrix".crm_deal d
-        WHERE d.data_fechamento >= ${startDate}::date 
+        WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
           AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
       `);
@@ -1418,7 +1430,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const contratosImplantacao = parseInt(row.contratos_implantacao_mql) || 0;
       const faturamentoAceleracao = parseFloat(row.faturamento_aceleracao_mql) || 0;
       const faturamentoImplantacao = parseFloat(row.faturamento_implantacao_mql) || 0;
-      
+      const faturamentoAceleracaoTrafego = parseFloat(row.faturamento_aceleracao_trafego) || 0;
+      const faturamentoImplantacaoTrafego = parseFloat(row.faturamento_implantacao_trafego) || 0;
+
       // Calcular taxas
       const percReuniaoAgendada = totalMqls > 0 ? reunioesAgendadas / totalMqls : 0;
       const percNoShow = reunioesAgendadas > 0 ? (reunioesAgendadas - reunioesRealizadas) / reunioesAgendadas : 0;
@@ -1438,7 +1452,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         contratosImplantacao,
         faturamentoAceleracao,
         faturamentoImplantacao,
-        
+        faturamentoAceleracaoTrafego,
+        faturamentoImplantacaoTrafego,
+
         // Taxas calculadas
         percReuniaoAgendada,
         percNoShow,
@@ -1491,11 +1507,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           
           -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao,
-          
+
           -- Faturamento Implantação (soma valor_pontual dos ganhos)
-          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao,
+
+          -- Faturamento via Tráfego (utm_source = facebook/google)
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' AND (
+            LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%'
+            OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%'
+            OR LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads'
+          ) THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao_trafego,
+          COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' AND (
+            LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%'
+            OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%'
+            OR LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads'
+          ) THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_trafego
         FROM "Bitrix".crm_deal d
-        WHERE d.data_fechamento >= ${startDate}::date 
+        WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
           AND (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
       `);
@@ -1510,7 +1538,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const contratosImplantacao = parseInt(row.contratos_implantacao) || 0;
       const faturamentoAceleracao = parseFloat(row.faturamento_aceleracao) || 0;
       const faturamentoImplantacao = parseFloat(row.faturamento_implantacao) || 0;
-      
+      const faturamentoAceleracaoTrafego = parseFloat(row.faturamento_aceleracao_trafego) || 0;
+      const faturamentoImplantacaoTrafego = parseFloat(row.faturamento_implantacao_trafego) || 0;
+
       // Calcular taxas
       const percReuniaoAgendada = totalNaoMqls > 0 ? reunioesAgendadas / totalNaoMqls : 0;
       const percNoShow = reunioesAgendadas > 0 ? (reunioesAgendadas - reunioesRealizadas) / reunioesAgendadas : 0;
@@ -1530,7 +1560,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         contratosImplantacao,
         faturamentoAceleracao,
         faturamentoImplantacao,
-        
+        faturamentoAceleracaoTrafego,
+        faturamentoImplantacaoTrafego,
+
         // Taxas calculadas
         percReuniaoAgendada,
         percNoShow,
