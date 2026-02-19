@@ -3991,17 +3991,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Buscar churns por mês (usando data_solicitacao_encerramento - quando cliente pediu cancelamento)
       const churnResult = await db.execute(sql`
-        SELECT 
+        SELECT
           TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           squad,
+          responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valorr), 0) as mrr_churn
         FROM "Clickup".cup_contratos
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valorr > 0
-        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad
-        ORDER BY mes, squad
+        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel
+        ORDER BY mes, squad, responsavel
       `);
       
       // Listar squads e operadores disponíveis (incluindo dados ao vivo)
@@ -9481,6 +9482,221 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching ranking contribuição:", error);
       res.status(500).json({ error: "Falha ao buscar ranking de contribuição" });
+    }
+  });
+
+  // ========================================
+  // ANALISE DE SQUADS - Endpoint consolidado
+  // ========================================
+  app.get("/api/analise-squads", async (req, res) => {
+    try {
+      const mesAno = req.query.mesAno as string;
+
+      if (!mesAno || !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+      }
+
+      const [ano, mes] = mesAno.split('-').map(Number);
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+      const inicioMesStr = inicioMes.toISOString().split('T')[0];
+      const fimMesStr = fimMes.toISOString().split('T')[0];
+
+      // Data de início para evolução (6 meses atrás)
+      const evolucaoStart = new Date(ano, mes - 7, 1);
+      const evolucaoStartStr = evolucaoStart.toISOString().split('T')[0];
+
+      // Verificar se o mês selecionado é o mês atual
+      const agora = new Date();
+      const isMesAtual = ano === agora.getFullYear() && mes === (agora.getMonth() + 1);
+
+      // 1) MRR por squad no mês selecionado
+      let mrrPorSquadRows: any[];
+      if (isMesAtual) {
+        // Mês atual: dados ao vivo de cup_contratos
+        const mrrResult = await db.execute(sql`
+          SELECT
+            COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
+            COALESCE(SUM(valorr::numeric), 0) as mrr,
+            COUNT(DISTINCT id_subtask) as contratos,
+            COUNT(DISTINCT id_task) as clientes
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND valorr IS NOT NULL AND valorr > 0
+          GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
+          ORDER BY mrr DESC
+        `);
+        mrrPorSquadRows = mrrResult.rows as any[];
+      } else {
+        // Mês anterior: snapshot histórico
+        const snapshotResult = await db.execute(sql`
+          SELECT MAX(data_snapshot) as ds
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= ${inicioMes}::timestamp
+            AND data_snapshot <= ${fimMes}::timestamp
+        `);
+        const dataSnapshot = (snapshotResult.rows[0] as any)?.ds;
+
+        if (dataSnapshot) {
+          const mrrResult = await db.execute(sql`
+            SELECT
+              COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
+              COALESCE(SUM(valorr::numeric), 0) as mrr,
+              COUNT(DISTINCT id_subtask) as contratos,
+              COUNT(DISTINCT id_task) as clientes
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot = ${dataSnapshot}::timestamp
+              AND status IN ('ativo', 'onboarding', 'triagem')
+              AND valorr IS NOT NULL AND valorr > 0
+            GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
+            ORDER BY mrr DESC
+          `);
+          mrrPorSquadRows = mrrResult.rows as any[];
+        } else {
+          // Fallback para dados atuais se não houver snapshot
+          const mrrResult = await db.execute(sql`
+            SELECT
+              COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
+              COALESCE(SUM(valorr::numeric), 0) as mrr,
+              COUNT(DISTINCT id_subtask) as contratos,
+              COUNT(DISTINCT id_task) as clientes
+            FROM "Clickup".cup_contratos
+            WHERE status IN ('ativo', 'onboarding', 'triagem')
+              AND valorr IS NOT NULL AND valorr > 0
+            GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
+            ORDER BY mrr DESC
+          `);
+          mrrPorSquadRows = mrrResult.rows as any[];
+        }
+      }
+
+      // 2) Churn por squad no mês selecionado
+      const churnResult = await db.execute(sql`
+        SELECT
+          COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
+          COUNT(*) as churns,
+          COALESCE(SUM(valorr::numeric), 0) as mrr_churn
+        FROM "Clickup".cup_contratos
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento >= ${inicioMesStr}::date
+          AND data_solicitacao_encerramento <= ${fimMesStr}::date
+          AND valorr > 0
+        GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
+      `);
+      const churnPorSquadRows = churnResult.rows as any[];
+
+      // 3) Evolução MRR por squad (últimos 6 meses)
+      const evolucaoMrrResult = await db.execute(sql`
+        WITH snapshots_mensais AS (
+          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
+            DATE_TRUNC('month', data_snapshot) as mes,
+            data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE DATE(data_snapshot) >= ${evolucaoStartStr}::date
+            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
+          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        ),
+        historical_data AS (
+          SELECT
+            TO_CHAR(sm.mes, 'YYYY-MM') as mes,
+            COALESCE(NULLIF(TRIM(h.squad), ''), 'Sem Squad') as squad,
+            COALESCE(SUM(h.valorr::numeric), 0) as mrr_total,
+            COUNT(DISTINCT h.id_subtask) as total_contratos
+          FROM snapshots_mensais sm
+          JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), COALESCE(NULLIF(TRIM(h.squad), ''), 'Sem Squad')
+        ),
+        current_month_data AS (
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', CURRENT_DATE), 'YYYY-MM') as mes,
+            COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
+            COALESCE(SUM(valorr::numeric), 0) as mrr_total,
+            COUNT(DISTINCT id_subtask) as total_contratos
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+          GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
+        )
+        SELECT * FROM historical_data
+        UNION ALL
+        SELECT * FROM current_month_data
+        ORDER BY mes, squad
+      `);
+
+      // 4) Evolução Churn por squad (últimos 6 meses)
+      const evolucaoChurnResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
+          COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
+          COUNT(*) as churns,
+          COALESCE(SUM(valorr::numeric), 0) as mrr_churn
+        FROM "Clickup".cup_contratos
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento >= ${evolucaoStartStr}::date
+          AND valorr > 0
+        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
+        ORDER BY mes, squad
+      `);
+
+      // Montar dados por squad
+      const churnMap = new Map<string, { churns: number; mrrChurn: number }>();
+      for (const row of churnPorSquadRows) {
+        churnMap.set(row.squad, {
+          churns: parseInt(row.churns) || 0,
+          mrrChurn: parseFloat(row.mrr_churn) || 0,
+        });
+      }
+
+      const squads = mrrPorSquadRows.map((row) => {
+        const mrr = parseFloat(row.mrr) || 0;
+        const contratos = parseInt(row.contratos) || 0;
+        const clientes = parseInt(row.clientes) || 0;
+        const churnData = churnMap.get(row.squad) || { churns: 0, mrrChurn: 0 };
+        const churnRate = contratos > 0 ? (churnData.churns / contratos) * 100 : 0;
+        const ticketMedio = contratos > 0 ? mrr / contratos : 0;
+
+        return {
+          squad: row.squad,
+          mrr,
+          contratos,
+          clientes,
+          churns: churnData.churns,
+          mrrChurn: churnData.mrrChurn,
+          churnRate: Math.round(churnRate * 100) / 100,
+          ticketMedio: Math.round(ticketMedio * 100) / 100,
+        };
+      });
+
+      // Totais
+      const totalMrr = squads.reduce((s, sq) => s + sq.mrr, 0);
+      const totalContratos = squads.reduce((s, sq) => s + sq.contratos, 0);
+      const totalClientes = squads.reduce((s, sq) => s + sq.clientes, 0);
+      const totalChurns = squads.reduce((s, sq) => s + sq.churns, 0);
+      const churnRateGeral = totalContratos > 0 ? Math.round((totalChurns / totalContratos) * 10000) / 100 : 0;
+      const ticketMedioGeral = totalContratos > 0 ? Math.round((totalMrr / totalContratos) * 100) / 100 : 0;
+
+      const squadsLista = squads.map(s => s.squad).filter(s => s !== 'Sem Squad');
+
+      res.json({
+        mesAno,
+        squads,
+        totais: {
+          totalMrr,
+          totalContratos,
+          totalClientes,
+          totalChurns,
+          churnRateGeral,
+          ticketMedioGeral,
+        },
+        evolucao: {
+          mrr: evolucaoMrrResult.rows,
+          churns: evolucaoChurnResult.rows,
+        },
+        squadsLista,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching analise squads:", error);
+      res.status(500).json({ error: "Failed to fetch analise squads" });
     }
   });
 

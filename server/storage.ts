@@ -4591,12 +4591,18 @@ export class DbStorage implements IStorage {
     // Sempre filtrar a partir de janeiro de 2025 (mínimo)
     const dataMinima = '2025-01-01';
 
-    // Filtrar EXCLUSIVAMENTE pela data de quitação
-    if (dataInicio && dataInicio >= dataMinima) {
-      whereClauses.push(`p.data_quitacao >= '${dataInicio}'`);
-    } else {
-      whereClauses.push(`p.data_quitacao >= '${dataMinima}'`);
-    }
+    // Guardar dataInicio original para filtrar meses visíveis depois
+    // A query busca 6 meses antes para calcular média histórica (tooltip de variação)
+    const dataInicioOriginal = (dataInicio && dataInicio >= dataMinima) ? dataInicio : dataMinima;
+
+    // Estender 6 meses atrás para ter dados históricos de comparação
+    const dataInicioDate = new Date(dataInicioOriginal + 'T00:00:00');
+    dataInicioDate.setMonth(dataInicioDate.getMonth() - 6);
+    const dataInicioHistorico = dataInicioDate.toISOString().split('T')[0];
+    const dataInicioQuery = dataInicioHistorico >= dataMinima ? dataInicioHistorico : dataMinima;
+
+    // Filtrar EXCLUSIVAMENTE pela data de quitação (com range estendido)
+    whereClauses.push(`p.data_quitacao >= '${dataInicioQuery}'`);
 
     if (dataFim) {
       whereClauses.push(`p.data_quitacao <= '${dataFim}'`);
@@ -4741,12 +4747,20 @@ export class DbStorage implements IStorage {
       }
     }
 
-    const meses = Array.from(mesesSet).sort();
+    const todosOsMeses = Array.from(mesesSet).sort();
 
     console.log(`[DFC DEBUG] Parcelas únicas processadas: ${parcelaIdsProcessadas.size}`);
     console.log(`[DFC DEBUG] Total valor processado (soma de valor_categoria): ${totalValorProcessado.toFixed(2)}`);
 
-    return buildHierarchy(items, meses, parcelasByCategory, categoriaNamesMap);
+    // Construir hierarquia com TODOS os meses (incluindo históricos para cálculo de média)
+    const result = buildHierarchy(items, todosOsMeses, parcelasByCategory, categoriaNamesMap);
+
+    // Filtrar meses visíveis: apenas os meses >= dataInicioOriginal
+    // Os meses históricos ficam em valuesByMonth para cálculo de variação no frontend
+    const mesInicioOriginal = dataInicioOriginal.substring(0, 7); // "YYYY-MM"
+    result.meses = result.meses.filter(m => m >= mesInicioOriginal);
+
+    return result;
   }
 
   async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {

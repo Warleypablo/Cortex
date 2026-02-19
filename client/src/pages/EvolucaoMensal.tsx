@@ -32,6 +32,7 @@ interface MrrDataPoint {
 interface ChurnDataPoint {
   mes: string;
   squad: string;
+  responsavel: string;
   churns: number;
   mrr_churn: number;
 }
@@ -111,7 +112,7 @@ export default function EvolucaoMensal() {
         const mrrMes = mrrData.filter(d => d.mes === mes);
         const churnMes = churnData.filter(d => d.mes === mes);
         
-        const squadsUnicos = Array.from(new Set(mrrMes.map(d => d.squad).filter(Boolean)));
+        const squadsUnicos = Array.from(new Set([...mrrMes.map(d => d.squad), ...churnMes.map(d => d.squad)].filter(Boolean)));
         
         const row: Record<string, any> = {
           mes: formatMesLabel(mes),
@@ -149,7 +150,7 @@ export default function EvolucaoMensal() {
         const mrrMes = mrrData.filter(d => d.mes === mes);
         const churnMes = churnData.filter(d => d.mes === mes);
         
-        const operadoresUnicos = Array.from(new Set(mrrMes.map(d => d.responsavel).filter(Boolean)));
+        const operadoresUnicos = Array.from(new Set([...mrrMes.map(d => d.responsavel), ...churnMes.map(d => d.responsavel)].filter(Boolean)));
         
         const row: Record<string, any> = {
           mes: formatMesLabel(mes),
@@ -168,11 +169,13 @@ export default function EvolucaoMensal() {
           }
         }
         
-        const churnTotal = churnMes.reduce((acc, d) => acc + (Number(d.mrr_churn) || 0), 0);
-        
+        const churnTotal = churnMes
+          .filter(d => operadorSelecionado === "todos" || d.responsavel === operadorSelecionado)
+          .reduce((acc, d) => acc + (Number(d.mrr_churn) || 0), 0);
+
         row.totalMrr = totalMrr;
         row.churn = churnTotal;
-        
+
         return row;
       });
     }
@@ -185,14 +188,14 @@ export default function EvolucaoMensal() {
     const churnData = data.churns || [];
     
     const mesesUnicos = Array.from(new Set(mrrData.map(d => d.mes))).sort();
-    
+
     return mesesUnicos.map(mes => {
       const mrrMes = mrrData.filter(d => d.mes === mes);
       const churnMes = churnData.filter(d => d.mes === mes);
-      
+
       let totalMrr = 0;
       let totalContratos = 0;
-      
+
       for (const d of mrrMes) {
         if (squadSelecionado === "todos" || d.squad === squadSelecionado) {
           if (operadorSelecionado === "todos" || d.responsavel === operadorSelecionado) {
@@ -201,13 +204,15 @@ export default function EvolucaoMensal() {
           }
         }
       }
-      
+
       const churnTotal = churnMes
         .filter(d => squadSelecionado === "todos" || d.squad === squadSelecionado)
+        .filter(d => operadorSelecionado === "todos" || d.responsavel === operadorSelecionado)
         .reduce((acc, d) => acc + (Number(d.mrr_churn) || 0), 0);
-      
+
       const churnsCount = churnMes
         .filter(d => squadSelecionado === "todos" || d.squad === squadSelecionado)
+        .filter(d => operadorSelecionado === "todos" || d.responsavel === operadorSelecionado)
         .reduce((acc, d) => acc + (Number(d.churns) || 0), 0);
       
       const churnRate = totalMrr > 0 ? (churnTotal / totalMrr) * 100 : 0;
@@ -338,7 +343,11 @@ export default function EvolucaoMensal() {
   return (
     <div className="p-6 space-y-6" data-testid="evolucao-mensal-page">
       <div className="flex flex-wrap gap-3 items-center">
-        <Select value={viewMode} onValueChange={(v) => setViewMode(v as "squad" | "operador")}>
+        <Select value={viewMode} onValueChange={(v) => {
+          setViewMode(v as "squad" | "operador");
+          if (v === "operador") setSquadSelecionado("todos");
+          if (v === "squad") setOperadorSelecionado("todos");
+        }}>
           <SelectTrigger className="w-[150px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50" data-testid="select-view-mode">
             <SelectValue placeholder="Visão" />
           </SelectTrigger>

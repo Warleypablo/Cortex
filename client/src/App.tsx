@@ -88,6 +88,7 @@ const Sugestoes = lazy(() => import("@/pages/Sugestoes"));
 const ProcessosInternos = lazy(() => import("@/pages/ProcessosInternos"));
 const ContratosModule = lazy(() => import("@/pages/ContratosModule"));
 const MargemCliente = lazy(() => import("@/pages/MargemCliente"));
+const AnaliseSquads = lazy(() => import("@/pages/AnaliseSquads"));
 const AutoReport = lazy(() => import("@/pages/AutoReport"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -195,6 +196,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/churn-predicao">{() => <ProtectedRoute path="/dashboard/churn-predicao" component={ChurnPredicao} />}</Route>
       <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>
       <Route path="/dashboard/contratos-detalhamento">{() => <ProtectedRoute path="/dashboard/contratos-detalhamento" component={ContratosDetalhamento} />}</Route>
+      <Route path="/dashboard/analise-squads">{() => <ProtectedRoute path="/dashboard/analise-squads" component={AnaliseSquads} />}</Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       
       {/* Financeiro */}
