@@ -48,6 +48,7 @@ interface ContractsProps {
   statusFilter: string[];
   tipoContratoFilter: string;
   produtoFilter: string[];
+  squadFilter: string[];
 }
 
 type SortField = "service" | "status" | "squad" | "responsavel" | "csResponsavel" | "createdDate" | "recurringValue" | "oneTimeValue" | "lt" | "dataSolicitacaoEncerramento" | "dataEntrega";
@@ -70,6 +71,7 @@ export default function Contracts({
   statusFilter,
   tipoContratoFilter,
   produtoFilter,
+  squadFilter,
 }: ContractsProps) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -232,15 +234,16 @@ export default function Contracts({
       const matchesServico = servicoFilter.length === 0 || servicoFilter.includes(contract.produto);
       const matchesStatus = statusFilter.length === 0 || statusFilter.includes(contract.status);
       const matchesProduto = produtoFilter.length === 0 || produtoFilter.includes(contract.produto);
-      
-      const matchesTipoContrato = 
+      const matchesSquad = squadFilter.length === 0 || squadFilter.includes(contract.squadCode);
+
+      const matchesTipoContrato =
         tipoContratoFilter === "ambos" ||
         (tipoContratoFilter === "recorrente" && contract.recurringValue > 0) ||
         (tipoContratoFilter === "pontual" && contract.oneTimeValue > 0);
-      
-      return matchesSearch && matchesServico && matchesStatus && matchesProduto && matchesTipoContrato;
+
+      return matchesSearch && matchesServico && matchesStatus && matchesProduto && matchesSquad && matchesTipoContrato;
     });
-  }, [contracts, searchQuery, servicoFilter, statusFilter, produtoFilter, tipoContratoFilter]);
+  }, [contracts, searchQuery, servicoFilter, statusFilter, produtoFilter, squadFilter, tipoContratoFilter]);
 
   const sortedContracts = useMemo(() => {
     return [...filteredContracts].sort((a, b) => {

@@ -10,9 +10,13 @@ import { Pool } from "pg";
 import { initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
+import path from "path";
 const app = express();
 
 app.set("trust proxy", 1);
+
+// Servir assets públicos (og-image, favicon) ANTES de auth para crawlers (WhatsApp, etc.)
+app.use(express.static(path.resolve(import.meta.dirname, "..", "client", "public")));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

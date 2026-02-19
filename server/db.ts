@@ -687,6 +687,27 @@ export async function initializeSysSchema(): Promise<void> {
       ADD COLUMN IF NOT EXISTS observacao_lider TEXT
     `);
 
+    // Churn Risk Scores table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.churn_risk_scores (
+        id SERIAL PRIMARY KEY,
+        contrato_id TEXT NOT NULL,
+        cliente_nome TEXT,
+        cnpj TEXT,
+        score INTEGER NOT NULL,
+        tier TEXT NOT NULL,
+        fatores JSONB DEFAULT '[]'::jsonb,
+        mrr NUMERIC(12,2),
+        squad TEXT,
+        produto TEXT,
+        cs_responsavel TEXT,
+        calculated_at TIMESTAMP DEFAULT NOW(),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_churn_risk_score ON cortex_core.churn_risk_scores(score DESC)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_churn_risk_contrato ON cortex_core.churn_risk_scores(contrato_id)`);
+
     console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
@@ -1499,7 +1520,21 @@ export async function initializeRhPesquisasTables(): Promise<void> {
     } catch (e) {
       // Colunas já existem, ignorar
     }
-    
+
+    // Criar tabela de ações do 1x1
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS "Inhire".rh_one_on_one_acoes (
+        id SERIAL PRIMARY KEY,
+        one_on_one_id INTEGER NOT NULL REFERENCES "Inhire".rh_one_on_one(id),
+        descricao TEXT NOT NULL,
+        responsavel TEXT,
+        prazo DATE,
+        status TEXT DEFAULT 'pendente',
+        concluida_em TIMESTAMP
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_rh_one_on_one_acoes_meeting ON "Inhire".rh_one_on_one_acoes(one_on_one_id)`);
+
     // Criar tabela de PDI
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS "Inhire".rh_pdi (

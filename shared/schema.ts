@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -30,6 +30,25 @@ export const authUsers = cortexCoreSchema.table("auth_users", {
 
 export type AuthUser = typeof authUsers.$inferSelect;
 export type InsertAuthUser = typeof authUsers.$inferInsert;
+
+export const churnRiskScores = cortexCoreSchema.table("churn_risk_scores", {
+  id: serial("id").primaryKey(),
+  contratoId: text("contrato_id").notNull(),
+  clienteNome: text("cliente_nome"),
+  cnpj: text("cnpj"),
+  score: integer("score").notNull(),
+  tier: text("tier").notNull(),
+  fatores: jsonb("fatores").default([]),
+  mrr: decimal("mrr"),
+  squad: text("squad"),
+  produto: text("produto"),
+  csResponsavel: text("cs_responsavel"),
+  calculatedAt: timestamp("calculated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type ChurnRiskScore = typeof churnRiskScores.$inferSelect;
+export type InsertChurnRiskScore = typeof churnRiskScores.$inferInsert;
 
 export const cazClientes = contaAzulSchema.table("caz_clientes", {
   id: integer("id").primaryKey(),
@@ -343,6 +362,7 @@ export const rhPatrimonio = inhireSchema.table("rh_patrimonio", {
   valorVenda: decimal("valor_venda"),
   descricao: text("descricao"),
   email: varchar("email", { length: 200 }),
+  empresa: varchar("empresa", { length: 100 }),
 });
 
 export const insertPatrimonioSchema = createInsertSchema(rhPatrimonio).partial({
@@ -1418,7 +1438,7 @@ export interface SearchResponse {
 }
 
 // Unified Assistant Types
-export type AssistantContext = 'geral' | 'financeiro' | 'cases' | 'clientes' | 'auto';
+export type AssistantContext = 'geral' | 'financeiro' | 'cases' | 'clientes' | 'churn' | 'auto';
 
 export interface UnifiedAssistantMessage {
   role: 'user' | 'assistant';

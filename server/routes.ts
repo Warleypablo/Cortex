@@ -3753,8 +3753,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid patrimonio ID" });
       }
       
-      const { numeroAtivo, ativo, marca, estadoConservacao, descricao, valorPago, valorMercado, senhaAtivo } = req.body;
-      
+      const { numeroAtivo, ativo, marca, estadoConservacao, descricao, valorPago, valorMercado, senhaAtivo, empresa } = req.body;
+
       const updateData: Record<string, string | null> = {};
       if (numeroAtivo !== undefined) updateData.numeroAtivo = numeroAtivo || null;
       if (ativo !== undefined) updateData.ativo = ativo || null;
@@ -3764,6 +3764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (valorPago !== undefined) updateData.valorPago = valorPago || null;
       if (valorMercado !== undefined) updateData.valorMercado = valorMercado || null;
       if (senhaAtivo !== undefined) updateData.senhaAtivo = senhaAtivo || null;
+      if (empresa !== undefined) updateData.empresa = empresa || null;
       
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ error: "No fields to update" });
@@ -8442,6 +8443,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === Churn Risk Prediction Endpoints ===
+
+  app.get("/api/churn-risk/summary", async (req, res) => {
+    try {
+      const { getRiskSummary } = await import("./services/churnRiskEngine");
+      const summary = await getRiskSummary();
+      res.json(summary);
+    } catch (error) {
+      console.error("[api] Error getting churn risk summary:", error);
+      res.status(500).json({ error: "Falha ao buscar resumo de risco" });
+    }
+  });
+
+  app.get("/api/churn-risk/scores", async (req, res) => {
+    try {
+      const { getRiskScores } = await import("./services/churnRiskEngine");
+      const scores = await getRiskScores({
+        squad: req.query.squad as string | undefined,
+        tier: req.query.tier as string | undefined,
+        produto: req.query.produto as string | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+      });
+      res.json(scores);
+    } catch (error) {
+      console.error("[api] Error getting churn risk scores:", error);
+      res.status(500).json({ error: "Falha ao buscar scores de risco" });
+    }
+  });
+
+  app.get("/api/churn-risk/contract/:id", async (req, res) => {
+    try {
+      const { getRiskScoreByContract } = await import("./services/churnRiskEngine");
+      const score = await getRiskScoreByContract(req.params.id);
+      if (!score) {
+        return res.status(404).json({ error: "Score não encontrado para este contrato" });
+      }
+      res.json(score);
+    } catch (error) {
+      console.error("[api] Error getting contract risk score:", error);
+      res.status(500).json({ error: "Falha ao buscar score do contrato" });
+    }
+  });
+
+  app.post("/api/churn-risk/recalculate", async (req, res) => {
+    try {
+      const { recalculateAndSave } = await import("./services/churnRiskEngine");
+      const result = await recalculateAndSave();
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error recalculating churn risk:", error);
+      res.status(500).json({ error: "Falha ao recalcular scores de risco" });
+    }
+  });
+
   // Churn Visão Geral - tendência mensal de churn (últimos 12 meses)
   app.get("/api/analytics/churn-visao-geral", async (req, res) => {
     try {
@@ -9385,7 +9440,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let despesaSemImpostos = 0;
         if (data.despesas) {
           for (const despesa of data.despesas) {
-            if (!despesa.categoriaId.toUpperCase().includes('IMPOSTOS')) {
+            const catId = despesa.categoriaId.toUpperCase();
+            // Somente nivel 1 (máximo 2 segmentos: DESP.SALARIOS, não DESP.SALARIOS.123)
+            const isNivel1 = despesa.nivel === 1 || catId.split('.').length <= 2;
+            if (!catId.includes('IMPOSTOS') && isNivel1) {
               despesaSemImpostos += despesa.valor;
             }
           }
@@ -9474,7 +9532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Mensagem é obrigatória" });
       }
 
-      const validContexts: AssistantContext[] = ['geral', 'financeiro', 'cases', 'clientes'];
+      const validContexts: AssistantContext[] = ['geral', 'financeiro', 'cases', 'clientes', 'churn'];
       const assistantContext: AssistantContext = validContexts.includes(context) ? context : 'geral';
 
       const request: UnifiedAssistantRequest = {

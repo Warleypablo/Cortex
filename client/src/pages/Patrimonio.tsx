@@ -82,9 +82,10 @@ interface PatrimonioDb {
   valorMercado: string | null;
   valorVenda: string | null;
   descricao: string | null;
+  empresa: string | null;
 }
 
-type SortField = "numeroAtivo" | "ativo" | "marca" | "descricao" | "estadoConservacao" | "responsavelAtual" | "valorPago" | "valorMercado";
+type SortField = "numeroAtivo" | "empresa" | "ativo" | "marca" | "descricao" | "estadoConservacao" | "responsavelAtual" | "valorPago" | "valorMercado";
 type SortDirection = "asc" | "desc";
 type TelefonesSortField = "conta" | "planoOperadora" | "telefone" | "responsavelNome" | "setor" | "ultimaRecarga" | "status";
 
@@ -104,6 +105,7 @@ export default function Patrimonio() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("patrimonios");
+  const [empresaTab, setEmpresaTab] = useState<"turbo-partners" | "turbo-oh">("turbo-partners");
   
   // Telefones state
   const [telefonesSearchQuery, setTelefonesSearchQuery] = useState("");
@@ -144,6 +146,7 @@ export default function Patrimonio() {
     valorMercado: "",
     valorVenda: "",
     descricao: "",
+    empresa: "Turbo Partners",
   });
   
   const { toast } = useToast();
@@ -196,22 +199,30 @@ export default function Patrimonio() {
     return Array.from(responsaveis).sort();
   }, [patrimonios]);
 
+  const patrimoniosByEmpresa = useMemo(() => {
+    if (!patrimonios) return [];
+    if (empresaTab === "turbo-partners") {
+      return patrimonios.filter(p => !p.empresa || p.empresa === "Turbo Partners");
+    }
+    return patrimonios.filter(p => p.empresa === "TurboOH");
+  }, [patrimonios, empresaTab]);
+
   const stats = useMemo(() => {
-    if (!patrimonios) return { totalAtivos: 0, ativosBom: 0, computadoresNotebooksBom: 0, computadoresNotebooksAtribuidos: 0, valorPago: 0, valorMercado: 0 };
-    
+    if (!patrimoniosByEmpresa) return { totalAtivos: 0, ativosBom: 0, computadoresNotebooksBom: 0, computadoresNotebooksAtribuidos: 0, valorPago: 0, valorMercado: 0 };
+
     let ativosBom = 0;
     let computadoresNotebooksBom = 0;
     let computadoresNotebooksAtribuidos = 0;
     let valorPago = 0;
     let valorMercado = 0;
-    
-    patrimonios.forEach(p => {
+
+    patrimoniosByEmpresa.forEach(p => {
       const estado = p.estadoConservacao?.toLowerCase() || "";
       const ativo = p.ativo?.toLowerCase() || "";
       const isBomEstado = estado.includes("bom") || estado.includes("novo") || estado.includes("ótimo");
       const isBomOuEstoque = isBomEstado || estado.includes("estoque");
       const isComputadorNotebook = ativo.includes("computador") || ativo.includes("notebook");
-      
+
       if (isBomEstado) {
         ativosBom++;
       }
@@ -231,21 +242,21 @@ export default function Patrimonio() {
         if (!isNaN(val)) valorMercado += val;
       }
     });
-    
+
     return {
-      totalAtivos: patrimonios.length,
+      totalAtivos: patrimoniosByEmpresa.length,
       ativosBom,
       computadoresNotebooksBom,
       computadoresNotebooksAtribuidos,
       valorPago,
       valorMercado,
     };
-  }, [patrimonios]);
+  }, [patrimoniosByEmpresa]);
 
   const filteredAndSortedPatrimonios = useMemo(() => {
-    if (!patrimonios) return [];
-    
-    let result = [...patrimonios];
+    if (!patrimoniosByEmpresa) return [];
+
+    let result = [...patrimoniosByEmpresa];
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -325,7 +336,7 @@ export default function Patrimonio() {
     });
     
     return result;
-  }, [patrimonios, searchQuery, filterTipoBem, filterEstado, filterMarca, filterResponsavel, sortField, sortDirection]);
+  }, [patrimoniosByEmpresa, searchQuery, filterTipoBem, filterEstado, filterMarca, filterResponsavel, sortField, sortDirection]);
 
   const totalPages = Math.ceil(filteredAndSortedPatrimonios.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -607,6 +618,7 @@ export default function Patrimonio() {
         valorMercado: data.valorMercado || null,
         valorVenda: data.valorVenda || null,
         descricao: data.descricao || null,
+        empresa: data.empresa || "Turbo Partners",
       });
     },
     onSuccess: () => {
@@ -639,6 +651,7 @@ export default function Patrimonio() {
       valorMercado: "",
       valorVenda: "",
       descricao: "",
+      empresa: empresaTab === "turbo-oh" ? "TurboOH" : "Turbo Partners",
     });
   };
 
@@ -700,6 +713,24 @@ export default function Patrimonio() {
             </TabsList>
             
             <TabsContent value="patrimonios" className="space-y-6 mt-6">
+              {/* Sub-abas Empresa */}
+              <div className="flex gap-2">
+                <Button
+                  variant={empresaTab === "turbo-partners" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => { setEmpresaTab("turbo-partners"); setCurrentPage(1); }}
+                >
+                  Turbo Partners
+                </Button>
+                <Button
+                  variant={empresaTab === "turbo-oh" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => { setEmpresaTab("turbo-oh"); setCurrentPage(1); }}
+                >
+                  TurboOH
+                </Button>
+              </div>
+
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <StatsCard
@@ -752,7 +783,10 @@ export default function Patrimonio() {
               </div>
               <Button
                 variant="default"
-                onClick={() => setIsCreatePatrimonioDialogOpen(true)}
+                onClick={() => {
+                  setNewPatrimonio(prev => ({ ...prev, empresa: empresaTab === "turbo-oh" ? "TurboOH" : "Turbo Partners" }));
+                  setIsCreatePatrimonioDialogOpen(true);
+                }}
                 className="gap-2"
                 data-testid="patrimonio-button-novo"
               >
@@ -979,7 +1013,17 @@ export default function Patrimonio() {
                                 {getSortIcon("numeroAtivo")}
                               </div>
                             </TableHead>
-                            <TableHead 
+                            <TableHead
+                              className="min-w-[140px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
+                              onClick={() => handleSort("empresa")}
+                              data-testid="header-empresa"
+                            >
+                              <div className="flex items-center">
+                                Empresa
+                                {getSortIcon("empresa")}
+                              </div>
+                            </TableHead>
+                            <TableHead
                               className="min-w-[200px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
                               onClick={() => handleSort("ativo")}
                               data-testid="header-bem"
@@ -1054,7 +1098,7 @@ export default function Patrimonio() {
                         <TableBody>
                           {paginatedPatrimonios.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                                 Nenhum patrimônio encontrado.
                               </TableCell>
                             </TableRow>
@@ -1068,6 +1112,18 @@ export default function Patrimonio() {
                               >
                                 <TableCell className="font-medium" data-testid={`numero-${item.id}`}>
                                   {item.numeroAtivo || "-"}
+                                </TableCell>
+                                <TableCell data-testid={`empresa-${item.id}`}>
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      item.empresa === "TurboOH"
+                                        ? "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300 border-violet-200 dark:border-violet-800"
+                                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                                    }
+                                  >
+                                    {item.empresa || "Turbo Partners"}
+                                  </Badge>
                                 </TableCell>
                                 <TableCell data-testid={`bem-${item.id}`}>
                                   {item.ativo || "-"}
@@ -1854,6 +1910,23 @@ export default function Patrimonio() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="patrimonio-empresa" className="text-right">
+                Empresa
+              </Label>
+              <Select
+                value={newPatrimonio.empresa}
+                onValueChange={(value) => setNewPatrimonio({ ...newPatrimonio, empresa: value })}
+              >
+                <SelectTrigger className="col-span-3" data-testid="patrimonio-select-empresa">
+                  <SelectValue placeholder="Selecione a empresa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Turbo Partners">Turbo Partners</SelectItem>
+                  <SelectItem value="TurboOH">TurboOH</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="patrimonio-numero-ativo" className="text-right">
                 Número do Ativo

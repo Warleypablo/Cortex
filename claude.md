@@ -52,6 +52,19 @@ Tabela de faturas e receitas do Conta Azul (integração via API).
 
 ---
 
+## 🤖 Agentes de Desenvolvimento
+
+Agentes especializados que servem como contexto para o Claude ao desenvolver features.
+Localizados em `agents/`:
+
+| Agente | Arquivo | Quando usar |
+|--------|---------|-------------|
+| DB Specialist | `agents/db-specialist.md` | Queries SQL, novas tabelas, relacionamentos, migracoes |
+
+Documentacao completa do banco: `DATABASE.md`
+
+---
+
 ## 🎯 Diretrizes de Desenvolvimento
 
 ### Suporte a Temas (Dark/Light Mode)
