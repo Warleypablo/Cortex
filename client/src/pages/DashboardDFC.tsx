@@ -223,43 +223,56 @@ export default function DashboardDFC() {
     };
   }, [dfcData]);
 
-  const resultadoByMonth = useMemo(() => {
-    if (!dfcData || !dfcData.nodes || dfcData.nodes.length === 0) return {};
-    
+  // Coleta todos os meses disponíveis (visíveis + históricos) para cálculo de variação
+  const allAvailableMonths = useMemo(() => {
+    if (!dfcData?.nodes) return new Set<string>();
     const receitasNode = dfcData.nodes.find(n => n.categoriaId === 'RECEITAS');
     const despesasNode = dfcData.nodes.find(n => n.categoriaId === 'DESPESAS');
-    
+    const months = new Set<string>();
+    if (receitasNode) Object.keys(receitasNode.valuesByMonth).forEach(m => months.add(m));
+    if (despesasNode) Object.keys(despesasNode.valuesByMonth).forEach(m => months.add(m));
+    return months;
+  }, [dfcData]);
+
+  const resultadoByMonth = useMemo(() => {
+    if (!dfcData || !dfcData.nodes || dfcData.nodes.length === 0) return {};
+
+    const receitasNode = dfcData.nodes.find(n => n.categoriaId === 'RECEITAS');
+    const despesasNode = dfcData.nodes.find(n => n.categoriaId === 'DESPESAS');
+
+    // Calcular resultado para TODOS os meses (visíveis + históricos) para variação
     const resultado: Record<string, number> = {};
-    dfcData.meses.forEach(mes => {
+    allAvailableMonths.forEach(mes => {
       const receita = receitasNode?.valuesByMonth[mes] || 0;
       const despesa = Math.abs(despesasNode?.valuesByMonth[mes] || 0);
       resultado[mes] = receita - despesa;
     });
-    
+
     return resultado;
-  }, [dfcData]);
+  }, [dfcData, allAvailableMonths]);
 
   const margemByMonth = useMemo(() => {
     if (!dfcData || !dfcData.nodes || dfcData.nodes.length === 0) return {};
-    
+
     const receitasNode = dfcData.nodes.find(n => n.categoriaId === 'RECEITAS');
     const despesasNode = dfcData.nodes.find(n => n.categoriaId === 'DESPESAS');
-    
+
+    // Calcular margem para TODOS os meses (visíveis + históricos) para variação
     const margem: Record<string, number> = {};
-    dfcData.meses.forEach(mes => {
+    allAvailableMonths.forEach(mes => {
       const receita = receitasNode?.valuesByMonth[mes] || 0;
       const despesa = Math.abs(despesasNode?.valuesByMonth[mes] || 0);
       const resultado = receita - despesa;
-      
+
       if (receita > 0) {
         margem[mes] = (resultado / receita) * 100;
       } else {
         margem[mes] = 0;
       }
     });
-    
+
     return margem;
-  }, [dfcData]);
+  }, [dfcData, allAvailableMonths]);
 
   const chartData = useMemo(() => {
     if (!dfcData || !dfcData.nodes || dfcData.nodes.length === 0) return [];
@@ -309,6 +322,28 @@ export default function DashboardDFC() {
   };
 
   const maxValue = useMemo(() => getMaxValue(), [dfcData]);
+
+  // Calcula variação % de um valor genérico em relação à média dos 6 meses anteriores
+  const calcVariacaoGeneric = (valuesByMonth: Record<string, number>, mes: string, useAbsValues = true): { avg6m: number; variacao: number; mesesUsados: number } | null => {
+    const mesDate = new Date(mes + '-01');
+    const prev6: number[] = [];
+    for (let i = 1; i <= 6; i++) {
+      const d = new Date(mesDate);
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (valuesByMonth[key] !== undefined) {
+        prev6.push(useAbsValues ? Math.abs(valuesByMonth[key] || 0) : (valuesByMonth[key] || 0));
+      }
+    }
+    if (prev6.length === 0) return null;
+    const avg = prev6.reduce((a, b) => a + b, 0) / prev6.length;
+    if (avg === 0) return null;
+    const valor = useAbsValues ? Math.abs(valuesByMonth[mes] || 0) : (valuesByMonth[mes] || 0);
+    return { avg6m: avg, variacao: ((valor - avg) / avg) * 100, mesesUsados: prev6.length };
+  };
+
+  // Calcula variação % de um valor em relação à média dos 6 meses anteriores
+  const calcVariacao = (node: DfcNode, mes: string) => calcVariacaoGeneric(node.valuesByMonth, mes);
 
   return (
     <div className="flex flex-col h-full">
@@ -953,34 +988,61 @@ export default function DashboardDFC() {
                             {dfcData.meses.map(mes => {
                               const valor = node.valuesByMonth[mes] || 0;
                               const absValor = Math.abs(valor);
+                              const varInfo = absValor > 0 ? calcVariacao(node, mes) : null;
+                              // Para receitas: subir é bom (verde), cair é ruim (vermelho)
+                              // Para despesas: subir é ruim (vermelho), cair é bom (verde)
+                              const isPositiveVariation = varInfo
+                                ? (isReceitaNode ? varInfo.variacao > 0 : varInfo.variacao < 0)
+                                : false;
+
                               return (
-                                <div 
+                                <div
                                   key={`val-${node.categoriaId}-${mes}`}
                                   className={`p-3 border-b text-right transition-colors ${
-                                    isRootNode 
-                                      ? (isReceitaNode 
-                                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20' 
+                                    isRootNode
+                                      ? (isReceitaNode
+                                        ? 'bg-emerald-50/50 dark:bg-emerald-950/20'
                                         : 'bg-rose-50/50 dark:bg-rose-950/20')
                                       : 'bg-background'
                                   }`}
                                   data-testid={`dfc-cell-${node.categoriaId}-${mes}`}
                                 >
                                   {absValor > 0 ? (
-                                    <div className="flex flex-col items-end gap-1">
-                                      <span className={`text-sm tabular-nums ${
-                                        isRootNode ? 'font-bold' : !node.isLeaf ? 'font-semibold' : 'font-medium'
-                                      } ${isRootNode ? (isReceitaNode ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400') : ''}`}>
-                                        {formatCurrencyNoDecimals(absValor)}
-                                      </span>
-                                      {node.isLeaf && maxValue > 0 && (
-                                        <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                                          <div 
-                                            className={`h-full rounded-full transition-all ${isReceitaNode ? 'bg-emerald-400' : 'bg-rose-400'}`}
-                                            style={{ width: `${(absValor / maxValue) * 100}%` }}
-                                          />
-                                        </div>
-                                      )}
-                                    </div>
+                                    <TooltipProvider delayDuration={200}>
+                                      <TooltipUI>
+                                        <TooltipTrigger asChild>
+                                          <div className="flex flex-col items-end gap-1 cursor-default">
+                                            <span className={`text-sm tabular-nums ${
+                                              isRootNode ? 'font-bold' : !node.isLeaf ? 'font-semibold' : 'font-medium'
+                                            } ${isRootNode ? (isReceitaNode ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400') : ''}`}>
+                                              {formatCurrencyNoDecimals(absValor)}
+                                            </span>
+                                            {node.isLeaf && maxValue > 0 && (
+                                              <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
+                                                <div
+                                                  className={`h-full rounded-full transition-all ${isReceitaNode ? 'bg-emerald-400' : 'bg-rose-400'}`}
+                                                  style={{ width: `${(absValor / maxValue) * 100}%` }}
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top" className="max-w-[220px]">
+                                          {varInfo ? (
+                                            <div className="space-y-1 text-xs">
+                                              <p className="text-muted-foreground">
+                                                Média {varInfo.mesesUsados}m anteriores: <span className="font-semibold text-foreground">{formatCurrencyNoDecimals(varInfo.avg6m)}</span>
+                                              </p>
+                                              <p className={isPositiveVariation ? 'text-emerald-500 font-semibold' : 'text-rose-500 font-semibold'}>
+                                                {isPositiveVariation ? '↑' : '↓'} {varInfo.variacao > 0 ? '+' : ''}{formatPercent(varInfo.variacao)} vs média
+                                              </p>
+                                            </div>
+                                          ) : (
+                                            <p className="text-xs text-muted-foreground">Sem dados históricos para comparação</p>
+                                          )}
+                                        </TooltipContent>
+                                      </TooltipUI>
+                                    </TooltipProvider>
                                   ) : (
                                     <span className="text-muted-foreground/30">
                                       <Minus className="w-3 h-3 inline" />
@@ -1069,21 +1131,43 @@ export default function DashboardDFC() {
                     {dfcData.meses.map(mes => {
                       const resultado = resultadoByMonth[mes] || 0;
                       const isPositivo = resultado >= 0;
+                      const resVarInfo = calcVariacaoGeneric(resultadoByMonth, mes, false);
+                      const resIsPositiveVar = resVarInfo ? resVarInfo.variacao > 0 : false;
                       return (
-                        <div 
+                        <div
                           key={`resultado-${mes}`}
                           className={`p-3 border-t-2 border-b text-right ${
-                            isPositivo 
-                              ? 'bg-emerald-50/50 dark:bg-emerald-950/30' 
+                            isPositivo
+                              ? 'bg-emerald-50/50 dark:bg-emerald-950/30'
                               : 'bg-rose-50/50 dark:bg-rose-950/30'
                           }`}
                           data-testid={`dfc-cell-resultado-${mes}`}
                         >
-                          <span className={`font-bold text-sm tabular-nums ${
-                            isPositivo ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-                          }`}>
-                            {isPositivo ? '+' : ''}{formatCurrencyNoDecimals(resultado)}
-                          </span>
+                          <TooltipProvider delayDuration={200}>
+                            <TooltipUI>
+                              <TooltipTrigger asChild>
+                                <span className={`font-bold text-sm tabular-nums cursor-default ${
+                                  isPositivo ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                }`}>
+                                  {isPositivo ? '+' : ''}{formatCurrencyNoDecimals(resultado)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[220px]">
+                                {resVarInfo ? (
+                                  <div className="space-y-1 text-xs">
+                                    <p className="text-muted-foreground">
+                                      Média {resVarInfo.mesesUsados}m anteriores: <span className="font-semibold text-foreground">{formatCurrencyNoDecimals(resVarInfo.avg6m)}</span>
+                                    </p>
+                                    <p className={resIsPositiveVar ? 'text-emerald-500 font-semibold' : 'text-rose-500 font-semibold'}>
+                                      {resIsPositiveVar ? '↑' : '↓'} {resVarInfo.variacao > 0 ? '+' : ''}{formatPercent(resVarInfo.variacao)} vs média
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">Sem dados históricos para comparação</p>
+                                )}
+                              </TooltipContent>
+                            </TooltipUI>
+                          </TooltipProvider>
                         </div>
                       );
                     })}
@@ -1102,9 +1186,11 @@ export default function DashboardDFC() {
                     </div>
                     {dfcData.meses.map(mes => {
                       const margem = margemByMonth[mes] || 0;
+                      const margemVarInfo = calcVariacaoGeneric(margemByMonth, mes, false);
+                      const margemIsPositiveVar = margemVarInfo ? margemVarInfo.variacao > 0 : false;
                       let colorClass = '';
                       let bgClass = '';
-                      
+
                       if (margem < 0) {
                         colorClass = 'text-rose-600 dark:text-rose-400';
                         bgClass = 'bg-rose-50/50 dark:bg-rose-950/30';
@@ -1115,16 +1201,36 @@ export default function DashboardDFC() {
                         colorClass = 'text-emerald-600 dark:text-emerald-400';
                         bgClass = 'bg-emerald-50/50 dark:bg-emerald-950/30';
                       }
-                      
+
                       return (
-                        <div 
+                        <div
                           key={`margem-${mes}`}
                           className={`p-3 border-b text-right ${bgClass}`}
                           data-testid={`dfc-cell-margem-${mes}`}
                         >
-                          <span className={`font-bold text-sm tabular-nums ${colorClass}`}>
-                            {formatPercent(margem)}
-                          </span>
+                          <TooltipProvider delayDuration={200}>
+                            <TooltipUI>
+                              <TooltipTrigger asChild>
+                                <span className={`font-bold text-sm tabular-nums cursor-default ${colorClass}`}>
+                                  {formatPercent(margem)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="max-w-[220px]">
+                                {margemVarInfo ? (
+                                  <div className="space-y-1 text-xs">
+                                    <p className="text-muted-foreground">
+                                      Média {margemVarInfo.mesesUsados}m anteriores: <span className="font-semibold text-foreground">{formatPercent(margemVarInfo.avg6m)}</span>
+                                    </p>
+                                    <p className={margemIsPositiveVar ? 'text-emerald-500 font-semibold' : 'text-rose-500 font-semibold'}>
+                                      {margemIsPositiveVar ? '↑' : '↓'} {margemVarInfo.variacao > 0 ? '+' : ''}{formatPercent(margemVarInfo.variacao)} vs média
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">Sem dados históricos para comparação</p>
+                                )}
+                              </TooltipContent>
+                            </TooltipUI>
+                          </TooltipProvider>
                         </div>
                       );
                     })}
