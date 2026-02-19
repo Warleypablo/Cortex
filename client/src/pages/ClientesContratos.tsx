@@ -43,6 +43,7 @@ type SavedFilter = {
     ltValue: string;
     aovOperator: string;
     aovValue: string;
+    squadFilter?: string[];
   };
 };
 
@@ -54,6 +55,7 @@ type ContractSavedFilter = {
     statusFilter: string[];
     tipoContratoFilter: string;
     produtoFilter: string[];
+    squadFilter?: string[];
   };
 };
 
@@ -92,6 +94,7 @@ export default function ClientesContratos() {
   const [ltValue, setLtValue] = usePersistentFilters("clientes-lt-value", "");
   const [aovOperator, setAovOperator] = usePersistentFilters("clientes-aov-operator", "all");
   const [aovValue, setAovValue] = usePersistentFilters("clientes-aov-value", "");
+  const [squadFilter, setSquadFilter] = usePersistentFilters<string[]>("clientes-squad", []);
   
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>(() => {
     try {
@@ -107,6 +110,7 @@ export default function ClientesContratos() {
   const [contractStatusFilter, setContractStatusFilter] = usePersistentFilters<string[]>("contratos-status", []);
   const [contractTipoContratoFilter, setContractTipoContratoFilter] = usePersistentFilters("contratos-tipo-contrato", "ambos");
   const [contractProdutoFilter, setContractProdutoFilter] = usePersistentFilters<string[]>("contratos-produto", []);
+  const [contractSquadFilter, setContractSquadFilter] = usePersistentFilters<string[]>("contratos-squad", []);
   
   const [contractSavedFilters, setContractSavedFilters] = useState<ContractSavedFilter[]>(() => {
     try {
@@ -200,12 +204,34 @@ export default function ClientesContratos() {
     return Array.from(produtosSet).sort();
   }, [contratos]);
 
+  const mapSquadCodeToName = (code: string | null): string => {
+    if (!code) return "Não definido";
+    switch (code) {
+      case "0": return "Supreme";
+      case "1": return "Forja";
+      case "2": return "Squadra";
+      case "3": return "Chama";
+      default: return code;
+    }
+  };
+
+  const squadsUnicos = useMemo(() => {
+    if (!contratos) return [];
+    const squadSet = new Set<string>();
+    contratos.forEach(contract => {
+      if (contract.squad && contract.squad.trim()) {
+        squadSet.add(contract.squad.trim());
+      }
+    });
+    return Array.from(squadSet).sort();
+  }, [contratos]);
+
   const saveCurrentFilter = () => {
     if (!newFilterName.trim()) return;
     const newFilter: SavedFilter = {
       id: Date.now().toString(),
       name: newFilterName.trim(),
-      filters: { servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue }
+      filters: { servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue, squadFilter }
     };
     const updated = [...savedFilters, newFilter];
     setSavedFilters(updated);
@@ -225,6 +251,7 @@ export default function ClientesContratos() {
     setLtValue(filter.filters.ltValue);
     setAovOperator(filter.filters.aovOperator);
     setAovValue(filter.filters.aovValue);
+    setSquadFilter(filter.filters.squadFilter || []);
   };
 
   const deleteSavedFilter = (id: string) => {
@@ -239,11 +266,12 @@ export default function ClientesContratos() {
     const newFilter: ContractSavedFilter = {
       id: Date.now().toString(),
       name: contractNewFilterName.trim(),
-      filters: { 
-        servicoFilter: contractServicoFilter, 
-        statusFilter: contractStatusFilter, 
+      filters: {
+        servicoFilter: contractServicoFilter,
+        statusFilter: contractStatusFilter,
         tipoContratoFilter: contractTipoContratoFilter,
-        produtoFilter: contractProdutoFilter
+        produtoFilter: contractProdutoFilter,
+        squadFilter: contractSquadFilter
       }
     };
     const updated = [...contractSavedFilters, newFilter];
@@ -259,6 +287,7 @@ export default function ClientesContratos() {
     setContractStatusFilter(filter.filters.statusFilter);
     setContractTipoContratoFilter(filter.filters.tipoContratoFilter);
     setContractProdutoFilter(filter.filters.produtoFilter || []);
+    setContractSquadFilter(filter.filters.squadFilter || []);
   };
 
   const deleteContractSavedFilter = (id: string) => {
@@ -268,7 +297,7 @@ export default function ClientesContratos() {
     toast({ title: "Filtro removido" });
   };
 
-  const hasActiveFilters = tipoContratoFilter !== "ambos" || servicoFilter.length > 0 || statusFilter.length > 0 || responsavelFilter.length > 0 || clusterFilter !== "all" || ltOperator !== "all" || aovOperator !== "all";
+  const hasActiveFilters = tipoContratoFilter !== "ambos" || servicoFilter.length > 0 || statusFilter.length > 0 || responsavelFilter.length > 0 || clusterFilter !== "all" || ltOperator !== "all" || aovOperator !== "all" || squadFilter.length > 0;
 
   const activeFilterCount = [
     tipoContratoFilter !== "ambos",
@@ -277,16 +306,18 @@ export default function ClientesContratos() {
     responsavelFilter.length > 0,
     clusterFilter !== "all",
     ltOperator !== "all",
-    aovOperator !== "all"
+    aovOperator !== "all",
+    squadFilter.length > 0,
   ].filter(Boolean).length;
 
-  const hasContractActiveFilters = contractTipoContratoFilter !== "ambos" || contractServicoFilter.length > 0 || contractStatusFilter.length > 0 || contractProdutoFilter.length > 0;
+  const hasContractActiveFilters = contractTipoContratoFilter !== "ambos" || contractServicoFilter.length > 0 || contractStatusFilter.length > 0 || contractProdutoFilter.length > 0 || contractSquadFilter.length > 0;
 
   const contractActiveFilterCount = [
     contractTipoContratoFilter !== "ambos",
     contractServicoFilter.length > 0,
     contractStatusFilter.length > 0,
     contractProdutoFilter.length > 0,
+    contractSquadFilter.length > 0,
   ].filter(Boolean).length;
 
   const clearAllFilters = () => {
@@ -299,6 +330,7 @@ export default function ClientesContratos() {
     setLtValue("");
     setAovOperator("all");
     setAovValue("");
+    setSquadFilter([]);
     toast({ title: "Filtros limpos" });
   };
 
@@ -307,6 +339,7 @@ export default function ClientesContratos() {
     setContractServicoFilter([]);
     setContractStatusFilter([]);
     setContractProdutoFilter([]);
+    setContractSquadFilter([]);
     toast({ title: "Filtros limpos" });
   };
 
@@ -351,10 +384,26 @@ export default function ClientesContratos() {
   };
 
   const toggleContractProdutoFilter = (produto: string) => {
-    setContractProdutoFilter(prev => 
-      prev.includes(produto) 
+    setContractProdutoFilter(prev =>
+      prev.includes(produto)
         ? prev.filter(p => p !== produto)
         : [...prev, produto]
+    );
+  };
+
+  const toggleContractSquadFilter = (squad: string) => {
+    setContractSquadFilter(prev =>
+      prev.includes(squad)
+        ? prev.filter(s => s !== squad)
+        : [...prev, squad]
+    );
+  };
+
+  const toggleSquadFilter = (squad: string) => {
+    setSquadFilter(prev =>
+      prev.includes(squad)
+        ? prev.filter(s => s !== squad)
+        : [...prev, squad]
     );
   };
   
@@ -610,6 +659,31 @@ export default function ClientesContratos() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Squad (múltipla seleção)</Label>
+                        {squadFilter.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">{squadFilter.length}</Badge>
+                        )}
+                      </div>
+                      <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
+                        {squadsUnicos.map(squad => (
+                          <label
+                            key={squad}
+                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
+                            data-testid={`checkbox-squad-${squad}`}
+                          >
+                            <Checkbox
+                              checked={squadFilter.includes(squad)}
+                              onCheckedChange={() => toggleSquadFilter(squad)}
+                              className="flex-shrink-0"
+                            />
+                            <span className="text-sm truncate flex-1 min-w-0">{mapSquadCodeToName(squad)}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -870,12 +944,37 @@ export default function ClientesContratos() {
                             className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
                             data-testid={`checkbox-contract-produto-${produto}`}
                           >
-                            <Checkbox 
-                              checked={contractProdutoFilter.includes(produto)} 
+                            <Checkbox
+                              checked={contractProdutoFilter.includes(produto)}
                               onCheckedChange={() => toggleContractProdutoFilter(produto)}
                               className="flex-shrink-0"
                             />
                             <span className="text-sm truncate flex-1 min-w-0">{produto}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs text-muted-foreground">Squad (múltipla seleção)</Label>
+                        {contractSquadFilter.length > 0 && (
+                          <Badge variant="secondary" className="text-xs">{contractSquadFilter.length}</Badge>
+                        )}
+                      </div>
+                      <div className="border rounded-md max-h-32 overflow-y-auto overflow-x-hidden">
+                        {squadsUnicos.map(squad => (
+                          <label
+                            key={squad}
+                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50 min-w-0"
+                            data-testid={`checkbox-contract-squad-${squad}`}
+                          >
+                            <Checkbox
+                              checked={contractSquadFilter.includes(squad)}
+                              onCheckedChange={() => toggleContractSquadFilter(squad)}
+                              className="flex-shrink-0"
+                            />
+                            <span className="text-sm truncate flex-1 min-w-0">{mapSquadCodeToName(squad)}</span>
                           </label>
                         ))}
                       </div>
@@ -911,6 +1010,7 @@ export default function ClientesContratos() {
             ltValue={ltValue}
             aovOperator={aovOperator}
             aovValue={aovValue}
+            squadFilter={squadFilter}
           />
         )}
         {activeTab === "contratos" && (
@@ -920,6 +1020,7 @@ export default function ClientesContratos() {
             statusFilter={contractStatusFilter}
             tipoContratoFilter={contractTipoContratoFilter}
             produtoFilter={contractProdutoFilter}
+            squadFilter={contractSquadFilter}
           />
         )}
       </div>

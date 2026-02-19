@@ -2559,10 +2559,11 @@ export class DbStorage implements IStorage {
         p.valor_pago as "valorPago",
         p.valor_mercado as "valorMercado",
         p.valor_venda as "valorVenda",
-        p.descricao
+        p.descricao,
+        p.empresa
       FROM "Inhire".rh_patrimonio p
       LEFT JOIN "Inhire".rh_pessoal c ON (
-        p.responsavel_id = c.id 
+        p.responsavel_id = c.id
         OR (p.responsavel_id IS NULL AND p.responsavel_atual = c.nome)
       )
       ORDER BY p.numero_ativo
@@ -2587,6 +2588,7 @@ export class DbStorage implements IStorage {
         valorMercado: schema.rhPatrimonio.valorMercado,
         valorVenda: schema.rhPatrimonio.valorVenda,
         descricao: schema.rhPatrimonio.descricao,
+        empresa: schema.rhPatrimonio.empresa,
         colaborador: schema.rhPessoal,
       })
       .from(schema.rhPatrimonio)
@@ -2620,6 +2622,7 @@ export class DbStorage implements IStorage {
       valorMercado: row.valorMercado,
       valorVenda: row.valorVenda,
       descricao: row.descricao,
+      empresa: row.empresa,
       email: null,
       colaborador: row.colaborador || undefined,
     };
@@ -2667,14 +2670,14 @@ export class DbStorage implements IStorage {
         responsavel_atual as "responsavelAtual",
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
-        valor_venda as "valorVenda", descricao
+        valor_venda as "valorVenda", descricao, empresa
       FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
-    
+
     if (!result.rows || result.rows.length === 0) {
       throw new Error("Patrimônio não encontrado");
     }
-    
+
     return { ...(result.rows[0] as any), email: null };
   }
 
@@ -2692,14 +2695,14 @@ export class DbStorage implements IStorage {
         responsavel_atual as "responsavelAtual",
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
-        valor_venda as "valorVenda", descricao
+        valor_venda as "valorVenda", descricao, empresa
       FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
-    
+
     if (!result.rows || result.rows.length === 0) {
       throw new Error("Patrimônio não encontrado");
     }
-    
+
     return { ...(result.rows[0] as any), email: null };
   }
 
@@ -2727,7 +2730,10 @@ export class DbStorage implements IStorage {
     if ('valorMercado' in data) {
       updates.push(sql`valor_mercado = ${data.valorMercado}`);
     }
-    
+    if ('empresa' in data) {
+      updates.push(sql`empresa = ${data.empresa}`);
+    }
+
     if (updates.length === 0) {
       throw new Error("No valid fields to update");
     }
@@ -2741,14 +2747,14 @@ export class DbStorage implements IStorage {
         responsavel_atual as "responsavelAtual",
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
-        valor_venda as "valorVenda", descricao
+        valor_venda as "valorVenda", descricao, empresa
       FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
-    
+
     if (!result.rows || result.rows.length === 0) {
       throw new Error("Patrimônio não encontrado");
     }
-    
+
     return { ...(result.rows[0] as any), email: null };
   }
 
@@ -11400,8 +11406,8 @@ export class DbStorage implements IStorage {
             '\s+', ' ', 'g'
           ))) as item_nome_norm
         FROM "Conta Azul".caz_parcelas p
-        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
+        INNER JOIN "Conta Azul".caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
+        LEFT JOIN "Conta Azul".caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
@@ -11611,8 +11617,8 @@ export class DbStorage implements IStorage {
           ))) as item_nome_norm,
           iv.valor::numeric as item_valor
         FROM "Conta Azul".caz_parcelas p
-        INNER JOIN caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
-        LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
+        INNER JOIN "Conta Azul".caz_vendas v ON p.descricao = 'Venda ' || v.numero::text
+        LEFT JOIN "Conta Azul".caz_itensvenda iv ON iv.id::text = v.id::text
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
@@ -12697,15 +12703,26 @@ export class DbStorage implements IStorage {
     }
 
     const result = await db.execute(sql`
-      WITH clientes_ativos AS (
+      WITH clientes_raw AS (
         SELECT 
           REPLACE(REPLACE(REPLACE(cnpj, '.', ''), '-', ''), '/', '') as cnpj_limpo,
           nome,
-          cnpj as cnpj_original
+          cnpj as cnpj_original,
+          LOWER(TRIM(status)) as status_norm
         FROM "Clickup".cup_clientes
-        WHERE LOWER(status) = 'ativo'
-          AND cnpj IS NOT NULL 
+        WHERE cnpj IS NOT NULL 
           AND TRIM(cnpj) != ''
+      ),
+      clientes_ativos AS (
+        SELECT 
+          cnpj_limpo,
+          nome,
+          cnpj_original
+        FROM clientes_raw
+        WHERE (
+          (status_norm LIKE '%ativo%' AND status_norm NOT LIKE '%inativo%' AND status_norm NOT LIKE '%cancelado%')
+          OR status_norm IN ('onboarding', 'triagem', 'em cancelamento', 'cancelamento')
+        )
       ),
       total_clientes AS (
         SELECT COUNT(*) as total FROM clientes_ativos
@@ -12832,8 +12849,8 @@ export class DbStorage implements IStorage {
         COALESCE(iv.valor::numeric, pr.valor) as valor
       FROM parcelas_receita pr
       LEFT JOIN "Conta Azul".caz_clientes caz ON TRIM(pr.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN caz_vendas v ON TRIM(v.numero::text) = TRIM(pr.numero_venda_extraido)
-      LEFT JOIN caz_itensvenda iv ON iv.id::text = v.id::text
+      LEFT JOIN "Conta Azul".caz_vendas v ON TRIM(v.numero::text) = TRIM(pr.numero_venda_extraido)
+      LEFT JOIN "Conta Azul".caz_itensvenda iv ON iv.id::text = v.id::text
       WHERE caz.cnpj IS NOT NULL
       ORDER BY COALESCE(iv.valor::numeric, pr.valor) DESC
     `);

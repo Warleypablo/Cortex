@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 import type { ClienteCompleto } from "../../../server/storage";
+import type { ContratoCompleto } from "@shared/schema";
 
 type SortField = "name" | "cnpj" | "ltv" | "lt" | "aov" | "status" | "startDate" | "cluster" | "financeiro" | "firstPayment";
 type SortDirection = "asc" | "desc";
@@ -32,6 +33,7 @@ interface ClientsProps {
   ltValue: string;
   aovOperator: string;
   aovValue: string;
+  squadFilter: string[];
 }
 
 export default function Clients({
@@ -45,6 +47,7 @@ export default function Clients({
   ltValue,
   aovOperator,
   aovValue,
+  squadFilter,
 }: ClientsProps) {
   const [, setLocation] = useLocation();
   const [currentPage, setCurrentPage] = useState(1);
@@ -63,6 +66,25 @@ export default function Clients({
   const { data: contratosMapData } = useQuery<{ mapa: Record<string, { id: number; numero_contrato: string; status: string; valor_negociado: number }> }>({
     queryKey: ["/api/contratos/mapa-cnpj"],
   });
+
+  const { data: contratosData } = useQuery<ContratoCompleto[]>({
+    queryKey: ["/api/contratos"],
+    enabled: squadFilter.length > 0,
+  });
+
+  // Mapa de cnpj do cliente → squads dos contratos
+  const clienteSquadMap = useMemo(() => {
+    if (!contratosData || squadFilter.length === 0) return null;
+    const map = new Map<string, Set<string>>();
+    contratosData.forEach(c => {
+      const cnpj = c.cnpjCliente;
+      if (cnpj && c.squad) {
+        if (!map.has(cnpj)) map.set(cnpj, new Set());
+        map.get(cnpj)!.add(c.squad);
+      }
+    });
+    return map;
+  }, [contratosData, squadFilter]);
 
   const filteredClients = useMemo(() => {
     if (!clientes) return [];
@@ -105,9 +127,15 @@ export default function Clients({
         (aovOperator === "menor" && clientAov < aovVal) ||
         (aovOperator === "igual" && clientAov === aovVal);
 
-      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato && matchesResponsavel && matchesCluster && matchesLt && matchesAov;
+      const clientCnpj = client.cnpjCliente || client.cnpj || "";
+      const matchesSquad = squadFilter.length === 0 || (
+        clienteSquadMap && clientCnpj && clienteSquadMap.has(clientCnpj) &&
+        squadFilter.some(s => clienteSquadMap.get(clientCnpj)!.has(s))
+      );
+
+      return matchesSearch && matchesServico && matchesStatus && matchesTipoContrato && matchesResponsavel && matchesCluster && matchesLt && matchesAov && matchesSquad;
     });
-  }, [clientes, searchQuery, servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue, ltvMap]);
+  }, [clientes, searchQuery, servicoFilter, statusFilter, tipoContratoFilter, responsavelFilter, clusterFilter, ltOperator, ltValue, aovOperator, aovValue, ltvMap, squadFilter, clienteSquadMap]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
