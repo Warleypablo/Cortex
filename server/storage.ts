@@ -2546,9 +2546,25 @@ export class DbStorage implements IStorage {
     return contratos.find(c => c.idSubtask === idSubtask);
   }
 
+  private patrimonioColumnsEnsured = false;
+
+  private async ensurePatrimonioColumns(): Promise<void> {
+    if (this.patrimonioColumnsEnsured) return;
+    try {
+      await db.execute(sql`
+        ALTER TABLE "Inhire".rh_patrimonio
+        ADD COLUMN IF NOT EXISTS empresa VARCHAR(100)
+      `);
+      this.patrimonioColumnsEnsured = true;
+    } catch (error) {
+      console.log("[storage] Error ensuring patrimonio columns:", error);
+    }
+  }
+
   async getPatrimonios(): Promise<Patrimonio[]> {
+    await this.ensurePatrimonioColumns();
     const result = await db.execute(sql`
-      SELECT 
+      SELECT
         p.id,
         p.numero_ativo as "numeroAtivo",
         p.ativo,
