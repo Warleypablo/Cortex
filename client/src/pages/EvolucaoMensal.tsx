@@ -94,6 +94,7 @@ export default function EvolucaoMensal() {
   const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
   const [operadorSelecionado, setOperadorSelecionado] = useState<string>("todos");
   const [meses, setMeses] = useState<string>("6");
+  const [tableMode, setTableMode] = useState<"mrr" | "churn">("mrr");
   
   const { data, isLoading } = useQuery<EvolucaoMensalResponse>({
     queryKey: [`/api/dashboard/evolucao-mensal?meses=${meses}`],
@@ -166,9 +167,14 @@ export default function EvolucaoMensal() {
               .reduce((acc, d) => acc + (Number(d.mrr_total) || 0), 0);
             row[operador] = mrrOperador;
             totalMrr += mrrOperador;
+
+            const churnOperador = churnMes
+              .filter(d => d.responsavel === operador)
+              .reduce((acc, d) => acc + (Number(d.mrr_churn) || 0), 0);
+            row[`churn_${operador}`] = churnOperador;
           }
         }
-        
+
         const churnTotal = churnMes
           .filter(d => operadorSelecionado === "todos" || d.responsavel === operadorSelecionado)
           .reduce((acc, d) => acc + (Number(d.mrr_churn) || 0), 0);
@@ -608,10 +614,36 @@ export default function EvolucaoMensal() {
           <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                <Zap className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                MRR por Squad
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+                  <Zap className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  {tableMode === "mrr" ? "MRR por Squad" : "Churn % por Squad"}
+                </CardTitle>
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setTableMode("mrr")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                      tableMode === "mrr"
+                        ? "bg-purple-500 text-white shadow-sm"
+                        : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+                    )}
+                  >
+                    MRR
+                  </button>
+                  <button
+                    onClick={() => setTableMode("churn")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                      tableMode === "churn"
+                        ? "bg-rose-500 text-white shadow-sm"
+                        : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+                    )}
+                  >
+                    Churn
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -626,16 +658,37 @@ export default function EvolucaoMensal() {
                           {row.mes}
                         </th>
                       ))}
-                      <th className="text-right py-3 px-4 text-cyan-600 dark:text-cyan-400 font-semibold whitespace-nowrap border-l border-gray-200 dark:border-zinc-700/50">
-                        Total
+                      <th className={cn(
+                        "text-right py-3 px-4 font-semibold whitespace-nowrap border-l border-gray-200 dark:border-zinc-700/50",
+                        tableMode === "churn" ? "text-rose-600 dark:text-rose-400" : "text-cyan-600 dark:text-cyan-400"
+                      )}>
+                        {tableMode === "churn" ? "Média" : "Total"}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {squads
                       .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
-                      .filter(squad => chartData.reduce((acc, row) => acc + (Number(row[squad]) || 0), 0) > 0)
+                      .filter(squad => {
+                        if (tableMode === "churn") {
+                          return chartData.some(row => (Number(row[squad]) || 0) > 0 || (Number(row[`churn_${squad}`]) || 0) > 0);
+                        }
+                        return chartData.reduce((acc, row) => acc + (Number(row[squad]) || 0), 0) > 0;
+                      })
                       .sort((a, b) => {
+                        if (tableMode === "churn") {
+                          const avgA = chartData.reduce((acc, row) => {
+                            const mrr = Number(row[a]) || 0;
+                            const churn = Number(row[`churn_${a}`]) || 0;
+                            return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
+                          }, 0) / chartData.length;
+                          const avgB = chartData.reduce((acc, row) => {
+                            const mrr = Number(row[b]) || 0;
+                            const churn = Number(row[`churn_${b}`]) || 0;
+                            return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
+                          }, 0) / chartData.length;
+                          return avgB - avgA;
+                        }
                         const totalA = chartData.reduce((acc, row) => acc + (Number(row[a]) || 0), 0);
                         const totalB = chartData.reduce((acc, row) => acc + (Number(row[b]) || 0), 0);
                         return totalB - totalA;
@@ -643,7 +696,7 @@ export default function EvolucaoMensal() {
                       .map((squad, i) => {
                       const color = getSquadColor(squad, i);
                       const total = chartData.reduce((acc, row) => acc + (Number(row[squad]) || 0), 0);
-                      
+
                       return (
                         <tr
                           key={squad}
@@ -658,41 +711,96 @@ export default function EvolucaoMensal() {
                               <span className="text-gray-800 dark:text-zinc-200 font-medium">{squad}</span>
                             </div>
                           </td>
-                          {chartData.map((row) => {
-                            const value = Number(row[squad]) || 0;
-                            const churnValue = Number(row[`churn_${squad}`]) || 0;
-                            const prevIndex = chartData.indexOf(row) - 1;
-                            const prevValue = prevIndex >= 0 ? (Number(chartData[prevIndex][squad]) || 0) : value;
-                            const trend = value > prevValue ? "up" : value < prevValue ? "down" : "same";
+                          {tableMode === "mrr" ? (
+                            <>
+                              {chartData.map((row) => {
+                                const value = Number(row[squad]) || 0;
+                                const churnValue = Number(row[`churn_${squad}`]) || 0;
+                                const prevIndex = chartData.indexOf(row) - 1;
+                                const prevValue = prevIndex >= 0 ? (Number(chartData[prevIndex][squad]) || 0) : value;
+                                const trend = value > prevValue ? "up" : value < prevValue ? "down" : "same";
 
-                            return (
-                              <td key={row.mes} className="text-right py-2 px-4 font-mono">
-                                <span className={cn(
-                                  "text-gray-700 dark:text-zinc-300",
-                                  trend === "up" && "text-emerald-600 dark:text-emerald-400",
-                                  trend === "down" && "text-rose-600 dark:text-rose-400"
-                                )}>
-                                  {formatCurrencyNoDecimals(value)}
-                                </span>
-                                {churnValue > 0 && (
-                                  <div className="text-[11px] text-rose-500 dark:text-rose-400/80 mt-0.5">
-                                    -{formatCurrencyNoDecimals(churnValue)}
-                                  </div>
-                                )}
+                                return (
+                                  <td key={row.mes} className="text-right py-2 px-4 font-mono">
+                                    <span className={cn(
+                                      "text-gray-700 dark:text-zinc-300",
+                                      trend === "up" && "text-emerald-600 dark:text-emerald-400",
+                                      trend === "down" && "text-rose-600 dark:text-rose-400"
+                                    )}>
+                                      {formatCurrencyNoDecimals(value)}
+                                    </span>
+                                    {churnValue > 0 && (
+                                      <div className="text-[11px] text-rose-500 dark:text-rose-400/80 mt-0.5">
+                                        -{formatCurrencyNoDecimals(churnValue)}
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="text-right py-2 px-4 font-mono font-semibold text-cyan-600 dark:text-cyan-400 border-l border-gray-200 dark:border-zinc-700/50">
+                                {formatCurrencyNoDecimals(total)}
+                                {(() => {
+                                  const totalChurn = chartData.reduce((acc, row) => acc + (Number(row[`churn_${squad}`]) || 0), 0);
+                                  return totalChurn > 0 ? (
+                                    <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                      -{formatCurrencyNoDecimals(totalChurn)}
+                                    </div>
+                                  ) : null;
+                                })()}
                               </td>
-                            );
-                          })}
-                          <td className="text-right py-2 px-4 font-mono font-semibold text-cyan-600 dark:text-cyan-400 border-l border-gray-200 dark:border-zinc-700/50">
-                            {formatCurrencyNoDecimals(total)}
-                            {(() => {
-                              const totalChurn = chartData.reduce((acc, row) => acc + (Number(row[`churn_${squad}`]) || 0), 0);
-                              return totalChurn > 0 ? (
-                                <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
-                                  -{formatCurrencyNoDecimals(totalChurn)}
-                                </div>
-                              ) : null;
-                            })()}
-                          </td>
+                            </>
+                          ) : (
+                            <>
+                              {chartData.map((row) => {
+                                const mrr = Number(row[squad]) || 0;
+                                const churn = Number(row[`churn_${squad}`]) || 0;
+                                const rate = mrr > 0 ? (churn / mrr) * 100 : 0;
+
+                                return (
+                                  <td key={row.mes} className="text-right py-3 px-4 font-mono">
+                                    {rate === 0 ? (
+                                      <span className="text-gray-400 dark:text-zinc-600">-</span>
+                                    ) : (
+                                      <div>
+                                        <span className={cn(
+                                          "font-medium",
+                                          rate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
+                                          rate <= 5 ? "text-amber-600 dark:text-amber-400" :
+                                          "text-rose-600 dark:text-rose-400"
+                                        )}>
+                                          {rate.toFixed(1)}%
+                                        </span>
+                                        <div className="text-[10px] text-gray-400 dark:text-zinc-500 mt-0.5">
+                                          {formatCurrencyNoDecimals(churn)}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="text-right py-3 px-4 font-mono font-semibold border-l border-gray-200 dark:border-zinc-700/50">
+                                {(() => {
+                                  const mesesComMrr = chartData.filter(row => (Number(row[squad]) || 0) > 0);
+                                  const avgRate = mesesComMrr.length > 0
+                                    ? mesesComMrr.reduce((acc, row) => {
+                                        const mrr = Number(row[squad]) || 0;
+                                        const churn = Number(row[`churn_${squad}`]) || 0;
+                                        return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
+                                      }, 0) / mesesComMrr.length
+                                    : 0;
+                                  return (
+                                    <span className={cn(
+                                      avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
+                                      avgRate <= 5 ? "text-amber-600 dark:text-amber-400" :
+                                      "text-rose-600 dark:text-rose-400"
+                                    )}>
+                                      {avgRate.toFixed(1)}%
+                                    </span>
+                                  );
+                                })()}
+                              </td>
+                            </>
+                          )}
                         </tr>
                       );
                     })}
@@ -702,36 +810,89 @@ export default function EvolucaoMensal() {
                       <td className="py-3 px-4 sticky left-0 bg-gray-100 dark:bg-zinc-800/95 backdrop-blur-sm text-gray-800 dark:text-zinc-200 font-semibold">
                         Total
                       </td>
-                      {chartData.map((row) => {
-                        const total = squads
-                          .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
-                          .reduce((acc, squad) => acc + (Number(row[squad]) || 0), 0);
-                        const churnTotal = Number(row.churn) || 0;
-                        return (
-                          <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
-                            {formatCurrencyNoDecimals(total)}
-                            {churnTotal > 0 && (
-                              <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
-                                -{formatCurrencyNoDecimals(churnTotal)}
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="text-right py-2 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
-                        {formatCurrencyNoDecimals(
-                          chartData.reduce((acc, row) => {
-                            return acc + squads
+                      {tableMode === "mrr" ? (
+                        <>
+                          {chartData.map((row) => {
+                            const total = squads
                               .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
-                              .reduce((sum, squad) => sum + (Number(row[squad]) || 0), 0);
-                          }, 0)
-                        )}
-                        <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
-                          -{formatCurrencyNoDecimals(
-                            chartData.reduce((acc, row) => acc + (Number(row.churn) || 0), 0)
-                          )}
-                        </div>
-                      </td>
+                              .reduce((acc, squad) => acc + (Number(row[squad]) || 0), 0);
+                            const churnTotal = Number(row.churn) || 0;
+                            return (
+                              <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
+                                {formatCurrencyNoDecimals(total)}
+                                {churnTotal > 0 && (
+                                  <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                    -{formatCurrencyNoDecimals(churnTotal)}
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="text-right py-2 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
+                            {formatCurrencyNoDecimals(
+                              chartData.reduce((acc, row) => {
+                                return acc + squads
+                                  .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
+                                  .reduce((sum, squad) => sum + (Number(row[squad]) || 0), 0);
+                              }, 0)
+                            )}
+                            <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                              -{formatCurrencyNoDecimals(
+                                chartData.reduce((acc, row) => acc + (Number(row.churn) || 0), 0)
+                              )}
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          {chartData.map((row) => {
+                            const totalMrr = squads
+                              .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
+                              .reduce((acc, squad) => acc + (Number(row[squad]) || 0), 0);
+                            const totalChurn = Number(row.churn) || 0;
+                            const rate = totalMrr > 0 ? (totalChurn / totalMrr) * 100 : 0;
+                            return (
+                              <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold">
+                                <span className={cn(
+                                  rate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
+                                  rate <= 5 ? "text-amber-600 dark:text-amber-400" :
+                                  "text-rose-600 dark:text-rose-400"
+                                )}>
+                                  {rate.toFixed(1)}%
+                                </span>
+                              </td>
+                            );
+                          })}
+                          <td className="text-right py-2 px-4 font-mono font-bold border-l border-gray-200 dark:border-zinc-700/50">
+                            {(() => {
+                              const mesesComMrr = chartData.filter(row => {
+                                const totalMrr = squads
+                                  .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
+                                  .reduce((acc, squad) => acc + (Number(row[squad]) || 0), 0);
+                                return totalMrr > 0;
+                              });
+                              const avgRate = mesesComMrr.length > 0
+                                ? mesesComMrr.reduce((acc, row) => {
+                                    const totalMrr = squads
+                                      .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
+                                      .reduce((a, squad) => a + (Number(row[squad]) || 0), 0);
+                                    const totalChurn = Number(row.churn) || 0;
+                                    return acc + (totalMrr > 0 ? (totalChurn / totalMrr) * 100 : 0);
+                                  }, 0) / mesesComMrr.length
+                                : 0;
+                              return (
+                                <span className={cn(
+                                  avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
+                                  avgRate <= 5 ? "text-amber-600 dark:text-amber-400" :
+                                  "text-rose-600 dark:text-rose-400"
+                                )}>
+                                  {avgRate.toFixed(1)}%
+                                </span>
+                              );
+                            })()}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   </tfoot>
                 </table>
@@ -747,10 +908,36 @@ export default function EvolucaoMensal() {
           <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                <Activity className="h-4 w-4 text-cyan-500 dark:text-cyan-400" />
-                MRR por Operador
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
+                  <Activity className="h-4 w-4 text-cyan-500 dark:text-cyan-400" />
+                  {tableMode === "mrr" ? "MRR por Operador" : "Churn % por Operador"}
+                </CardTitle>
+                <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setTableMode("mrr")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                      tableMode === "mrr"
+                        ? "bg-cyan-500 text-white shadow-sm"
+                        : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+                    )}
+                  >
+                    MRR
+                  </button>
+                  <button
+                    onClick={() => setTableMode("churn")}
+                    className={cn(
+                      "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                      tableMode === "churn"
+                        ? "bg-rose-500 text-white shadow-sm"
+                        : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+                    )}
+                  >
+                    Churn
+                  </button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -765,16 +952,37 @@ export default function EvolucaoMensal() {
                           {row.mes}
                         </th>
                       ))}
-                      <th className="text-right py-3 px-4 text-cyan-600 dark:text-cyan-400 font-semibold whitespace-nowrap border-l border-gray-200 dark:border-zinc-700/50">
-                        Total
+                      <th className={cn(
+                        "text-right py-3 px-4 font-semibold whitespace-nowrap border-l border-gray-200 dark:border-zinc-700/50",
+                        tableMode === "churn" ? "text-rose-600 dark:text-rose-400" : "text-cyan-600 dark:text-cyan-400"
+                      )}>
+                        {tableMode === "churn" ? "Média" : "Total"}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {operadores
                       .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
-                      .filter(op => chartData.reduce((acc, row) => acc + (Number(row[op]) || 0), 0) > 0)
+                      .filter(op => {
+                        if (tableMode === "churn") {
+                          return chartData.some(row => (Number(row[op]) || 0) > 0 || (Number(row[`churn_${op}`]) || 0) > 0);
+                        }
+                        return chartData.reduce((acc, row) => acc + (Number(row[op]) || 0), 0) > 0;
+                      })
                       .sort((a, b) => {
+                        if (tableMode === "churn") {
+                          const avgA = chartData.reduce((acc, row) => {
+                            const mrr = Number(row[a]) || 0;
+                            const churn = Number(row[`churn_${a}`]) || 0;
+                            return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
+                          }, 0) / chartData.length;
+                          const avgB = chartData.reduce((acc, row) => {
+                            const mrr = Number(row[b]) || 0;
+                            const churn = Number(row[`churn_${b}`]) || 0;
+                            return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
+                          }, 0) / chartData.length;
+                          return avgB - avgA;
+                        }
                         const totalA = chartData.reduce((acc, row) => acc + (Number(row[a]) || 0), 0);
                         const totalB = chartData.reduce((acc, row) => acc + (Number(row[b]) || 0), 0);
                         return totalB - totalA;
@@ -782,7 +990,7 @@ export default function EvolucaoMensal() {
                       .map((operador, i) => {
                       const color = getSquadColor(operador, i);
                       const total = chartData.reduce((acc, row) => acc + (Number(row[operador]) || 0), 0);
-                      
+
                       return (
                         <tr
                           key={operador}
@@ -797,27 +1005,82 @@ export default function EvolucaoMensal() {
                               <span className="text-gray-800 dark:text-zinc-200 font-medium">{operador}</span>
                             </div>
                           </td>
-                          {chartData.map((row) => {
-                            const value = Number(row[operador]) || 0;
-                            const prevIndex = chartData.indexOf(row) - 1;
-                            const prevValue = prevIndex >= 0 ? (Number(chartData[prevIndex][operador]) || 0) : value;
-                            const trend = value > prevValue ? "up" : value < prevValue ? "down" : "same";
+                          {tableMode === "mrr" ? (
+                            <>
+                              {chartData.map((row) => {
+                                const value = Number(row[operador]) || 0;
+                                const prevIndex = chartData.indexOf(row) - 1;
+                                const prevValue = prevIndex >= 0 ? (Number(chartData[prevIndex][operador]) || 0) : value;
+                                const trend = value > prevValue ? "up" : value < prevValue ? "down" : "same";
 
-                            return (
-                              <td key={row.mes} className="text-right py-3 px-4 font-mono">
-                                <span className={cn(
-                                  "text-gray-700 dark:text-zinc-300",
-                                  trend === "up" && "text-emerald-600 dark:text-emerald-400",
-                                  trend === "down" && "text-rose-600 dark:text-rose-400"
-                                )}>
-                                  {formatCurrencyNoDecimals(value)}
-                                </span>
+                                return (
+                                  <td key={row.mes} className="text-right py-3 px-4 font-mono">
+                                    <span className={cn(
+                                      "text-gray-700 dark:text-zinc-300",
+                                      trend === "up" && "text-emerald-600 dark:text-emerald-400",
+                                      trend === "down" && "text-rose-600 dark:text-rose-400"
+                                    )}>
+                                      {formatCurrencyNoDecimals(value)}
+                                    </span>
+                                  </td>
+                                );
+                              })}
+                              <td className="text-right py-3 px-4 font-mono font-semibold text-cyan-600 dark:text-cyan-400 border-l border-gray-200 dark:border-zinc-700/50">
+                                {formatCurrencyNoDecimals(total)}
                               </td>
-                            );
-                          })}
-                          <td className="text-right py-3 px-4 font-mono font-semibold text-cyan-600 dark:text-cyan-400 border-l border-gray-200 dark:border-zinc-700/50">
-                            {formatCurrencyNoDecimals(total)}
-                          </td>
+                            </>
+                          ) : (
+                            <>
+                              {chartData.map((row) => {
+                                const mrr = Number(row[operador]) || 0;
+                                const churn = Number(row[`churn_${operador}`]) || 0;
+                                const rate = mrr > 0 ? (churn / mrr) * 100 : 0;
+
+                                return (
+                                  <td key={row.mes} className="text-right py-3 px-4 font-mono">
+                                    {rate === 0 ? (
+                                      <span className="text-gray-400 dark:text-zinc-600">-</span>
+                                    ) : (
+                                      <div>
+                                        <span className={cn(
+                                          "font-medium",
+                                          rate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
+                                          rate <= 5 ? "text-amber-600 dark:text-amber-400" :
+                                          "text-rose-600 dark:text-rose-400"
+                                        )}>
+                                          {rate.toFixed(1)}%
+                                        </span>
+                                        <div className="text-[10px] text-gray-400 dark:text-zinc-500 mt-0.5">
+                                          {formatCurrencyNoDecimals(churn)}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                              <td className="text-right py-3 px-4 font-mono font-semibold border-l border-gray-200 dark:border-zinc-700/50">
+                                {(() => {
+                                  const mesesComMrr = chartData.filter(row => (Number(row[operador]) || 0) > 0);
+                                  const avgRate = mesesComMrr.length > 0
+                                    ? mesesComMrr.reduce((acc, row) => {
+                                        const mrr = Number(row[operador]) || 0;
+                                        const churn = Number(row[`churn_${operador}`]) || 0;
+                                        return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
+                                      }, 0) / mesesComMrr.length
+                                    : 0;
+                                  return (
+                                    <span className={cn(
+                                      avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
+                                      avgRate <= 5 ? "text-amber-600 dark:text-amber-400" :
+                                      "text-rose-600 dark:text-rose-400"
+                                    )}>
+                                      {avgRate.toFixed(1)}%
+                                    </span>
+                                  );
+                                })()}
+                              </td>
+                            </>
+                          )}
                         </tr>
                       );
                     })}
@@ -827,36 +1090,89 @@ export default function EvolucaoMensal() {
                       <td className="py-3 px-4 sticky left-0 bg-gray-100 dark:bg-zinc-800/95 backdrop-blur-sm text-gray-800 dark:text-zinc-200 font-semibold">
                         Total
                       </td>
-                      {chartData.map((row) => {
-                        const total = operadores
-                          .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
-                          .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
-                        const churnTotal = Number(row.churn) || 0;
-                        return (
-                          <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
-                            {formatCurrencyNoDecimals(total)}
-                            {churnTotal > 0 && (
-                              <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
-                                -{formatCurrencyNoDecimals(churnTotal)}
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="text-right py-2 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
-                        {formatCurrencyNoDecimals(
-                          chartData.reduce((acc, row) => {
-                            return acc + operadores
+                      {tableMode === "mrr" ? (
+                        <>
+                          {chartData.map((row) => {
+                            const total = operadores
                               .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
-                              .reduce((sum, op) => sum + (Number(row[op]) || 0), 0);
-                          }, 0)
-                        )}
-                        <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
-                          -{formatCurrencyNoDecimals(
-                            chartData.reduce((acc, row) => acc + (Number(row.churn) || 0), 0)
-                          )}
-                        </div>
-                      </td>
+                              .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
+                            const churnTotal = Number(row.churn) || 0;
+                            return (
+                              <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
+                                {formatCurrencyNoDecimals(total)}
+                                {churnTotal > 0 && (
+                                  <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                    -{formatCurrencyNoDecimals(churnTotal)}
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="text-right py-2 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
+                            {formatCurrencyNoDecimals(
+                              chartData.reduce((acc, row) => {
+                                return acc + operadores
+                                  .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
+                                  .reduce((sum, op) => sum + (Number(row[op]) || 0), 0);
+                              }, 0)
+                            )}
+                            <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                              -{formatCurrencyNoDecimals(
+                                chartData.reduce((acc, row) => acc + (Number(row.churn) || 0), 0)
+                              )}
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          {chartData.map((row) => {
+                            const totalMrr = operadores
+                              .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
+                              .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
+                            const totalChurn = Number(row.churn) || 0;
+                            const rate = totalMrr > 0 ? (totalChurn / totalMrr) * 100 : 0;
+                            return (
+                              <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold">
+                                <span className={cn(
+                                  rate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
+                                  rate <= 5 ? "text-amber-600 dark:text-amber-400" :
+                                  "text-rose-600 dark:text-rose-400"
+                                )}>
+                                  {rate.toFixed(1)}%
+                                </span>
+                              </td>
+                            );
+                          })}
+                          <td className="text-right py-2 px-4 font-mono font-bold border-l border-gray-200 dark:border-zinc-700/50">
+                            {(() => {
+                              const mesesComMrr = chartData.filter(row => {
+                                const totalMrr = operadores
+                                  .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
+                                  .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
+                                return totalMrr > 0;
+                              });
+                              const avgRate = mesesComMrr.length > 0
+                                ? mesesComMrr.reduce((acc, row) => {
+                                    const totalMrr = operadores
+                                      .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
+                                      .reduce((a, op) => a + (Number(row[op]) || 0), 0);
+                                    const totalChurn = Number(row.churn) || 0;
+                                    return acc + (totalMrr > 0 ? (totalChurn / totalMrr) * 100 : 0);
+                                  }, 0) / mesesComMrr.length
+                                : 0;
+                              return (
+                                <span className={cn(
+                                  avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
+                                  avgRate <= 5 ? "text-amber-600 dark:text-amber-400" :
+                                  "text-rose-600 dark:text-rose-400"
+                                )}>
+                                  {avgRate.toFixed(1)}%
+                                </span>
+                              );
+                            })()}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   </tfoot>
                 </table>
