@@ -3295,7 +3295,7 @@ export class DbStorage implements IStorage {
         )::date as data
       ),
       daily_transactions AS (
-        SELECT 
+        SELECT
           data_vencimento::date as data,
           SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
@@ -3304,13 +3304,28 @@ export class DbStorage implements IStorage {
           AND status NOT IN ('PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
         GROUP BY data_vencimento::date
+      ),
+      paid_transactions AS (
+        SELECT
+          data_quitacao::date as data,
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_pagas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_pagas
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento IN ('RECEITA', 'DESPESA')
+          AND status = 'QUITADO'
+          AND data_quitacao IS NOT NULL
+          AND data_quitacao::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        GROUP BY data_quitacao::date
       )
-      SELECT 
+      SELECT
         TO_CHAR(d.data, 'YYYY-MM-DD') as data,
         COALESCE(dt.entradas_previstas, 0) as entradas_previstas,
-        COALESCE(dt.saidas_previstas, 0) as saidas_previstas
+        COALESCE(dt.saidas_previstas, 0) as saidas_previstas,
+        COALESCE(pt.entradas_pagas, 0) as entradas_pagas,
+        COALESCE(pt.saidas_pagas, 0) as saidas_pagas
       FROM dates d
       LEFT JOIN daily_transactions dt ON d.data = dt.data
+      LEFT JOIN paid_transactions pt ON d.data = pt.data
       ORDER BY d.data
     `);
     
@@ -3321,23 +3336,25 @@ export class DbStorage implements IStorage {
     const dados = (result.rows as any[]).map((row: any) => {
       const entradasPrevistas = parseFloat(row.entradas_previstas || '0');
       const saidasPrevistas = parseFloat(row.saidas_previstas || '0');
-      
+      const entradasPagas = parseFloat(row.entradas_pagas || '0');
+      const saidasPagas = parseFloat(row.saidas_pagas || '0');
+
       const snapshotDia = snapshotMap.get(row.data);
       const entradasEsperadas = hasSnapshot && snapshotDia ? snapshotDia.entradas : 0;
       const saidasEsperadas = hasSnapshot && snapshotDia ? snapshotDia.saidas : 0;
-      
+
       const entradas = entradasPrevistas;
       const saidas = saidasPrevistas;
       const saldoDia = entradas - saidas;
       saldoAcumulado += saldoDia;
-      
+
       if (hasSnapshot) {
         const saldoDiaEsperado = entradasEsperadas - saidasEsperadas;
         saldoEsperado += saldoDiaEsperado;
       } else {
         saldoEsperado = 0;
       }
-      
+
       return {
         data: row.data,
         entradas,
@@ -3345,8 +3362,8 @@ export class DbStorage implements IStorage {
         saldoDia,
         saldoAcumulado,
         saldoEsperado,
-        entradasPagas: 0,
-        saidasPagas: 0,
+        entradasPagas,
+        saidasPagas,
         entradasPrevistas,
         saidasPrevistas,
         entradasEsperadas,
