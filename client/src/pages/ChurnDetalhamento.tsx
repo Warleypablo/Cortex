@@ -28,7 +28,8 @@ import {
   CalendarDays,
   Building2,
   Users,
-  Pause
+  Pause,
+  CalendarRange
 } from "lucide-react";
 import {
   Table,
@@ -44,7 +45,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import RelatorioSemanalChurn from "./RelatorioSemanalChurn";
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
@@ -360,6 +362,7 @@ export default function ChurnDetalhamento() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Fechado por padrão, dados principais no hero
   const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
+  const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio">("analise");
 
   const { data, isLoading, error } = useQuery<ChurnDetalhamentoData>({
     queryKey: ["/api/analytics/churn-detalhamento", dataInicio, dataFim],
@@ -635,17 +638,18 @@ export default function ChurnDetalhamento() {
   }, [churnDailyInsights.status]);
 
   const distribuicaoPorSquad = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-    
+    const churnOnly = filteredContratos.filter(c => c.tipo === 'churn');
+    if (churnOnly.length === 0) return [];
+
     const squadCounts: Record<string, { count: number; mrr: number }> = {};
-    filteredContratos.forEach(c => {
+    churnOnly.forEach(c => {
       const squad = c.squad || "Não especificado";
       if (!squadCounts[squad]) squadCounts[squad] = { count: 0, mrr: 0 };
       squadCounts[squad].count++;
       squadCounts[squad].mrr += c.valorr || 0;
     });
-    
-    const total = filteredContratos.length;
+
+    const total = churnOnly.length;
     return Object.entries(squadCounts)
       .map(([name, data]) => ({
         name: name.length > 15 ? name.substring(0, 15) + "..." : name,
@@ -1257,6 +1261,29 @@ export default function ChurnDetalhamento() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Tabs de nível superior */}
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio")}>
+        <TabsList>
+          <TabsTrigger value="analise" className="gap-2" data-testid="main-tab-analise">
+            <BarChart3 className="h-4 w-4" />
+            Análise Detalhada
+          </TabsTrigger>
+          <TabsTrigger value="contratos" className="gap-2" data-testid="main-tab-contratos">
+            <FileText className="h-4 w-4" />
+            Contratos
+          </TabsTrigger>
+          <TabsTrigger value="relatorio" className="gap-2" data-testid="main-tab-relatorio">
+            <CalendarRange className="h-4 w-4" />
+            Relatório Semanal
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {mainTab === "relatorio" ? (
+        <RelatorioSemanalChurn />
+      ) : mainTab === "analise" ? (
+      <>
 
       {/* Painel Executivo Hero - Taxa de Churn */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
@@ -2452,6 +2479,10 @@ export default function ChurnDetalhamento() {
         </Collapsible>
       </Card>
 
+      </>
+      ) : (
+      <>
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
@@ -2728,6 +2759,9 @@ export default function ChurnDetalhamento() {
           )}
         </CardContent>
       </Card>
+
+      </>
+      )}
     </div>
   );
 }
