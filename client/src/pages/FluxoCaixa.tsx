@@ -36,6 +36,7 @@ import {
 } from "recharts";
 import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco, ClassificacaoClientesResponse, FluxoCaixaMensalResponse } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import RelatorioSemanalFinanceiro from "./RelatorioSemanalFinanceiro";
 
 interface FluxoDiaDetalhe {
   entradas: {
@@ -89,7 +90,7 @@ export default function FluxoCaixa() {
   useSetPageInfo("Fluxo de Caixa", "Análise de entradas e saídas do período");
   
   const hoje = new Date();
-  const [viewMode, setViewMode] = useState<'diario' | 'mensal'>('diario');
+  const [viewMode, setViewMode] = useState<'diario' | 'mensal' | 'semanal'>('diario');
   const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
   const [selectedYear, setSelectedYear] = useState(hoje.getFullYear());
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
@@ -266,21 +267,36 @@ export default function FluxoCaixa() {
               <BarChart3 className="w-4 h-4 mr-2" />
               Mensal
             </button>
+            <button
+              className={cn(
+                "inline-flex items-center justify-center rounded-sm px-3 py-1.5 text-sm font-medium transition-all",
+                viewMode === 'semanal' && "bg-background text-foreground shadow-sm"
+              )}
+              onClick={() => setViewMode('semanal')}
+            >
+              <Receipt className="w-4 h-4 mr-2" />
+              Semanal
+            </button>
           </div>
 
-          {viewMode === 'diario' ? (
-            <MonthYearPicker
-              value={selectedMonth}
-              onChange={setSelectedMonth}
-            />
-          ) : (
-            <YearPicker
-              value={selectedYear}
-              onChange={setSelectedYear}
-            />
+          {viewMode !== 'semanal' && (
+            viewMode === 'diario' ? (
+              <MonthYearPicker
+                value={selectedMonth}
+                onChange={setSelectedMonth}
+              />
+            ) : (
+              <YearPicker
+                value={selectedYear}
+                onChange={setSelectedYear}
+              />
+            )
           )}
         </div>
 
+        {viewMode === 'semanal' && <RelatorioSemanalFinanceiro />}
+
+        {viewMode !== 'semanal' && <>
         {/* KPIs Principais */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-saldo-atual">
@@ -838,6 +854,7 @@ export default function FluxoCaixa() {
             )}
           </CardContent>
         </Card>
+        </>}
       </div>
 
       {/* Dialog de Detalhamento do Dia */}
