@@ -1398,6 +1398,36 @@ export const insertJuridicoClienteSchema = createInsertSchema(juridicoClientes).
 export type JuridicoCliente = typeof juridicoClientes.$inferSelect;
 export type InsertJuridicoCliente = z.infer<typeof insertJuridicoClienteSchema>;
 
+// Tabela para processos judiciais
+export const juridicoProcessos = cortexCoreSchema.table("juridico_processos", {
+  id: serial("id").primaryKey(),
+  numeroCnj: varchar("numero_cnj", { length: 50 }).unique(),
+  clientePrincipal: varchar("cliente_principal", { length: 255 }),
+  posicaoCliente: varchar("posicao_cliente", { length: 50 }), // Requerido, Exequente, Reclamado, Reclamante, Autor
+  acao: text("acao"),
+  status: varchar("status", { length: 30 }).default("Ativo"), // Ativo, Encerrado, Arquivado, Suspenso
+  contrarioPrincipal: varchar("contrario_principal", { length: 255 }),
+  cpfCnpj: varchar("cpf_cnpj", { length: 20 }),
+  objetosAcao: text("objetos_acao"),
+  dataDistribuicao: date("data_distribuicao"),
+  instancia: varchar("instancia", { length: 30 }),
+  comarca: varchar("comarca", { length: 100 }),
+  orgao: varchar("orgao", { length: 100 }),
+  varaTurma: varchar("vara_turma", { length: 100 }),
+  naturezaAcao: varchar("natureza_acao", { length: 50 }), // Cível, Trabalhista
+  valorCausa: decimal("valor_causa", { precision: 15, scale: 2 }),
+  sentencaAcordao: text("sentenca_acordao"),
+  ultimoAndamento: text("ultimo_andamento"),
+  observacoes: text("observacoes"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+  criadoPor: varchar("criado_por", { length: 100 }),
+});
+
+export const insertJuridicoProcessoSchema = createInsertSchema(juridicoProcessos).omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type JuridicoProcesso = typeof juridicoProcessos.$inferSelect;
+export type InsertJuridicoProcesso = z.infer<typeof insertJuridicoProcessoSchema>;
+
 // Tabela para comunicações/avisos internos sobre clientes
 export const clienteComunicacoes = pgTable("cliente_comunicacoes", {
   id: serial("id").primaryKey(),
