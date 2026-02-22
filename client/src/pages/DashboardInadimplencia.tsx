@@ -607,6 +607,7 @@ export default function DashboardInadimplencia() {
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [isDownloadingCobrancaPdf, setIsDownloadingCobrancaPdf] = useState(false);
+  const [isDownloadingCompleto, setIsDownloadingCompleto] = useState(false);
   
   const handleDownloadPdf = async (apenasAtivos: boolean = false) => {
     try {
@@ -695,6 +696,42 @@ export default function DashboardInadimplencia() {
       });
     } finally {
       setIsDownloadingCobrancaPdf(false);
+    }
+  };
+
+  const handleDownloadRelatorioCompleto = async () => {
+    try {
+      setIsDownloadingCompleto(true);
+      const params = new URLSearchParams();
+      if (dataInicio) params.append('dataInicio', dataInicio);
+      if (dataFim) params.append('dataFim', dataFim);
+
+      const response = await fetch(`/api/inadimplencia/relatorio-completo-pdf?${params.toString()}`);
+      if (!response.ok) throw new Error('Erro ao gerar relatório');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `relatorio-completo-inadimplencia-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "PDF gerado com sucesso",
+        description: "Relatório completo de inadimplência baixado.",
+      });
+    } catch (error) {
+      console.error('Erro ao baixar PDF completo:', error);
+      toast({
+        title: "Erro ao gerar PDF",
+        description: "Não foi possível gerar o relatório completo. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloadingCompleto(false);
     }
   };
 
@@ -820,6 +857,21 @@ export default function DashboardInadimplencia() {
                   Limpar Filtros
                 </Button>
               )}
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handleDownloadRelatorioCompleto}
+                disabled={isDownloadingCompleto}
+                className="h-9 px-4 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/30 border-0 transition-all"
+                data-testid="button-download-pdf-completo"
+              >
+                {isDownloadingCompleto ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-1.5" />
+                )}
+                PDF Completo
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
