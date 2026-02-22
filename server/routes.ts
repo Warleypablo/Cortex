@@ -6,7 +6,7 @@ import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
 import { db } from "./db";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
 import { chat as unifiedAssistantChat } from "./services/unifiedAssistant";
 import type { UnifiedAssistantRequest, AssistantContext } from "@shared/schema";
@@ -4949,6 +4949,633 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Relatório Completo de Inadimplência (PDF analítico)
+  app.get("/api/inadimplencia/relatorio-completo-pdf", async (req, res) => {
+    try {
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
+
+      // Buscar todos os dados em paralelo
+      const [resumo, metricas, clientesData, empresasData, squadsData,
+             vendedoresData, metodosData, responsaveisData, produtosData,
+             nuncaPagaramData, canceladosData] = await Promise.all([
+        storage.getInadimplenciaResumo(dataInicio, dataFim),
+        storage.getMetricasRecebimento(dataInicio, dataFim),
+        storage.getInadimplenciaClientes(dataInicio, dataFim, 'valor', 500),
+        storage.getInadimplenciaPorEmpresa(dataInicio, dataFim),
+        storage.getInadimplenciaPorSquad(dataInicio, dataFim),
+        storage.getInadimplenciaPorVendedor(dataInicio, dataFim),
+        storage.getInadimplenciaPorMetodoPagamento(dataInicio, dataFim),
+        storage.getInadimplenciaPorResponsavel(dataInicio, dataFim),
+        storage.getInadimplenciaPorProduto(dataInicio, dataFim),
+        storage.getClientesNuncaPagaram(dataInicio, dataFim),
+        storage.getContratosCanceladosComCobranca(),
+      ]);
+
+      // Query para receita bruta mensal (denominador do % inadimplência)
+      const today = new Date().toISOString().split('T')[0];
+      const receitaMensalResult = await db.execute(sql.raw(`
+        SELECT TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
+               COALESCE(SUM(valor_bruto::numeric), 0) as receita_bruta
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND data_vencimento >= (CURRENT_DATE - INTERVAL '3 months')
+          AND data_vencimento < CURRENT_DATE
+        GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
+        ORDER BY mes
+      `));
+      const receitaMensal: Record<string, number> = {};
+      for (const row of receitaMensalResult.rows as any[]) {
+        receitaMensal[row.mes] = parseFloat(row.receita_bruta) || 0;
+      }
+
+      const clientes = clientesData.clientes;
+      const empresas = (empresasData as any).empresas || (empresasData as any) || [];
+      const squads = (squadsData as any).squads || (squadsData as any) || [];
+      const vendedores = (vendedoresData as any).vendedores || (vendedoresData as any) || [];
+      const metodos = (metodosData as any).metodos || (metodosData as any) || [];
+      const responsaveis = (responsaveisData as any).responsaveis || (responsaveisData as any) || [];
+      const produtos = (produtosData as any).produtos || (produtosData as any) || [];
+      const nuncaPagaram = (nuncaPagaramData as any).clientes || (nuncaPagaramData as any) || [];
+      const cancelados = (canceladosData as any).contratos || (canceladosData as any) || [];
+
+      // Inicializar PDF (bufferPages para rodapé com paginação)
+      const doc = new PDFDocument({
+        margin: 40,
+        size: 'A4',
+        layout: 'landscape',
+        bufferPages: true
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=relatorio-completo-inadimplencia-${today}.pdf`);
+      doc.pipe(res);
+
+      const pageWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+      const marginLeft = 40;
+      const dataHoje = new Date().toLocaleDateString('pt-BR');
+
+      // Paleta de cores
+      const colors = {
+        primary: '#1e293b',
+        accent: '#f59e0b',
+        accentLight: '#fbbf24',
+        danger: '#dc2626',
+        dangerDark: '#991b1b',
+        success: '#22c55e',
+        warning: '#f97316',
+        warningLight: '#f59e0b',
+        text: '#1f2937',
+        muted: '#64748b',
+        light: '#f8fafc',
+        lighter: '#fafafa',
+        border: '#e2e8f0',
+        headerBg: '#f1f5f9',
+        purple: '#7c3aed',
+        blue: '#3b82f6',
+      };
+
+      // Helper: formatar moeda
+      const fmtCurrency = (v: number) => new Intl.NumberFormat('pt-BR', {
+        style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0
+      }).format(v);
+
+      const fmtCurrencyFull = (v: number) => new Intl.NumberFormat('pt-BR', {
+        style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2
+      }).format(v);
+
+      const fmtPct = (v: number) => `${v.toFixed(1).replace('.', ',')}%`;
+
+      // Helper: verificar nova página
+      const checkNewPage = (space: number = 80) => {
+        if (doc.y > doc.page.height - space) {
+          doc.addPage();
+          return true;
+        }
+        return false;
+      };
+
+      // Helper: desenhar KPI card
+      const drawKpiCard = (x: number, y: number, w: number, h: number,
+                           label: string, value: string, sub: string, accentColor: string) => {
+        doc.rect(x, y, w, h).fill(colors.light);
+        doc.rect(x, y, 4, h).fill(accentColor);
+        doc.fontSize(8).font('Helvetica').fillColor(colors.muted).text(label, x + 12, y + 8, { width: w - 20 });
+        doc.fontSize(16).font('Helvetica-Bold').fillColor(colors.primary).text(value, x + 12, y + 24, { width: w - 20 });
+        doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(sub, x + 12, y + 44, { width: w - 20 });
+      };
+
+      // Helper: desenhar header de seção
+      const drawSectionHeader = (title: string) => {
+        checkNewPage(100);
+        doc.moveDown(0.5);
+        doc.rect(marginLeft, doc.y, pageWidth, 22).fill(colors.primary);
+        doc.fontSize(11).font('Helvetica-Bold').fillColor('#ffffff').text(title, marginLeft + 10, doc.y + 5);
+        doc.y = doc.y + 28;
+        doc.fillColor(colors.text);
+      };
+
+      // Helper: desenhar tabela de breakdown dimensional
+      const drawBreakdownTable = (data: any[], labelField: string, valueField: string,
+                                  qtdField: string, title: string) => {
+        drawSectionHeader(title);
+        if (!Array.isArray(data) || data.length === 0) {
+          doc.fontSize(9).font('Helvetica').fillColor(colors.muted).text('Sem dados disponíveis', marginLeft + 10);
+          doc.moveDown(0.5);
+          return;
+        }
+
+        const items = data.slice(0, 10);
+        const maxVal = Math.max(...items.map((d: any) => parseFloat(d[valueField]) || 0), 1);
+        const colWidths = { label: 220, valor: 110, qtd: 60, pct: 60, bar: pageWidth - 480 };
+
+        // Header
+        const headerY = doc.y;
+        doc.rect(marginLeft, headerY, pageWidth, 16).fill(colors.headerBg);
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.muted);
+        let xPos = marginLeft + 8;
+        doc.text(title.includes('Método') ? 'Método' : title.includes('Empresa') ? 'Empresa' : title.includes('Squad') ? 'Squad' : title.includes('Vendedor') ? 'Vendedor' : title.includes('Responsável') ? 'Responsável' : title.includes('Produto') ? 'Produto' : 'Item', xPos, headerY + 4, { width: colWidths.label });
+        xPos += colWidths.label;
+        doc.text('Valor', xPos, headerY + 4, { width: colWidths.valor, align: 'right' });
+        xPos += colWidths.valor + 10;
+        doc.text('Clientes', xPos, headerY + 4, { width: colWidths.qtd, align: 'center' });
+        xPos += colWidths.qtd + 10;
+        doc.text('% Total', xPos, headerY + 4, { width: colWidths.pct, align: 'center' });
+        xPos += colWidths.pct + 10;
+        doc.text('Distribuição', xPos, headerY + 4, { width: colWidths.bar });
+
+        doc.y = headerY + 20;
+
+        for (let i = 0; i < items.length; i++) {
+          checkNewPage(20);
+          const item = items[i];
+          const rowY = doc.y;
+          const valor = parseFloat(item[valueField]) || 0;
+          const qtd = parseInt(item[qtdField]) || 0;
+          const pct = resumo.totalInadimplente > 0 ? (valor / resumo.totalInadimplente) * 100 : 0;
+          const barWidth = maxVal > 0 ? (valor / maxVal) * colWidths.bar : 0;
+
+          if (i % 2 === 1) {
+            doc.rect(marginLeft, rowY - 1, pageWidth, 14).fill(colors.lighter);
+          }
+
+          xPos = marginLeft + 8;
+          const label = String(item[labelField] || '-');
+          const labelTrunc = label.length > 35 ? label.substring(0, 35) + '...' : label;
+          doc.fontSize(7).font('Helvetica').fillColor(colors.text).text(labelTrunc, xPos, rowY + 2, { width: colWidths.label });
+          xPos += colWidths.label;
+          doc.font('Helvetica-Bold').fillColor(colors.danger).text(fmtCurrency(valor), xPos, rowY + 2, { width: colWidths.valor, align: 'right' });
+          xPos += colWidths.valor + 10;
+          doc.font('Helvetica').fillColor(colors.text).text(String(qtd), xPos, rowY + 2, { width: colWidths.qtd, align: 'center' });
+          xPos += colWidths.qtd + 10;
+          doc.text(fmtPct(pct), xPos, rowY + 2, { width: colWidths.pct, align: 'center' });
+          xPos += colWidths.pct + 10;
+
+          // Barra visual
+          if (barWidth > 0) {
+            doc.rect(xPos, rowY + 2, barWidth, 8).fill(colors.accent);
+          }
+
+          doc.y = rowY + 16;
+        }
+        doc.moveDown(0.3);
+      };
+
+      // ==================== PÁGINA 1: CAPA + RESUMO EXECUTIVO ====================
+
+      // Header bar
+      doc.rect(0, 0, doc.page.width, 100).fill(colors.primary);
+      doc.fontSize(22).fillColor('#ffffff').font('Helvetica-Bold');
+      doc.text('RELATÓRIO COMPLETO DE INADIMPLÊNCIA', marginLeft, 25, { align: 'center' });
+      doc.fontSize(13).fillColor(colors.accentLight).font('Helvetica');
+      doc.text('Análise Detalhada • Indicadores • Breakdowns', marginLeft, 55, { align: 'center' });
+      doc.fontSize(9).fillColor('#94a3b8');
+      doc.text(`Gerado em: ${dataHoje}`, marginLeft, 78, { align: 'center' });
+
+      doc.y = 115;
+
+      // 4 KPI Cards
+      const cardW = (pageWidth - 30) / 4;
+      const cardH = 58;
+      const cardY = doc.y;
+
+      drawKpiCard(marginLeft, cardY, cardW, cardH,
+        'TOTAL INADIMPLENTE', fmtCurrency(resumo.totalInadimplente),
+        `${resumo.quantidadeParcelas} parcelas em aberto`, colors.danger);
+
+      drawKpiCard(marginLeft + cardW + 10, cardY, cardW, cardH,
+        'CLIENTES INADIMPLENTES', String(resumo.quantidadeClientes),
+        `Ticket médio: ${fmtCurrency(resumo.ticketMedio)}`, colors.warning);
+
+      drawKpiCard(marginLeft + (cardW + 10) * 2, cardY, cardW, cardH,
+        'TICKET MÉDIO', fmtCurrency(resumo.ticketMedio),
+        `Por cliente inadimplente`, colors.accent);
+
+      drawKpiCard(marginLeft + (cardW + 10) * 3, cardY, cardW, cardH,
+        'ÚLTIMOS 45 DIAS', fmtCurrency(resumo.valorUltimos45Dias),
+        `${resumo.quantidadeUltimos45Dias} parcelas`, colors.purple);
+
+      doc.y = cardY + cardH + 20;
+
+      // Seção: Inadimplência dos Últimos 3 Meses
+      drawSectionHeader('INADIMPLÊNCIA DOS ÚLTIMOS 3 MESES');
+
+      const evolucao = resumo.evolucaoMensal || [];
+      const ultimos3Meses = evolucao.slice(-3);
+
+      if (ultimos3Meses.length > 0) {
+        // Header da tabela
+        const tblHeaderY = doc.y;
+        doc.rect(marginLeft, tblHeaderY, pageWidth, 16).fill(colors.headerBg);
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.muted);
+        doc.text('Mês', marginLeft + 10, tblHeaderY + 4, { width: 120 });
+        doc.text('Valor Inadimplente', marginLeft + 140, tblHeaderY + 4, { width: 130, align: 'right' });
+        doc.text('Receita Bruta', marginLeft + 280, tblHeaderY + 4, { width: 130, align: 'right' });
+        doc.text('% Inadimplência', marginLeft + 420, tblHeaderY + 4, { width: 100, align: 'center' });
+        doc.text('Parcelas', marginLeft + 530, tblHeaderY + 4, { width: 60, align: 'center' });
+        doc.text('Distribuição', marginLeft + 600, tblHeaderY + 4, { width: pageWidth - 610 });
+        doc.y = tblHeaderY + 20;
+
+        const maxMesVal = Math.max(...ultimos3Meses.map((m: any) => m.valor || 0), 1);
+        let somaValor = 0;
+        let somaPct = 0;
+        let mesesComPct = 0;
+
+        for (let i = 0; i < ultimos3Meses.length; i++) {
+          const mes = ultimos3Meses[i];
+          const rowY = doc.y;
+          const valor = mes.valor || 0;
+          const receita = receitaMensal[mes.mes] || 0;
+          const pct = receita > 0 ? (valor / receita) * 100 : 0;
+          const barWidth = maxMesVal > 0 ? (valor / maxMesVal) * (pageWidth - 610) : 0;
+
+          somaValor += valor;
+          if (receita > 0) { somaPct += pct; mesesComPct++; }
+
+          if (i % 2 === 1) {
+            doc.rect(marginLeft, rowY - 1, pageWidth, 16).fill(colors.lighter);
+          }
+
+          doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text);
+          doc.text(mes.mesLabel || mes.mes, marginLeft + 10, rowY + 3, { width: 120 });
+          doc.font('Helvetica-Bold').fillColor(colors.danger);
+          doc.text(fmtCurrency(valor), marginLeft + 140, rowY + 3, { width: 130, align: 'right' });
+          doc.font('Helvetica').fillColor(colors.text);
+          doc.text(receita > 0 ? fmtCurrency(receita) : '-', marginLeft + 280, rowY + 3, { width: 130, align: 'right' });
+          doc.font('Helvetica-Bold').fillColor(pct > 10 ? colors.danger : pct > 5 ? colors.warning : colors.success);
+          doc.text(receita > 0 ? fmtPct(pct) : '-', marginLeft + 420, rowY + 3, { width: 100, align: 'center' });
+          doc.font('Helvetica').fillColor(colors.text);
+          doc.text(String(mes.quantidade || 0), marginLeft + 530, rowY + 3, { width: 60, align: 'center' });
+
+          if (barWidth > 0) {
+            doc.rect(marginLeft + 600, rowY + 3, barWidth, 9).fill(colors.accent);
+          }
+
+          doc.y = rowY + 18;
+        }
+
+        // Linha de média
+        doc.moveDown(0.3);
+        const mediaY = doc.y;
+        doc.rect(marginLeft, mediaY, pageWidth, 20).fill('#eff6ff');
+        doc.rect(marginLeft, mediaY, 4, 20).fill(colors.blue);
+
+        const mediaValor = ultimos3Meses.length > 0 ? somaValor / ultimos3Meses.length : 0;
+        const mediaPct = mesesComPct > 0 ? somaPct / mesesComPct : 0;
+
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(colors.primary);
+        doc.text('INADIMPLÊNCIA MÉDIA (3 meses)', marginLeft + 14, mediaY + 5, { width: 200 });
+        doc.fillColor(colors.danger);
+        doc.text(fmtCurrency(mediaValor), marginLeft + 240, mediaY + 5, { width: 130, align: 'right' });
+        doc.fillColor(mediaPct > 10 ? colors.danger : mediaPct > 5 ? colors.warning : colors.success);
+        doc.text(fmtPct(mediaPct), marginLeft + 420, mediaY + 5, { width: 100, align: 'center' });
+
+        doc.y = mediaY + 26;
+      }
+
+      // Detalhamento Últimos 45 Dias
+      doc.moveDown(0.5);
+      const det45Y = doc.y;
+      const det45W = pageWidth / 3 - 10;
+      const pct45 = resumo.totalInadimplente > 0 ? (resumo.valorUltimos45Dias / resumo.totalInadimplente) * 100 : 0;
+
+      doc.rect(marginLeft, det45Y, det45W, 48).fill('#fef2f2');
+      doc.rect(marginLeft, det45Y, 4, 48).fill(colors.danger);
+      doc.fontSize(7).font('Helvetica').fillColor(colors.dangerDark).text('VALOR ÚLTIMOS 45 DIAS', marginLeft + 12, det45Y + 6);
+      doc.fontSize(14).font('Helvetica-Bold').fillColor(colors.danger).text(fmtCurrency(resumo.valorUltimos45Dias), marginLeft + 12, det45Y + 18);
+      doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(`${resumo.quantidadeUltimos45Dias} parcelas`, marginLeft + 12, det45Y + 36);
+
+      doc.rect(marginLeft + det45W + 10, det45Y, det45W, 48).fill('#fef2f2');
+      doc.rect(marginLeft + det45W + 10, det45Y, 4, 48).fill(colors.warning);
+      doc.fontSize(7).font('Helvetica').fillColor(colors.dangerDark).text('% DO TOTAL', marginLeft + det45W + 24, det45Y + 6);
+      doc.fontSize(14).font('Helvetica-Bold').fillColor(colors.warning).text(fmtPct(pct45), marginLeft + det45W + 24, det45Y + 18);
+      doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text('dos últimos 45 dias sobre o total', marginLeft + det45W + 24, det45Y + 36);
+
+      doc.rect(marginLeft + (det45W + 10) * 2, det45Y, det45W, 48).fill('#f0fdf4');
+      doc.rect(marginLeft + (det45W + 10) * 2, det45Y, 4, 48).fill(colors.success);
+      doc.fontSize(7).font('Helvetica').fillColor('#166534').text('RESTANTE (> 45 DIAS)', marginLeft + (det45W + 10) * 2 + 12, det45Y + 6);
+      doc.fontSize(14).font('Helvetica-Bold').fillColor('#166534').text(fmtCurrency(resumo.totalInadimplente - resumo.valorUltimos45Dias), marginLeft + (det45W + 10) * 2 + 12, det45Y + 18);
+      doc.fontSize(7).font('Helvetica').fillColor(colors.muted).text(fmtPct(100 - pct45) + ' do total', marginLeft + (det45W + 10) * 2 + 12, det45Y + 36);
+
+      doc.y = det45Y + 58;
+
+      // ==================== PÁGINA 2: AGING + TOP 10 ====================
+      doc.addPage();
+
+      // Análise de Aging
+      drawSectionHeader('ANÁLISE DE AGING — DISTRIBUIÇÃO POR FAIXA DE ATRASO');
+
+      const faixas = resumo.faixas;
+      const agingData = [
+        { label: '1 a 30 dias', ...faixas.ate30dias, color: colors.success },
+        { label: '31 a 60 dias', ...faixas.de31a60dias, color: colors.warningLight },
+        { label: '61 a 90 dias', ...faixas.de61a90dias, color: colors.warning },
+        { label: 'Acima de 90 dias', ...faixas.acima90dias, color: colors.danger },
+      ];
+
+      // Stacked bar visual
+      const stackBarY = doc.y;
+      const stackBarH = 24;
+      const totalAging = agingData.reduce((s, d) => s + (d.valor || 0), 0);
+      let stackX = marginLeft;
+
+      for (const faixa of agingData) {
+        const w = totalAging > 0 ? (faixa.valor / totalAging) * pageWidth : pageWidth / 4;
+        if (w > 2) {
+          doc.rect(stackX, stackBarY, w, stackBarH).fill(faixa.color);
+          if (w > 50) {
+            doc.fontSize(7).font('Helvetica-Bold').fillColor('#ffffff');
+            doc.text(fmtPct(faixa.percentual || 0), stackX + 4, stackBarY + 4, { width: w - 8 });
+            doc.fontSize(6).font('Helvetica').text(fmtCurrency(faixa.valor || 0), stackX + 4, stackBarY + 14, { width: w - 8 });
+          }
+        }
+        stackX += w;
+      }
+
+      doc.y = stackBarY + stackBarH + 10;
+
+      // Tabela de aging detalhada
+      const agingHeaderY = doc.y;
+      doc.rect(marginLeft, agingHeaderY, pageWidth, 16).fill(colors.headerBg);
+      doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.muted);
+      doc.text('Faixa de Atraso', marginLeft + 10, agingHeaderY + 4, { width: 150 });
+      doc.text('Valor', marginLeft + 170, agingHeaderY + 4, { width: 120, align: 'right' });
+      doc.text('Quantidade', marginLeft + 300, agingHeaderY + 4, { width: 80, align: 'center' });
+      doc.text('% do Total', marginLeft + 400, agingHeaderY + 4, { width: 80, align: 'center' });
+      doc.text('Barra', marginLeft + 500, agingHeaderY + 4, { width: pageWidth - 510 });
+      doc.y = agingHeaderY + 20;
+
+      const maxAgingVal = Math.max(...agingData.map(d => d.valor || 0), 1);
+      for (let i = 0; i < agingData.length; i++) {
+        const faixa = agingData[i];
+        const rowY = doc.y;
+        const barW = maxAgingVal > 0 ? ((faixa.valor || 0) / maxAgingVal) * (pageWidth - 510) : 0;
+
+        if (i % 2 === 1) {
+          doc.rect(marginLeft, rowY - 1, pageWidth, 16).fill(colors.lighter);
+        }
+
+        // Color dot
+        doc.circle(marginLeft + 14, rowY + 6, 4).fill(faixa.color);
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.text);
+        doc.text(faixa.label, marginLeft + 24, rowY + 2, { width: 140 });
+        doc.font('Helvetica-Bold').fillColor(colors.danger);
+        doc.text(fmtCurrency(faixa.valor || 0), marginLeft + 170, rowY + 2, { width: 120, align: 'right' });
+        doc.font('Helvetica').fillColor(colors.text);
+        doc.text(String(faixa.quantidade || 0), marginLeft + 300, rowY + 2, { width: 80, align: 'center' });
+        doc.text(fmtPct(faixa.percentual || 0), marginLeft + 400, rowY + 2, { width: 80, align: 'center' });
+        if (barW > 0) {
+          doc.rect(marginLeft + 500, rowY + 2, barW, 9).fill(faixa.color);
+        }
+
+        doc.y = rowY + 18;
+      }
+
+      doc.moveDown(1);
+
+      // Top 10 Clientes Inadimplentes
+      drawSectionHeader('TOP 10 CLIENTES INADIMPLENTES');
+
+      const top10 = clientes.slice(0, 10);
+      if (top10.length > 0) {
+        const tblY = doc.y;
+        doc.rect(marginLeft, tblY, pageWidth, 16).fill(colors.headerBg);
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.muted);
+        doc.text('#', marginLeft + 5, tblY + 4, { width: 20 });
+        doc.text('Cliente', marginLeft + 25, tblY + 4, { width: 200 });
+        doc.text('Valor', marginLeft + 235, tblY + 4, { width: 100, align: 'right' });
+        doc.text('Parcelas', marginLeft + 345, tblY + 4, { width: 55, align: 'center' });
+        doc.text('Dias Atraso', marginLeft + 410, tblY + 4, { width: 65, align: 'center' });
+        doc.text('Status', marginLeft + 485, tblY + 4, { width: 120 });
+        doc.text('Responsável', marginLeft + 615, tblY + 4, { width: pageWidth - 625 });
+        doc.y = tblY + 20;
+
+        for (let i = 0; i < top10.length; i++) {
+          checkNewPage(20);
+          const c = top10[i];
+          const rowY = doc.y;
+
+          if (i % 2 === 1) {
+            doc.rect(marginLeft, rowY - 1, pageWidth, 14).fill(colors.lighter);
+          }
+
+          doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.muted);
+          doc.text(String(i + 1), marginLeft + 5, rowY + 2, { width: 20 });
+          const nome = c.nomeCliente.length > 35 ? c.nomeCliente.substring(0, 35) + '...' : c.nomeCliente;
+          doc.font('Helvetica').fillColor(colors.text).text(nome, marginLeft + 25, rowY + 2, { width: 200 });
+          doc.font('Helvetica-Bold').fillColor(colors.danger).text(fmtCurrency(c.valorTotal), marginLeft + 235, rowY + 2, { width: 100, align: 'right' });
+          doc.font('Helvetica').fillColor(colors.text).text(String(c.quantidadeParcelas), marginLeft + 345, rowY + 2, { width: 55, align: 'center' });
+
+          const diasColor = c.diasAtrasoMax > 90 ? colors.danger : c.diasAtrasoMax > 60 ? colors.warning : c.diasAtrasoMax > 30 ? colors.warningLight : colors.success;
+          doc.font('Helvetica-Bold').fillColor(diasColor).text(`${c.diasAtrasoMax}d`, marginLeft + 410, rowY + 2, { width: 65, align: 'center' });
+
+          const status = (c.statusClickup || '-').substring(0, 20);
+          doc.font('Helvetica').fillColor(colors.text).text(status, marginLeft + 485, rowY + 2, { width: 120 });
+          const resp = (c.responsavel || '-').substring(0, 22);
+          doc.text(resp, marginLeft + 615, rowY + 2, { width: pageWidth - 625 });
+
+          doc.y = rowY + 16;
+        }
+      }
+
+      // ==================== PÁGINA 3: BREAKDOWNS DIMENSIONAIS ====================
+      doc.addPage();
+
+      drawBreakdownTable(
+        Array.isArray(empresas) ? empresas : [],
+        'empresa', 'valor', 'quantidadeClientes',
+        'INADIMPLÊNCIA POR EMPRESA'
+      );
+
+      drawBreakdownTable(
+        Array.isArray(squads) ? squads : [],
+        'squad', 'valor', 'quantidadeClientes',
+        'INADIMPLÊNCIA POR SQUAD'
+      );
+
+      drawBreakdownTable(
+        Array.isArray(metodos) ? metodos : [],
+        'metodoPagamento', 'valor', 'quantidadeClientes',
+        'INADIMPLÊNCIA POR MÉTODO DE PAGAMENTO'
+      );
+
+      // ==================== PÁGINA 4: VENDEDORES + MÉTRICAS ====================
+      doc.addPage();
+
+      drawBreakdownTable(
+        Array.isArray(vendedores) ? vendedores : [],
+        'vendedor', 'valor', 'quantidadeClientes',
+        'INADIMPLÊNCIA POR VENDEDOR'
+      );
+
+      drawBreakdownTable(
+        Array.isArray(responsaveis) ? responsaveis : [],
+        'responsavel', 'valor', 'quantidadeClientes',
+        'INADIMPLÊNCIA POR RESPONSÁVEL CS'
+      );
+
+      drawBreakdownTable(
+        Array.isArray(produtos) ? produtos : [],
+        'produto', 'valor', 'quantidadeClientes',
+        'INADIMPLÊNCIA POR PRODUTO/SERVIÇO'
+      );
+
+      // ==================== MÉTRICAS DE RECEBIMENTO ====================
+      doc.addPage();
+
+      drawSectionHeader('MÉTRICAS DE RECEBIMENTO');
+
+      const metCardW = (pageWidth - 30) / 4;
+      const metCardH = 58;
+      const metCardY = doc.y;
+
+      drawKpiCard(marginLeft, metCardY, metCardW, metCardH,
+        'TEMPO MÉDIO RECEBIMENTO', `${metricas.tempoMedioRecebimento || 0} dias`,
+        'Média geral de recebimento', colors.blue);
+
+      drawKpiCard(marginLeft + metCardW + 10, metCardY, metCardW, metCardH,
+        'TEMPO MÉDIO INADIMPLENTES', `${metricas.tempoMedioRecebimentoInadimplentes || 0} dias`,
+        'Pagamentos em atraso', colors.warning);
+
+      drawKpiCard(marginLeft + (metCardW + 10) * 2, metCardY, metCardW, metCardH,
+        'INADIMPLENTES 1ª PARCELA', `${metricas.clientesInadimPrimeiraParcela || 0}`,
+        `${fmtPct(metricas.percentualInadimPrimeiraParcela || 0)} - ${fmtCurrency(metricas.valorInadimPrimeiraParcela || 0)}`, colors.danger);
+
+      drawKpiCard(marginLeft + (metCardW + 10) * 3, metCardY, metCardW, metCardH,
+        'NUNCA PAGARAM', `${metricas.clientesNuncaPagaram || 0}`,
+        `${fmtPct(metricas.percentualNuncaPagaram || 0)} - ${fmtCurrency(metricas.valorNuncaPagaram || 0)}`, colors.dangerDark);
+
+      doc.y = metCardY + metCardH + 20;
+
+      // Clientes que Nunca Pagaram - Top 10
+      drawSectionHeader('CLIENTES QUE NUNCA PAGARAM — TOP 10');
+
+      const nuncaPagaramTop = Array.isArray(nuncaPagaram) ? nuncaPagaram.slice(0, 10) : [];
+      if (nuncaPagaramTop.length > 0) {
+        const npHeaderY = doc.y;
+        doc.rect(marginLeft, npHeaderY, pageWidth, 16).fill(colors.headerBg);
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.muted);
+        doc.text('#', marginLeft + 5, npHeaderY + 4, { width: 20 });
+        doc.text('Cliente', marginLeft + 25, npHeaderY + 4, { width: 220 });
+        doc.text('Valor', marginLeft + 255, npHeaderY + 4, { width: 110, align: 'right' });
+        doc.text('Parcelas', marginLeft + 375, npHeaderY + 4, { width: 60, align: 'center' });
+        doc.text('Dias Atraso', marginLeft + 445, npHeaderY + 4, { width: 70, align: 'center' });
+        doc.text('Empresa', marginLeft + 525, npHeaderY + 4, { width: pageWidth - 535 });
+        doc.y = npHeaderY + 20;
+
+        for (let i = 0; i < nuncaPagaramTop.length; i++) {
+          checkNewPage(20);
+          const c = nuncaPagaramTop[i];
+          const rowY = doc.y;
+
+          if (i % 2 === 1) {
+            doc.rect(marginLeft, rowY - 1, pageWidth, 14).fill(colors.lighter);
+          }
+
+          doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.muted);
+          doc.text(String(i + 1), marginLeft + 5, rowY + 2, { width: 20 });
+          const nome = String(c.nomeCliente || c.nome || '-');
+          doc.font('Helvetica').fillColor(colors.text).text(nome.substring(0, 40), marginLeft + 25, rowY + 2, { width: 220 });
+          doc.font('Helvetica-Bold').fillColor(colors.danger).text(fmtCurrency(c.valorTotal || c.valor || 0), marginLeft + 255, rowY + 2, { width: 110, align: 'right' });
+          doc.font('Helvetica').fillColor(colors.text).text(String(c.quantidadeParcelas || c.parcelas || 0), marginLeft + 375, rowY + 2, { width: 60, align: 'center' });
+          doc.font('Helvetica-Bold').fillColor(colors.danger).text(`${c.diasAtrasoMax || c.diasAtraso || 0}d`, marginLeft + 445, rowY + 2, { width: 70, align: 'center' });
+          doc.font('Helvetica').fillColor(colors.text).text(String(c.empresa || '-').substring(0, 25), marginLeft + 525, rowY + 2, { width: pageWidth - 535 });
+
+          doc.y = rowY + 16;
+        }
+      } else {
+        doc.fontSize(9).font('Helvetica').fillColor(colors.muted).text('Nenhum cliente nesta categoria no período.', marginLeft + 10);
+      }
+
+      // ==================== CONTRATOS CANCELADOS ====================
+      doc.moveDown(1);
+
+      drawSectionHeader('CONTRATOS CANCELADOS COM COBRANÇAS EM ABERTO');
+
+      const canceladosTop = Array.isArray(cancelados) ? cancelados.slice(0, 15) : [];
+      if (canceladosTop.length > 0) {
+        const ccHeaderY = doc.y;
+        doc.rect(marginLeft, ccHeaderY, pageWidth, 16).fill(colors.headerBg);
+        doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.muted);
+        doc.text('#', marginLeft + 5, ccHeaderY + 4, { width: 20 });
+        doc.text('Cliente', marginLeft + 25, ccHeaderY + 4, { width: 220 });
+        doc.text('Valor em Aberto', marginLeft + 255, ccHeaderY + 4, { width: 110, align: 'right' });
+        doc.text('Parcelas', marginLeft + 375, ccHeaderY + 4, { width: 60, align: 'center' });
+        doc.text('Status', marginLeft + 445, ccHeaderY + 4, { width: 120 });
+        doc.text('Empresa', marginLeft + 575, ccHeaderY + 4, { width: pageWidth - 585 });
+        doc.y = ccHeaderY + 20;
+
+        for (let i = 0; i < canceladosTop.length; i++) {
+          checkNewPage(20);
+          const c = canceladosTop[i];
+          const rowY = doc.y;
+
+          if (i % 2 === 1) {
+            doc.rect(marginLeft, rowY - 1, pageWidth, 14).fill(colors.lighter);
+          }
+
+          doc.fontSize(7).font('Helvetica-Bold').fillColor(colors.muted);
+          doc.text(String(i + 1), marginLeft + 5, rowY + 2, { width: 20 });
+          const nome = String(c.nomeCliente || c.nome || '-');
+          doc.font('Helvetica').fillColor(colors.text).text(nome.substring(0, 40), marginLeft + 25, rowY + 2, { width: 220 });
+          doc.font('Helvetica-Bold').fillColor(colors.danger).text(fmtCurrency(c.valorTotal || c.valor || 0), marginLeft + 255, rowY + 2, { width: 110, align: 'right' });
+          doc.font('Helvetica').fillColor(colors.text).text(String(c.quantidadeParcelas || c.parcelas || 0), marginLeft + 375, rowY + 2, { width: 60, align: 'center' });
+          const status = String(c.statusClickup || c.status || '-').substring(0, 20);
+          doc.text(status, marginLeft + 445, rowY + 2, { width: 120 });
+          doc.text(String(c.empresa || '-').substring(0, 20), marginLeft + 575, rowY + 2, { width: pageWidth - 585 });
+
+          doc.y = rowY + 16;
+        }
+
+        // Resumo dos cancelados
+        doc.moveDown(0.5);
+        const totalCanc = canceladosTop.reduce((s: number, c: any) => s + (c.valorTotal || c.valor || 0), 0);
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.primary);
+        doc.text(`Total: ${canceladosTop.length} contratos cancelados — ${fmtCurrency(totalCanc)} em cobranças pendentes`, marginLeft + 10);
+      } else {
+        doc.fontSize(9).font('Helvetica').fillColor(colors.muted).text('Nenhum contrato cancelado com cobranças em aberto.', marginLeft + 10);
+      }
+
+      // ==================== RODAPÉ EM TODAS AS PÁGINAS ====================
+      const pages = doc.bufferedPageRange();
+      for (let i = pages.start; i < pages.start + pages.count; i++) {
+        doc.switchToPage(i);
+        doc.fontSize(7).font('Helvetica').fillColor('#94a3b8');
+        doc.text(
+          `Relatório gerado automaticamente pelo sistema Cortex — ${dataHoje} — Página ${i + 1} de ${pages.count}`,
+          marginLeft, doc.page.height - 30,
+          { align: 'center', width: pageWidth }
+        );
+      }
+
+      doc.end();
+
+    } catch (error) {
+      console.error("[api] Error generating complete inadimplencia PDF:", error);
+      res.status(500).json({ error: "Failed to generate complete inadimplencia PDF" });
+    }
+  });
+
   // Relatório PDF de clientes com Contexto CS = "Cobrar"
   app.get("/api/inadimplencia/relatorio-cobranca-pdf", async (req, res) => {
     try {
@@ -6975,6 +7602,352 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching escalation rules:", error);
       res.status(500).json({ error: "Failed to fetch escalation rules" });
+    }
+  });
+
+  // ==================== JURÍDICO - Processos Judiciais ====================
+
+  let juridicoProcessosTableInitialized = false;
+  async function ensureJuridicoProcessosTable() {
+    if (juridicoProcessosTableInitialized) return;
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS cortex_core.juridico_processos (
+          id SERIAL PRIMARY KEY,
+          numero_cnj VARCHAR(50) UNIQUE,
+          cliente_principal VARCHAR(255),
+          posicao_cliente VARCHAR(50),
+          acao TEXT,
+          status VARCHAR(30) DEFAULT 'Ativo',
+          contrario_principal VARCHAR(255),
+          cpf_cnpj VARCHAR(20),
+          objetos_acao TEXT,
+          data_distribuicao DATE,
+          instancia VARCHAR(30),
+          comarca VARCHAR(100),
+          orgao VARCHAR(100),
+          vara_turma VARCHAR(100),
+          natureza_acao VARCHAR(50),
+          valor_causa DECIMAL(15,2),
+          sentenca_acordao TEXT,
+          ultimo_andamento TEXT,
+          observacoes TEXT,
+          criado_em TIMESTAMP DEFAULT NOW(),
+          atualizado_em TIMESTAMP DEFAULT NOW(),
+          criado_por VARCHAR(100)
+        )
+      `);
+      juridicoProcessosTableInitialized = true;
+    } catch (error) {
+      console.error("[api] Error ensuring juridico_processos table:", error);
+    }
+  }
+
+  // GET - Resumo/KPIs dos processos
+  app.get("/api/juridico/processos/resumo", async (req, res) => {
+    try {
+      await ensureJuridicoProcessosTable();
+
+      const result = await db.execute(sql`
+        SELECT
+          COUNT(*)::int as "totalProcessos",
+          COUNT(*) FILTER (WHERE status = 'Ativo')::int as "processosAtivos",
+          COALESCE(SUM(valor_causa), 0)::numeric as "valorTotalRisco",
+          COALESCE(SUM(valor_causa) FILTER (WHERE status = 'Ativo'), 0)::numeric as "valorRiscoAtivo"
+        FROM cortex_core.juridico_processos
+      `);
+
+      const porNatureza = await db.execute(sql`
+        SELECT
+          COALESCE(natureza_acao, 'Não informado') as "natureza",
+          COUNT(*)::int as "quantidade",
+          COALESCE(SUM(valor_causa), 0)::numeric as "valor"
+        FROM cortex_core.juridico_processos
+        GROUP BY natureza_acao
+        ORDER BY COUNT(*) DESC
+      `);
+
+      const porStatus = await db.execute(sql`
+        SELECT
+          COALESCE(status, 'Não informado') as "status",
+          COUNT(*)::int as "quantidade"
+        FROM cortex_core.juridico_processos
+        GROUP BY status
+        ORDER BY COUNT(*) DESC
+      `);
+
+      const porPosicao = await db.execute(sql`
+        SELECT
+          COALESCE(posicao_cliente, 'Não informado') as "posicao",
+          COUNT(*)::int as "quantidade"
+        FROM cortex_core.juridico_processos
+        GROUP BY posicao_cliente
+        ORDER BY COUNT(*) DESC
+      `);
+
+      const porComarca = await db.execute(sql`
+        SELECT
+          COALESCE(comarca, 'Não informado') as "comarca",
+          COUNT(*)::int as "quantidade"
+        FROM cortex_core.juridico_processos
+        GROUP BY comarca
+        ORDER BY COUNT(*) DESC
+        LIMIT 10
+      `);
+
+      const evolucaoMensal = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_distribuicao, 'YYYY-MM') as "mes",
+          TO_CHAR(data_distribuicao, 'Mon/YY') as "mesLabel",
+          COUNT(*)::int as "quantidade"
+        FROM cortex_core.juridico_processos
+        WHERE data_distribuicao IS NOT NULL
+        GROUP BY TO_CHAR(data_distribuicao, 'YYYY-MM'), TO_CHAR(data_distribuicao, 'Mon/YY')
+        ORDER BY TO_CHAR(data_distribuicao, 'YYYY-MM')
+      `);
+
+      const resumo = result.rows[0] || { totalProcessos: 0, processosAtivos: 0, valorTotalRisco: 0, valorRiscoAtivo: 0 };
+
+      res.json({
+        ...resumo,
+        porNatureza: porNatureza.rows,
+        porStatus: porStatus.rows,
+        porPosicao: porPosicao.rows,
+        porComarca: porComarca.rows,
+        evolucaoMensal: evolucaoMensal.rows,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching processos resumo:", error);
+      res.status(500).json({ error: "Failed to fetch processos summary" });
+    }
+  });
+
+  // GET - Listar todos os processos com filtros
+  app.get("/api/juridico/processos", async (req, res) => {
+    try {
+      await ensureJuridicoProcessosTable();
+
+      const busca = req.query.busca as string | undefined;
+      const statusFilter = req.query.status as string | undefined;
+      const natureza = req.query.natureza as string | undefined;
+      const posicao = req.query.posicao as string | undefined;
+
+      const conditions: SQL[] = [];
+
+      if (busca) {
+        const pattern = `%${busca}%`;
+        conditions.push(sql`(numero_cnj ILIKE ${pattern} OR cliente_principal ILIKE ${pattern} OR contrario_principal ILIKE ${pattern} OR acao ILIKE ${pattern})`);
+      }
+      if (statusFilter && statusFilter !== 'todos') {
+        conditions.push(sql`status = ${statusFilter}`);
+      }
+      if (natureza && natureza !== 'todos') {
+        conditions.push(sql`natureza_acao = ${natureza}`);
+      }
+      if (posicao && posicao !== 'todos') {
+        conditions.push(sql`posicao_cliente = ${posicao}`);
+      }
+
+      const whereClause = conditions.length > 0
+        ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT
+          id, numero_cnj as "numeroCnj", cliente_principal as "clientePrincipal",
+          posicao_cliente as "posicaoCliente", acao, status,
+          contrario_principal as "contrarioPrincipal", cpf_cnpj as "cpfCnpj",
+          objetos_acao as "objetosAcao", data_distribuicao as "dataDistribuicao",
+          instancia, comarca, orgao, vara_turma as "varaTurma",
+          natureza_acao as "naturezaAcao", valor_causa as "valorCausa",
+          sentenca_acordao as "sentencaAcordao", ultimo_andamento as "ultimoAndamento",
+          observacoes, criado_em as "criadoEm", atualizado_em as "atualizadoEm",
+          criado_por as "criadoPor"
+        FROM cortex_core.juridico_processos
+        ${whereClause}
+        ORDER BY criado_em DESC
+      `);
+      res.json({ processos: result.rows });
+    } catch (error) {
+      console.error("[api] Error fetching processos:", error);
+      res.status(500).json({ error: "Failed to fetch processos" });
+    }
+  });
+
+  // POST - Criar novo processo
+  app.post("/api/juridico/processos", async (req, res) => {
+    try {
+      await ensureJuridicoProcessosTable();
+      const data = req.body;
+
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.juridico_processos (
+          numero_cnj, cliente_principal, posicao_cliente, acao, status,
+          contrario_principal, cpf_cnpj, objetos_acao, data_distribuicao,
+          instancia, comarca, orgao, vara_turma, natureza_acao, valor_causa,
+          sentenca_acordao, ultimo_andamento, observacoes, criado_por
+        ) VALUES (
+          ${data.numeroCnj || null}, ${data.clientePrincipal || null},
+          ${data.posicaoCliente || null}, ${data.acao || null}, ${data.status || 'Ativo'},
+          ${data.contrarioPrincipal || null}, ${data.cpfCnpj || null},
+          ${data.objetosAcao || null}, ${data.dataDistribuicao || null},
+          ${data.instancia || null}, ${data.comarca || null}, ${data.orgao || null},
+          ${data.varaTurma || null}, ${data.naturezaAcao || null}, ${data.valorCausa || null},
+          ${data.sentencaAcordao || null}, ${data.ultimoAndamento || null},
+          ${data.observacoes || null}, ${data.criadoPor || null}
+        )
+        RETURNING id
+      `);
+
+      res.json({ success: true, id: (result.rows[0] as any)?.id });
+    } catch (error) {
+      console.error("[api] Error creating processo:", error);
+      res.status(500).json({ error: "Failed to create processo" });
+    }
+  });
+
+  // PUT - Atualizar processo existente
+  app.put("/api/juridico/processos/:id", async (req, res) => {
+    try {
+      await ensureJuridicoProcessosTable();
+      const { id } = req.params;
+      const data = req.body;
+
+      await db.execute(sql`
+        UPDATE cortex_core.juridico_processos SET
+          numero_cnj = ${data.numeroCnj || null},
+          cliente_principal = ${data.clientePrincipal || null},
+          posicao_cliente = ${data.posicaoCliente || null},
+          acao = ${data.acao || null},
+          status = ${data.status || 'Ativo'},
+          contrario_principal = ${data.contrarioPrincipal || null},
+          cpf_cnpj = ${data.cpfCnpj || null},
+          objetos_acao = ${data.objetosAcao || null},
+          data_distribuicao = ${data.dataDistribuicao || null},
+          instancia = ${data.instancia || null},
+          comarca = ${data.comarca || null},
+          orgao = ${data.orgao || null},
+          vara_turma = ${data.varaTurma || null},
+          natureza_acao = ${data.naturezaAcao || null},
+          valor_causa = ${data.valorCausa || null},
+          sentenca_acordao = ${data.sentencaAcordao || null},
+          ultimo_andamento = ${data.ultimoAndamento || null},
+          observacoes = ${data.observacoes || null},
+          atualizado_em = NOW()
+        WHERE id = ${parseInt(id)}
+      `);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error updating processo:", error);
+      res.status(500).json({ error: "Failed to update processo" });
+    }
+  });
+
+  // DELETE - Excluir processo
+  app.delete("/api/juridico/processos/:id", async (req, res) => {
+    try {
+      await ensureJuridicoProcessosTable();
+      const { id } = req.params;
+
+      await db.execute(sql`
+        DELETE FROM cortex_core.juridico_processos WHERE id = ${parseInt(id)}
+      `);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting processo:", error);
+      res.status(500).json({ error: "Failed to delete processo" });
+    }
+  });
+
+  // POST - Seed inicial de processos jurídicos (dados da planilha)
+  app.post("/api/juridico/processos/seed", async (req, res) => {
+    try {
+      await ensureJuridicoProcessosTable();
+
+      // Verificar se já tem dados
+      const existing = await db.execute(sql`SELECT COUNT(*)::int as count FROM cortex_core.juridico_processos`);
+      if ((existing.rows[0] as any)?.count > 0) {
+        return res.json({ message: "Dados já existem. Seed ignorado.", count: (existing.rows[0] as any).count });
+      }
+
+      const processos = [
+        { numero_cnj: '5029875-82.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Requerido', acao: null, status: 'Ativo', contrario_principal: 'NOVAES COMERCIO LTDA', cpf_cnpj: '39.306.125/0001-80', objetos_acao: 'Declaração de inexistência de débito', data_distribuicao: '2025-08-04', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '3ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 1997.00, sentenca_acordao: 'Sim (Sim)', ultimo_andamento: 'Arquivamento definitivo', observacoes: 'Após homologação do acordo entre as partes, o processo será encerrado e arquivado' },
+        { numero_cnj: '5034121-24.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'CB WEBSTORE LTDA', cpf_cnpj: '53.321.748/0001-77', objetos_acao: null, data_distribuicao: '2025-08-29', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '3ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 7668.22, sentenca_acordao: 'Sim (Sim)', ultimo_andamento: null, observacoes: 'Proferido despacho determinando nossa manifestação sobre a exceção de pré-executividade apresentada pela 2ª executada' },
+        { numero_cnj: '5034126-46.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'INFOTECH PROMOÇÃO DE VENDAS E SERVIÇOS LTDA', cpf_cnpj: '37.800.871/0001-60', objetos_acao: null, data_distribuicao: '2025-08-29', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '4ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 5886.14, sentenca_acordao: 'Não', ultimo_andamento: 'Processo concluso ao magistrado após apresentação de nova procuração', observacoes: 'Vamos nos manifestar conforme outros processos' },
+        { numero_cnj: '5034199-18.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'MAHATMA LUCAS GADELHA PEREIRA', cpf_cnpj: '56.267.836/0001-01', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-08-25', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '1ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 11997.35, sentenca_acordao: null, ultimo_andamento: null, observacoes: null },
+        { numero_cnj: '5034208-77.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'PODER DOS FIOS COSMÉTICOS LTDA', cpf_cnpj: '57.732.954/0001-06', objetos_acao: null, data_distribuicao: '2025-08-29', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '5ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: 'Não', ultimo_andamento: 'Certidão e despacho de devolução de carta para a parte', observacoes: 'Será necessária a redistribuição da nova Carta Precatória' },
+        { numero_cnj: '5034211-32.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'F5 COMPANY LTDA', cpf_cnpj: '52.505.243/0001-63', objetos_acao: null, data_distribuicao: '2025-08-29', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '5ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: null, observacoes: null },
+        { numero_cnj: '5034175-27.2025.8.26.0015', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Requerente', acao: 'Carta Precatória Cível', status: 'Ativo', contrario_principal: 'F5 COMPANY LTDA', cpf_cnpj: '52.505.243/0001-63', objetos_acao: 'Citação da requerida', data_distribuicao: '2025-01-27', instancia: '1ª Instância', comarca: 'Regional BI - Poderosa', orgao: 'TJSP', vara_turma: '1ª Vara do Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 2836.00, sentenca_acordao: 'Não', ultimo_andamento: 'Baixa da Carta Precatória', observacoes: 'Será necessária a redistribuição da Carta Precatória' },
+        { numero_cnj: '5034216-54.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'DOLCE FIT ALIMENTOS E BEBIDAS FUNCIONAIS LTDA', cpf_cnpj: '51.822.715/0001-60', objetos_acao: null, data_distribuicao: '2025-08-29', instancia: '1ª Instância', comarca: 'Comarca de Capital', orgao: 'TJES', vara_turma: '1ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 3855.40, sentenca_acordao: 'Não', ultimo_andamento: 'Expedida Carta Precatória para citar a parte', observacoes: 'Será necessária a redistribuição da Carta Precatória' },
+        { numero_cnj: '4622385-49.2025.8.26.0056', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Requerente', acao: 'Carta Precatória Cível', status: 'Ativo', contrario_principal: 'DOLCE FIT ALIMENTOS E BEBIDAS FUNCIONAIS LTDA', cpf_cnpj: '51.822.715/0001-60', objetos_acao: 'Citação da requerida', data_distribuicao: '2025-02-09', instancia: '1ª Instância', comarca: 'JEC Central - Virginópolis', orgao: 'TJSP', vara_turma: '2ª Vara do Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: 'Baixa da Carta Precatória', observacoes: 'Será necessária a redistribuição da Carta Precatória' },
+        { numero_cnj: '5034280-10.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: null, cpf_cnpj: '57.470.157/0001-06', objetos_acao: null, data_distribuicao: '2025-08-30', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '4ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 5109.92, sentenca_acordao: null, ultimo_andamento: 'Expedição de Carta Precatória de citação da Executada', observacoes: 'Inserido em rotina para diligenciar a análise do nosso ofício' },
+        { numero_cnj: '5034333-43.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'BR SERVIÇOS DIGITAIS LTDA', cpf_cnpj: '42.060.722/0001-55', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-01', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: 6976.14, sentenca_acordao: null, ultimo_andamento: null, observacoes: 'Medidas são utilizadas para comprovação expedição de Carta Precatória de citação da Executada. Peticionaremos requerendo que a expedição seja reiterada' },
+        { numero_cnj: '5034476-34.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'FÉ DOS CACHOS LTDA', cpf_cnpj: '52.395.585/0001-90', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-05', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '2ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 12988.65, sentenca_acordao: 'Não', ultimo_andamento: null, observacoes: null },
+        { numero_cnj: '5035287-91.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'ALLDAYS NUTRITION LTDA', cpf_cnpj: null, objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-05', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: null, observacoes: 'Juntada de comprovação de produção de documentos apresentados e aplicar citação da Executada' },
+        { numero_cnj: '5035314-74.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'FANTASMA DA OPERA ESTÉTICA E SAÚDE CAPILAR LTDA', cpf_cnpj: '49.051.240/0001-04', objetos_acao: null, data_distribuicao: '2025-09-05', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '8ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 10474.18, sentenca_acordao: 'Não', ultimo_andamento: 'Carta Precatória de citação da Executada', observacoes: 'Vamos nos manifestar conforme outros processos. Com o retorno negativo da Carta Precatória, informaremos novo endereço e requereremos citação do novo endereço' },
+        { numero_cnj: '5035320-81.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'HORTENSIA MOTA VIDAL 01776841564', cpf_cnpj: '31.676.332/0001-78', objetos_acao: null, data_distribuicao: '2025-09-05', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '4ª Vara Cível', natureza_acao: 'Cível', valor_causa: 6224.77, sentenca_acordao: null, ultimo_andamento: 'Diligenciar, em apreender, a apreciação do novo endereço e requerimento expedição do novo', observacoes: 'Solicitamos a remessa dos autos a uma Vara Cível. Tendo em vista a alta complexidade do caso' },
+        { numero_cnj: '5035362-33.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'PLATAFORMA E COMÉRCIO DIAZ LTDA', cpf_cnpj: '44.333.986/0001-07', objetos_acao: null, data_distribuicao: '2025-09-05', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '3ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 2582.05, sentenca_acordao: null, ultimo_andamento: null, observacoes: 'Estamos sul (ilegível) e que a Turbo não pode ligar sem acordo' },
+        { numero_cnj: '5035397-90.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'EBEYRE STORE LTDA', cpf_cnpj: '53.042.649/0001-31', objetos_acao: null, data_distribuicao: '2025-09-05', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '5ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 15464.15, sentenca_acordao: null, ultimo_andamento: 'Com o retorno negativo do primeiro mandado de citação, indicou-se novo endereço e requereu-se a expedição de nova citação', observacoes: 'Inserido em rotina para diligenciar a análise do nosso ofício' },
+        { numero_cnj: '5035382-24.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'JOAO FABIO LOUREIRO SILVA', cpf_cnpj: null, objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-05', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '4ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 2382.83, sentenca_acordao: null, ultimo_andamento: 'Distribuição Carta Precatória', observacoes: null },
+        { numero_cnj: '5035373-42.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'FERREIRA SOLANO LTDA', cpf_cnpj: '49.736.173/0001-62', objetos_acao: null, data_distribuicao: '2025-09-05', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '1ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 12886.83, sentenca_acordao: 'Não', ultimo_andamento: 'Determinação comprovação de CF', observacoes: 'Atender ao CP' },
+        { numero_cnj: '5035432-53.2025.8.13.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Requerente', acao: 'Carta Precatória Cível', status: 'Ativo', contrario_principal: 'FERREIRA SOLANO LTDA', cpf_cnpj: '49.738.171/0001-42', objetos_acao: null, data_distribuicao: '2025-12-09', instancia: '1ª Instância', comarca: 'Belo Horizonte', orgao: 'TJMG', vara_turma: 'Vara de Precatórias Cível', natureza_acao: 'Cível', valor_causa: 7086.63, sentenca_acordao: 'Não', ultimo_andamento: null, observacoes: null },
+        { numero_cnj: '5036040-48.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'AMAM - INDÚSTRIA E COMÉRCIO LTDA', cpf_cnpj: '21.045.782/0001-55', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-11', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '3ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 10774.86, sentenca_acordao: null, ultimo_andamento: 'Processo inserido em fluxo para diligenciar análise', observacoes: 'Processo inserido em fluxo para diligenciar análise e petição a citação da PI na procuração' },
+        { numero_cnj: '5036058-49.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'GPA SUPLEMENTOS LTDA', cpf_cnpj: '44.060.045/0001-47', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-11', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '8ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 18009.71, sentenca_acordao: null, ultimo_andamento: 'Fomos intimados para apresentar a via original do título executivo, estão analisando para ver se já havia sido apresentado', observacoes: 'Documentos apresentados e aplicar citação da Executada' },
+        { numero_cnj: '5036072-53.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'GRUPO EMPRESARIAL TORI LTDA', cpf_cnpj: '44.315.426/0001-88', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-12', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '8ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: 'Fomos intimados para apresentar a via original do título executivo', observacoes: null },
+        { numero_cnj: '5036020-30.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'BRITO E SANTOS SUPLEMENTOS ALIMENTÍCIOS LTDA', cpf_cnpj: null, objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-12', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: 4453.81, sentenca_acordao: null, ultimo_andamento: 'Expedida carta de citação da Executada', observacoes: null },
+        { numero_cnj: '5036429-71.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'DIÁLOGOS SUPLEMENTOS LTDA', cpf_cnpj: '54.907.558/0001-84', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-09-12', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: 2455.86, sentenca_acordao: null, ultimo_andamento: 'Petição solicitando a adoção de certidão', observacoes: 'Diligenciar' },
+        { numero_cnj: '5035611-81.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'HUBIAGE DISTRIBUIDORA LTDA', cpf_cnpj: '34.366.677/0002-40', objetos_acao: null, data_distribuicao: '2025-09-09', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '8ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 23782.44, sentenca_acordao: null, ultimo_andamento: null, observacoes: 'Diligenciar' },
+        { numero_cnj: '5036500-20.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: null, cpf_cnpj: '55.542.136/0001-15', objetos_acao: null, data_distribuicao: '2025-09-17', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '5ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 6304.35, sentenca_acordao: 'Não', ultimo_andamento: 'Medidas são utilizadas para comprovação expedição de Carta Precatória de citação da Executada', observacoes: 'Inserido em rotina para análise do nosso ofício' },
+        { numero_cnj: '5037007-91.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'N.F. COMÉRCIO E INDÚSTRIA LTDA', cpf_cnpj: null, objetos_acao: null, data_distribuicao: '2025-11-27', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: 'Preliminares o cancelamento da audiência de conciliação e a expedição de carta de citação', observacoes: null },
+        { numero_cnj: '5048176-77.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'ALPHA MASTER', cpf_cnpj: '54.378.550/0001-78', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-11-27', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '3ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 5345.30, sentenca_acordao: null, ultimo_andamento: 'Diligenciar', observacoes: null },
+        { numero_cnj: '5048115-22.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'BYR LTDA', cpf_cnpj: '39.395.031/0001-10', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2025-11-09', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '1ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 8891.03, sentenca_acordao: null, ultimo_andamento: 'Determinar o prosseguimento da prova', observacoes: 'Petição requerendo o cumprimento da sentença' },
+        { numero_cnj: '5048213-22.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'CASA ATELLA LTDA', cpf_cnpj: '28.676.521/0001-82', objetos_acao: null, data_distribuicao: '2025-11-09', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: '5ª Juizado Especial Cível', natureza_acao: 'Cível', valor_causa: 19831.75, sentenca_acordao: null, ultimo_andamento: null, observacoes: 'Inserido em rotina para diligenciar' },
+        { numero_cnj: '5050813-70.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'VENÂNCIO CORREIA DE OLIVEIRA LTDA', cpf_cnpj: '37.028.056/0001-97', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2026-01-10', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: null, observacoes: null },
+        { numero_cnj: '5001548-21.2026.8.08.0094', cliente_principal: 'PEIXOTO DEBBANE TREINAMENTO E CONSULTORIA ADMINISTRATIVA LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: null, cpf_cnpj: null, objetos_acao: null, data_distribuicao: '2026-01-16', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: 5506.20, sentenca_acordao: null, ultimo_andamento: null, observacoes: null },
+        { numero_cnj: '5000975-68.2024.8.08.0094', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Requerido', acao: 'Ação de Indenização por danos materiais e morais', status: 'Ativo', contrario_principal: 'ANDRÉIA PONCE E SILVA LTDA', cpf_cnpj: '31.652.414/0001-29', objetos_acao: null, data_distribuicao: '2026-01-23', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: 9093.14, sentenca_acordao: null, ultimo_andamento: 'Processo em magistrado', observacoes: 'Médica realizada pelo magistrado para análise' },
+        { numero_cnj: '5002320-56.2026.8.08.0024', cliente_principal: 'PEIXOTO DEBBANE TREINAMENTO E CONSULTORIA ADMINISTRATIVA LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'SAVARESE MEDICINAS LTDA', cpf_cnpj: '41.593.226/0001-00', objetos_acao: 'Execução de dívida reconhecida', data_distribuicao: '2026-01-23', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: null, observacoes: 'Processo em magistrado para análise' },
+        { numero_cnj: '5002999-56.2025.8.08.0024', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Exequente', acao: 'Ação de execução de título extrajudicial', status: 'Ativo', contrario_principal: 'CK DISTRIBUIDORA E REPRESENTAÇÕES LTDA', cpf_cnpj: '31.941.662/0001-00', objetos_acao: 'Indenização trabalhista', data_distribuicao: '2026-01-27', instancia: '1ª Instância', comarca: 'Vitória', orgao: 'TJES', vara_turma: null, natureza_acao: 'Cível', valor_causa: 9467.50, sentenca_acordao: null, ultimo_andamento: null, observacoes: null },
+        { numero_cnj: '0000375-19.2025.5.17.0004', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Reclamado', acao: 'Reclamação Trabalhista', status: 'Ativo', contrario_principal: 'PEDRO HENRIQUE LOPES SPINDULA', cpf_cnpj: '160.584.817-40', objetos_acao: null, data_distribuicao: '2024-03-01', instancia: '1ª Instância', comarca: null, orgao: 'TRT17', vara_turma: '4ª Vara do Trabalho', natureza_acao: 'Trabalhista', valor_causa: null, sentenca_acordao: null, ultimo_andamento: 'Aguardando a União para apresentar os cálculos de valor da causa e dos juros devidos', observacoes: null },
+        { numero_cnj: '5625365-68.2024.4.02.5001', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Requerente', acao: 'Ação Ordinária', status: 'Ativo', contrario_principal: 'UNIÃO - FAZENDA NACIONAL', cpf_cnpj: '00.394.460/0216-53', objetos_acao: null, data_distribuicao: '2024-02-01', instancia: '1ª Instância', comarca: null, orgao: 'TRF2', vara_turma: '2ª Juizado Especial Criminal e Fazenda Pública', natureza_acao: 'Cível', valor_causa: 301.12, sentenca_acordao: 'Sim (Sim)', ultimo_andamento: null, observacoes: 'Confirmar a conferência e juntada do ofício e trânsito' },
+        { numero_cnj: '5034153-63.2024.8.02.5001', cliente_principal: 'TURBO PARTNERS LTDA', posicao_cliente: 'Requerente', acao: 'Ação Ordinária', status: 'Ativo', contrario_principal: 'ESTADO DO ESPÍRITO SANTO', cpf_cnpj: '27.080.605/0008-63', objetos_acao: 'Restituição de indébito tributário', data_distribuicao: '2025-11-07', instancia: '1ª Instância', comarca: null, orgao: 'TJES', vara_turma: '1ª Juizado Especial Criminal e Fazenda Pública', natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: 'Confirmar a conferência e juntada do ofício e trânsito', observacoes: 'Conferir nos autos do ofício' },
+        { numero_cnj: '5040198-49.2025.4.02.5001', cliente_principal: 'ANDRÉ DEBBANE MUSSO', posicao_cliente: 'Requerente', acao: 'Ação Ordinária', status: 'Ativo', contrario_principal: 'UNIÃO - FAZENDA NACIONAL', cpf_cnpj: '00.394.460/0216-53', objetos_acao: 'Restituição de indébito tributário', data_distribuicao: '2025-12-21', instancia: '1ª Instância', comarca: null, orgao: 'TRF2', vara_turma: null, natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: null, observacoes: null },
+        { numero_cnj: '5031392-66.2025.4.03.5001', cliente_principal: 'ANDRÉ DEBBANE MUSSO', posicao_cliente: 'Requerente', acao: 'Ação Ordinária', status: 'Ativo', contrario_principal: 'UNIÃO - FAZENDA NACIONAL', cpf_cnpj: null, objetos_acao: null, data_distribuicao: null, instancia: '1ª Instância', comarca: null, orgao: 'TRF3', vara_turma: null, natureza_acao: 'Cível', valor_causa: null, sentenca_acordao: null, ultimo_andamento: null, observacoes: 'Alvará' },
+      ];
+
+      let inserted = 0;
+      const errors: string[] = [];
+
+      for (const p of processos) {
+        try {
+          const valorCausa = p.valor_causa !== null && p.valor_causa !== undefined ? String(p.valor_causa) : null;
+          const dataDistribuicao = p.data_distribuicao || null;
+          await db.execute(sql`
+            INSERT INTO cortex_core.juridico_processos (
+              numero_cnj, cliente_principal, posicao_cliente, acao, status,
+              contrario_principal, cpf_cnpj, objetos_acao, data_distribuicao,
+              instancia, comarca, orgao, vara_turma, natureza_acao, valor_causa,
+              sentenca_acordao, ultimo_andamento, observacoes
+            ) VALUES (
+              ${p.numero_cnj}, ${p.cliente_principal}, ${p.posicao_cliente}, ${p.acao}, ${p.status},
+              ${p.contrario_principal}, ${p.cpf_cnpj}, ${p.objetos_acao}, ${dataDistribuicao},
+              ${p.instancia}, ${p.comarca}, ${p.orgao}, ${p.vara_turma}, ${p.natureza_acao}, ${valorCausa},
+              ${p.sentenca_acordao}, ${p.ultimo_andamento}, ${p.observacoes}
+            )
+            ON CONFLICT (numero_cnj) DO NOTHING
+          `);
+          inserted++;
+        } catch (err: any) {
+          console.error(`[api] Error inserting processo ${p.numero_cnj}:`, err?.message || err);
+          errors.push(`${p.numero_cnj}: ${err?.message || 'unknown error'}`);
+        }
+      }
+
+      res.json({ success: true, message: `${inserted} de ${processos.length} processos inseridos com sucesso`, errors: errors.length > 0 ? errors : undefined });
+    } catch (error: any) {
+      console.error("[api] Error seeding processos:", error?.message || error);
+      res.status(500).json({ error: "Failed to seed processos", detail: error?.message });
     }
   });
 
