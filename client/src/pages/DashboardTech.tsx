@@ -5,13 +5,13 @@ import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/util
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  Monitor, 
-  Rocket, 
-  Clock, 
-  DollarSign, 
-  Users, 
-  CheckCircle2, 
+import {
+  Monitor,
+  Rocket,
+  Clock,
+  DollarSign,
+  Users,
+  CheckCircle2,
   Target,
   AlertCircle,
   Calendar,
@@ -19,10 +19,12 @@ import {
   Zap,
   Timer,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  LineChart as LineChartIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Link } from "wouter";
 import {
   BarChart,
   Bar,
@@ -166,6 +168,26 @@ export default function DashboardTech() {
     queryKey: ['/api/tech/velocidade'],
   });
 
+  const { data: evolucaoMensal } = useQuery<{ mes: string; valorRealizado: number; valorPrevisto: number }[]>({
+    queryKey: ['/api/tech/receita-mensal', 6],
+    queryFn: async () => {
+      const res = await fetch('/api/tech/receita-mensal?meses=6', { credentials: "include" });
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+  });
+
+  const receitaMesAtual = evolucaoMensal?.length
+    ? evolucaoMensal[evolucaoMensal.length - 1]?.valorRealizado || 0
+    : 0;
+
+  // Dados para mini sparkline
+  const miniEvolucaoData = evolucaoMensal?.map(m => {
+    const [year, month] = m.mes.split('-');
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return { mes: `${monthNames[parseInt(month) - 1]}`, valor: m.valorRealizado };
+  }) || [];
+
   // Dados para gráficos
   const statusChartData = projetosPorStatus?.map(s => ({
     name: s.status,
@@ -290,7 +312,7 @@ export default function DashboardTech() {
         )}
 
         {/* KPIs Principais com visual melhorado */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-3">
@@ -388,6 +410,92 @@ export default function DashboardTech() {
                     </p>
                   )}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/20 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Receita Mês</p>
+                  <p className="text-xl font-bold text-emerald-600">
+                    {formatCurrencyCompact(receitaMesAtual)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Mini evolução + Links rápidos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {miniEvolucaoData.length > 0 && (
+            <Card>
+              <CardContent className="pt-4 pb-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-muted-foreground">Receita últimos 6 meses</p>
+                  <Link href="/tech/evolucao">
+                    <span className="text-xs text-primary flex items-center gap-1 hover:underline cursor-pointer">
+                      Ver evolução <ArrowRight className="h-3 w-3" />
+                    </span>
+                  </Link>
+                </div>
+                <div className="flex items-end gap-1 h-16">
+                  {miniEvolucaoData.map((d, i) => {
+                    const maxVal = Math.max(...miniEvolucaoData.map(x => x.valor), 1);
+                    const height = (d.valor / maxVal) * 100;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                        <div
+                          className="w-full bg-emerald-500/80 rounded-t-sm transition-all"
+                          style={{ height: `${Math.max(height, 4)}%` }}
+                          title={formatCurrency(d.valor)}
+                        />
+                        <span className="text-[9px] text-muted-foreground">{d.mes}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <p className="text-sm font-medium text-muted-foreground mb-3">Análises Detalhadas</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Link href="/tech/projetos">
+                  <div className="p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors">
+                    <Monitor className="h-4 w-4 text-blue-500 mb-1" />
+                    <p className="text-sm font-medium">Projetos</p>
+                    <p className="text-xs text-muted-foreground">Detalhamento completo</p>
+                  </div>
+                </Link>
+                <Link href="/tech/evolucao">
+                  <div className="p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors">
+                    <LineChartIcon className="h-4 w-4 text-green-500 mb-1" />
+                    <p className="text-sm font-medium">Evolução</p>
+                    <p className="text-xs text-muted-foreground">Tendências mensais</p>
+                  </div>
+                </Link>
+                <Link href="/tech/financeiro">
+                  <div className="p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors">
+                    <DollarSign className="h-4 w-4 text-purple-500 mb-1" />
+                    <p className="text-sm font-medium">Financeiro</p>
+                    <p className="text-xs text-muted-foreground">Previsto vs Realizado</p>
+                  </div>
+                </Link>
+                <Link href="/tech/projetos">
+                  <div className="p-3 rounded-lg border bg-card hover:bg-muted/50 cursor-pointer transition-colors">
+                    <Users className="h-4 w-4 text-orange-500 mb-1" />
+                    <p className="text-sm font-medium">Performance</p>
+                    <p className="text-xs text-muted-foreground">Por responsável</p>
+                  </div>
+                </Link>
               </div>
             </CardContent>
           </Card>

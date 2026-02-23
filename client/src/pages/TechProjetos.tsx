@@ -163,6 +163,7 @@ export default function TechProjetos() {
   const [activeTab, setActiveTab] = useState<'abertos' | 'fechados'>('abertos');
   const [responsavelFilter, setResponsavelFilter] = useState<string>('todos');
   const [tipoFilter, setTipoFilter] = useState<string>('todos');
+  const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'data' | 'valor' | 'prazo'>('data');
   
@@ -223,12 +224,21 @@ export default function TechProjetos() {
     return tipos?.map(t => t.tipo).filter(t => t && t !== 'Não definido') || [];
   }, [tipos]);
 
+  const uniqueStatuses = useMemo(() => {
+    if (!projetos) return [];
+    return Array.from(new Set(projetos.map(p => p.statusProjeto).filter(Boolean))).sort();
+  }, [projetos]);
+
   const filteredProjetos = useMemo(() => {
     let result = projetos || [];
-    
+
+    if (statusFilter !== 'todos') {
+      result = result.filter(p => p.statusProjeto === statusFilter);
+    }
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      result = result.filter(p => 
+      result = result.filter(p =>
         p.taskName?.toLowerCase().includes(term) ||
         p.responsavel?.toLowerCase().includes(term) ||
         p.tipo?.toLowerCase().includes(term)
@@ -802,6 +812,18 @@ export default function TechProjetos() {
                   <SelectItem value="todos">Todos</SelectItem>
                   {uniqueTipos.map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-status">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos Status</SelectItem>
+                  {uniqueStatuses.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
