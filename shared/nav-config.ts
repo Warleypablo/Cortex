@@ -48,6 +48,8 @@ export const PERMISSION_KEYS = {
   TECH: {
     VISAO_GERAL: 'tech.visao_geral',
     PROJETOS: 'tech.projetos',
+    EVOLUCAO: 'tech.evolucao',
+    FINANCEIRO: 'tech.financeiro',
   },
   // Comercial
   COM: {
@@ -200,6 +202,8 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   // Tech
   '/dashboard/tech': PERMISSION_KEYS.TECH.VISAO_GERAL,
   '/tech/projetos': PERMISSION_KEYS.TECH.PROJETOS,
+  '/tech/evolucao': PERMISSION_KEYS.TECH.EVOLUCAO,
+  '/tech/financeiro': PERMISSION_KEYS.TECH.FINANCEIRO,
   // Comercial
   '/dashboard/comercial/closers': PERMISSION_KEYS.COM.CLOSERS,
   '/dashboard/comercial/sdrs': PERMISSION_KEYS.COM.SDRS,
@@ -385,6 +389,16 @@ export const NAV_CONFIG = {
         { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
       ],
     },
+    {
+      title: 'Tech',
+      icon: 'Monitor',
+      items: [
+        { title: 'Visão Geral', url: '/dashboard/tech', icon: 'Eye', permissionKey: PERMISSION_KEYS.TECH.VISAO_GERAL },
+        { title: 'Projetos', url: '/tech/projetos', icon: 'FolderOpen', permissionKey: PERMISSION_KEYS.TECH.PROJETOS },
+        { title: 'Evolução Mensal', url: '/tech/evolucao', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.TECH.EVOLUCAO },
+        { title: 'Análise Financeira', url: '/tech/financeiro', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.TECH.FINANCEIRO },
+      ],
+    },
   ],
   
   // G&G (Pessoas)
@@ -562,6 +576,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',
   [PERMISSION_KEYS.TECH.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.TECH.PROJETOS]: 'Projetos',
+  [PERMISSION_KEYS.TECH.EVOLUCAO]: 'Evolução Mensal',
+  [PERMISSION_KEYS.TECH.FINANCEIRO]: 'Análise Financeira',
   [PERMISSION_KEYS.COM.CLOSERS]: 'Closers',
   [PERMISSION_KEYS.COM.SDRS]: 'SDRs',
   [PERMISSION_KEYS.COM.DET_CLOSERS]: 'Detalhamento Closers',

@@ -21,6 +21,7 @@ import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
+import { registerTechRoutes } from "./routes/tech";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -10052,18 +10053,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM "Clickup".cup_clientes
           WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
         ),
-        contrato_unico AS (
-          SELECT DISTINCT ON (cc.cnpj_limpo)
+        contrato_todos AS (
+          SELECT DISTINCT
             cc.cnpj_limpo,
             ct.squad,
             ct.servico,
-            ct.id_subtask
+            ct.id_subtask,
+            COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
           FROM cup_cnpj_normalizado cc
           INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
           WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-          ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
+        ),
+        contrato_com_peso AS (
+          SELECT
+            cnpj_limpo,
+            squad,
+            servico,
+            id_subtask,
+            CASE
+              WHEN SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo) > 0
+              THEN valor_contrato / SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo)
+              ELSE 1.0 / COUNT(*) OVER (PARTITION BY cnpj_limpo)
+            END as peso
+          FROM contrato_todos
         )
-        SELECT 
+        SELECT
           TO_CHAR(p.data_quitacao, 'YYYY-MM') as mes,
           COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
           COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
@@ -10071,14 +10085,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COALESCE(cu.servico, 'Serviço não identificado') as servico_nome,
           COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
           p.id as parcela_id,
-          p.valor_pago::numeric as valor,
+          (p.valor_pago::numeric * COALESCE(cu.peso, 1)) as valor,
           p.data_quitacao,
           p.link_nfse,
           p.num_nfse,
           p.url_cobranca
         FROM "Conta Azul".caz_parcelas p
         LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
+        LEFT JOIN contrato_com_peso cu ON caz.cnpj_limpo = cu.cnpj_limpo
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
@@ -10320,23 +10334,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM "Clickup".cup_clientes
           WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
         ),
-        contrato_unico AS (
-          SELECT DISTINCT ON (cc.cnpj_limpo)
+        contrato_todos AS (
+          SELECT DISTINCT
             cc.cnpj_limpo,
             ct.squad,
-            ct.id_subtask
+            ct.id_subtask,
+            COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
           FROM cup_cnpj_normalizado cc
           INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
           WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-          ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
+        ),
+        contrato_com_peso AS (
+          SELECT
+            cnpj_limpo,
+            squad,
+            id_subtask,
+            CASE
+              WHEN SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo) > 0
+              THEN valor_contrato / SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo)
+              ELSE 1.0 / COUNT(*) OVER (PARTITION BY cnpj_limpo)
+            END as peso
+          FROM contrato_todos
         )
-        SELECT 
+        SELECT
           COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
-          SUM(p.valor_pago::numeric) as valor_bruto,
+          SUM(p.valor_pago::numeric * COALESCE(cu.peso, 1)) as valor_bruto,
           COUNT(DISTINCT p.id) as quantidade_parcelas
         FROM "Conta Azul".caz_parcelas p
         LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
+        LEFT JOIN contrato_com_peso cu ON caz.cnpj_limpo = cu.cnpj_limpo
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
@@ -12056,113 +12082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Tech Dashboard API routes
-  app.get("/api/tech/metricas", async (req, res) => {
-    try {
-      const metricas = await storage.getTechMetricas();
-      res.json(metricas);
-    } catch (error) {
-      console.error("[api] Error fetching tech metrics:", error);
-      res.status(500).json({ error: "Failed to fetch tech metrics" });
-    }
-  });
-
-  app.get("/api/tech/projetos-por-status", async (req, res) => {
-    try {
-      const projetos = await storage.getTechProjetosPorStatus();
-      res.json(projetos);
-    } catch (error) {
-      console.error("[api] Error fetching tech projects by status:", error);
-      res.status(500).json({ error: "Failed to fetch tech projects by status" });
-    }
-  });
-
-  app.get("/api/tech/projetos-por-responsavel", async (req, res) => {
-    try {
-      const projetos = await storage.getTechProjetosPorResponsavel();
-      res.json(projetos);
-    } catch (error) {
-      console.error("[api] Error fetching tech projects by responsible:", error);
-      res.status(500).json({ error: "Failed to fetch tech projects by responsible" });
-    }
-  });
-
-  app.get("/api/tech/projetos-por-tipo", async (req, res) => {
-    try {
-      const projetos = await storage.getTechProjetosPorTipo();
-      res.json(projetos);
-    } catch (error) {
-      console.error("[api] Error fetching tech projects by type:", error);
-      res.status(500).json({ error: "Failed to fetch tech projects by type" });
-    }
-  });
-
-  app.get("/api/tech/projetos-em-andamento", async (req, res) => {
-    try {
-      const projetos = await storage.getTechProjetosEmAndamento();
-      res.json(projetos);
-    } catch (error) {
-      console.error("[api] Error fetching active tech projects:", error);
-      res.status(500).json({ error: "Failed to fetch active tech projects" });
-    }
-  });
-
-  app.get("/api/tech/projetos-fechados", async (req, res) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 20;
-      const projetos = await storage.getTechProjetosFechados(limit);
-      res.json(projetos);
-    } catch (error) {
-      console.error("[api] Error fetching closed tech projects:", error);
-      res.status(500).json({ error: "Failed to fetch closed tech projects" });
-    }
-  });
-
-  app.get("/api/tech/tasks-por-status", async (req, res) => {
-    try {
-      const tasks = await storage.getTechTasksPorStatus();
-      res.json(tasks);
-    } catch (error) {
-      console.error("[api] Error fetching tech tasks by status:", error);
-      res.status(500).json({ error: "Failed to fetch tech tasks by status" });
-    }
-  });
-
-  app.get("/api/tech/velocidade", async (req, res) => {
-    try {
-      const velocidade = await storage.getTechVelocidade();
-      res.json(velocidade);
-    } catch (error) {
-      console.error("[api] Error fetching tech velocity:", error);
-      res.status(500).json({ error: "Failed to fetch tech velocity" });
-    }
-  });
-
-  app.get("/api/tech/tempo-responsavel", async (req, res) => {
-    try {
-      const startDate = req.query.startDate as string | undefined;
-      const endDate = req.query.endDate as string | undefined;
-      const responsavel = req.query.responsavel as string | undefined;
-      const data = await storage.getTechTempoResponsavel(startDate, endDate, responsavel);
-      res.json(data);
-    } catch (error) {
-      console.error("[api] Error fetching tech tempo por responsavel:", error);
-      res.status(500).json({ error: "Failed to fetch tech tempo por responsavel" });
-    }
-  });
-
-  app.get("/api/tech/projetos", async (req, res) => {
-    try {
-      const tipo = (req.query.tipo as 'abertos' | 'fechados') || 'abertos';
-      const responsavel = req.query.responsavel as string | undefined;
-      const tipoP = req.query.tipoP as string | undefined;
-      const projetos = await storage.getTechAllProjetos(tipo, responsavel, tipoP);
-      res.json(projetos);
-    } catch (error) {
-      console.error("[api] Error fetching tech projetos:", error);
-      res.status(500).json({ error: "Failed to fetch tech projetos" });
-    }
-  });
+  // Tech Dashboard routes moved to server/routes/tech.ts
 
   // ==================== COMERCIAL - CLOSERS ====================
   
@@ -14738,6 +14658,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Metas & Notifications Module - registered from separate file
   await registerMetasRoutes(app, db, storage);
+
+  // Tech Module - registered from separate file
+  registerTechRoutes(app, db, storage);
 
   // Contratos Module - registered from separate file
   registerContratosRoutes(app);
