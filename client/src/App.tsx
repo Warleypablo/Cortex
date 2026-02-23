@@ -43,6 +43,8 @@ const DashboardInhire = lazy(() => import("@/pages/DashboardInhire"));
 const DashboardRecrutamento = lazy(() => import("@/pages/DashboardRecrutamento"));
 const DashboardTech = lazy(() => import("@/pages/DashboardTech"));
 const TechProjetos = lazy(() => import("@/pages/TechProjetos"));
+const TechEvolucao = lazy(() => import("@/pages/TechEvolucao"));
+const TechFinanceiro = lazy(() => import("@/pages/TechFinanceiro"));
 const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
 const MetaAds = lazy(() => import("@/pages/MetaAds"));
 const AuditoriaSistemas = lazy(() => import("@/pages/AuditoriaSistemas"));
@@ -228,6 +230,8 @@ function ProtectedRouter() {
       {/* Tech */}
       <Route path="/dashboard/tech">{() => <ProtectedRoute path="/dashboard/tech" component={DashboardTech} />}</Route>
       <Route path="/tech/projetos">{() => <ProtectedRoute path="/tech/projetos" component={TechProjetos} />}</Route>
+      <Route path="/tech/evolucao">{() => <ProtectedRoute path="/tech/evolucao" component={TechEvolucao} />}</Route>
+      <Route path="/tech/financeiro">{() => <ProtectedRoute path="/tech/financeiro" component={TechFinanceiro} />}</Route>
       
       {/* Comercial */}
       <Route path="/dashboard/comercial/closers">{() => <ProtectedRoute path="/dashboard/comercial/closers" component={DashboardClosers} />}</Route>

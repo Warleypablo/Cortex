@@ -277,7 +277,11 @@ export interface IStorage {
   getTechVelocidade(): Promise<TechVelocidade>;
   getTechTempoResponsavel(startDate?: string, endDate?: string, responsavel?: string): Promise<TechTempoResponsavel[]>;
   getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]>;
-  
+  getTechEvolucaoMensal(meses?: number): Promise<TechEvolucaoMensal[]>;
+  getTechEvolucaoPorTipo(meses?: number): Promise<TechEvolucaoTipo[]>;
+  getTechFinanceiro(startDate?: string, endDate?: string): Promise<TechFinanceiroAnalise>;
+  getTechReceitaMensal(meses?: number): Promise<{ mes: string; valorRealizado: number; valorPrevisto: number }[]>;
+
   // Metric Formatting Rules
   getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]>;
   getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null>;
@@ -571,6 +575,45 @@ export interface TechTempoResponsavel {
   projetosAtivos?: number;
   tempoEmAberto?: number;
   valorAtivos?: number;
+}
+
+export interface TechEvolucaoMensal {
+  mes: string;
+  entregas: number;
+  valorTotal: number;
+  tempoMedioEntrega: number;
+  taxaNoPrazo: number;
+}
+
+export interface TechEvolucaoTipo {
+  mes: string;
+  tipo: string;
+  entregas: number;
+  valorTotal: number;
+}
+
+export interface TechFinanceiroAnalise {
+  porTipo: {
+    tipo: string;
+    quantidadeRealizado: number;
+    valorRealizado: number;
+    ticketMedioRealizado: number;
+    quantidadePrevisto: number;
+    valorPrevisto: number;
+    ticketMedioPrevisto: number;
+  }[];
+  totais: {
+    valorRealizado: number;
+    valorPrevisto: number;
+    quantidadeRealizado: number;
+    quantidadePrevisto: number;
+    ticketMedioGeral: number;
+  };
+  evolucaoMensal: {
+    mes: string;
+    valorRealizado: number;
+    valorPrevisto: number;
+  }[];
 }
 
 export class MemStorage implements IStorage {
@@ -1019,6 +1062,22 @@ export class MemStorage implements IStorage {
   }
 
   async getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechEvolucaoMensal(meses?: number): Promise<TechEvolucaoMensal[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechEvolucaoPorTipo(meses?: number): Promise<TechEvolucaoTipo[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechFinanceiro(startDate?: string, endDate?: string): Promise<TechFinanceiroAnalise> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  async getTechReceitaMensal(meses?: number): Promise<{ mes: string; valorRealizado: number; valorPrevisto: number }[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -7861,14 +7920,13 @@ export class DbStorage implements IStorage {
     
     // Validate date format (YYYY-MM-DD) to prevent injection
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    
+
+    // Date filters only apply to fechados (deliveries), NOT to ativos (current open projects)
     if (startDate && dateRegex.test(startDate)) {
       fechadosConditions.push(sql`lancamento >= ${startDate}::date`);
-      ativosConditions.push(sql`data_criada >= ${startDate}::date`);
     }
     if (endDate && dateRegex.test(endDate)) {
       fechadosConditions.push(sql`lancamento <= ${endDate}::date`);
-      ativosConditions.push(sql`data_criada <= ${endDate}::date`);
     }
     if (responsavelFilter && responsavelFilter !== 'todos') {
       fechadosConditions.push(sql`responsavel = ${responsavelFilter}`);
@@ -7992,8 +8050,213 @@ export class DbStorage implements IStorage {
     }));
   }
 
+  // ============== TECH - EVOLUÇÃO E FINANCEIRO ==============
+
+  async getTechEvolucaoMensal(meses: number = 12): Promise<TechEvolucaoMensal[]> {
+    const result = await db.execute(sql`
+      SELECT
+        TO_CHAR(lancamento::date, 'YYYY-MM') as mes,
+        COUNT(*)::int as entregas,
+        COALESCE(SUM(valor_p::numeric), 0) as valor_total,
+        COALESCE(AVG(lancamento::date - data_criada::date), 0) as tempo_medio_entrega,
+        CASE
+          WHEN COUNT(CASE WHEN data_vencimento IS NOT NULL THEN 1 END) > 0
+          THEN (COUNT(CASE WHEN lancamento::date <= data_vencimento::date THEN 1 END)::float /
+                COUNT(CASE WHEN data_vencimento IS NOT NULL THEN 1 END)::float) * 100
+          ELSE 0
+        END as taxa_no_prazo
+      FROM "Clickup".cup_projetos_tech_fechados
+      WHERE lancamento IS NOT NULL
+        AND lancamento >= (CURRENT_DATE - (${meses} || ' months')::interval)
+      GROUP BY TO_CHAR(lancamento::date, 'YYYY-MM')
+      ORDER BY mes
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      mes: row.mes,
+      entregas: parseInt(row.entregas || '0'),
+      valorTotal: parseFloat(row.valor_total || '0'),
+      tempoMedioEntrega: parseFloat(row.tempo_medio_entrega || '0'),
+      taxaNoPrazo: parseFloat(row.taxa_no_prazo || '0'),
+    }));
+  }
+
+  async getTechEvolucaoPorTipo(meses: number = 12): Promise<TechEvolucaoTipo[]> {
+    const result = await db.execute(sql`
+      SELECT
+        TO_CHAR(lancamento::date, 'YYYY-MM') as mes,
+        COALESCE(tipo, 'Não definido') as tipo,
+        COUNT(*)::int as entregas,
+        COALESCE(SUM(valor_p::numeric), 0) as valor_total
+      FROM "Clickup".cup_projetos_tech_fechados
+      WHERE lancamento IS NOT NULL
+        AND lancamento >= (CURRENT_DATE - (${meses} || ' months')::interval)
+      GROUP BY TO_CHAR(lancamento::date, 'YYYY-MM'), tipo
+      ORDER BY mes, tipo
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      mes: row.mes,
+      tipo: row.tipo,
+      entregas: parseInt(row.entregas || '0'),
+      valorTotal: parseFloat(row.valor_total || '0'),
+    }));
+  }
+
+  async getTechFinanceiro(startDate?: string, endDate?: string): Promise<TechFinanceiroAnalise> {
+    const start = startDate || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+    const end = endDate || new Date().toISOString().split('T')[0];
+
+    // Realizado (projetos fechados no período)
+    const realizadoResult = await db.execute(sql`
+      SELECT
+        COALESCE(tipo, 'Não definido') as tipo,
+        COUNT(*)::int as quantidade,
+        COALESCE(SUM(valor_p::numeric), 0) as valor_realizado,
+        COALESCE(AVG(valor_p::numeric), 0) as ticket_medio
+      FROM "Clickup".cup_projetos_tech_fechados
+      WHERE lancamento >= ${start}::timestamp
+        AND lancamento <= ${end}::timestamp
+        AND lancamento IS NOT NULL
+      GROUP BY tipo
+    `);
+
+    // Previsto (projetos ativos com vencimento no período)
+    const previstoResult = await db.execute(sql`
+      SELECT
+        COALESCE(tipo, 'Não definido') as tipo,
+        COUNT(*)::int as quantidade,
+        COALESCE(SUM(valor_p::numeric), 0) as valor_previsto,
+        COALESCE(AVG(valor_p::numeric), 0) as ticket_medio
+      FROM "Clickup".cup_projetos_tech
+      WHERE data_vencimento >= ${start}::timestamp
+        AND data_vencimento <= ${end}::timestamp
+        AND data_vencimento IS NOT NULL
+      GROUP BY tipo
+    `);
+
+    const realizadoRows = realizadoResult.rows as any[];
+    const previstoRows = previstoResult.rows as any[];
+
+    // Combinar por tipo
+    const tiposMap = new Map<string, any>();
+
+    for (const row of realizadoRows) {
+      tiposMap.set(row.tipo, {
+        tipo: row.tipo,
+        quantidadeRealizado: parseInt(row.quantidade || '0'),
+        valorRealizado: parseFloat(row.valor_realizado || '0'),
+        ticketMedioRealizado: parseFloat(row.ticket_medio || '0'),
+        quantidadePrevisto: 0,
+        valorPrevisto: 0,
+        ticketMedioPrevisto: 0,
+      });
+    }
+
+    for (const row of previstoRows) {
+      const existing = tiposMap.get(row.tipo);
+      if (existing) {
+        existing.quantidadePrevisto = parseInt(row.quantidade || '0');
+        existing.valorPrevisto = parseFloat(row.valor_previsto || '0');
+        existing.ticketMedioPrevisto = parseFloat(row.ticket_medio || '0');
+      } else {
+        tiposMap.set(row.tipo, {
+          tipo: row.tipo,
+          quantidadeRealizado: 0,
+          valorRealizado: 0,
+          ticketMedioRealizado: 0,
+          quantidadePrevisto: parseInt(row.quantidade || '0'),
+          valorPrevisto: parseFloat(row.valor_previsto || '0'),
+          ticketMedioPrevisto: parseFloat(row.ticket_medio || '0'),
+        });
+      }
+    }
+
+    const porTipo = Array.from(tiposMap.values()).sort((a, b) => b.valorRealizado - a.valorRealizado);
+
+    const totalRealizado = porTipo.reduce((s, t) => s + t.valorRealizado, 0);
+    const totalPrevisto = porTipo.reduce((s, t) => s + t.valorPrevisto, 0);
+    const qtdRealizado = porTipo.reduce((s, t) => s + t.quantidadeRealizado, 0);
+    const qtdPrevisto = porTipo.reduce((s, t) => s + t.quantidadePrevisto, 0);
+
+    // Evolução mensal realizado vs previsto
+    const evolucaoResult = await db.execute(sql`
+      WITH realizado AS (
+        SELECT TO_CHAR(lancamento::date, 'YYYY-MM') as mes,
+               COALESCE(SUM(valor_p::numeric), 0) as valor_realizado
+        FROM "Clickup".cup_projetos_tech_fechados
+        WHERE lancamento >= ${start}::timestamp AND lancamento <= ${end}::timestamp AND lancamento IS NOT NULL
+        GROUP BY TO_CHAR(lancamento::date, 'YYYY-MM')
+      ),
+      previsto AS (
+        SELECT TO_CHAR(data_vencimento::date, 'YYYY-MM') as mes,
+               COALESCE(SUM(valor_p::numeric), 0) as valor_previsto
+        FROM "Clickup".cup_projetos_tech
+        WHERE data_vencimento >= ${start}::timestamp AND data_vencimento <= ${end}::timestamp AND data_vencimento IS NOT NULL
+        GROUP BY TO_CHAR(data_vencimento::date, 'YYYY-MM')
+      )
+      SELECT COALESCE(r.mes, p.mes) as mes,
+             COALESCE(r.valor_realizado, 0) as valor_realizado,
+             COALESCE(p.valor_previsto, 0) as valor_previsto
+      FROM realizado r
+      FULL OUTER JOIN previsto p ON r.mes = p.mes
+      ORDER BY mes
+    `);
+
+    const evolucaoMensal = (evolucaoResult.rows as any[]).map(row => ({
+      mes: row.mes,
+      valorRealizado: parseFloat(row.valor_realizado || '0'),
+      valorPrevisto: parseFloat(row.valor_previsto || '0'),
+    }));
+
+    return {
+      porTipo,
+      totais: {
+        valorRealizado: totalRealizado,
+        valorPrevisto: totalPrevisto,
+        quantidadeRealizado: qtdRealizado,
+        quantidadePrevisto: qtdPrevisto,
+        ticketMedioGeral: qtdRealizado > 0 ? totalRealizado / qtdRealizado : 0,
+      },
+      evolucaoMensal,
+    };
+  }
+
+  async getTechReceitaMensal(meses: number = 12): Promise<{ mes: string; valorRealizado: number; valorPrevisto: number }[]> {
+    const result = await db.execute(sql`
+      WITH realizado AS (
+        SELECT TO_CHAR(lancamento::date, 'YYYY-MM') as mes,
+               COALESCE(SUM(valor_p::numeric), 0) as valor_realizado
+        FROM "Clickup".cup_projetos_tech_fechados
+        WHERE lancamento IS NOT NULL
+          AND lancamento >= (CURRENT_DATE - (${meses} || ' months')::interval)
+        GROUP BY TO_CHAR(lancamento::date, 'YYYY-MM')
+      ),
+      previsto AS (
+        SELECT TO_CHAR(data_vencimento::date, 'YYYY-MM') as mes,
+               COALESCE(SUM(valor_p::numeric), 0) as valor_previsto
+        FROM "Clickup".cup_projetos_tech
+        WHERE data_vencimento IS NOT NULL
+          AND data_vencimento >= (CURRENT_DATE - (${meses} || ' months')::interval)
+        GROUP BY TO_CHAR(data_vencimento::date, 'YYYY-MM')
+      )
+      SELECT COALESCE(r.mes, p.mes) as mes,
+             COALESCE(r.valor_realizado, 0) as valor_realizado,
+             COALESCE(p.valor_previsto, 0) as valor_previsto
+      FROM realizado r
+      FULL OUTER JOIN previsto p ON r.mes = p.mes
+      ORDER BY mes
+    `);
+
+    return (result.rows as any[]).map(row => ({
+      mes: row.mes,
+      valorRealizado: parseFloat(row.valor_realizado || '0'),
+      valorPrevisto: parseFloat(row.valor_previsto || '0'),
+    }));
+  }
+
   // ============== INADIMPLÊNCIA ==============
-  
+
   async getInadimplenciaResumo(dataInicio?: string, dataFim?: string): Promise<{
     totalInadimplente: number;
     quantidadeClientes: number;
@@ -12167,21 +12430,18 @@ export class DbStorage implements IStorage {
         FROM "Clickup".cup_clientes
         WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
       ),
-      contrato_unico AS (
-        SELECT DISTINCT ON (cc.cnpj_limpo)
+      contrato_todos AS (
+        SELECT DISTINCT
           cc.cnpj_limpo,
-          ct.squad,
-          ct.servico,
-          ct.id_subtask
+          ct.squad
         FROM cup_cnpj_normalizado cc
         INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
         WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-        ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
       )
       SELECT DISTINCT COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad
       FROM "Conta Azul".caz_parcelas p
       LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-      LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
+      LEFT JOIN contrato_todos cu ON caz.cnpj_limpo = cu.cnpj_limpo
       WHERE p.status = 'QUITADO'
         AND p.tipo_evento = 'RECEITA'
         AND p.data_quitacao >= ${dataInicio}::date
@@ -12218,21 +12478,34 @@ export class DbStorage implements IStorage {
         FROM "Clickup".cup_clientes
         WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
       ),
-      contrato_unico AS (
-        SELECT DISTINCT ON (cc.cnpj_limpo)
+      contrato_todos AS (
+        SELECT DISTINCT
           cc.cnpj_limpo,
           ct.squad,
           ct.servico,
-          ct.id_subtask
+          ct.id_subtask,
+          COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
         FROM cup_cnpj_normalizado cc
         INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
         WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-        ORDER BY cc.cnpj_limpo, ct.id_subtask DESC NULLS LAST
+      ),
+      contrato_com_peso AS (
+        SELECT
+          cnpj_limpo,
+          squad,
+          servico,
+          id_subtask,
+          CASE
+            WHEN SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo) > 0
+            THEN valor_contrato / SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo)
+            ELSE 1.0 / COUNT(*) OVER (PARTITION BY cnpj_limpo)
+          END as peso
+        FROM contrato_todos
       ),
       parcelas_com_squad AS (
-        SELECT 
+        SELECT
           p.id as parcela_id,
-          p.valor_pago::numeric as valor,
+          (p.valor_pago::numeric * COALESCE(cu.peso, 1)) as valor,
           p.categoria_id,
           p.categoria_nome,
           caz.nome as cliente_nome,
@@ -12240,7 +12513,7 @@ export class DbStorage implements IStorage {
           COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad
         FROM "Conta Azul".caz_parcelas p
         LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        LEFT JOIN contrato_unico cu ON caz.cnpj_limpo = cu.cnpj_limpo
+        LEFT JOIN contrato_com_peso cu ON caz.cnpj_limpo = cu.cnpj_limpo
         WHERE p.status = 'QUITADO'
           AND p.tipo_evento = 'RECEITA'
           AND p.data_quitacao >= ${dataInicio}::date
