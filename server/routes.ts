@@ -10120,32 +10120,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const row of result.rows as any[]) {
         const mes = row.mes;
-        const categoriaId = row.categoria_id;
-        const categoriaNome = row.categoria_nome;
+        const categoriaNome = row.categoria_nome || 'Sem Categoria';
         const clienteNome = row.cliente_nome;
         const servicoNome = row.servico_nome;
         const squadNome = row.squad;
         const valor = Number(row.valor) || 0;
-        
+
         squadsSet.add(squadNome);
-        
+
         if (!mesesMap.has(mes)) {
           mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
         }
-        
+
         const mesData = mesesMap.get(mes)!;
         mesData.receitaTotal += valor;
         mesData.totalParcelas += 1;
-        
-        if (!mesData.categorias.has(categoriaId)) {
-          mesData.categorias.set(categoriaId, {
+
+        // Agrupar por categoria_nome (não UUID) para unificar categorias com mesmo nome
+        if (!mesData.categorias.has(categoriaNome)) {
+          mesData.categorias.set(categoriaNome, {
             nome: categoriaNome,
             valorTotal: 0,
             clientes: new Map()
           });
         }
-        
-        const cat = mesData.categorias.get(categoriaId)!;
+
+        const cat = mesData.categorias.get(categoriaNome)!;
         cat.valorTotal += valor;
         
         if (!cat.clientes.has(clienteNome)) {
@@ -10203,31 +10203,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           nivel: 0
         });
         
-        for (const [categoriaId, cat] of Array.from(mesData.categorias.entries())) {
+        for (const [categoriaNome, cat] of Array.from(mesData.categorias.entries())) {
+          // Sanitizar nome para uso como ID hierárquico
+          const categoriaKey = categoriaNome.replace(/\./g, '_');
           // Nível 1: Categoria
           receitas.push({
-            categoriaId: `RECEITAS.${categoriaId}`,
+            categoriaId: `RECEITAS.${categoriaKey}`,
             categoriaNome: cat.nome,
             valor: cat.valorTotal,
             nivel: 1
           });
-          
+
           for (const [clienteNome, cliente] of Array.from(cat.clientes.entries())) {
             // Nível 2: Cliente
             receitas.push({
-              categoriaId: `RECEITAS.${categoriaId}.${clienteNome}`,
+              categoriaId: `RECEITAS.${categoriaKey}.${clienteNome}`,
               categoriaNome: clienteNome,
               valor: cliente.valorTotal,
               nivel: 2
             });
-            
+
             for (const [chaveServico, servico] of Array.from(cliente.servicos.entries())) {
               const [servicoNome] = chaveServico.split('|');
               totalContratos++;
-              
+
               // Nível 3: Serviço com parcelas
               receitas.push({
-                categoriaId: `RECEITAS.${categoriaId}.${clienteNome}.${servicoNome}`,
+                categoriaId: `RECEITAS.${categoriaKey}.${clienteNome}.${servicoNome}`,
                 categoriaNome: `${servicoNome} (${servico.squad})`,
                 valor: servico.valor,
                 nivel: 3,
