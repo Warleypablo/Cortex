@@ -707,7 +707,7 @@ export default function ProcessosJuridico() {
                             {processo.status || "-"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-gray-600 dark:text-zinc-400 max-w-[160px] truncate">
+                        <TableCell className="text-sm text-gray-600 dark:text-zinc-400 min-w-[280px]">
                           {processo.contrarioPrincipal || "-"}
                         </TableCell>
                         <TableCell className="text-sm text-gray-600 dark:text-zinc-400 whitespace-nowrap">
