@@ -12287,23 +12287,23 @@ export class DbStorage implements IStorage {
     const categoriaMap = new Map<string, CategoriaInfo>();
     
     for (const row of receitasResult.rows as any[]) {
-      const categoriaId = row.categoria_id || 'SEM_CATEGORIA';
       const categoriaNome = row.categoria_nome || 'Sem Categoria';
       const clienteNome = row.cliente_nome || 'Cliente não identificado';
       const servicoNome = row.servico_nome || 'Serviço não identificado';
       const squadNome = row.squad || 'Sem Squad';
       const valor = Number(row.valor_total) || 0;
       const parcelas = Number(row.quantidade_parcelas) || 0;
-      
-      if (!categoriaMap.has(categoriaId)) {
-        categoriaMap.set(categoriaId, {
+
+      // Agrupar por categoria_nome (não UUID) para unificar categorias com mesmo nome
+      if (!categoriaMap.has(categoriaNome)) {
+        categoriaMap.set(categoriaNome, {
           nome: categoriaNome,
           valorTotal: 0,
           clientes: new Map()
         });
       }
-      
-      const cat = categoriaMap.get(categoriaId)!;
+
+      const cat = categoriaMap.get(categoriaNome)!;
       cat.valorTotal += valor;
       
       if (!cat.clientes.has(clienteNome)) {
@@ -12334,19 +12334,21 @@ export class DbStorage implements IStorage {
       }
     }
     
-    for (const [categoriaId, cat] of Array.from(categoriaMap.entries())) {
+    for (const [categoriaNome, cat] of Array.from(categoriaMap.entries())) {
+      // Sanitizar nome para uso como ID hierárquico (substituir pontos por underscores)
+      const categoriaKey = categoriaNome.replace(/\./g, '_');
       receitas.push({
-        categoriaId,
+        categoriaId: categoriaKey,
         categoriaNome: cat.nome,
         valor: cat.valorTotal,
         nivel: 1
       });
-      
+
       const clientesOrdenados = Array.from(cat.clientes.entries())
         .sort((a, b) => b[1].valorTotal - a[1].valorTotal);
-      
+
       for (const [clienteNome, clienteInfo] of clientesOrdenados) {
-        const clienteId = `${categoriaId}.${clienteNome.substring(0, 30).replace(/\./g, '_')}`;
+        const clienteId = `${categoriaKey}.${clienteNome.substring(0, 30).replace(/\./g, '_')}`;
         receitas.push({
           categoriaId: clienteId,
           categoriaNome: clienteNome,
@@ -12450,11 +12452,47 @@ export class DbStorage implements IStorage {
     const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
     
     // Buscar freelancers do período selecionado, cruzando com rh_pessoal para obter squad
-    // O valor está em custom_fields->>'Valor' formatado como "R$ 2.500,00"
-    // Precisa limpar formatação: remover R$, pontos de milhar, e trocar vírgula por ponto
-    // JOIN mais robusto: compara primeiro + segundo nome (pois cup_freelas tem nomes curtos)
+    // Usa CTE best_match com DISTINCT ON para selecionar apenas o MELHOR match por nome,
+    // priorizando: exato > primeiro+segundo > starts_with > sobrenome_contains > 8chars
+    // Isso evita que JOINs fuzzy cruzem freelancers com pessoas erradas de squads diferentes
     const freelaResult = await db.execute(sql`
-      SELECT 
+      WITH best_match AS (
+        SELECT DISTINCT ON (LOWER(TRIM(fn.responsavel)))
+          LOWER(TRIM(fn.responsavel)) as responsavel_key,
+          rp.squad as rh_squad
+        FROM (SELECT DISTINCT responsavel FROM "Clickup".cup_freelas WHERE responsavel IS NOT NULL) fn
+        LEFT JOIN "Inhire".rh_pessoal rp ON (
+          LOWER(TRIM(fn.responsavel)) = LOWER(TRIM(rp.nome))
+          OR LOWER(TRIM(fn.responsavel)) = LOWER(
+            SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2)
+          )
+          OR LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(fn.responsavel)) || '%'
+          OR (
+            LOWER(SPLIT_PART(TRIM(fn.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
+            AND LENGTH(SPLIT_PART(TRIM(fn.responsavel), ' ', 2)) >= 3
+            AND LOWER(TRIM(rp.nome)) LIKE '%' || LOWER(SPLIT_PART(TRIM(fn.responsavel), ' ', 2)) || '%'
+          )
+          OR (
+            LOWER(SPLIT_PART(TRIM(fn.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
+            AND LENGTH(SPLIT_PART(TRIM(fn.responsavel), ' ', 2)) >= 4
+            AND LOWER(TRIM(rp.nome)) LIKE '%' || LEFT(LOWER(SPLIT_PART(TRIM(fn.responsavel), ' ', 2)), 8) || '%'
+          )
+        )
+        ORDER BY LOWER(TRIM(fn.responsavel)),
+          CASE
+            WHEN rp.id IS NULL THEN 99
+            WHEN LOWER(TRIM(fn.responsavel)) = LOWER(TRIM(rp.nome)) THEN 1
+            WHEN LOWER(TRIM(fn.responsavel)) = LOWER(
+              SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2)
+            ) THEN 2
+            WHEN LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(fn.responsavel)) || '%' THEN 3
+            WHEN LOWER(SPLIT_PART(TRIM(fn.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
+              AND LOWER(TRIM(rp.nome)) LIKE '%' || LOWER(SPLIT_PART(TRIM(fn.responsavel), ' ', 2)) || '%' THEN 4
+            ELSE 5
+          END,
+          rp.id NULLS LAST
+      )
+      SELECT
         f.responsavel,
         f.valor_projeto as valor_projeto_raw,
         f.custom_fields->>'Valor' as valor_custom_raw,
@@ -12473,41 +12511,15 @@ export class DbStorage implements IStorage {
           0
         ) as valor,
         f.data_pagamento,
-        COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad
+        COALESCE(NULLIF(TRIM(bm.rh_squad), ''), 'Sem Squad') as squad
       FROM "Clickup".cup_freelas f
-      LEFT JOIN "Inhire".rh_pessoal rp ON (
-        -- Match exato
-        LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
-        OR
-        -- Match por primeiro + segundo nome (para nomes curtos em cup_freelas)
-        LOWER(TRIM(f.responsavel)) = LOWER(
-          SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2)
-        )
-        OR
-        -- Match se o nome de rp começa com o responsavel
-        LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(f.responsavel)) || '%'
-        OR
-        -- Match flexível: primeiro nome igual E segundo nome do responsavel aparece no nome completo
-        -- Ex: "Livia Scalon" → "Livia de Oliveira Scalon" (primeiro=Livia, "Scalon" está no nome)
-        (
-          LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
-          AND LOWER(TRIM(rp.nome)) LIKE '%' || LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)) || '%'
-        )
-        OR
-        -- Match por similaridade de primeiro nome e sobrenome aproximado (para typos como Ichinoseki vs Ichinosek)
-        (
-          LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
-          AND (
-            LOWER(TRIM(rp.nome)) LIKE '%' || LEFT(LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)), 8) || '%'
-          )
-        )
-      )
+      LEFT JOIN best_match bm ON LOWER(TRIM(f.responsavel)) = bm.responsavel_key
       WHERE f.data_pagamento >= ${dataInicio}::date
         AND f.data_pagamento < (${dataFim}::date + interval '1 day')
         AND (
           ${squadFilterKey}::text IS NULL
           OR REGEXP_REPLACE(
-            LOWER(COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad')),
+            LOWER(COALESCE(NULLIF(TRIM(bm.rh_squad), ''), 'Sem Squad')),
             '[^[:alnum:]]',
             '',
             'g'
@@ -12515,60 +12527,11 @@ export class DbStorage implements IStorage {
         )
       ORDER BY COALESCE(f.valor_projeto::numeric, 0) DESC
     `);
-    
+
     // Agrupar freelancers por responsavel
     const freelasPorResponsavel = new Map<string, { responsavel: string; valor: number }>();
     let freelaTotal = 0;
-    
-    console.log('[freelas] Total rows:', freelaResult.rows.length, 'Primeiro:', freelaResult.rows[0]);
-    
-    // Debug: mostrar todos os freelancers e seus squads para identificar problemas de join
-    if (squadFilterValue) {
-      console.log('[freelas] Filtro de squad aplicado:', squadFilterValue);
-      
-      // Debug: buscar nomes similares para encontrar variações
-      const similarNamesDebug = await db.execute(sql`
-        SELECT nome, squad FROM "Inhire".rh_pessoal 
-        WHERE LOWER(nome) LIKE '%livia%' OR LOWER(nome) LIKE '%lívia%' OR LOWER(nome) LIKE '%scalon%'
-           OR LOWER(nome) LIKE '%ana%lello%' OR LOWER(nome) LIKE '%vinicius%' OR LOWER(nome) LIKE '%ichinoseki%'
-      `);
-      console.log('[freelas-debug] Pessoas com nome similar no RH:', similarNamesDebug.rows);
-      
-      // Buscar todos os freelas SEM filtro de squad para debug (com join robusto)
-      const allFreelasDebug = await db.execute(sql`
-        SELECT 
-          f.responsavel,
-          rp.nome as nome_rh,
-          rp.squad as squad_rh,
-          CASE WHEN rp.nome IS NULL THEN 'NAO ENCONTRADO' ELSE 'OK' END as match_status
-        FROM "Clickup".cup_freelas f
-        LEFT JOIN "Inhire".rh_pessoal rp ON (
-          LOWER(TRIM(f.responsavel)) = LOWER(TRIM(rp.nome))
-          OR LOWER(TRIM(f.responsavel)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2))
-          OR LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(f.responsavel)) || '%'
-          OR (
-            LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
-            AND LOWER(TRIM(rp.nome)) LIKE '%' || LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)) || '%'
-          )
-          OR (
-            LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 1)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1))
-            AND LOWER(TRIM(rp.nome)) LIKE '%' || LEFT(LOWER(SPLIT_PART(TRIM(f.responsavel), ' ', 2)), 8) || '%'
-          )
-        )
-        WHERE f.data_pagamento >= ${dataInicio}::date
-          AND f.data_pagamento < (${dataFim}::date + interval '1 day')
-        ORDER BY f.responsavel
-      `);
-      console.log('[freelas-debug] Todos os freelancers do período (join robusto):', 
-        (allFreelasDebug.rows as any[]).map(r => ({
-          responsavel: r.responsavel,
-          nome_rh: r.nome_rh,
-          squad_rh: r.squad_rh,
-          match: r.match_status
-        }))
-      );
-    }
-    
+
     for (const row of freelaResult.rows as any[]) {
       const responsavel = row.responsavel || 'Não identificado';
       const valor = Number(row.valor) || 0;
