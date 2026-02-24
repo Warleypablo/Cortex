@@ -1,11 +1,23 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
 import { SiGoogle } from "react-icons/si";
-import { Mail, ArrowLeft, Loader2, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, ArrowLeft, Loader2, Lock, Eye, EyeOff, Building2 } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { motion, AnimatePresence } from "framer-motion";
 import { WebGLShader } from "@/components/ui/web-gl-shader";
 import { Input } from "@/components/ui/input";
 import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
+
+// Formata CNPJ enquanto o usuário digita: XX.XXX.XXX/XXXX-XX
+function maskCnpj(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 14);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0,2)}.${digits.slice(2)}`;
+  if (digits.length <= 8) return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5)}`;
+  if (digits.length <= 12) return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8)}`;
+  return `${digits.slice(0,2)}.${digits.slice(2,5)}.${digits.slice(5,8)}/${digits.slice(8,12)}-${digits.slice(12)}`;
+}
 
 function GlassFilter() {
   return (
@@ -45,15 +57,21 @@ function GlassFilter() {
 
 export default function Login() {
   usePageTitle("Login");
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [isHovered, setIsHovered] = useState(false);
   const [isDevLoading, setIsDevLoading] = useState(false);
   const [showExternalLogin, setShowExternalLogin] = useState(false);
+  const [showClientLogin, setShowClientLogin] = useState(false);
   const [externalEmail, setExternalEmail] = useState('');
   const [externalPassword, setExternalPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [externalLoading, setExternalLoading] = useState(false);
   const [externalError, setExternalError] = useState('');
-  
+  const [cnpj, setCnpj] = useState('');
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cnpjError, setCnpjError] = useState('');
+
   // Mostra botão de dev login apenas em desenvolvimento
   const isDevelopment = import.meta.env.DEV;
 
@@ -75,6 +93,37 @@ export default function Login() {
     }
   };
   
+  const handleClientLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCnpjError('');
+    setCnpjLoading(true);
+
+    try {
+      const response = await fetch("/auth/client-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cnpj }),
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Pre-populate cache so the portal renders instantly without loading state
+        if (data.client) {
+          queryClient.setQueryData(["/api/auth/client-me"], data.client);
+        }
+        setLocation("/portal-cliente");
+      } else {
+        const data = await response.json();
+        setCnpjError(data.message || "CNPJ não encontrado");
+      }
+    } catch {
+      setCnpjError("Erro ao conectar. Tente novamente.");
+    } finally {
+      setCnpjLoading(false);
+    }
+  };
+
   const handleExternalLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setExternalError('');
@@ -153,7 +202,7 @@ export default function Login() {
             </motion.div>
 
             <AnimatePresence mode="wait">
-              {!showExternalLogin ? (
+              {!showExternalLogin && !showClientLogin ? (
                 <motion.div
                   key="main-login"
                   initial={{ opacity: 0, y: 10 }}
@@ -176,13 +225,22 @@ export default function Login() {
                     <SiGoogle className="w-5 h-5" />
                     <span className="font-medium">Entrar com Google</span>
                   </button>
-                  
+
                   <div className="flex items-center gap-4 my-2">
                     <div className="h-px bg-white/10 flex-1" />
                     <span className="text-white/30 text-xs uppercase tracking-wider">ou</span>
                     <div className="h-px bg-white/10 flex-1" />
                   </div>
-                  
+
+                  <button
+                    onClick={() => setLocation("/loginclientes")}
+                    className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-full py-3 px-4 transition-all duration-300 hover:border-blue-500/40"
+                    data-testid="button-client-login"
+                  >
+                    <Building2 className="w-5 h-5" />
+                    <span className="font-medium">Área do Cliente</span>
+                  </button>
+
                   <button
                     onClick={() => setShowExternalLogin(true)}
                     className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 rounded-full py-3 px-4 transition-all duration-300 hover:border-orange-500/40"
@@ -191,7 +249,7 @@ export default function Login() {
                     <Mail className="w-5 h-5" />
                     <span className="font-medium">Login Externo</span>
                   </button>
-                  
+
                   {isDevelopment && (
                     <button
                       onClick={handleDevLogin}
@@ -202,12 +260,85 @@ export default function Login() {
                       <span>{isDevLoading ? "Entrando..." : "Entrar como Admin (Dev)"}</span>
                     </button>
                   )}
-                  
+
                   <div className="pt-4">
                     <p className="text-xs text-white/40">
                       Autenticação segura via Google OAuth 2.0
                     </p>
                   </div>
+                </motion.div>
+              ) : showClientLogin ? (
+                <motion.div
+                  key="client-login"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4 pt-2"
+                >
+                  <button
+                    onClick={() => {
+                      setShowClientLogin(false);
+                      setCnpjError('');
+                      setCnpj('');
+                    }}
+                    className="flex items-center gap-2 text-white/50 hover:text-white/80 transition-colors text-sm"
+                    data-testid="button-back-client-login"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Voltar</span>
+                  </button>
+
+                  <div className="space-y-2">
+                    <h3 className="text-white font-medium">Área do Cliente</h3>
+                    <p className="text-white/40 text-sm">
+                      Digite seu CNPJ para acessar sua área exclusiva
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleClientLogin} className="space-y-4">
+                    <div className="relative">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                      <Input
+                        type="text"
+                        placeholder="00.000.000/0000-00"
+                        value={cnpj}
+                        onChange={(e) => setCnpj(maskCnpj(e.target.value))}
+                        className="bg-white/[0.05] border-white/[0.1] text-white placeholder:text-white/30 rounded-full pl-10 pr-4 py-3 h-auto focus:border-blue-500/50 focus:ring-blue-500/20 font-mono"
+                        required
+                        data-testid="input-client-cnpj"
+                      />
+                    </div>
+
+                    {cnpjError && (
+                      <p className="text-red-400 text-sm px-2" data-testid="text-cnpj-error">
+                        {cnpjError}
+                      </p>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={cnpjLoading || cnpj.replace(/\D/g, '').length !== 14}
+                      className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-blue-500 hover:bg-blue-600 text-white rounded-full py-3.5 px-4 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid="button-submit-client"
+                    >
+                      {cnpjLoading ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          <span className="font-medium">Verificando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Building2 className="w-5 h-5" />
+                          <span className="font-medium">Acessar Área do Cliente</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  <p className="text-xs text-white/30 text-center pt-2">
+                    Acesso vinculado ao seu CNPJ cadastrado
+                  </p>
                 </motion.div>
               ) : (
                 <motion.div

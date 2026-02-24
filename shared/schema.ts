@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2697,3 +2697,35 @@ export const stagingContratoServicos = pgTable("staging.contrato_servicos", {
 export const insertContratoServicoSchema = createInsertSchema(stagingContratoServicos).omit({ id: true, criadoEm: true });
 export type ContratoServico = typeof stagingContratoServicos.$inferSelect;
 export type InsertContratoServico = z.infer<typeof insertContratoServicoSchema>;
+
+// ── Chat: mensagens entre clientes e colaboradores ──────────────────────────
+export const chatMensagens = cortexCoreSchema.table("chat_mensagens", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  remetenteTipo: varchar("remetente_tipo", { length: 20 }).notNull(), // 'cliente' | 'colaborador'
+  remetenteNome: text("remetente_nome"),
+  mensagem: text("mensagem").notNull(),
+  lida: boolean("lida").default(false).notNull(),
+  criadoEm: timestamp("criado_em").defaultNow().notNull(),
+}, (table) => [index("chat_mensagens_client_idx").on(table.clientId)]);
+
+export type ChatMensagem = typeof chatMensagens.$inferSelect;
+export type InsertChatMensagem = typeof chatMensagens.$inferInsert;
+
+// ── Portal: solicitações de cancelamento ─────────────────────────────────────
+export const portalCancelamentos = cortexCoreSchema.table("portal_cancelamentos", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  produto: text("produto"),
+  nota: integer("nota"),
+  motivos: text("motivos"),          // JSON array stringificado
+  pontosMelhoria: text("pontos_melhoria"),  // JSON array stringificado
+  proximoPasso: text("proximo_passo"),
+  retorno: text("retorno"),
+  urgencia: text("urgencia"),
+  detalhe: text("detalhe"),
+  criadoEm: timestamp("criado_em").defaultNow().notNull(),
+}, (table) => [index("portal_cancelamentos_client_idx").on(table.clientId)]);
+
+export type PortalCancelamento = typeof portalCancelamentos.$inferSelect;
+export type InsertPortalCancelamento = typeof portalCancelamentos.$inferInsert;

@@ -37,6 +37,7 @@ const AREAS = [
   "Audiovisual",
   "Estagiário (geral)",
   "Liderança (squad, time)",
+  "Growth Interno",
 ];
 
 const MOTIVOS_PERMANENCIA = [
