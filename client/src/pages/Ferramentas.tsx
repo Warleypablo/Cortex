@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ExternalLink, BarChart3, MessageSquare, FileText, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ExternalLink, BarChart3, MessageSquare, FileText, Activity, FileBarChart, Download, Loader2 } from "lucide-react";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 
@@ -45,17 +48,70 @@ const ferramentas: Ferramenta[] = [
 export default function Ferramentas() {
   usePageTitle("Ferramentas");
   useSetPageInfo("Ferramentas", "Acesse as ferramentas e sistemas da Turbo Partners");
-  
+
+  const now = new Date();
+  const [mesSelecionado, setMesSelecionado] = useState({ month: now.getMonth() + 1, year: now.getFullYear() });
+  const [gerando, setGerando] = useState(false);
+
   const handleFerramentaClick = (url: string) => {
     if (url !== "#") {
       window.open(url, "_blank", "noopener,noreferrer");
     }
   };
 
+  const handleGerarPdf = () => {
+    setGerando(true);
+    const mes = `${mesSelecionado.year}-${String(mesSelecionado.month).padStart(2, "0")}`;
+    window.open(`/api/relatorio-mensal/pdf?mes=${mes}`, "_blank");
+    setTimeout(() => setGerando(false), 3000);
+  };
+
   return (
     <div className="bg-background">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+          {/* Card especial: Relatório Mensal */}
+          <Card className="border-primary/20 dark:border-primary/30 transition-all" data-testid="card-relatorio-mensal">
+            <CardHeader className="gap-2 space-y-0">
+              <div className="flex items-start justify-between">
+                <div className="p-3 rounded-lg bg-primary/10">
+                  <FileBarChart className="w-6 h-6 text-primary" />
+                </div>
+              </div>
+              <CardTitle className="text-xl mt-4">Relatório Mensal</CardTitle>
+              <CardDescription>Gere o relatório financeiro mensal em PDF com 11 indicadores</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3">
+                <MonthYearPicker
+                  value={mesSelecionado}
+                  onChange={setMesSelecionado}
+                  triggerClassName="w-full"
+                />
+                <Button
+                  onClick={handleGerarPdf}
+                  disabled={gerando}
+                  className="w-full gap-2"
+                  data-testid="button-gerar-pdf"
+                >
+                  {gerando ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Gerar PDF
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Cards de ferramentas externas */}
           {ferramentas.map((ferramenta) => {
             const IconComponent = ferramenta.icon;
             return (
