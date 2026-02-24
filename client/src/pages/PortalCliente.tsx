@@ -104,6 +104,126 @@ function formatDayLabel(dateStr: string) {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 }
 
+// ── Mensagens especiais do chat ───────────────────────────────────────────────
+type SystemMsg =
+  | { _type: 'encerramento'; atendimentoId: number; encerradoPor: string }
+  | { _type: 'avaliacao_request'; atendimentoId: number }
+  | { _type: 'avaliacao_respondida'; atendimentoId: number; nota: number };
+
+function parseSystemMsg(mensagem: string): SystemMsg | null {
+  try {
+    const p = JSON.parse(mensagem);
+    if (p && ['encerramento', 'avaliacao_request', 'avaliacao_respondida', 'cancelamento'].includes(p._type)) return p;
+  } catch { /* não é JSON */ }
+  return null;
+}
+
+function EncerramentoBanner({ msg }: { msg: { _type: 'encerramento'; encerradoPor: string } }) {
+  return (
+    <div className="flex items-center gap-2 my-3">
+      <div className="flex-1 h-px bg-white/[0.06]" />
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-800/80 border border-white/[0.07]">
+        <Check className="w-3 h-3 text-emerald-400/70" />
+        <span className="text-[11px] text-white/35">Atendimento encerrado por <span className="text-white/50">{msg.encerradoPor}</span></span>
+      </div>
+      <div className="flex-1 h-px bg-white/[0.06]" />
+    </div>
+  );
+}
+
+function AvaliacaoWidget({ atendimentoId }: { atendimentoId: number }) {
+  const queryClient = useQueryClient();
+  const [nota, setNota] = useState<number | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const [comentario, setComentario] = useState('');
+
+  const avaliarMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/portal-cliente/avaliar-atendimento', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ atendimentoId, nota, comentario }),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Falha ao enviar');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/portal-cliente/chat'] });
+    },
+  });
+
+  const EMOJIS = ['😡', '😟', '😐', '🙂', '😍'];
+  const LABELS = ['Péssimo', 'Ruim', 'Regular', 'Bom', 'Ótimo'];
+  const active = hover ?? nota;
+
+  return (
+    <div className="rounded-2xl border border-blue-500/15 bg-blue-950/15 overflow-hidden">
+      <div className="px-4 py-3 border-b border-blue-500/10">
+        <p className="text-sm font-medium text-white/70">Como foi o atendimento?</p>
+        <p className="text-[11px] text-white/30 mt-0.5">Sua avaliação nos ajuda a melhorar</p>
+      </div>
+      <div className="px-4 py-3 space-y-3">
+        {/* Estrelas */}
+        <div className="flex items-center justify-center gap-2">
+          {[1,2,3,4,5].map(i => (
+            <button
+              key={i}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+              onClick={() => setNota(i)}
+              className="flex flex-col items-center gap-1 transition-transform hover:scale-110"
+            >
+              <span className={`text-2xl leading-none transition-all ${active && i <= active ? 'opacity-100' : 'opacity-25'}`}>
+                {EMOJIS[i - 1]}
+              </span>
+              {active === i && (
+                <span className="text-[9px] text-white/40">{LABELS[i - 1]}</span>
+              )}
+            </button>
+          ))}
+        </div>
+        {/* Comentário */}
+        {nota && (
+          <textarea
+            value={comentario}
+            onChange={e => setComentario(e.target.value)}
+            placeholder="Comentário opcional..."
+            rows={2}
+            className="w-full bg-zinc-800/60 border border-white/[0.07] rounded-xl px-3 py-2 text-xs text-white/70 placeholder:text-white/20 focus:outline-none focus:border-blue-500/30 resize-none"
+          />
+        )}
+        <button
+          onClick={() => avaliarMutation.mutate()}
+          disabled={!nota || avaliarMutation.isPending}
+          className="w-full py-2 rounded-xl bg-blue-600/25 hover:bg-blue-600/35 border border-blue-500/20 text-sm text-blue-300/80 font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          {avaliarMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Enviar avaliação'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function AvaliacaoRespondida({ nota }: { nota: number }) {
+  const EMOJIS = ['😡', '😟', '😐', '🙂', '😍'];
+  const LABELS = ['Péssimo', 'Ruim', 'Regular', 'Bom', 'Ótimo'];
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-zinc-800/40 border border-white/[0.06]">
+      <span className="text-2xl">{EMOJIS[nota - 1]}</span>
+      <div>
+        <p className="text-xs font-medium text-white/60">Avaliação enviada</p>
+        <p className="text-[11px] text-white/30">{LABELS[nota - 1]} · Obrigado pelo feedback!</p>
+      </div>
+      <div className="ml-auto flex gap-0.5">
+        {[1,2,3,4,5].map(i => (
+          <span key={i} className={`text-sm ${i <= nota ? 'opacity-100' : 'opacity-15'}`}>⭐</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ChatModuloCliente({ clientId }: { clientId: number }) {
   const queryClient = useQueryClient();
   const [inputValue, setInputValue] = useState('');
@@ -190,6 +310,7 @@ function ChatModuloCliente({ clientId }: { clientId: number }) {
               const isCliente = msg.remetenteTipo === 'cliente';
               const prevMsg = idx > 0 ? mensagens[idx - 1] : null;
               const showDayLabel = !prevMsg || formatDayLabel(msg.criadoEm) !== formatDayLabel(prevMsg.criadoEm);
+              const sysMsg = parseSystemMsg(msg.mensagem);
 
               return (
                 <div key={msg.id}>
@@ -200,30 +321,36 @@ function ChatModuloCliente({ clientId }: { clientId: number }) {
                       <div className="flex-1 h-px bg-white/[0.05]" />
                     </div>
                   )}
-                  <div className={`flex ${isCliente ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`flex items-end gap-2 max-w-[80%] ${isCliente ? 'flex-row-reverse' : 'flex-row'}`}>
-                      {/* Avatar */}
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mb-1 ${
-                        isCliente ? 'bg-blue-600/30 border border-blue-500/20' : 'bg-zinc-700 border border-white/[0.08]'
-                      }`}>
-                        <User className="w-3 h-3 text-white/40" />
-                      </div>
-                      {/* Bolha */}
-                      <div className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
-                        isCliente
-                          ? 'bg-blue-600/25 border border-blue-500/20 text-white/85 rounded-br-sm'
-                          : 'bg-zinc-800 border border-white/[0.07] text-white/70 rounded-bl-sm'
-                      }`}>
-                        {!isCliente && msg.remetenteNome && (
-                          <p className="text-[10px] text-white/30 mb-1 font-medium">{msg.remetenteNome}</p>
-                        )}
-                        <p>{msg.mensagem}</p>
-                        <p className={`text-[10px] mt-1 ${isCliente ? 'text-blue-300/30' : 'text-white/20'} text-right`}>
-                          {formatTime(msg.criadoEm)}
-                        </p>
+                  {sysMsg?._type === 'encerramento' ? (
+                    <EncerramentoBanner msg={sysMsg as any} />
+                  ) : sysMsg?._type === 'avaliacao_request' ? (
+                    <AvaliacaoWidget atendimentoId={(sysMsg as any).atendimentoId} />
+                  ) : sysMsg?._type === 'avaliacao_respondida' ? (
+                    <AvaliacaoRespondida nota={(sysMsg as any).nota} />
+                  ) : sysMsg?._type === 'cancelamento' ? null : (
+                    <div className={`flex ${isCliente ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`flex items-end gap-2 max-w-[80%] ${isCliente ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mb-1 ${
+                          isCliente ? 'bg-blue-600/30 border border-blue-500/20' : 'bg-zinc-700 border border-white/[0.08]'
+                        }`}>
+                          <User className="w-3 h-3 text-white/40" />
+                        </div>
+                        <div className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${
+                          isCliente
+                            ? 'bg-blue-600/25 border border-blue-500/20 text-white/85 rounded-br-sm'
+                            : 'bg-zinc-800 border border-white/[0.07] text-white/70 rounded-bl-sm'
+                        }`}>
+                          {!isCliente && msg.remetenteNome && (
+                            <p className="text-[10px] text-white/30 mb-1 font-medium">{msg.remetenteNome}</p>
+                          )}
+                          <p>{msg.mensagem}</p>
+                          <p className={`text-[10px] mt-1 ${isCliente ? 'text-blue-300/30' : 'text-white/20'} text-right`}>
+                            {formatTime(msg.criadoEm)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}
@@ -341,6 +468,7 @@ function ChatFlutuante({ clientId, onClose }: { clientId: number; onClose: () =>
               const isCliente = msg.remetenteTipo === 'cliente';
               const prevMsg = idx > 0 ? mensagens[idx - 1] : null;
               const showDay = !prevMsg || formatDayLabel(msg.criadoEm) !== formatDayLabel(prevMsg.criadoEm);
+              const sysMsg = parseSystemMsg(msg.mensagem);
               return (
                 <div key={msg.id}>
                   {showDay && (
@@ -350,21 +478,29 @@ function ChatFlutuante({ clientId, onClose }: { clientId: number; onClose: () =>
                       <div className="flex-1 h-px bg-white/[0.05]" />
                     </div>
                   )}
-                  <div className={`flex ${isCliente ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
-                      isCliente
-                        ? 'bg-blue-600/25 border border-blue-500/20 text-white/80 rounded-br-sm'
-                        : 'bg-zinc-800 border border-white/[0.07] text-white/65 rounded-bl-sm'
-                    }`}>
-                      {!isCliente && msg.remetenteNome && (
-                        <p className="text-[9px] text-white/30 mb-0.5 font-medium">{msg.remetenteNome}</p>
-                      )}
-                      <p>{msg.mensagem}</p>
-                      <p className={`text-[9px] mt-0.5 text-right ${isCliente ? 'text-blue-300/25' : 'text-white/18'}`}>
-                        {formatTime(msg.criadoEm)}
-                      </p>
+                  {sysMsg?._type === 'encerramento' ? (
+                    <EncerramentoBanner msg={sysMsg as any} />
+                  ) : sysMsg?._type === 'avaliacao_request' ? (
+                    <AvaliacaoWidget atendimentoId={(sysMsg as any).atendimentoId} />
+                  ) : sysMsg?._type === 'avaliacao_respondida' ? (
+                    <AvaliacaoRespondida nota={(sysMsg as any).nota} />
+                  ) : sysMsg?._type === 'cancelamento' ? null : (
+                    <div className={`flex ${isCliente ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
+                        isCliente
+                          ? 'bg-blue-600/25 border border-blue-500/20 text-white/80 rounded-br-sm'
+                          : 'bg-zinc-800 border border-white/[0.07] text-white/65 rounded-bl-sm'
+                      }`}>
+                        {!isCliente && msg.remetenteNome && (
+                          <p className="text-[9px] text-white/30 mb-0.5 font-medium">{msg.remetenteNome}</p>
+                        )}
+                        <p>{msg.mensagem}</p>
+                        <p className={`text-[9px] mt-0.5 text-right ${isCliente ? 'text-blue-300/25' : 'text-white/18'}`}>
+                          {formatTime(msg.criadoEm)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })}

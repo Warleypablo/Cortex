@@ -2712,6 +2712,21 @@ export const chatMensagens = cortexCoreSchema.table("chat_mensagens", {
 export type ChatMensagem = typeof chatMensagens.$inferSelect;
 export type InsertChatMensagem = typeof chatMensagens.$inferInsert;
 
+// ── Chat: registro de atendimentos (para TMA e métricas) ─────────────────────
+export const chatAtendimentos = cortexCoreSchema.table("chat_atendimentos", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  iniciadoEm: timestamp("iniciado_em").notNull(),
+  encerradoEm: timestamp("encerrado_em").defaultNow().notNull(),
+  encerradoPor: text("encerrado_por"),
+  duracaoMinutos: decimal("duracao_minutos", { precision: 10, scale: 2 }),
+  avaliacao: integer("avaliacao"),
+  avaliacaoComentario: text("avaliacao_comentario"),
+}, (table) => [index("chat_atendimentos_client_idx").on(table.clientId)]);
+
+export type ChatAtendimento = typeof chatAtendimentos.$inferSelect;
+export type InsertChatAtendimento = typeof chatAtendimentos.$inferInsert;
+
 // ── Portal: solicitações de cancelamento ─────────────────────────────────────
 export const portalCancelamentos = cortexCoreSchema.table("portal_cancelamentos", {
   id: serial("id").primaryKey(),

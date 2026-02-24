@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MessageSquare, Send, Loader2, User, Search, CheckCheck, AlertTriangle, Star } from "lucide-react";
+import { MessageSquare, Send, Loader2, User, Search, CheckCheck, AlertTriangle, Star, PhoneOff, Clock } from "lucide-react";
 
 interface Conversa {
   client_id: number;
@@ -11,6 +11,8 @@ interface Conversa {
   last_message: string | null;
   last_at: string | null;
   unread_count: number;
+  ativo: boolean;
+  ultimo_encerramento: string | null;
 }
 
 interface ChatMensagem {
@@ -23,11 +25,21 @@ interface ChatMensagem {
   criadoEm: string;
 }
 
+interface UltimoAtendimento {
+  id: number;
+  iniciadoEm: string;
+  encerradoEm: string;
+  encerradoPor: string | null;
+  duracaoMinutos: string | null;
+}
+
 interface ConversaDetalhe {
   mensagens: ChatMensagem[];
   clientNome: string;
   cnpj: string;
   responsavel: string | null;
+  ativo: boolean;
+  ultimoAtendimento: UltimoAtendimento | null;
 }
 
 interface CancelamentoPayload {
@@ -37,6 +49,19 @@ interface CancelamentoPayload {
   nota: number | null;
   motivos: string[];
   urgencia: string;
+}
+
+type SystemMsg =
+  | { _type: 'encerramento'; atendimentoId: number; encerradoPor: string }
+  | { _type: 'avaliacao_request'; atendimentoId: number }
+  | { _type: 'avaliacao_respondida'; atendimentoId: number; nota: number };
+
+function parseSystemMsg(mensagem: string): SystemMsg | null {
+  try {
+    const p = JSON.parse(mensagem);
+    if (p && ['encerramento', 'avaliacao_request', 'avaliacao_respondida'].includes(p._type)) return p;
+  } catch { /* não é JSON */ }
+  return null;
 }
 
 function parseCancelamento(mensagem: string): CancelamentoPayload | null {
@@ -148,6 +173,7 @@ export default function ChatAtendimento() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
+  const [confirmEncerrar, setConfirmEncerrar] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Lista de conversas
@@ -163,6 +189,22 @@ export default function ChatAtendimento() {
     enabled: selectedId !== null,
     refetchInterval: 3000,
     staleTime: 0,
+  });
+
+  const encerrarMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/chat/encerrar/${selectedId}`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Falha ao encerrar');
+      return res.json();
+    },
+    onSuccess: () => {
+      setConfirmEncerrar(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/chat/conversa', selectedId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/chat/conversas'] });
+    },
   });
 
   const enviarMutation = useMutation({
@@ -248,17 +290,23 @@ export default function ChatAtendimento() {
             conversasFiltradas.map((c) => (
               <button
                 key={c.client_id}
-                onClick={() => setSelectedId(c.client_id)}
+                onClick={() => { setSelectedId(c.client_id); setConfirmEncerrar(false); }}
                 className={`w-full text-left px-4 py-3.5 hover:bg-white/[0.03] transition-colors ${
                   selectedId === c.client_id ? 'bg-white/[0.05]' : ''
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  {/* Avatar */}
-                  <div className="w-9 h-9 rounded-full bg-zinc-700 border border-white/[0.08] flex items-center justify-center shrink-0 mt-0.5">
-                    <span className="text-xs font-semibold text-white/50">
-                      {(c.client_nome ?? 'C').split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
-                    </span>
+                  {/* Avatar com indicador de status */}
+                  <div className="relative shrink-0 mt-0.5">
+                    <div className="w-9 h-9 rounded-full bg-zinc-700 border border-white/[0.08] flex items-center justify-center">
+                      <span className="text-xs font-semibold text-white/50">
+                        {(c.client_nome ?? 'C').split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)}
+                      </span>
+                    </div>
+                    {/* Dot de status */}
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 ${
+                      c.ativo ? 'bg-emerald-400' : 'bg-zinc-600'
+                    }`} />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1 mb-0.5">
@@ -309,11 +357,58 @@ export default function ChatAtendimento() {
                     <p className="text-sm font-medium text-white/70">{conversa?.clientNome}</p>
                     <p className="text-[11px] text-white/25 font-mono">{conversa?.cnpj}</p>
                   </div>
-                  <div className="ml-auto flex items-center gap-2">
+                  <div className="ml-auto flex items-center gap-3">
                     {conversa?.responsavel && (
                       <span className="text-[11px] text-white/25">
                         CX: <span className="text-white/40">{conversa.responsavel}</span>
                       </span>
+                    )}
+
+                    {/* Badge de status do atendimento */}
+                    {conversa?.ativo ? (
+                      <span className="flex items-center gap-1.5 text-[11px] text-emerald-400/70 bg-emerald-500/8 border border-emerald-500/15 px-2 py-1 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Em atendimento
+                      </span>
+                    ) : conversa?.ultimoAtendimento ? (
+                      <span className="flex items-center gap-1.5 text-[11px] text-white/25 bg-zinc-800/50 border border-white/[0.05] px-2 py-1 rounded-full">
+                        <Clock className="w-3 h-3" />
+                        Encerrado · {conversa.ultimoAtendimento.duracaoMinutos
+                          ? `${Math.round(parseFloat(conversa.ultimoAtendimento.duracaoMinutos))}min`
+                          : '—'}
+                      </span>
+                    ) : null}
+
+                    {/* Botão encerrar */}
+                    {conversa?.ativo && !confirmEncerrar && (
+                      <button
+                        onClick={() => setConfirmEncerrar(true)}
+                        className="flex items-center gap-1.5 text-[11px] text-red-400/70 hover:text-red-400 bg-red-500/8 hover:bg-red-500/15 border border-red-500/15 hover:border-red-500/25 px-2.5 py-1 rounded-full transition-colors"
+                      >
+                        <PhoneOff className="w-3 h-3" />
+                        Encerrar
+                      </button>
+                    )}
+
+                    {/* Confirmação de encerramento */}
+                    {confirmEncerrar && (
+                      <div className="flex items-center gap-2 bg-zinc-900 border border-white/[0.08] rounded-xl px-3 py-1.5 shadow-xl">
+                        <span className="text-[11px] text-white/50">Encerrar atendimento?</span>
+                        <button
+                          onClick={() => encerrarMutation.mutate()}
+                          disabled={encerrarMutation.isPending}
+                          className="text-[11px] font-medium text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                        >
+                          {encerrarMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Confirmar'}
+                        </button>
+                        <span className="text-white/20">·</span>
+                        <button
+                          onClick={() => setConfirmEncerrar(false)}
+                          className="text-[11px] text-white/30 hover:text-white/50 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
                     )}
                   </div>
                 </>
@@ -338,6 +433,7 @@ export default function ChatAtendimento() {
                     const showDayLabel = !prevMsg || formatDayLabel(msg.criadoEm) !== formatDayLabel(prevMsg.criadoEm);
 
                     const cancelamento = parseCancelamento(msg.mensagem);
+                    const sysMsg = !cancelamento ? parseSystemMsg(msg.mensagem) : null;
 
                     return (
                       <div key={msg.id}>
@@ -349,7 +445,31 @@ export default function ChatAtendimento() {
                           </div>
                         )}
 
-                        {cancelamento ? (
+                        {sysMsg?._type === 'encerramento' ? (
+                          /* Divider de encerramento */
+                          <div className="flex items-center gap-2 my-3">
+                            <div className="flex-1 h-px bg-white/[0.05]" />
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800/60 border border-white/[0.07]">
+                              <PhoneOff className="w-2.5 h-2.5 text-white/30" />
+                              <span className="text-[10px] text-white/30">
+                                Encerrado por <span className="text-white/45">{sysMsg.encerradoPor}</span>
+                              </span>
+                            </div>
+                            <div className="flex-1 h-px bg-white/[0.05]" />
+                          </div>
+                        ) : sysMsg?._type === 'avaliacao_respondida' ? (
+                          /* Badge de avaliação recebida */
+                          <div className="flex items-center gap-2 my-2 px-2">
+                            <div className="flex-1 h-px bg-white/[0.04]" />
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/8 border border-amber-500/15">
+                              <span className="text-[11px]">⭐</span>
+                              <span className="text-[10px] text-amber-400/60">
+                                Cliente avaliou com nota {sysMsg.nota}/5
+                              </span>
+                            </div>
+                            <div className="flex-1 h-px bg-white/[0.04]" />
+                          </div>
+                        ) : sysMsg?._type === 'avaliacao_request' ? null : cancelamento ? (
                           /* Card visual de cancelamento */
                           <div className="flex justify-start">
                             <div className="flex items-start gap-2 max-w-[85%]">
