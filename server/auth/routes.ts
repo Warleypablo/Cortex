@@ -5,7 +5,7 @@ import type { User } from "./userDb";
 import { getCallbackURL } from "./config";
 import { isExternalEmailAllowed, createExternalUser, EXTERNAL_USER_ROUTES } from "./userDb";
 import { db } from "../db";
-import { cazClientes, cazParcelas, chatMensagens, cupClientes, cupContratos, portalCancelamentos } from "../../shared/schema";
+import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos } from "../../shared/schema";
 import { eq, desc, sql, inArray, and } from "drizzle-orm";
 
 // Senhas hasheadas para usuários externos (hash de "***REMOVED***")
@@ -383,6 +383,58 @@ router.post("/api/portal-cliente/solicitacao-cancelamento", async (req, res) => 
   } catch (error) {
     console.error("Erro ao registrar solicitação de cancelamento:", error);
     return res.status(500).json({ message: "Erro ao enviar solicitação" });
+  }
+});
+
+// Avaliação de atendimento pelo cliente
+router.post("/api/portal-cliente/avaliar-atendimento", async (req, res) => {
+  const clientData = (req.session as any).clientData;
+  if (!clientData) return res.status(401).json({ message: "Não autenticado como cliente" });
+
+  const { atendimentoId, nota, comentario } = req.body;
+  if (!atendimentoId || typeof atendimentoId !== 'number') {
+    return res.status(400).json({ message: "atendimentoId inválido" });
+  }
+  if (!nota || typeof nota !== 'number' || nota < 1 || nota > 5) {
+    return res.status(400).json({ message: "Nota inválida (1 a 5)" });
+  }
+
+  try {
+    // Garante que o atendimento pertence ao cliente
+    const atend = await db
+      .select()
+      .from(chatAtendimentos)
+      .where(and(eq(chatAtendimentos.id, atendimentoId), eq(chatAtendimentos.clientId, clientData.id)))
+      .limit(1);
+
+    if (!atend.length) {
+      return res.status(404).json({ message: "Atendimento não encontrado" });
+    }
+    if (atend[0].avaliacao !== null) {
+      return res.status(409).json({ message: "Atendimento já avaliado" });
+    }
+
+    // Salva avaliação no atendimento
+    await db
+      .update(chatAtendimentos)
+      .set({ avaliacao: nota, avaliacaoComentario: comentario?.trim() || null })
+      .where(eq(chatAtendimentos.id, atendimentoId));
+
+    // Atualiza a mensagem avaliacao_request → avaliacao_respondida
+    // Usa LIKE em vez de ::jsonb para evitar erro em mensagens de texto puro
+    await db.execute(sql`
+      UPDATE cortex_core.chat_mensagens
+      SET mensagem = ${JSON.stringify({ _type: 'avaliacao_respondida', atendimentoId, nota })}
+      WHERE client_id = ${clientData.id}
+        AND mensagem LIKE '%"_type":"avaliacao_request"%'
+        AND mensagem LIKE ${`%"atendimentoId":${atendimentoId}%`}
+    `);
+
+    console.log(`⭐ Avaliação recebida: atendimento=${atendimentoId} nota=${nota} cliente=${clientData.id}`);
+    res.json({ message: "Avaliação enviada com sucesso" });
+  } catch (error) {
+    console.error("Erro ao registrar avaliação:", error);
+    return res.status(500).json({ message: "Erro ao salvar avaliação" });
   }
 });
 
