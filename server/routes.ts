@@ -22,6 +22,7 @@ import { registerGrowthRoutes } from "./routes/growth";
 import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
+import { registerRelatorioMensalRoutes } from "./routes/relatorioMensal";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -14661,6 +14662,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Tech Module - registered from separate file
   registerTechRoutes(app, db, storage);
+
+  // Relatório Mensal PDF - registered from separate file
+  registerRelatorioMensalRoutes(app, db);
 
   // Contratos Module - registered from separate file
   registerContratosRoutes(app);
