@@ -1,4 +1,6 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, Component, type ReactNode } from "react";
+import PortalClientePage from "@/pages/PortalCliente";
+import LoginClientePage from "@/pages/LoginCliente";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -28,6 +30,7 @@ const PatrimonioDetail = lazy(() => import("@/pages/PatrimonioDetail"));
 const Ferramentas = lazy(() => import("@/pages/Ferramentas"));
 const TurboZap = lazy(() => import("@/pages/TurboZap"));
 const Atendimento = lazy(() => import("@/pages/Atendimento"));
+const ChatAtendimento = lazy(() => import("@/pages/ChatAtendimento"));
 const VisaoGeral = lazy(() => import("@/pages/VisaoGeral"));
 const DashboardFinanceiro = lazy(() => import("@/pages/DashboardFinanceiro"));
 const DashboardGeG = lazy(() => import("@/pages/DashboardGeG"));
@@ -93,7 +96,31 @@ const ContratosModule = lazy(() => import("@/pages/ContratosModule"));
 const MargemCliente = lazy(() => import("@/pages/MargemCliente"));
 const AnaliseSquads = lazy(() => import("@/pages/AnaliseSquads"));
 const AutoReport = lazy(() => import("@/pages/AutoReport"));
+const PortalCliente = PortalClientePage;
 const NotFound = lazy(() => import("@/pages/not-found"));
+
+// Error boundary to catch silent crashes in the portal
+class PortalErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ position: 'fixed', inset: 0, background: '#09090b', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: 'monospace', zIndex: 9999 }}>
+          <p style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#f87171' }}>Erro no Portal</p>
+          <p style={{ fontSize: '0.75rem', color: '#a1a1aa', maxWidth: '600px', textAlign: 'center', wordBreak: 'break-all' }}>{this.state.error.message}</p>
+          <button onClick={() => window.location.href = '/login'} style={{ marginTop: '2rem', padding: '0.5rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}>Voltar ao Login</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function PageLoader() {
   return (
@@ -185,6 +212,7 @@ function ProtectedRouter() {
       <Route path="/ferramentas">{() => <ProtectedRoute path="/ferramentas" component={Ferramentas} />}</Route>
       <Route path="/turbozap">{() => <ProtectedRoute path="/turbozap" component={TurboZap} />}</Route>
       <Route path="/atendimento">{() => <ProtectedRoute path="/atendimento" component={Atendimento} />}</Route>
+      <Route path="/chat-clientes">{() => <ProtectedRoute path="/chat-clientes" component={ChatAtendimento} />}</Route>
       <Route path="/acessos">{() => <ProtectedRoute path="/acessos" component={Acessos} />}</Route>
       <Route path="/conhecimentos">{() => <ProtectedRoute path="/conhecimentos" component={Conhecimentos} />}</Route>
       <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
@@ -296,11 +324,15 @@ function ProtectedRouter() {
   );
 }
 
+const LoginCliente = LoginClientePage;
+
 function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Switch>
         <Route path="/login" component={Login} />
+        <Route path="/loginclientes" component={LoginCliente} />
+        <Route path="/portal-cliente" component={PortalCliente} />
         <Route><ProtectedRouter /></Route>
       </Switch>
     </Suspense>
@@ -316,15 +348,17 @@ function DealNotificationsHandler() {
 function AppLayout() {
   const [location] = useLocation();
   const isLoginPage = location === "/login";
+  const isLoginCliente = location === "/loginclientes";
   const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation";
+  const isPortalCliente = location.startsWith("/portal-cliente");
 
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
-  if (isLoginPage) {
-    return <Router />;
+  if (isLoginPage || isLoginCliente || isPortalCliente) {
+    return <PortalErrorBoundary><Router /></PortalErrorBoundary>;
   }
 
   if (isPresentationMode) {

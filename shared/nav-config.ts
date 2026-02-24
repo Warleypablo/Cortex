@@ -14,6 +14,7 @@ export const PERMISSION_KEYS = {
     SUGESTOES: 'general.sugestoes',
     ENPS: 'general.enps',
     PROCESSOS_INTERNOS: 'general.processos_internos',
+    CHAT_CLIENTES: 'general.chat_clientes',
   },
   // Financeiro
   FIN: {
@@ -175,6 +176,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/sugestoes': PERMISSION_KEYS.GENERAL.SUGESTOES,
   '/rh/nps/responder': PERMISSION_KEYS.GENERAL.ENPS,
   '/processos-internos': PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS,
+  '/chat-clientes': PERMISSION_KEYS.GENERAL.CHAT_CLIENTES,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   // Financeiro
   '/dashboard/financeiro': PERMISSION_KEYS.FIN.VISAO_GERAL,
@@ -311,6 +313,7 @@ export const NAV_CONFIG = {
     { title: 'Sugestões', url: '/sugestoes', icon: 'Lightbulb', permissionKey: PERMISSION_KEYS.GENERAL.SUGESTOES },
     { title: 'Pesquisa E-NPS', url: '/rh/nps/responder', icon: 'ClipboardCheck', permissionKey: PERMISSION_KEYS.GENERAL.ENPS },
     { title: 'Processos Internos', url: '/processos-internos', icon: 'FolderOpen', permissionKey: PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS },
+    { title: 'Chat Clientes', url: '/chat-clientes', icon: 'MessageSquare', permissionKey: PERMISSION_KEYS.GENERAL.CHAT_CLIENTES },
   ],
   
   // Geral module
@@ -324,6 +327,7 @@ export const NAV_CONFIG = {
       { title: 'Conhecimento & Benefícios', url: '/conhecimentos', icon: 'BookOpen', permissionKey: PERMISSION_KEYS.GENERAL.CONHECIMENTO },
       { title: 'GPTurbo', url: '/cases/chat', icon: 'Sparkles', permissionKey: PERMISSION_KEYS.GENERAL.GPTURBO },
       { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
+      { title: 'Chat Clientes', url: '/chat-clientes', icon: 'MessageSquare', permissionKey: PERMISSION_KEYS.GENERAL.CHAT_CLIENTES },
       { title: 'OKR 2026', url: '/okr-2026', icon: 'Trophy', permissionKey: PERMISSION_KEYS.ADMIN.OKR_2026 },
     ],
   },
@@ -556,6 +560,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GENERAL.BENEFICIOS]: 'Clube Benefícios',
   [PERMISSION_KEYS.GENERAL.GPTURBO]: 'GPTurbo',
   [PERMISSION_KEYS.GENERAL.TURBO_TOOLS]: 'Turbo Tools',
+  [PERMISSION_KEYS.GENERAL.CHAT_CLIENTES]: 'Chat Clientes',
   [PERMISSION_KEYS.ADMIN.OKR_2026]: 'OKR 2026',
   [PERMISSION_KEYS.FIN.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.FIN.DFC]: 'DFC',
