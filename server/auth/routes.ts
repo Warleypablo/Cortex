@@ -5,8 +5,8 @@ import type { User } from "./userDb";
 import { getCallbackURL } from "./config";
 import { isExternalEmailAllowed, createExternalUser, EXTERNAL_USER_ROUTES } from "./userDb";
 import { db } from "../db";
-import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos } from "../../shared/schema";
-import { eq, desc, sql, inArray, and } from "drizzle-orm";
+import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos, arClientes, arMetricas, arCampanhas, arCanais } from "../../shared/schema";
+import { eq, desc, sql, inArray, and, asc } from "drizzle-orm";
 
 // Senhas hasheadas para usuários externos (hash de "***REMOVED***")
 const EXTERNAL_USER_PASSWORDS: Record<string, string> = {
@@ -660,6 +660,176 @@ router.post("/api/portal-cliente/chat", async (req, res) => {
   } catch (error) {
     console.error("Erro ao enviar mensagem:", error);
     return res.status(500).json({ message: "Erro ao enviar mensagem" });
+  }
+});
+
+// ── GET /api/portal-cliente/performance ───────────────────────────────────────
+router.get("/api/portal-cliente/performance", async (req, res) => {
+  const clientData = (req.session as any).clientData;
+  if (!clientData) return res.status(401).json({ message: "Não autenticado como cliente" });
+
+  const freq = (req.query.freq as string) || "SEMANAL";
+  const periodo = req.query.periodo as string | undefined; // formato YYYY-MM-DD
+
+  try {
+    // 1. cazClientes → dados do cliente logado (CNPJ)
+    const cazRow = await db
+      .select({ id: cazClientes.id, cnpj: cazClientes.cnpj, nome: cazClientes.nome })
+      .from(cazClientes)
+      .where(eq(cazClientes.id, clientData.id))
+      .limit(1);
+    console.log(`🔍 [PERF] Step 1 - cazClientes id=${clientData.id}:`, cazRow[0] ? `cnpj="${cazRow[0].cnpj}" nome="${cazRow[0].nome}"` : 'NOT FOUND');
+
+    // 2. cazClientes.cnpj → cupClientes.cnpj (busca nome no Clickup)
+    //    O CNPJ pode estar formatado diferente nos dois schemas, então normaliza
+    const cupRow = await db
+      .select({ nome: cupClientes.nome, cnpj: cupClientes.cnpj })
+      .from(cazClientes)
+      .innerJoin(cupClientes, sql`regexp_replace(${cazClientes.cnpj}, '[^0-9]', '', 'g') = regexp_replace(${cupClientes.cnpj}, '[^0-9]', '', 'g')`)
+      .where(eq(cazClientes.id, clientData.id))
+      .limit(1);
+    console.log(`🔍 [PERF] Step 2 - cupClientes via CNPJ join:`, cupRow[0] ? `nome="${cupRow[0].nome}" cnpj="${cupRow[0].cnpj}"` : 'NOT FOUND (CNPJ não bate entre Conta Azul e Clickup)');
+
+    if (!cupRow.length || !cupRow[0].nome) {
+      return res.json({ cliente: null, categoria: null, metricas: null, campanhas_meta: [], campanhas_google: [], canais: [], historico: [], _debug: { step: 2, msg: 'cupClientes not found via CNPJ join' } });
+    }
+
+    const nomeClickup = cupRow[0].nome;
+
+    // 3. cupClientes.nome → arClientes.nome
+    //    Tenta match exato primeiro, depois fuzzy por similaridade (pg_trgm)
+    let arClienteRow = await db
+      .select()
+      .from(arClientes)
+      .where(sql`LOWER(TRIM(${arClientes.nome})) = LOWER(TRIM(${nomeClickup}))`)
+      .limit(1);
+
+    let matchType = 'exact';
+
+    // Fallback: similaridade por trigramas (pg_trgm) — threshold 0.3
+    if (!arClienteRow.length) {
+      arClienteRow = await db
+        .select()
+        .from(arClientes)
+        .where(sql`similarity(LOWER(${arClientes.nome}), LOWER(${nomeClickup})) > 0.3`)
+        .orderBy(sql`similarity(LOWER(${arClientes.nome}), LOWER(${nomeClickup})) DESC`)
+        .limit(1);
+      matchType = 'similarity';
+    }
+
+    // Fallback 2: normaliza removendo sufixos corporativos (LTDA, ME, EIRELI, S/A, etc.)
+    if (!arClienteRow.length) {
+      const normSql = (col: any) => sql`LOWER(TRIM(regexp_replace(${col}, '\\s*(LTDA|ME|EPP|EIRELI|S/?A|S\\.A\\.|LTDA\\.?|-)\\s*', '', 'gi')))`;
+      arClienteRow = await db
+        .select()
+        .from(arClientes)
+        .where(sql`${normSql(arClientes.nome)} = ${normSql(sql.raw(`'${nomeClickup.replace(/'/g, "''")}'`))}`)
+        .limit(1);
+      matchType = 'normalized';
+    }
+
+    // Fallback 3: LIKE com primeiras palavras significativas do nome
+    if (!arClienteRow.length) {
+      const palavras = nomeClickup.trim().split(/\s+/).filter(p => !['LTDA', 'ME', 'EPP', 'EIRELI', 'S/A', 'SA', 'DE', 'DO', 'DA', 'E', '-'].includes(p.toUpperCase()));
+      const prefix = palavras.slice(0, 2).join(' ');
+      if (prefix.length >= 3) {
+        arClienteRow = await db
+          .select()
+          .from(arClientes)
+          .where(sql`LOWER(${arClientes.nome}) LIKE LOWER(${`%${prefix}%`})`)
+          .limit(1);
+        matchType = 'like-prefix';
+      }
+    }
+
+    console.log(`🔍 [PERF] Step 3 - arClientes match nome="${nomeClickup}":`,
+      arClienteRow[0] ? `id=${arClienteRow[0].id} nome="${arClienteRow[0].nome}" categoria="${arClienteRow[0].categoria}" (${matchType})` : 'NOT FOUND em todos os métodos');
+
+    if (!arClienteRow.length) {
+      return res.json({ cliente: nomeClickup, categoria: null, metricas: null, campanhas_meta: [], campanhas_google: [], canais: [], historico: [] });
+    }
+
+    const arCliente = arClienteRow[0];
+    const clienteNome = arCliente.nome;
+    const categoria = arCliente.categoria;
+
+    // 4. Métricas do período selecionado (ou mais recente)
+    let metricasQuery = db
+      .select()
+      .from(arMetricas)
+      .where(sql`LOWER(TRIM(${arMetricas.clienteNome})) = LOWER(TRIM(${clienteNome})) AND ${arMetricas.freq} = ${freq}`)
+      .orderBy(desc(arMetricas.periodoInicio))
+      .limit(1);
+
+    if (periodo) {
+      metricasQuery = db
+        .select()
+        .from(arMetricas)
+        .where(sql`LOWER(TRIM(${arMetricas.clienteNome})) = LOWER(TRIM(${clienteNome})) AND ${arMetricas.freq} = ${freq} AND ${arMetricas.periodoInicio} = ${periodo}`)
+        .limit(1);
+    }
+
+    const metricasRows = await metricasQuery;
+    const metricas = metricasRows[0] ?? null;
+    console.log(`🔍 [PERF] Step 4 - metricas for "${clienteNome}" freq=${freq}:`, metricas ? `periodo=${metricas.periodoInicio} → ${metricas.periodoFim}` : 'NOT FOUND (sem métricas)');
+
+    // Período de referência para campanhas e canais
+    const refInicio = metricas?.periodoInicio ?? periodo;
+    const refFim = metricas?.periodoFim ?? periodo;
+
+    // 4. Top 5 campanhas Meta
+    const campanhasMeta = refInicio ? await db
+      .select()
+      .from(arCampanhas)
+      .where(sql`LOWER(TRIM(${arCampanhas.clienteNome})) = LOWER(TRIM(${clienteNome})) AND ${arCampanhas.freq} = ${freq} AND ${arCampanhas.periodoInicio} = ${refInicio} AND ${arCampanhas.plataforma} = 'meta'`)
+      .orderBy(asc(arCampanhas.rank))
+      .limit(5) : [];
+
+    // 5. Top 5 campanhas Google
+    const campanhasGoogle = refInicio ? await db
+      .select()
+      .from(arCampanhas)
+      .where(sql`LOWER(TRIM(${arCampanhas.clienteNome})) = LOWER(TRIM(${clienteNome})) AND ${arCampanhas.freq} = ${freq} AND ${arCampanhas.periodoInicio} = ${refInicio} AND ${arCampanhas.plataforma} = 'google'`)
+      .orderBy(asc(arCampanhas.rank))
+      .limit(5) : [];
+
+    // 6. Top 5 canais GA4
+    const canais = refInicio ? await db
+      .select()
+      .from(arCanais)
+      .where(sql`LOWER(TRIM(${arCanais.clienteNome})) = LOWER(TRIM(${clienteNome})) AND ${arCanais.freq} = ${freq} AND ${arCanais.periodoInicio} = ${refInicio}`)
+      .orderBy(asc(arCanais.rank))
+      .limit(5) : [];
+
+    // 7. Histórico (últimos 6 períodos) para gráficos de evolução
+    const historico = await db
+      .select()
+      .from(arMetricas)
+      .where(sql`LOWER(TRIM(${arMetricas.clienteNome})) = LOWER(TRIM(${clienteNome})) AND ${arMetricas.freq} = ${freq}`)
+      .orderBy(desc(arMetricas.periodoInicio))
+      .limit(6);
+
+    // 8. Períodos disponíveis para o seletor
+    const periodosRaw = await db
+      .select({ periodoInicio: arMetricas.periodoInicio, periodoFim: arMetricas.periodoFim })
+      .from(arMetricas)
+      .where(sql`LOWER(TRIM(${arMetricas.clienteNome})) = LOWER(TRIM(${clienteNome})) AND ${arMetricas.freq} = ${freq}`)
+      .orderBy(desc(arMetricas.periodoInicio))
+      .limit(24);
+
+    res.json({
+      cliente: clienteNome,
+      categoria,
+      metricas,
+      campanhas_meta: campanhasMeta,
+      campanhas_google: campanhasGoogle,
+      canais,
+      historico: historico.reverse(),
+      periodos: periodosRaw,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar performance do cliente:", error);
+    return res.status(500).json({ message: "Erro ao buscar dados de performance" });
   }
 });
 
