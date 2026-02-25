@@ -2744,3 +2744,137 @@ export const portalCancelamentos = cortexCoreSchema.table("portal_cancelamentos"
 
 export type PortalCancelamento = typeof portalCancelamentos.$inferSelect;
 export type InsertPortalCancelamento = typeof portalCancelamentos.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTOREPORT — relatórios de performance (schema "autoreport" no PostgreSQL)
+// ══════════════════════════════════════════════════════════════════════════════
+export const autoreportSchema = pgSchema("autoreport");
+
+export const arClientes = autoreportSchema.table("clientes", {
+  id: serial("id").primaryKey(),
+  nome: text("nome").notNull(),
+  categoria: text("categoria"),
+  gestor: text("gestor"),
+  squad: text("squad"),
+  painelUrl: text("painel_url"),
+  pastaUrl: text("pasta_url"),
+  idGoogleAds: text("id_google_ads"),
+  idMetaAds: text("id_meta_ads"),
+  idGa4: text("id_ga4"),
+  statusAuto: text("status_auto"),
+  ultimaGeracao: text("ultima_geracao"),
+  extras: jsonb("extras"),
+});
+
+export const arMetricas = autoreportSchema.table("metricas", {
+  id: serial("id").primaryKey(),
+  clienteNome: text("cliente_nome").notNull(),
+  categoria: text("categoria").notNull(),
+  freq: text("freq").notNull(),
+  periodoInicio: date("periodo_inicio").notNull(),
+  periodoFim: date("periodo_fim").notNull(),
+  // Core
+  faturamento: decimal("faturamento", { precision: 14, scale: 2 }),
+  faturamentoMes: decimal("faturamento_mes", { precision: 14, scale: 2 }),
+  investimento: decimal("investimento", { precision: 14, scale: 2 }),
+  investimentoMes: decimal("investimento_mes", { precision: 14, scale: 2 }),
+  roas: decimal("roas", { precision: 8, scale: 4 }),
+  vendas: integer("vendas"),
+  cpa: decimal("cpa", { precision: 10, scale: 2 }),
+  // E-commerce
+  taxaConv: decimal("taxa_conv", { precision: 8, scale: 4 }),
+  ticketMedio: decimal("ticket_medio", { precision: 10, scale: 2 }),
+  custoPorSessao: decimal("custo_por_sessao", { precision: 10, scale: 2 }),
+  metaFaturamento: decimal("meta_faturamento", { precision: 14, scale: 2 }),
+  metaInvestimento: decimal("meta_investimento", { precision: 14, scale: 2 }),
+  pctMetaFat: decimal("pct_meta_fat", { precision: 8, scale: 4 }),
+  pctMetaInv: decimal("pct_meta_inv", { precision: 8, scale: 4 }),
+  // Lead
+  leads: integer("leads"),
+  leadsMes: integer("leads_mes"),
+  cpl: decimal("cpl", { precision: 10, scale: 2 }),
+  custoPorSessaoLead: decimal("custo_por_sessao_lead", { precision: 10, scale: 2 }),
+  leadsPorSessao: decimal("leads_por_sessao", { precision: 8, scale: 4 }),
+  metaLeads: integer("meta_leads"),
+  pctMetaLeads: decimal("pct_meta_leads", { precision: 8, scale: 4 }),
+  // Google Ads
+  invGoogle: decimal("inv_google", { precision: 14, scale: 2 }),
+  fatGoogle: decimal("fat_google", { precision: 14, scale: 2 }),
+  vendasGoogle: integer("vendas_google"),
+  roasGoogle: decimal("roas_google", { precision: 8, scale: 4 }),
+  cpaGoogle: decimal("cpa_google", { precision: 10, scale: 2 }),
+  impGoogle: integer("imp_google"),
+  leadsGoogle: integer("leads_google"),
+  cplGoogle: decimal("cpl_google", { precision: 10, scale: 2 }),
+  lpiGoogle: decimal("lpi_google", { precision: 8, scale: 4 }),
+  // Meta Ads
+  invMeta: decimal("inv_meta", { precision: 14, scale: 2 }),
+  fatMeta: decimal("fat_meta", { precision: 14, scale: 2 }),
+  vendasMeta: integer("vendas_meta"),
+  roasMeta: decimal("roas_meta", { precision: 8, scale: 4 }),
+  cpaMeta: decimal("cpa_meta", { precision: 10, scale: 2 }),
+  impMeta: integer("imp_meta"),
+  leadsMeta: integer("leads_meta"),
+  cplMeta: decimal("cpl_meta", { precision: 10, scale: 2 }),
+  lpiMeta: decimal("lpi_meta", { precision: 8, scale: 4 }),
+  // GA4
+  sessoes: integer("sessoes"),
+  sessoesEngajadas: integer("sessoes_engajadas"),
+  taxaEngajamento: decimal("taxa_engajamento", { precision: 8, scale: 4 }),
+  tempoMedioEngajamento: decimal("tempo_medio_engajamento", { precision: 10, scale: 2 }),
+  usuarios: integer("usuarios"),
+  novosUsuarios: integer("novos_usuarios"),
+  // Variations & comparative
+  variacoes: jsonb("variacoes"),
+  compPeriodoInicio: date("comp_periodo_inicio"),
+  compPeriodoFim: date("comp_periodo_fim"),
+  dadosRaw: jsonb("dados_raw"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const arCampanhas = autoreportSchema.table("campanhas", {
+  id: serial("id").primaryKey(),
+  clienteNome: text("cliente_nome").notNull(),
+  categoria: text("categoria").notNull(),
+  freq: text("freq").notNull(),
+  periodoInicio: date("periodo_inicio").notNull(),
+  periodoFim: date("periodo_fim").notNull(),
+  plataforma: text("plataforma").notNull(),
+  rank: integer("rank").notNull(),
+  nomeCampanha: text("nome_campanha"),
+  thumbnailUrl: text("thumbnail_url"),
+  conversoes: decimal("conversoes", { precision: 10, scale: 2 }),
+  faturamento: decimal("faturamento", { precision: 14, scale: 2 }),
+  investimento: decimal("investimento", { precision: 14, scale: 2 }),
+  cpa: decimal("cpa", { precision: 10, scale: 2 }),
+  roas: decimal("roas", { precision: 8, scale: 4 }),
+  impressoes: integer("impressoes"),
+  leads: integer("leads"),
+  cpl: decimal("cpl", { precision: 10, scale: 2 }),
+  lpi: decimal("lpi", { precision: 8, scale: 4 }),
+});
+
+export const arCanais = autoreportSchema.table("canais", {
+  id: serial("id").primaryKey(),
+  clienteNome: text("cliente_nome").notNull(),
+  categoria: text("categoria").notNull(),
+  freq: text("freq").notNull(),
+  periodoInicio: date("periodo_inicio").notNull(),
+  periodoFim: date("periodo_fim").notNull(),
+  rank: integer("rank").notNull(),
+  nomeCanal: text("nome_canal"),
+  descricao: text("descricao"),
+  sessoes: integer("sessoes"),
+  sessoesEngajadas: integer("sessoes_engajadas"),
+  taxaEngajamento: decimal("taxa_engajamento", { precision: 8, scale: 4 }),
+  tempoMedio: decimal("tempo_medio", { precision: 10, scale: 2 }),
+  eventos: integer("eventos"),
+  receita: decimal("receita", { precision: 14, scale: 2 }),
+  usuarios: integer("usuarios"),
+  novosUsuarios: integer("novos_usuarios"),
+});
+
+export type ArCliente = typeof arClientes.$inferSelect;
+export type ArMetrica = typeof arMetricas.$inferSelect;
+export type ArCampanha = typeof arCampanhas.$inferSelect;
+export type ArCanal = typeof arCanais.$inferSelect;
