@@ -1,10 +1,13 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import type React from "react";
 import { useLocation } from "wouter";
+
+const PortalPerformance = lazy(() => import("@/pages/PortalPerformance"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClientAuth, ClientAuthProvider } from "@/contexts/ClientAuthContext";
 import type { ClientUser } from "@/contexts/ClientAuthContext";
-import { Loader2, Building2, Mail, Phone, LogOut, CircleDollarSign, CheckCircle2, AlertCircle, Clock, ExternalLink, BarChart3, Briefcase, Pencil, Check, X, XCircle, TrendingUp, TrendingDown, Receipt, MessageSquare, Send, User } from "lucide-react";
+import { Loader2, Building2, Mail, Phone, LogOut, CircleDollarSign, CheckCircle2, AlertCircle, Clock, ExternalLink, BarChart3, Briefcase, Pencil, Check, X, XCircle, TrendingUp, TrendingDown, Receipt, MessageSquare, Send, User, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
 
 type Module = 'financeiro' | 'relatorios' | 'servicos' | 'atendimento';
@@ -829,6 +832,8 @@ function PortalClienteContent() {
   const [, setLocation] = useLocation();
   const { client, isLoading, isAuthenticated, logout } = useClientAuth();
   const queryClient = useQueryClient();
+  const { theme, toggleTheme } = useTheme();
+  const isDark = theme === "dark";
   const [activeModule, setActiveModule] = useState<Module>('financeiro');
   const [chatOpen, setChatOpen] = useState(false);
   const [editField, setEditField] = useState<'email' | 'telefone' | null>(null);
@@ -930,29 +935,39 @@ function PortalClienteContent() {
     .toUpperCase();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className={`min-h-screen transition-colors duration-300 ${isDark ? "bg-zinc-950 text-white" : "bg-slate-50 text-slate-900"}`}>
       {/* Header */}
-      <header className="border-b border-white/[0.06] bg-zinc-900/80 backdrop-blur-md sticky top-0 z-10">
+      <header className={`border-b backdrop-blur-md sticky top-0 z-10 transition-colors duration-300 ${isDark ? "border-white/[0.06] bg-zinc-900/80" : "border-slate-200 bg-white/80"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src={turboLogo} alt="Turbo Partners" className="h-6 w-auto opacity-90" />
-            <div className="w-px h-4 bg-white/10" />
-            <span className="text-white/40 text-xs font-medium tracking-wide">Área do Cliente</span>
+            <img src={turboLogo} alt="Turbo Partners" className={`h-6 w-auto transition-all duration-300 ${isDark ? "opacity-90" : "brightness-0 opacity-80"}`} />
+            <div className={`w-px h-4 ${isDark ? "bg-white/10" : "bg-slate-200"}`} />
+            <span className={`text-xs font-medium tracking-wide ${isDark ? "text-white/40" : "text-slate-500"}`}>Área do Cliente</span>
           </div>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 text-white/35 hover:text-white/70 transition-colors text-sm px-3 py-1.5 rounded-lg hover:bg-white/5"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Sair</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className={`flex items-center justify-center h-8 w-8 rounded-lg transition-colors ${isDark ? "text-white/35 hover:text-white/70 hover:bg-white/5" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"}`}
+              aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+              title={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+            >
+              {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={logout}
+              className={`flex items-center gap-1.5 transition-colors text-sm px-3 py-1.5 rounded-lg ${isDark ? "text-white/35 hover:text-white/70 hover:bg-white/5" : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"}`}
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sair</span>
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
         {/* ── Hero: saudação ── */}
-        <div className="relative overflow-hidden rounded-2xl bg-zinc-900 border border-white/[0.07] px-6 py-6">
+        <div className={`relative overflow-hidden rounded-2xl border px-6 py-6 transition-colors duration-300 ${isDark ? "bg-zinc-900 border-white/[0.07]" : "bg-white border-slate-200 shadow-sm"}`}>
           {/* Gradiente decorativo */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-blue-600/[0.07] via-transparent to-transparent" />
           <div className="pointer-events-none absolute -top-10 -left-10 w-40 h-40 rounded-full bg-blue-600/10 blur-3xl" />
@@ -964,10 +979,10 @@ function PortalClienteContent() {
                 <span className="text-sm font-bold text-blue-300/90">{initials}</span>
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-white leading-tight">
+                <h1 className={`text-lg sm:text-xl font-bold leading-tight ${isDark ? "text-white" : "text-slate-900"}`}>
                   Olá, {client.nome ?? 'Cliente'} 👋
                 </h1>
-                <p className="text-white/35 text-xs mt-0.5">
+                <p className={`text-xs mt-0.5 ${isDark ? "text-white/35" : "text-slate-500"}`}>
                   Bem-vindo à sua área exclusiva.
                 </p>
               </div>
@@ -976,21 +991,21 @@ function PortalClienteContent() {
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
                 isAtivo
                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : 'bg-zinc-700/50 text-zinc-400 border border-zinc-600/30'
+                  : isDark ? 'bg-zinc-700/50 text-zinc-400 border border-zinc-600/30' : 'bg-slate-100 text-slate-400 border border-slate-200'
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${isAtivo ? 'bg-emerald-400' : 'bg-zinc-500'}`} />
                 {isAtivo ? 'Ativo' : 'Inativo'}
               </span>
-              <p className="text-[11px] text-white/20 font-mono hidden sm:block">{client.cnpj ?? ''}</p>
+              <p className={`text-[11px] font-mono hidden sm:block ${isDark ? "text-white/20" : "text-slate-400"}`}>{client.cnpj ?? ''}</p>
             </div>
           </div>
         </div>
 
         {/* ── Navegação de módulos ── */}
-        <div className="flex gap-1 p-1 bg-zinc-900/60 border border-white/[0.07] rounded-xl w-fit">
+        <div className={`flex gap-1 p-1 border rounded-xl w-fit transition-colors duration-300 ${isDark ? "bg-zinc-900/60 border-white/[0.07]" : "bg-slate-100 border-slate-200"}`}>
           {([
             { id: 'financeiro',  label: 'Financeiro',   Icon: CircleDollarSign, comingSoon: false },
-            { id: 'relatorios',  label: 'Relatórios',   Icon: BarChart3,        comingSoon: true },
+            { id: 'relatorios',  label: 'Performance',  Icon: BarChart3,        comingSoon: false },
             { id: 'servicos',    label: 'Serviços',     Icon: Briefcase,        comingSoon: false },
             { id: 'atendimento', label: 'Atendimento',  Icon: MessageSquare,    comingSoon: false },
           ] as { id: Module; label: string; Icon: React.ElementType; comingSoon: boolean }[]).map(({ id, label, Icon, comingSoon }) => (
@@ -999,14 +1014,14 @@ function PortalClienteContent() {
               onClick={() => setActiveModule(id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeModule === id
-                  ? 'bg-white/[0.09] text-white shadow-sm'
-                  : 'text-white/30 hover:text-white/55 hover:bg-white/[0.04]'
+                  ? isDark ? 'bg-white/[0.09] text-white shadow-sm' : 'bg-white text-slate-900 shadow-sm'
+                  : isDark ? 'text-white/30 hover:text-white/55 hover:bg-white/[0.04]' : 'text-slate-400 hover:text-slate-600 hover:bg-white/60'
               }`}
             >
               <Icon className={`w-4 h-4 ${activeModule === id ? 'opacity-80' : 'opacity-40'}`} />
               {label}
               {comingSoon && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-700/50 text-white/20 font-medium">
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${isDark ? "bg-zinc-700/50 text-white/20" : "bg-slate-200 text-slate-400"}`}>
                   Em breve
                 </span>
               )}
@@ -1020,100 +1035,100 @@ function PortalClienteContent() {
           {/* Cards de resumo */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Total */}
-            <div className="relative overflow-hidden bg-zinc-900 border border-white/[0.07] rounded-2xl p-5">
-              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-white/0 via-white/10 to-white/0" />
+            <div className={`relative overflow-hidden border rounded-2xl p-5 transition-colors duration-300 ${isDark ? "bg-zinc-900 border-white/[0.07]" : "bg-white border-slate-200 shadow-sm"}`}>
+              <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${isDark ? "from-white/0 via-white/10 to-white/0" : "from-slate-200/0 via-slate-200 to-slate-200/0"}`} />
               <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-medium text-white/35 uppercase tracking-widest">Total em Faturas</p>
-                <div className="w-7 h-7 rounded-lg bg-white/[0.06] flex items-center justify-center">
-                  <Receipt className="w-3.5 h-3.5 text-white/30" />
+                <p className={`text-[11px] font-medium uppercase tracking-widest ${isDark ? "text-white/35" : "text-slate-400"}`}>Total em Faturas</p>
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${isDark ? "bg-white/[0.06]" : "bg-slate-100"}`}>
+                  <Receipt className={`w-3.5 h-3.5 ${isDark ? "text-white/30" : "text-slate-400"}`} />
                 </div>
               </div>
               {isResumoLoading ? (
-                <div className="h-7 w-28 bg-white/10 rounded-lg animate-pulse" />
+                <div className={`h-7 w-28 rounded-lg animate-pulse ${isDark ? "bg-white/10" : "bg-slate-200"}`} />
               ) : (
-                <p className="text-2xl font-bold text-white tracking-tight">{formatCurrency(totais.total)}</p>
+                <p className={`text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>{formatCurrency(totais.total)}</p>
               )}
-              <p className="text-[11px] text-white/20 mt-2">{faturas.length} faturas no total</p>
+              <p className={`text-[11px] mt-2 ${isDark ? "text-white/20" : "text-slate-400"}`}>{faturas.length} faturas no total</p>
             </div>
 
             {/* Pago */}
-            <div className="relative overflow-hidden bg-zinc-900 border border-white/[0.07] rounded-2xl p-5">
+            <div className={`relative overflow-hidden border rounded-2xl p-5 transition-colors duration-300 ${isDark ? "bg-zinc-900 border-white/[0.07]" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-emerald-500/0 via-emerald-500/30 to-emerald-500/0" />
               <div className="absolute bottom-0 right-0 w-24 h-24 rounded-full bg-emerald-500/[0.04] blur-2xl pointer-events-none" />
               <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-medium text-white/35 uppercase tracking-widest">Total Pago</p>
+                <p className={`text-[11px] font-medium uppercase tracking-widest ${isDark ? "text-white/35" : "text-slate-400"}`}>Total Pago</p>
                 <div className="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/15 flex items-center justify-center">
                   <TrendingUp className="w-3.5 h-3.5 text-emerald-400/70" />
                 </div>
               </div>
               {isResumoLoading ? (
-                <div className="h-7 w-28 bg-white/10 rounded-lg animate-pulse" />
+                <div className={`h-7 w-28 rounded-lg animate-pulse ${isDark ? "bg-white/10" : "bg-slate-200"}`} />
               ) : (
-                <p className="text-2xl font-bold text-emerald-400 tracking-tight">{formatCurrency(totais.pago)}</p>
+                <p className={`text-2xl font-bold tracking-tight ${isDark ? "text-emerald-400" : "text-emerald-600"}`}>{formatCurrency(totais.pago)}</p>
               )}
-              <p className="text-[11px] text-emerald-500/30 mt-2">
+              <p className={`text-[11px] mt-2 ${isDark ? "text-emerald-500/30" : "text-emerald-600/50"}`}>
                 {totais.total > 0 ? `${Math.round((totais.pago / totais.total) * 100)}% do total` : '—'}
               </p>
             </div>
 
             {/* Atrasado */}
-            <div className="relative overflow-hidden bg-zinc-900 border border-white/[0.07] rounded-2xl p-5">
+            <div className={`relative overflow-hidden border rounded-2xl p-5 transition-colors duration-300 ${isDark ? "bg-zinc-900 border-white/[0.07]" : "bg-white border-slate-200 shadow-sm"}`}>
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-red-500/0 via-red-500/25 to-red-500/0" />
               <div className="absolute bottom-0 right-0 w-24 h-24 rounded-full bg-red-500/[0.04] blur-2xl pointer-events-none" />
               <div className="flex items-start justify-between mb-3">
-                <p className="text-[11px] font-medium text-white/35 uppercase tracking-widest">Atrasado</p>
+                <p className={`text-[11px] font-medium uppercase tracking-widest ${isDark ? "text-white/35" : "text-slate-400"}`}>Atrasado</p>
                 <div className="w-7 h-7 rounded-lg bg-red-500/10 border border-red-500/15 flex items-center justify-center">
                   <AlertCircle className="w-3.5 h-3.5 text-red-400/70" />
                 </div>
               </div>
               {isResumoLoading ? (
-                <div className="h-7 w-28 bg-white/10 rounded-lg animate-pulse" />
+                <div className={`h-7 w-28 rounded-lg animate-pulse ${isDark ? "bg-white/10" : "bg-slate-200"}`} />
               ) : (
-                <p className="text-2xl font-bold text-red-400 tracking-tight">{formatCurrency(totalAtrasado)}</p>
+                <p className={`text-2xl font-bold tracking-tight ${isDark ? "text-red-400" : "text-red-600"}`}>{formatCurrency(totalAtrasado)}</p>
               )}
-              <p className="text-[11px] text-red-500/30 mt-2">
+              <p className={`text-[11px] mt-2 ${isDark ? "text-red-500/30" : "text-red-600/50"}`}>
                 {faturasAtrasadas.length > 0 ? `${faturasAtrasadas.length} fatura${faturasAtrasadas.length > 1 ? 's' : ''} atrasada${faturasAtrasadas.length > 1 ? 's' : ''}` : 'Tudo em dia'}
               </p>
             </div>
           </div>
 
           {/* Dados cadastrais */}
-          <div className="bg-zinc-900 border border-white/[0.07] rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/[0.05] flex items-center justify-between">
-              <h2 className="text-[11px] font-semibold text-white/35 uppercase tracking-widest">Dados Cadastrais</h2>
-              <span className="text-[10px] text-white/15">Empresa e CNPJ são somente leitura</span>
+          <div className={`border rounded-2xl overflow-hidden transition-colors duration-300 ${isDark ? "bg-zinc-900 border-white/[0.07]" : "bg-white border-slate-200 shadow-sm"}`}>
+            <div className={`px-5 py-4 border-b flex items-center justify-between ${isDark ? "border-white/[0.05]" : "border-slate-100"}`}>
+              <h2 className={`text-[11px] font-semibold uppercase tracking-widest ${isDark ? "text-white/35" : "text-slate-400"}`}>Dados Cadastrais</h2>
+              <span className={`text-[10px] ${isDark ? "text-white/15" : "text-slate-300"}`}>Empresa e CNPJ são somente leitura</span>
             </div>
 
-            <div className="divide-y divide-white/[0.04]">
+            <div className={`divide-y ${isDark ? "divide-white/[0.04]" : "divide-slate-100"}`}>
               {/* Empresa */}
               <div className="px-5 py-3.5 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-white/[0.06] flex items-center justify-center shrink-0">
-                  <Building2 className="w-3.5 h-3.5 text-white/25" />
+                <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${isDark ? "bg-zinc-800 border-white/[0.06]" : "bg-slate-100 border-slate-200"}`}>
+                  <Building2 className={`w-3.5 h-3.5 ${isDark ? "text-white/25" : "text-slate-400"}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-white/25 uppercase tracking-wider mb-0.5">Empresa</p>
-                  <p className="text-sm text-white/75 font-medium truncate">{client.nome ?? '—'}</p>
+                  <p className={`text-[10px] uppercase tracking-wider mb-0.5 ${isDark ? "text-white/25" : "text-slate-400"}`}>Empresa</p>
+                  <p className={`text-sm font-medium truncate ${isDark ? "text-white/75" : "text-slate-700"}`}>{client.nome ?? '—'}</p>
                 </div>
               </div>
 
               {/* CNPJ */}
               <div className="px-5 py-3.5 flex items-center gap-3">
-                <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-white/[0.06] flex items-center justify-center shrink-0">
-                  <Building2 className="w-3.5 h-3.5 text-white/25" />
+                <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 ${isDark ? "bg-zinc-800 border-white/[0.06]" : "bg-slate-100 border-slate-200"}`}>
+                  <Building2 className={`w-3.5 h-3.5 ${isDark ? "text-white/25" : "text-slate-400"}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-white/25 uppercase tracking-wider mb-0.5">CNPJ</p>
-                  <p className="text-sm text-white/60 font-mono">{client.cnpj ?? '—'}</p>
+                  <p className={`text-[10px] uppercase tracking-wider mb-0.5 ${isDark ? "text-white/25" : "text-slate-400"}`}>CNPJ</p>
+                  <p className={`text-sm font-mono ${isDark ? "text-white/60" : "text-slate-500"}`}>{client.cnpj ?? '—'}</p>
                 </div>
               </div>
 
               {/* E-mail — editável */}
               <div className="px-5 py-3.5 flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
-                  <Mail className="w-3.5 h-3.5 text-white/25" />
+                <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${isDark ? "bg-zinc-800 border-white/[0.06]" : "bg-slate-100 border-slate-200"}`}>
+                  <Mail className={`w-3.5 h-3.5 ${isDark ? "text-white/25" : "text-slate-400"}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-white/25 uppercase tracking-wider mb-1">E-mail</p>
+                  <p className={`text-[10px] uppercase tracking-wider mb-1 ${isDark ? "text-white/25" : "text-slate-400"}`}>E-mail</p>
                   {editField === 'email' ? (
                     <form onSubmit={handleSaveEdit} className="flex items-center gap-2">
                       <input
@@ -1121,7 +1136,7 @@ function PortalClienteContent() {
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         placeholder="seu@email.com"
-                        className="flex-1 text-sm bg-zinc-800 border border-white/[0.12] rounded-lg px-3 py-1.5 text-white/80 placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+                        className={`flex-1 text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${isDark ? "bg-zinc-800 border-white/[0.12] text-white/80 placeholder:text-white/20" : "bg-slate-50 border-slate-200 text-slate-700 placeholder:text-slate-300"}`}
                         autoFocus
                       />
                       <button type="submit" disabled={editSaving}
@@ -1130,17 +1145,17 @@ function PortalClienteContent() {
                         {!editSaving && 'Salvar'}
                       </button>
                       <button type="button" onClick={() => setEditField(null)}
-                        className="p-1.5 rounded-lg text-white/25 hover:text-white/55 hover:bg-white/5 transition-colors">
+                        className={`p-1.5 rounded-lg transition-colors ${isDark ? "text-white/25 hover:text-white/55 hover:bg-white/5" : "text-slate-300 hover:text-slate-500 hover:bg-slate-100"}`}>
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </form>
                   ) : (
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`text-sm ${client.email ? 'text-white/65' : 'text-white/20 italic'}`}>
+                      <span className={`text-sm ${client.email ? (isDark ? 'text-white/65' : 'text-slate-600') : (isDark ? 'text-white/20 italic' : 'text-slate-300 italic')}`}>
                         {client.email ?? 'Não informado'}
                       </span>
                       <button onClick={() => startEdit('email', client.email ?? '')}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-white/25 hover:text-white/60 hover:bg-white/5 text-xs transition-colors shrink-0">
+                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors shrink-0 ${isDark ? "text-white/25 hover:text-white/60 hover:bg-white/5" : "text-slate-300 hover:text-slate-500 hover:bg-slate-100"}`}>
                         <Pencil className="w-3 h-3" />
                         <span className="hidden sm:inline">Editar</span>
                       </button>
@@ -1154,11 +1169,11 @@ function PortalClienteContent() {
 
               {/* Telefone — editável */}
               <div className="px-5 py-3.5 flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-zinc-800 border border-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
-                  <Phone className="w-3.5 h-3.5 text-white/25" />
+                <div className={`w-7 h-7 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${isDark ? "bg-zinc-800 border-white/[0.06]" : "bg-slate-100 border-slate-200"}`}>
+                  <Phone className={`w-3.5 h-3.5 ${isDark ? "text-white/25" : "text-slate-400"}`} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-white/25 uppercase tracking-wider mb-1">Telefone</p>
+                  <p className={`text-[10px] uppercase tracking-wider mb-1 ${isDark ? "text-white/25" : "text-slate-400"}`}>Telefone</p>
                   {editField === 'telefone' ? (
                     <form onSubmit={handleSaveEdit} className="flex items-center gap-2">
                       <input
@@ -1166,7 +1181,7 @@ function PortalClienteContent() {
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
                         placeholder="(00) 00000-0000"
-                        className="flex-1 text-sm bg-zinc-800 border border-white/[0.12] rounded-lg px-3 py-1.5 text-white/80 placeholder:text-white/20 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
+                        className={`flex-1 text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 ${isDark ? "bg-zinc-800 border-white/[0.12] text-white/80 placeholder:text-white/20" : "bg-slate-50 border-slate-200 text-slate-700 placeholder:text-slate-300"}`}
                         autoFocus
                       />
                       <button type="submit" disabled={editSaving}
@@ -1175,17 +1190,17 @@ function PortalClienteContent() {
                         {!editSaving && 'Salvar'}
                       </button>
                       <button type="button" onClick={() => setEditField(null)}
-                        className="p-1.5 rounded-lg text-white/25 hover:text-white/55 hover:bg-white/5 transition-colors">
+                        className={`p-1.5 rounded-lg transition-colors ${isDark ? "text-white/25 hover:text-white/55 hover:bg-white/5" : "text-slate-300 hover:text-slate-500 hover:bg-slate-100"}`}>
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </form>
                   ) : (
                     <div className="flex items-center justify-between gap-2">
-                      <span className={`text-sm ${client.telefone ? 'text-white/65' : 'text-white/20 italic'}`}>
+                      <span className={`text-sm ${client.telefone ? (isDark ? 'text-white/65' : 'text-slate-600') : (isDark ? 'text-white/20 italic' : 'text-slate-300 italic')}`}>
                         {client.telefone ?? 'Não informado'}
                       </span>
                       <button onClick={() => startEdit('telefone', client.telefone ?? '')}
-                        className="flex items-center gap-1 px-2 py-1 rounded-md text-white/25 hover:text-white/60 hover:bg-white/5 text-xs transition-colors shrink-0">
+                        className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs transition-colors shrink-0 ${isDark ? "text-white/25 hover:text-white/60 hover:bg-white/5" : "text-slate-300 hover:text-slate-500 hover:bg-slate-100"}`}>
                         <Pencil className="w-3 h-3" />
                         <span className="hidden sm:inline">Editar</span>
                       </button>
@@ -1200,14 +1215,14 @@ function PortalClienteContent() {
           </div>
 
           {/* Tabela de faturas */}
-          <div className="bg-zinc-900 border border-white/[0.07] rounded-2xl overflow-hidden">
+          <div className={`border rounded-2xl overflow-hidden transition-colors duration-300 ${isDark ? "bg-zinc-900 border-white/[0.07]" : "bg-white border-slate-200 shadow-sm"}`}>
             {/* Cabeçalho da seção */}
-            <div className="px-5 py-4 border-b border-white/[0.05] flex items-center justify-between">
+            <div className={`px-5 py-4 border-b flex items-center justify-between ${isDark ? "border-white/[0.05]" : "border-slate-100"}`}>
               <div className="flex items-center gap-2.5">
-                <Receipt className="w-4 h-4 text-white/25" />
-                <h2 className="text-[11px] font-semibold text-white/35 uppercase tracking-widest">Faturas</h2>
+                <Receipt className={`w-4 h-4 ${isDark ? "text-white/25" : "text-slate-400"}`} />
+                <h2 className={`text-[11px] font-semibold uppercase tracking-widest ${isDark ? "text-white/35" : "text-slate-400"}`}>Faturas</h2>
                 {!isResumoLoading && faturas.length > 0 && (
-                  <span className="text-xs bg-zinc-800 border border-white/[0.06] text-white/25 px-2 py-0.5 rounded-full tabular-nums">
+                  <span className={`text-xs border px-2 py-0.5 rounded-full tabular-nums ${isDark ? "bg-zinc-800 border-white/[0.06] text-white/25" : "bg-slate-100 border-slate-200 text-slate-400"}`}>
                     {faturas.length}
                   </span>
                 )}
@@ -1217,32 +1232,32 @@ function PortalClienteContent() {
             {isResumoLoading ? (
               <div className="p-5 space-y-2.5">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-12 bg-white/[0.04] rounded-xl animate-pulse" />
+                  <div key={i} className={`h-12 rounded-xl animate-pulse ${isDark ? "bg-white/[0.04]" : "bg-slate-100"}`} />
                 ))}
               </div>
             ) : faturas.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3">
-                <div className="w-12 h-12 rounded-xl bg-zinc-800 border border-white/[0.06] flex items-center justify-center">
-                  <Receipt className="w-5 h-5 text-white/15" />
+                <div className={`w-12 h-12 rounded-xl border flex items-center justify-center ${isDark ? "bg-zinc-800 border-white/[0.06]" : "bg-slate-100 border-slate-200"}`}>
+                  <Receipt className={`w-5 h-5 ${isDark ? "text-white/15" : "text-slate-300"}`} />
                 </div>
-                <p className="text-white/25 text-sm">Nenhuma fatura encontrada</p>
+                <p className={`text-sm ${isDark ? "text-white/25" : "text-slate-400"}`}>Nenhuma fatura encontrada</p>
               </div>
             ) : (
               <>
                 {/* Header de colunas */}
                 <div
-                  className="hidden sm:grid px-5 py-2.5 bg-zinc-800/40 border-b border-white/[0.04]"
+                  className={`hidden sm:grid px-5 py-2.5 border-b ${isDark ? "bg-zinc-800/40 border-white/[0.04]" : "bg-slate-50 border-slate-100"}`}
                   style={{ gridTemplateColumns: '1fr 100px 110px 96px 110px 80px' }}
                 >
                   {['Descrição', 'Vencimento', 'Pagamento', 'Status', 'Valor', 'Link'].map((col, i) => (
-                    <span key={col} className={`text-[10px] font-semibold text-white/20 uppercase tracking-widest ${i >= 4 ? 'text-right' : ''}`}>
+                    <span key={col} className={`text-[10px] font-semibold uppercase tracking-widest ${i >= 4 ? 'text-right' : ''} ${isDark ? "text-white/20" : "text-slate-400"}`}>
                       {col}
                     </span>
                   ))}
                 </div>
 
                 {/* Linhas */}
-                <div className="divide-y divide-white/[0.03]">
+                <div className={`divide-y ${isDark ? "divide-white/[0.03]" : "divide-slate-100"}`}>
                   {faturas.map((fatura) => {
                     const s = (fatura.status ?? '').toUpperCase();
                     const isPago = s === 'QUITADO' || s === 'PAGO' || s === 'RECEBIDO';
@@ -1251,7 +1266,9 @@ function PortalClienteContent() {
                     return (
                       <div
                         key={fatura.id}
-                        className={`relative sm:grid items-center px-5 py-3.5 hover:bg-white/[0.015] transition-colors group border-l-[3px] flex flex-col sm:flex-row gap-2 sm:gap-0 ${
+                        className={`relative sm:grid items-center px-5 py-3.5 transition-colors group border-l-[3px] flex flex-col sm:flex-row gap-2 sm:gap-0 ${
+                          isDark ? "hover:bg-white/[0.015]" : "hover:bg-slate-50"
+                        } ${
                           isAtrasadoRow
                             ? 'border-l-red-500/50'
                             : isPago
@@ -1262,23 +1279,23 @@ function PortalClienteContent() {
                       >
                         {/* Descrição */}
                         <div className="min-w-0">
-                          <p className="text-sm text-white/80 font-medium truncate">
+                          <p className={`text-sm font-medium truncate ${isDark ? "text-white/80" : "text-slate-700"}`}>
                             {fatura.descricao || fatura.categoriaNome || 'Fatura'}
                           </p>
                           {fatura.descricao && fatura.categoriaNome && (
-                            <p className="text-[11px] text-white/20 truncate mt-0.5">{fatura.categoriaNome}</p>
+                            <p className={`text-[11px] truncate mt-0.5 ${isDark ? "text-white/20" : "text-slate-400"}`}>{fatura.categoriaNome}</p>
                           )}
                         </div>
 
                         {/* Vencimento */}
-                        <p className="text-sm text-white/45 tabular-nums">
-                          <span className="sm:hidden text-white/20 text-xs mr-1">Venc.</span>
+                        <p className={`text-sm tabular-nums ${isDark ? "text-white/45" : "text-slate-500"}`}>
+                          <span className={`sm:hidden text-xs mr-1 ${isDark ? "text-white/20" : "text-slate-400"}`}>Venc.</span>
                           {formatDate(fatura.dataVencimento)}
                         </p>
 
                         {/* Pagamento */}
-                        <p className={`text-sm tabular-nums ${fatura.dataQuitacao ? 'text-emerald-400/60' : 'text-white/15'}`}>
-                          <span className="sm:hidden text-white/20 text-xs mr-1">Pago em</span>
+                        <p className={`text-sm tabular-nums ${fatura.dataQuitacao ? (isDark ? 'text-emerald-400/60' : 'text-emerald-600/70') : (isDark ? 'text-white/15' : 'text-slate-300')}`}>
+                          <span className={`sm:hidden text-xs mr-1 ${isDark ? "text-white/20" : "text-slate-400"}`}>Pago em</span>
                           {formatDate(fatura.dataQuitacao)}
                         </p>
 
@@ -1289,7 +1306,7 @@ function PortalClienteContent() {
 
                         {/* Valor */}
                         <p className={`text-sm font-semibold tabular-nums sm:text-right ${
-                          isAtrasadoRow ? 'text-red-400' : isPago ? 'text-white/75' : 'text-amber-300/80'
+                          isAtrasadoRow ? (isDark ? 'text-red-400' : 'text-red-600') : isPago ? (isDark ? 'text-white/75' : 'text-slate-700') : (isDark ? 'text-amber-300/80' : 'text-amber-600')
                         }`}>
                           {formatCurrency(fatura.valorBruto)}
                         </p>
@@ -1301,7 +1318,7 @@ function PortalClienteContent() {
                               href={fatura.urlCobranca}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 text-blue-400/80 text-xs font-medium transition-colors border border-blue-500/15"
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border ${isDark ? "bg-blue-600/15 hover:bg-blue-600/25 text-blue-400/80 border-blue-500/15" : "bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"}`}
                             >
                               <ExternalLink className="w-3 h-3" />
                               Boleto
@@ -1320,53 +1337,44 @@ function PortalClienteContent() {
 
         </>}
 
-        {/* ── Módulo: Relatórios ── */}
+        {/* ── Módulo: Performance ── */}
         {activeModule === 'relatorios' && (
-          <div className="bg-zinc-900 border border-white/[0.07] rounded-2xl overflow-hidden">
-            <div className="flex flex-col items-center justify-center py-24 gap-5 px-6 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-zinc-800 border border-white/[0.07] flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-white/15" />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-white/50 font-semibold">Relatórios</p>
-                <p className="text-white/20 text-sm max-w-xs leading-relaxed">
-                  Visualize relatórios detalhados de performance, histórico de pagamentos e evolução financeira da sua conta.
-                </p>
-              </div>
-              <span className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-blue-500/8 text-blue-400/50 border border-blue-500/15 font-medium">
-                <Clock className="w-3 h-3" />
-                Em breve
-              </span>
+          <Suspense fallback={
+            <div className={`flex items-center justify-center py-16 gap-2 ${isDark ? "text-white/30" : "text-slate-400"}`}>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Carregando...</span>
             </div>
-          </div>
+          }>
+            <PortalPerformance />
+          </Suspense>
         )}
 
         {/* ── Módulo: Serviços ── */}
         {activeModule === 'servicos' && (
-          <div className="bg-zinc-900 border border-white/[0.07] rounded-2xl overflow-hidden">
+          <div className={`border rounded-2xl overflow-hidden transition-colors duration-300 ${isDark ? "bg-zinc-900 border-white/[0.07]" : "bg-white border-slate-200 shadow-sm"}`}>
             {/* Header */}
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-white/[0.07]">
-              <div className="w-8 h-8 rounded-lg bg-zinc-800 border border-white/[0.07] flex items-center justify-center">
-                <Briefcase className="w-4 h-4 text-white/40" />
+            <div className={`flex items-center gap-3 px-5 py-4 border-b ${isDark ? "border-white/[0.07]" : "border-slate-100"}`}>
+              <div className={`w-8 h-8 rounded-lg border flex items-center justify-center ${isDark ? "bg-zinc-800 border-white/[0.07]" : "bg-slate-100 border-slate-200"}`}>
+                <Briefcase className={`w-4 h-4 ${isDark ? "text-white/40" : "text-slate-400"}`} />
               </div>
               <div>
-                <p className="text-white/80 font-semibold text-sm">Serviços Contratados</p>
-                <p className="text-white/30 text-xs">Produtos e responsáveis ativos na sua conta</p>
+                <p className={`font-semibold text-sm ${isDark ? "text-white/80" : "text-slate-700"}`}>Serviços Contratados</p>
+                <p className={`text-xs ${isDark ? "text-white/30" : "text-slate-400"}`}>Produtos e responsáveis ativos na sua conta</p>
               </div>
             </div>
 
             {isServicosLoading ? (
-              <div className="flex items-center justify-center py-16 gap-2 text-white/30">
+              <div className={`flex items-center justify-center py-16 gap-2 ${isDark ? "text-white/30" : "text-slate-400"}`}>
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span className="text-sm">Carregando...</span>
               </div>
             ) : !servicos || servicos.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-6">
-                <Briefcase className="w-8 h-8 text-white/10" />
-                <p className="text-white/30 text-sm">Nenhum serviço encontrado para esta conta.</p>
+                <Briefcase className={`w-8 h-8 ${isDark ? "text-white/10" : "text-slate-200"}`} />
+                <p className={`text-sm ${isDark ? "text-white/30" : "text-slate-400"}`}>Nenhum serviço encontrado para esta conta.</p>
               </div>
             ) : (
-              <div className="divide-y divide-white/[0.05]">
+              <div className={`divide-y ${isDark ? "divide-white/[0.05]" : "divide-slate-100"}`}>
                 {servicos.map((s, i) => {
                   const st = (s.status ?? '').toLowerCase();
                   const isAtivo = st.includes('ativo') || st.includes('anda') || st.includes('progr');
@@ -1375,7 +1383,7 @@ function PortalClienteContent() {
                   const badgeClass = isAtivo
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                     : isConcluido
-                    ? 'bg-zinc-700/60 text-white/40 border-white/[0.07]'
+                    ? isDark ? 'bg-zinc-700/60 text-white/40 border-white/[0.07]' : 'bg-slate-100 text-slate-400 border-slate-200'
                     : isPausado
                     ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
                     : 'bg-blue-500/10 text-blue-400 border-blue-500/20';
@@ -1383,11 +1391,11 @@ function PortalClienteContent() {
                   return (
                     <div key={i} className="flex items-center justify-between px-5 py-4 gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-white/80 text-sm font-medium truncate">
+                        <p className={`text-sm font-medium truncate ${isDark ? "text-white/80" : "text-slate-700"}`}>
                           {s.produto ?? '—'}
                         </p>
                         {s.responsavel && (
-                          <p className="text-white/30 text-xs mt-0.5 truncate">
+                          <p className={`text-xs mt-0.5 truncate ${isDark ? "text-white/30" : "text-slate-400"}`}>
                             Responsável: {s.responsavel}
                           </p>
                         )}
@@ -1401,7 +1409,7 @@ function PortalClienteContent() {
                         {!isConcluido && (
                           <button
                             onClick={() => setCancelServico(s)}
-                            className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium bg-transparent hover:bg-red-500/10 text-white/20 hover:text-red-400 border-white/[0.07] hover:border-red-500/20 transition-colors"
+                            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium bg-transparent hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 transition-colors ${isDark ? "text-white/20 border-white/[0.07]" : "text-slate-300 border-slate-200"}`}
                           >
                             <XCircle className="w-3 h-3" />
                             Cancelar
@@ -1421,7 +1429,7 @@ function PortalClienteContent() {
           <ChatModuloCliente clientId={(client as any).id} />
         )}
 
-        <p className="text-center text-[11px] text-white/15 pb-4">
+        <p className={`text-center text-[11px] pb-4 ${isDark ? "text-white/15" : "text-slate-300"}`}>
           Turbo Partners · Área do Cliente · Dados protegidos
         </p>
       </main>
@@ -1437,15 +1445,15 @@ function PortalClienteContent() {
       )}
       <button
         onClick={() => setChatOpen(o => !o)}
-        className={`fixed bottom-5 right-5 w-14 h-14 rounded-full shadow-lg shadow-black/40 flex items-center justify-center transition-all z-50 ${
+        className={`fixed bottom-5 right-5 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all z-50 ${
           chatOpen
-            ? 'bg-zinc-700 hover:bg-zinc-600 border border-white/[0.10]'
-            : 'bg-blue-600 hover:bg-blue-500 border border-blue-400/20'
+            ? isDark ? 'bg-zinc-700 hover:bg-zinc-600 border border-white/[0.10] shadow-black/40' : 'bg-slate-200 hover:bg-slate-300 border border-slate-300 shadow-slate-300/30'
+            : 'bg-blue-600 hover:bg-blue-500 border border-blue-400/20 shadow-blue-600/30'
         }`}
         title="Atendimento"
       >
         {chatOpen
-          ? <X className="w-5 h-5 text-white/70" />
+          ? <X className={`w-5 h-5 ${isDark ? "text-white/70" : "text-slate-500"}`} />
           : <MessageSquare className="w-5 h-5 text-white" />
         }
       </button>
