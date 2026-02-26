@@ -5580,7 +5580,8 @@ export default function DetailColaborador() {
   const { setPageInfo } = usePageInfo();
   const { user } = useAuth();
   const [, params] = useRoute("/colaborador/:id");
-  const colaboradorId = params?.id || "";
+  const [, perfilParams] = useRoute("/meu-perfil/:id");
+  const colaboradorId = params?.id || perfilParams?.id || "";
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [addPromocaoDialogOpen, setAddPromocaoDialogOpen] = useState(false);
   const [assignPatrimonioDialogOpen, setAssignPatrimonioDialogOpen] = useState(false);

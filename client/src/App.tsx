@@ -294,6 +294,7 @@ function ProtectedRouter() {
       
       {/* Meu Perfil */}
       <Route path="/meu-perfil">{() => <ProtectedRoute path="/meu-perfil" component={MeuPerfil} />}</Route>
+      <Route path="/meu-perfil/:id">{() => <ProtectedRoute path="/meu-perfil" component={DetailColaborador} />}</Route>
       
       {/* Avisos/Notificações */}
       <Route path="/avisos">{() => <ProtectedRoute path="/avisos" component={Avisos} />}</Route>
