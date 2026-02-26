@@ -125,14 +125,18 @@ export function registerRelatorioMensalRoutes(app: Express, db: any) {
       const impostos = parseFloat((receitaResult.rows[0] as any)?.impostos || "0");
       const receitaLiquida = receitaQuitada - impostos;
 
-      // CSV, CAC, SG&A
+      // CSV (excluindo CAC, SGA, IR/CSLL), CAC, SG&A
       const custosResult = await db.execute(sql`
         SELECT
-          COALESCE(SUM(CASE WHEN categoria_nome LIKE '06.%' AND categoria_nome NOT LIKE '06.13%'
+          COALESCE(SUM(CASE WHEN categoria_nome LIKE '06.%'
+            AND categoria_nome NOT LIKE '06.03%' AND categoria_nome NOT LIKE '06.04%'
+            AND categoria_nome NOT LIKE '06.10%' AND categoria_nome NOT LIKE '06.11%' AND categoria_nome NOT LIKE '06.12%'
+            AND categoria_nome NOT LIKE '06.13%'
             THEN valor_pago::numeric ELSE 0 END), 0) as csv,
           COALESCE(SUM(CASE WHEN (categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.04%')
             THEN valor_pago::numeric ELSE 0 END), 0) as cac,
           COALESCE(SUM(CASE WHEN (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+            AND categoria_nome NOT LIKE '06.11.01%'
             THEN valor_pago::numeric ELSE 0 END), 0) as sga
         FROM "Conta Azul".caz_parcelas
         WHERE status = 'QUITADO'

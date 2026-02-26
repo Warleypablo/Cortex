@@ -16016,10 +16016,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/okr2026/hero-drilldown", isAuthenticated, async (req, res) => {
+    try {
+      const metric = req.query.metric as string;
+      if (!metric) {
+        return res.status(400).json({ error: "Missing 'metric' query parameter" });
+      }
+      const {
+        getMrrAtivoDetail,
+        getChurnDetail,
+        getVendasMrrDetail,
+        getAquisicaoPontualDetail,
+        getValorEntreguePontualDetail,
+        getCsvDetail,
+        getCacDetail,
+        getSgaDetail,
+        getCapexDetail,
+        getTaxesOnRevenueDetail,
+        getTaxIrCsllDetail,
+        getRevenueOtherDetail,
+      } = await import("./okr2026/metricsAdapter");
+
+      const handlers: Record<string, () => Promise<any>> = {
+        mrr_ativo: getMrrAtivoDetail,
+        vendas_mrr: getVendasMrrDetail,
+        churn: getChurnDetail,
+        vendas_pontuais: getAquisicaoPontualDetail,
+        entregas_pontuais: getValorEntreguePontualDetail,
+        cogs_csv: getCsvDetail,
+        cac_total: getCacDetail,
+        sga_total: getSgaDetail,
+        capex: getCapexDetail,
+        taxes_on_revenue: getTaxesOnRevenueDetail,
+        tax_ir_csll: getTaxIrCsllDetail,
+        revenue_other: getRevenueOtherDetail,
+      };
+
+      const handler = handlers[metric];
+      if (!handler) {
+        return res.status(400).json({ error: `Unknown metric: ${metric}` });
+      }
+
+      const result = await handler();
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error fetching hero drilldown:", error);
+      res.status(500).json({ error: "Failed to fetch hero drilldown" });
+    }
+  });
+
   app.get("/api/okr2026/summary", isAuthenticated, async (req, res) => {
     try {
       const { getCached, setCache } = await import("./okr2026/cache");
-      const { 
+      const {
         getDashboardMetrics, 
         getObjectives, 
         getKRs, 
@@ -16634,12 +16683,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["cash_balance"]) actualsByMetric["cash_balance"] = {};
           actualsByMetric["cash_balance"][currentMonthKey] = saldoCaixa;
           
-          // CSV (Custo Serviços Vendidos) - categoria 06.% exceto 06.13%
+          // CSV (Custo Serviços Vendidos) - categoria 06.% excluindo CAC (06.03,06.04), SGA (06.10,06.11,06.12) e IR/CSLL (06.13)
           const csvResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_pago::numeric), 0) as csv
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
               AND categoria_nome LIKE '06.%'
+              AND categoria_nome NOT LIKE '06.03%'
+              AND categoria_nome NOT LIKE '06.04%'
+              AND categoria_nome NOT LIKE '06.10%'
+              AND categoria_nome NOT LIKE '06.11%'
+              AND categoria_nome NOT LIKE '06.12%'
               AND categoria_nome NOT LIKE '06.13%'
               AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
               AND data_quitacao::date <= CURRENT_DATE
@@ -16661,19 +16715,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!actualsByMetric["cac_total"]) actualsByMetric["cac_total"] = {};
           actualsByMetric["cac_total"][currentMonthKey] = cacTotal;
           
-          // SG&A (Despesas Administrativas) - categorias 06.10%, 06.11%, 06.12%
+          // SG&A (Despesas Administrativas) - categorias 06.10%, 06.11%, 06.12% excluindo CAPEX (06.11.01%)
           const sgaResult = await db.execute(sql`
             SELECT COALESCE(SUM(valor_pago::numeric), 0) as sga
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
               AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+              AND categoria_nome NOT LIKE '06.11.01%'
               AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
               AND data_quitacao::date <= CURRENT_DATE
           `);
           const sgaTotal = parseFloat((sgaResult.rows[0] as any)?.sga || "0");
           if (!actualsByMetric["sga_total"]) actualsByMetric["sga_total"] = {};
           actualsByMetric["sga_total"][currentMonthKey] = sgaTotal;
+
+          // CAPEX (Compra de Ativos) - categoria 06.11.01%
+          const capexResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_pago::numeric), 0) as capex
+            FROM "Conta Azul".caz_parcelas
+            WHERE status = 'QUITADO'
+              AND categoria_nome LIKE '06.11.01%'
+              AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
+              AND data_quitacao::date <= CURRENT_DATE
+          `);
+          const capexTotal = parseFloat((capexResult.rows[0] as any)?.capex || "0");
+          if (!actualsByMetric["capex"]) actualsByMetric["capex"] = {};
+          actualsByMetric["capex"][currentMonthKey] = capexTotal;
           
+          // IR/CSLL - categoria 06.13%
+          const irCsllResult = await db.execute(sql`
+            SELECT COALESCE(SUM(valor_pago::numeric), 0) as ir_csll
+            FROM "Conta Azul".caz_parcelas
+            WHERE status = 'QUITADO'
+              AND categoria_nome LIKE '06.13%'
+              AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
+              AND data_quitacao::date <= CURRENT_DATE
+          `);
+          const irCsll = parseFloat((irCsllResult.rows[0] as any)?.ir_csll || "0");
+          if (!actualsByMetric["tax_ir_csll"]) actualsByMetric["tax_ir_csll"] = {};
+          actualsByMetric["tax_ir_csll"][currentMonthKey] = irCsll;
+
           // Margem Bruta = Receita Líquida - CSV
           const margemBruta = receitaLiquida - csvTotal;
           if (!actualsByMetric["gross_margin"]) actualsByMetric["gross_margin"] = {};
@@ -16756,6 +16837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           unit: def.unit,
           direction: def.direction,
           is_derived: def.is_derived,
+          formula: def.formula || null,
           period_type: def.period_type,
           order: idx,
           months: monthsData,
@@ -16921,6 +17003,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM "Conta Azul".caz_parcelas
         WHERE status = 'QUITADO'
           AND categoria_nome LIKE '06.%'
+          AND categoria_nome NOT LIKE '06.03%'
+          AND categoria_nome NOT LIKE '06.04%'
+          AND categoria_nome NOT LIKE '06.10%'
+          AND categoria_nome NOT LIKE '06.11%'
+          AND categoria_nome NOT LIKE '06.12%'
           AND categoria_nome NOT LIKE '06.13%'
           AND data_quitacao::date >= '${startStr}'::date
           AND data_quitacao::date <= '${endStr}'::date
@@ -16932,6 +17019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         FROM "Conta Azul".caz_parcelas
         WHERE status = 'QUITADO'
           AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+          AND categoria_nome NOT LIKE '06.11.01%'
           AND data_quitacao::date >= '${startStr}'::date
           AND data_quitacao::date <= '${endStr}'::date
       `));
