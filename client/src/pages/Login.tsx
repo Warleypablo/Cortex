@@ -233,15 +233,6 @@ export default function Login() {
                   </div>
 
                   <button
-                    onClick={() => setLocation("/loginclientes")}
-                    className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 rounded-full py-3 px-4 transition-all duration-300 hover:border-blue-500/40"
-                    data-testid="button-client-login"
-                  >
-                    <Building2 className="w-5 h-5" />
-                    <span className="font-medium">Área do Cliente</span>
-                  </button>
-
-                  <button
                     onClick={() => setShowExternalLogin(true)}
                     className="backdrop-blur-md w-full flex items-center justify-center gap-3 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/20 rounded-full py-3 px-4 transition-all duration-300 hover:border-orange-500/40"
                     data-testid="button-external-login"

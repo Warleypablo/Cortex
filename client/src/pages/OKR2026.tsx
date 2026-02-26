@@ -183,6 +183,7 @@ interface Series {
   mrr: { month: string; value: number }[];
   ebitda: { month: string; value: number }[];
   churn: { month: string; value: number }[];
+  inadimplencia: { month: string; value: number }[];
 }
 
 interface SummaryResponse {
@@ -2082,7 +2083,11 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
   const cashGenTarget = currentTargets.geracaoCaixa;
 
   // Valores atuais
-  const inadValue = metrics.inadimplencia_brl ?? (metrics.inadimplencia_percentual ? (metrics.mrr_ativo ?? 0) * (metrics.inadimplencia_percentual / 100) : 0);
+  const inadRealtime = metrics.inadimplencia_brl ?? (metrics.inadimplencia_percentual ? (metrics.mrr_ativo ?? 0) * (metrics.inadimplencia_percentual / 100) : 0);
+  // Inadimplência dinâmica: usa série para meses passados (reflete pagamentos recuperados)
+  const inadValue = viewMode === "month" && !isSelectedMonthCurrent && !isSelectedMonthFuture
+    ? (getValueFromSeries(series.inadimplencia, selectedMonth) ?? inadRealtime)
+    : inadRealtime;
   const churnValue = metrics.churn_brl ?? (metrics.net_churn_mrr_percentual ? (metrics.mrr_ativo ?? 0) * (metrics.net_churn_mrr_percentual / 100) : 0);
   const vendasMrrValue = metrics.vendas_mrr ?? 0;
 
