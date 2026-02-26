@@ -16184,6 +16184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mrr: metrics.mrr_serie || [],
         ebitda: [],
         churn: [],
+        inadimplencia: metrics.inadimplencia_serie || [],
         geracao_caixa_margem: await getMetricSeries("geracao_caixa_margem", `${new Date().getFullYear()}-01-01`, `${new Date().getFullYear()}-12-31`)
       };
       
