@@ -27,6 +27,7 @@ export interface DashboardMetrics {
   inadimplencia_valor: number;
   inadimplencia_brl: number;
   inadimplencia_percentual: number;
+  inadimplencia_serie: { month: string; value: number }[];
   gross_churn_mrr: number;
   gross_mrr_churn_percentual: number;
   net_churn_mrr: number | null;
@@ -343,6 +344,32 @@ export async function getInadimplencia(): Promise<{ valor: number; percentual: n
     getInadimplenciaPct()
   ]);
   return { valor, percentual };
+}
+
+// Série mensal dinâmica de inadimplência em BRL.
+// Usa nao_pago que se atualiza conforme pagamentos são recuperados no mês seguinte.
+export async function getInadimplenciaBrlSerie(): Promise<{ month: string; value: number }[]> {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        TO_CHAR(data_vencimento, 'YYYY-MM') as month,
+        COALESCE(SUM(nao_pago::numeric), 0) as valor
+      FROM "Conta Azul".caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND data_vencimento >= date_trunc('year', CURRENT_DATE)
+        AND data_vencimento < CURRENT_DATE
+        AND nao_pago::numeric > 0
+      GROUP BY TO_CHAR(data_vencimento, 'YYYY-MM')
+      ORDER BY month
+    `);
+    return (result.rows as any[]).map(row => ({
+      month: row.month,
+      value: parseFloat(row.valor || "0")
+    }));
+  } catch (error) {
+    console.error("[OKR] Error fetching Inadimplência BRL Serie:", error);
+    return [];
+  }
 }
 
 export async function getGrossChurnMrr(): Promise<number> {
@@ -1875,7 +1902,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     techProjetosValor,
     techFreelancersPct,
     folhaBeneficios,
-    saldoProjetado
+    saldoProjetado,
+    inadimplenciaSerie
   ] = await Promise.all([
     getMrrAtivo(),
     getMrrInicioMes(),
@@ -1905,7 +1933,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getTechProjetosValor(),
     getTechFreelancersPct(),
     getFolhaBeneficios(),
-    getSaldoProjetado()
+    getSaldoProjetado(),
+    getInadimplenciaBrlSerie()
   ]);
 
   const receitaPorHead = headcount > 0 ? receitaYTD.liquida / headcount : 0;
@@ -1923,6 +1952,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     inadimplencia_valor: inadimplencia.valor,
     inadimplencia_brl: inadimplencia.valor,
     inadimplencia_percentual: inadimplencia.percentual,
+    inadimplencia_serie: inadimplenciaSerie,
     gross_churn_mrr: churnMRR.gross,
     gross_mrr_churn_percentual: churnMRR.grossPercentual,
     net_churn_mrr: churnMRR.net,
