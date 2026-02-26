@@ -54,6 +54,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { HeroCardDrillDown } from "@/components/HeroCardDrillDown";
 
 interface DashboardMetrics {
   mrr_ativo: number;
@@ -602,16 +603,17 @@ function getKRStatus(
 }
 
 
-function HeroCard({ 
-  title, 
-  value, 
-  target, 
-  format, 
+function HeroCard({
+  title,
+  value,
+  target,
+  format,
   direction = "higher",
-  icon: Icon, 
+  icon: Icon,
   tooltip,
   status,
-  href
+  href,
+  onClick
 }: {
   title: string;
   value: number | null;
@@ -622,6 +624,7 @@ function HeroCard({
   tooltip?: string;
   status?: "green" | "yellow" | "red";
   href?: string;
+  onClick?: () => void;
 }) {
   const formatValue = (v: number) => {
     if (format === "currency") return formatCurrency(v);
@@ -677,9 +680,11 @@ function HeroCard({
 
   const alertStatus = getAlertStatus();
 
+  const isClickable = !!onClick || !!href;
+
   const cardContent = (
-    <Card 
-      className={`relative overflow-visible border-l-4 ${colors.border} ${href ? 'cursor-pointer hover-elevate transition-all' : ''}`}
+    <Card
+      className={`relative overflow-visible border-l-4 ${colors.border} ${isClickable ? 'cursor-pointer hover:shadow-md transition-all' : ''}`}
       data-testid={`card-hero-${title.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
@@ -739,10 +744,18 @@ function HeroCard({
     </Card>
   );
 
+  if (onClick) {
+    return (
+      <div role="button" tabIndex={0} onClick={onClick} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }} className="block">
+        {cardContent}
+      </div>
+    );
+  }
+
   if (href) {
     return <Link href={href} className="block">{cardContent}</Link>;
   }
-  
+
   return cardContent;
 }
 
@@ -1999,6 +2012,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [selectedQuarter, setSelectedQuarter] = useState<"Q1" | "Q2" | "Q3" | "Q4">(() => currentQuarter);
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(() => getCurrentMonth());
+  const [drillDownMetric, setDrillDownMetric] = useState<{ metric: string; title: string } | null>(null);
 
   const { data: latestCheckinsData } = useQuery<LatestCheckinsResponse>({
     queryKey: ["/api/okr2026/kr-checkins-latest"],
@@ -2163,9 +2177,9 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <HeroCard
           title="MRR Ativo"
-          value={viewMode === "month" 
-            ? (isSelectedMonthCurrent || isSelectedMonthFuture 
-                ? metrics.mrr_ativo 
+          value={viewMode === "month"
+            ? (isSelectedMonthCurrent || isSelectedMonthFuture
+                ? metrics.mrr_ativo
                 : getValueFromSeries(series.mrr || metrics.mrr_serie, selectedMonth) ?? metrics.mrr_ativo)
             : metrics.mrr_ativo}
           target={mrrTarget}
@@ -2175,6 +2189,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           tooltip={viewMode === "month"
             ? `${selectedMonthData?.label}: Meta ${formatCurrency(mrrTarget)}${isSelectedMonthFuture ? ' (Valor atual - mês futuro)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(mrrTarget)}`}
+          onClick={() => setDrillDownMetric({ metric: "mrr_ativo", title: "MRR Ativo — Detalhamento" })}
         />
         <HeroCard
           title="Vendas MRR"
@@ -2187,6 +2202,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             ? `${selectedMonthData?.label}: Meta ${formatCurrency(vendasMrrTarget)}${isSelectedMonthFuture ? ' (Mês futuro - sem dados)' : ''}`
             : `Meta ${selectedQuarter}: ${formatCurrency(vendasMrrTarget)}`}
           href="/dashboard/comercial/closers"
+          onClick={() => setDrillDownMetric({ metric: "vendas_mrr", title: "Vendas MRR — Detalhamento" })}
         />
         <HeroCard
           title="Inadimplência"
@@ -2200,6 +2216,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             : `Meta ${selectedQuarter}: Máx ${formatCurrency(inadTarget)}`}
           status={isSelectedMonthFuture ? undefined : inadStatus}
           href="/dashboard/inadimplencia"
+          onClick={() => setDrillDownMetric({ metric: "inadimplencia", title: "Inadimplência — Detalhamento" })}
         />
         <HeroCard
           title="Churn"
@@ -2213,6 +2230,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             : `Meta ${selectedQuarter}: Máx ${formatCurrency(churnTarget)}`}
           status={isSelectedMonthFuture ? undefined : churnStatus}
           href="/dashboard/churn-detalhamento"
+          onClick={() => setDrillDownMetric({ metric: "churn", title: "Churn — Detalhamento" })}
         />
         <HeroCard
           title="Vendas Pontuais"
@@ -2222,6 +2240,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           direction="higher"
           icon={Wallet}
           tooltip="Vendas pontuais fechadas no mês (CRM)"
+          onClick={() => setDrillDownMetric({ metric: "vendas_pontuais", title: "Vendas Pontuais — Detalhamento" })}
         />
         <HeroCard
           title="Entregas Pontuais"
@@ -2231,6 +2250,7 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           direction="higher"
           icon={Target}
           tooltip="Projetos pontuais entregues no mês"
+          onClick={() => setDrillDownMetric({ metric: "entregas_pontuais", title: "Entregas Pontuais — Detalhamento" })}
         />
       </div>
 
@@ -2276,6 +2296,13 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           <HugzBlock metrics={metrics} initiatives={initiatives} />
         </div>
       </div>
+
+      <HeroCardDrillDown
+        metric={drillDownMetric?.metric as any ?? null}
+        title={drillDownMetric?.title ?? ""}
+        open={!!drillDownMetric}
+        onOpenChange={(open) => { if (!open) setDrillDownMetric(null); }}
+      />
     </div>
   );
 }
@@ -3250,6 +3277,7 @@ interface BPMetric {
   unit: "BRL" | "COUNT" | "PCT";
   direction: string;
   is_derived: boolean;
+  formula?: string | null;
   order: number;
   months: BPMetricMonth[];
   totals: {
@@ -3271,9 +3299,26 @@ interface BPFinanceiroResponse {
 
 type BPDisplayMode = "actual" | "plan" | "variance";
 
+const BP_DRILLDOWN_MAP: Record<string, { metric: string; title: string }> = {
+  mrr_active: { metric: "mrr_ativo", title: "MRR Ativo — Detalhamento" },
+  sales_mrr: { metric: "vendas_mrr", title: "Vendas MRR — Detalhamento" },
+  revenue_one_time: { metric: "vendas_pontuais", title: "Vendas Pontuais — Detalhamento" },
+  bad_debt: { metric: "inadimplencia", title: "Inadimplência — Detalhamento" },
+  churn_mrr_month: { metric: "churn", title: "Churn — Detalhamento" },
+  cogs_csv: { metric: "cogs_csv", title: "CSV (Custo Serviços) — Detalhamento" },
+  cac_total: { metric: "cac_total", title: "CAC (Custo Aquisição) — Detalhamento" },
+  sga_total: { metric: "sga_total", title: "SG&A (Despesas Adm.) — Detalhamento" },
+  capex: { metric: "capex", title: "CAPEX (Compra de Ativos) — Detalhamento" },
+  taxes_on_revenue: { metric: "taxes_on_revenue", title: "Impostos sobre Receita — Detalhamento" },
+  tax_ir_csll: { metric: "tax_ir_csll", title: "IR/CSLL — Detalhamento" },
+  revenue_other: { metric: "revenue_other", title: "Outras Receitas — Detalhamento" },
+};
+
 function BPFinanceiroTab() {
   const [displayMode, setDisplayMode] = useState<BPDisplayMode>("actual");
-  
+  const [drillDownMetric, setDrillDownMetric] = useState<{ metric: string; title: string } | null>(null);
+  const [formulaBreakdown, setFormulaBreakdown] = useState<{ metric: BPMetric; month: string } | null>(null);
+
   const { data, isLoading, error } = useQuery<BPFinanceiroResponse>({
     queryKey: ["/api/okr2026/bp-financeiro"],
   });
@@ -3378,8 +3423,9 @@ function BPFinanceiroTab() {
         {keyMetrics.map((metric) => {
           const progress = calculateProgress(metric.totals.actual, metric.totals.plan);
           const isOnTrack = progress !== null && progress >= 90;
-          return (
-            <Card key={metric.metric_key} className="overflow-hidden border-0 shadow-md bg-gradient-to-br from-card to-card/80">
+          const dd = BP_DRILLDOWN_MAP[metric.metric_key];
+          const cardEl = (
+            <Card key={metric.metric_key} className={`overflow-hidden border-0 shadow-md bg-gradient-to-br from-card to-card/80 ${dd ? 'cursor-pointer hover:shadow-lg transition-all' : ''}`}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
                   <div className={`p-2.5 rounded-xl ${isOnTrack ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400'}`}>
@@ -3405,6 +3451,13 @@ function BPFinanceiroTab() {
                 )}
               </CardContent>
             </Card>
+          );
+          return dd ? (
+            <div key={metric.metric_key} role="button" tabIndex={0} onClick={() => setDrillDownMetric(dd)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setDrillDownMetric(dd); }}>
+              {cardEl}
+            </div>
+          ) : (
+            <div key={metric.metric_key}>{cardEl}</div>
           );
         })}
       </div>
@@ -3502,11 +3555,15 @@ function BPFinanceiroTab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
-                {data.metrics.map((metric, idx) => (
-                  <tr 
-                    key={metric.metric_key} 
-                    className={`group transition-colors hover:bg-muted/40 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}
+                {data.metrics.map((metric, idx) => {
+                  const rowDd = BP_DRILLDOWN_MAP[metric.metric_key];
+                  const hasFormula = metric.is_derived && !!metric.formula;
+                  return (
+                  <tr
+                    key={metric.metric_key}
+                    className={`group transition-colors hover:bg-muted/40 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'} ${rowDd || hasFormula ? 'cursor-pointer' : ''}`}
                     data-testid={`row-bp-${metric.metric_key}`}
+                    onClick={rowDd ? () => setDrillDownMetric(rowDd) : undefined}
                   >
                     <td className={`py-3 px-4 sticky left-0 z-10 border-r border-border/50 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'} group-hover:bg-muted/40 transition-colors`}>
                       <Tooltip>
@@ -3544,7 +3601,11 @@ function BPFinanceiroTab() {
                       const cellStatus = m.status || "gray";
                       
                       return (
-                        <td key={m.month} className="py-2 px-1 text-center">
+                        <td
+                          key={m.month}
+                          className="py-2 px-1 text-center"
+                          onClick={hasFormula ? (e) => { e.stopPropagation(); setFormulaBreakdown({ metric, month: m.month }); } : undefined}
+                        >
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 min-w-[70px] transition-colors ${showSignal ? getStatusBg(cellStatus) : "bg-muted/30"} hover:brightness-95 dark:hover:brightness-110`}>
@@ -3635,7 +3696,8 @@ function BPFinanceiroTab() {
                       })()}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -3648,6 +3710,94 @@ function BPFinanceiroTab() {
         <span className="text-border">•</span>
         {data.meta.totalMetrics} métricas
       </div>
+
+      <HeroCardDrillDown
+        metric={drillDownMetric?.metric as any ?? null}
+        title={drillDownMetric?.title ?? ""}
+        open={!!drillDownMetric}
+        onOpenChange={(open) => { if (!open) setDrillDownMetric(null); }}
+      />
+
+      <Dialog open={!!formulaBreakdown} onOpenChange={(open) => { if (!open) setFormulaBreakdown(null); }}>
+        <DialogContent className="max-w-lg bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+          {formulaBreakdown && (() => {
+            const { metric: fbMetric, month: fbMonth } = formulaBreakdown;
+            const formula = fbMetric.formula || "";
+            const tokens = formula.split(/\s+/);
+            const monthLabel = (() => {
+              const num = parseInt(fbMonth.split("-")[1]);
+              const labels = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+              return labels[num - 1] || fbMonth;
+            })();
+
+            const getMetricValue = (key: string): number | null => {
+              const found = data.metrics.find(x => x.metric_key === key);
+              if (!found) return null;
+              const monthData = found.months.find(x => x.month === fbMonth);
+              return monthData?.actual ?? null;
+            };
+            const getMetricTitle = (key: string): string => {
+              const found = data.metrics.find(x => x.metric_key === key);
+              return found?.title || key;
+            };
+
+            const getComponentUnit = (key: string): string => {
+              const found = data.metrics.find(x => x.metric_key === key);
+              return found?.unit || "BRL";
+            };
+
+            const components: { key: string; title: string; value: number | null; op: string; unit: string }[] = [];
+            let currentOp = "+";
+            for (const token of tokens) {
+              if (token === "+" || token === "-" || token === "/" || token === "*") {
+                currentOp = token;
+              } else {
+                components.push({ key: token, title: getMetricTitle(token), value: getMetricValue(token), op: currentOp, unit: getComponentUnit(token) });
+              }
+            }
+
+            const resultMonthData = fbMetric.months.find(x => x.month === fbMonth);
+            const resultValue = resultMonthData?.actual;
+
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="text-gray-900 dark:text-white">{fbMetric.title}</DialogTitle>
+                  <DialogDescription className="text-gray-500 dark:text-zinc-400">
+                    Cálculo detalhado — {monthLabel}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-2">
+                  <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                    {components.map((comp, i) => (
+                      <div key={comp.key} className="flex items-center gap-3">
+                        <span className="w-6 text-center text-sm font-bold text-muted-foreground">
+                          {i === 0 ? "" : comp.op === "-" ? "−" : comp.op === "/" ? "÷" : comp.op === "*" ? "×" : "+"}
+                        </span>
+                        <div className="flex-1 flex items-center justify-between">
+                          <span className="text-sm text-gray-700 dark:text-zinc-300">{comp.title}</span>
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white tabular-nums">
+                            {comp.value !== null ? formatValue(comp.value, comp.unit) : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-3 border-t border-gray-200 dark:border-zinc-700 pt-4">
+                    <span className="w-6 text-center text-sm font-bold text-muted-foreground">=</span>
+                    <div className="flex-1 flex items-center justify-between">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">{fbMetric.title}</span>
+                      <span className="text-lg font-bold text-primary tabular-nums">
+                        {resultValue !== null && resultValue !== undefined ? formatValue(resultValue, fbMetric.unit) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
