@@ -834,7 +834,7 @@ function PortalClienteContent() {
   const queryClient = useQueryClient();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-  const [activeModule, setActiveModule] = useState<Module>('financeiro');
+  const [activeModule, setActiveModule] = useState<Module>('relatorios');
   const [chatOpen, setChatOpen] = useState(false);
   const [editField, setEditField] = useState<'email' | 'telefone' | null>(null);
   const [editValue, setEditValue] = useState('');
@@ -1004,8 +1004,8 @@ function PortalClienteContent() {
         {/* ── Navegação de módulos ── */}
         <div className={`flex gap-1 p-1 border rounded-xl w-fit transition-colors duration-300 ${isDark ? "bg-zinc-900/60 border-white/[0.07]" : "bg-slate-100 border-slate-200"}`}>
           {([
-            { id: 'financeiro',  label: 'Financeiro',   Icon: CircleDollarSign, comingSoon: false },
             { id: 'relatorios',  label: 'Performance',  Icon: BarChart3,        comingSoon: false },
+            { id: 'financeiro',  label: 'Financeiro',   Icon: CircleDollarSign, comingSoon: false },
             { id: 'servicos',    label: 'Serviços',     Icon: Briefcase,        comingSoon: false },
             { id: 'atendimento', label: 'Atendimento',  Icon: MessageSquare,    comingSoon: false },
           ] as { id: Module; label: string; Icon: React.ElementType; comingSoon: boolean }[]).map(({ id, label, Icon, comingSoon }) => (
