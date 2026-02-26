@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean, jsonb, index, uniqueIndex, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -189,6 +189,42 @@ export const cupDataHist = clickupSchema.table("cup_data_hist", {
   csResponsavel: text("cs_responsavel"),
   vendedor: text("vendedor"),
 });
+
+export const cupChurn = clickupSchema.table("cup_churn", {
+  taskId: text("task_id").primaryKey(),
+  parentId: text("parent_id"),
+  nome: text("nome"),
+  status: text("status"),
+  responsavelGeral: text("responsavel_geral"),
+  csResponsavel: text("cs_responsavel"),
+  vendedor: text("vendedor"),
+  squad: text("squad"),
+  produto: text("produto"),
+  plano: text("plano"),
+  cluster: text("cluster"),
+  equipe: text("equipe"),
+  tipoNegocio: text("tipo_negocio"),
+  valorR: doublePrecision("valor_r"),
+  dataCriado: date("data_criado"),
+  dataPrimeiroPagamento: date("data_primeiro_pagamento"),
+  dataInicioProjeto: date("data_inicio_projeto"),
+  dataSolicitacaoEncerramento: date("data_solicitacao_encerramento"),
+  ultimoDiaOperacao: date("ultimo_dia_operacao"),
+  lt: text("lt"),
+  statusConta: text("status_conta"),
+  statusCancelamento: text("status_cancelamento"),
+  motivoCancelamento: text("motivo_cancelamento"),
+  submotivoCancelamento: text("submotivo_cancelamento"),
+  mensagemCliente: text("mensagem_cliente"),
+  contextoOperacao: text("contexto_operacao"),
+  contextoCx: text("contexto_cx"),
+  possibilidadeRetencao: text("possibilidade_retencao"),
+  evitabilidadeChurn: text("evitabilidade_churn"),
+  reteve: text("reteve"),
+  abonarChurn: text("abonar_churn"),
+});
+
+export type CupChurn = typeof cupChurn.$inferSelect;
 
 export const rhPessoal = inhireSchema.table("rh_pessoal", {
   id: integer("id").primaryKey(),
@@ -2878,3 +2914,20 @@ export type ArCliente = typeof arClientes.$inferSelect;
 export type ArMetrica = typeof arMetricas.$inferSelect;
 export type ArCampanha = typeof arCampanhas.$inferSelect;
 export type ArCanal = typeof arCanais.$inferSelect;
+
+// ── Client Credentials (Portal do Cliente - login com senha) ─────────────────
+export const clientCredentials = cortexCoreSchema.table("client_credentials", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  cnpj: varchar("cnpj", { length: 20 }).notNull(),
+  passwordHash: text("password_hash").notNull(),
+  mustChangePassword: boolean("must_change_password").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("client_credentials_cnpj_idx").on(table.cnpj),
+  index("client_credentials_client_id_idx").on(table.clientId),
+]);
+
+export type ClientCredential = typeof clientCredentials.$inferSelect;
+export type InsertClientCredential = typeof clientCredentials.$inferInsert;

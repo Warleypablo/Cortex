@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -82,9 +82,21 @@ interface ChurnContract {
   status: string;
   servico: string;
   motivo_cancelamento?: string;
-  tipo: 'churn' | 'pausado';
+  tipo: 'churn' | 'pausado' | 'em_cancelamento';
   lifetime_meses: number;
   ltv: number;
+  // Novos campos de cup_churn
+  plano?: string | null;
+  cluster?: string | null;
+  submotivo?: string | null;
+  mensagem_cliente?: string | null;
+  contexto_operacao?: string | null;
+  contexto_cx?: string | null;
+  possibilidade_retencao?: string | null;
+  evitabilidade_churn?: string | null;
+  status_cancelamento?: string | null;
+  status_conta?: string | null;
+  ultimo_dia_operacao?: string | null;
 }
 
 interface ChurnPorSquad {
@@ -111,6 +123,12 @@ interface ChurnPorMotivo {
   percentual: number;
 }
 
+interface ChurnBreakdownItem {
+  label: string;
+  mrr: number;
+  count: number;
+}
+
 interface ChurnDetalhamentoData {
   contratos: ChurnContract[];
   metricas: {
@@ -124,6 +142,9 @@ interface ChurnDetalhamentoData {
     churn_percentual?: number;
     churn_por_squad?: ChurnPorSquad[];
     churn_por_motivo?: ChurnPorMotivo[];
+    churn_por_evitabilidade?: ChurnBreakdownItem[];
+    churn_por_cluster?: ChurnBreakdownItem[];
+    churn_por_plano?: ChurnBreakdownItem[];
     periodo_referencia?: string;
   };
   filtros: {
@@ -131,6 +152,10 @@ interface ChurnDetalhamentoData {
     produtos: string[];
     responsaveis: string[];
     servicos: string[];
+    planos?: string[];
+    clusters?: string[];
+    evitabilidades?: string[];
+    possibilidades_retencao?: string[];
   };
   retentionCurve?: RetentionPoint[];
 }
@@ -356,6 +381,11 @@ export default function ChurnDetalhamento() {
   const [filterProdutos, setFilterProdutos] = useState<string[]>([]);
   const [filterResponsaveis, setFilterResponsaveis] = useState<string[]>([]);
   const [filterServicos, setFilterServicos] = useState<string[]>([]);
+  const [filterPlanos, setFilterPlanos] = useState<string[]>([]);
+  const [filterClusters, setFilterClusters] = useState<string[]>([]);
+  const [filterEvitabilidades, setFilterEvitabilidades] = useState<string[]>([]);
+  const [filterPossibilidadesRetencao, setFilterPossibilidadesRetencao] = useState<string[]>([]);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [dataInicio, setDataInicio] = useState<string>(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [dataFim, setDataFim] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
@@ -426,7 +456,23 @@ export default function ChurnDetalhamento() {
     if (filterServicos.length > 0) {
       filtered = filtered.filter(c => c.servico && filterServicos.includes(c.servico));
     }
-    
+
+    if (filterPlanos.length > 0) {
+      filtered = filtered.filter(c => c.plano && filterPlanos.includes(c.plano));
+    }
+
+    if (filterClusters.length > 0) {
+      filtered = filtered.filter(c => c.cluster && filterClusters.includes(c.cluster));
+    }
+
+    if (filterEvitabilidades.length > 0) {
+      filtered = filtered.filter(c => c.evitabilidade_churn && filterEvitabilidades.includes(c.evitabilidade_churn));
+    }
+
+    if (filterPossibilidadesRetencao.length > 0) {
+      filtered = filtered.filter(c => c.possibilidade_retencao && filterPossibilidadesRetencao.includes(c.possibilidade_retencao));
+    }
+
     filtered.sort((a, b) => {
       let comparison = 0;
       switch (sortBy) {
@@ -454,22 +500,20 @@ export default function ChurnDetalhamento() {
     });
     
     return filtered;
-  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, dataInicio, dataFim, sortBy, sortOrder]);
+  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder]);
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
       return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0 };
     }
-    
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
-    const pausadoContratos = filteredContratos.filter(c => c.tipo === 'pausado');
-    
-    const totalChurned = churnContratos.length;
-    const totalPausados = pausadoContratos.length;
-    const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
-    const mrrPausado = pausadoContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
-    const ltvTotal = churnContratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
-    const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
+
+    // Todos os contratos de cup_churn são churn
+    const totalChurned = filteredContratos.length;
+    const totalPausados = 0;
+    const mrrPerdido = filteredContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    const mrrPausado = 0;
+    const ltvTotal = filteredContratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
+    const ltMedio = totalChurned > 0 ? filteredContratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
     const ticketMedio = totalChurned > 0 ? mrrPerdido / totalChurned : 0;
     
     return {
@@ -2293,6 +2337,151 @@ export default function ChurnDetalhamento() {
         </CardContent>
       </Card>
 
+      {/* Nova Seção: Evitabilidade, Cluster, Plano */}
+      {!isLoading && data?.metricas && (
+        <SectionBlock
+          title="Inteligência de Churn"
+          subtitle="Evitabilidade, cluster e plano"
+          icon={PieChart}
+          accent="bg-gradient-to-r from-purple-500 to-indigo-500"
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Evitabilidade - Donut */}
+            <TechChartCard
+              title="Evitabilidade"
+              subtitle="Churn evitável vs inevitável"
+              icon={AlertTriangle}
+              iconBg="bg-gradient-to-r from-purple-500 to-indigo-500"
+            >
+              {(data.metricas.churn_por_evitabilidade?.length ?? 0) === 0 ? (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                  Sem dados
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <ResponsiveContainer width="55%" height={200}>
+                    <RechartsPie>
+                      <Pie
+                        data={data.metricas.churn_por_evitabilidade}
+                        dataKey="count"
+                        nameKey="label"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={65}
+                        strokeWidth={2}
+                        stroke="hsl(var(--card))"
+                      >
+                        {data.metricas.churn_por_evitabilidade!.map((_, index) => (
+                          <Cell key={index} fill={index === 0 ? "#ef4444" : "#10b981"} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
+                    </RechartsPie>
+                  </ResponsiveContainer>
+                  <div className="flex-1 space-y-2 text-xs">
+                    {data.metricas.churn_por_evitabilidade!.map((item, i) => (
+                      <div key={item.label} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1.5 space-y-0.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: i === 0 ? "#ef4444" : "#10b981" }} />
+                            <span className="text-muted-foreground">{item.label}</span>
+                          </div>
+                          <span className="font-semibold text-foreground tabular-nums">{item.count}</span>
+                        </div>
+                        <div className="pl-4 text-[10px] text-red-500 dark:text-red-400">
+                          {formatCurrencyNoDecimals(item.mrr)} MRR
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </TechChartCard>
+
+            {/* Cluster - Bar */}
+            <TechChartCard
+              title="Churn por Cluster"
+              subtitle="Distribuição por cluster de cliente"
+              icon={Users}
+              iconBg="bg-gradient-to-r from-cyan-500 to-blue-500"
+            >
+              {(data.metricas.churn_por_cluster?.length ?? 0) === 0 ? (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                  Sem dados
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {data.metricas.churn_por_cluster!.map((item, i) => {
+                    const maxCount = Math.max(...data.metricas.churn_por_cluster!.map(d => d.count), 1);
+                    const barWidth = Math.max((item.count / maxCount) * 100, 3);
+                    return (
+                      <div key={item.label} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1.5 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }} />
+                            <span className="truncate text-xs text-muted-foreground">{item.label}</span>
+                          </div>
+                          <span className="text-xs font-semibold text-foreground tabular-nums whitespace-nowrap">{item.count}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${barWidth}%`, backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }} />
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-red-500 dark:text-red-400">
+                          {formatCurrencyNoDecimals(item.mrr)} MRR
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TechChartCard>
+
+            {/* Plano - Bar */}
+            <TechChartCard
+              title="Churn por Plano"
+              subtitle="Distribuição por plano contratado"
+              icon={BarChart3}
+              iconBg="bg-gradient-to-r from-amber-500 to-orange-500"
+            >
+              {(data.metricas.churn_por_plano?.length ?? 0) === 0 ? (
+                <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                  Sem dados
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {data.metricas.churn_por_plano!.map((item, i) => {
+                    const maxCount = Math.max(...data.metricas.churn_por_plano!.map(d => d.count), 1);
+                    const barWidth = Math.max((item.count / maxCount) * 100, 3);
+                    return (
+                      <div key={item.label} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1.5 space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm" style={{ backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }} />
+                            <span className="truncate text-xs text-muted-foreground">{item.label}</span>
+                          </div>
+                          <span className="text-xs font-semibold text-foreground tabular-nums whitespace-nowrap">{item.count}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${barWidth}%`, backgroundColor: REFINED_COLORS[i % REFINED_COLORS.length] }} />
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-red-500 dark:text-red-400">
+                          {formatCurrencyNoDecimals(item.mrr)} MRR
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TechChartCard>
+          </div>
+        </SectionBlock>
+      )}
+
       {/* Top Clientes Perdidos */}
       {!isLoading && topClientesPerdidos.length > 0 && (
         <Card className="border-red-200 dark:border-red-900/40">
@@ -2370,9 +2559,9 @@ export default function ChurnDetalhamento() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold">Filtros Avançados</span>
-                    {(searchTerm || filterSquads.length > 0 || filterProdutos.length > 0 || filterResponsaveis.length > 0 || filterServicos.length > 0) && (
+                    {(searchTerm || filterSquads.length > 0 || filterProdutos.length > 0 || filterResponsaveis.length > 0 || filterServicos.length > 0 || filterPlanos.length > 0 || filterClusters.length > 0 || filterEvitabilidades.length > 0 || filterPossibilidadesRetencao.length > 0) && (
                       <Badge variant="secondary" className="text-[10px] h-5">
-                        {[searchTerm ? 1 : 0, filterSquads.length, filterProdutos.length, filterResponsaveis.length, filterServicos.length].reduce((a, b) => a + (b > 0 ? 1 : 0), 0)} ativo(s)
+                        {[searchTerm ? 1 : 0, filterSquads.length, filterProdutos.length, filterResponsaveis.length, filterServicos.length, filterPlanos.length, filterClusters.length, filterEvitabilidades.length, filterPossibilidadesRetencao.length].reduce((a, b) => a + (b > 0 ? 1 : 0), 0)} ativo(s)
                       </Badge>
                     )}
                   </div>
@@ -2439,6 +2628,46 @@ export default function ChurnDetalhamento() {
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-sm font-medium">Plano</label>
+                  <MultiSelect
+                    options={data?.filtros?.planos || []}
+                    selected={filterPlanos}
+                    onChange={setFilterPlanos}
+                    placeholder="Todos os planos"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Cluster</label>
+                  <MultiSelect
+                    options={data?.filtros?.clusters || []}
+                    selected={filterClusters}
+                    onChange={setFilterClusters}
+                    placeholder="Todos os clusters"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Evitabilidade</label>
+                  <MultiSelect
+                    options={data?.filtros?.evitabilidades || []}
+                    selected={filterEvitabilidades}
+                    onChange={setFilterEvitabilidades}
+                    placeholder="Todas"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Possib. Retenção</label>
+                  <MultiSelect
+                    options={data?.filtros?.possibilidades_retencao || []}
+                    selected={filterPossibilidadesRetencao}
+                    onChange={setFilterPossibilidadesRetencao}
+                    placeholder="Todas"
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-sm font-medium">Ordenar por</label>
                   <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger data-testid="select-sort">
@@ -2463,6 +2692,10 @@ export default function ChurnDetalhamento() {
                       setFilterProdutos([]);
                       setFilterResponsaveis([]);
                       setFilterServicos([]);
+                      setFilterPlanos([]);
+                      setFilterClusters([]);
+                      setFilterEvitabilidades([]);
+                      setFilterPossibilidadesRetencao([]);
                       setDataInicio(format(subMonths(new Date(), 12), "yyyy-MM-dd"));
                       setDataFim(format(new Date(), "yyyy-MM-dd"));
                       setSortBy("data_encerramento");
@@ -2490,7 +2723,7 @@ export default function ChurnDetalhamento() {
               <TabsList>
                 <TabsTrigger value="contratos" className="gap-2" data-testid="tab-contratos">
                   <FileText className="h-4 w-4" />
-                  Contratos (Churn + Pausados)
+                  Contratos
                 </TabsTrigger>
                 <TabsTrigger value="clientes" className="gap-2" data-testid="tab-clientes">
                   <Building2 className="h-4 w-4" />
@@ -2526,7 +2759,8 @@ export default function ChurnDetalhamento() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead 
+                      <TableHead className="w-[30px]"></TableHead>
+                      <TableHead
                         className="cursor-pointer hover:bg-muted/80"
                         onClick={() => handleSort("cliente_nome")}
                       >
@@ -2535,11 +2769,13 @@ export default function ChurnDetalhamento() {
                           <SortIcon column="cliente_nome" />
                         </div>
                       </TableHead>
-                      <TableHead>Tipo</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Produto</TableHead>
+                      <TableHead>Plano</TableHead>
+                      <TableHead>Cluster</TableHead>
                       <TableHead>Squad</TableHead>
-                      <TableHead>Responsável</TableHead>
-                      <TableHead 
+                      <TableHead>Evitabilidade</TableHead>
+                      <TableHead
                         className="cursor-pointer hover:bg-muted/80 text-right"
                         onClick={() => handleSort("valorr")}
                       >
@@ -2548,81 +2784,138 @@ export default function ChurnDetalhamento() {
                           <SortIcon column="valorr" />
                         </div>
                       </TableHead>
-                      <TableHead>Início</TableHead>
-                      <TableHead 
+                      <TableHead
                         className="cursor-pointer hover:bg-muted/80"
                         onClick={() => handleSort("data_encerramento")}
                       >
                         <div className="flex items-center gap-1">
-                          Data Evento
+                          Solicitação
                           <SortIcon column="data_encerramento" />
                         </div>
                       </TableHead>
-                      <TableHead 
+                      <TableHead
                         className="cursor-pointer hover:bg-muted/80 text-right"
                         onClick={() => handleSort("lifetime_meses")}
                       >
                         <div className="flex items-center justify-end gap-1">
-                          Lifetime
+                          LT
                           <SortIcon column="lifetime_meses" />
-                        </div>
-                      </TableHead>
-                      <TableHead 
-                        className="cursor-pointer hover:bg-muted/80 text-right"
-                        onClick={() => handleSort("ltv")}
-                      >
-                        <div className="flex items-center justify-end gap-1">
-                          LTV
-                          <SortIcon column="ltv" />
                         </div>
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredContratos.slice(0, 100).map((contrato, index) => (
-                      <TableRow 
-                        key={`${contrato.id}-${index}`} 
-                        data-testid={`row-churn-${contrato.id}`}
-                        className="hover:bg-muted/30"
-                      >
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{contrato.cliente_nome || "-"}</span>
-                            <span className="text-xs text-muted-foreground">{contrato.cnpj || "-"}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={contrato.tipo === 'pausado' ? 'secondary' : 'destructive'}
-                            className={contrato.tipo === 'pausado' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' : ''}
+                    {filteredContratos.slice(0, 100).map((contrato, index) => {
+                      const isExpanded = expandedRow === `${contrato.id}-${index}`;
+                      const hasDetails = contrato.mensagem_cliente || contrato.contexto_operacao || contrato.contexto_cx;
+                      return (
+                        <React.Fragment key={`${contrato.id}-${index}`}>
+                          <TableRow
+                            data-testid={`row-churn-${contrato.id}`}
+                            className={`hover:bg-muted/30 ${hasDetails ? 'cursor-pointer' : ''} ${isExpanded ? 'bg-muted/20' : ''}`}
+                            onClick={() => hasDetails && setExpandedRow(isExpanded ? null : `${contrato.id}-${index}`)}
                           >
-                            {contrato.tipo === 'pausado' ? 'Pausado' : 'Churn'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{contrato.produto || "-"}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{contrato.squad || "-"}</Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">{contrato.responsavel || "-"}</TableCell>
-                        <TableCell className={`text-right font-semibold ${contrato.tipo === 'pausado' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {formatCurrency(contrato.valorr || 0)}
-                        </TableCell>
-                        <TableCell className="text-sm">{formatDate(contrato.data_inicio)}</TableCell>
-                        <TableCell className="text-sm">{formatDate(contrato.data_encerramento || contrato.data_pausa)}</TableCell>
-                        <TableCell className="text-right">
-                          <Badge 
-                            variant={contrato.lifetime_meses < 6 ? "destructive" : contrato.lifetime_meses < 12 ? "secondary" : "default"}
-                          >
-                            {contrato.lifetime_meses.toFixed(1)}m
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(contrato.ltv || 0)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            <TableCell className="w-[30px] px-2">
+                              {hasDetails && (
+                                isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium text-sm">{contrato.cliente_nome || "-"}</span>
+                                {contrato.motivo_cancelamento && contrato.motivo_cancelamento !== 'Não especificado' && (
+                                  <span className="text-[10px] text-muted-foreground">{contrato.motivo_cancelamento}</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={contrato.status?.toLowerCase().includes('em cancelamento') ? 'secondary' : 'destructive'}
+                                className={contrato.status?.toLowerCase().includes('em cancelamento') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : 'text-[10px]'}
+                              >
+                                {contrato.status?.toLowerCase().includes('em cancelamento') ? 'Em Cancel.' : 'Churn'}
+                              </Badge>
+                              {contrato.status_cancelamento && (
+                                <div className="text-[10px] text-muted-foreground mt-0.5">{contrato.status_cancelamento}</div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-[10px]">{contrato.produto || "-"}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">{contrato.plano || "-"}</TableCell>
+                            <TableCell className="text-xs">{contrato.cluster || "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className="text-[10px]">{contrato.squad || "-"}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {contrato.evitabilidade_churn && (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-[10px] ${
+                                    contrato.evitabilidade_churn === 'Evitável'
+                                      ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
+                                      : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
+                                  }`}
+                                >
+                                  {contrato.evitabilidade_churn}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className={`text-right font-semibold ${contrato.status?.toLowerCase().includes('em cancelamento') ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>
+                              {contrato.valorr > 0 ? formatCurrency(contrato.valorr) : '-'}
+                            </TableCell>
+                            <TableCell className="text-xs">{formatDate(contrato.data_encerramento)}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge
+                                variant={contrato.lifetime_meses < 3 ? "destructive" : contrato.lifetime_meses < 6 ? "secondary" : "default"}
+                                className="text-[10px]"
+                              >
+                                {contrato.lifetime_meses.toFixed(1)}m
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && hasDetails && (
+                            <TableRow key={`${contrato.id}-${index}-details`} className="bg-muted/10 hover:bg-muted/10">
+                              <TableCell colSpan={11} className="p-0">
+                                <div className="px-6 py-4 space-y-3 border-l-4 border-primary/30">
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="flex flex-wrap gap-2">
+                                      <StatPill label="Responsável" value={contrato.responsavel || '-'} />
+                                      <StatPill label="CS" value={contrato.cs_responsavel || '-'} />
+                                      <StatPill label="Vendedor" value={contrato.vendedor || '-'} />
+                                      {contrato.possibilidade_retencao && (
+                                        <StatPill label="Retenção" value={contrato.possibilidade_retencao} tone={contrato.possibilidade_retencao === 'Baixa' ? 'danger' : contrato.possibilidade_retencao === 'Média' ? 'warning' : 'success'} />
+                                      )}
+                                      {contrato.status_conta && (
+                                        <StatPill label="Status Conta" value={contrato.status_conta} />
+                                      )}
+                                    </div>
+                                  </div>
+                                  {contrato.mensagem_cliente && (
+                                    <div className="rounded-lg border border-border/50 bg-white/60 dark:bg-zinc-900/40 p-3">
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Mensagem do Cliente</p>
+                                      <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{contrato.mensagem_cliente}</p>
+                                    </div>
+                                  )}
+                                  {contrato.contexto_operacao && (
+                                    <div className="rounded-lg border border-border/50 bg-white/60 dark:bg-zinc-900/40 p-3">
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Contexto Operação</p>
+                                      <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{contrato.contexto_operacao}</p>
+                                    </div>
+                                  )}
+                                  {contrato.contexto_cx && (
+                                    <div className="rounded-lg border border-border/50 bg-white/60 dark:bg-zinc-900/40 p-3">
+                                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">Contexto CX</p>
+                                      <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{contrato.contexto_cx}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </TableBody>
                 </Table>
                 {filteredContratos.length > 100 && (
