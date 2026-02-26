@@ -1764,6 +1764,11 @@ export async function seedBpSnapshotJaneiro2026(): Promise<void> {
       FROM "Conta Azul".caz_parcelas
       WHERE status = 'QUITADO'
         AND categoria_nome LIKE '06.%'
+        AND categoria_nome NOT LIKE '06.03%'
+        AND categoria_nome NOT LIKE '06.04%'
+        AND categoria_nome NOT LIKE '06.10%'
+        AND categoria_nome NOT LIKE '06.11%'
+        AND categoria_nome NOT LIKE '06.12%'
         AND categoria_nome NOT LIKE '06.13%'
         AND data_quitacao::date >= '${startStr}'::date
         AND data_quitacao::date <= '${endStr}'::date
@@ -1775,6 +1780,7 @@ export async function seedBpSnapshotJaneiro2026(): Promise<void> {
       FROM "Conta Azul".caz_parcelas
       WHERE status = 'QUITADO'
         AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+        AND categoria_nome NOT LIKE '06.11.01%'
         AND data_quitacao::date >= '${startStr}'::date
         AND data_quitacao::date <= '${endStr}'::date
     `));
