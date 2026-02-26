@@ -715,6 +715,315 @@ export async function getValorEntreguePontual(): Promise<number> {
   }
 }
 
+// ============ DRILL-DOWN DETAIL FUNCTIONS ============
+
+export interface DrillDownItem {
+  id: string;
+  label: string;
+  sublabel?: string;
+  valor: number;
+  details: Record<string, string | number | null>;
+}
+
+export interface DrillDownResult {
+  metric: string;
+  total: number;
+  count: number;
+  items: DrillDownItem[];
+}
+
+export async function getMrrAtivoDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT c.id_subtask, cl.nome, c.squad, c.responsavel, c.produto, c.valorr::numeric as valor
+      FROM "Clickup".cup_contratos c
+      LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
+      WHERE c.status IN ('ativo', 'onboarding', 'triagem') AND c.valorr > 0
+      ORDER BY c.valorr::numeric DESC LIMIT 200
+    `);
+    const rows = result.rows as any[];
+    const items: DrillDownItem[] = rows.map(r => ({
+      id: r.id_subtask || "",
+      label: r.nome || "Sem nome",
+      sublabel: r.squad || "",
+      valor: parseFloat(r.valor || "0"),
+      details: { squad: r.squad, responsavel: r.responsavel, produto: r.produto }
+    }));
+    const total = items.reduce((s, i) => s + i.valor, 0);
+    return { metric: "mrr_ativo", total, count: items.length, items };
+  } catch (error) {
+    console.error("[OKR] Error fetching MRR Ativo Detail:", error);
+    return { metric: "mrr_ativo", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getChurnDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT c.id_subtask, cl.nome, c.squad, c.responsavel, c.produto, c.valorr::numeric as valor, c.data_solicitacao_encerramento
+      FROM "Clickup".cup_contratos c
+      LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
+      WHERE c.valorr > 0 AND c.data_solicitacao_encerramento IS NOT NULL
+        AND TO_CHAR(c.data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+      ORDER BY c.valorr::numeric DESC
+    `);
+    const rows = result.rows as any[];
+    const items: DrillDownItem[] = rows.map(r => ({
+      id: r.id_subtask || "",
+      label: r.nome || "Sem nome",
+      sublabel: r.squad || "",
+      valor: parseFloat(r.valor || "0"),
+      details: { squad: r.squad, responsavel: r.responsavel, produto: r.produto, data_solicitacao: r.data_solicitacao_encerramento }
+    }));
+    const total = items.reduce((s, i) => s + i.valor, 0);
+    return { metric: "churn", total, count: items.length, items };
+  } catch (error) {
+    console.error("[OKR] Error fetching Churn Detail:", error);
+    return { metric: "churn", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getVendasMrrDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT d.id, d.title, d.company_name, d.assigned_by_name, d.valor_recorrente::numeric as valor, d.data_fechamento
+      FROM "Bitrix".crm_deal d
+      WHERE d.stage_name = 'Negócio Ganho'
+        AND d.data_fechamento IS NOT NULL
+        AND TO_CHAR(d.data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND d.valor_recorrente IS NOT NULL AND d.valor_recorrente > 0
+      ORDER BY d.valor_recorrente::numeric DESC
+    `);
+    const rows = result.rows as any[];
+    const items: DrillDownItem[] = rows.map(r => ({
+      id: String(r.id || ""),
+      label: r.title || "Sem título",
+      sublabel: r.company_name || "",
+      valor: parseFloat(r.valor || "0"),
+      details: { empresa: r.company_name, closer: r.assigned_by_name, data_fechamento: r.data_fechamento }
+    }));
+    const total = items.reduce((s, i) => s + i.valor, 0);
+    return { metric: "vendas_mrr", total, count: items.length, items };
+  } catch (error) {
+    console.error("[OKR] Error fetching Vendas MRR Detail:", error);
+    return { metric: "vendas_mrr", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getAquisicaoPontualDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT d.id, d.title, d.company_name, d.assigned_by_name, d.valor_pontual::numeric as valor, d.data_fechamento
+      FROM "Bitrix".crm_deal d
+      WHERE d.stage_name = 'Negócio Ganho'
+        AND d.data_fechamento IS NOT NULL
+        AND TO_CHAR(d.data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND d.valor_pontual IS NOT NULL AND d.valor_pontual > 0
+      ORDER BY d.valor_pontual::numeric DESC
+    `);
+    const rows = result.rows as any[];
+    const items: DrillDownItem[] = rows.map(r => ({
+      id: String(r.id || ""),
+      label: r.title || "Sem título",
+      sublabel: r.company_name || "",
+      valor: parseFloat(r.valor || "0"),
+      details: { empresa: r.company_name, closer: r.assigned_by_name, data_fechamento: r.data_fechamento }
+    }));
+    const total = items.reduce((s, i) => s + i.valor, 0);
+    return { metric: "vendas_pontuais", total, count: items.length, items };
+  } catch (error) {
+    console.error("[OKR] Error fetching Aquisição Pontual Detail:", error);
+    return { metric: "vendas_pontuais", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getValorEntreguePontualDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT c.id_subtask, cl.nome, c.squad, c.responsavel, c.servico, c.valorp::numeric as valor, c.data_inicio
+      FROM "Clickup".cup_contratos c
+      LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
+      WHERE c.data_inicio IS NOT NULL
+        AND TO_CHAR(c.data_inicio, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        AND c.valorp IS NOT NULL AND c.valorp > 0
+      ORDER BY c.valorp::numeric DESC
+    `);
+    const rows = result.rows as any[];
+    const items: DrillDownItem[] = rows.map(r => ({
+      id: r.id_subtask || "",
+      label: r.nome || "Sem nome",
+      sublabel: r.squad || "",
+      valor: parseFloat(r.valor || "0"),
+      details: { squad: r.squad, responsavel: r.responsavel, servico: r.servico, data_inicio: r.data_inicio }
+    }));
+    const total = items.reduce((s, i) => s + i.valor, 0);
+    return { metric: "entregas_pontuais", total, count: items.length, items };
+  } catch (error) {
+    console.error("[OKR] Error fetching Valor Entregue Pontual Detail:", error);
+    return { metric: "entregas_pontuais", total: 0, count: 0, items: [] };
+  }
+}
+
+function mapCazRows(rows: any[], metricName: string): DrillDownResult {
+  const items: DrillDownItem[] = rows.map(r => ({
+    id: String(r.id || ""),
+    label: r.empresa || r.descricao || "Sem nome",
+    sublabel: r.descricao || "",
+    valor: parseFloat(r.valor || "0"),
+    details: { categoria: r.categoria_nome, descricao: r.descricao, data: r.data_quitacao || r.data_vencimento }
+  }));
+  const total = items.reduce((s, i) => s + i.valor, 0);
+  return { metric: metricName, total, count: items.length, items };
+}
+
+export async function getCsvDetail(): Promise<DrillDownResult> {
+  // CSV: 06.% excluindo CAC (06.03,06.04), SGA (06.10,06.11,06.12) e IR/CSLL (06.13)
+  try {
+    const result = await db.execute(sql`
+      SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
+             data_quitacao, data_vencimento, empresa
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND categoria_nome LIKE '06.%'
+        AND categoria_nome NOT LIKE '06.03%'
+        AND categoria_nome NOT LIKE '06.04%'
+        AND categoria_nome NOT LIKE '06.10%'
+        AND categoria_nome NOT LIKE '06.11%'
+        AND categoria_nome NOT LIKE '06.12%'
+        AND categoria_nome NOT LIKE '06.13%'
+        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
+        AND data_quitacao::date <= CURRENT_DATE
+      ORDER BY valor_pago::numeric DESC
+      LIMIT 200
+    `);
+    return mapCazRows(result.rows as any[], "cogs_csv");
+  } catch (error) {
+    console.error("[OKR] Error fetching CSV Detail:", error);
+    return { metric: "cogs_csv", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getCacDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
+             data_quitacao, data_vencimento, empresa
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND (categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.04%')
+        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
+        AND data_quitacao::date <= CURRENT_DATE
+      ORDER BY valor_pago::numeric DESC
+      LIMIT 200
+    `);
+    return mapCazRows(result.rows as any[], "cac_total");
+  } catch (error) {
+    console.error("[OKR] Error fetching CAC Detail:", error);
+    return { metric: "cac_total", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getSgaDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
+             data_quitacao, data_vencimento, empresa
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+        AND categoria_nome NOT LIKE '06.11.01%'
+        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
+        AND data_quitacao::date <= CURRENT_DATE
+      ORDER BY valor_pago::numeric DESC
+      LIMIT 200
+    `);
+    return mapCazRows(result.rows as any[], "sga_total");
+  } catch (error) {
+    console.error("[OKR] Error fetching SGA Detail:", error);
+    return { metric: "sga_total", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getCapexDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
+             data_quitacao, data_vencimento, empresa
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND categoria_nome LIKE '06.11.01%'
+        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
+        AND data_quitacao::date <= CURRENT_DATE
+      ORDER BY valor_pago::numeric DESC
+      LIMIT 200
+    `);
+    return mapCazRows(result.rows as any[], "capex");
+  } catch (error) {
+    console.error("[OKR] Error fetching CAPEX Detail:", error);
+    return { metric: "capex", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getTaxesOnRevenueDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT id, descricao, categoria_nome, valor_liquido::numeric as valor,
+             data_quitacao, data_vencimento, empresa
+      FROM "Conta Azul".caz_parcelas
+      WHERE tipo_evento = 'DESPESA'
+        AND categoria_nome LIKE '05.05%'
+        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
+        AND data_quitacao::date <= CURRENT_DATE
+      ORDER BY valor_liquido::numeric DESC
+      LIMIT 200
+    `);
+    return mapCazRows(result.rows as any[], "taxes_on_revenue");
+  } catch (error) {
+    console.error("[OKR] Error fetching Taxes on Revenue Detail:", error);
+    return { metric: "taxes_on_revenue", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getTaxIrCsllDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
+             data_quitacao, data_vencimento, empresa
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND categoria_nome LIKE '06.13%'
+        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
+        AND data_quitacao::date <= CURRENT_DATE
+      ORDER BY valor_pago::numeric DESC
+      LIMIT 200
+    `);
+    return mapCazRows(result.rows as any[], "tax_ir_csll");
+  } catch (error) {
+    console.error("[OKR] Error fetching IR/CSLL Detail:", error);
+    return { metric: "tax_ir_csll", total: 0, count: 0, items: [] };
+  }
+}
+
+export async function getRevenueOtherDetail(): Promise<DrillDownResult> {
+  try {
+    const result = await db.execute(sql`
+      SELECT id, descricao, categoria_nome, valor_liquido::numeric as valor,
+             data_quitacao, data_vencimento, empresa
+      FROM "Conta Azul".caz_parcelas
+      WHERE tipo_evento = 'RECEITA'
+        AND (categoria_nome LIKE '03.02%' OR categoria_nome LIKE '03.03%' OR categoria_nome LIKE '04.01%' OR categoria_nome LIKE '04.03%')
+        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
+        AND data_quitacao::date <= CURRENT_DATE
+      ORDER BY valor_liquido::numeric DESC
+      LIMIT 200
+    `);
+    return mapCazRows(result.rows as any[], "revenue_other");
+  } catch (error) {
+    console.error("[OKR] Error fetching Revenue Other Detail:", error);
+    return { metric: "revenue_other", total: 0, count: 0, items: [] };
+  }
+}
+
 export async function getGeracaoCaixa(): Promise<number> {
   try {
     // Geração de Caixa = Entradas - Saídas desde início do ano (mesma lógica do card "Saldo" no DFC)
