@@ -36,7 +36,7 @@ export default function MeuPerfil() {
 
   useEffect(() => {
     if (colaboradorData?.colaboradorId) {
-      setLocation(`/colaborador/${colaboradorData.colaboradorId}`);
+      setLocation(`/meu-perfil/${colaboradorData.colaboradorId}`);
     }
   }, [colaboradorData, setLocation]);
 
