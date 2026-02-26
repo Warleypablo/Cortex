@@ -190,9 +190,9 @@ export async function getReceitaYTD(): Promise<{
   try {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
-      SELECT 
-        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as total,
-        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND categoria_nome NOT ILIKE '%imposto%' THEN valor_pago::numeric ELSE 0 END), 0) as liquida
+      SELECT
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as total,
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND categoria_nome NOT ILIKE '%imposto%' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as liquida
       FROM "Conta Azul".caz_parcelas
       WHERE EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
         AND tipo_evento = 'RECEITA'
@@ -220,9 +220,9 @@ export async function getEbitdaYTD(): Promise<number> {
   try {
     const currentYear = new Date().getFullYear();
     const result = await db.execute(sql`
-      SELECT 
-        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
-        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as ebitda
+      SELECT
+        COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) -
+        COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as ebitda
       FROM "Conta Azul".caz_parcelas
       WHERE EXTRACT(YEAR FROM COALESCE(data_quitacao, data_vencimento)) = ${currentYear}
         AND status = 'QUITADO'
@@ -374,13 +374,24 @@ export async function getInadimplenciaBrlSerie(): Promise<{ month: string; value
 
 export async function getGrossChurnMrr(): Promise<number> {
   try {
-    // Churn = contratos com data_solicitacao_encerramento no mês atual
+    const currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+    // A partir de 2026-02, usar cup_churn como fonte
+    if (currentMonth >= '2026-02') {
+      const result = await db.execute(sql`
+        SELECT COALESCE(SUM(valor_r), 0) as churn_mrr
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+      `);
+      return parseFloat((result.rows[0] as any)?.churn_mrr || "0");
+    }
+    // Meses anteriores: manter cup_contratos
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(valorr::numeric), 0) as churn_mrr
       FROM "Clickup".cup_contratos
       WHERE valorr IS NOT NULL
         AND valorr::numeric > 0
-        AND data_solicitacao_encerramento IS NOT NULL 
+        AND data_solicitacao_encerramento IS NOT NULL
         AND TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
     `);
     return parseFloat((result.rows[0] as any)?.churn_mrr || "0");
@@ -471,6 +482,28 @@ export async function getNetChurnPct(netChurn?: number, mrrInicioMes?: number): 
 
 export async function getLogoChurn(): Promise<number> {
   try {
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    // A partir de 2026-02, usar cup_churn (parent_id = task do cliente)
+    if (currentMonth >= '2026-02') {
+      const result = await db.execute(sql`
+        WITH churned_parents AS (
+          SELECT DISTINCT COALESCE(c.parent_id, c.task_id) as client_id
+          FROM "Clickup".cup_churn c
+          WHERE c.data_solicitacao_encerramento IS NOT NULL
+            AND TO_CHAR(c.data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+        ),
+        clientes_ainda_ativos AS (
+          SELECT DISTINCT id_task
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+        )
+        SELECT COUNT(DISTINCT cp.client_id) as logo_churn
+        FROM churned_parents cp
+        WHERE cp.client_id NOT IN (SELECT id_task FROM clientes_ainda_ativos WHERE id_task IS NOT NULL)
+      `);
+      return parseInt((result.rows[0] as any)?.logo_churn || "0");
+    }
+    // Meses anteriores: manter cup_contratos
     const result = await db.execute(sql`
       WITH clientes_cancelados AS (
         SELECT DISTINCT c.id_task
@@ -1389,18 +1422,32 @@ async function getEbitdaSeriesForRange(startDate: string, endDate: string): Prom
 
 async function getChurnSeriesForRange(startDate: string, endDate: string): Promise<MetricSeriesPoint[]> {
   try {
+    // UNION: cup_contratos para meses < 2026-02, cup_churn para meses >= 2026-02
     const result = await db.execute(sql`
-      SELECT 
-        TO_CHAR(data_encerramento, 'YYYY-MM') as date,
-        COALESCE(SUM(valorr::numeric), 0) as value
-      FROM "Clickup".cup_contratos
-      WHERE status = 'cancelado'
-        AND data_encerramento IS NOT NULL
-        AND data_encerramento >= ${startDate}::date 
-        AND data_encerramento <= ${endDate}::date
-        AND valorr IS NOT NULL
-        AND valorr > 0
-      GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+      SELECT date, SUM(value) as value FROM (
+        SELECT
+          TO_CHAR(data_encerramento, 'YYYY-MM') as date,
+          COALESCE(SUM(valorr::numeric), 0) as value
+        FROM "Clickup".cup_contratos
+        WHERE status = 'cancelado'
+          AND data_encerramento IS NOT NULL
+          AND data_encerramento >= ${startDate}::date
+          AND data_encerramento <= ${endDate}::date
+          AND data_encerramento < '2026-02-01'::date
+          AND valorr IS NOT NULL
+          AND valorr::numeric > 0
+        GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+        UNION ALL
+        SELECT
+          TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') as date,
+          COALESCE(SUM(valor_r), 0) as value
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento >= '2026-02-01'::date
+          AND data_solicitacao_encerramento <= ${endDate}::date
+        GROUP BY TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM')
+      ) combined
+      GROUP BY date
       ORDER BY date
     `);
     return (result.rows as any[]).map(row => ({
@@ -1814,17 +1861,30 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
         GROUP BY pm.current_month
       ),
       churn_by_month AS (
-        SELECT 
-          TO_CHAR(data_encerramento, 'YYYY-MM') as month,
-          COALESCE(SUM(valorr::numeric), 0) as churn_mrr
-        FROM "Clickup".cup_contratos
-        WHERE status = 'cancelado'
-          AND data_encerramento IS NOT NULL
-          AND data_encerramento >= ${startDate}::date 
-          AND data_encerramento <= ${endDate}::date
-          AND valorr IS NOT NULL
-          AND valorr > 0
-        GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+        SELECT month, SUM(churn_mrr) as churn_mrr FROM (
+          SELECT
+            TO_CHAR(data_encerramento, 'YYYY-MM') as month,
+            COALESCE(SUM(valorr::numeric), 0) as churn_mrr
+          FROM "Clickup".cup_contratos
+          WHERE status = 'cancelado'
+            AND data_encerramento IS NOT NULL
+            AND data_encerramento >= ${startDate}::date
+            AND data_encerramento <= ${endDate}::date
+            AND data_encerramento < '2026-02-01'::date
+            AND valorr IS NOT NULL
+            AND valorr::numeric > 0
+          GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+          UNION ALL
+          SELECT
+            TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') as month,
+            COALESCE(SUM(valor_r), 0) as churn_mrr
+          FROM "Clickup".cup_churn
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= '2026-02-01'::date
+            AND data_solicitacao_encerramento <= ${endDate}::date
+          GROUP BY TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM')
+        ) combined
+        GROUP BY month
       ),
       expansion_calc AS (
         SELECT 
@@ -1890,21 +1950,40 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
         GROUP BY mi.month
       ),
       monthly_logo_churn AS (
-        SELECT 
-          TO_CHAR(data_encerramento, 'YYYY-MM') as date,
-          COUNT(DISTINCT id_task) as logos_churned
-        FROM "Clickup".cup_contratos
-        WHERE status = 'cancelado'
-          AND data_encerramento IS NOT NULL
-          AND data_encerramento >= ${startDate}::date 
-          AND data_encerramento <= ${endDate}::date
-          AND id_task NOT IN (
-            SELECT DISTINCT id_task 
-            FROM "Clickup".cup_contratos 
-            WHERE status IN ('ativo', 'onboarding', 'triagem')
-              AND id_task IS NOT NULL
-          )
-        GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+        SELECT date, SUM(logos_churned) as logos_churned FROM (
+          SELECT
+            TO_CHAR(data_encerramento, 'YYYY-MM') as date,
+            COUNT(DISTINCT id_task) as logos_churned
+          FROM "Clickup".cup_contratos
+          WHERE status = 'cancelado'
+            AND data_encerramento IS NOT NULL
+            AND data_encerramento >= ${startDate}::date
+            AND data_encerramento <= ${endDate}::date
+            AND data_encerramento < '2026-02-01'::date
+            AND id_task NOT IN (
+              SELECT DISTINCT id_task
+              FROM "Clickup".cup_contratos
+              WHERE status IN ('ativo', 'onboarding', 'triagem')
+                AND id_task IS NOT NULL
+            )
+          GROUP BY TO_CHAR(data_encerramento, 'YYYY-MM')
+          UNION ALL
+          SELECT
+            TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') as date,
+            COUNT(DISTINCT COALESCE(parent_id, task_id)) as logos_churned
+          FROM "Clickup".cup_churn
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= '2026-02-01'::date
+            AND data_solicitacao_encerramento <= ${endDate}::date
+            AND COALESCE(parent_id, task_id) NOT IN (
+              SELECT DISTINCT id_task
+              FROM "Clickup".cup_contratos
+              WHERE status IN ('ativo', 'onboarding', 'triagem')
+                AND id_task IS NOT NULL
+            )
+          GROUP BY TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM')
+        ) combined
+        GROUP BY date
       )
       SELECT 
         ci.month as date,
