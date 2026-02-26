@@ -9469,12 +9469,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Churn Visão Geral - tendência mensal de churn (últimos 12 meses)
+  // Migrado para usar cup_churn como fonte principal
   app.get("/api/analytics/churn-visao-geral", async (req, res) => {
     try {
       const meses = parseInt(req.query.meses as string) || 12;
 
-      // Últimos N meses de churn agregado por mês
-      // Usa data_solicitacao_encerramento como data de referência do churn
       const churnMensalResult = await db.execute(sql`
         WITH meses AS (
           SELECT generate_series(
@@ -9485,16 +9484,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ),
         churn_mensal AS (
           SELECT
-            DATE_TRUNC('month', c.data_solicitacao_encerramento)::date AS mes,
+            DATE_TRUNC('month', c.data_solicitacao_encerramento::timestamp)::date AS mes,
             COUNT(*) AS total_churned,
-            COALESCE(SUM(c.valorr::numeric), 0) AS mrr_perdido
-          FROM "Clickup".cup_contratos c
+            COALESCE(SUM(c.valor_r), 0) AS mrr_perdido
+          FROM "Clickup".cup_churn c
           WHERE c.data_solicitacao_encerramento IS NOT NULL
-            AND c.valorr IS NOT NULL
-            AND c.valorr > 0
-            AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
-            AND c.data_solicitacao_encerramento >= DATE_TRUNC('month', NOW() - INTERVAL '${sql.raw(String(meses - 1))} months')
-          GROUP BY DATE_TRUNC('month', c.data_solicitacao_encerramento)
+            AND c.data_solicitacao_encerramento::timestamp >= DATE_TRUNC('month', NOW() - INTERVAL '${sql.raw(String(meses - 1))} months')
+          GROUP BY DATE_TRUNC('month', c.data_solicitacao_encerramento::timestamp)
         ),
         ultimo_snapshot_mes AS (
           SELECT
@@ -9545,170 +9541,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Churn Detalhamento - lista de contratos encerrados/churned e pausados com detalhes
+  // Churn Detalhamento - lista de contratos churned com detalhes ricos de cup_churn
   app.get("/api/analytics/churn-detalhamento", async (req, res) => {
     try {
       const meses = req.query.meses as string || "12";
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
-      
-      let churnDateFilter = sql`TRUE`;
-      let pausaDateFilter = sql`TRUE`;
-      
-      // If explicit date range provided, use it for each type with its respective date column
-      // IMPORTANTE: Churn usa data_solicitacao_encerramento (quando cliente solicitou cancelamento)
+
+      let dateFilter = sql`TRUE`;
+
       if (startDate && endDate) {
-        churnDateFilter = sql`c.data_solicitacao_encerramento >= ${startDate}::date AND c.data_solicitacao_encerramento <= ${endDate}::date`;
-        pausaDateFilter = sql`c.data_pausa >= ${startDate}::date AND c.data_pausa <= ${endDate}::date`;
+        dateFilter = sql`c.data_solicitacao_encerramento >= ${startDate}::date AND c.data_solicitacao_encerramento <= ${endDate}::date`;
       } else if (meses !== "all") {
         const mesesNum = parseInt(meses) || 12;
-        churnDateFilter = sql`c.data_solicitacao_encerramento >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
-        pausaDateFilter = sql`c.data_pausa >= NOW() - INTERVAL '${sql.raw(String(mesesNum))} months'`;
+        dateFilter = sql`c.data_solicitacao_encerramento >= (NOW() - INTERVAL '${sql.raw(String(mesesNum))} months')::date`;
       }
-      
-      // Get churned/encerrados contracts - uses data_solicitacao_encerramento
-      // IMPORTANTE: Churn usa data_solicitacao_encerramento (quando cliente solicitou cancelamento)
-      // Exclude irrelevant squads: turbo interno, squad x
+
+      // Query principal em cup_churn - sem necessidade de JOIN com cup_clientes
       const churnResult = await db.execute(sql`
-        SELECT 
-          c.id_task as id,
-          cl.nome as cliente_nome,
-          cl.cnpj,
-          c.produto,
-          c.squad,
-          c.responsavel,
+        SELECT
+          c.task_id,
+          c.parent_id,
+          c.nome,
+          c.status,
+          c.responsavel_geral,
           c.cs_responsavel,
           c.vendedor,
-          COALESCE(c.valorr, 0) as valorr,
-          c.data_inicio,
-          c.data_solicitacao_encerramento as data_encerramento,
-          NULL::timestamp as data_pausa,
-          c.status,
-          c.servico,
+          c.squad,
+          c.produto,
+          c.plano,
+          c.cluster,
+          c.equipe,
+          c.tipo_negocio,
+          c.valor_r,
+          c.data_criado,
+          c.data_primeiro_pagamento,
+          c.data_inicio_projeto,
+          c.data_solicitacao_encerramento,
+          c.ultimo_dia_operacao,
+          c.lt,
+          c.status_conta,
+          c.status_cancelamento,
           c.motivo_cancelamento,
-          'churn' as tipo,
-          CASE 
-            WHEN c.data_inicio IS NOT NULL AND c.data_solicitacao_encerramento IS NOT NULL 
-            THEN GREATEST(0.5, 
-              (c.data_solicitacao_encerramento::date - c.data_inicio::date)::numeric / 30.44
-            )
-            ELSE 0 
-          END as lifetime_meses
-        FROM "Clickup".cup_contratos c
-        LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
+          c.submotivo_cancelamento,
+          c.mensagem_cliente,
+          c.contexto_operacao,
+          c.contexto_cx,
+          c.possibilidade_retencao,
+          c.evitabilidade_churn,
+          c.reteve,
+          c.abonar_churn
+        FROM "Clickup".cup_churn c
         WHERE c.data_solicitacao_encerramento IS NOT NULL
-          AND c.valorr IS NOT NULL
-          AND c.valorr > 0
-          AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
-          AND ${churnDateFilter}
+          AND ${dateFilter}
+        ORDER BY c.data_solicitacao_encerramento DESC
       `);
-      
-      // Get paused contracts - exclude irrelevant squads
-      const pausaResult = await db.execute(sql`
-        SELECT 
-          c.*,
-          cl.nome as cliente_nome,
-          cl.cnpj
-        FROM "Clickup".cup_contratos c
-        LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
-        WHERE c.data_pausa IS NOT NULL
-          AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
-          AND ${pausaDateFilter}
-      `);
-      
-      // Combine and sort by date (encerramento or pausa)
-      const allContratos = [
-        ...churnResult.rows.map((row: any) => ({
-          id: row.id,
-          cliente_nome: row.cliente_nome || 'Cliente não identificado',
-          cnpj: row.cnpj || '',
+
+      // Mapear para formato do frontend
+      const allContratos = churnResult.rows.map((row: any) => {
+        const ltValue = row.lt ? Math.abs(parseFloat(row.lt)) : 0;
+        const valorr = Number(row.valor_r) || 0;
+        // Todos os registros de cup_churn são churn (a tabela é curada para isso)
+        // O status original (cancelado/inativo, em cancelamento) fica em status_cancelamento
+        const tipo = 'churn' as const;
+
+        return {
+          id: row.task_id,
+          cliente_nome: row.nome || 'Cliente não identificado',
+          cnpj: '',
           produto: row.produto || 'Não especificado',
           squad: row.squad || 'Não especificado',
-          responsavel: row.responsavel || 'Não especificado',
+          responsavel: row.responsavel_geral || 'Não especificado',
           cs_responsavel: row.cs_responsavel || 'Não especificado',
           vendedor: row.vendedor || 'Não especificado',
-          valorr: Number(row.valorr) || 0,
-          data_inicio: row.data_inicio,
-          data_encerramento: row.data_encerramento,
+          valorr: valorr,
+          data_inicio: row.data_inicio_projeto,
+          data_encerramento: row.data_solicitacao_encerramento,
           data_pausa: null,
           status: row.status || 'encerrado',
-          servico: row.servico || 'Não especificado',
+          servico: row.produto || 'Não especificado',
           motivo_cancelamento: row.motivo_cancelamento || 'Não especificado',
-          tipo: 'churn',
-          lifetime_meses: Number(row.lifetime_meses) || 0,
-          ltv: (Number(row.valorr) || 0) * (Number(row.lifetime_meses) || 0),
-        })),
-        ...pausaResult.rows.map((row: any) => {
-          const lifetimeMeses = row.data_inicio && row.data_pausa 
-            ? Math.max(0.5, (new Date(row.data_pausa).getTime() - new Date(row.data_inicio).getTime()) / (1000 * 60 * 60 * 24 * 30.44))
-            : 0;
-          return {
-            id: row.id_task,
-            cliente_nome: row.cliente_nome || 'Cliente não identificado',
-            cnpj: row.cnpj || '',
-            produto: row.produto || 'Não especificado',
-            squad: row.squad || 'Não especificado',
-            responsavel: row.responsavel || 'Não especificado',
-            cs_responsavel: row.cs_responsavel || 'Não especificado',
-            vendedor: row.vendedor || 'Não especificado',
-            valorr: Number(row.valorr) || 0,
-            data_inicio: row.data_inicio,
-            data_encerramento: null,
-            data_pausa: row.data_pausa,
-            status: row.status || 'pausado',
-            servico: row.servico || 'Não especificado',
-            tipo: 'pausado',
-            lifetime_meses: lifetimeMeses,
-            ltv: (Number(row.valorr) || 0) * lifetimeMeses,
-          };
-        }),
-      ].sort((a, b) => {
-        const dateA = a.data_encerramento || a.data_pausa;
-        const dateB = b.data_encerramento || b.data_pausa;
-        return new Date(dateB).getTime() - new Date(dateA).getTime();
+          tipo: tipo,
+          lifetime_meses: ltValue,
+          ltv: valorr * ltValue,
+          // Novos campos de cup_churn
+          plano: row.plano || null,
+          cluster: row.cluster || null,
+          submotivo: row.submotivo_cancelamento || null,
+          mensagem_cliente: row.mensagem_cliente || null,
+          contexto_operacao: row.contexto_operacao || null,
+          contexto_cx: row.contexto_cx || null,
+          possibilidade_retencao: row.possibilidade_retencao || null,
+          evitabilidade_churn: row.evitabilidade_churn || null,
+          status_cancelamento: row.status_cancelamento || null,
+          status_conta: row.status_conta || null,
+          ultimo_dia_operacao: row.ultimo_dia_operacao || null,
+        };
       });
-      
-      // Get unique values for filters
+
+      // Filtros disponíveis
       const squads = Array.from(new Set(allContratos.map((c: any) => c.squad).filter(Boolean))).sort();
       const produtos = Array.from(new Set(allContratos.map((c: any) => c.produto).filter(Boolean))).sort();
       const responsaveis = Array.from(new Set(allContratos.map((c: any) => c.responsavel).filter(Boolean))).sort();
       const servicos = Array.from(new Set(allContratos.map((c: any) => c.servico).filter(Boolean))).sort();
-      
-      // Calculate metrics separately for churn and pausado
-      const churnContratos = allContratos.filter(c => c.tipo === 'churn');
-      const pausadoContratos = allContratos.filter(c => c.tipo === 'pausado');
-      
-      const totalChurned = churnContratos.length;
-      const totalPausados = pausadoContratos.length;
-      const mrrPerdidoChurn = churnContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
-      const mrrPerdidoPausado = pausadoContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
-      const ltvTotal = churnContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
-      const ltMedio = totalChurned > 0 ? churnContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
-      
-      // Calculate MRR ativo do mês anterior para calcular percentual de churn
-      // Primeiro, determinar o período de referência (mês anterior ao início do período de análise)
+      const planos = Array.from(new Set(allContratos.map((c: any) => c.plano).filter(Boolean))).sort();
+      const clusters = Array.from(new Set(allContratos.map((c: any) => c.cluster).filter(Boolean))).sort();
+      const evitabilidades = Array.from(new Set(allContratos.map((c: any) => c.evitabilidade_churn).filter(Boolean))).sort();
+      const possibilidades_retencao = Array.from(new Set(allContratos.map((c: any) => c.possibilidade_retencao).filter(Boolean))).sort();
+
+      // Métricas - todos são churn (cup_churn é tabela curada)
+      const totalChurned = allContratos.length;
+      const totalEmCancelamento = 0;
+      const mrrPerdidoChurn = allContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
+      const mrrEmCancelamento = 0;
+      const ltvTotal = allContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
+      const ltMedio = totalChurned > 0 ? allContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
+
+      // MRR ativo de referência via cup_data_hist
       let refDate: Date;
       if (startDate) {
         refDate = new Date(startDate);
         refDate.setMonth(refDate.getMonth() - 1);
-        refDate.setDate(1); // Primeiro dia do mês anterior
+        refDate.setDate(1);
       } else {
-        // Se não tem data específica, usa o mês passado
         refDate = new Date();
         refDate.setMonth(refDate.getMonth() - 1);
         refDate.setDate(1);
       }
-      
-      // Último dia do mês de referência
+
       const refEndDate = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0);
       const refDateStr = refEndDate.toISOString().split('T')[0];
-      
-      // Buscar MRR ativo no final do mês anterior usando tabela de snapshot histórico
-      // Incluir status: ativo, onboarding, triagem (mesmo critério usado no gráfico de evolução)
-      // Excluir squads irrelevantes: turbo interno, squad x
+
       const inicioMesRef = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
       const fimMesRef = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59);
-      
+
       const mrrAtivoResult = await db.execute(sql`
         WITH ultimo_snapshot AS (
           SELECT MAX(data_snapshot) as data_ultimo_snapshot
@@ -9716,90 +9682,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
           WHERE data_snapshot >= ${inicioMesRef}::timestamp
             AND data_snapshot <= ${fimMesRef}::timestamp
         )
-        SELECT 
+        SELECT
           COALESCE(h.squad, 'Não especificado') as squad,
           COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
         FROM ultimo_snapshot us
-        JOIN "Clickup".cup_data_hist h 
+        JOIN "Clickup".cup_data_hist h
           ON h.data_snapshot = us.data_ultimo_snapshot
           AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
           AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
         GROUP BY COALESCE(h.squad, 'Não especificado')
       `);
-      
-      // Calcular MRR ativo total e por squad
+
       const mrrAtivoPorSquad: Record<string, number> = {};
       let mrrAtivoTotal = 0;
-      
+
       for (const row of mrrAtivoResult.rows as any[]) {
         const squadName = row.squad || 'Não especificado';
         const mrr = Number(row.mrr_ativo) || 0;
         mrrAtivoPorSquad[squadName] = mrr;
         mrrAtivoTotal += mrr;
       }
-      
-      // Calcular MRR perdido por squad (apenas churn, não pausado)
+
+      // MRR perdido por squad (churn)
       const mrrPerdidoPorSquad: Record<string, number> = {};
-      for (const contrato of churnContratos) {
-        const squadName = contrato.squad || 'Não especificado';
-        mrrPerdidoPorSquad[squadName] = (mrrPerdidoPorSquad[squadName] || 0) + contrato.valorr;
+      for (const contrato of allContratos) {
+        const squadName = (contrato as any).squad || 'Não especificado';
+        mrrPerdidoPorSquad[squadName] = (mrrPerdidoPorSquad[squadName] || 0) + (contrato as any).valorr;
       }
-      
-      // Calcular percentual de churn geral e por squad
+
       const churnPercentualGeral = mrrAtivoTotal > 0 ? (mrrPerdidoChurn / mrrAtivoTotal) * 100 : 0;
-      
-      const churnPercentualPorSquad: { squad: string; mrr_ativo: number; mrr_perdido: number; percentual: number }[] = [];
-      
-      // Incluir todos os squads que tem MRR ativo ou perdido
+
       const allSquadNames = Array.from(new Set([...Object.keys(mrrAtivoPorSquad), ...Object.keys(mrrPerdidoPorSquad)]));
-      
-      for (const squadName of allSquadNames) {
-        const mrrAtivo = mrrAtivoPorSquad[squadName] || 0;
-        const mrrPerdido = mrrPerdidoPorSquad[squadName] || 0;
-        const percentual = mrrAtivo > 0 ? (mrrPerdido / mrrAtivo) * 100 : 0;
-        
-        churnPercentualPorSquad.push({
-          squad: squadName,
-          mrr_ativo: mrrAtivo,
-          mrr_perdido: mrrPerdido,
-          percentual: percentual,
-        });
-      }
-      
-      // Ordenar por percentual de churn (maior primeiro)
-      churnPercentualPorSquad.sort((a, b) => b.percentual - a.percentual);
-      
-      // ===== ANÁLISE DE SOBREVIVÊNCIA =====
-      // Mostra quanto tempo os contratos sobrevivem antes de sair (churn/pausa)
-      // Baseado nos contratos filtrados que já saíram
-      
-      const contratosComLifetime = allContratos.filter((c: any) => 
-        c.lifetime_meses !== undefined && c.lifetime_meses !== null && c.lifetime_meses >= 0
-      );
-      
+      const churnPercentualPorSquad = allSquadNames.map(squadName => ({
+        squad: squadName,
+        mrr_ativo: mrrAtivoPorSquad[squadName] || 0,
+        mrr_perdido: mrrPerdidoPorSquad[squadName] || 0,
+        percentual: (mrrAtivoPorSquad[squadName] || 0) > 0 ? ((mrrPerdidoPorSquad[squadName] || 0) / (mrrAtivoPorSquad[squadName] || 1)) * 100 : 0,
+      })).sort((a, b) => b.percentual - a.percentual);
+
+      // Retention curve
+      const contratosComLifetime = allContratos.filter((c: any) => c.lifetime_meses >= 0);
       const totalBase = contratosComLifetime.length;
       const totalMrrBase = contratosComLifetime.reduce((sum: number, c: any) => sum + (c.valorr || 0), 0);
-      
-      // Calcular distribuição de sobrevivência
-      const retentionCurve: { monthIndex: number; retainedPct: number; mrrRetainedPct: number; retainedCount: number; totalStarted: number; retainedMrr: number; churnedCount: number; atRisk: number }[] = [];
-      
+
+      const retentionCurve: any[] = [];
       for (let month = 0; month <= 12; month++) {
-        // Contratos que sobreviveram pelo menos X meses
         const sobreviventes = contratosComLifetime.filter((c: any) => c.lifetime_meses >= month);
         const sobrevivMrr = sobreviventes.reduce((sum: number, c: any) => sum + (c.valorr || 0), 0);
-        
-        // Churned neste intervalo [month, month+1)
-        const churnedNoPeriodo = contratosComLifetime.filter((c: any) => 
-          c.lifetime_meses >= month && c.lifetime_meses < month + 1
-        );
-        
-        const retainedPct = totalBase > 0 ? (sobreviventes.length / totalBase) * 100 : 0;
-        const mrrRetainedPct = totalMrrBase > 0 ? (sobrevivMrr / totalMrrBase) * 100 : 0;
-        
+        const churnedNoPeriodo = contratosComLifetime.filter((c: any) => c.lifetime_meses >= month && c.lifetime_meses < month + 1);
+
         retentionCurve.push({
           monthIndex: month,
-          retainedPct: Math.round(retainedPct * 10) / 10,
-          mrrRetainedPct: Math.round(mrrRetainedPct * 10) / 10,
+          retainedPct: totalBase > 0 ? Math.round((sobreviventes.length / totalBase) * 1000) / 10 : 0,
+          mrrRetainedPct: totalMrrBase > 0 ? Math.round((sobrevivMrr / totalMrrBase) * 1000) / 10 : 0,
           retainedCount: sobreviventes.length,
           totalStarted: totalBase,
           retainedMrr: sobrevivMrr,
@@ -9807,19 +9742,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           atRisk: sobreviventes.length,
         });
       }
-      
-      // Calcular MRR perdido por motivo de cancelamento
+
+      // MRR perdido por motivo de cancelamento
       const mrrPorMotivo: Record<string, { mrr: number; count: number }> = {};
-      for (const contrato of churnContratos) {
+      for (const contrato of allContratos) {
         const motivo = (contrato as any).motivo_cancelamento || 'Não especificado';
-        if (!mrrPorMotivo[motivo]) {
-          mrrPorMotivo[motivo] = { mrr: 0, count: 0 };
-        }
-        mrrPorMotivo[motivo].mrr += contrato.valorr;
+        if (!mrrPorMotivo[motivo]) mrrPorMotivo[motivo] = { mrr: 0, count: 0 };
+        mrrPorMotivo[motivo].mrr += (contrato as any).valorr;
         mrrPorMotivo[motivo].count += 1;
       }
-      
-      // Converter para array e ordenar por MRR perdido
+
       const churnPorMotivo = Object.entries(mrrPorMotivo)
         .map(([motivo, data]) => ({
           motivo,
@@ -9828,20 +9760,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
           percentual: mrrPerdidoChurn > 0 ? (data.mrr / mrrPerdidoChurn) * 100 : 0,
         }))
         .sort((a, b) => b.mrr_perdido - a.mrr_perdido);
-      
+
+      // Novas métricas: churn por evitabilidade
+      const evitabilidadeData: Record<string, { mrr: number; count: number }> = {};
+      for (const c of allContratos) {
+        const ev = (c as any).evitabilidade_churn || 'Não informado';
+        if (!evitabilidadeData[ev]) evitabilidadeData[ev] = { mrr: 0, count: 0 };
+        evitabilidadeData[ev].mrr += (c as any).valorr;
+        evitabilidadeData[ev].count += 1;
+      }
+      const churnPorEvitabilidade = Object.entries(evitabilidadeData)
+        .map(([label, data]) => ({ label, mrr: data.mrr, count: data.count }))
+        .sort((a, b) => b.mrr - a.mrr);
+
+      // Churn por cluster
+      const clusterData: Record<string, { mrr: number; count: number }> = {};
+      for (const c of allContratos) {
+        const cl = (c as any).cluster || 'Não informado';
+        if (!clusterData[cl]) clusterData[cl] = { mrr: 0, count: 0 };
+        clusterData[cl].mrr += (c as any).valorr;
+        clusterData[cl].count += 1;
+      }
+      const churnPorCluster = Object.entries(clusterData)
+        .map(([label, data]) => ({ label, mrr: data.mrr, count: data.count }))
+        .sort((a, b) => b.mrr - a.mrr);
+
+      // Churn por plano
+      const planoData: Record<string, { mrr: number; count: number }> = {};
+      for (const c of allContratos) {
+        const pl = (c as any).plano || 'Não informado';
+        if (!planoData[pl]) planoData[pl] = { mrr: 0, count: 0 };
+        planoData[pl].mrr += (c as any).valorr;
+        planoData[pl].count += 1;
+      }
+      const churnPorPlano = Object.entries(planoData)
+        .map(([label, data]) => ({ label, mrr: data.mrr, count: data.count }))
+        .sort((a, b) => b.mrr - a.mrr);
+
       res.json({
         contratos: allContratos,
         metricas: {
           total_churned: totalChurned,
-          total_pausados: totalPausados,
+          total_pausados: totalEmCancelamento,
           mrr_perdido: mrrPerdidoChurn,
-          mrr_pausado: mrrPerdidoPausado,
+          mrr_pausado: mrrEmCancelamento,
           ltv_total: ltvTotal,
           lt_medio: ltMedio,
           mrr_ativo_ref: mrrAtivoTotal,
           churn_percentual: churnPercentualGeral,
           churn_por_squad: churnPercentualPorSquad,
           churn_por_motivo: churnPorMotivo,
+          churn_por_evitabilidade: churnPorEvitabilidade,
+          churn_por_cluster: churnPorCluster,
+          churn_por_plano: churnPorPlano,
           periodo_referencia: refDateStr,
         },
         filtros: {
@@ -9849,6 +9820,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           produtos,
           responsaveis,
           servicos,
+          planos,
+          clusters,
+          evitabilidades,
+          possibilidades_retencao,
         },
         retentionCurve,
       });
@@ -16585,11 +16560,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Geração de Caixa = Receitas - Despesas (mesma lógica do DFC)
           const geracaoCaixaResult = await db.execute(sql`
-            SELECT 
-              COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as entradas,
-              COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as saidas,
-              COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) -
-              COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as geracao_caixa
+            SELECT
+              COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as entradas,
+              COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as saidas,
+              COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) -
+              COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as geracao_caixa
             FROM "Conta Azul".caz_parcelas
             WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
               AND status = 'QUITADO'
@@ -16685,7 +16660,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // CSV (Custo Serviços Vendidos) - categoria 06.% excluindo CAC (06.03,06.04), SGA (06.10,06.11,06.12) e IR/CSLL (06.13)
           const csvResult = await db.execute(sql`
-            SELECT COALESCE(SUM(valor_pago::numeric), 0) as csv
+            SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as csv
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
               AND categoria_nome LIKE '06.%'
@@ -16704,7 +16679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // CAC (Custo de Aquisição) - categorias 06.03% e 06.04%
           const cacResult = await db.execute(sql`
-            SELECT COALESCE(SUM(valor_pago::numeric), 0) as cac
+            SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
               AND (categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.04%')
@@ -16717,7 +16692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // SG&A (Despesas Administrativas) - categorias 06.10%, 06.11%, 06.12% excluindo CAPEX (06.11.01%)
           const sgaResult = await db.execute(sql`
-            SELECT COALESCE(SUM(valor_pago::numeric), 0) as sga
+            SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as sga
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
               AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
@@ -16731,7 +16706,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // CAPEX (Compra de Ativos) - categoria 06.11.01%
           const capexResult = await db.execute(sql`
-            SELECT COALESCE(SUM(valor_pago::numeric), 0) as capex
+            SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as capex
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
               AND categoria_nome LIKE '06.11.01%'
@@ -16744,7 +16719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // IR/CSLL - categoria 06.13%
           const irCsllResult = await db.execute(sql`
-            SELECT COALESCE(SUM(valor_pago::numeric), 0) as ir_csll
+            SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
               AND categoria_nome LIKE '06.13%'

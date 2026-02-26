@@ -22,7 +22,7 @@ interface AuthContextType {
 }
 
 // Rotas acessíveis a todos os usuários autenticados (sem precisar de permissão)
-const PUBLIC_ROUTES = ['/rh/nps/responder'];
+const PUBLIC_ROUTES = ['/rh/nps/responder', '/meu-perfil'];
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 

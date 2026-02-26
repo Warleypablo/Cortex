@@ -15,6 +15,7 @@ import {
   Users,
   Percent,
   Pause,
+  Shield,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -25,6 +26,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  PieChart as RechartsPie,
+  Pie,
+  Cell,
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -45,6 +49,12 @@ interface ChurnPorMotivo {
   percentual: number;
 }
 
+interface ChurnBreakdownItem {
+  label: string;
+  mrr: number;
+  count: number;
+}
+
 interface ChurnDetalhamentoData {
   metricas: {
     total_churned: number;
@@ -57,6 +67,7 @@ interface ChurnDetalhamentoData {
     churn_percentual?: number;
     churn_por_squad?: ChurnPorSquad[];
     churn_por_motivo?: ChurnPorMotivo[];
+    churn_por_evitabilidade?: ChurnBreakdownItem[];
   };
 }
 
@@ -271,6 +282,12 @@ export default function ChurnVisaoGeral() {
       quantidade: mot.quantidade,
       percentual: mot.percentual,
     }));
+  }, [m]);
+
+  // Evitabilidade data
+  const evitabilidadeData = useMemo(() => {
+    if (!m?.churn_por_evitabilidade) return [];
+    return m.churn_por_evitabilidade;
   }, [m]);
 
   return (
@@ -547,6 +564,94 @@ export default function ChurnVisaoGeral() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Churn por Evitabilidade */}
+          {evitabilidadeData.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Shield className="w-5 h-5 text-primary" />
+                  Churn por Evitabilidade
+                </CardTitle>
+                <CardDescription>Proporção de churns evitáveis vs inevitáveis</CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="flex items-center gap-6">
+                  <div className="w-[200px] h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RechartsPie>
+                        <Pie
+                          data={evitabilidadeData}
+                          dataKey="count"
+                          nameKey="label"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={80}
+                          strokeWidth={3}
+                          stroke="hsl(var(--card))"
+                        >
+                          {evitabilidadeData.map((entry, index) => (
+                            <Cell
+                              key={entry.label}
+                              fill={entry.label === 'Evitável' ? '#ef4444' : entry.label === 'Inevitável' ? '#6b7280' : SQUAD_COLORS[index % SQUAD_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (!active || !payload?.length) return null;
+                            const data = payload[0].payload as ChurnBreakdownItem;
+                            return (
+                              <div className="bg-background/95 backdrop-blur-sm border rounded-xl shadow-xl p-3 min-w-[160px]">
+                                <p className="text-sm font-semibold">{data.label}</p>
+                                <p className="text-sm text-muted-foreground">{data.count} contratos</p>
+                                <p className="text-sm font-semibold text-red-500">{formatCurrencyCompact(data.mrr)} MRR</p>
+                              </div>
+                            );
+                          }}
+                        />
+                      </RechartsPie>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 space-y-3">
+                    {evitabilidadeData.map((item) => {
+                      const total = evitabilidadeData.reduce((s, d) => s + d.count, 0);
+                      const pct = total > 0 ? (item.count / total) * 100 : 0;
+                      const color = item.label === 'Evitável' ? '#ef4444' : '#6b7280';
+                      return (
+                        <div key={item.label} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                              <span className="text-sm font-medium">{item.label}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-muted-foreground">
+                                {item.count} contratos
+                              </span>
+                              <span className="text-sm font-semibold">
+                                {formatCurrencyCompact(item.mrr)}
+                              </span>
+                              <Badge variant="outline" className="text-xs font-medium min-w-[42px] justify-center">
+                                {pct.toFixed(0)}%
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full transition-all"
+                              style={{ width: `${pct}%`, backgroundColor: color }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       ) : (
         <Card className="p-12">
