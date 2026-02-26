@@ -4311,15 +4311,27 @@ export class DbStorage implements IStorage {
     const mrr = parseFloat(mrrRow.mrr || '0');
     const aquisicaoMrr = parseFloat(aquisicaoMrrRow.aquisicao_mrr || '0');
     const aquisicaoPontual = parseFloat(aquisicaoPontualRow.aquisicao_pontual_crm || '0');
-    const churnBase = parseFloat(transRow.churn || '0');
+    let churnBase = parseFloat(transRow.churn || '0');
     const pausados = parseFloat(transRow.pausados || '0');
     const receitaPontualEntregue = parseFloat(transRow.receita_pontual_entregue || '0');
     const valorEntreguePontual = parseFloat(valorEntreguePontualRow?.valor_entregue_pontual || '0');
     const clientesUnicos = parseInt(transRow.clientes_unicos || '0');
     const ticketMedio = clientesUnicos > 0 ? mrr / clientesUnicos : 0;
+
+    // Para fevereiro/2026 em diante, usar cup_churn como fonte de churn
+    if (mesAno >= '2026-02') {
+      const cupChurnQuery = await db.execute(sql`
+        SELECT COALESCE(SUM(valor_r), 0) as churn_total
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento >= ${inicioMes}::timestamp
+          AND data_solicitacao_encerramento <= ${fimMes}::timestamp
+      `);
+      churnBase = parseFloat((cupChurnQuery.rows[0] as any)?.churn_total || '0');
+    }
+
     const churn = churnBase;
-    
-    console.log(`[visao-geral] Churn: base=${churnBase}, total=${churn}`);
+
+    console.log(`[visao-geral] Churn (${mesAno}): base=${churnBase}, total=${churn}, source=${mesAno >= '2026-02' ? 'cup_churn' : 'cup_contratos'}`);
     
     // Calcular churn rate: (valor churn / MRR mês anterior) * 100
     const churnRate = mrrMesAnterior > 0 ? (churn / mrrMesAnterior) * 100 : 0;
@@ -4707,7 +4719,7 @@ export class DbStorage implements IStorage {
         p.id,
         p.status,
         p.descricao,
-        p.valor_pago,
+        (COALESCE(p.valor_pago::numeric, 0) - COALESCE(p.desconto::numeric, 0)) as valor_pago,
         p.valor_liquido,
         p.metodo_pagamento,
         p.categoria_id,
@@ -9382,15 +9394,15 @@ export class DbStorage implements IStorage {
     const dataReferencia = dataHoje < ultimoDiaStr ? dataHoje : ultimoDiaStr;
     
     const resumoResult = await db.execute(sql.raw(`
-      SELECT 
+      SELECT
         COALESCE(SUM(valor_liquido::numeric), 0) as total_previsto,
-        COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) <= 0 
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
+        COALESCE(SUM(CASE
+          WHEN COALESCE(nao_pago::numeric, 0) <= 0
+          THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0
         END), 0) as total_recebido,
-        COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date 
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
+        COALESCE(SUM(CASE
+          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date
+          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0
         END), 0) as total_pendente,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date
@@ -9413,17 +9425,17 @@ export class DbStorage implements IStorage {
     const totalInadimplente = parseFloat(resumoRow?.total_inadimplente || '0');
     
     const porDiaResult = await db.execute(sql.raw(`
-      SELECT 
+      SELECT
         EXTRACT(DAY FROM data_vencimento) as dia,
         TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_completa,
         COALESCE(SUM(valor_liquido::numeric), 0) as previsto,
-        COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) <= 0 
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
+        COALESCE(SUM(CASE
+          WHEN COALESCE(nao_pago::numeric, 0) <= 0
+          THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0
         END), 0) as recebido,
-        COALESCE(SUM(CASE 
-          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date 
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0 
+        COALESCE(SUM(CASE
+          WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date
+          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0
         END), 0) as pendente,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date
@@ -9545,6 +9557,7 @@ export class DbStorage implements IStorage {
         cp.descricao,
         cp.valor_bruto,
         COALESCE(cp.valor_pago, 0) as valor_pago,
+        COALESCE(cp.desconto, 0) as desconto,
         COALESCE(cp.nao_pago, 0) as nao_pago,
         TO_CHAR(cp.data_vencimento, 'YYYY-MM-DD') as data_vencimento,
         cp.status,
@@ -9583,10 +9596,12 @@ export class DbStorage implements IStorage {
     
     const parcelas = (result.rows as any[]).map(row => {
       const valorBruto = parseFloat(row.valor_bruto || '0');
-      const valorPago = parseFloat(row.valor_pago || '0');
+      const valorPagoRaw = parseFloat(row.valor_pago || '0');
+      const desconto = parseFloat(row.desconto || '0');
+      const valorPago = valorPagoRaw - desconto;
       const naoPago = parseFloat(row.nao_pago || '0');
       const statusCalc = row.status_calculado as 'pago' | 'pendente' | 'inadimplente';
-      
+
       totalPrevisto += valorBruto;
       if (statusCalc === 'pago') {
         totalRecebido += valorPago;
