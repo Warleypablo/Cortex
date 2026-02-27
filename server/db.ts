@@ -1994,3 +1994,109 @@ export async function createPerformanceIndexes(): Promise<void> {
     console.error('[database] Error creating performance indexes:', error);
   }
 }
+
+export async function initializeClientCredentialsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.client_credentials (
+        id SERIAL PRIMARY KEY,
+        client_id INTEGER NOT NULL,
+        cnpj VARCHAR(20) NOT NULL,
+        password_hash TEXT NOT NULL,
+        must_change_password BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS client_credentials_cnpj_idx
+      ON cortex_core.client_credentials(cnpj)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS client_credentials_client_id_idx
+      ON cortex_core.client_credentials(client_id)
+    `);
+    console.log('[database] Client credentials table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing client credentials table:', error);
+  }
+}
+
+export async function initializeChamadosTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.chamados (
+        id SERIAL PRIMARY KEY,
+        titulo VARCHAR(255) NOT NULL,
+        descricao TEXT NOT NULL,
+        area VARCHAR(50) NOT NULL,
+        categoria VARCHAR(100),
+        prioridade VARCHAR(20) DEFAULT 'media',
+        status VARCHAR(30) DEFAULT 'aberto',
+        solicitante_id VARCHAR(100) NOT NULL,
+        solicitante_nome VARCHAR(255) NOT NULL,
+        solicitante_email VARCHAR(255) NOT NULL,
+        solicitante_squad VARCHAR(100),
+        responsavel_id VARCHAR(100),
+        responsavel_nome VARCHAR(255),
+        responsavel_email VARCHAR(255),
+        criado_em TIMESTAMP DEFAULT NOW(),
+        atualizado_em TIMESTAMP DEFAULT NOW(),
+        resolvido_em TIMESTAMP,
+        fechado_em TIMESTAMP
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_chamados_area ON cortex_core.chamados(area)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_chamados_status ON cortex_core.chamados(status)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_chamados_solicitante ON cortex_core.chamados(solicitante_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_chamados_responsavel ON cortex_core.chamados(responsavel_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_chamados_squad ON cortex_core.chamados(solicitante_squad)`);
+    // Add client columns for financial chamados
+    await db.execute(sql`ALTER TABLE cortex_core.chamados ADD COLUMN IF NOT EXISTS cliente_cnpj VARCHAR(20)`);
+    await db.execute(sql`ALTER TABLE cortex_core.chamados ADD COLUMN IF NOT EXISTS cliente_nome VARCHAR(255)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.chamado_comentarios (
+        id SERIAL PRIMARY KEY,
+        chamado_id INTEGER NOT NULL REFERENCES cortex_core.chamados(id) ON DELETE CASCADE,
+        autor_id VARCHAR(100) NOT NULL,
+        autor_nome VARCHAR(255) NOT NULL,
+        autor_email VARCHAR(255) NOT NULL,
+        comentario TEXT NOT NULL,
+        interno BOOLEAN DEFAULT false,
+        criado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_chamado_comentarios_chamado ON cortex_core.chamado_comentarios(chamado_id)`);
+
+    console.log('[database] Chamados tables initialized');
+  } catch (error) {
+    console.error('[database] Error initializing chamados tables:', error);
+  }
+}
+
+export async function seedChamadoCategories(): Promise<void> {
+  try {
+    const seedCategories: { fieldType: string; options: string[] }[] = [
+      { fieldType: 'chamado_cat_financeiro', options: ['Pagamento', 'Nota Fiscal', 'Reembolso', 'Orçamento', 'Outros'] },
+      { fieldType: 'chamado_cat_ti', options: ['Acesso', 'Equipamento', 'Software', 'Bug', 'Outros'] },
+      { fieldType: 'chamado_cat_rh', options: ['Férias', 'Benefícios', 'Documentos', 'Outros'] },
+      { fieldType: 'chamado_cat_operacao', options: ['Sobre Cliente', 'Processo Interno', 'Outros'] },
+      { fieldType: 'chamado_cat_comercial', options: ['Proposta', 'Contrato', 'Outros'] },
+    ];
+
+    for (const cat of seedCategories) {
+      for (let i = 0; i < cat.options.length; i++) {
+        const opt = cat.options[i];
+        await db.execute(sql`
+          INSERT INTO system_field_options (field_type, value, label, sort_order, is_active)
+          VALUES (${cat.fieldType}, ${opt.toLowerCase().replace(/ /g, '_')}, ${opt}, ${i}, true)
+          ON CONFLICT (field_type, value) DO NOTHING
+        `);
+      }
+    }
+    console.log('[database] Chamado categories seeded');
+  } catch (error) {
+    console.error('[database] Error seeding chamado categories:', error);
+  }
+}

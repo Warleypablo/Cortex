@@ -10,12 +10,15 @@ export interface ClientUser {
   telefone: string | null;
   endereco: string | null;
   ativo: string | boolean | null;
+  mustChangePassword?: boolean;
 }
 
 interface ClientAuthContextType {
   client: ClientUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  mustChangePassword: boolean;
+  clearMustChangePassword: () => void;
   logout: () => Promise<void>;
 }
 
@@ -32,10 +35,16 @@ export function ClientAuthProvider({ children }: { children: ReactNode }) {
     retry: false,
   });
 
+  const clearMustChangePassword = () => {
+    queryClient.setQueryData<ClientUser>(["/api/auth/client-me"], (old) =>
+      old ? { ...old, mustChangePassword: false } : old
+    );
+  };
+
   const logout = async () => {
     await fetch("/auth/client-logout", { method: "POST" });
     queryClient.removeQueries({ queryKey: ["/api/auth/client-me"] });
-    window.location.href = "/login";
+    window.location.href = "/loginclientes";
   };
 
   return (
@@ -43,6 +52,8 @@ export function ClientAuthProvider({ children }: { children: ReactNode }) {
       client: client ?? null,
       isLoading,
       isAuthenticated: !!client,
+      mustChangePassword: !!client?.mustChangePassword,
+      clearMustChangePassword,
       logout,
     }}>
       {children}

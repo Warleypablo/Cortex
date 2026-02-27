@@ -33,7 +33,7 @@ export function getCallbackURL(): string {
     return `https://${devDomain}/auth/google/callback`;
   }
 
-  return "http://localhost:5000/auth/google/callback";
+  return "http://localhost:3000/auth/google/callback";
 }
 
 export function configurePassport() {
