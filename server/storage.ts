@@ -3356,8 +3356,14 @@ export class DbStorage implements IStorage {
       daily_transactions AS (
         SELECT
           data_vencimento::date as data,
-          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_previstas,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_previstas
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN
+            CASE WHEN status = 'QUITADO' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0))
+            ELSE valor_bruto::numeric END
+          ELSE 0 END) as entradas_previstas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN
+            CASE WHEN status = 'QUITADO' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0))
+            ELSE valor_bruto::numeric END
+          ELSE 0 END) as saidas_previstas
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status NOT IN ('PERDIDO')
@@ -3367,8 +3373,8 @@ export class DbStorage implements IStorage {
       paid_transactions AS (
         SELECT
           data_quitacao::date as data,
-          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_pagas,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_pagas
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END) as entradas_pagas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END) as saidas_pagas
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status = 'QUITADO'
@@ -3451,8 +3457,14 @@ export class DbStorage implements IStorage {
       monthly_transactions AS (
         SELECT
           date_trunc('month', data_vencimento)::date as mes,
-          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN
+            CASE WHEN status = 'QUITADO' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0))
+            ELSE valor_bruto::numeric END
+          ELSE 0 END) as entradas,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN
+            CASE WHEN status = 'QUITADO' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0))
+            ELSE valor_bruto::numeric END
+          ELSE 0 END) as saidas
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status NOT IN ('PERDIDO')
@@ -3493,7 +3505,8 @@ export class DbStorage implements IStorage {
       SELECT
         p.id,
         COALESCE(p.descricao, 'Sem descrição') as descricao,
-        p.valor_bruto::numeric as valor,
+        CASE WHEN p.status = 'QUITADO' THEN (COALESCE(p.valor_pago::numeric, 0) - COALESCE(p.desconto::numeric, 0))
+        ELSE p.valor_bruto::numeric END as valor,
         p.tipo_evento,
         p.status,
         COALESCE(p.categoria_nome, 'Sem categoria') as categoria,
@@ -3730,9 +3743,15 @@ export class DbStorage implements IStorage {
         WHERE ativo = 'true' OR ativo = 't' OR ativo = '1'
       ),
       periodo AS (
-        SELECT 
-          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto::numeric ELSE 0 END) as entradas_periodo,
-          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_bruto::numeric ELSE 0 END) as saidas_periodo
+        SELECT
+          SUM(CASE WHEN tipo_evento = 'RECEITA' THEN
+            CASE WHEN status = 'QUITADO' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0))
+            ELSE valor_bruto::numeric END
+          ELSE 0 END) as entradas_periodo,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' THEN
+            CASE WHEN status = 'QUITADO' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0))
+            ELSE valor_bruto::numeric END
+          ELSE 0 END) as saidas_periodo
         FROM "Conta Azul".caz_parcelas
         WHERE status != 'PERDIDO'
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
@@ -4749,14 +4768,7 @@ export class DbStorage implements IStorage {
       const tipoEvento = row.tipo_evento as string || '';
       const tipoEventoNormalized = (tipoEvento || '').toUpperCase().trim();
       const valorPagoRaw = parseFloat(row.valor_pago as string || '0');
-      const valorLiquidoRaw = parseFloat(row.valor_liquido as string || '0');
-      const metodoPagamento = (row.metodo_pagamento as string || '').trim().toUpperCase();
-      const statusParcela = (row.status as string || '').trim().toUpperCase();
-      const valorPago = Number.isFinite(valorPagoRaw) ? valorPagoRaw : 0;
-      const valorLiquido = Number.isFinite(valorLiquidoRaw) ? valorLiquidoRaw : 0;
-      const valorBase = (tipoEventoNormalized === 'RECEITA' && metodoPagamento === 'CARTAO_CREDITO_VIA_LINK' && valorLiquido > 0 && statusParcela === 'QUITADO')
-        ? valorLiquido
-        : valorPago;
+      const valorBase = Number.isFinite(valorPagoRaw) ? valorPagoRaw : 0;
 
       if (categoriaNomes.length === 0) {
         const fallbackPrefix = tipoEventoNormalized === 'DESPESA' ? '06.99' : '03.99';

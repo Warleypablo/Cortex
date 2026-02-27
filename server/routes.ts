@@ -24,6 +24,7 @@ import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
 import { registerRelatorioMensalRoutes } from "./routes/relatorioMensal";
 import { registerChatRoutes } from "./routes/chat";
+import { registerChamadosRoutes } from "./routes/chamados";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -9468,79 +9469,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Churn Visão Geral - tendência mensal de churn (últimos 12 meses)
-  // Migrado para usar cup_churn como fonte principal
-  app.get("/api/analytics/churn-visao-geral", async (req, res) => {
-    try {
-      const meses = parseInt(req.query.meses as string) || 12;
-
-      const churnMensalResult = await db.execute(sql`
-        WITH meses AS (
-          SELECT generate_series(
-            DATE_TRUNC('month', NOW() - INTERVAL '${sql.raw(String(meses - 1))} months'),
-            DATE_TRUNC('month', NOW()),
-            '1 month'::interval
-          )::date AS mes
-        ),
-        churn_mensal AS (
-          SELECT
-            DATE_TRUNC('month', c.data_solicitacao_encerramento::timestamp)::date AS mes,
-            COUNT(*) AS total_churned,
-            COALESCE(SUM(c.valor_r), 0) AS mrr_perdido
-          FROM "Clickup".cup_churn c
-          WHERE c.data_solicitacao_encerramento IS NOT NULL
-            AND c.data_solicitacao_encerramento::timestamp >= DATE_TRUNC('month', NOW() - INTERVAL '${sql.raw(String(meses - 1))} months')
-          GROUP BY DATE_TRUNC('month', c.data_solicitacao_encerramento::timestamp)
-        ),
-        ultimo_snapshot_mes AS (
-          SELECT
-            DATE_TRUNC('month', data_snapshot)::date AS mes,
-            MAX(data_snapshot) AS ultimo_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE data_snapshot >= DATE_TRUNC('month', NOW() - INTERVAL '${sql.raw(String(meses))} months')
-          GROUP BY DATE_TRUNC('month', data_snapshot)
-        ),
-        mrr_ativo_mensal AS (
-          SELECT
-            usm.mes,
-            COALESCE(SUM(h.valorr::numeric), 0) AS mrr_ativo
-          FROM ultimo_snapshot_mes usm
-          JOIN "Clickup".cup_data_hist h ON h.data_snapshot = usm.ultimo_snapshot
-          WHERE LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
-            AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
-          GROUP BY usm.mes
-        )
-        SELECT
-          m.mes,
-          COALESCE(cm.total_churned, 0) AS total_churned,
-          COALESCE(cm.mrr_perdido, 0) AS mrr_perdido,
-          COALESCE(ma.mrr_ativo, 0) AS mrr_ativo,
-          CASE
-            WHEN COALESCE(ma.mrr_ativo, 0) > 0
-            THEN ROUND((COALESCE(cm.mrr_perdido, 0) / ma.mrr_ativo) * 100, 2)
-            ELSE 0
-          END AS churn_rate
-        FROM meses m
-        LEFT JOIN churn_mensal cm ON cm.mes = m.mes
-        LEFT JOIN mrr_ativo_mensal ma ON ma.mes = DATE_TRUNC('month', m.mes - INTERVAL '1 month')::date
-        ORDER BY m.mes ASC
-      `);
-
-      res.json({
-        tendencia: churnMensalResult.rows.map((row: any) => ({
-          mes: row.mes,
-          totalChurned: Number(row.total_churned) || 0,
-          mrrPerdido: Number(row.mrr_perdido) || 0,
-          mrrAtivo: Number(row.mrr_ativo) || 0,
-          churnRate: Number(row.churn_rate) || 0,
-        })),
-      });
-    } catch (error) {
-      console.error("[api] Error fetching churn visao geral:", error);
-      res.status(500).json({ error: "Failed to fetch churn visao geral data" });
-    }
-  });
-
   // Churn Detalhamento - lista de contratos churned com detalhes ricos de cup_churn
   app.get("/api/analytics/churn-detalhamento", async (req, res) => {
     try {
@@ -9830,6 +9758,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching churn detalhamento:", error);
       res.status(500).json({ error: "Failed to fetch churn detalhamento data" });
+    }
+  });
+
+  // Análise IA das mensagens de churn — classifica sentimento, temas e gera insight
+  const churnAICache = new Map<string, { result: any; timestamp: number }>();
+  const CHURN_AI_CACHE_TTL = 1000 * 60 * 30; // 30 min
+
+  app.post("/api/analytics/churn-mensagens-ai", async (req, res) => {
+    try {
+      const { mensagens } = req.body as {
+        mensagens: { id: string; cliente: string; mensagem: string; motivo?: string; mrr?: number }[];
+      };
+
+      if (!mensagens || !Array.isArray(mensagens) || mensagens.length === 0) {
+        return res.status(400).json({ error: "Nenhuma mensagem para analisar" });
+      }
+
+      // Cache key baseado nos IDs das mensagens (ordenados)
+      const cacheKey = mensagens.map(m => m.id).sort().join(',');
+      const cached = churnAICache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < CHURN_AI_CACHE_TTL) {
+        return res.json(cached.result);
+      }
+
+      // Usar sistema centralizado de AI (suporta OpenAI + Gemini com fallback)
+      const { getAIConfig, getAIClient } = await import("./services/unifiedAssistant");
+      const aiConfig = await getAIConfig();
+      const aiClient = getAIClient(aiConfig.provider);
+
+      // Limitar a 60 mensagens por batch pra não estourar tokens
+      const batch = mensagens.slice(0, 60);
+
+      const mensagensFormatadas = batch.map((m, i) =>
+        `[${i + 1}] ID:${m.id} | Cliente: ${m.cliente} | Motivo: ${m.motivo || 'N/A'} | MRR: R$${m.mrr || 0}\nMensagem: "${m.mensagem}"`
+      ).join('\n\n');
+
+      const response = await aiClient.chat.completions.create({
+        model: aiConfig.model,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `Você é um analista sênior de Customer Success especializado em análise de churn. Você recebe mensagens reais de clientes que cancelaram ou pausaram contratos.
+
+Sua tarefa é analisar CADA mensagem como um todo — entendendo contexto, tom, intenções e nuances — e classificar:
+
+1. **sentimento**: "negativo", "neutro" ou "positivo" — baseado no TOM GERAL da mensagem, não em palavras isoladas. Ex: "O atendimento era bom mas não trouxe resultado" = negativo (insatisfação com resultado apesar de elogio parcial).
+
+2. **temas**: array de 1-3 temas que melhor descrevem O QUE a mensagem está dizendo. Use APENAS estes temas:
+   - "Resultado/ROI" — cliente não viu retorno, resultados abaixo do esperado
+   - "Preço/Custo" — questão financeira, custo-benefício, orçamento
+   - "Atendimento" — qualidade do suporte, comunicação, tempo de resposta
+   - "Operação" — erros, falhas, qualidade de execução
+   - "Estratégia" — falta de direcionamento, planejamento, alinhamento
+   - "Decisão Interna" — mudança interna do cliente, reestruturação, corte
+   - "Concorrência" — trocou de fornecedor, in-house
+   - "Produto" — limitação da ferramenta/plataforma
+   - "Confiança" — quebra de confiança, transparência
+   - "Onboarding" — problemas no início, implantação
+   - "Relacionamento" — falta de proximidade, empatia
+
+3. **resumo**: 1 frase curta (max 15 palavras) capturando a essência da mensagem. Deve ser útil para um diretor que está scaneando rapidamente.
+
+Responda em JSON com esta estrutura:
+{
+  "analises": [
+    {
+      "id": "id_do_contrato",
+      "sentimento": "negativo|neutro|positivo",
+      "temas": ["Tema1", "Tema2"],
+      "resumo": "Frase curta descrevendo a essência"
+    }
+  ],
+  "sintese": {
+    "principal_motivo": "O tema mais recorrente e impactante",
+    "padrao_critico": "Padrão preocupante identificado (se houver)",
+    "recomendacao": "1 ação concreta que a operação deveria tomar"
+  }
+}`
+          },
+          {
+            role: "user",
+            content: `Analise estas ${batch.length} mensagens de clientes que deram churn:\n\n${mensagensFormatadas}`
+          }
+        ],
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        return res.status(500).json({ error: "Resposta vazia da IA" });
+      }
+
+      const parsed = JSON.parse(content);
+
+      // Salvar no cache
+      churnAICache.set(cacheKey, { result: parsed, timestamp: Date.now() });
+
+      res.json(parsed);
+    } catch (error: any) {
+      console.error("[api] Error in churn AI analysis:", error);
+      res.status(500).json({ error: "Falha na análise IA: " + (error.message || "Erro desconhecido") });
     }
   });
 
@@ -14647,6 +14677,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Chat Atendimento - registered from separate file
   registerChatRoutes(app);
+
+  // Chamados Module - registered from separate file
+  registerChamadosRoutes(app);
 
   // ============================================
   // Sugestões API

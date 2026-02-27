@@ -15,6 +15,7 @@ export const PERMISSION_KEYS = {
     ENPS: 'general.enps',
     PROCESSOS_INTERNOS: 'general.processos_internos',
     CHAT_CLIENTES: 'general.chat_clientes',
+    CHAMADOS: 'general.chamados',
   },
   // Financeiro
   FIN: {
@@ -32,7 +33,6 @@ export const PERMISSION_KEYS = {
   GESTAO: {
     VISAO_GERAL: 'gestao.visao_geral',
     CLIENTES_CONTRATOS: 'gestao.clientes_contratos',
-    CHURN_VISAO_GERAL: 'gestao.churn_visao_geral',
     CHURN_DETALHAMENTO: 'gestao.churn_detalhamento',
     CHURN_PREDICAO: 'gestao.churn_predicao',
     EVOLUCAO_MENSAL: 'gestao.evolucao_mensal',
@@ -177,6 +177,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/rh/nps/responder': PERMISSION_KEYS.GENERAL.ENPS,
   '/processos-internos': PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS,
   '/chat-clientes': PERMISSION_KEYS.GENERAL.CHAT_CLIENTES,
+  '/chamados': PERMISSION_KEYS.GENERAL.CHAMADOS,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   // Financeiro
   '/dashboard/financeiro': PERMISSION_KEYS.FIN.VISAO_GERAL,
@@ -189,7 +190,6 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/margem-cliente': PERMISSION_KEYS.FIN.MARGEM_CLIENTE,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
-  '/dashboard/churn-visao-geral': PERMISSION_KEYS.GESTAO.CHURN_VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
@@ -314,6 +314,7 @@ export const NAV_CONFIG = {
     { title: 'Pesquisa E-NPS', url: '/rh/nps/responder', icon: 'ClipboardCheck', permissionKey: PERMISSION_KEYS.GENERAL.ENPS },
     { title: 'Processos Internos', url: '/processos-internos', icon: 'FolderOpen', permissionKey: PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS },
     { title: 'Chat Clientes', url: '/chat-clientes', icon: 'MessageSquare', permissionKey: PERMISSION_KEYS.GENERAL.CHAT_CLIENTES },
+    { title: 'Chamados', url: '/chamados', icon: 'Ticket', permissionKey: PERMISSION_KEYS.GENERAL.CHAMADOS },
   ],
   
   // Geral module
@@ -328,6 +329,7 @@ export const NAV_CONFIG = {
       { title: 'GPTurbo', url: '/cases/chat', icon: 'Sparkles', permissionKey: PERMISSION_KEYS.GENERAL.GPTURBO },
       { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
       { title: 'Chat Clientes', url: '/chat-clientes', icon: 'MessageSquare', permissionKey: PERMISSION_KEYS.GENERAL.CHAT_CLIENTES },
+      { title: 'Chamados', url: '/chamados', icon: 'Ticket', permissionKey: PERMISSION_KEYS.GENERAL.CHAMADOS },
       { title: 'OKR 2026', url: '/okr-2026', icon: 'Trophy', permissionKey: PERMISSION_KEYS.ADMIN.OKR_2026 },
     ],
   },
@@ -364,7 +366,6 @@ export const NAV_CONFIG = {
         { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS },
         { title: 'Detalhamento Contratos', url: '/dashboard/contratos-detalhamento', icon: 'FileText', permissionKey: PERMISSION_KEYS.GESTAO.CONTRATOS_DETALHAMENTO },
         { title: 'Evolução Mensal', url: '/dashboard/evolucao-mensal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL },
-        { title: 'Visão Geral Churn', url: '/dashboard/churn-visao-geral', icon: 'Activity', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_VISAO_GERAL },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
         { title: 'Predição de Churn', url: '/dashboard/churn-predicao', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_PREDICAO },
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
@@ -569,7 +570,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.FIN.INADIMPLENCIA]: 'Inadimplência',
   [PERMISSION_KEYS.FIN.AUDITORIA]: 'Auditoria de Sistemas',
   [PERMISSION_KEYS.GESTAO.VISAO_GERAL]: 'Visão Geral',
-  [PERMISSION_KEYS.GESTAO.CHURN_VISAO_GERAL]: 'Visão Geral Churn',
   [PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
   [PERMISSION_KEYS.GESTAO.CHURN_PREDICAO]: 'Predição de Churn',
   [PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL]: 'Evolução Mensal',
@@ -606,5 +606,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
   [PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS]: 'Processos Internos',
+  [PERMISSION_KEYS.GENERAL.CHAMADOS]: 'Chamados',
   [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
 };

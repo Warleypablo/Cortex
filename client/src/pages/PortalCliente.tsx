@@ -6,7 +6,7 @@ const PortalPerformance = lazy(() => import("@/pages/PortalPerformance"));
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useClientAuth, ClientAuthProvider } from "@/contexts/ClientAuthContext";
 import type { ClientUser } from "@/contexts/ClientAuthContext";
-import { Loader2, Building2, Mail, Phone, LogOut, CircleDollarSign, CheckCircle2, AlertCircle, Clock, ExternalLink, BarChart3, Briefcase, Pencil, Check, X, XCircle, TrendingUp, TrendingDown, Receipt, MessageSquare, Send, User, Sun, Moon } from "lucide-react";
+import { Loader2, Building2, Mail, Phone, LogOut, CircleDollarSign, CheckCircle2, AlertCircle, Clock, ExternalLink, BarChart3, Briefcase, Pencil, Check, X, XCircle, TrendingUp, TrendingDown, Receipt, MessageSquare, Send, User, Sun, Moon, Lock, Eye, EyeOff } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
 
@@ -828,9 +828,152 @@ function CancelamentoModal({ servico, onClose }: { servico: Servico; onClose: ()
   );
 }
 
+function ForcePasswordChange({ onSuccess }: { onSuccess: () => void }) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (newPassword.length < 6) {
+      setError('A nova senha deve ter no mínimo 6 caracteres');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('As senhas não coincidem');
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setError('A nova senha deve ser diferente da atual');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/client-change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || 'Erro ao alterar senha');
+        return;
+      }
+      onSuccess();
+    } catch {
+      setError('Erro ao conectar. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={`min-h-screen flex items-center justify-center px-4 ${isDark ? 'bg-zinc-950' : 'bg-gray-50'}`}>
+      <div className={`w-full max-w-sm rounded-2xl p-8 space-y-6 shadow-2xl border ${isDark ? 'bg-zinc-900 border-white/[0.08]' : 'bg-white border-gray-200'}`}>
+        <div className="text-center space-y-2">
+          <div className={`inline-flex items-center justify-center w-14 h-14 rounded-full ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+            <Lock className={`w-7 h-7 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+          </div>
+          <h2 className={`text-xl font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>Troca de Senha Obrigatória</h2>
+          <p className={`text-sm ${isDark ? 'text-white/40' : 'text-gray-500'}`}>
+            Por segurança, defina uma nova senha para continuar
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
+              Senha Atual
+            </label>
+            <div className="relative">
+              <Lock className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-white/30' : 'text-gray-400'}`} />
+              <input
+                type={showCurrentPassword ? "text" : "password"}
+                value={currentPassword}
+                onChange={(e) => { setCurrentPassword(e.target.value); setError(''); }}
+                className={`w-full rounded-xl pl-10 pr-12 py-3 text-sm border focus:outline-none focus:ring-1 ${isDark ? 'bg-zinc-800/60 border-white/[0.1] text-white focus:border-blue-500/50 focus:ring-blue-500/20' : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-500 focus:ring-blue-500/20'}`}
+                required
+                autoFocus
+              />
+              <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-white/30 hover:text-white/60' : 'text-gray-400 hover:text-gray-600'} transition-colors`}>
+                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
+              Nova Senha
+            </label>
+            <div className="relative">
+              <Lock className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-white/30' : 'text-gray-400'}`} />
+              <input
+                type={showNewPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => { setNewPassword(e.target.value); setError(''); }}
+                placeholder="Mínimo 6 caracteres"
+                className={`w-full rounded-xl pl-10 pr-12 py-3 text-sm border focus:outline-none focus:ring-1 ${isDark ? 'bg-zinc-800/60 border-white/[0.1] text-white placeholder:text-white/20 focus:border-blue-500/50 focus:ring-blue-500/20' : 'bg-gray-50 border-gray-200 text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500/20'}`}
+                required
+              />
+              <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className={`absolute right-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-white/30 hover:text-white/60' : 'text-gray-400 hover:text-gray-600'} transition-colors`}>
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className={`text-xs font-medium uppercase tracking-wider ${isDark ? 'text-white/50' : 'text-gray-500'}`}>
+              Confirmar Nova Senha
+            </label>
+            <div className="relative">
+              <Lock className={`absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 ${isDark ? 'text-white/30' : 'text-gray-400'}`} />
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
+                className={`w-full rounded-xl pl-10 pr-4 py-3 text-sm border focus:outline-none focus:ring-1 ${isDark ? 'bg-zinc-800/60 border-white/[0.1] text-white focus:border-blue-500/50 focus:ring-blue-500/20' : 'bg-gray-50 border-gray-200 text-gray-900 focus:border-blue-500 focus:ring-blue-500/20'}`}
+                required
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-red-400 text-xs px-1">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || !currentPassword || !newPassword || !confirmPassword}
+            className="w-full flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-3 text-sm font-medium transition-colors"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Alterando...</span>
+              </>
+            ) : (
+              <span>Definir Nova Senha</span>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function PortalClienteContent() {
   const [, setLocation] = useLocation();
-  const { client, isLoading, isAuthenticated, logout } = useClientAuth();
+  const { client, isLoading, isAuthenticated, mustChangePassword, clearMustChangePassword, logout } = useClientAuth();
   const queryClient = useQueryClient();
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
@@ -908,7 +1051,7 @@ function PortalClienteContent() {
             Sua sessão expirou ou o login não foi concluído corretamente.
           </p>
           <button
-            onClick={() => setLocation("/login")}
+            onClick={() => setLocation("/loginclientes")}
             className="w-full py-3 px-6 bg-white/10 hover:bg-white/15 text-white rounded-full text-sm transition-colors mt-2"
           >
             Voltar ao Login
@@ -916,6 +1059,10 @@ function PortalClienteContent() {
         </div>
       </div>
     );
+  }
+
+  if (mustChangePassword) {
+    return <ForcePasswordChange onSuccess={clearMustChangePassword} />;
   }
 
   const totais = resumo?.totais ?? { total: 0, pago: 0, naoPago: 0 };
