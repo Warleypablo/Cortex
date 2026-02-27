@@ -108,13 +108,31 @@ class PortalErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
+  componentDidCatch(error: Error) {
+    // Auto-reload on chunk load failures (happens after deploy when browser has stale cache)
+    if (
+      error.message?.includes('Failed to fetch dynamically imported module') ||
+      error.message?.includes('Importing a module script failed') ||
+      error.message?.includes('Loading chunk') ||
+      error.message?.includes('ChunkLoadError')
+    ) {
+      const reloadKey = 'chunk-reload-' + window.location.pathname;
+      if (!sessionStorage.getItem(reloadKey)) {
+        sessionStorage.setItem(reloadKey, '1');
+        window.location.reload();
+        return;
+      }
+      sessionStorage.removeItem(reloadKey);
+    }
+  }
   render() {
     if (this.state.error) {
       return (
         <div style={{ position: 'fixed', inset: 0, background: '#09090b', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: 'monospace', zIndex: 9999 }}>
           <p style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#f87171' }}>Erro no Portal</p>
           <p style={{ fontSize: '0.75rem', color: '#a1a1aa', maxWidth: '600px', textAlign: 'center', wordBreak: 'break-all' }}>{this.state.error.message}</p>
-          <button onClick={() => window.location.href = '/login'} style={{ marginTop: '2rem', padding: '0.5rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}>Voltar ao Login</button>
+          <button onClick={() => { sessionStorage.clear(); window.location.reload(); }} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}>Recarregar Página</button>
+          <button onClick={() => window.location.href = '/login'} style={{ marginTop: '0.5rem', padding: '0.5rem 1.5rem', background: 'transparent', color: '#a1a1aa', border: '1px solid #3f3f46', borderRadius: '0.5rem', cursor: 'pointer' }}>Voltar ao Login</button>
         </div>
       );
     }
