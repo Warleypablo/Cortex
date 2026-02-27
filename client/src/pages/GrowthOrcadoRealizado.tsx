@@ -141,6 +141,7 @@ export default function GrowthOrcadoRealizado() {
   const [selectedMonth, setSelectedMonth] = useState("2026-01");
   const [cardFilter, setCardFilter] = useState<'todos' | 'mql' | 'nao-mql'>('todos');
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
+  const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
   
   const months = [
     { value: "2026-01", label: "Janeiro 2026" },
@@ -160,9 +161,9 @@ export default function GrowthOrcadoRealizado() {
   }, [selectedMonth]);
 
   const { data: mqlData, isLoading: mqlLoading } = useQuery<MQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate, contagemFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}`);
       if (!res.ok) throw new Error('Failed to fetch MQL metrics');
       return res.json();
     },
@@ -189,9 +190,9 @@ export default function GrowthOrcadoRealizado() {
   }
 
   const { data: naoMqlData, isLoading: naoMqlLoading } = useQuery<NaoMQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate, contagemFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}`);
       if (!res.ok) throw new Error('Failed to fetch Não-MQL metrics');
       return res.json();
     },
@@ -607,6 +608,23 @@ export default function GrowthOrcadoRealizado() {
     totalSection,
   ];
 
+  // Seções filtradas pelo cardFilter (Origem: MQL / Não-MQL / Todos)
+  const filteredSections: MetricSection[] = useMemo(() => {
+    if (cardFilter === 'mql') {
+      return [
+        ...marketingSections,
+        { title: 'Métricas de Vendas: MQL', icon: <Users className="w-5 h-5" />, metrics: mqlMetrics },
+      ];
+    }
+    if (cardFilter === 'nao-mql') {
+      return [
+        ...marketingSections,
+        { title: 'Métricas de Vendas: Não-MQL', icon: <Users className="w-5 h-5" />, metrics: naoMqlMetrics },
+      ];
+    }
+    return allSections;
+  }, [cardFilter, marketingSections, mqlMetrics, naoMqlMetrics, allSections]);
+
   // Métricas amarelas para a aba Consolidado (filtradas por seção)
   const YELLOW_METRIC_IDS = new Set([
     'mql_noshow', 'mql_ticket_acel', 'mql_ticket_impl',
@@ -614,7 +632,7 @@ export default function GrowthOrcadoRealizado() {
     'total_cac_ads', 'total_ticket_acel', 'total_ticket_impl',
   ]);
 
-  const consolidadoSections: MetricSection[] = allSections
+  const consolidadoSections: MetricSection[] = filteredSections
     .map(section => ({
       ...section,
       metrics: section.metrics.filter(m => YELLOW_METRIC_IDS.has(m.id))
@@ -668,9 +686,13 @@ export default function GrowthOrcadoRealizado() {
     ? sumByCardFilter(ORCADO_MQL.contratosImplantacao, ORCADO_NAO_MQL.contratosImplantacao)
     : sumByCardFilter(ORCADO_MQL.novosClientes, ORCADO_NAO_MQL.novosClientes);
   const clientesPerc = clientesOrcado > 0 ? (clientesRealizado / clientesOrcado) * 100 : 0;
-  const clientesLabel = revenueFilter === 'recorrente' ? 'Contratos Recorrentes'
-    : revenueFilter === 'pontual' ? 'Contratos Implantação'
-    : 'Novos Clientes';
+  const clientesLabel = contagemFilter === 'cliente'
+    ? (revenueFilter === 'recorrente' ? 'Clientes Recorrentes'
+      : revenueFilter === 'pontual' ? 'Clientes Implantação'
+      : 'Novos Clientes')
+    : (revenueFilter === 'recorrente' ? 'Contratos Recorrentes'
+      : revenueFilter === 'pontual' ? 'Contratos Implantação'
+      : 'Novos Contratos');
 
   // Faturamento: usa apenas dados de tráfego (utm_source = facebook/google), reage a cardFilter + revenueFilter
   const faturamentoRealizado = revenueFilter === 'recorrente'
@@ -756,6 +778,24 @@ export default function GrowthOrcadoRealizado() {
               )}
             >
               {filter === 'todos' ? 'Todos' : filter === 'recorrente' ? 'Recorrente' : 'Pontual'}
+            </button>
+          ))}
+        </div>
+        <div className="h-5 w-px bg-border" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium mr-1">Contagem:</span>
+          {(['contrato', 'cliente'] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setContagemFilter(filter)}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-medium transition-all border",
+                contagemFilter === filter
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+              )}
+            >
+              {filter === 'contrato' ? 'Contrato' : 'Cliente'}
             </button>
           ))}
         </div>
@@ -932,8 +972,12 @@ export default function GrowthOrcadoRealizado() {
                   <LineChart className="w-5 h-5 text-orange-500" />
                 </div>
                 <div>
-                  <CardTitle className="text-base">Todas as Métricas - Orçado x Realizado</CardTitle>
-                  <CardDescription>Visão consolidada de todas as métricas de marketing e vendas</CardDescription>
+                  <CardTitle className="text-base">
+                    {cardFilter === 'mql' ? 'Métricas MQL' : cardFilter === 'nao-mql' ? 'Métricas Não-MQL' : 'Todas as Métricas'} - Orçado x Realizado
+                  </CardTitle>
+                  <CardDescription>
+                    {cardFilter === 'mql' ? 'Métricas de marketing e vendas (apenas MQL)' : cardFilter === 'nao-mql' ? 'Métricas de marketing e vendas (apenas Não-MQL)' : 'Visão consolidada de todas as métricas de marketing e vendas'}
+                  </CardDescription>
                 </div>
                 {(adsLoading || mqlLoading || naoMqlLoading) && (
                   <Loader2 className="w-4 h-4 animate-spin text-muted-foreground ml-auto" />
@@ -954,7 +998,7 @@ export default function GrowthOrcadoRealizado() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {allSections.map((section) => (
+                    {filteredSections.map((section) => (
                       section.metrics.map((metric, idx) => (
                         <TableRow 
                           key={metric.id} 
@@ -1073,6 +1117,7 @@ export default function GrowthOrcadoRealizado() {
         <TabsContent value="vendas" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* MQL */}
+            {cardFilter !== 'nao-mql' && (
             <Card className="overflow-hidden">
               <div className="h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
               <CardHeader className="pb-3">
@@ -1103,7 +1148,7 @@ export default function GrowthOrcadoRealizado() {
                         <div className="w-20">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                              <div 
+                              <div
                                 className={cn(
                                   "h-full rounded-full transition-all duration-500",
                                   metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500",
@@ -1129,8 +1174,10 @@ export default function GrowthOrcadoRealizado() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
             {/* Não-MQL */}
+            {cardFilter !== 'mql' && (
             <Card className="overflow-hidden">
               <div className="h-1 bg-gradient-to-r from-amber-500 to-orange-500" />
               <CardHeader className="pb-3">
@@ -1161,7 +1208,7 @@ export default function GrowthOrcadoRealizado() {
                         <div className="w-20">
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                              <div 
+                              <div
                                 className={cn(
                                   "h-full rounded-full transition-all duration-500",
                                   metric.percentual !== null && metric.percentual >= 100 && "bg-emerald-500",
@@ -1187,6 +1234,7 @@ export default function GrowthOrcadoRealizado() {
                 </div>
               </CardContent>
             </Card>
+            )}
           </div>
 
         </TabsContent>

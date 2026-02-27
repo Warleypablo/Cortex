@@ -5,7 +5,7 @@ import type { User } from "./userDb";
 import { getCallbackURL } from "./config";
 import { isExternalEmailAllowed, createExternalUser, EXTERNAL_USER_ROUTES } from "./userDb";
 import { db } from "../db";
-import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos, arClientes, arMetricas, arCampanhas, arCanais } from "../../shared/schema";
+import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos, arClientes, arMetricas, arCampanhas, arCanais, clientCredentials } from "../../shared/schema";
 import { eq, desc, sql, inArray, and, asc } from "drizzle-orm";
 
 // Senhas hasheadas para usuários externos (hash de "***REMOVED***")
@@ -237,10 +237,14 @@ function formatCnpj(cnpj: string): string {
 }
 
 router.post("/auth/client-login", async (req, res) => {
-  const { cnpj } = req.body;
+  const { cnpj, password } = req.body;
 
   if (!cnpj || typeof cnpj !== 'string') {
     return res.status(400).json({ message: "CNPJ é obrigatório" });
+  }
+
+  if (!password || typeof password !== 'string') {
+    return res.status(400).json({ message: "Senha é obrigatória" });
   }
 
   const raw = cleanCnpj(cnpj);
@@ -252,7 +256,6 @@ router.post("/auth/client-login", async (req, res) => {
 
   try {
     // Busca normalizando o CNPJ no banco: remove todos os não-dígitos antes de comparar
-    // Isso cobre qualquer formato que possa estar armazenado (com ou sem máscara)
     const rows = await db
       .select()
       .from(cazClientes)
@@ -268,6 +271,38 @@ router.post("/auth/client-login", async (req, res) => {
       return res.status(404).json({ message: "CNPJ não encontrado. Verifique os dados e tente novamente." });
     }
 
+    // Busca ou cria credenciais para este cliente
+    let creds = await db
+      .select()
+      .from(clientCredentials)
+      .where(eq(clientCredentials.cnpj, raw))
+      .limit(1);
+
+    if (!creds.length) {
+      // Primeira vez: cria credenciais com senha padrão
+      const defaultPassword = process.env.CLIENT_DEFAULT_PASSWORD || '***REMOVED***';
+      const hash = bcrypt.hashSync(defaultPassword, 10);
+      const [newCred] = await db
+        .insert(clientCredentials)
+        .values({
+          clientId: client.id,
+          cnpj: raw,
+          passwordHash: hash,
+          mustChangePassword: true,
+        })
+        .returning();
+      creds = [newCred];
+      console.log(`🔑 Credenciais criadas para CNPJ ${formatted} (senha padrão)`);
+    }
+
+    const credential = creds[0];
+
+    // Valida a senha
+    if (!bcrypt.compareSync(password, credential.passwordHash)) {
+      console.log(`❌ Senha incorreta para CNPJ ${formatted}`);
+      return res.status(401).json({ message: "Senha incorreta" });
+    }
+
     const clientPayload = {
       id: client.id,
       nome: client.nome,
@@ -276,6 +311,7 @@ router.post("/auth/client-login", async (req, res) => {
       telefone: client.telefone,
       endereco: client.endereco,
       ativo: client.ativo,
+      mustChangePassword: credential.mustChangePassword,
     };
 
     // Regenera a sessão para evitar interferência do Passport com sessões internas
@@ -292,7 +328,7 @@ router.post("/auth/client-login", async (req, res) => {
           console.error("Erro ao salvar sessão do cliente:", saveErr);
           return res.status(500).json({ message: "Erro ao salvar sessão" });
         }
-        console.log(`✅ Login de cliente bem-sucedido: ${client.nome} (${client.cnpj}) sessionId=${req.sessionID}`);
+        console.log(`✅ Login de cliente bem-sucedido: ${client.nome} (${client.cnpj}) mustChangePassword=${credential.mustChangePassword} sessionId=${req.sessionID}`);
         res.json({ message: "Login realizado com sucesso", client: clientPayload });
       });
     });
@@ -302,13 +338,94 @@ router.post("/auth/client-login", async (req, res) => {
   }
 });
 
-router.get("/api/auth/client-me", (req, res) => {
-  const sessionKeys = Object.keys(req.session);
+// Troca de senha do cliente (obrigatória no primeiro login)
+router.post("/api/auth/client-change-password", async (req, res) => {
   const clientData = (req.session as any).clientData;
-  console.log(`🔍 /api/auth/client-me → sessionId=${req.sessionID} keys=[${sessionKeys.join(',')}] clientData=${clientData ? JSON.stringify(clientData.cnpj) : 'null'}`);
   if (!clientData) {
     return res.status(401).json({ message: "Não autenticado como cliente" });
   }
+
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || typeof currentPassword !== 'string') {
+    return res.status(400).json({ message: "Senha atual é obrigatória" });
+  }
+  if (!newPassword || typeof newPassword !== 'string') {
+    return res.status(400).json({ message: "Nova senha é obrigatória" });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: "A nova senha deve ter no mínimo 6 caracteres" });
+  }
+  if (currentPassword === newPassword) {
+    return res.status(400).json({ message: "A nova senha deve ser diferente da atual" });
+  }
+
+  const raw = cleanCnpj(clientData.cnpj || '');
+
+  try {
+    const creds = await db
+      .select()
+      .from(clientCredentials)
+      .where(eq(clientCredentials.cnpj, raw))
+      .limit(1);
+
+    if (!creds.length) {
+      return res.status(404).json({ message: "Credenciais não encontradas" });
+    }
+
+    const credential = creds[0];
+
+    if (!bcrypt.compareSync(currentPassword, credential.passwordHash)) {
+      return res.status(401).json({ message: "Senha atual incorreta" });
+    }
+
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    await db
+      .update(clientCredentials)
+      .set({
+        passwordHash: newHash,
+        mustChangePassword: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(clientCredentials.id, credential.id));
+
+    // Atualiza sessão
+    (req.session as any).clientData.mustChangePassword = false;
+    req.session.save((err) => {
+      if (err) console.error("Erro ao salvar sessão após troca de senha:", err);
+    });
+
+    console.log(`🔑 Senha alterada com sucesso: cliente id=${clientData.id} CNPJ=${raw}`);
+    res.json({ message: "Senha alterada com sucesso" });
+  } catch (error) {
+    console.error("Erro ao alterar senha do cliente:", error);
+    return res.status(500).json({ message: "Erro ao alterar senha" });
+  }
+});
+
+router.get("/api/auth/client-me", async (req, res) => {
+  const clientData = (req.session as any).clientData;
+  if (!clientData) {
+    return res.status(401).json({ message: "Não autenticado como cliente" });
+  }
+
+  // Sempre busca o estado atual de mustChangePassword do banco
+  try {
+    const raw = cleanCnpj(clientData.cnpj || '');
+    if (raw.length === 14) {
+      const creds = await db
+        .select({ mustChangePassword: clientCredentials.mustChangePassword })
+        .from(clientCredentials)
+        .where(eq(clientCredentials.cnpj, raw))
+        .limit(1);
+      if (creds.length) {
+        clientData.mustChangePassword = creds[0].mustChangePassword;
+      }
+    }
+  } catch (e) {
+    // Se falhar a consulta, usa o valor da sessão
+  }
+
   res.json(clientData);
 });
 

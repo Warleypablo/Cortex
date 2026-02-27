@@ -35,7 +35,6 @@ const VisaoGeral = lazy(() => import("@/pages/VisaoGeral"));
 const DashboardFinanceiro = lazy(() => import("@/pages/DashboardFinanceiro"));
 const DashboardGeG = lazy(() => import("@/pages/DashboardGeG"));
 const CalendarioFerias = lazy(() => import("@/pages/CalendarioFerias"));
-const ChurnVisaoGeral = lazy(() => import("@/pages/ChurnVisaoGeral"));
 const ChurnDetalhamento = lazy(() => import("@/pages/ChurnDetalhamento"));
 const ChurnPredicao = lazy(() => import("@/pages/ChurnPredicao"));
 const ContratosDetalhamento = lazy(() => import("@/pages/ContratosDetalhamento"));
@@ -96,6 +95,7 @@ const ContratosModule = lazy(() => import("@/pages/ContratosModule"));
 const MargemCliente = lazy(() => import("@/pages/MargemCliente"));
 const AnaliseSquads = lazy(() => import("@/pages/AnaliseSquads"));
 const AutoReport = lazy(() => import("@/pages/AutoReport"));
+const Chamados = lazy(() => import("@/pages/Chamados"));
 const PortalCliente = PortalClientePage;
 const NotFound = lazy(() => import("@/pages/not-found"));
 
@@ -218,11 +218,11 @@ function ProtectedRouter() {
       <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
       <Route path="/sugestoes">{() => <ProtectedRoute path="/sugestoes" component={Sugestoes} />}</Route>
       <Route path="/processos-internos">{() => <ProtectedRoute path="/processos-internos" component={ProcessosInternos} />}</Route>
+      <Route path="/chamados">{() => <ProtectedRoute path="/chamados" component={Chamados} />}</Route>
       <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       
       {/* Operação */}
       <Route path="/visao-geral">{() => <ProtectedRoute path="/visao-geral" component={VisaoGeral} />}</Route>
-      <Route path="/dashboard/churn-visao-geral">{() => <ProtectedRoute path="/dashboard/churn-visao-geral" component={ChurnVisaoGeral} />}</Route>
       <Route path="/dashboard/churn-detalhamento">{() => <ProtectedRoute path="/dashboard/churn-detalhamento" component={ChurnDetalhamento} />}</Route>
       <Route path="/dashboard/churn-predicao">{() => <ProtectedRoute path="/dashboard/churn-predicao" component={ChurnPredicao} />}</Route>
       <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>

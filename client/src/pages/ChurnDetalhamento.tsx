@@ -29,7 +29,14 @@ import {
   Building2,
   Users,
   Pause,
-  CalendarRange
+  CalendarRange,
+  Brain,
+  MessageSquare,
+  GitBranch,
+  Lightbulb,
+  Shield,
+  Hash,
+  Megaphone
 } from "lucide-react";
 import {
   Table,
@@ -185,6 +192,69 @@ const formatCurrencyNoDecimals = (value: number) => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(value);
+};
+
+// === Voz do Cliente: Constants & Helpers ===
+
+const EXPANDED_KEYWORDS: Record<string, string[]> = {
+  'Resultado': ['resultado', 'performance', 'meta', 'retorno', 'roi', 'entrega'],
+  'Preço': ['preco', 'valor', 'custo', 'caro', 'investimento', 'orcamento', 'budget'],
+  'Atendimento': ['atendimento', 'suporte', 'resposta', 'demora', 'comunicacao', 'contato'],
+  'Operação': ['operacao', 'operacional', 'execucao', 'qualidade', 'erro', 'falha'],
+  'Estratégia': ['estrategia', 'estrategico', 'planejamento', 'direcionamento', 'alinhamento'],
+  'Interno': ['interno', 'reestruturacao', 'mudanca interna', 'corte', 'reducao'],
+  'Concorrência': ['concorrencia', 'concorrente', 'agencia', 'inhouse', 'in-house'],
+  'Prazo': ['prazo', 'tempo', 'urgencia', 'deadline', 'atraso', 'lento'],
+  'Produto': ['produto', 'ferramenta', 'plataforma', 'funcionalidade', 'feature', 'sistema'],
+  'Confiança': ['confianca', 'credibilidade', 'transparencia', 'honestidade', 'seguranca'],
+  'Onboarding': ['onboarding', 'implantacao', 'inicio', 'setup', 'treinamento', 'integracao'],
+  'Relacionamento': ['relacionamento', 'parceria', 'proximidade', 'dedicacao', 'empatia', 'cuidado'],
+};
+
+const normalizeText = (text: string): string =>
+  text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+const highlightKeywords = (text: string, keywords: string[]): React.ReactNode => {
+  if (!text || keywords.length === 0) return text;
+  const normalizedText = normalizeText(text);
+  const segments: { start: number; end: number }[] = [];
+
+  keywords.forEach(kw => {
+    const normalizedKw = normalizeText(kw);
+    let idx = normalizedText.indexOf(normalizedKw);
+    while (idx !== -1) {
+      segments.push({ start: idx, end: idx + normalizedKw.length });
+      idx = normalizedText.indexOf(normalizedKw, idx + 1);
+    }
+  });
+
+  if (segments.length === 0) return text;
+
+  // Merge overlapping segments
+  segments.sort((a, b) => a.start - b.start);
+  const merged: { start: number; end: number }[] = [segments[0]];
+  for (let i = 1; i < segments.length; i++) {
+    const last = merged[merged.length - 1];
+    if (segments[i].start <= last.end) {
+      last.end = Math.max(last.end, segments[i].end);
+    } else {
+      merged.push(segments[i]);
+    }
+  }
+
+  const parts: React.ReactNode[] = [];
+  let lastEnd = 0;
+  merged.forEach((seg, i) => {
+    if (seg.start > lastEnd) parts.push(text.slice(lastEnd, seg.start));
+    parts.push(
+      <mark key={i} className="bg-yellow-200 dark:bg-yellow-900/60 rounded px-0.5">
+        {text.slice(seg.start, seg.end)}
+      </mark>
+    );
+    lastEnd = seg.end;
+  });
+  if (lastEnd < text.length) parts.push(text.slice(lastEnd));
+  return <>{parts}</>;
 };
 
 const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
@@ -393,6 +463,18 @@ export default function ChurnDetalhamento() {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Fechado por padrão, dados principais no hero
   const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
   const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio">("analise");
+  const [crossAnalysisView, setCrossAnalysisView] = useState<"motivo" | "cluster" | "plano">("motivo");
+  const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
+  const [analysisSubTab, setAnalysisSubTab] = useState<"resumo" | "distribuicao" | "inteligencia">("resumo");
+
+  // Voz do Cliente states
+  const [muralSortBy, setMuralSortBy] = useState<"mrr" | "date">("mrr");
+  const [muralFilterSentiment, setMuralFilterSentiment] = useState<string | null>(null);
+  const [muralFilterTheme, setMuralFilterTheme] = useState<string | null>(null);
+  const [muralExpandedId, setMuralExpandedId] = useState<string | null>(null);
+  const [selectedThemeKeyword, setSelectedThemeKeyword] = useState<string | null>(null);
+  const [expandedOpTheme, setExpandedOpTheme] = useState<string | null>(null);
+  const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery<ChurnDetalhamentoData>({
     queryKey: ["/api/analytics/churn-detalhamento", dataInicio, dataFim],
@@ -965,6 +1047,353 @@ export default function ChurnDetalhamento() {
       .slice(0, 10);
   }, [filteredContratos]);
 
+  // Feature 1: Churn DNA Tags helper
+  const getChurnDNATags = (contrato: ChurnContract) => {
+    const tags: { label: string; value: string; color: string }[] = [];
+    if (contrato.evitabilidade_churn) {
+      tags.push({
+        label: "Evitabilidade",
+        value: contrato.evitabilidade_churn,
+        color: contrato.evitabilidade_churn === 'Evitável'
+          ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
+          : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+      });
+    }
+    if (contrato.possibilidade_retencao) {
+      const retColor = contrato.possibilidade_retencao === 'Alta'
+        ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
+        : contrato.possibilidade_retencao === 'Média'
+        ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
+        : 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
+      tags.push({ label: "Retenção", value: contrato.possibilidade_retencao, color: retColor });
+    }
+    if (contrato.cluster) {
+      tags.push({ label: "Cluster", value: contrato.cluster, color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' });
+    }
+    if (contrato.plano) {
+      tags.push({ label: "Plano", value: contrato.plano, color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-800' });
+    }
+    if (contrato.motivo_cancelamento && contrato.motivo_cancelamento !== 'Não especificado') {
+      tags.push({ label: "Motivo", value: contrato.motivo_cancelamento, color: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' });
+    }
+    if (contrato.submotivo) {
+      tags.push({ label: "Submotivo", value: contrato.submotivo, color: 'bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800' });
+    }
+    return tags;
+  };
+
+  // Feature 2: Análise de Padrões de Texto (mensagem_cliente)
+  const textPatternAnalysis = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+
+    const results: { keyword: string; count: number; mrr: number; evitavelPct: number; contratos: string[]; matchedContratos: ChurnContract[] }[] = [];
+
+    Object.entries(EXPANDED_KEYWORDS).forEach(([keyword, terms]) => {
+      const matched = filteredContratos.filter(c => {
+        const msg = normalizeText(c.mensagem_cliente || '');
+        return terms.some(t => msg.includes(t));
+      });
+      if (matched.length > 0) {
+        const evitavel = matched.filter(c => c.evitabilidade_churn === 'Evitável').length;
+        results.push({
+          keyword,
+          count: matched.length,
+          mrr: matched.reduce((sum, c) => sum + (c.valorr || 0), 0),
+          evitavelPct: matched.length > 0 ? (evitavel / matched.length) * 100 : 0,
+          contratos: matched.map(c => c.cliente_nome).slice(0, 5),
+          matchedContratos: matched,
+        });
+      }
+    });
+
+    return results.sort((a, b) => b.count - a.count);
+  }, [filteredContratos]);
+
+  // Feature 3: Drill-down Motivo → Submotivo
+  const motivoSubmotivoTree = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+
+    const tree: Record<string, { count: number; mrr: number; submotivos: Record<string, { count: number; mrr: number }> }> = {};
+
+    filteredContratos.forEach(c => {
+      const motivo = c.motivo_cancelamento || 'Não especificado';
+      if (!tree[motivo]) tree[motivo] = { count: 0, mrr: 0, submotivos: {} };
+      tree[motivo].count++;
+      tree[motivo].mrr += c.valorr || 0;
+
+      const sub = c.submotivo || 'Sem submotivo';
+      if (!tree[motivo].submotivos[sub]) tree[motivo].submotivos[sub] = { count: 0, mrr: 0 };
+      tree[motivo].submotivos[sub].count++;
+      tree[motivo].submotivos[sub].mrr += c.valorr || 0;
+    });
+
+    return Object.entries(tree)
+      .map(([motivo, data]) => ({
+        motivo,
+        count: data.count,
+        mrr: data.mrr,
+        submotivos: Object.entries(data.submotivos)
+          .map(([sub, info]) => ({ submotivo: sub, count: info.count, mrr: info.mrr }))
+          .sort((a, b) => b.mrr - a.mrr),
+      }))
+      .sort((a, b) => b.mrr - a.mrr);
+  }, [filteredContratos]);
+
+  // Feature 4: Matriz Cruzada (Evitabilidade × Motivo/Cluster/Plano)
+  const crossAnalysisData = useMemo(() => {
+    if (filteredContratos.length === 0) return [];
+
+    const getDimension = (c: ChurnContract) => {
+      switch (crossAnalysisView) {
+        case 'motivo': return c.motivo_cancelamento || 'Não especificado';
+        case 'cluster': return c.cluster || 'Não especificado';
+        case 'plano': return c.plano || 'Não especificado';
+      }
+    };
+
+    const groups: Record<string, { evitavel: number; inevitavel: number; mrrEvitavel: number; mrrInevitavel: number }> = {};
+
+    filteredContratos.forEach(c => {
+      const dim = getDimension(c);
+      if (!groups[dim]) groups[dim] = { evitavel: 0, inevitavel: 0, mrrEvitavel: 0, mrrInevitavel: 0 };
+      if (c.evitabilidade_churn === 'Evitável') {
+        groups[dim].evitavel++;
+        groups[dim].mrrEvitavel += c.valorr || 0;
+      } else {
+        groups[dim].inevitavel++;
+        groups[dim].mrrInevitavel += c.valorr || 0;
+      }
+    });
+
+    return Object.entries(groups)
+      .map(([name, data]) => ({
+        name: name.length > 20 ? name.substring(0, 20) + '...' : name,
+        fullName: name,
+        evitavel: data.evitavel,
+        inevitavel: data.inevitavel,
+        mrrEvitavel: data.mrrEvitavel,
+        mrrInevitavel: data.mrrInevitavel,
+        total: data.evitavel + data.inevitavel,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+  }, [filteredContratos, crossAnalysisView]);
+
+  // Feature 5: Cards de Contexto (Operação + CX)
+  const contextThemes = useMemo(() => {
+    if (filteredContratos.length === 0) return { operacao: [], cx: [] };
+
+    const opThemes: Record<string, string[]> = {
+      'Falha de Comunicação': ['comunicação', 'contato', 'resposta', 'alinhamento', 'informação'],
+      'Erro Operacional': ['erro', 'falha', 'bug', 'problema técnico', 'incorreto'],
+      'Atraso': ['atraso', 'demora', 'prazo', 'lento', 'demorou'],
+      'Falta de Acompanhamento': ['acompanhamento', 'follow', 'proativo', 'abandonado', 'negligência'],
+      'Turnover': ['turnover', 'troca', 'saiu', 'mudança de equipe', 'rotatividade'],
+      'Qualidade': ['qualidade', 'entrega', 'padrão', 'expectativa', 'insatisf'],
+    };
+
+    const cxThemes: Record<string, string[]> = {
+      'Insatisfação Geral': ['insatisf', 'frustrad', 'descontente', 'chateado', 'decepcion'],
+      'Falta de Resultado': ['resultado', 'retorno', 'meta', 'roi', 'performance'],
+      'Problema de Comunicação': ['comunicação', 'contato', 'resposta', 'demora', 'suporte'],
+      'Questão Financeira': ['preço', 'custo', 'valor', 'caro', 'investimento', 'orçamento'],
+      'Mudança de Estratégia': ['estratégia', 'mudança', 'reestrutur', 'direcionamento', 'interno'],
+      'Concorrência': ['concorrência', 'concorrente', 'agência', 'inhouse', 'proposta'],
+    };
+
+    const analyzeContext = (field: 'contexto_operacao' | 'contexto_cx', themes: Record<string, string[]>) => {
+      const results: { theme: string; count: number; mrr: number; examples: string[]; matchedContratos: ChurnContract[] }[] = [];
+
+      Object.entries(themes).forEach(([theme, terms]) => {
+        const matched = filteredContratos.filter(c => {
+          const text = (c[field] || '').toLowerCase();
+          return text.length > 0 && terms.some(t => text.includes(t));
+        });
+        if (matched.length > 0) {
+          results.push({
+            theme,
+            count: matched.length,
+            mrr: matched.reduce((sum, c) => sum + (c.valorr || 0), 0),
+            examples: matched.map(c => (c[field] || '').substring(0, 80)).slice(0, 3),
+            matchedContratos: matched,
+          });
+        }
+      });
+
+      return results.sort((a, b) => b.count - a.count);
+    };
+
+    return {
+      operacao: analyzeContext('contexto_operacao', opThemes),
+      cx: analyzeContext('contexto_cx', cxThemes),
+    };
+  }, [filteredContratos]);
+
+  // Feature 6: Score de Oportunidade de Retenção
+  const retentionOpportunities = useMemo(() => {
+    if (filteredContratos.length === 0) return { scored: [], totalMissed: 0, mrrMissed: 0, avgScore: 0 };
+
+    const scored = filteredContratos.map(c => {
+      let score = 0;
+
+      // Possibilidade de retenção (0-30 pts)
+      if (c.possibilidade_retencao === 'Alta') score += 30;
+      else if (c.possibilidade_retencao === 'Média') score += 20;
+      else if (c.possibilidade_retencao === 'Baixa') score += 5;
+
+      // Evitabilidade (0-25 pts)
+      if (c.evitabilidade_churn === 'Evitável') score += 25;
+
+      // Lifetime (0-15 pts)
+      if (c.lifetime_meses >= 12) score += 15;
+      else if (c.lifetime_meses >= 6) score += 10;
+
+      // MRR alto (0-20 pts) - escala relativa
+      const maxMrr = Math.max(...filteredContratos.map(x => x.valorr || 0), 1);
+      score += Math.round(((c.valorr || 0) / maxMrr) * 20);
+
+      // Tem mensagem_cliente (10 pts)
+      if (c.mensagem_cliente && c.mensagem_cliente.trim().length > 0) score += 10;
+
+      const isMissedOpportunity = c.evitabilidade_churn === 'Evitável' &&
+        (c.possibilidade_retencao === 'Alta' || c.possibilidade_retencao === 'Média');
+
+      return { ...c, score: Math.min(score, 100), isMissedOpportunity };
+    }).sort((a, b) => b.score - a.score);
+
+    const missed = scored.filter(c => c.isMissedOpportunity);
+    const avgScore = scored.length > 0 ? scored.reduce((sum, c) => sum + c.score, 0) / scored.length : 0;
+
+    return {
+      scored,
+      totalMissed: missed.length,
+      mrrMissed: missed.reduce((sum, c) => sum + (c.valorr || 0), 0),
+      avgScore,
+    };
+  }, [filteredContratos]);
+
+  // === Voz do Cliente: Análise IA ===
+
+  // Mensagens que têm texto real
+  const contratosComMensagem = useMemo(() =>
+    filteredContratos.filter(c => c.mensagem_cliente && c.mensagem_cliente.trim().length > 0),
+    [filteredContratos]
+  );
+
+  // Payload para a IA — só monta quando tem mensagens
+  const aiPayload = useMemo(() => {
+    if (contratosComMensagem.length === 0) return null;
+    return contratosComMensagem.map(c => ({
+      id: c.id,
+      cliente: c.cliente_nome,
+      mensagem: c.mensagem_cliente!,
+      motivo: c.motivo_cancelamento || undefined,
+      mrr: c.valorr || 0,
+    }));
+  }, [contratosComMensagem]);
+
+  // Chamada à IA
+  const { data: aiAnalysis, isLoading: aiLoading, error: aiError, refetch: refetchAI } = useQuery<{
+    analises: { id: string; sentimento: string; temas: string[]; resumo: string }[];
+    sintese: { principal_motivo: string; padrao_critico: string; recomendacao: string };
+  }>({
+    queryKey: ["/api/analytics/churn-mensagens-ai", aiPayload?.map(m => m.id).sort().join(',')],
+    queryFn: async () => {
+      const res = await fetch("/api/analytics/churn-mensagens-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mensagens: aiPayload }),
+      });
+      if (!res.ok) throw new Error("Falha na análise IA");
+      return res.json();
+    },
+    enabled: !!aiPayload && aiPayload.length > 0,
+    staleTime: 1000 * 60 * 30, // 30 min cache
+    retry: 1,
+  });
+
+  // Mapas derivados da análise IA
+  const aiByContract = useMemo(() => {
+    const map = new Map<string, { sentimento: string; temas: string[]; resumo: string }>();
+    if (!aiAnalysis?.analises) return map;
+    aiAnalysis.analises.forEach(a => map.set(a.id, a));
+    return map;
+  }, [aiAnalysis]);
+
+  // Distribuição de sentimento a partir da IA
+  const sentimentDistribution = useMemo(() => {
+    if (!aiAnalysis?.analises) return [];
+    let neg = 0, neu = 0, pos = 0;
+    let mrrNeg = 0, mrrNeu = 0, mrrPos = 0;
+
+    aiAnalysis.analises.forEach(a => {
+      const c = contratosComMensagem.find(x => x.id === a.id);
+      const mrr = c?.valorr || 0;
+      if (a.sentimento === 'negativo') { neg++; mrrNeg += mrr; }
+      else if (a.sentimento === 'positivo') { pos++; mrrPos += mrr; }
+      else { neu++; mrrNeu += mrr; }
+    });
+
+    const result: { sentiment: string; count: number; mrr: number; color: string }[] = [];
+    if (neg > 0) result.push({ sentiment: 'Negativo', count: neg, mrr: mrrNeg, color: '#ef4444' });
+    if (neu > 0) result.push({ sentiment: 'Neutro', count: neu, mrr: mrrNeu, color: '#94a3b8' });
+    if (pos > 0) result.push({ sentiment: 'Positivo', count: pos, mrr: mrrPos, color: '#22c55e' });
+    return result;
+  }, [aiAnalysis, contratosComMensagem]);
+
+  // Distribuição de temas a partir da IA
+  const themeDistribution = useMemo(() => {
+    if (!aiAnalysis?.analises) return [];
+    const themes: Record<string, { count: number; mrr: number }> = {};
+
+    aiAnalysis.analises.forEach(a => {
+      const c = contratosComMensagem.find(x => x.id === a.id);
+      const mrr = c?.valorr || 0;
+      (a.temas || []).forEach(t => {
+        if (!themes[t]) themes[t] = { count: 0, mrr: 0 };
+        themes[t].count++;
+        themes[t].mrr += mrr;
+      });
+    });
+
+    return Object.entries(themes)
+      .map(([theme, data]) => ({ theme, ...data }))
+      .sort((a, b) => b.count - a.count);
+  }, [aiAnalysis, contratosComMensagem]);
+
+  // Mural filtrado
+  const muralMessages = useMemo(() => {
+    let msgs = contratosComMensagem.map(c => {
+      const ai = aiByContract.get(c.id);
+      return {
+        ...c,
+        sentiment: ai?.sentimento || 'neutro',
+        temas: ai?.temas || [],
+        resumo: ai?.resumo || '',
+      };
+    });
+
+    if (muralFilterSentiment) {
+      msgs = msgs.filter(m => m.sentiment === muralFilterSentiment);
+    }
+
+    if (muralFilterTheme) {
+      msgs = msgs.filter(m => m.temas.includes(muralFilterTheme));
+    }
+
+    if (muralSortBy === 'mrr') {
+      msgs.sort((a, b) => (b.valorr || 0) - (a.valorr || 0));
+    } else {
+      msgs.sort((a, b) => {
+        const da = a.data_encerramento || a.data_pausa || '';
+        const db = b.data_encerramento || b.data_pausa || '';
+        return db.localeCompare(da);
+      });
+    }
+
+    return msgs;
+  }, [contratosComMensagem, aiByContract, muralFilterSentiment, muralFilterTheme, muralSortBy]);
+
   // Distribuição por faixa de ticket (MRR)
   const distribuicaoPorTicket = useMemo(() => {
     if (filteredContratos.length === 0) return [];
@@ -1329,6 +1758,29 @@ export default function ChurnDetalhamento() {
       ) : mainTab === "analise" ? (
       <>
 
+      {/* Sub-abas da Análise */}
+      <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40 w-fit">
+        {([
+          { key: "resumo", label: "Resumo" },
+          { key: "distribuicao", label: "Distribuição" },
+          { key: "inteligencia", label: "Inteligência" },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setAnalysisSubTab(tab.key)}
+            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+              analysisSubTab === tab.key
+                ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {analysisSubTab === "resumo" && (
+      <>
       {/* Painel Executivo Hero - Taxa de Churn */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
         <Card className="relative overflow-hidden border-2 border-red-200/50 dark:border-red-900/30 bg-gradient-to-br from-slate-50 via-white to-red-50/30 dark:from-zinc-900 dark:via-zinc-900 dark:to-red-950/20">
@@ -1671,6 +2123,76 @@ export default function ChurnDetalhamento() {
         </Card>
       )}
 
+      {/* Top Clientes Perdidos - movido para sub-aba Resumo */}
+      {!isLoading && topClientesPerdidos.length > 0 && (
+        <Card className="border-red-200 dark:border-red-900/40">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 shadow-lg">
+                <TrendingDown className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Top 10 Clientes Perdidos</CardTitle>
+                <CardDescription>Maior impacto financeiro no período</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">#</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Produto</TableHead>
+                    <TableHead>Squad</TableHead>
+                    <TableHead className="text-right">MRR</TableHead>
+                    <TableHead className="text-right">LTV</TableHead>
+                    <TableHead className="text-center">Lifetime</TableHead>
+                    <TableHead>Data Saída</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {topClientesPerdidos.map((c, idx) => (
+                    <TableRow key={c.id} data-testid={`row-top-cliente-${idx}`}>
+                      <TableCell>
+                        <Badge variant={idx < 3 ? "destructive" : "secondary"} className="font-bold">
+                          {idx + 1}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <span className="font-medium">{c.cliente_nome}</span>
+                          {c.cnpj && <p className="text-xs text-muted-foreground">{c.cnpj}</p>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">{c.produto}</TableCell>
+                      <TableCell className="text-sm">{c.squad}</TableCell>
+                      <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
+                        {formatCurrency(c.valorr)}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatCurrencyNoDecimals(c.ltv)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline">{c.lifetime_meses.toFixed(1)}m</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(c.data_encerramento)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      </>
+      )}
+
+      {analysisSubTab === "distribuicao" && (
+      <>
       <SectionBlock
         title="Volume e Mix"
         subtitle="Como o churn se distribui no periodo"
@@ -2191,153 +2713,12 @@ export default function ChurnDetalhamento() {
         </TechChartCard>
       </div>
       </SectionBlock>
+      </>
+      )}
 
-      {/* Análise de Churn por Tipo de Erro */}
-      <Card className="border-orange-200 dark:border-orange-900/40">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 shadow-lg">
-                <AlertTriangle className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Churn por Tipo de Erro</CardTitle>
-                <CardDescription>Erro Operacional, Indireto e Falta de Resultado</CardDescription>
-              </div>
-            </div>
-            {churnPorTipoErro.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {churnPorTipoErro.map((tipo) => (
-                  <Button
-                    key={tipo.tipo}
-                    variant={tipoErroSelecionado === tipo.tipo || (!tipoErroSelecionado && tipo.tipo === churnPorTipoErro[0]?.tipo) ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTipoErroSelecionado(tipo.tipo)}
-                    data-testid={`btn-tipo-erro-${tipo.tipo.toLowerCase().replace(/\s+/g, '-')}`}
-                    className="text-xs"
-                  >
-                    {tipo.tipo}
-                    <Badge variant="secondary" className="ml-1.5 text-[10px]">{tipo.count}</Badge>
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <Skeleton className="h-[320px] w-full" />
-          ) : churnPorTipoErro.length === 0 ? (
-            <div className="h-[320px] flex items-center justify-center text-muted-foreground text-sm">
-              Nenhum dado de erro operacional encontrado no período
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Resumo do tipo selecionado */}
-              {(() => {
-                const tipoAtual = churnPorTipoErro.find(t => t.tipo === tipoErroSelecionado) || churnPorTipoErro[0];
-                if (!tipoAtual) return null;
-                return (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{tipoAtual.count}</p>
-                      <p className="text-xs text-muted-foreground">Contratos</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrencyNoDecimals(tipoAtual.mrr)}</p>
-                      <p className="text-xs text-muted-foreground">MRR Perdido</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">{Object.keys(tipoAtual.porSquad).length}</p>
-                      <p className="text-xs text-muted-foreground">Squads Afetados</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-foreground">{Object.keys(tipoAtual.porResponsavel).length}</p>
-                      <p className="text-xs text-muted-foreground">Responsáveis</p>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Tabs de visualização */}
-              <div className="flex items-center gap-2 border-b border-gray-200 dark:border-zinc-700 pb-2">
-                {[
-                  { key: 'squad', label: 'Por Squad' },
-                  { key: 'responsavel', label: 'Por Responsável' },
-                  { key: 'vendedor', label: 'Por Vendedor' },
-                  { key: 'cs_responsavel', label: 'Por CS' }
-                ].map(tab => (
-                  <Button
-                    key={tab.key}
-                    variant={tipoErroTab === tab.key ? 'secondary' : 'ghost'}
-                    size="sm"
-                    onClick={() => setTipoErroTab(tab.key as any)}
-                    data-testid={`tab-tipo-erro-${tab.key}`}
-                    className="text-xs"
-                  >
-                    {tab.label}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Lista de ranking */}
-              <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                {dadosTipoErroAtual.length === 0 ? (
-                  <div className="text-center text-muted-foreground text-sm py-8">
-                    Nenhum dado disponível para esta visualização
-                  </div>
-                ) : (
-                  dadosTipoErroAtual.map((item, index) => {
-                    const maxMrr = Math.max(...dadosTipoErroAtual.map(d => d.mrr));
-                    const percentage = maxMrr > 0 ? (item.mrr / maxMrr) * 100 : 0;
-                    const isTop3 = index < 3;
-                    const medalColors = ['bg-amber-500', 'bg-gray-400', 'bg-amber-700'];
-                    
-                    return (
-                      <div 
-                        key={item.fullName}
-                        data-testid={`tipo-erro-item-${index}`}
-                        className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                          isTop3 
-                            ? 'bg-orange-50/80 dark:bg-orange-950/40 border border-orange-100 dark:border-orange-900/50' 
-                            : 'bg-gray-50/50 dark:bg-zinc-900/30 border border-gray-100/50 dark:border-zinc-800/50'
-                        }`}
-                      >
-                        <div className="w-6 text-center flex-shrink-0">
-                          {isTop3 ? (
-                            <div className={`w-5 h-5 rounded-full ${medalColors[index]} flex items-center justify-center`}>
-                              <span className="text-[10px] font-bold text-white">{index + 1}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs font-medium text-muted-foreground">{index + 1}º</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="text-sm font-medium truncate" title={item.fullName}>{item.fullName}</span>
-                            <div className="flex items-center gap-3 text-sm">
-                              <span className="text-muted-foreground">{item.count} contratos</span>
-                              <span className="font-bold text-red-600 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(item.mrr)}</span>
-                            </div>
-                          </div>
-                          <div className="h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
-                              style={{ width: `${percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Nova Seção: Evitabilidade, Cluster, Plano */}
+      {analysisSubTab === "inteligencia" && (
+      <>
+      {/* Inteligência de Churn: Evitabilidade, Cluster, Plano */}
       {!isLoading && data?.metricas && (
         <SectionBlock
           title="Inteligência de Churn"
@@ -2482,72 +2863,980 @@ export default function ChurnDetalhamento() {
         </SectionBlock>
       )}
 
-      {/* Top Clientes Perdidos */}
-      {!isLoading && topClientesPerdidos.length > 0 && (
-        <Card className="border-red-200 dark:border-red-900/40">
-          <CardHeader className="pb-3">
+      {/* Churn por Tipo de Erro - movido para sub-aba Inteligência */}
+      <Card className="border-orange-200 dark:border-orange-900/40">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 shadow-lg">
-                <TrendingDown className="h-5 w-5 text-white" />
+              <div className="p-2 rounded-lg bg-gradient-to-r from-orange-500 to-red-500 shadow-lg">
+                <AlertTriangle className="h-5 w-5 text-white" />
               </div>
               <div>
-                <CardTitle className="text-base">Top 10 Clientes Perdidos</CardTitle>
-                <CardDescription>Maior impacto financeiro no período</CardDescription>
+                <CardTitle className="text-base">Churn por Tipo de Erro</CardTitle>
+                <CardDescription>Erro Operacional, Indireto e Falta de Resultado</CardDescription>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">#</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Squad</TableHead>
-                    <TableHead className="text-right">MRR</TableHead>
-                    <TableHead className="text-right">LTV</TableHead>
-                    <TableHead className="text-center">Lifetime</TableHead>
-                    <TableHead>Data Saída</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {topClientesPerdidos.map((c, idx) => (
-                    <TableRow key={c.id} data-testid={`row-top-cliente-${idx}`}>
-                      <TableCell>
-                        <Badge variant={idx < 3 ? "destructive" : "secondary"} className="font-bold">
-                          {idx + 1}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <span className="font-medium">{c.cliente_nome}</span>
-                          {c.cnpj && <p className="text-xs text-muted-foreground">{c.cnpj}</p>}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{c.produto}</TableCell>
-                      <TableCell className="text-sm">{c.squad}</TableCell>
-                      <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
-                        {formatCurrency(c.valorr)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatCurrencyNoDecimals(c.ltv)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">{c.lifetime_meses.toFixed(1)}m</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(c.data_encerramento)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            {churnPorTipoErro.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {churnPorTipoErro.map((tipo) => (
+                  <Button
+                    key={tipo.tipo}
+                    variant={tipoErroSelecionado === tipo.tipo || (!tipoErroSelecionado && tipo.tipo === churnPorTipoErro[0]?.tipo) ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTipoErroSelecionado(tipo.tipo)}
+                    data-testid={`btn-tipo-erro-${tipo.tipo.toLowerCase().replace(/\s+/g, '-')}`}
+                    className="text-xs"
+                  >
+                    {tipo.tipo}
+                    <Badge variant="secondary" className="ml-1.5 text-[10px]">{tipo.count}</Badge>
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-[320px] w-full" />
+          ) : churnPorTipoErro.length === 0 ? (
+            <div className="h-[320px] flex items-center justify-center text-muted-foreground text-sm">
+              Nenhum dado de erro operacional encontrado no período
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            <div className="space-y-4">
+              {/* Resumo do tipo selecionado */}
+              {(() => {
+                const tipoAtual = churnPorTipoErro.find(t => t.tipo === tipoErroSelecionado) || churnPorTipoErro[0];
+                if (!tipoAtual) return null;
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{tipoAtual.count}</p>
+                      <p className="text-xs text-muted-foreground">Contratos</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">{formatCurrencyNoDecimals(tipoAtual.mrr)}</p>
+                      <p className="text-xs text-muted-foreground">MRR Perdido</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{Object.keys(tipoAtual.porSquad).length}</p>
+                      <p className="text-xs text-muted-foreground">Squads Afetados</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-foreground">{Object.keys(tipoAtual.porResponsavel).length}</p>
+                      <p className="text-xs text-muted-foreground">Responsáveis</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tabs de visualização */}
+              <div className="flex items-center gap-2 border-b border-gray-200 dark:border-zinc-700 pb-2">
+                {[
+                  { key: 'squad', label: 'Por Squad' },
+                  { key: 'responsavel', label: 'Por Responsável' },
+                  { key: 'vendedor', label: 'Por Vendedor' },
+                  { key: 'cs_responsavel', label: 'Por CS' }
+                ].map(tab => (
+                  <Button
+                    key={tab.key}
+                    variant={tipoErroTab === tab.key ? 'secondary' : 'ghost'}
+                    size="sm"
+                    onClick={() => setTipoErroTab(tab.key as any)}
+                    data-testid={`tab-tipo-erro-${tab.key}`}
+                    className="text-xs"
+                  >
+                    {tab.label}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Lista de ranking */}
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {dadosTipoErroAtual.length === 0 ? (
+                  <div className="text-center text-muted-foreground text-sm py-8">
+                    Nenhum dado disponível para esta visualização
+                  </div>
+                ) : (
+                  dadosTipoErroAtual.map((item, index) => {
+                    const maxMrr = Math.max(...dadosTipoErroAtual.map(d => d.mrr));
+                    const percentage = maxMrr > 0 ? (item.mrr / maxMrr) * 100 : 0;
+                    const isTop3 = index < 3;
+                    const medalColors = ['bg-amber-500', 'bg-gray-400', 'bg-amber-700'];
+
+                    return (
+                      <div
+                        key={item.fullName}
+                        data-testid={`tipo-erro-item-${index}`}
+                        className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                          isTop3
+                            ? 'bg-orange-50/80 dark:bg-orange-950/40 border border-orange-100 dark:border-orange-900/50'
+                            : 'bg-gray-50/50 dark:bg-zinc-900/30 border border-gray-100/50 dark:border-zinc-800/50'
+                        }`}
+                      >
+                        <div className="w-6 text-center flex-shrink-0">
+                          {isTop3 ? (
+                            <div className={`w-5 h-5 rounded-full ${medalColors[index]} flex items-center justify-center`}>
+                              <span className="text-[10px] font-bold text-white">{index + 1}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium text-muted-foreground">{index + 1}º</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="text-sm font-medium truncate" title={item.fullName}>{item.fullName}</span>
+                            <div className="flex items-center gap-3 text-sm">
+                              <span className="text-muted-foreground">{item.count} contratos</span>
+                              <span className="font-bold text-red-600 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(item.mrr)}</span>
+                            </div>
+                          </div>
+                          <div className="h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* NOVO: Análise Profunda (Features 2-5) */}
+      {!isLoading && filteredContratos.length > 0 && (
+        <SectionBlock
+          title="Análise Profunda"
+          subtitle="Padrões de texto, motivos e cruzamentos"
+          icon={Brain}
+          accent="bg-gradient-to-r from-indigo-500 to-purple-600"
+        >
+          {/* Feature 2 + Feature 3: Text Patterns + Motivo→Submotivo */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Feature 2: Análise de Padrões de Texto (2/3) */}
+            <TechChartCard
+              title="Padrões nas Mensagens"
+              subtitle="Keywords identificadas na mensagem do cliente"
+              icon={MessageSquare}
+              iconBg="bg-gradient-to-r from-indigo-500 to-purple-500"
+              meta={<StatPill label="Com mensagem" value={`${filteredContratos.filter(c => c.mensagem_cliente).length}`} tone="info" />}
+            >
+              <div className="lg:col-span-2">
+                {textPatternAnalysis.length === 0 ? (
+                  <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
+                    Sem mensagens para analisar
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={Math.max(220, textPatternAnalysis.length * 40)}>
+                    <BarChart data={textPatternAnalysis} layout="vertical" margin={{ left: 0, right: 10, top: 5, bottom: 5 }}>
+                      <defs>
+                        <linearGradient id="deepBarGradient" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#6366f1" />
+                          <stop offset="100%" stopColor="#8b5cf6" />
+                        </linearGradient>
+                      </defs>
+                      <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                      <YAxis type="category" dataKey="keyword" width={80} tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
+                      <Tooltip
+                        content={({ active, payload, label }: any) => {
+                          if (!active || !payload?.length) return null;
+                          const d = textPatternAnalysis.find((t: any) => t.keyword === label);
+                          return (
+                            <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-700/50 rounded-lg shadow-xl p-3 min-w-[200px]">
+                              <p className="text-xs font-semibold text-foreground mb-2">{label}</p>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between"><span className="text-muted-foreground">Contratos</span><span className="font-bold text-foreground">{d?.count}</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground">MRR Impactado</span><span className="font-bold text-red-500">{formatCurrencyNoDecimals(d?.mrr || 0)}</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground">% Evitável</span><span className="font-bold text-foreground">{(d?.evitavelPct || 0).toFixed(0)}%</span></div>
+                              </div>
+                              {d?.contratos && d.contratos.length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-border/50">
+                                  <p className="text-[10px] text-muted-foreground mb-1">Clientes:</p>
+                                  {d.contratos.map((n: string, i: number) => (
+                                    <p key={i} className="text-[10px] text-foreground truncate">{n}</p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }}
+                      />
+                      <Bar
+                        dataKey="count"
+                        fill="url(#deepBarGradient)"
+                        radius={[0, 4, 4, 0]}
+                        name="Contratos"
+                        cursor="pointer"
+                        onClick={(data: any) => {
+                          if (data?.keyword) {
+                            setSelectedThemeKeyword(selectedThemeKeyword === data.keyword ? null : data.keyword);
+                          }
+                        }}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+                {/* Drill-down: mensagens matchadas */}
+                {selectedThemeKeyword && (() => {
+                  const themeData = textPatternAnalysis.find(t => t.keyword === selectedThemeKeyword);
+                  const terms = EXPANDED_KEYWORDS[selectedThemeKeyword] || [];
+                  if (!themeData || themeData.matchedContratos.length === 0) return null;
+                  return (
+                    <div className="mt-3 border-t border-border/50 pt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-foreground">
+                          Mensagens com "{selectedThemeKeyword}" ({themeData.matchedContratos.length})
+                        </p>
+                        <button
+                          onClick={() => setSelectedThemeKeyword(null)}
+                          className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Fechar
+                        </button>
+                      </div>
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                        {themeData.matchedContratos.slice(0, 15).map((c, i) => (
+                          <div key={`drill-${c.id}-${i}`} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 p-2">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs font-medium text-foreground">{c.cliente_nome}</span>
+                              <span className="text-[10px] text-red-500 font-semibold">{formatCurrencyNoDecimals(c.valorr)}</span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                              {highlightKeywords(c.mensagem_cliente || '', terms)}
+                            </p>
+                          </div>
+                        ))}
+                        {themeData.matchedContratos.length > 15 && (
+                          <p className="text-[10px] text-muted-foreground text-center pt-1">
+                            Mostrando 15 de {themeData.matchedContratos.length}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </TechChartCard>
+
+            {/* Feature 3: Drill-down Motivo → Submotivo (1/3) */}
+            <TechChartCard
+              title="Motivo → Submotivo"
+              subtitle="Hierarquia de motivos de cancelamento"
+              icon={GitBranch}
+              iconBg="bg-gradient-to-r from-orange-500 to-red-500"
+            >
+              {motivoSubmotivoTree.length === 0 ? (
+                <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
+                  Sem dados
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                  {motivoSubmotivoTree.map((item) => {
+                    const maxCount = Math.max(...motivoSubmotivoTree.map(d => d.count), 1);
+                    const barWidth = Math.max((item.count / maxCount) * 100, 5);
+                    const isOpen = expandedMotivo === item.motivo;
+                    return (
+                      <div key={item.motivo}>
+                        <div
+                          className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 px-2 py-1.5 cursor-pointer hover:bg-muted/30 transition-colors"
+                          onClick={() => setExpandedMotivo(isOpen ? null : item.motivo)}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {isOpen ? <ChevronUp className="h-3 w-3 flex-shrink-0 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 flex-shrink-0 text-muted-foreground" />}
+                              <span className="truncate text-xs text-foreground font-medium">{item.motivo}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-xs font-semibold text-foreground tabular-nums">{item.count}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 pl-5">
+                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-500 transition-all" style={{ width: `${barWidth}%` }} />
+                            </div>
+                            <span className="text-[10px] text-red-500 dark:text-red-400 tabular-nums whitespace-nowrap">{formatCurrencyNoDecimals(item.mrr)}</span>
+                          </div>
+                        </div>
+                        {isOpen && item.submotivos.length > 0 && (
+                          <div className="ml-5 mt-1 space-y-1 border-l-2 border-orange-200 dark:border-orange-800 pl-2">
+                            {item.submotivos.map((sub) => {
+                              const subMaxCount = Math.max(...item.submotivos.map(s => s.count), 1);
+                              const subBarWidth = Math.max((sub.count / subMaxCount) * 100, 5);
+                              return (
+                                <div key={sub.submotivo} className="rounded-md border border-border/30 bg-white/50 dark:bg-zinc-900/30 px-2 py-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="truncate text-[11px] text-muted-foreground">{sub.submotivo}</span>
+                                    <span className="text-[11px] font-semibold text-foreground tabular-nums">{sub.count}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <div className="flex-1 h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                      <div className="h-full rounded-full bg-orange-300 dark:bg-orange-600 transition-all" style={{ width: `${subBarWidth}%` }} />
+                                    </div>
+                                    <span className="text-[9px] text-red-500 dark:text-red-400 tabular-nums whitespace-nowrap">{formatCurrencyNoDecimals(sub.mrr)}</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TechChartCard>
+          </div>
+
+          {/* Feature 4: Matriz Cruzada (full-width) */}
+          <TechChartCard
+            title="Matriz de Evitabilidade"
+            subtitle="Cruzamento evitável × dimensão"
+            icon={Target}
+            iconBg="bg-gradient-to-r from-rose-500 to-red-600"
+            meta={
+              <div className="flex gap-1">
+                {(['motivo', 'cluster', 'plano'] as const).map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setCrossAnalysisView(v)}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                      crossAnalysisView === v
+                        ? 'bg-rose-500 text-white shadow-sm'
+                        : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                    }`}
+                  >
+                    {v === 'motivo' ? 'Por Motivo' : v === 'cluster' ? 'Por Cluster' : 'Por Plano'}
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            {crossAnalysisData.length === 0 ? (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
+                Sem dados
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={Math.max(200, crossAnalysisData.length * 36)}>
+                <BarChart data={crossAnalysisData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="deepEvitGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#ef4444" />
+                      <stop offset="100%" stopColor="#f87171" />
+                    </linearGradient>
+                    <linearGradient id="deepInevGradient" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#34d399" />
+                    </linearGradient>
+                  </defs>
+                  <XAxis type="number" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
+                  <Tooltip
+                    content={({ active, payload, label }: any) => {
+                      if (!active || !payload?.length) return null;
+                      const d = crossAnalysisData.find((x: any) => x.name === label);
+                      return (
+                        <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-700/50 rounded-lg shadow-xl p-3 min-w-[180px]">
+                          <p className="text-xs font-semibold text-foreground mb-2">{d?.fullName || label}</p>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between gap-4"><span className="text-red-500">Evitável</span><span className="font-bold">{d?.evitavel} ({formatCurrencyNoDecimals(d?.mrrEvitavel || 0)})</span></div>
+                            <div className="flex justify-between gap-4"><span className="text-emerald-500">Inevitável</span><span className="font-bold">{d?.inevitavel} ({formatCurrencyNoDecimals(d?.mrrInevitavel || 0)})</span></div>
+                          </div>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Legend
+                    formatter={(value: string) => <span className="text-[10px] text-muted-foreground">{value}</span>}
+                    iconSize={8}
+                  />
+                  <Bar dataKey="evitavel" name="Evitável" fill="url(#deepEvitGradient)" stackId="a" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="inevitavel" name="Inevitável" fill="url(#deepInevGradient)" stackId="a" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </TechChartCard>
+
+          {/* Feature 5: Cards de Contexto (Operação + CX) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <TechChartCard
+              title="Temas Operacionais"
+              subtitle="Padrões no contexto de operação"
+              icon={Shield}
+              iconBg="bg-gradient-to-r from-slate-500 to-zinc-600"
+            >
+              {contextThemes.operacao.length === 0 ? (
+                <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
+                  Sem dados de operação
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                  {contextThemes.operacao.map((item, i) => {
+                    const maxMrr = Math.max(...contextThemes.operacao.map(d => d.mrr), 1);
+                    const barWidth = Math.max((item.mrr / maxMrr) * 100, 5);
+                    const isExpanded = expandedOpTheme === item.theme;
+                    return (
+                      <div key={item.theme} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedOpTheme(isExpanded ? null : item.theme)}
+                          className="w-full px-2.5 py-2 space-y-1 text-left hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PALETTE[i % PALETTE.length] }} />
+                              <span className="text-xs font-medium text-foreground">{item.theme}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant="secondary" className="text-[10px] h-5">{item.count}</Badge>
+                              {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${barWidth}%`, backgroundColor: PALETTE[i % PALETTE.length] }} />
+                            </div>
+                            <span className="text-[10px] text-red-500 dark:text-red-400 tabular-nums whitespace-nowrap">{formatCurrencyNoDecimals(item.mrr)}</span>
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="border-t border-border/30 bg-gray-50/50 dark:bg-zinc-950/30 px-2.5 py-2 space-y-1.5 max-h-[200px] overflow-y-auto">
+                            {item.matchedContratos.slice(0, 20).map(c => (
+                              <div key={c.id} className="flex items-start gap-2 text-[11px]">
+                                <div className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-zinc-500 flex-shrink-0 mt-1.5" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-medium text-foreground truncate max-w-[140px]">{c.cliente_nome}</span>
+                                    <span className="text-red-500 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(c.valorr)}</span>
+                                  </div>
+                                  <p className="text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">{c.contexto_operacao}</p>
+                                </div>
+                              </div>
+                            ))}
+                            {item.matchedContratos.length > 20 && (
+                              <p className="text-[10px] text-muted-foreground text-center pt-1">+{item.matchedContratos.length - 20} contratos</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TechChartCard>
+
+            <TechChartCard
+              title="Temas CX"
+              subtitle="Padrões no contexto de experiência do cliente"
+              icon={Users}
+              iconBg="bg-gradient-to-r from-teal-500 to-cyan-500"
+            >
+              {contextThemes.cx.length === 0 ? (
+                <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
+                  Sem dados de CX
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                  {contextThemes.cx.map((item, i) => {
+                    const maxMrr = Math.max(...contextThemes.cx.map(d => d.mrr), 1);
+                    const barWidth = Math.max((item.mrr / maxMrr) * 100, 5);
+                    const isExpanded = expandedCxTheme === item.theme;
+                    return (
+                      <div key={item.theme} className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedCxTheme(isExpanded ? null : item.theme)}
+                          className="w-full px-2.5 py-2 space-y-1 text-left hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: PALETTE[(i + 5) % PALETTE.length] }} />
+                              <span className="text-xs font-medium text-foreground">{item.theme}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant="secondary" className="text-[10px] h-5">{item.count}</Badge>
+                              {isExpanded ? <ChevronUp className="h-3 w-3 text-muted-foreground" /> : <ChevronDown className="h-3 w-3 text-muted-foreground" />}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all" style={{ width: `${barWidth}%`, backgroundColor: PALETTE[(i + 5) % PALETTE.length] }} />
+                            </div>
+                            <span className="text-[10px] text-red-500 dark:text-red-400 tabular-nums whitespace-nowrap">{formatCurrencyNoDecimals(item.mrr)}</span>
+                          </div>
+                        </button>
+                        {isExpanded && (
+                          <div className="border-t border-border/30 bg-gray-50/50 dark:bg-zinc-950/30 px-2.5 py-2 space-y-1.5 max-h-[200px] overflow-y-auto">
+                            {item.matchedContratos.slice(0, 20).map(c => (
+                              <div key={c.id} className="flex items-start gap-2 text-[11px]">
+                                <div className="w-1.5 h-1.5 rounded-full bg-teal-400 dark:bg-teal-600 flex-shrink-0 mt-1.5" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-medium text-foreground truncate max-w-[140px]">{c.cliente_nome}</span>
+                                    <span className="text-red-500 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(c.valorr)}</span>
+                                  </div>
+                                  <p className="text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">{c.contexto_cx}</p>
+                                </div>
+                              </div>
+                            ))}
+                            {item.matchedContratos.length > 20 && (
+                              <p className="text-[10px] text-muted-foreground text-center pt-1">+{item.matchedContratos.length - 20} contratos</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </TechChartCard>
+          </div>
+        </SectionBlock>
       )}
 
+      {/* NOVO: Voz do Cliente — Análise por IA */}
+      {!isLoading && contratosComMensagem.length > 0 && (
+        <SectionBlock
+          title="Voz do Cliente"
+          subtitle="Análise por inteligência artificial das mensagens reais de churn"
+          icon={Megaphone}
+          accent="bg-gradient-to-r from-teal-500 to-cyan-600"
+        >
+          {/* Loading / Error states */}
+          {aiLoading && (
+            <div className="flex items-center justify-center gap-3 py-8">
+              <div className="h-5 w-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-muted-foreground">Analisando {contratosComMensagem.length} mensagens com IA...</span>
+            </div>
+          )}
+
+          {aiError && (
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 p-4">
+              <p className="text-sm text-red-600 dark:text-red-400 mb-2">Erro na análise IA</p>
+              <button onClick={() => refetchAI()} className="text-xs text-red-500 underline hover:text-red-700">Tentar novamente</button>
+            </div>
+          )}
+
+          {aiAnalysis && !aiLoading && (
+            <>
+              {/* Síntese da IA — o insight mais valioso */}
+              {aiAnalysis.sintese && (
+                <Card className="border-teal-200/60 dark:border-teal-800/40 bg-teal-50/30 dark:bg-teal-950/20">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 flex-shrink-0">
+                        <Brain className="h-4 w-4 text-white" />
+                      </div>
+                      <div className="space-y-2 min-w-0">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Principal Causa</p>
+                          <p className="text-sm font-semibold text-foreground">{aiAnalysis.sintese.principal_motivo}</p>
+                        </div>
+                        {aiAnalysis.sintese.padrao_critico && (
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Padrão Crítico</p>
+                            <p className="text-sm text-foreground/80">{aiAnalysis.sintese.padrao_critico}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Recomendação</p>
+                          <p className="text-sm font-medium text-teal-700 dark:text-teal-400">{aiAnalysis.sintese.recomendacao}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Charts: Sentimento + Temas */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Donut Sentimento IA */}
+                <TechChartCard
+                  title="Sentimento"
+                  subtitle="Classificação por IA (análise contextual completa)"
+                  icon={PieChart}
+                  iconBg="bg-gradient-to-r from-rose-500 to-orange-500"
+                >
+                  {sentimentDistribution.length === 0 ? (
+                    <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">Sem dados</div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <RechartsPie>
+                        <Pie data={sentimentDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="count" nameKey="sentiment">
+                          {sentimentDistribution.map((entry, index) => (
+                            <Cell key={`sent-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={({ active, payload }: any) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0].payload;
+                          return (
+                            <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-700/50 rounded-lg shadow-xl p-3 min-w-[160px]">
+                              <p className="text-xs font-semibold text-foreground mb-1">{d.sentiment}</p>
+                              <div className="space-y-1 text-xs">
+                                <div className="flex justify-between"><span className="text-muted-foreground">Contratos</span><span className="font-bold">{d.count}</span></div>
+                                <div className="flex justify-between"><span className="text-muted-foreground">MRR</span><span className="font-bold text-red-500">{formatCurrencyNoDecimals(d.mrr)}</span></div>
+                              </div>
+                            </div>
+                          );
+                        }} />
+                        <Legend formatter={(value: string) => <span className="text-[10px] text-muted-foreground">{value}</span>} iconSize={8} />
+                      </RechartsPie>
+                    </ResponsiveContainer>
+                  )}
+                </TechChartCard>
+
+                {/* Temas identificados pela IA */}
+                <TechChartCard
+                  title="Temas Identificados"
+                  subtitle="Classificação por IA — o que os clientes estão dizendo"
+                  icon={Hash}
+                  iconBg="bg-gradient-to-r from-violet-500 to-purple-600"
+                >
+                  {themeDistribution.length === 0 ? (
+                    <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">Sem dados</div>
+                  ) : (
+                    <div className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1">
+                      {themeDistribution.map((item, i) => {
+                        const maxCount = themeDistribution[0]?.count || 1;
+                        const barWidth = Math.max((item.count / maxCount) * 100, 8);
+                        const isActive = muralFilterTheme === item.theme;
+                        return (
+                          <button
+                            key={`theme-${i}`}
+                            onClick={() => setMuralFilterTheme(isActive ? null : item.theme)}
+                            className={`w-full text-left rounded-md border p-2 transition-all ${
+                              isActive
+                                ? 'border-violet-400 dark:border-violet-600 bg-violet-50/50 dark:bg-violet-950/30'
+                                : 'border-border/30 bg-white/50 dark:bg-zinc-900/30 hover:bg-muted/30'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-medium text-foreground">{item.theme}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-muted-foreground tabular-nums">{item.count}x</span>
+                                <span className="text-[10px] text-red-500 font-semibold tabular-nums">{formatCurrencyNoDecimals(item.mrr)}</span>
+                              </div>
+                            </div>
+                            <div className="h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-purple-500 transition-all" style={{ width: `${barWidth}%` }} />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </TechChartCard>
+              </div>
+
+              {/* Mural de Mensagens */}
+              <Card className="border-border/50">
+                <CardHeader className="py-3 px-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-sm font-semibold">Mensagens dos Clientes</CardTitle>
+                      <CardDescription className="text-xs">{contratosComMensagem.length} mensagens analisadas por IA</CardDescription>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {/* Sentiment filter pills */}
+                      {['negativo', 'neutro', 'positivo'].map(s => (
+                        <button
+                          key={s}
+                          onClick={() => setMuralFilterSentiment(muralFilterSentiment === s ? null : s)}
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors border ${
+                            muralFilterSentiment === s
+                              ? s === 'negativo' ? 'bg-red-500 text-white border-red-500'
+                                : s === 'positivo' ? 'bg-green-500 text-white border-green-500'
+                                : 'bg-gray-500 text-white border-gray-500'
+                              : 'border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted'
+                          }`}
+                        >
+                          {s === 'negativo' ? 'Negativo' : s === 'positivo' ? 'Positivo' : 'Neutro'}
+                        </button>
+                      ))}
+                      <span className="text-border/60">|</span>
+                      {/* Sort buttons */}
+                      <div className="flex gap-1">
+                        {(['mrr', 'date'] as const).map(s => (
+                          <button
+                            key={s}
+                            onClick={() => setMuralSortBy(s)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-medium transition-colors ${
+                              muralSortBy === s
+                                ? 'bg-teal-500 text-white shadow-sm'
+                                : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                            }`}
+                          >
+                            {s === 'mrr' ? 'Por MRR' : 'Por Data'}
+                          </button>
+                        ))}
+                      </div>
+                      {(muralFilterSentiment || muralFilterTheme) && (
+                        <button
+                          onClick={() => { setMuralFilterSentiment(null); setMuralFilterTheme(null); }}
+                          className="text-[10px] text-muted-foreground hover:text-foreground underline transition-colors"
+                        >
+                          Limpar filtros
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  {muralMessages.length === 0 ? (
+                    <div className="h-[100px] flex items-center justify-center text-muted-foreground text-sm">
+                      Nenhuma mensagem com os filtros selecionados
+                    </div>
+                  ) : (
+                    <>
+                      {muralMessages.length > 50 && (
+                        <p className="text-[10px] text-muted-foreground mb-2">Mostrando 50 de {muralMessages.length}</p>
+                      )}
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                        {muralMessages.slice(0, 50).map((msg, i) => {
+                          const sentColor = msg.sentiment === 'negativo' ? 'border-l-red-500' : msg.sentiment === 'positivo' ? 'border-l-green-500' : 'border-l-gray-400 dark:border-l-zinc-500';
+                          const isExpanded = muralExpandedId === msg.id;
+                          const msgDate = msg.data_encerramento || msg.data_pausa;
+                          return (
+                            <div
+                              key={`mural-${msg.id}-${i}`}
+                              className={`rounded-lg border border-border/40 bg-white/70 dark:bg-zinc-900/50 p-3 border-l-4 ${sentColor} transition-all`}
+                            >
+                              {/* Header */}
+                              <div className="flex items-start justify-between gap-2 mb-1">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm font-semibold text-foreground truncate">{msg.cliente_nome}</p>
+                                    <span className="text-[10px] text-red-500 font-semibold">{formatCurrencyNoDecimals(msg.valorr)}</span>
+                                  </div>
+                                  {/* Resumo IA */}
+                                  {msg.resumo && (
+                                    <p className="text-xs text-muted-foreground italic mt-0.5">{msg.resumo}</p>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-1 flex-shrink-0">
+                                  {msg.temas.map((t, ti) => (
+                                    <Badge key={ti} variant="outline" className="text-[9px] px-1.5 py-0 bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800">
+                                      {t}
+                                    </Badge>
+                                  ))}
+                                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${
+                                    msg.sentiment === 'negativo'
+                                      ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
+                                      : msg.sentiment === 'positivo'
+                                      ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800'
+                                      : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
+                                  }`}>
+                                    {msg.sentiment === 'negativo' ? 'Negativo' : msg.sentiment === 'positivo' ? 'Positivo' : 'Neutro'}
+                                  </Badge>
+                                </div>
+                              </div>
+                              {/* Metadata row */}
+                              <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                <Badge variant="outline" className="text-[9px] px-1.5 py-0">{msg.squad}</Badge>
+                                {msg.motivo_cancelamento && (
+                                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800">
+                                    {msg.motivo_cancelamento}
+                                  </Badge>
+                                )}
+                                {msg.evitabilidade_churn && (
+                                  <Badge variant="outline" className={`text-[9px] px-1.5 py-0 ${
+                                    msg.evitabilidade_churn === 'Evitável'
+                                      ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
+                                      : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
+                                  }`}>
+                                    {msg.evitabilidade_churn}
+                                  </Badge>
+                                )}
+                                {msgDate && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {format(parseISO(msgDate), "dd/MM/yyyy", { locale: ptBR })}
+                                  </span>
+                                )}
+                              </div>
+                              {/* Message body */}
+                              <p className="text-xs text-foreground/80 leading-relaxed whitespace-pre-line">
+                                {msg.mensagem_cliente}
+                              </p>
+                              {/* Expandable context */}
+                              {(msg.contexto_operacao || msg.contexto_cx) && (
+                                <div className="mt-2">
+                                  <button
+                                    onClick={() => setMuralExpandedId(isExpanded ? null : msg.id)}
+                                    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                                  >
+                                    {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                    Contexto adicional
+                                  </button>
+                                  {isExpanded && (
+                                    <div className="mt-2 space-y-2 pl-3 border-l-2 border-border/40">
+                                      {msg.contexto_operacao && (
+                                        <div>
+                                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Contexto Operação</p>
+                                          <p className="text-[11px] text-foreground/70 whitespace-pre-line">{msg.contexto_operacao}</p>
+                                        </div>
+                                      )}
+                                      {msg.contexto_cx && (
+                                        <div>
+                                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-0.5">Contexto CX</p>
+                                          <p className="text-[11px] text-foreground/70 whitespace-pre-line">{msg.contexto_cx}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </SectionBlock>
+      )}
+
+      {/* NOVO: Oportunidades de Retenção (Feature 6) */}
+      {!isLoading && filteredContratos.length > 0 && retentionOpportunities.scored.length > 0 && (
+        <SectionBlock
+          title="Oportunidades de Retenção"
+          subtitle="Score de oportunidade e análise de retenção"
+          icon={Lightbulb}
+          accent="bg-gradient-to-r from-amber-500 to-orange-500"
+        >
+          {/* KPI cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <TechKpiCard
+              title="Oportunidades Perdidas"
+              value={String(retentionOpportunities.totalMissed)}
+              subtitle="Evitáveis com retenção alta/média"
+              icon={AlertTriangle}
+              gradient="bg-gradient-to-r from-red-500 to-rose-600"
+              shadowColor="shadow-red-500/10"
+            />
+            <TechKpiCard
+              title="MRR Oportunidades"
+              value={formatCurrencyNoDecimals(retentionOpportunities.mrrMissed)}
+              subtitle="Valor das oportunidades perdidas"
+              icon={DollarSign}
+              gradient="bg-gradient-to-r from-amber-500 to-orange-500"
+              shadowColor="shadow-amber-500/10"
+            />
+            <TechKpiCard
+              title="Score Médio"
+              value={`${retentionOpportunities.avgScore.toFixed(0)}/100`}
+              subtitle="Score médio de oportunidade"
+              icon={Target}
+              gradient="bg-gradient-to-r from-indigo-500 to-purple-500"
+              shadowColor="shadow-indigo-500/10"
+            />
+          </div>
+
+          {/* Tabela de oportunidades */}
+          <Card className="border-border/50">
+            <CardContent className="p-0">
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-[80px]">Score</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Motivo</TableHead>
+                      <TableHead className="text-right">MRR</TableHead>
+                      <TableHead className="text-center">Lifetime</TableHead>
+                      <TableHead className="text-center">Evitabilidade</TableHead>
+                      <TableHead className="text-center">Retenção</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {retentionOpportunities.scored.slice(0, 20).map((c, idx) => (
+                      <TableRow
+                        key={`opp-${c.id}-${idx}`}
+                        className={c.isMissedOpportunity ? 'border-l-4 border-l-red-400 dark:border-l-red-600' : ''}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-12 h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  c.score >= 70 ? 'bg-red-500' : c.score >= 40 ? 'bg-amber-500' : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${c.score}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-bold text-foreground tabular-nums">{c.score}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm font-medium text-foreground">{c.cliente_nome}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">{c.motivo_cancelamento || '-'}</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className="text-sm font-semibold text-red-600 dark:text-red-400">{formatCurrencyNoDecimals(c.valorr)}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge
+                            variant={c.lifetime_meses < 3 ? "destructive" : c.lifetime_meses < 6 ? "secondary" : "default"}
+                            className="text-[10px]"
+                          >
+                            {c.lifetime_meses.toFixed(1)}m
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {c.evitabilidade_churn && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${
+                                c.evitabilidade_churn === 'Evitável'
+                                  ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
+                                  : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
+                              }`}
+                            >
+                              {c.evitabilidade_churn}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {c.possibilidade_retencao && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${
+                                c.possibilidade_retencao === 'Alta'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800'
+                                  : c.possibilidade_retencao === 'Média'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800'
+                                  : 'bg-gray-50 text-gray-600 border-gray-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700'
+                              }`}
+                            >
+                              {c.possibilidade_retencao}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {retentionOpportunities.scored.length > 20 && (
+                  <div className="p-3 text-center text-muted-foreground text-xs border-t">
+                    Mostrando top 20 de {retentionOpportunities.scored.length} contratos por score
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </SectionBlock>
+      )}
+      </>
+      )}
+
+      {/* Filtros Avançados - sempre visível em qualquer sub-aba */}
       <Card className="border-border/50">
         <Collapsible open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
           <CardHeader className="py-3">
@@ -2878,6 +4167,16 @@ export default function ChurnDetalhamento() {
                             <TableRow key={`${contrato.id}-${index}-details`} className="bg-muted/10 hover:bg-muted/10">
                               <TableCell colSpan={11} className="p-0">
                                 <div className="px-6 py-4 space-y-3 border-l-4 border-primary/30">
+                                  {/* Churn DNA Tags */}
+                                  {getChurnDNATags(contrato).length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mb-1">
+                                      {getChurnDNATags(contrato).map((tag, i) => (
+                                        <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-medium ${tag.color}`}>
+                                          <span className="text-[9px] opacity-70">{tag.label}:</span> {tag.value}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="flex flex-wrap gap-2">
                                       <StatPill label="Responsável" value={contrato.responsavel || '-'} />
