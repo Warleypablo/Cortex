@@ -1372,6 +1372,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
+      const contagem = (req.query.contagem as string) || 'contrato';
+
+      // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
+      const countNovos = contagem === 'cliente'
+        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN d.company_id END)")
+        : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)");
+      const countAcel = contagem === 'cliente'
+        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN d.company_id END)")
+        : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END)");
+      const countImpl = contagem === 'cliente'
+        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END)")
+        : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
+
       // Query para buscar métricas de vendas MQL do Bitrix
       // MQL = leads onde mql = '1' ou 'true'
       // Usando data_fechamento como referência de data para negócios ganhos
@@ -1379,23 +1392,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT
           -- Total MQLs com data_fechamento no período
           COUNT(*) as total_mqls,
-          
+
           -- Reuniões Agendadas MQL (deals que passaram por RM ou stages superiores)
-          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada', 
+          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada',
             'Reunião Realizada', 'RR - Reunião Realizada', 'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_agendadas_mql,
-          
+
           -- Reuniões Realizadas MQL (deals que passaram por RR ou stages superiores)
-          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada', 
+          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
             'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_realizadas_mql,
-          
+
           -- Novos Clientes MQL (Negócio Ganho)
-          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as novos_clientes_mql,
-          
+          ${countNovos} as novos_clientes_mql,
+
           -- Contratos Aceleração (valor_recorrente > 0 e Negócio Ganho)
-          COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END) as contratos_aceleracao_mql,
-          
+          ${countAcel} as contratos_aceleracao_mql,
+
           -- Contratos Implantação (valor_pontual > 0 e Negócio Ganho)
-          COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END) as contratos_implantacao_mql,
+          ${countImpl} as contratos_implantacao_mql,
           
           -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao_mql,
@@ -1480,6 +1493,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
+      const contagem = (req.query.contagem as string) || 'contrato';
+
+      // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
+      const countNovos = contagem === 'cliente'
+        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN d.company_id END)")
+        : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)");
+      const countAcel = contagem === 'cliente'
+        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN d.company_id END)")
+        : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END)");
+      const countImpl = contagem === 'cliente'
+        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END)")
+        : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
+
       // Query para buscar métricas de vendas Não-MQL do Bitrix
       // Não-MQL = leads onde mql != '1' e mql != 'true' (ou mql é null)
       // Usando data_fechamento como referência de data para negócios ganhos
@@ -1487,23 +1513,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT
           -- Total Não-MQLs com data_fechamento no período
           COUNT(*) as total_nao_mqls,
-          
+
           -- Reuniões Agendadas Não-MQL (deals que passaram por RM ou stages superiores)
-          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada', 
+          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada',
             'Reunião Realizada', 'RR - Reunião Realizada', 'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_agendadas,
-          
+
           -- Reuniões Realizadas Não-MQL (deals que passaram por RR ou stages superiores)
-          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada', 
+          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
             'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_realizadas,
-          
+
           -- Novos Clientes Não-MQL (Negócio Ganho)
-          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as novos_clientes,
-          
+          ${countNovos} as novos_clientes,
+
           -- Contratos Aceleração (valor_recorrente > 0 e Negócio Ganho)
-          COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END) as contratos_aceleracao,
-          
+          ${countAcel} as contratos_aceleracao,
+
           -- Contratos Implantação (valor_pontual > 0 e Negócio Ganho)
-          COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END) as contratos_implantacao,
+          ${countImpl} as contratos_implantacao,
           
           -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao,

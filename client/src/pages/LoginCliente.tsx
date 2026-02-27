@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Building2, Loader2, ArrowLeft, Shield } from "lucide-react";
+import { Building2, Loader2, ArrowLeft, Shield, Lock, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
@@ -19,6 +19,8 @@ export default function LoginCliente() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [cnpj, setCnpj] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,7 +33,7 @@ export default function LoginCliente() {
       const response = await fetch("/auth/client-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cnpj }),
+        body: JSON.stringify({ cnpj, password }),
         credentials: "include",
       });
 
@@ -100,6 +102,34 @@ export default function LoginCliente() {
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-xs text-white/50 font-medium uppercase tracking-wider">
+                Senha
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Digite sua senha"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (error) setError('');
+                  }}
+                  className="bg-zinc-800/60 border-white/[0.1] text-white placeholder:text-white/20 rounded-xl pl-10 pr-12 py-3 h-auto focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 text-sm"
+                  required
+                  data-testid="input-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
             {error && (
               <motion.p
                 initial={{ opacity: 0, y: -4 }}
@@ -113,7 +143,7 @@ export default function LoginCliente() {
 
             <button
               type="submit"
-              disabled={loading || cnpj.replace(/\D/g, '').length !== 14}
+              disabled={loading || cnpj.replace(/\D/g, '').length !== 14 || !password}
               className="w-full flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-3 text-sm font-medium transition-colors"
               data-testid="button-submit"
             >
