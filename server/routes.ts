@@ -9783,8 +9783,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Usar sistema centralizado de AI (suporta OpenAI + Gemini com fallback)
-      const { getAIConfig, getAIClient } = await import("./services/unifiedAssistant");
+      const { getAIConfig, getAIClient, AI_PROVIDERS } = await import("./services/unifiedAssistant");
       const aiConfig = await getAIConfig();
+
+      if (!AI_PROVIDERS[aiConfig.provider].available) {
+        return res.status(503).json({ error: `Provider ${aiConfig.provider} não está configurado. Verifique as chaves de API nas configurações.` });
+      }
+
       const aiClient = getAIClient(aiConfig.provider);
 
       // Limitar a 60 mensagens por batch pra não estourar tokens
@@ -9794,14 +9799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `[${i + 1}] ID:${m.id} | Cliente: ${m.cliente} | Motivo: ${m.motivo || 'N/A'} | MRR: R$${m.mrr || 0}\nMensagem: "${m.mensagem}"`
       ).join('\n\n');
 
-      const response = await aiClient.chat.completions.create({
-        model: aiConfig.model,
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: `Você é um analista sênior de Customer Success especializado em análise de churn. Você recebe mensagens reais de clientes que cancelaram ou pausaram contratos.
+      const systemPrompt = `Você é um analista sênior de Customer Success especializado em análise de churn. Você recebe mensagens reais de clientes que cancelaram ou pausaram contratos.
 
 Sua tarefa é analisar CADA mensagem como um todo — entendendo contexto, tom, intenções e nuances — e classificar:
 
@@ -9822,7 +9820,7 @@ Sua tarefa é analisar CADA mensagem como um todo — entendendo contexto, tom, 
 
 3. **resumo**: 1 frase curta (max 15 palavras) capturando a essência da mensagem. Deve ser útil para um diretor que está scaneando rapidamente.
 
-Responda em JSON com esta estrutura:
+IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutura:
 {
   "analises": [
     {
@@ -9837,21 +9835,47 @@ Responda em JSON com esta estrutura:
     "padrao_critico": "Padrão preocupante identificado (se houver)",
     "recomendacao": "1 ação concreta que a operação deveria tomar"
   }
-}`
-          },
-          {
-            role: "user",
-            content: `Analise estas ${batch.length} mensagens de clientes que deram churn:\n\n${mensagensFormatadas}`
-          }
-        ],
-      });
+}`;
 
-      const content = response.choices[0]?.message?.content;
+      // Gemini via OpenAI compat pode não suportar response_format, então tentamos com e sem
+      let content: string | null = null;
+
+      try {
+        const response = await aiClient.chat.completions.create({
+          model: aiConfig.model,
+          temperature: 0.1,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Analise estas ${batch.length} mensagens de clientes que deram churn:\n\n${mensagensFormatadas}` },
+          ],
+        });
+        content = response.choices[0]?.message?.content || null;
+      } catch (firstErr: any) {
+        console.warn(`[churn-ai] response_format falhou (${aiConfig.provider}/${aiConfig.model}), tentando sem:`, firstErr.message);
+        // Retry sem response_format (fallback para Gemini)
+        const response = await aiClient.chat.completions.create({
+          model: aiConfig.model,
+          temperature: 0.1,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Analise estas ${batch.length} mensagens de clientes que deram churn:\n\n${mensagensFormatadas}` },
+          ],
+        });
+        content = response.choices[0]?.message?.content || null;
+      }
+
       if (!content) {
         return res.status(500).json({ error: "Resposta vazia da IA" });
       }
 
-      const parsed = JSON.parse(content);
+      // Limpa markdown code fences caso a IA retorne ```json ... ```
+      let cleanContent = content.trim();
+      if (cleanContent.startsWith('```')) {
+        cleanContent = cleanContent.replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
+      }
+
+      const parsed = JSON.parse(cleanContent);
 
       // Salvar no cache
       churnAICache.set(cacheKey, { result: parsed, timestamp: Date.now() });
@@ -9859,7 +9883,8 @@ Responda em JSON com esta estrutura:
       res.json(parsed);
     } catch (error: any) {
       console.error("[api] Error in churn AI analysis:", error);
-      res.status(500).json({ error: "Falha na análise IA: " + (error.message || "Erro desconhecido") });
+      const detail = error.message || "Erro desconhecido";
+      res.status(500).json({ error: `Falha na análise IA: ${detail}` });
     }
   });
 
