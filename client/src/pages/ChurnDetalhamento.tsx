@@ -1304,7 +1304,10 @@ export default function ChurnDetalhamento() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mensagens: aiPayload }),
       });
-      if (!res.ok) throw new Error("Falha na análise IA");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Erro ${res.status}`);
+      }
       return res.json();
     },
     enabled: !!aiPayload && aiPayload.length > 0,
@@ -3414,8 +3417,9 @@ export default function ChurnDetalhamento() {
 
           {aiError && (
             <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20 p-4">
-              <p className="text-sm text-red-600 dark:text-red-400 mb-2">Erro na análise IA</p>
-              <button onClick={() => refetchAI()} className="text-xs text-red-500 underline hover:text-red-700">Tentar novamente</button>
+              <p className="text-sm text-red-600 dark:text-red-400 font-medium">Erro na análise IA</p>
+              <p className="text-xs text-red-500/80 dark:text-red-400/60 mt-1">{(aiError as Error).message}</p>
+              <button onClick={() => refetchAI()} className="mt-3 text-xs text-teal-600 dark:text-teal-400 underline hover:text-teal-800 dark:hover:text-teal-300">Tentar novamente</button>
             </div>
           )}
 
