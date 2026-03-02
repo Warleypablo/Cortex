@@ -17,89 +17,125 @@ import { AssistantWidget } from "@/components/AssistantWidget";
 import { useDealNotifications } from "@/hooks/use-deal-notifications";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 
-const Homepage = lazy(() => import("@/pages/Homepage"));
-const Clients = lazy(() => import("@/pages/Clients"));
-const Contracts = lazy(() => import("@/pages/Contracts"));
-const ClientesContratos = lazy(() => import("@/pages/ClientesContratos"));
-const ClientDetail = lazy(() => import("@/pages/ClientDetail"));
-const Colaboradores = lazy(() => import("@/pages/Colaboradores"));
-const ColaboradoresAnalise = lazy(() => import("@/pages/ColaboradoresAnalise"));
-const DetailColaborador = lazy(() => import("@/pages/DetailColaborador"));
-const Patrimonio = lazy(() => import("@/pages/Patrimonio"));
-const PatrimonioDetail = lazy(() => import("@/pages/PatrimonioDetail"));
-const Ferramentas = lazy(() => import("@/pages/Ferramentas"));
-const TurboZap = lazy(() => import("@/pages/TurboZap"));
-const Atendimento = lazy(() => import("@/pages/Atendimento"));
-const ChatAtendimento = lazy(() => import("@/pages/ChatAtendimento"));
-const VisaoGeral = lazy(() => import("@/pages/VisaoGeral"));
-const DashboardFinanceiro = lazy(() => import("@/pages/DashboardFinanceiro"));
-const DashboardGeG = lazy(() => import("@/pages/DashboardGeG"));
-const CalendarioFerias = lazy(() => import("@/pages/CalendarioFerias"));
-const ChurnDetalhamento = lazy(() => import("@/pages/ChurnDetalhamento"));
-const ChurnPredicao = lazy(() => import("@/pages/ChurnPredicao"));
-const ContratosDetalhamento = lazy(() => import("@/pages/ContratosDetalhamento"));
-const EvolucaoMensal = lazy(() => import("@/pages/EvolucaoMensal"));
-const DashboardDFC = lazy(() => import("@/pages/DashboardDFC"));
-const DashboardInadimplencia = lazy(() => import("@/pages/DashboardInadimplencia"));
-const DashboardInhire = lazy(() => import("@/pages/DashboardInhire"));
-const DashboardRecrutamento = lazy(() => import("@/pages/DashboardRecrutamento"));
-const DashboardTech = lazy(() => import("@/pages/DashboardTech"));
-const TechProjetos = lazy(() => import("@/pages/TechProjetos"));
-const TechEvolucao = lazy(() => import("@/pages/TechEvolucao"));
-const TechFinanceiro = lazy(() => import("@/pages/TechFinanceiro"));
-const FluxoCaixa = lazy(() => import("@/pages/FluxoCaixa"));
-const MetaAds = lazy(() => import("@/pages/MetaAds"));
-const AuditoriaSistemas = lazy(() => import("@/pages/AuditoriaSistemas"));
-const ContribuicaoColaborador = lazy(() => import("@/pages/ContribuicaoColaborador"));
-const ContribuicaoOperador = lazy(() => import("@/pages/ContribuicaoOperador"));
-const ContribuicaoSquad = lazy(() => import("@/pages/ContribuicaoSquad"));
-const AdminUsuarios = lazy(() => import("@/pages/AdminUsuarios"));
-const AdminAvisos = lazy(() => import("@/pages/AdminAvisos"));
-const AccessDenied = lazy(() => import("@/pages/AccessDenied"));
-const Login = lazy(() => import("@/pages/Login"));
-const DashboardClosers = lazy(() => import("@/pages/DashboardClosers"));
-const DashboardSDRs = lazy(() => import("@/pages/DashboardSDRs"));
-const DetailClosers = lazy(() => import("@/pages/DetailClosers"));
-const DetailSDRs = lazy(() => import("@/pages/DetailSDRs"));
-const AnaliseVendas = lazy(() => import("@/pages/AnaliseVendas"));
-const PresentationMode = lazy(() => import("@/pages/PresentationMode"));
-const DetalhamentoVendas = lazy(() => import("@/pages/DetalhamentoVendas"));
-const Criativos = lazy(() => import("@/pages/Criativos"));
-const GrowthOrcadoRealizado = lazy(() => import("@/pages/GrowthOrcadoRealizado"));
-const GrowthVisaoGeral = lazy(() => import("@/pages/GrowthVisaoGeral"));
-const PerformancePlataformas = lazy(() => import("@/pages/PerformancePlataformas"));
-const RevenueGoals = lazy(() => import("@/pages/RevenueGoals"));
-const CasesChat = lazy(() => import("@/pages/CasesChat"));
-const JuridicoClientes = lazy(() => import("@/pages/JuridicoClientes"));
-const ProcessosJuridico = lazy(() => import("@/pages/ProcessosJuridico"));
-const ContratosColaboradores = lazy(() => import("@/pages/ContratosColaboradores"));
-const InvestorsReport = lazy(() => import("@/pages/InvestorsReport"));
-const Acessos = lazy(() => import("@/pages/Acessos"));
-const Conhecimentos = lazy(() => import("@/pages/Conhecimentos"));
-const Beneficios = lazy(() => import("@/pages/Beneficios"));
-const OKR2026 = lazy(() => import("@/pages/OKR2026"));
-const AdminNotificationRules = lazy(() => import("@/pages/AdminNotificationRules"));
-const AdminDesignSystem = lazy(() => import("@/pages/AdminDesignSystem"));
-const Calendario = lazy(() => import("@/pages/Calendario"));
-const OnboardingRH = lazy(() => import("@/pages/OnboardingRH"));
-const OnboardingsClientes = lazy(() => import("@/pages/OnboardingsClientes"));
-const PesquisasGG = lazy(() => import("@/pages/PesquisasGG"));
-const NpsPesquisa = lazy(() => import("@/pages/NpsPesquisa"));
-const MeuPerfil = lazy(() => import("@/pages/MeuPerfil"));
-const Avisos = lazy(() => import("@/pages/Avisos"));
-const AdminHealth = lazy(() => import("@/pages/AdminHealth"));
-const AdminOverrides = lazy(() => import("@/pages/AdminOverrides"));
-const Sugestoes = lazy(() => import("@/pages/Sugestoes"));
-const ProcessosInternos = lazy(() => import("@/pages/ProcessosInternos"));
-const ContratosModule = lazy(() => import("@/pages/ContratosModule"));
-const MargemCliente = lazy(() => import("@/pages/MargemCliente"));
-const AnaliseSquads = lazy(() => import("@/pages/AnaliseSquads"));
-const AutoReport = lazy(() => import("@/pages/AutoReport"));
-const Chamados = lazy(() => import("@/pages/Chamados"));
-const PortalCliente = PortalClientePage;
-const NotFound = lazy(() => import("@/pages/not-found"));
+// Wrapper around lazy() that retries with cache-busting on chunk load failure.
+// After a deploy, old chunk hashes no longer exist on the server. A plain retry
+// would hit the browser cache and fail again, so we append ?t=<timestamp> to
+// force a fresh network request for the new index.html / chunk manifest.
+function lazyWithRetry(factory: () => Promise<{ default: React.ComponentType<any> }>) {
+  return lazy(() =>
+    factory().catch((err) => {
+      // Only retry for chunk/module load errors
+      const msg = err?.message || '';
+      if (
+        msg.includes('Failed to fetch dynamically imported module') ||
+        msg.includes('Importing a module script failed') ||
+        msg.includes('Loading chunk') ||
+        msg.includes('ChunkLoadError')
+      ) {
+        // Avoid infinite retry loop: only retry once per session per page
+        const retryKey = `chunk-retry-${window.location.pathname}`;
+        if (!sessionStorage.getItem(retryKey)) {
+          sessionStorage.setItem(retryKey, Date.now().toString());
+          // Force a full page reload bypassing cache to get fresh HTML with new chunk hashes
+          window.location.reload();
+          // Return a never-resolving promise to prevent React from rendering the error
+          return new Promise(() => {});
+        }
+        // Already retried — clear flag and let the error propagate to ErrorBoundary
+        sessionStorage.removeItem(retryKey);
+      }
+      throw err;
+    })
+  );
+}
 
-// Error boundary to catch silent crashes in the portal
+const Homepage = lazyWithRetry(() => import("@/pages/Homepage"));
+const Clients = lazyWithRetry(() => import("@/pages/Clients"));
+const Contracts = lazyWithRetry(() => import("@/pages/Contracts"));
+const ClientesContratos = lazyWithRetry(() => import("@/pages/ClientesContratos"));
+const ClientDetail = lazyWithRetry(() => import("@/pages/ClientDetail"));
+const Colaboradores = lazyWithRetry(() => import("@/pages/Colaboradores"));
+const ColaboradoresAnalise = lazyWithRetry(() => import("@/pages/ColaboradoresAnalise"));
+const DetailColaborador = lazyWithRetry(() => import("@/pages/DetailColaborador"));
+const Patrimonio = lazyWithRetry(() => import("@/pages/Patrimonio"));
+const PatrimonioDetail = lazyWithRetry(() => import("@/pages/PatrimonioDetail"));
+const Ferramentas = lazyWithRetry(() => import("@/pages/Ferramentas"));
+const TurboZap = lazyWithRetry(() => import("@/pages/TurboZap"));
+const Atendimento = lazyWithRetry(() => import("@/pages/Atendimento"));
+const ChatAtendimento = lazyWithRetry(() => import("@/pages/ChatAtendimento"));
+const VisaoGeral = lazyWithRetry(() => import("@/pages/VisaoGeral"));
+const DashboardFinanceiro = lazyWithRetry(() => import("@/pages/DashboardFinanceiro"));
+const DashboardGeG = lazyWithRetry(() => import("@/pages/DashboardGeG"));
+const CalendarioFerias = lazyWithRetry(() => import("@/pages/CalendarioFerias"));
+const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
+const ChurnPredicao = lazyWithRetry(() => import("@/pages/ChurnPredicao"));
+const ContratosDetalhamento = lazyWithRetry(() => import("@/pages/ContratosDetalhamento"));
+const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
+const DashboardDFC = lazyWithRetry(() => import("@/pages/DashboardDFC"));
+const DashboardInadimplencia = lazyWithRetry(() => import("@/pages/DashboardInadimplencia"));
+const DashboardInhire = lazyWithRetry(() => import("@/pages/DashboardInhire"));
+const DashboardRecrutamento = lazyWithRetry(() => import("@/pages/DashboardRecrutamento"));
+const DashboardTech = lazyWithRetry(() => import("@/pages/DashboardTech"));
+const TechProjetos = lazyWithRetry(() => import("@/pages/TechProjetos"));
+const TechEvolucao = lazyWithRetry(() => import("@/pages/TechEvolucao"));
+const TechFinanceiro = lazyWithRetry(() => import("@/pages/TechFinanceiro"));
+const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
+const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
+const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
+const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
+const ContribuicaoOperador = lazyWithRetry(() => import("@/pages/ContribuicaoOperador"));
+const ContribuicaoSquad = lazyWithRetry(() => import("@/pages/ContribuicaoSquad"));
+const AdminUsuarios = lazyWithRetry(() => import("@/pages/AdminUsuarios"));
+const AdminAvisos = lazyWithRetry(() => import("@/pages/AdminAvisos"));
+const AccessDenied = lazyWithRetry(() => import("@/pages/AccessDenied"));
+const Login = lazyWithRetry(() => import("@/pages/Login"));
+const DashboardClosers = lazyWithRetry(() => import("@/pages/DashboardClosers"));
+const DashboardSDRs = lazyWithRetry(() => import("@/pages/DashboardSDRs"));
+const DetailClosers = lazyWithRetry(() => import("@/pages/DetailClosers"));
+const DetailSDRs = lazyWithRetry(() => import("@/pages/DetailSDRs"));
+const AnaliseVendas = lazyWithRetry(() => import("@/pages/AnaliseVendas"));
+const PresentationMode = lazyWithRetry(() => import("@/pages/PresentationMode"));
+const DetalhamentoVendas = lazyWithRetry(() => import("@/pages/DetalhamentoVendas"));
+const Criativos = lazyWithRetry(() => import("@/pages/Criativos"));
+const GrowthOrcadoRealizado = lazyWithRetry(() => import("@/pages/GrowthOrcadoRealizado"));
+const GrowthVisaoGeral = lazyWithRetry(() => import("@/pages/GrowthVisaoGeral"));
+const PerformancePlataformas = lazyWithRetry(() => import("@/pages/PerformancePlataformas"));
+const RevenueGoals = lazyWithRetry(() => import("@/pages/RevenueGoals"));
+const CasesChat = lazyWithRetry(() => import("@/pages/CasesChat"));
+const JuridicoClientes = lazyWithRetry(() => import("@/pages/JuridicoClientes"));
+const ProcessosJuridico = lazyWithRetry(() => import("@/pages/ProcessosJuridico"));
+const ContratosColaboradores = lazyWithRetry(() => import("@/pages/ContratosColaboradores"));
+const InvestorsReport = lazyWithRetry(() => import("@/pages/InvestorsReport"));
+const Acessos = lazyWithRetry(() => import("@/pages/Acessos"));
+const Conhecimentos = lazyWithRetry(() => import("@/pages/Conhecimentos"));
+const Beneficios = lazyWithRetry(() => import("@/pages/Beneficios"));
+const OKR2026 = lazyWithRetry(() => import("@/pages/OKR2026"));
+const AdminNotificationRules = lazyWithRetry(() => import("@/pages/AdminNotificationRules"));
+const AdminDesignSystem = lazyWithRetry(() => import("@/pages/AdminDesignSystem"));
+const Calendario = lazyWithRetry(() => import("@/pages/Calendario"));
+const OnboardingRH = lazyWithRetry(() => import("@/pages/OnboardingRH"));
+const OnboardingsClientes = lazyWithRetry(() => import("@/pages/OnboardingsClientes"));
+const PesquisasGG = lazyWithRetry(() => import("@/pages/PesquisasGG"));
+const NpsPesquisa = lazyWithRetry(() => import("@/pages/NpsPesquisa"));
+const MeuPerfil = lazyWithRetry(() => import("@/pages/MeuPerfil"));
+const Avisos = lazyWithRetry(() => import("@/pages/Avisos"));
+const AdminHealth = lazyWithRetry(() => import("@/pages/AdminHealth"));
+const AdminOverrides = lazyWithRetry(() => import("@/pages/AdminOverrides"));
+const Sugestoes = lazyWithRetry(() => import("@/pages/Sugestoes"));
+const ProcessosInternos = lazyWithRetry(() => import("@/pages/ProcessosInternos"));
+const ContratosModule = lazyWithRetry(() => import("@/pages/ContratosModule"));
+const MargemCliente = lazyWithRetry(() => import("@/pages/MargemCliente"));
+const AnaliseSquads = lazyWithRetry(() => import("@/pages/AnaliseSquads"));
+const AutoReport = lazyWithRetry(() => import("@/pages/AutoReport"));
+const Chamados = lazyWithRetry(() => import("@/pages/Chamados"));
+const PortalCliente = PortalClientePage;
+const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
+
+// Error boundary to catch silent crashes in the portal.
+// The lazyWithRetry wrapper handles the first auto-reload attempt at the
+// import level.  This boundary is the safety net: if the error still reaches
+// here (e.g. a non-chunk error, or the retry already happened), it shows a
+// user-friendly screen with a manual reload button.
 class PortalErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -108,29 +144,21 @@ class PortalErrorBoundary extends Component<{ children: ReactNode }, { error: Er
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
-  componentDidCatch(error: Error) {
-    // Auto-reload on chunk load failures (happens after deploy when browser has stale cache)
-    if (
-      error.message?.includes('Failed to fetch dynamically imported module') ||
-      error.message?.includes('Importing a module script failed') ||
-      error.message?.includes('Loading chunk') ||
-      error.message?.includes('ChunkLoadError')
-    ) {
-      const reloadKey = 'chunk-reload-' + window.location.pathname;
-      if (!sessionStorage.getItem(reloadKey)) {
-        sessionStorage.setItem(reloadKey, '1');
-        window.location.reload();
-        return;
-      }
-      sessionStorage.removeItem(reloadKey);
-    }
-  }
   render() {
     if (this.state.error) {
+      const isChunkError =
+        this.state.error.message?.includes('Failed to fetch dynamically imported module') ||
+        this.state.error.message?.includes('Importing a module script failed') ||
+        this.state.error.message?.includes('Loading chunk') ||
+        this.state.error.message?.includes('ChunkLoadError');
       return (
         <div style={{ position: 'fixed', inset: 0, background: '#09090b', color: 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', fontFamily: 'monospace', zIndex: 9999 }}>
           <p style={{ fontSize: '1.2rem', marginBottom: '1rem', color: '#f87171' }}>Erro no Portal</p>
-          <p style={{ fontSize: '0.75rem', color: '#a1a1aa', maxWidth: '600px', textAlign: 'center', wordBreak: 'break-all' }}>{this.state.error.message}</p>
+          <p style={{ fontSize: '0.75rem', color: '#a1a1aa', maxWidth: '600px', textAlign: 'center', wordBreak: 'break-all' }}>
+            {isChunkError
+              ? 'Uma nova versão do portal foi publicada. Clique abaixo para atualizar.'
+              : this.state.error.message}
+          </p>
           <button onClick={() => { sessionStorage.clear(); window.location.reload(); }} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem', cursor: 'pointer' }}>Recarregar Página</button>
           <button onClick={() => window.location.href = '/login'} style={{ marginTop: '0.5rem', padding: '0.5rem 1.5rem', background: 'transparent', color: '#a1a1aa', border: '1px solid #3f3f46', borderRadius: '0.5rem', cursor: 'pointer' }}>Voltar ao Login</button>
         </div>
@@ -381,10 +409,11 @@ function AppLayout() {
   }
 
   if (isPresentationMode) {
-    return <Router />;
+    return <PortalErrorBoundary><Router /></PortalErrorBoundary>;
   }
 
   return (
+    <PortalErrorBoundary>
     <PageProvider>
       <DealNotificationsHandler />
       <SidebarProvider style={style as React.CSSProperties}>
@@ -400,6 +429,7 @@ function AppLayout() {
       </SidebarProvider>
       <AssistantWidget />
     </PageProvider>
+    </PortalErrorBoundary>
   );
 }
 

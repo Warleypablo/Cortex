@@ -16055,6 +16055,17 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       if (!metric) {
         return res.status(400).json({ error: "Missing 'metric' query parameter" });
       }
+
+      // Optional month param (e.g. "2026-01") to filter by specific month
+      const monthParam = req.query.month as string | undefined;
+      let startDate: string | undefined;
+      let endDate: string | undefined;
+      if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+        const [year, month] = monthParam.split('-').map(Number);
+        startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+        endDate = new Date(year, month, 0).toISOString().split('T')[0];
+      }
+
       const {
         getMrrAtivoDetail,
         getChurnDetail,
@@ -16071,18 +16082,18 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       } = await import("./okr2026/metricsAdapter");
 
       const handlers: Record<string, () => Promise<any>> = {
-        mrr_ativo: getMrrAtivoDetail,
-        vendas_mrr: getVendasMrrDetail,
-        churn: getChurnDetail,
-        vendas_pontuais: getAquisicaoPontualDetail,
-        entregas_pontuais: getValorEntreguePontualDetail,
-        cogs_csv: getCsvDetail,
-        cac_total: getCacDetail,
-        sga_total: getSgaDetail,
-        capex: getCapexDetail,
-        taxes_on_revenue: getTaxesOnRevenueDetail,
-        tax_ir_csll: getTaxIrCsllDetail,
-        revenue_other: getRevenueOtherDetail,
+        mrr_ativo: () => getMrrAtivoDetail(),
+        vendas_mrr: () => getVendasMrrDetail(),
+        churn: () => getChurnDetail(),
+        vendas_pontuais: () => getAquisicaoPontualDetail(),
+        entregas_pontuais: () => getValorEntreguePontualDetail(),
+        cogs_csv: () => getCsvDetail(startDate, endDate),
+        cac_total: () => getCacDetail(startDate, endDate),
+        sga_total: () => getSgaDetail(startDate, endDate),
+        capex: () => getCapexDetail(startDate, endDate),
+        taxes_on_revenue: () => getTaxesOnRevenueDetail(startDate, endDate),
+        tax_ir_csll: () => getTaxIrCsllDetail(startDate, endDate),
+        revenue_other: () => getRevenueOtherDetail(startDate, endDate),
       };
 
       const handler = handlers[metric];
@@ -16503,13 +16514,14 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       }
       
       // Load historical snapshots for past months
+      const snapshotedMonths = new Set<string>();
       try {
         const snapshotsResult = await db.execute(sql`
-          SELECT mes_ano, metricas 
+          SELECT mes_ano, metricas
           FROM cortex_core.bp_snapshots
           ORDER BY mes_ano
         `);
-        
+
         const metricKeyMap: Record<string, string> = {
           mrr_active: "mrr_active",
           sales_mrr: "sales_mrr",
@@ -16524,6 +16536,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           cac: "cac_total",
           sga: "sga_total",
           ebitda: "ebitda",
+          capex: "capex",
+          tax_ir_csll: "tax_ir_csll",
           cash_generation: "cash_generation",
           cash_generation_margin_pct: "cash_generation_margin_pct",
           cash_balance: "cash_balance",
@@ -16535,8 +16549,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         
         for (const row of snapshotsResult.rows as any[]) {
           const mesAno = row.mes_ano;
+          snapshotedMonths.add(mesAno);
           const metricas = typeof row.metricas === 'string' ? JSON.parse(row.metricas) : row.metricas;
-          
+
           for (const [snapshotKey, bpKey] of Object.entries(metricKeyMap)) {
             if (metricas[snapshotKey] !== undefined) {
               if (!actualsByMetric[bpKey]) actualsByMetric[bpKey] = {};
@@ -16544,16 +16559,118 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             }
           }
         }
-        console.log(`[bp-financeiro] Loaded ${snapshotsResult.rows.length} historical snapshots`);
+        console.log(`[bp-financeiro] Loaded ${snapshotsResult.rows.length} historical snapshots: ${Array.from(snapshotedMonths).join(", ")}`);
       } catch (snapshotError) {
         console.log("[api] BP financeiro: Could not load historical snapshots", snapshotError);
       }
-      
+
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonthNum = now.getMonth() + 1;
       const currentMonthKey = `${currentYear}-${String(currentMonthNum).padStart(2, "0")}`;
-      
+
+      // Auto-create or refresh snapshots for past months missing data
+      if (currentYear === 2026 && currentMonthNum > 1) {
+        for (let m = 1; m < currentMonthNum; m++) {
+          const monthKey = `2026-${String(m).padStart(2, "0")}`;
+          // Skip if snapshot exists and has non-zero financial data
+          if (snapshotedMonths.has(monthKey)) {
+            const hasSalesData = (actualsByMetric["sales_mrr"]?.[monthKey] ?? 0) > 0
+              || (actualsByMetric["revenue_one_time"]?.[monthKey] ?? 0) > 0
+              || (actualsByMetric["cogs_csv"]?.[monthKey] ?? 0) > 0
+              || (actualsByMetric["revenue_net"]?.[monthKey] ?? 0) > 0;
+            if (hasSalesData) continue;
+            console.log(`[bp-financeiro] Snapshot for ${monthKey} has zero financial data, refreshing...`);
+          }
+          try {
+            console.log(`[bp-financeiro] Auto-creating snapshot for missing month ${monthKey}`);
+            const mStart = new Date(2026, m - 1, 1).toISOString().split("T")[0];
+            const mEnd = new Date(2026, m, 0).toISOString().split("T")[0];
+
+            const [snapMrr, snapVendas, snapPontual, snapOutras, snapInad, snapImpostos, snapCaixa, snapCsv, snapSga, snapCac, snapCapex, snapIrCsll, snapChurn, snapHeadcount, snapClientes, snapContratos] = await Promise.all([
+              db.execute(sql.raw(`SELECT COALESCE(SUM(valorr), 0) as mrr FROM "Clickup".cup_contratos WHERE status IN ('ativo', 'onboarding', 'triagem') AND (data_inicio IS NULL OR data_inicio <= '${mEnd}') AND (data_encerramento IS NULL OR data_encerramento > '${mEnd}')`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(valor_recorrente::numeric), 0) as vendas_mrr FROM "Bitrix".crm_deal WHERE stage_name = 'Negócio Ganho' AND data_fechamento >= '${mStart}' AND data_fechamento <= '${mEnd}' AND valor_recorrente IS NOT NULL AND valor_recorrente > 0`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(valor_pontual::numeric), 0) as receita_pontual FROM "Bitrix".crm_deal WHERE stage_name = 'Negócio Ganho' AND data_fechamento >= '${mStart}' AND data_fechamento <= '${mEnd}' AND valor_pontual IS NOT NULL AND valor_pontual > 0`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total FROM "Conta Azul".caz_parcelas WHERE tipo_evento = 'RECEITA' AND (categoria_nome LIKE '03.02%' OR categoria_nome LIKE '03.03%' OR categoria_nome LIKE '04.01%' OR categoria_nome LIKE '04.03%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(nao_pago::numeric), 0) as inadimplencia FROM "Conta Azul".caz_parcelas WHERE tipo_evento = 'RECEITA' AND data_vencimento >= '${mStart}' AND data_vencimento <= '${mEnd}' AND nao_pago::numeric > 0`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total FROM "Conta Azul".caz_parcelas WHERE tipo_evento = 'DESPESA' AND categoria_nome LIKE '05.05%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as entradas, COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as saidas FROM "Conta Azul".caz_parcelas WHERE data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date AND status = 'QUITADO'`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as csv FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '05.01%' OR categoria_nome LIKE '05.02%' OR categoria_nome LIKE '05.03%' OR categoria_nome LIKE '05.04.01%' OR categoria_nome LIKE '06.01%' OR categoria_nome LIKE '06.05%' OR categoria_nome LIKE '06.07%' OR categoria_nome LIKE '06.10.01%' OR categoria_nome LIKE '06.10.03%' OR categoria_nome LIKE '06.10.04%') AND categoria_nome NOT LIKE '06.07.02%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as sga FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '06.02%' OR categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.08%' OR categoria_nome LIKE '06.09%' OR categoria_nome LIKE '06.10.02%' OR categoria_nome LIKE '06.10.05%' OR categoria_nome LIKE '06.10.06%' OR categoria_nome LIKE '06.10.07%' OR categoria_nome LIKE '06.10.08%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%') AND categoria_nome NOT LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '05.04.02%' OR categoria_nome LIKE '06.04%' OR categoria_nome LIKE '06.06%' OR categoria_nome LIKE '06.07.02%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as capex FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND categoria_nome LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND categoria_nome LIKE '06.13%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(valorr::numeric), 0) as churn FROM "Clickup".cup_contratos WHERE data_solicitacao_encerramento >= '${mStart}' AND data_solicitacao_encerramento <= '${mEnd}'`)),
+              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE status = 'Ativo'`)),
+              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_clientes WHERE status IN ('ativo', 'triagem', 'onboarding')`)),
+              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_contratos WHERE status IN ('ativo', 'triagem', 'onboarding')`)),
+            ]);
+
+            const sMrr = parseFloat((snapMrr.rows[0] as any)?.mrr || "0");
+            const sVendas = parseFloat((snapVendas.rows[0] as any)?.vendas_mrr || "0");
+            const sPontual = parseFloat((snapPontual.rows[0] as any)?.receita_pontual || "0");
+            const sOutras = parseFloat((snapOutras.rows[0] as any)?.total || "0");
+            const sInad = parseFloat((snapInad.rows[0] as any)?.inadimplencia || "0");
+            const sImpostos = parseFloat((snapImpostos.rows[0] as any)?.total || "0");
+            const sEntradas = parseFloat((snapCaixa.rows[0] as any)?.entradas || "0");
+            const sSaidas = parseFloat((snapCaixa.rows[0] as any)?.saidas || "0");
+            const sCsv = parseFloat((snapCsv.rows[0] as any)?.csv || "0");
+            const sSga = parseFloat((snapSga.rows[0] as any)?.sga || "0");
+            const sCac = parseFloat((snapCac.rows[0] as any)?.cac || "0");
+            const sCapex = parseFloat((snapCapex.rows[0] as any)?.capex || "0");
+            const sIrCsll = parseFloat((snapIrCsll.rows[0] as any)?.ir_csll || "0");
+            const sChurn = parseFloat((snapChurn.rows[0] as any)?.churn || "0");
+            const sReceitaTotal = sMrr + sPontual + sOutras;
+            const sReceitaLiquida = sReceitaTotal - sImpostos;
+            const sMargemBruta = sReceitaLiquida - sCsv;
+            const sEbitda = sMargemBruta - sCac - sSga;
+            const sGeracaoCaixa = sEntradas - sSaidas;
+            const sMargemCaixa = sEntradas > 0 ? sGeracaoCaixa / sEntradas : 0;
+
+            const snapMetricas = {
+              mrr_active: sMrr, sales_mrr: sVendas, revenue_one_time: sPontual,
+              revenue_other: sOutras, revenue_billable_total: sReceitaTotal,
+              bad_debt: sInad, taxes_on_revenue: sImpostos, net_revenue: sReceitaLiquida,
+              csv: sCsv, gross_margin: sMargemBruta, cac: sCac, sga: sSga, ebitda: sEbitda,
+              capex: sCapex, tax_ir_csll: sIrCsll,
+              cash_generation: sGeracaoCaixa, cash_generation_margin_pct: sMargemCaixa,
+              churn_mrr_month: sChurn, headcount_total: parseInt((snapHeadcount.rows[0] as any)?.total || "0"),
+              clients_active: parseInt((snapClientes.rows[0] as any)?.total || "0"),
+              contracts_active: parseInt((snapContratos.rows[0] as any)?.total || "0"),
+              receitas_dfc: sEntradas, despesas_dfc: sSaidas,
+            };
+
+            // Save snapshot for future requests
+            await db.execute(sql`
+              INSERT INTO cortex_core.bp_snapshots (mes_ano, data_snapshot, metricas)
+              VALUES (${monthKey}, NOW(), ${JSON.stringify(snapMetricas)}::jsonb)
+              ON CONFLICT (mes_ano) DO UPDATE SET data_snapshot = NOW(), metricas = ${JSON.stringify(snapMetricas)}::jsonb
+            `);
+
+            // Populate actuals from the generated snapshot
+            const autoMetricMap: Record<string, string> = {
+              mrr_active: "mrr_active", sales_mrr: "sales_mrr", revenue_one_time: "revenue_one_time",
+              revenue_other: "revenue_other", revenue_billable_total: "revenue_billable_total",
+              bad_debt: "bad_debt", taxes_on_revenue: "taxes_on_revenue", net_revenue: "revenue_net",
+              csv: "cogs_csv", gross_margin: "gross_margin", cac: "cac_total", sga: "sga_total",
+              ebitda: "ebitda", capex: "capex", tax_ir_csll: "tax_ir_csll",
+              cash_generation: "cash_generation", cash_generation_margin_pct: "cash_generation_margin_pct",
+              churn_mrr_month: "churn_mrr_month", headcount_total: "headcount_total",
+              clients_active: "clients_active", contracts_active: "contracts_active",
+            };
+            for (const [snapshotKey, bpKey] of Object.entries(autoMetricMap)) {
+              if ((snapMetricas as any)[snapshotKey] !== undefined) {
+                if (!actualsByMetric[bpKey]) actualsByMetric[bpKey] = {};
+                actualsByMetric[bpKey][monthKey] = (snapMetricas as any)[snapshotKey];
+              }
+            }
+            console.log(`[bp-financeiro] Auto-snapshot created for ${monthKey}`);
+          } catch (autoSnapError) {
+            console.log(`[bp-financeiro] Could not auto-create snapshot for ${monthKey}`, autoSnapError);
+          }
+        }
+      }
+
       if (currentYear === 2026) {
         try {
           const startOfMonth = new Date(currentYear, currentMonthNum - 1, 1);
@@ -16716,18 +16833,24 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           if (!actualsByMetric["cash_balance"]) actualsByMetric["cash_balance"] = {};
           actualsByMetric["cash_balance"][currentMonthKey] = saldoCaixa;
           
-          // CSV (Custo Serviços Vendidos) - categoria 06.% excluindo CAC (06.03,06.04), SGA (06.10,06.11,06.12) e IR/CSLL (06.13)
+          // CSV (Custo Serviços Vendidos) - categorias 05.01-05.04.01, 06.01, 06.05, 06.07 (exceto 06.07.02), 06.10.01, 06.10.03, 06.10.04
           const csvResult = await db.execute(sql`
             SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as csv
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
-              AND categoria_nome LIKE '06.%'
-              AND categoria_nome NOT LIKE '06.03%'
-              AND categoria_nome NOT LIKE '06.04%'
-              AND categoria_nome NOT LIKE '06.10%'
-              AND categoria_nome NOT LIKE '06.11%'
-              AND categoria_nome NOT LIKE '06.12%'
-              AND categoria_nome NOT LIKE '06.13%'
+              AND (
+                categoria_nome LIKE '05.01%'
+                OR categoria_nome LIKE '05.02%'
+                OR categoria_nome LIKE '05.03%'
+                OR categoria_nome LIKE '05.04.01%'
+                OR categoria_nome LIKE '06.01%'
+                OR categoria_nome LIKE '06.05%'
+                OR categoria_nome LIKE '06.07%'
+                OR categoria_nome LIKE '06.10.01%'
+                OR categoria_nome LIKE '06.10.03%'
+                OR categoria_nome LIKE '06.10.04%'
+              )
+              AND categoria_nome NOT LIKE '06.07.02%'
               AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
               AND data_quitacao::date <= CURRENT_DATE
           `);
@@ -16735,12 +16858,17 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           if (!actualsByMetric["cogs_csv"]) actualsByMetric["cogs_csv"] = {};
           actualsByMetric["cogs_csv"][currentMonthKey] = csvTotal;
           
-          // CAC (Custo de Aquisição) - categorias 06.03% e 06.04%
+          // CAC (Custo de Aquisição) - categorias 05.04.02, 06.04, 06.06, 06.07.02
           const cacResult = await db.execute(sql`
             SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
-              AND (categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.04%')
+              AND (
+                categoria_nome LIKE '05.04.02%'
+                OR categoria_nome LIKE '06.04%'
+                OR categoria_nome LIKE '06.06%'
+                OR categoria_nome LIKE '06.07.02%'
+              )
               AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
               AND data_quitacao::date <= CURRENT_DATE
           `);
@@ -16748,12 +16876,24 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           if (!actualsByMetric["cac_total"]) actualsByMetric["cac_total"] = {};
           actualsByMetric["cac_total"][currentMonthKey] = cacTotal;
           
-          // SG&A (Despesas Administrativas) - categorias 06.10%, 06.11%, 06.12% excluindo CAPEX (06.11.01%)
+          // SG&A (Despesas Administrativas) - categorias 06.02, 06.03, 06.08, 06.09, 06.10.02, 06.10.05-08, 06.11 (exceto 06.11.01), 06.12
           const sgaResult = await db.execute(sql`
             SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as sga
             FROM "Conta Azul".caz_parcelas
             WHERE status = 'QUITADO'
-              AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+              AND (
+                categoria_nome LIKE '06.02%'
+                OR categoria_nome LIKE '06.03%'
+                OR categoria_nome LIKE '06.08%'
+                OR categoria_nome LIKE '06.09%'
+                OR categoria_nome LIKE '06.10.02%'
+                OR categoria_nome LIKE '06.10.05%'
+                OR categoria_nome LIKE '06.10.06%'
+                OR categoria_nome LIKE '06.10.07%'
+                OR categoria_nome LIKE '06.10.08%'
+                OR categoria_nome LIKE '06.11%'
+                OR categoria_nome LIKE '06.12%'
+              )
               AND categoria_nome NOT LIKE '06.11.01%'
               AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
               AND data_quitacao::date <= CURRENT_DATE
@@ -17032,47 +17172,100 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const margemGeracaoCaixa = entradas > 0 ? geracaoCaixa / entradas : 0;
       
       const csvResult = await db.execute(sql.raw(`
-        SELECT COALESCE(SUM(valor_pago::numeric), 0) as csv
+        SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as csv
         FROM "Conta Azul".caz_parcelas
         WHERE status = 'QUITADO'
-          AND categoria_nome LIKE '06.%'
-          AND categoria_nome NOT LIKE '06.03%'
-          AND categoria_nome NOT LIKE '06.04%'
-          AND categoria_nome NOT LIKE '06.10%'
-          AND categoria_nome NOT LIKE '06.11%'
-          AND categoria_nome NOT LIKE '06.12%'
-          AND categoria_nome NOT LIKE '06.13%'
+          AND (
+            categoria_nome LIKE '05.01%'
+            OR categoria_nome LIKE '05.02%'
+            OR categoria_nome LIKE '05.03%'
+            OR categoria_nome LIKE '05.04.01%'
+            OR categoria_nome LIKE '06.01%'
+            OR categoria_nome LIKE '06.05%'
+            OR categoria_nome LIKE '06.07%'
+            OR categoria_nome LIKE '06.10.01%'
+            OR categoria_nome LIKE '06.10.03%'
+            OR categoria_nome LIKE '06.10.04%'
+          )
+          AND categoria_nome NOT LIKE '06.07.02%'
           AND data_quitacao::date >= '${startStr}'::date
           AND data_quitacao::date <= '${endStr}'::date
       `));
       const csv = parseFloat((csvResult.rows[0] as any)?.csv || "0");
-      
+
       const sgaResult = await db.execute(sql.raw(`
-        SELECT COALESCE(SUM(valor_pago::numeric), 0) as sga
+        SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as sga
         FROM "Conta Azul".caz_parcelas
         WHERE status = 'QUITADO'
-          AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+          AND (
+            categoria_nome LIKE '06.02%'
+            OR categoria_nome LIKE '06.03%'
+            OR categoria_nome LIKE '06.08%'
+            OR categoria_nome LIKE '06.09%'
+            OR categoria_nome LIKE '06.10.02%'
+            OR categoria_nome LIKE '06.10.05%'
+            OR categoria_nome LIKE '06.10.06%'
+            OR categoria_nome LIKE '06.10.07%'
+            OR categoria_nome LIKE '06.10.08%'
+            OR categoria_nome LIKE '06.11%'
+            OR categoria_nome LIKE '06.12%'
+          )
           AND categoria_nome NOT LIKE '06.11.01%'
           AND data_quitacao::date >= '${startStr}'::date
           AND data_quitacao::date <= '${endStr}'::date
       `));
       const sga = parseFloat((sgaResult.rows[0] as any)?.sga || "0");
-      
+
       const cacResult = await db.execute(sql.raw(`
-        SELECT COALESCE(SUM(valor_pago::numeric), 0) as cac
+        SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac
         FROM "Conta Azul".caz_parcelas
         WHERE status = 'QUITADO'
-          AND (categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.04%')
+          AND (
+            categoria_nome LIKE '05.04.02%'
+            OR categoria_nome LIKE '06.04%'
+            OR categoria_nome LIKE '06.06%'
+            OR categoria_nome LIKE '06.07.02%'
+          )
           AND data_quitacao::date >= '${startStr}'::date
           AND data_quitacao::date <= '${endStr}'::date
       `));
       const cac = parseFloat((cacResult.rows[0] as any)?.cac || "0");
       
+      // CAPEX (06.11.01%)
+      const capexResult = await db.execute(sql.raw(`
+        SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as capex
+        FROM "Conta Azul".caz_parcelas
+        WHERE status = 'QUITADO' AND categoria_nome LIKE '06.11.01%'
+          AND data_quitacao::date >= '${startStr}'::date AND data_quitacao::date <= '${endStr}'::date
+      `));
+      const capex = parseFloat((capexResult.rows[0] as any)?.capex || "0");
+
+      // IR/CSLL (06.13%)
+      const irCsllResult = await db.execute(sql.raw(`
+        SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll
+        FROM "Conta Azul".caz_parcelas
+        WHERE status = 'QUITADO' AND categoria_nome LIKE '06.13%'
+          AND data_quitacao::date >= '${startStr}'::date AND data_quitacao::date <= '${endStr}'::date
+      `));
+      const irCsll = parseFloat((irCsllResult.rows[0] as any)?.ir_csll || "0");
+
+      // Churn MRR
+      const churnResult = await db.execute(sql.raw(`
+        SELECT COALESCE(SUM(valorr::numeric), 0) as churn FROM "Clickup".cup_contratos
+        WHERE data_solicitacao_encerramento >= '${startStr}' AND data_solicitacao_encerramento <= '${endStr}'
+      `));
+      const churnMrr = parseFloat((churnResult.rows[0] as any)?.churn || "0");
+
+      // Headcount, Clientes, Contratos
+      const headcountResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE status = 'Ativo'`));
+      const clientesResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_clientes WHERE status IN ('ativo', 'triagem', 'onboarding')`));
+      const contratosResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_contratos WHERE status IN ('ativo', 'triagem', 'onboarding')`));
+
       const receitaTotalFaturavel = mrrAtivo + receitaPontual + outrasReceitas;
       const receitaLiquida = receitaTotalFaturavel - inadimplencia - impostos;
       const margemBruta = receitaLiquida - csv;
       const ebitda = margemBruta - cac - sga;
-      
+
       const metricas = {
         mrr_active: mrrAtivo,
         sales_mrr: vendasMrr,
@@ -17087,8 +17280,14 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         cac: cac,
         sga: sga,
         ebitda: ebitda,
+        capex: capex,
+        tax_ir_csll: irCsll,
         cash_generation: geracaoCaixa,
         cash_generation_margin_pct: margemGeracaoCaixa,
+        churn_mrr_month: churnMrr,
+        headcount_total: parseInt((headcountResult.rows[0] as any)?.total || "0"),
+        clients_active: parseInt((clientesResult.rows[0] as any)?.total || "0"),
+        contracts_active: parseInt((contratosResult.rows[0] as any)?.total || "0"),
         receitas_dfc: entradas,
         despesas_dfc: saidas,
       };
