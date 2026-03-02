@@ -16580,7 +16580,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             const mEnd = new Date(2026, m, 0).toISOString().split("T")[0];
 
             const [snapMrr, snapVendas, snapPontual, snapOutras, snapInad, snapImpostos, snapCaixa, snapCsv, snapSga, snapCac, snapCapex, snapIrCsll, snapChurn, snapHeadcount, snapClientes, snapContratos] = await Promise.all([
-              db.execute(sql.raw(`SELECT COALESCE(SUM(valorr), 0) as mrr FROM "Clickup".cup_contratos WHERE status IN ('ativo', 'onboarding', 'triagem') AND (data_inicio IS NULL OR data_inicio <= '${mEnd}') AND (data_encerramento IS NULL OR data_encerramento > '${mEnd}')`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(valorr::numeric), 0) as mrr FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${mEnd}'::date AND status IN ('ativo', 'onboarding', 'triagem')`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(valor_recorrente::numeric), 0) as vendas_mrr FROM "Bitrix".crm_deal WHERE stage_name = 'Negócio Ganho' AND data_fechamento >= '${mStart}' AND data_fechamento <= '${mEnd}' AND valor_recorrente IS NOT NULL AND valor_recorrente > 0`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(valor_pontual::numeric), 0) as receita_pontual FROM "Bitrix".crm_deal WHERE stage_name = 'Negócio Ganho' AND data_fechamento >= '${mStart}' AND data_fechamento <= '${mEnd}' AND valor_pontual IS NOT NULL AND valor_pontual > 0`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total FROM "Conta Azul".caz_parcelas WHERE tipo_evento = 'RECEITA' AND (categoria_nome LIKE '03.02%' OR categoria_nome LIKE '03.03%' OR categoria_nome LIKE '04.01%' OR categoria_nome LIKE '04.03%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
@@ -16591,11 +16591,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as sga FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '06.02%' OR categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.08%' OR categoria_nome LIKE '06.09%' OR categoria_nome LIKE '06.10.02%' OR categoria_nome LIKE '06.10.05%' OR categoria_nome LIKE '06.10.06%' OR categoria_nome LIKE '06.10.07%' OR categoria_nome LIKE '06.10.08%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%') AND categoria_nome NOT LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '05.04.02%' OR categoria_nome LIKE '06.04%' OR categoria_nome LIKE '06.06%' OR categoria_nome LIKE '06.07.02%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as capex FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND categoria_nome LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
-              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND categoria_nome LIKE '06.13%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll FROM "Conta Azul".caz_parcelas WHERE status IN ('QUITADO','RECEBIDO_PARCIAL') AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01.02%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(valorr::numeric), 0) as churn FROM "Clickup".cup_contratos WHERE data_solicitacao_encerramento >= '${mStart}' AND data_solicitacao_encerramento <= '${mEnd}'`)),
               db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE status = 'Ativo'`)),
               db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_clientes WHERE status IN ('ativo', 'triagem', 'onboarding')`)),
-              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_contratos WHERE status IN ('ativo', 'triagem', 'onboarding')`)),
+              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${mEnd}'::date AND status IN ('ativo', 'triagem', 'onboarding')`)),
             ]);
 
             const sMrr = parseFloat((snapMrr.rows[0] as any)?.mrr || "0");
@@ -16908,12 +16908,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           if (!actualsByMetric["capex"]) actualsByMetric["capex"] = {};
           actualsByMetric["capex"][currentMonthKey] = capexTotal;
           
-          // IR/CSLL - categoria 06.13%
+          // IR/CSLL - categorias 06.13% e 08.01.02%
           const irCsllResult = await db.execute(sql`
             SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll
             FROM "Conta Azul".caz_parcelas
-            WHERE status = 'QUITADO'
-              AND categoria_nome LIKE '06.13%'
+            WHERE status IN ('QUITADO', 'RECEBIDO_PARCIAL')
+              AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01.02%')
               AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
               AND data_quitacao::date <= CURRENT_DATE
           `);
@@ -17083,11 +17083,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const endStr = endOfMonth.toISOString().split("T")[0];
       
       const mrrResult = await db.execute(sql.raw(`
-        SELECT COALESCE(SUM(valorr), 0) as mrr
-        FROM "Clickup".cup_contratos
-        WHERE status IN ('ativo', 'onboarding', 'triagem')
-          AND (data_inicio IS NULL OR data_inicio <= '${endStr}')
-          AND (data_encerramento IS NULL OR data_encerramento > '${endStr}')
+        SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
+        FROM "Clickup".cup_data_hist
+        WHERE data_snapshot::date = '${endStr}'::date
+          AND status IN ('ativo', 'onboarding', 'triagem')
       `));
       const mrrAtivo = parseFloat((mrrResult.rows[0] as any)?.mrr || "0");
       
@@ -17141,10 +17140,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const inadimplencia = parseFloat((inadResult.rows[0] as any)?.inadimplencia || "0");
       
       const impostosResult = await db.execute(sql.raw(`
-        SELECT COALESCE(SUM(valor_pago::numeric), 0) as impostos
+        SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as impostos
         FROM "Conta Azul".caz_parcelas
-        WHERE status = 'QUITADO'
-          AND categoria_nome LIKE '06.13%'
+        WHERE status IN ('QUITADO', 'RECEBIDO_PARCIAL')
+          AND categoria_nome LIKE '05.05%'
           AND data_quitacao::date >= '${startStr}'::date
           AND data_quitacao::date <= '${endStr}'::date
       `));
@@ -17233,11 +17232,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       `));
       const capex = parseFloat((capexResult.rows[0] as any)?.capex || "0");
 
-      // IR/CSLL (06.13%)
+      // IR/CSLL (06.13% e 08.01.02%)
       const irCsllResult = await db.execute(sql.raw(`
         SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll
         FROM "Conta Azul".caz_parcelas
-        WHERE status = 'QUITADO' AND categoria_nome LIKE '06.13%'
+        WHERE status IN ('QUITADO', 'RECEBIDO_PARCIAL') AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01.02%')
           AND data_quitacao::date >= '${startStr}'::date AND data_quitacao::date <= '${endStr}'::date
       `));
       const irCsll = parseFloat((irCsllResult.rows[0] as any)?.ir_csll || "0");
@@ -17252,7 +17251,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       // Headcount, Clientes, Contratos
       const headcountResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE status = 'Ativo'`));
       const clientesResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_clientes WHERE status IN ('ativo', 'triagem', 'onboarding')`));
-      const contratosResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_contratos WHERE status IN ('ativo', 'triagem', 'onboarding')`));
+      const contratosResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${endStr}'::date AND status IN ('ativo', 'triagem', 'onboarding')`));
 
       const receitaTotalFaturavel = mrrAtivo + receitaPontual + outrasReceitas;
       const receitaLiquida = receitaTotalFaturavel - inadimplencia - impostos;
