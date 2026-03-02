@@ -1061,7 +1061,7 @@ export async function getTaxIrCsllDetail(startDate?: string, endDate?: string): 
              data_quitacao, data_vencimento, empresa
       FROM "Conta Azul".caz_parcelas
       WHERE status IN ('QUITADO', 'RECEBIDO_PARCIAL')
-        AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01.02%')
+        AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01%')
         AND data_quitacao::date >= ${sd}::date
         AND data_quitacao::date <= ${ed}::date
       ORDER BY valor_pago::numeric DESC
