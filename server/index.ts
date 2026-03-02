@@ -6,7 +6,7 @@ import passport from "passport";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
-import { Pool } from "pg";
+import { pool as dbPool } from "./db";
 import { initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
@@ -22,19 +22,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 function createSessionStore() {
-  // Use Google Cloud SQL for sessions if available
+  // Reuse the main database pool for sessions to avoid exhausting connection slots
   if (process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD) {
     const PgSession = connectPgSimple(session);
-    const sessionPool = new Pool({
-      host: process.env.DB_HOST,
-      port: 5432,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false }
-    });
     return new PgSession({
-      pool: sessionPool,
+      pool: dbPool,
       tableName: 'session',
       createTableIfMissing: true,
     });

@@ -1362,6 +1362,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // Growth - Orçado x Realizado - Categorias distintas de crm_deal
+  app.get("/api/growth/orcado-realizado/categories", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT category_name
+        FROM "Bitrix".crm_deal
+        WHERE category_name IS NOT NULL AND category_name != ''
+        ORDER BY category_name
+      `);
+      const categories = (result.rows as any[]).map((r: any) => r.category_name);
+      res.json(categories);
+    } catch (error) {
+      console.error("[api] Error fetching deal categories:", error);
+      res.status(500).json({ error: "Failed to fetch deal categories" });
+    }
+  });
+
   // Growth - Orçado x Realizado - Métricas de Vendas MQL
   app.get("/api/growth/orcado-realizado/mql", async (req, res) => {
     try {
@@ -1373,6 +1390,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       const contagem = (req.query.contagem as string) || 'contrato';
+      const categoryName = req.query.categoryName as string | undefined;
+      const categoryFilter = categoryName ? sql`AND d.category_name = ${categoryName}` : sql``;
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
@@ -1409,7 +1428,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
           -- Contratos Implantação (valor_pontual > 0 e Negócio Ganho)
           ${countImpl} as contratos_implantacao_mql,
-          
+
           -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao_mql,
 
@@ -1431,6 +1450,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
           AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
+          ${categoryFilter}
       `);
 
       const row = result.rows[0] as any;
@@ -1494,6 +1514,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       const contagem = (req.query.contagem as string) || 'contrato';
+      const categoryName = req.query.categoryName as string | undefined;
+      const categoryFilter = categoryName ? sql`AND d.category_name = ${categoryName}` : sql``;
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
@@ -1530,7 +1552,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
           -- Contratos Implantação (valor_pontual > 0 e Negócio Ganho)
           ${countImpl} as contratos_implantacao,
-          
+
           -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao,
 
@@ -1552,6 +1574,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
           AND (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
+          ${categoryFilter}
       `);
 
       const row = result.rows[0] as any;

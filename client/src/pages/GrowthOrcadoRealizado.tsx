@@ -142,6 +142,7 @@ export default function GrowthOrcadoRealizado() {
   const [cardFilter, setCardFilter] = useState<'todos' | 'mql' | 'nao-mql'>('todos');
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
+  const [categoryFilter, setCategoryFilter] = useState<string>('todos');
   
   const months = [
     { value: "2026-01", label: "Janeiro 2026" },
@@ -160,10 +161,21 @@ export default function GrowthOrcadoRealizado() {
     };
   }, [selectedMonth]);
 
-  const { data: mqlData, isLoading: mqlLoading } = useQuery<MQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate, contagemFilter],
+  const { data: categories } = useQuery<string[]>({
+    queryKey: ['/api/growth/orcado-realizado/categories'],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}`);
+      const res = await fetch('/api/growth/orcado-realizado/categories');
+      if (!res.ok) throw new Error('Failed to fetch categories');
+      return res.json();
+    },
+  });
+
+  const categoryParam = categoryFilter !== 'todos' ? `&categoryName=${encodeURIComponent(categoryFilter)}` : '';
+
+  const { data: mqlData, isLoading: mqlLoading } = useQuery<MQLMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate, contagemFilter, categoryFilter],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${categoryParam}`);
       if (!res.ok) throw new Error('Failed to fetch MQL metrics');
       return res.json();
     },
@@ -190,9 +202,9 @@ export default function GrowthOrcadoRealizado() {
   }
 
   const { data: naoMqlData, isLoading: naoMqlLoading } = useQuery<NaoMQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate, contagemFilter],
+    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate, contagemFilter, categoryFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}`);
+      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${categoryParam}`);
       if (!res.ok) throw new Error('Failed to fetch Não-MQL metrics');
       return res.json();
     },
@@ -747,42 +759,6 @@ export default function GrowthOrcadoRealizado() {
       {/* Filtros + Cards de Resumo */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground font-medium mr-1">Origem:</span>
-          {(['todos', 'mql', 'nao-mql'] as const).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setCardFilter(filter)}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-all border",
-                cardFilter === filter
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
-              )}
-            >
-              {filter === 'todos' ? 'Todos' : filter === 'mql' ? 'MQL' : 'Não-MQL'}
-            </button>
-          ))}
-        </div>
-        <div className="h-5 w-px bg-border" />
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground font-medium mr-1">Tipo:</span>
-          {(['todos', 'recorrente', 'pontual'] as const).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => setRevenueFilter(filter)}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-all border",
-                revenueFilter === filter
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
-              )}
-            >
-              {filter === 'todos' ? 'Todos' : filter === 'recorrente' ? 'Recorrente' : 'Pontual'}
-            </button>
-          ))}
-        </div>
-        <div className="h-5 w-px bg-border" />
-        <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground font-medium mr-1">Contagem:</span>
           {(['contrato', 'cliente'] as const).map((filter) => (
             <button
@@ -798,6 +774,21 @@ export default function GrowthOrcadoRealizado() {
               {filter === 'contrato' ? 'Contrato' : 'Cliente'}
             </button>
           ))}
+        </div>
+        <div className="h-5 w-px bg-border" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium mr-1">Funil:</span>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="h-8 w-48 text-xs">
+              <SelectValue placeholder="Todas as categorias" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              {categories?.map((cat) => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

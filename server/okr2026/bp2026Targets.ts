@@ -260,8 +260,7 @@ export const BP_2026_TARGETS: MetricDefinition[] = [
     unit: "BRL",
     period_type: "month_sum",
     direction: "up",
-    is_derived: true,
-    formula: "ebitda - tax_ir_csll - capex",
+    is_derived: false,
     dimension_key: "bp_checkpoint",
     dimension_value: "checkpoint",
     months: {
