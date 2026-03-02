@@ -10,9 +10,11 @@ const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
+  application_name: 'cortex_app',
   connectionTimeoutMillis: 10000,
-  idleTimeoutMillis: 30000,
-  max: 10,
+  idleTimeoutMillis: 10000,
+  max: 5,
+  allowExitOnIdle: true,
 });
 
 pool.on('error', (err) => {
@@ -21,6 +23,14 @@ pool.on('error', (err) => {
     console.error('[database] Details:', err.message);
   }
 });
+
+// Graceful shutdown: close pool when process exits
+function shutdownPool() {
+  console.log('[database] Closing pool...');
+  pool.end().catch(() => {});
+}
+process.on('SIGTERM', shutdownPool);
+process.on('SIGINT', shutdownPool);
 
 export const db = drizzle(pool, { schema });
 export { pool, schema };
