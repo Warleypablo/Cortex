@@ -24,10 +24,10 @@ pool.on('error', (err) => {
   }
 });
 
-// Graceful shutdown: close pool when process exits
+// Graceful shutdown: close pool and exit
 function shutdownPool() {
-  console.log('[database] Closing pool...');
-  pool.end().catch(() => {});
+  console.log('[database] Shutting down...');
+  pool.end().then(() => process.exit(0)).catch(() => process.exit(1));
 }
 process.on('SIGTERM', shutdownPool);
 process.on('SIGINT', shutdownPool);
