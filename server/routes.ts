@@ -3993,20 +3993,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY mes, squad, responsavel
       `);
       
-      // Buscar churns por mês (usando data_solicitacao_encerramento - quando cliente pediu cancelamento)
+      // Buscar churns por mês da tabela curada cup_churn
       const churnResult = await db.execute(sql`
         SELECT
           TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           squad,
-          responsavel,
+          responsavel_geral as responsavel,
           COUNT(*) as churns,
-          COALESCE(SUM(valorr), 0) as mrr_churn
-        FROM "Clickup".cup_contratos
+          COALESCE(SUM(valor_r), 0) as mrr_churn
+        FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
-          AND valorr > 0
-        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel
-        ORDER BY mes, squad, responsavel
+          AND valor_r > 0
+        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
+        ORDER BY mes, squad, responsavel_geral
       `);
       
       // Listar squads e operadores disponíveis (incluindo dados ao vivo)
