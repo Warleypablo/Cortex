@@ -16571,6 +16571,28 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // Auto-create or refresh snapshots for past months missing data
       if (currentYear === 2026 && currentMonthNum > 1) {
+        // Fetch current bank balance and future cash flow to calculate historical balances
+        let currentBankBalance = 0;
+        try {
+          const bankResult = await db.execute(sql`SELECT COALESCE(SUM(balance::numeric), 0) as total FROM "Conta Azul".caz_bancos`);
+          currentBankBalance = parseFloat((bankResult.rows[0] as any)?.total || "0");
+        } catch (e) { /* ignore */ }
+        // Cash flow from each month's start to today (to subtract retroactively)
+        const cashFlowAfter: Record<string, number> = {};
+        try {
+          const cfResult = await db.execute(sql`
+            SELECT TO_CHAR(data_quitacao, 'YYYY-MM') as mes,
+              COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric,0) - COALESCE(desconto::numeric,0)) ELSE 0 END), 0) -
+              COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN (COALESCE(valor_pago::numeric,0) - COALESCE(desconto::numeric,0)) ELSE 0 END), 0) as fluxo
+            FROM "Conta Azul".caz_parcelas
+            WHERE data_quitacao::date >= '2026-01-01' AND status IN ('QUITADO','RECEBIDO_PARCIAL')
+            GROUP BY TO_CHAR(data_quitacao, 'YYYY-MM')
+          `);
+          for (const row of cfResult.rows as any[]) {
+            cashFlowAfter[row.mes] = parseFloat(row.fluxo || "0");
+          }
+        } catch (e) { /* ignore */ }
+
         for (let m = 1; m < currentMonthNum; m++) {
           const monthKey = `2026-${String(m).padStart(2, "0")}`;
           // Always refresh past-month snapshots to ensure accuracy after query changes
@@ -16619,6 +16641,13 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             const sGeracaoCaixa = sEntradas - sSaidas;
             const sMargemCaixa = sEntradas > 0 ? sGeracaoCaixa / sEntradas : 0;
 
+            // Saldo de caixa retroativo: saldo_atual - fluxo de caixa dos meses seguintes até hoje
+            let sSaldoCaixa = currentBankBalance;
+            for (let futureM = m + 1; futureM <= currentMonthNum; futureM++) {
+              const futureKey = `2026-${String(futureM).padStart(2, "0")}`;
+              sSaldoCaixa -= (cashFlowAfter[futureKey] || 0);
+            }
+
             const snapMetricas = {
               mrr_active: sMrr, sales_mrr: sVendas, revenue_one_time: sPontual,
               revenue_other: sOutras, revenue_billable_total: sReceitaTotal,
@@ -16626,6 +16655,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
               csv: sCsv, gross_margin: sMargemBruta, cac: sCac, sga: sSga, ebitda: sEbitda,
               capex: sCapex, tax_ir_csll: sIrCsll,
               cash_generation: sGeracaoCaixa, cash_generation_margin_pct: sMargemCaixa,
+              cash_balance: sSaldoCaixa,
               churn_mrr_month: sChurn, headcount_total: parseInt((snapHeadcount.rows[0] as any)?.total || "0"),
               clients_active: parseInt((snapClientes.rows[0] as any)?.total || "0"),
               contracts_active: parseInt((snapContratos.rows[0] as any)?.total || "0"),
@@ -16647,7 +16677,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
               csv: "cogs_csv", gross_margin: "gross_margin", cac: "cac_total", sga: "sga_total",
               ebitda: "ebitda", capex: "capex", tax_ir_csll: "tax_ir_csll",
               cash_generation: "cash_generation", cash_generation_margin_pct: "cash_generation_margin_pct",
-              churn_mrr_month: "churn_mrr_month", headcount_total: "headcount_total",
+              cash_balance: "cash_balance", churn_mrr_month: "churn_mrr_month", headcount_total: "headcount_total",
               clients_active: "clients_active", contracts_active: "contracts_active",
             };
             for (const [snapshotKey, bpKey] of Object.entries(autoMetricMap)) {
