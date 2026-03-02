@@ -12,7 +12,7 @@ const pool = new Pool({
   ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
-  max: 20,
+  max: 10,
 });
 
 pool.on('error', (err) => {
@@ -605,6 +605,17 @@ export async function initializeSysSchema(): Promise<void> {
         active BOOLEAN DEFAULT true,
         sort_order INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // system_settings - key/value store for app configuration (AI provider, etc.)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        id SERIAL PRIMARY KEY,
+        key VARCHAR(100) UNIQUE NOT NULL,
+        value TEXT NOT NULL,
+        description TEXT,
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
