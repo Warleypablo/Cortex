@@ -909,23 +909,31 @@ function mapCazRows(rows: any[], metricName: string): DrillDownResult {
   return { metric: metricName, total, count: items.length, items };
 }
 
-export async function getCsvDetail(): Promise<DrillDownResult> {
-  // CSV: 06.% excluindo CAC (06.03,06.04), SGA (06.10,06.11,06.12) e IR/CSLL (06.13)
+export async function getCsvDetail(startDate?: string, endDate?: string): Promise<DrillDownResult> {
+  // CSV: 05.01-05.04.01, 06.01, 06.05, 06.07 (exceto 06.07.02), 06.10.01, 06.10.03, 06.10.04
+  const sd = startDate || '2026-01-01';
+  const ed = endDate || new Date().toISOString().split('T')[0];
   try {
     const result = await db.execute(sql`
       SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
              data_quitacao, data_vencimento, empresa
       FROM "Conta Azul".caz_parcelas
       WHERE status = 'QUITADO'
-        AND categoria_nome LIKE '06.%'
-        AND categoria_nome NOT LIKE '06.03%'
-        AND categoria_nome NOT LIKE '06.04%'
-        AND categoria_nome NOT LIKE '06.10%'
-        AND categoria_nome NOT LIKE '06.11%'
-        AND categoria_nome NOT LIKE '06.12%'
-        AND categoria_nome NOT LIKE '06.13%'
-        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
-        AND data_quitacao::date <= CURRENT_DATE
+        AND (
+          categoria_nome LIKE '05.01%'
+          OR categoria_nome LIKE '05.02%'
+          OR categoria_nome LIKE '05.03%'
+          OR categoria_nome LIKE '05.04.01%'
+          OR categoria_nome LIKE '06.01%'
+          OR categoria_nome LIKE '06.05%'
+          OR categoria_nome LIKE '06.07%'
+          OR categoria_nome LIKE '06.10.01%'
+          OR categoria_nome LIKE '06.10.03%'
+          OR categoria_nome LIKE '06.10.04%'
+        )
+        AND categoria_nome NOT LIKE '06.07.02%'
+        AND data_quitacao::date >= ${sd}::date
+        AND data_quitacao::date <= ${ed}::date
       ORDER BY valor_pago::numeric DESC
       LIMIT 200
     `);
@@ -936,16 +944,24 @@ export async function getCsvDetail(): Promise<DrillDownResult> {
   }
 }
 
-export async function getCacDetail(): Promise<DrillDownResult> {
+export async function getCacDetail(startDate?: string, endDate?: string): Promise<DrillDownResult> {
+  // CAC: 05.04.02, 06.04, 06.06, 06.07.02
+  const sd = startDate || '2026-01-01';
+  const ed = endDate || new Date().toISOString().split('T')[0];
   try {
     const result = await db.execute(sql`
       SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
              data_quitacao, data_vencimento, empresa
       FROM "Conta Azul".caz_parcelas
       WHERE status = 'QUITADO'
-        AND (categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.04%')
-        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
-        AND data_quitacao::date <= CURRENT_DATE
+        AND (
+          categoria_nome LIKE '05.04.02%'
+          OR categoria_nome LIKE '06.04%'
+          OR categoria_nome LIKE '06.06%'
+          OR categoria_nome LIKE '06.07.02%'
+        )
+        AND data_quitacao::date >= ${sd}::date
+        AND data_quitacao::date <= ${ed}::date
       ORDER BY valor_pago::numeric DESC
       LIMIT 200
     `);
@@ -956,17 +972,32 @@ export async function getCacDetail(): Promise<DrillDownResult> {
   }
 }
 
-export async function getSgaDetail(): Promise<DrillDownResult> {
+export async function getSgaDetail(startDate?: string, endDate?: string): Promise<DrillDownResult> {
+  // SG&A: 06.02, 06.03, 06.08, 06.09, 06.10.02, 06.10.05-08, 06.11 (exceto 06.11.01), 06.12
+  const sd = startDate || '2026-01-01';
+  const ed = endDate || new Date().toISOString().split('T')[0];
   try {
     const result = await db.execute(sql`
       SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
              data_quitacao, data_vencimento, empresa
       FROM "Conta Azul".caz_parcelas
       WHERE status = 'QUITADO'
-        AND (categoria_nome LIKE '06.10%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%')
+        AND (
+          categoria_nome LIKE '06.02%'
+          OR categoria_nome LIKE '06.03%'
+          OR categoria_nome LIKE '06.08%'
+          OR categoria_nome LIKE '06.09%'
+          OR categoria_nome LIKE '06.10.02%'
+          OR categoria_nome LIKE '06.10.05%'
+          OR categoria_nome LIKE '06.10.06%'
+          OR categoria_nome LIKE '06.10.07%'
+          OR categoria_nome LIKE '06.10.08%'
+          OR categoria_nome LIKE '06.11%'
+          OR categoria_nome LIKE '06.12%'
+        )
         AND categoria_nome NOT LIKE '06.11.01%'
-        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
-        AND data_quitacao::date <= CURRENT_DATE
+        AND data_quitacao::date >= ${sd}::date
+        AND data_quitacao::date <= ${ed}::date
       ORDER BY valor_pago::numeric DESC
       LIMIT 200
     `);
@@ -977,7 +1008,9 @@ export async function getSgaDetail(): Promise<DrillDownResult> {
   }
 }
 
-export async function getCapexDetail(): Promise<DrillDownResult> {
+export async function getCapexDetail(startDate?: string, endDate?: string): Promise<DrillDownResult> {
+  const sd = startDate || '2026-01-01';
+  const ed = endDate || new Date().toISOString().split('T')[0];
   try {
     const result = await db.execute(sql`
       SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
@@ -985,8 +1018,8 @@ export async function getCapexDetail(): Promise<DrillDownResult> {
       FROM "Conta Azul".caz_parcelas
       WHERE status = 'QUITADO'
         AND categoria_nome LIKE '06.11.01%'
-        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
-        AND data_quitacao::date <= CURRENT_DATE
+        AND data_quitacao::date >= ${sd}::date
+        AND data_quitacao::date <= ${ed}::date
       ORDER BY valor_pago::numeric DESC
       LIMIT 200
     `);
@@ -997,7 +1030,9 @@ export async function getCapexDetail(): Promise<DrillDownResult> {
   }
 }
 
-export async function getTaxesOnRevenueDetail(): Promise<DrillDownResult> {
+export async function getTaxesOnRevenueDetail(startDate?: string, endDate?: string): Promise<DrillDownResult> {
+  const sd = startDate || '2026-01-01';
+  const ed = endDate || new Date().toISOString().split('T')[0];
   try {
     const result = await db.execute(sql`
       SELECT id, descricao, categoria_nome, valor_liquido::numeric as valor,
@@ -1005,8 +1040,8 @@ export async function getTaxesOnRevenueDetail(): Promise<DrillDownResult> {
       FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'DESPESA'
         AND categoria_nome LIKE '05.05%'
-        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
-        AND data_quitacao::date <= CURRENT_DATE
+        AND data_quitacao::date >= ${sd}::date
+        AND data_quitacao::date <= ${ed}::date
       ORDER BY valor_liquido::numeric DESC
       LIMIT 200
     `);
@@ -1017,7 +1052,9 @@ export async function getTaxesOnRevenueDetail(): Promise<DrillDownResult> {
   }
 }
 
-export async function getTaxIrCsllDetail(): Promise<DrillDownResult> {
+export async function getTaxIrCsllDetail(startDate?: string, endDate?: string): Promise<DrillDownResult> {
+  const sd = startDate || '2026-01-01';
+  const ed = endDate || new Date().toISOString().split('T')[0];
   try {
     const result = await db.execute(sql`
       SELECT id, descricao, categoria_nome, valor_pago::numeric as valor,
@@ -1025,8 +1062,8 @@ export async function getTaxIrCsllDetail(): Promise<DrillDownResult> {
       FROM "Conta Azul".caz_parcelas
       WHERE status = 'QUITADO'
         AND categoria_nome LIKE '06.13%'
-        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
-        AND data_quitacao::date <= CURRENT_DATE
+        AND data_quitacao::date >= ${sd}::date
+        AND data_quitacao::date <= ${ed}::date
       ORDER BY valor_pago::numeric DESC
       LIMIT 200
     `);
@@ -1037,7 +1074,9 @@ export async function getTaxIrCsllDetail(): Promise<DrillDownResult> {
   }
 }
 
-export async function getRevenueOtherDetail(): Promise<DrillDownResult> {
+export async function getRevenueOtherDetail(startDate?: string, endDate?: string): Promise<DrillDownResult> {
+  const sd = startDate || '2026-01-01';
+  const ed = endDate || new Date().toISOString().split('T')[0];
   try {
     const result = await db.execute(sql`
       SELECT id, descricao, categoria_nome, valor_liquido::numeric as valor,
@@ -1045,8 +1084,8 @@ export async function getRevenueOtherDetail(): Promise<DrillDownResult> {
       FROM "Conta Azul".caz_parcelas
       WHERE tipo_evento = 'RECEITA'
         AND (categoria_nome LIKE '03.02%' OR categoria_nome LIKE '03.03%' OR categoria_nome LIKE '04.01%' OR categoria_nome LIKE '04.03%')
-        AND data_quitacao::date >= DATE_TRUNC('month', CURRENT_DATE)::date
-        AND data_quitacao::date <= CURRENT_DATE
+        AND data_quitacao::date >= ${sd}::date
+        AND data_quitacao::date <= ${ed}::date
       ORDER BY valor_liquido::numeric DESC
       LIMIT 200
     `);
@@ -1665,26 +1704,28 @@ async function getSgaPctSeriesForRange(startDate: string, endDate: string): Prom
   try {
     const result = await db.execute(sql`
       WITH monthly_sga AS (
-        SELECT 
+        SELECT
           TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
-          COALESCE(SUM(valor_pago::numeric), 0) as sga_total
+          COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as sga_total
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status = 'QUITADO'
-          AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+          AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date
           AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
           AND (
-            categoria_nome ILIKE '%administrativ%'
-            OR categoria_nome ILIKE '%admin%'
-            OR categoria_nome ILIKE '%geral%'
-            OR categoria_nome ILIKE '%despesas gerais%'
-            OR categoria_nome ILIKE '%escritório%'
-            OR categoria_nome ILIKE '%office%'
-            OR categoria_nome ILIKE '%aluguel%'
-            OR categoria_nome ILIKE '%utilities%'
-            OR categoria_nome ILIKE '%telefone%'
-            OR categoria_nome ILIKE '%internet%'
+            categoria_nome LIKE '06.02%'
+            OR categoria_nome LIKE '06.03%'
+            OR categoria_nome LIKE '06.08%'
+            OR categoria_nome LIKE '06.09%'
+            OR categoria_nome LIKE '06.10.02%'
+            OR categoria_nome LIKE '06.10.05%'
+            OR categoria_nome LIKE '06.10.06%'
+            OR categoria_nome LIKE '06.10.07%'
+            OR categoria_nome LIKE '06.10.08%'
+            OR categoria_nome LIKE '06.11%'
+            OR categoria_nome LIKE '06.12%'
           )
+          AND categoria_nome NOT LIKE '06.11.01%'
         GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
       ),
       monthly_receita AS (
@@ -1722,50 +1763,19 @@ async function getCacPctSeriesForRange(startDate: string, endDate: string): Prom
   try {
     const result = await db.execute(sql`
       WITH monthly_cac AS (
-        SELECT 
+        SELECT
           TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as date,
-          COALESCE(SUM(valor_pago::numeric), 0) as cac_total
+          COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac_total
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'DESPESA'
           AND status = 'QUITADO'
-          AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date 
+          AND COALESCE(data_quitacao, data_vencimento) >= ${startDate}::date
           AND COALESCE(data_quitacao, data_vencimento) <= ${endDate}::date
           AND (
-            categoria_nome ILIKE '%marketing%'
-            OR categoria_nome ILIKE '%publicidade%'
-            OR categoria_nome ILIKE '%propaganda%'
-            OR categoria_nome ILIKE '%mídia%'
-            OR categoria_nome ILIKE '%midia%'
-            OR categoria_nome ILIKE '%media%'
-            OR categoria_nome ILIKE '%ads%'
-            OR categoria_nome ILIKE '%google%'
-            OR categoria_nome ILIKE '%facebook%'
-            OR categoria_nome ILIKE '%meta%'
-            OR categoria_nome ILIKE '%instagram%'
-            OR categoria_nome ILIKE '%tiktok%'
-            OR categoria_nome ILIKE '%linkedin%'
-            OR categoria_nome ILIKE '%vendas%'
-            OR categoria_nome ILIKE '%comercial%'
-            OR categoria_nome ILIKE '%sales%'
-            OR categoria_nome ILIKE '%growth%'
-            OR categoria_nome ILIKE '%aquisição%'
-            OR categoria_nome ILIKE '%aquisicao%'
-            OR categoria_nome ILIKE '%acquisition%'
-            OR categoria_nome ILIKE '%tráfego%'
-            OR categoria_nome ILIKE '%trafego%'
-            OR categoria_nome ILIKE '%traffic%'
-            OR categoria_nome ILIKE '%lead%'
-            OR categoria_nome ILIKE '%sdr%'
-            OR categoria_nome ILIKE '%closer%'
-            OR categoria_nome ILIKE '%comissão%'
-            OR categoria_nome ILIKE '%comissao%'
-            OR categoria_nome ILIKE '%commission%'
-            OR categoria_nome ILIKE '%campanha%'
-            OR categoria_nome ILIKE '%campaign%'
-            OR categoria_nome ILIKE '%anúncio%'
-            OR categoria_nome ILIKE '%anuncio%'
-            OR categoria_nome ILIKE '%patrocinado%'
-            OR categoria_nome ILIKE '%sponsored%'
+            categoria_nome LIKE '05.04.02%'
+            OR categoria_nome LIKE '06.04%'
+            OR categoria_nome LIKE '06.06%'
+            OR categoria_nome LIKE '06.07.02%'
           )
         GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
       ),
