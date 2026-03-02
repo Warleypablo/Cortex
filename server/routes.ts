@@ -16591,7 +16591,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as sga FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '06.02%' OR categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.08%' OR categoria_nome LIKE '06.09%' OR categoria_nome LIKE '06.10.02%' OR categoria_nome LIKE '06.10.05%' OR categoria_nome LIKE '06.10.06%' OR categoria_nome LIKE '06.10.07%' OR categoria_nome LIKE '06.10.08%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%') AND categoria_nome NOT LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '05.04.02%' OR categoria_nome LIKE '06.04%' OR categoria_nome LIKE '06.06%' OR categoria_nome LIKE '06.07.02%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as capex FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND categoria_nome LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
-              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll FROM "Conta Azul".caz_parcelas WHERE status IN ('QUITADO','RECEBIDO_PARCIAL') AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01.02%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll FROM "Conta Azul".caz_parcelas WHERE status IN ('QUITADO','RECEBIDO_PARCIAL') AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(valorr::numeric), 0) as churn FROM "Clickup".cup_contratos WHERE data_solicitacao_encerramento >= '${mStart}' AND data_solicitacao_encerramento <= '${mEnd}'`)),
               db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE status = 'Ativo'`)),
               db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_clientes WHERE status IN ('ativo', 'triagem', 'onboarding')`)),
@@ -16913,7 +16913,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll
             FROM "Conta Azul".caz_parcelas
             WHERE status IN ('QUITADO', 'RECEBIDO_PARCIAL')
-              AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01.02%')
+              AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01%')
               AND data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
               AND data_quitacao::date <= CURRENT_DATE
           `);
@@ -17236,7 +17236,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const irCsllResult = await db.execute(sql.raw(`
         SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll
         FROM "Conta Azul".caz_parcelas
-        WHERE status IN ('QUITADO', 'RECEBIDO_PARCIAL') AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01.02%')
+        WHERE status IN ('QUITADO', 'RECEBIDO_PARCIAL') AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01%')
           AND data_quitacao::date >= '${startStr}'::date AND data_quitacao::date <= '${endStr}'::date
       `));
       const irCsll = parseFloat((irCsllResult.rows[0] as any)?.ir_csll || "0");
