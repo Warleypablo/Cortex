@@ -16594,7 +16594,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
               db.execute(sql.raw(`SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total FROM "Conta Azul".caz_parcelas WHERE tipo_evento = 'RECEITA' AND (categoria_nome LIKE '03.02%' OR categoria_nome LIKE '03.03%' OR categoria_nome LIKE '04.01%' OR categoria_nome LIKE '04.03%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(nao_pago::numeric), 0) as inadimplencia FROM "Conta Azul".caz_parcelas WHERE tipo_evento = 'RECEITA' AND data_vencimento >= '${mStart}' AND data_vencimento <= '${mEnd}' AND nao_pago::numeric > 0`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(valor_liquido::numeric), 0) as total FROM "Conta Azul".caz_parcelas WHERE tipo_evento = 'DESPESA' AND categoria_nome LIKE '05.05%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
-              db.execute(sql.raw(`SELECT COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as entradas, COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as saidas FROM "Conta Azul".caz_parcelas WHERE data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date AND status = 'QUITADO'`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as entradas, COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as saidas FROM "Conta Azul".caz_parcelas WHERE data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date AND status IN ('QUITADO', 'RECEBIDO_PARCIAL')`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as csv FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '05.01%' OR categoria_nome LIKE '05.02%' OR categoria_nome LIKE '05.03%' OR categoria_nome LIKE '05.04.01%' OR categoria_nome LIKE '06.01%' OR categoria_nome LIKE '06.05%' OR categoria_nome LIKE '06.07%' OR categoria_nome LIKE '06.10.01%' OR categoria_nome LIKE '06.10.03%' OR categoria_nome LIKE '06.10.04%') AND categoria_nome NOT LIKE '06.07.02%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as sga FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '06.02%' OR categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.08%' OR categoria_nome LIKE '06.09%' OR categoria_nome LIKE '06.10.02%' OR categoria_nome LIKE '06.10.05%' OR categoria_nome LIKE '06.10.06%' OR categoria_nome LIKE '06.10.07%' OR categoria_nome LIKE '06.10.08%' OR categoria_nome LIKE '06.11%' OR categoria_nome LIKE '06.12%') AND categoria_nome NOT LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '05.04.02%' OR categoria_nome LIKE '06.04%' OR categoria_nome LIKE '06.06%' OR categoria_nome LIKE '06.07.02%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
@@ -16733,7 +16733,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           if (!actualsByMetric["churn_mrr_month"]) actualsByMetric["churn_mrr_month"] = {};
           actualsByMetric["churn_mrr_month"][currentMonthKey] = churnMrr;
           
-          // Geração de Caixa = Receitas - Despesas (mesma lógica do DFC)
+          // Geração de Caixa = Receitas - Despesas (mesma query da DFC RESULTADO)
           const geracaoCaixaResult = await db.execute(sql`
             SELECT
               COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as entradas,
@@ -16741,8 +16741,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
               COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) -
               COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as geracao_caixa
             FROM "Conta Azul".caz_parcelas
-            WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
-              AND status = 'QUITADO'
+            WHERE data_quitacao::date >= ${startOfMonth.toISOString().split("T")[0]}::date
+              AND data_quitacao::date <= CURRENT_DATE
+              AND status IN ('QUITADO', 'RECEBIDO_PARCIAL')
           `);
           const entradas = parseFloat((geracaoCaixaResult.rows[0] as any)?.entradas || "0");
           const geracaoCaixa = parseFloat((geracaoCaixaResult.rows[0] as any)?.geracao_caixa || "0");
@@ -17158,13 +17159,13 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const impostos = parseFloat((impostosResult.rows[0] as any)?.impostos || "0");
       
       const geracaoCaixaResult = await db.execute(sql.raw(`
-        SELECT 
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as entradas,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as saidas
+        SELECT
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as entradas,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0 END), 0) as saidas
         FROM "Conta Azul".caz_parcelas
         WHERE data_quitacao::date >= '${startStr}'::date
           AND data_quitacao::date <= '${endStr}'::date
-          AND status = 'QUITADO'
+          AND status IN ('QUITADO', 'RECEBIDO_PARCIAL')
       `));
       const entradas = parseFloat((geracaoCaixaResult.rows[0] as any)?.entradas || "0");
       const saidas = parseFloat((geracaoCaixaResult.rows[0] as any)?.saidas || "0");
