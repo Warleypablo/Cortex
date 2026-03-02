@@ -3316,7 +3316,7 @@ const BP_DRILLDOWN_MAP: Record<string, { metric: string; title: string }> = {
 
 function BPFinanceiroTab() {
   const [displayMode, setDisplayMode] = useState<BPDisplayMode>("actual");
-  const [drillDownMetric, setDrillDownMetric] = useState<{ metric: string; title: string } | null>(null);
+  const [drillDownMetric, setDrillDownMetric] = useState<{ metric: string; title: string; month?: string } | null>(null);
   const [formulaBreakdown, setFormulaBreakdown] = useState<{ metric: BPMetric; month: string } | null>(null);
 
   const { data, isLoading, error } = useQuery<BPFinanceiroResponse>({
@@ -3561,11 +3561,13 @@ function BPFinanceiroTab() {
                   return (
                   <tr
                     key={metric.metric_key}
-                    className={`group transition-colors hover:bg-muted/40 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'} ${rowDd || hasFormula ? 'cursor-pointer' : ''}`}
+                    className={`group transition-colors hover:bg-muted/40 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}
                     data-testid={`row-bp-${metric.metric_key}`}
-                    onClick={rowDd ? () => setDrillDownMetric(rowDd) : undefined}
                   >
-                    <td className={`py-3 px-4 sticky left-0 z-10 border-r border-border/50 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'} group-hover:bg-muted/40 transition-colors`}>
+                    <td
+                      className={`py-3 px-4 sticky left-0 z-10 border-r border-border/50 ${idx % 2 === 0 ? 'bg-background' : 'bg-muted/10'} group-hover:bg-muted/40 transition-colors ${rowDd ? 'cursor-pointer' : ''}`}
+                      onClick={rowDd ? () => setDrillDownMetric(rowDd) : undefined}
+                    >
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="flex items-center gap-2 cursor-help">
@@ -3603,8 +3605,15 @@ function BPFinanceiroTab() {
                       return (
                         <td
                           key={m.month}
-                          className="py-2 px-1 text-center"
-                          onClick={hasFormula ? (e) => { e.stopPropagation(); setFormulaBreakdown({ metric, month: m.month }); } : undefined}
+                          className={`py-2 px-1 text-center ${rowDd || hasFormula ? 'cursor-pointer' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (hasFormula) {
+                              setFormulaBreakdown({ metric, month: m.month });
+                            } else if (rowDd) {
+                              setDrillDownMetric({ ...rowDd, month: m.month });
+                            }
+                          }}
                         >
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -3716,6 +3725,7 @@ function BPFinanceiroTab() {
         title={drillDownMetric?.title ?? ""}
         open={!!drillDownMetric}
         onOpenChange={(open) => { if (!open) setDrillDownMetric(null); }}
+        month={drillDownMetric?.month}
       />
 
       <Dialog open={!!formulaBreakdown} onOpenChange={(open) => { if (!open) setFormulaBreakdown(null); }}>

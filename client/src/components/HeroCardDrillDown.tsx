@@ -131,18 +131,22 @@ export function HeroCardDrillDown({
   title,
   open,
   onOpenChange,
+  month,
 }: {
   metric: MetricKey | null;
   title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  month?: string;
 }) {
   const isInadimplencia = metric === "inadimplencia";
 
   const { data, isLoading } = useQuery<DrillDownResult>({
-    queryKey: ["/api/okr2026/hero-drilldown", metric],
+    queryKey: ["/api/okr2026/hero-drilldown", metric, month],
     queryFn: async () => {
-      const res = await fetch(`/api/okr2026/hero-drilldown?metric=${metric}`);
+      const params = new URLSearchParams({ metric: metric! });
+      if (month) params.set("month", month);
+      const res = await fetch(`/api/okr2026/hero-drilldown?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch drilldown");
       return res.json();
     },
@@ -179,11 +183,21 @@ export function HeroCardDrillDown({
   const columns = metric ? METRIC_COLUMNS[metric] : [];
   const detailHref = metric ? METRIC_HREF[metric] : undefined;
 
+  const monthLabel = month
+    ? (() => {
+        const [y, m] = month.split('-');
+        const names = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+        return `${names[parseInt(m, 10) - 1]}/${y}`;
+      })()
+    : null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 overflow-hidden">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-gray-900 dark:text-white">{title}</DialogTitle>
+          <DialogTitle className="text-gray-900 dark:text-white">
+            {title}{monthLabel ? ` — ${monthLabel}` : ''}
+          </DialogTitle>
           <DialogDescription className="text-gray-500 dark:text-zinc-400">
             {count} {count === 1 ? "item" : "itens"} — Total: {formatBRL(total)}
           </DialogDescription>
