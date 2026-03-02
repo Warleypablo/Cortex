@@ -16573,17 +16573,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       if (currentYear === 2026 && currentMonthNum > 1) {
         for (let m = 1; m < currentMonthNum; m++) {
           const monthKey = `2026-${String(m).padStart(2, "0")}`;
-          // Skip if snapshot exists and has non-zero financial data
-          if (snapshotedMonths.has(monthKey)) {
-            const hasSalesData = (actualsByMetric["sales_mrr"]?.[monthKey] ?? 0) > 0
-              || (actualsByMetric["revenue_one_time"]?.[monthKey] ?? 0) > 0
-              || (actualsByMetric["cogs_csv"]?.[monthKey] ?? 0) > 0
-              || (actualsByMetric["revenue_net"]?.[monthKey] ?? 0) > 0;
-            if (hasSalesData) continue;
-            console.log(`[bp-financeiro] Snapshot for ${monthKey} has zero financial data, refreshing...`);
-          }
+          // Always refresh past-month snapshots to ensure accuracy after query changes
           try {
-            console.log(`[bp-financeiro] Auto-creating snapshot for missing month ${monthKey}`);
+            console.log(`[bp-financeiro] Refreshing snapshot for ${monthKey}`);
             const mStart = new Date(2026, m - 1, 1).toISOString().split("T")[0];
             const mEnd = new Date(2026, m, 0).toISOString().split("T")[0];
 
@@ -16664,7 +16656,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
                 actualsByMetric[bpKey][monthKey] = (snapMetricas as any)[snapshotKey];
               }
             }
-            console.log(`[bp-financeiro] Auto-snapshot created for ${monthKey}`);
+            console.log(`[bp-financeiro] Snapshot refreshed for ${monthKey}: caixa=${sGeracaoCaixa.toFixed(0)} (entradas=${sEntradas.toFixed(0)} saidas=${sSaidas.toFixed(0)})`);
           } catch (autoSnapError) {
             console.log(`[bp-financeiro] Could not auto-create snapshot for ${monthKey}`, autoSnapError);
           }

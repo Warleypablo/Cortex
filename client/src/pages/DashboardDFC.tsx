@@ -345,6 +345,24 @@ export default function DashboardDFC() {
   // Calcula variação % de um valor em relação à média dos 6 meses anteriores
   const calcVariacao = (node: DfcNode, mes: string) => calcVariacaoGeneric(node.valuesByMonth, mes);
 
+  // Calcula variação % em relação ao mês anterior
+  const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const calcVariacaoMesAnterior = (valuesByMonth: Record<string, number>, mes: string, useAbsValues = true): number | null => {
+    // Não mostrar variação no mês atual (dados incompletos)
+    if (mes === currentMonthKey) return null;
+    const [year, month] = mes.split('-').map(Number);
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear = month === 1 ? year - 1 : year;
+    const prevKey = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    if (valuesByMonth[prevKey] === undefined) return null;
+    const valorAtual = useAbsValues ? Math.abs(valuesByMonth[mes] || 0) : (valuesByMonth[mes] || 0);
+    const valorAnterior = useAbsValues ? Math.abs(valuesByMonth[prevKey] || 0) : (valuesByMonth[prevKey] || 0);
+    if (valorAnterior === 0) return null;
+    // Para valores com sinal, não mostrar se sinais diferem (cruzou zero)
+    if (!useAbsValues && ((valorAtual > 0 && valorAnterior < 0) || (valorAtual < 0 && valorAnterior > 0))) return null;
+    return ((valorAtual - valorAnterior) / valorAnterior) * 100;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -1017,6 +1035,16 @@ export default function DashboardDFC() {
                                             } ${isRootNode ? (isReceitaNode ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400') : ''}`}>
                                               {formatCurrencyNoDecimals(absValor)}
                                             </span>
+                                            {(() => {
+                                              const varMoM = calcVariacaoMesAnterior(node.valuesByMonth, mes);
+                                              if (varMoM === null) return null;
+                                              const isGood = isReceitaNode ? varMoM > 0 : varMoM < 0;
+                                              return (
+                                                <span className={`text-[10px] tabular-nums ${isGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                  {varMoM > 0 ? '▲' : '▼'} {varMoM > 0 ? '+' : ''}{formatPercent(varMoM)}
+                                                </span>
+                                              );
+                                            })()}
                                             {node.isLeaf && maxValue > 0 && (
                                               <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
                                                 <div
@@ -1146,11 +1174,23 @@ export default function DashboardDFC() {
                           <TooltipProvider delayDuration={200}>
                             <TooltipUI>
                               <TooltipTrigger asChild>
-                                <span className={`font-bold text-sm tabular-nums cursor-default ${
-                                  isPositivo ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-                                }`}>
-                                  {isPositivo ? '+' : ''}{formatCurrencyNoDecimals(resultado)}
-                                </span>
+                                <div className="flex flex-col items-end gap-0.5 cursor-default">
+                                  <span className={`font-bold text-sm tabular-nums ${
+                                    isPositivo ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                                  }`}>
+                                    {isPositivo ? '+' : ''}{formatCurrencyNoDecimals(resultado)}
+                                  </span>
+                                  {(() => {
+                                    const varMoM = calcVariacaoMesAnterior(resultadoByMonth, mes, false);
+                                    if (varMoM === null) return null;
+                                    const isGood = varMoM > 0;
+                                    return (
+                                      <span className={`text-[10px] tabular-nums ${isGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                        {varMoM > 0 ? '▲' : '▼'} {varMoM > 0 ? '+' : ''}{formatPercent(varMoM)}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-[220px]">
                                 {resVarInfo ? (
