@@ -5,6 +5,7 @@ import { isAuthenticated } from "../auth/middleware";
 import PDFDocument from "pdfkit";
 import FormData from "form-data";
 import OpenAI from "openai";
+import crypto from "crypto";
 
 let openaiClient: OpenAI | null = null;
 
@@ -17,6 +18,15 @@ function getOpenAIClient(): OpenAI | null {
   }
   return openaiClient;
 }
+
+// Temporary in-memory store for PDF preview tokens (auto-cleanup after 5 min)
+const previewTokens = new Map<string, { data: { contrato: any; itens: any[] }; timestamp: number }>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, entry] of previewTokens) {
+    if (now - entry.timestamp > 5 * 60 * 1000) previewTokens.delete(token);
+  }
+}, 60 * 1000);
 
 let tablesInitialized = false;
 
@@ -485,10 +495,22 @@ async function ensureContratosTablesExist() {
         api_url VARCHAR(255),
         webhook_url VARCHAR(255),
         webhook_secret VARCHAR(255),
+        tipo VARCHAR(50) DEFAULT 'clientes',
         ativo BOOLEAN DEFAULT true,
         data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Add tipo column if it doesn't exist (migration for existing tables)
+    await db.execute(sql`
+      ALTER TABLE staging.assinafy_config
+      ADD COLUMN IF NOT EXISTS tipo VARCHAR(50) DEFAULT 'clientes'
+    `);
+
+    // Backfill existing rows that have NULL tipo
+    await db.execute(sql`
+      UPDATE staging.assinafy_config SET tipo = 'clientes' WHERE tipo IS NULL
     `);
 
     // Log de mudança de status de documentos
@@ -544,7 +566,102 @@ async function ensureContratosTablesExist() {
 
 export function registerContratosRoutes(app: Express) {
   ensureContratosTablesExist();
-  
+
+  // Helper: ao assinar contrato, cria card do cliente em cup_clientes + serviços em cup_contratos
+  async function syncClienteFromSignedContract(contratoId: number) {
+    try {
+      // 1. Buscar contrato + entidade
+      const contratoResult = await db.execute(sql`
+        SELECT c.id, c.entidade_id, c.comercial_nome,
+               c.data_inicio_recorrentes, c.data_inicio_pontuais,
+               e.nome, e.cpf_cnpj, e.email, e.telefone
+        FROM staging.contratos c
+        JOIN staging.entidades e ON e.id = c.entidade_id
+        WHERE c.id = ${contratoId}
+      `);
+
+      if (contratoResult.rows.length === 0) {
+        console.log(`[sync-cliente] Contrato ${contratoId} ou entidade não encontrado, pulando sync`);
+        return;
+      }
+
+      const contrato = contratoResult.rows[0] as any;
+      const cnpjLimpo = (contrato.cpf_cnpj || '').replace(/\D/g, '');
+
+      if (!cnpjLimpo) {
+        console.log(`[sync-cliente] Contrato ${contratoId}: entidade sem CPF/CNPJ, pulando sync`);
+        return;
+      }
+
+      // 2. Verificar se cliente já existe em cup_clientes (por cnpj)
+      const clienteExistente = await db.execute(sql`
+        SELECT cnpj, task_id FROM "Clickup".cup_clientes WHERE cnpj = ${cnpjLimpo}
+      `);
+
+      let taskId: string;
+
+      if (clienteExistente.rows.length > 0) {
+        taskId = (clienteExistente.rows[0] as any).task_id;
+        console.log(`[sync-cliente] Cliente já existe com task_id=${taskId}, reutilizando`);
+      } else {
+        // Criar novo cliente
+        taskId = `cortex-ent-${contrato.entidade_id}`;
+        await db.execute(sql`
+          INSERT INTO "Clickup".cup_clientes (cnpj, task_id, nome, status, email, telefone)
+          VALUES (${cnpjLimpo}, ${taskId}, ${contrato.nome}, 'triagem', ${contrato.email}, ${contrato.telefone})
+        `);
+        console.log(`[sync-cliente] Novo cliente criado: cnpj=${cnpjLimpo}, task_id=${taskId}`);
+      }
+
+      // 3. Buscar itens do contrato com serviço e plano
+      const itensResult = await db.execute(sql`
+        SELECT ci.id, ci.modalidade, ci.valor_negociado,
+               s.nome AS servico_nome,
+               ps.nome AS plano_nome
+        FROM staging.contratos_itens ci
+        JOIN staging.planos_servicos ps ON ps.id = ci.plano_servico_id
+        JOIN staging.servicos s ON s.id = ps.servico_id
+        WHERE ci.contrato_id = ${contratoId}
+      `);
+
+      // 4. Inserir cada item como contrato em cup_contratos
+      for (const item of itensResult.rows as any[]) {
+        const idSubtask = `cortex-ci-${item.id}`;
+        const servicoNome = `${item.servico_nome} - ${item.plano_nome}`;
+        const isRecorrente = (item.modalidade || '').toLowerCase() === 'recorrente';
+        const valorNeg = parseFloat(item.valor_negociado) || 0;
+        const valorr = isRecorrente ? valorNeg : 0;
+        const valorp = isRecorrente ? 0 : valorNeg;
+        const dataInicio = isRecorrente
+          ? contrato.data_inicio_recorrentes
+          : contrato.data_inicio_pontuais;
+
+        await db.execute(sql`
+          INSERT INTO "Clickup".cup_contratos
+            (id_subtask, id_task, servico, produto, status, valorr, valorp, data_inicio, vendedor)
+          VALUES
+            (${idSubtask}, ${taskId}, ${servicoNome}, ${item.servico_nome}, 'triagem',
+             ${valorr}, ${valorp}, ${dataInicio || null}, ${contrato.comercial_nome})
+          ON CONFLICT (id_subtask) DO UPDATE SET
+            id_task = EXCLUDED.id_task,
+            servico = EXCLUDED.servico,
+            produto = EXCLUDED.produto,
+            status = EXCLUDED.status,
+            valorr = EXCLUDED.valorr,
+            valorp = EXCLUDED.valorp,
+            data_inicio = EXCLUDED.data_inicio,
+            vendedor = EXCLUDED.vendedor
+        `);
+        console.log(`[sync-cliente] Contrato-item ${idSubtask} sincronizado (${servicoNome})`);
+      }
+
+      console.log(`[sync-cliente] Sync concluído para contrato ${contratoId}: ${itensResult.rows.length} itens`);
+    } catch (error: any) {
+      // Loga erro mas NÃO propaga — o contrato já foi atualizado com sucesso
+      console.error(`[sync-cliente] Erro ao sincronizar contrato ${contratoId}:`, error.message);
+    }
+  }
+
   // ============================================================================
   // ENTIDADES ROUTES
   // ============================================================================
@@ -1506,37 +1623,49 @@ export function registerContratosRoutes(app: Express) {
   });
 
   // Função helper para gerar PDF COMPLETO do contrato e retornar como Buffer
-  // Reutilizada pelo endpoint gerar-pdf e enviar-assinatura
+  // Reutilizada pelo endpoint gerar-pdf, enviar-assinatura e preview-pdf
   // IMPORTANTE: Esta função gera o PDF completo com todas as páginas (partes, serviços, escopo, TMA, assinaturas)
-  async function generateContratoPdfBuffer(contratoId: number): Promise<Buffer> {
-    // Buscar dados do contrato
-    const contratoResult = await db.execute(sql`
-      SELECT c.*, e.nome as cliente_nome, e.cpf_cnpj, e.tipo_pessoa,
-             e.endereco, e.numero, e.complemento, e.bairro, e.cidade, e.estado, e.cep,
-             e.email, e.telefone, e.nome_socio, e.cpf_socio
-      FROM staging.contratos c
-      LEFT JOIN staging.entidades e ON c.entidade_id = e.id
-      WHERE c.id = ${contratoId}
-    `);
+  // Se preloadedData for fornecido, usa os dados direto (sem buscar no banco) - usado pelo preview
+  async function generateContratoPdfBuffer(
+    contratoId: number,
+    preloadedData?: { contrato: any; itens: any[] }
+  ): Promise<Buffer> {
+    let contrato: any;
+    let itens: any[];
 
-    if (contratoResult.rows.length === 0) {
-      throw new Error("Contrato não encontrado");
+    if (preloadedData) {
+      contrato = preloadedData.contrato;
+      itens = preloadedData.itens;
+    } else {
+      // Buscar dados do contrato
+      const contratoResult = await db.execute(sql`
+        SELECT c.*, e.nome as cliente_nome, e.cpf_cnpj, e.tipo_pessoa,
+               e.endereco, e.numero, e.complemento, e.bairro, e.cidade, e.estado, e.cep,
+               e.email, e.telefone, e.nome_socio, e.cpf_socio
+        FROM staging.contratos c
+        LEFT JOIN staging.entidades e ON c.entidade_id = e.id
+        WHERE c.id = ${contratoId}
+      `);
+
+      if (contratoResult.rows.length === 0) {
+        throw new Error("Contrato não encontrado");
+      }
+
+      contrato = contratoResult.rows[0] as any;
+
+      // Buscar itens do contrato com escopo e diretrizes
+      const itensResult = await db.execute(sql`
+        SELECT ci.*, ps.nome as plano_nome, ps.escopo as plano_escopo, ps.diretrizes as plano_diretrizes,
+               s.nome as servico_nome
+        FROM staging.contratos_itens ci
+        LEFT JOIN staging.planos_servicos ps ON ci.plano_servico_id = ps.id
+        LEFT JOIN staging.servicos s ON ps.servico_id = s.id
+        WHERE ci.contrato_id = ${contratoId}
+        ORDER BY ci.id
+      `);
+
+      itens = itensResult.rows as any[];
     }
-
-    const contrato = contratoResult.rows[0] as any;
-
-    // Buscar itens do contrato com escopo e diretrizes
-    const itensResult = await db.execute(sql`
-      SELECT ci.*, ps.nome as plano_nome, ps.escopo as plano_escopo, ps.diretrizes as plano_diretrizes,
-             s.nome as servico_nome
-      FROM staging.contratos_itens ci
-      LEFT JOIN staging.planos_servicos ps ON ci.plano_servico_id = ps.id
-      LEFT JOIN staging.servicos s ON ps.servico_id = s.id
-      WHERE ci.contrato_id = ${contratoId}
-      ORDER BY ci.id
-    `);
-
-    const itens = itensResult.rows as any[];
 
     // Criar documento PDF com margens similares ao mPDF
     const doc = new PDFDocument({
@@ -1937,6 +2066,123 @@ export function registerContratosRoutes(app: Express) {
       doc.end();
     });
   }
+
+  // Preview PDF - gera PDF a partir dos dados do formulário (sem salvar)
+  // Step 1: POST saves preview data and returns a temporary token
+  app.post("/api/contratos/preview-pdf", isAuthenticated, async (req, res) => {
+    try {
+      const { contrato: formData, itens: formItens } = req.body;
+      if (!formData) {
+        return res.status(400).json({ error: "Dados do contrato são obrigatórios" });
+      }
+
+      // Buscar dados da entidade (cliente) se fornecido
+      let entidade: any = {};
+      if (formData.cliente_id) {
+        const entResult = await db.execute(sql`
+          SELECT * FROM staging.entidades WHERE id = ${formData.cliente_id}
+        `);
+        if (entResult.rows.length > 0) {
+          entidade = entResult.rows[0] as any;
+        }
+      }
+
+      // Resolver nomes de planos/serviços para os itens
+      const resolvedItens: any[] = [];
+      for (const item of (formItens || [])) {
+        let planoInfo: any = {};
+        if (item.plano_servico_id) {
+          const planoResult = await db.execute(sql`
+            SELECT ps.nome as plano_nome, ps.escopo as plano_escopo, ps.diretrizes as plano_diretrizes,
+                   s.nome as servico_nome
+            FROM staging.planos_servicos ps
+            LEFT JOIN staging.servicos s ON ps.servico_id = s.id
+            WHERE ps.id = ${item.plano_servico_id}
+          `);
+          if (planoResult.rows.length > 0) {
+            planoInfo = planoResult.rows[0];
+          }
+        } else if (item.servico_id) {
+          const svcResult = await db.execute(sql`
+            SELECT nome as servico_nome FROM staging.servicos WHERE id = ${item.servico_id}
+          `);
+          if (svcResult.rows.length > 0) {
+            planoInfo.servico_nome = (svcResult.rows[0] as any).servico_nome;
+          }
+        }
+        resolvedItens.push({
+          ...item,
+          plano_nome: item.plano_nome || planoInfo.plano_nome || item.descricao || 'Personalizado',
+          plano_escopo: planoInfo.plano_escopo || item.escopo || null,
+          plano_diretrizes: planoInfo.plano_diretrizes || null,
+          servico_nome: item.servico_nome || planoInfo.servico_nome || 'Serviço',
+        });
+      }
+
+      // Montar objeto contrato no mesmo formato esperado por generateContratoPdfBuffer
+      const contratoData = {
+        numero_contrato: formData.numero_contrato || 'PREVIEW',
+        cliente_nome: entidade.nome || 'Cliente',
+        cpf_cnpj: entidade.cpf_cnpj || null,
+        tipo_pessoa: entidade.tipo_pessoa || 'juridica',
+        endereco: entidade.endereco || null,
+        numero: entidade.numero || null,
+        complemento: entidade.complemento || null,
+        bairro: entidade.bairro || null,
+        cidade: entidade.cidade || null,
+        estado: entidade.estado || null,
+        cep: entidade.cep || null,
+        email: entidade.email || null,
+        telefone: entidade.telefone || null,
+        nome_socio: entidade.nome_socio || null,
+        cpf_socio: entidade.cpf_socio || null,
+        data_inicio_recorrentes: formData.data_inicio_recorrentes || null,
+        data_inicio_cobranca_recorrentes: formData.data_inicio_cobranca_recorrentes || null,
+        data_inicio_pontuais: formData.data_inicio_pontuais || null,
+        data_inicio_cobranca_pontuais: formData.data_inicio_cobranca_pontuais || null,
+        observacoes: formData.observacoes || null,
+        comercial_nome: formData.comercial_nome || null,
+        comercial_email: formData.comercial_email || null,
+      };
+
+      const token = crypto.randomUUID();
+      previewTokens.set(token, {
+        data: { contrato: contratoData, itens: resolvedItens },
+        timestamp: Date.now(),
+      });
+
+      res.json({ token });
+    } catch (error: any) {
+      console.error("[contratos] Erro ao preparar preview PDF:", error);
+      res.status(500).json({ error: "Erro ao preparar preview PDF", details: error.message });
+    }
+  });
+
+  // Step 2: GET generates the PDF using the token (browser navigates here directly)
+  app.get("/api/contratos/preview-pdf/:token", isAuthenticated, async (req, res) => {
+    try {
+      const entry = previewTokens.get(req.params.token);
+      if (!entry) {
+        return res.status(404).json({ error: "Token expirado ou inválido" });
+      }
+      previewTokens.delete(req.params.token);
+
+      const { contrato, itens } = entry.data;
+      console.log("[contratos] Gerando preview PDF para:", contrato.cliente_nome, "com", itens.length, "itens");
+
+      const pdfBuffer = await generateContratoPdfBuffer(0, { contrato, itens });
+      console.log("[contratos] Preview PDF gerado, tamanho:", pdfBuffer.length, "bytes");
+
+      const nomeArquivo = (contrato.cliente_nome || 'Preview').replace(/[^a-zA-Z0-9]/g, '_');
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Length', pdfBuffer.length);
+      res.setHeader('Content-Disposition', `inline; filename="Preview_${nomeArquivo}.pdf"`);
+      res.end(pdfBuffer);
+    } catch (error: any) {
+      console.error("[contratos] Erro ao gerar preview PDF:", error);
+      res.status(500).json({ error: "Erro ao gerar preview PDF", details: error.message });
+    }
+  });
 
   // Endpoint para gerar PDF do contrato - Modelo Profissional Turbo Partners
   app.get("/api/contratos/:id/gerar-pdf", isAuthenticated, async (req, res) => {
@@ -2678,11 +2924,11 @@ export function registerContratosRoutes(app: Express) {
       
       console.log(`[assinafy] Contrato ${contratoId} atualizado para 'enviado para assinatura'`);
       
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: "Contrato enviado para assinatura com sucesso",
         documentId,
-        signerId,
+        signerIds,
         emailEnviado: emailSignatario
       });
       
@@ -2761,7 +3007,10 @@ export function registerContratosRoutes(app: Express) {
         `);
         
         console.log(`[assinafy-webhook] Contrato ${contrato.id} atualizado para '${novoStatus}'`);
-        
+
+        // Sincronizar cliente e serviços para cup_clientes/cup_contratos
+        await syncClienteFromSignedContract(contrato.id);
+
       } else if (isRecusado) {
         novoStatus = 'recusado';
         novoAssStatus = 'declined';
@@ -2869,6 +3118,9 @@ export function registerContratosRoutes(app: Express) {
             WHERE id = ${contratoId}
           `);
           console.log(`[assinafy] Contrato ${contratoId} atualizado para 'assinado'`);
+
+          // Sincronizar cliente e serviços para cup_clientes/cup_contratos
+          await syncClienteFromSignedContract(contratoId);
         } else if (isRecusadoAssinafy) {
           novoStatus = 'recusado';
           await db.execute(sql`
@@ -2904,6 +3156,67 @@ export function registerContratosRoutes(app: Express) {
     } catch (error: any) {
       console.error("[assinafy] Erro ao consultar status:", error);
       res.status(500).json({ error: "Erro ao consultar status", details: error.message });
+    }
+  });
+
+  // ============================================================================
+  // CONTRATOS NA RUA — contratos enviados para assinatura / assinados / recusados
+  // ============================================================================
+
+  app.get("/api/contratos-na-rua", isAuthenticated, async (req, res) => {
+    try {
+      const contratosResult = await db.execute(sql`
+        SELECT c.*,
+               e.nome as cliente_nome, e.cpf_cnpj, e.tipo_pessoa, e.email, e.telefone,
+               e.email_cobranca, e.nome_socio
+        FROM staging.contratos c
+        LEFT JOIN staging.entidades e ON c.entidade_id = e.id
+        WHERE c.status IN ('enviado para assinatura', 'enviado_para_assinatura')
+        ORDER BY c.signature_sent_at DESC NULLS LAST
+      `);
+
+      const contratos = contratosResult.rows as any[];
+
+      if (contratos.length === 0) {
+        return res.json({ contratos: [] });
+      }
+
+      // Buscar itens de todos os contratos em batch
+      const contratoIds = contratos.map((c: any) => c.id);
+      const idPlaceholders = sql.join(contratoIds.map((id: number) => sql`${id}`), sql`, `);
+      const itensResult = await db.execute(sql`
+        SELECT ci.*, ps.nome as plano_nome, s.nome as servico_nome
+        FROM staging.contratos_itens ci
+        LEFT JOIN staging.planos_servicos ps ON ci.plano_servico_id = ps.id
+        LEFT JOIN staging.servicos s ON ps.servico_id = s.id
+        WHERE ci.contrato_id IN (${idPlaceholders})
+      `);
+
+      const itensPorContrato = new Map<number, any[]>();
+      for (const item of itensResult.rows as any[]) {
+        const id = item.contrato_id;
+        if (!itensPorContrato.has(id)) itensPorContrato.set(id, []);
+        itensPorContrato.get(id)!.push(item);
+      }
+
+      const result = contratos.map((c: any) => ({
+        ...c,
+        cliente: {
+          nome: c.cliente_nome,
+          cpf_cnpj: c.cpf_cnpj,
+          tipo_pessoa: c.tipo_pessoa,
+          email: c.email,
+          telefone: c.telefone,
+          email_cobranca: c.email_cobranca,
+          nome_socio: c.nome_socio,
+        },
+        itens: itensPorContrato.get(c.id) || [],
+      }));
+
+      res.json({ contratos: result });
+    } catch (error: any) {
+      console.error("[contratos-na-rua] Erro ao buscar contratos:", error);
+      res.status(500).json({ error: "Erro ao buscar contratos na rua", details: error.message });
     }
   });
 
