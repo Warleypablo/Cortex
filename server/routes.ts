@@ -25,6 +25,7 @@ import { registerTechRoutes } from "./routes/tech";
 import { registerRelatorioMensalRoutes } from "./routes/relatorioMensal";
 import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
+import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -2031,50 +2032,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Client Portal API - Tasks, Communications, Legal Status
   // ============================================
 
-  // GET /api/cliente/:cnpj/tasks - Fetch tasks for a client
-  // Uses cortex_core.tarefas_clientes table, related by cliente column matching cup_clientes.nome
+  // GET /api/cliente/:cnpj/tasks - Fetch tasks for a client (with subtasks hierarchy)
   app.get("/api/cliente/:cnpj/tasks", async (req, res) => {
     try {
       const { cnpj } = req.params;
-      
-      // First get the client name from cup_clientes
+
       const clienteResult = await db.execute(sql`
         SELECT nome FROM "Clickup".cup_clientes WHERE cnpj = ${cnpj}
       `);
-      
+
       const clienteNome = clienteResult.rows.length > 0 ? (clienteResult.rows[0] as any).nome : null;
-      
+
       if (!clienteNome) {
         return res.json([]);
       }
-      
-      // Query tasks from cortex_core.tarefas_clientes
-      // Related by "cliente" column matching cup_clientes.nome (case-insensitive, trimmed)
+
       const tasksResult = await db.execute(sql`
-        SELECT 
+        SELECT
           t.id,
           t.nome,
+          t.descricao,
           t.status,
+          t.prioridade,
           t.responsavel,
           t.data_vencimento as "dataLimite",
           t.created_at as "dataCriacao",
           t.data_conclusao as "dataConclusao",
           t.cliente,
           t.equipe,
-          t.tipo_task as "tipoTask"
+          t.tipo_task as "tipoTask",
+          t.parent_id as "parentId"
         FROM cortex_core.tarefas_clientes t
         WHERE LOWER(TRIM(t.cliente)) = LOWER(TRIM(${clienteNome}))
            OR t.cliente ILIKE ${`%${clienteNome}%`}
-        ORDER BY 
+        ORDER BY
           CASE WHEN LOWER(TRIM(t.cliente)) = LOWER(TRIM(${clienteNome})) THEN 0 ELSE 1 END,
           t.created_at DESC NULLS LAST
-        LIMIT 100
+        LIMIT 500
       `);
-      
-      res.json(tasksResult.rows);
+
+      // Build hierarchy: parent tasks with subtasks nested
+      const allTasks = tasksResult.rows as any[];
+      const taskMap = new Map<number, any>();
+      const parentTasks: any[] = [];
+
+      // First pass: index all tasks
+      for (const task of allTasks) {
+        task.subtasks = [];
+        taskMap.set(task.id, task);
+      }
+
+      // Second pass: attach children to parents
+      for (const task of allTasks) {
+        if (task.parentId && taskMap.has(task.parentId)) {
+          taskMap.get(task.parentId).subtasks.push(task);
+        } else if (!task.parentId) {
+          parentTasks.push(task);
+        } else {
+          // Orphaned subtask (parent not in results) — show as top-level
+          parentTasks.push(task);
+        }
+      }
+
+      res.json(parentTasks);
     } catch (error) {
       console.error("[api] Error fetching client tasks:", error);
       res.status(500).json({ error: "Failed to fetch tasks" });
+    }
+  });
+
+  // PUT /api/cliente/tasks/:id - Update a task
+  app.put("/api/cliente/tasks/:id", async (req, res) => {
+    try {
+      const taskId = parseInt(req.params.id);
+      const { status, responsavel, equipe, prioridade, data_vencimento, nome } = req.body;
+
+      // Auto-set data_conclusao based on status
+      let dataConclusao: string | null = null;
+      if (status) {
+        const completed = ['concluída', 'done', 'complete', 'completo', 'aprovado', 'finalizado'].includes(status.toLowerCase());
+        if (completed) {
+          dataConclusao = new Date().toISOString();
+        }
+      }
+
+      const result = await db.execute(sql`
+        UPDATE cortex_core.tarefas_clientes SET
+          status = COALESCE(${status ?? null}, status),
+          responsavel = CASE WHEN ${responsavel !== undefined ? 'yes' : 'no'} = 'yes' THEN ${responsavel ?? null} ELSE responsavel END,
+          equipe = CASE WHEN ${equipe !== undefined ? 'yes' : 'no'} = 'yes' THEN ${equipe ?? null} ELSE equipe END,
+          prioridade = COALESCE(${prioridade ?? null}, prioridade),
+          data_vencimento = CASE WHEN ${data_vencimento !== undefined ? 'yes' : 'no'} = 'yes' THEN ${data_vencimento ?? null}::timestamp ELSE data_vencimento END,
+          nome = COALESCE(${nome ?? null}, nome),
+          data_conclusao = CASE WHEN ${dataConclusao} IS NOT NULL THEN ${dataConclusao}::timestamp
+                               WHEN ${status ?? null} IS NOT NULL THEN NULL
+                               ELSE data_conclusao END
+        WHERE id = ${taskId}
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating task:", error);
+      res.status(500).json({ error: "Failed to update task" });
+    }
+  });
+
+  // DELETE /api/cliente/tasks/:id - Delete a task (cascade deletes subtasks)
+  app.delete("/api/cliente/tasks/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      await db.execute(sql`
+        DELETE FROM cortex_core.tarefas_clientes WHERE id = ${parseInt(id)}
+      `);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting task:", error);
+      res.status(500).json({ error: "Failed to delete task" });
     }
   });
 
@@ -14705,6 +14785,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Chamados Module - registered from separate file
   registerChamadosRoutes(app);
+
+  // TurboZap - Central de Cobranças via WhatsApp
+  registerTurboZapRoutes(app);
+  initTurboZapTables().catch((err) => console.error("[turbozap] Init error:", err));
 
   // ============================================
   // Sugestões API

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import { useRoute, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageInfo } from "@/contexts/PageContext";
@@ -17,7 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
 import { TurbodashKPICards } from "@/components/TurbodashKPICards";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown, XCircle, Star, MessageCircle, Wrench, Lock, Settings, Plug } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, ChevronRight, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown, XCircle, Star, MessageCircle, Wrench, Lock, Settings, Plug, Trash2 } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -127,15 +127,17 @@ interface SortConfig {
 interface ClienteTask {
   id: string;
   nome: string;
+  descricao: string | null;
   status: string;
   prioridade: string;
   responsavel: string | null;
   dataLimite: string | null;
-  projeto: string | null;
   dataCriacao: string | null;
   dataConclusao: string | null;
   equipe: string | null;
   tipoTask: string | null;
+  parentId: number | null;
+  subtasks?: ClienteTask[];
 }
 
 interface ClienteComunicacao {
@@ -194,7 +196,24 @@ export default function ClientDetail() {
     responsavel: '__all__',
     equipe: '__all__'
   });
-  
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [editingTask, setEditingTask] = useState<ClienteTask | null>(null);
+  const [taskEditData, setTaskEditData] = useState({
+    nome: '',
+    status: '',
+    responsavel: '',
+    equipe: '',
+    prioridade: '',
+    data_vencimento: '',
+  });
+
+  const TASK_SQUAD_LIST = [
+    "Aurea", "Black", "Bloomfield", "Chama", "Hunters", "Makers",
+    "Pulse", "Selva", "Squadra", "Squad X", "Supreme", "Tech"
+  ];
+  const TASK_STATUS_LIST = ["a fazer", "em andamento", "concluída", "cancelada"];
+  const PRIORIDADE_LIST = ["baixa", "normal", "alta", "urgente"];
+
   const isTaskCompleted = (status: string | null | undefined): boolean => {
     if (!status) return false;
     const statusLower = status.toLowerCase();
@@ -368,7 +387,7 @@ export default function ClientDetail() {
 
   const { data: colaboradoresDropdown } = useQuery<{ id: number; nome: string; status: string | null }[]>({
     queryKey: ["/api/colaboradores/dropdown"],
-    enabled: !!editingContratoId || isEditingDados,
+    enabled: !!editingContratoId || isEditingDados || !!editingTask,
   });
 
   const { data: tasks, isLoading: isLoadingTasks } = useQuery<ClienteTask[]>({
@@ -410,6 +429,70 @@ export default function ClientDetail() {
     conteudo: "",
     prioridade: "normal",
   });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskId, data }: { taskId: string; data: Record<string, any> }) => {
+      const response = await apiRequest("PUT", `/api/cliente/tasks/${taskId}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", cliente?.cnpj, "tasks"] });
+      setEditingTask(null);
+      toast({ title: "Tarefa atualizada", description: "A tarefa foi atualizada com sucesso." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível atualizar a tarefa.", variant: "destructive" });
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      await apiRequest("DELETE", `/api/cliente/tasks/${taskId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", cliente?.cnpj, "tasks"] });
+      toast({ title: "Tarefa excluída", description: "A tarefa foi excluída com sucesso." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível excluir a tarefa.", variant: "destructive" });
+    },
+  });
+
+  const openEditModal = (task: ClienteTask) => {
+    setEditingTask(task);
+    setTaskEditData({
+      nome: task.nome || '',
+      status: task.status || 'a fazer',
+      responsavel: task.responsavel || '',
+      equipe: task.equipe || '',
+      prioridade: task.prioridade || 'normal',
+      data_vencimento: task.dataLimite ? task.dataLimite.split('T')[0] : '',
+    });
+  };
+
+  const handleSaveTask = () => {
+    if (!editingTask) return;
+    updateTaskMutation.mutate({
+      taskId: editingTask.id,
+      data: {
+        nome: taskEditData.nome,
+        status: taskEditData.status,
+        responsavel: taskEditData.responsavel || null,
+        equipe: taskEditData.equipe || null,
+        prioridade: taskEditData.prioridade,
+        data_vencimento: taskEditData.data_vencimento || null,
+      },
+    });
+  };
+
+  const toggleExpand = (taskId: string) => {
+    setExpandedTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
 
   const createComunicacaoMutation = useMutation({
     mutationFn: async (data: typeof newComunicacao) => {
@@ -977,46 +1060,48 @@ export default function ClientDetail() {
     }
   }, [sortedReceitas]);
   
+  // Collect all tasks + subtasks for building filter options
+  const allFlatTasks = useMemo(() => {
+    if (!tasks) return [];
+    const flat: ClienteTask[] = [];
+    tasks.forEach(t => {
+      flat.push(t);
+      if (t.subtasks) t.subtasks.forEach(st => flat.push(st));
+    });
+    return flat;
+  }, [tasks]);
+
   const taskStatusOptions = useMemo(() => {
-    if (!tasks) return [];
     const statuses = new Set<string>();
-    tasks.forEach(t => {
-      if (t.status) statuses.add(t.status);
-    });
+    allFlatTasks.forEach(t => { if (t.status) statuses.add(t.status); });
     return Array.from(statuses).sort();
-  }, [tasks]);
-  
+  }, [allFlatTasks]);
+
   const taskResponsavelOptions = useMemo(() => {
-    if (!tasks) return [];
     const responsaveis = new Set<string>();
-    tasks.forEach(t => {
-      if (t.responsavel) responsaveis.add(t.responsavel);
-    });
+    allFlatTasks.forEach(t => { if (t.responsavel) responsaveis.add(t.responsavel); });
     return Array.from(responsaveis).sort();
-  }, [tasks]);
-  
+  }, [allFlatTasks]);
+
   const taskEquipeOptions = useMemo(() => {
-    if (!tasks) return [];
     const equipes = new Set<string>();
-    tasks.forEach(t => {
-      if (t.equipe) equipes.add(t.equipe);
-    });
+    allFlatTasks.forEach(t => { if (t.equipe) equipes.add(t.equipe); });
     return Array.from(equipes).sort();
   }, [tasks]);
   
   const filteredTasks = useMemo(() => {
     if (!tasks) return [];
-    return tasks.filter(task => {
-      if (taskFilters.status !== '__all__' && task.status !== taskFilters.status) {
-        return false;
-      }
-      if (taskFilters.responsavel !== '__all__' && task.responsavel !== taskFilters.responsavel) {
-        return false;
-      }
-      if (taskFilters.equipe !== '__all__' && task.equipe !== taskFilters.equipe) {
-        return false;
-      }
+    const matchesFilter = (t: ClienteTask) => {
+      if (taskFilters.status !== '__all__' && t.status !== taskFilters.status) return false;
+      if (taskFilters.responsavel !== '__all__' && t.responsavel !== taskFilters.responsavel) return false;
+      if (taskFilters.equipe !== '__all__' && t.equipe !== taskFilters.equipe) return false;
       return true;
+    };
+    // Show parent if it matches OR if any subtask matches
+    return tasks.filter(task => {
+      if (matchesFilter(task)) return true;
+      if (task.subtasks && task.subtasks.some(st => matchesFilter(st))) return true;
+      return false;
     });
   }, [tasks, taskFilters]);
 
@@ -3287,7 +3372,7 @@ export default function ClientDetail() {
                   <ListTodo className="w-5 h-5 text-primary" />
                   <h2 className="text-lg font-semibold">Tarefas do Cliente</h2>
                   {tasks && tasks.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">{tasks.length} tarefas</Badge>
+                    <Badge variant="secondary" className="text-xs">{allFlatTasks.length} tarefas</Badge>
                   )}
                 </div>
               </div>
@@ -3370,88 +3455,212 @@ export default function ClientDetail() {
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 </div>
               ) : filteredTasks && filteredTasks.length > 0 ? (
+                <>
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30 border-b">
-                      <TableHead className="bg-muted/30" data-testid="header-task-nome">Nome</TableHead>
-                      <TableHead className="bg-muted/30" data-testid="header-task-status">Status</TableHead>
-                      <TableHead className="bg-muted/30" data-testid="header-task-prioridade">Prioridade</TableHead>
-                      <TableHead className="bg-muted/30" data-testid="header-task-responsavel">Responsável</TableHead>
-                      <TableHead className="bg-muted/30" data-testid="header-task-data">Data Limite</TableHead>
-                      <TableHead className="bg-muted/30" data-testid="header-task-dias-aberta">Dias Aberta</TableHead>
-                      <TableHead className="bg-muted/30" data-testid="header-task-equipe">Equipe</TableHead>
+                      <TableHead className="bg-muted/30 w-8"></TableHead>
+                      <TableHead className="bg-muted/30">Nome</TableHead>
+                      <TableHead className="bg-muted/30">Status</TableHead>
+                      <TableHead className="bg-muted/30">Prioridade</TableHead>
+                      <TableHead className="bg-muted/30">Responsável</TableHead>
+                      <TableHead className="bg-muted/30">Data Limite</TableHead>
+                      <TableHead className="bg-muted/30">Equipe</TableHead>
+                      <TableHead className="bg-muted/30 w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredTasks.map((task) => {
-                      const diasAberta = calcularDiasAberta(task);
+                      const hasSubtasks = task.subtasks && task.subtasks.length > 0;
+                      const isExpanded = expandedTasks.has(task.id);
+                      const completedSubtasks = hasSubtasks ? task.subtasks!.filter(st => isTaskCompleted(st.status)).length : 0;
+                      const totalSubtasks = hasSubtasks ? task.subtasks!.length : 0;
                       const isCompleted = isTaskCompleted(task.status);
+
+                      const renderTaskRow = (t: ClienteTask, isSubtask: boolean) => {
+                        const dAberta = calcularDiasAberta(t);
+                        const tCompleted = isTaskCompleted(t.status);
+                        return (
+                          <TableRow
+                            key={t.id}
+                            className={`hover-elevate ${isSubtask ? 'bg-muted/10' : ''}`}
+                          >
+                            <TableCell className="w-8 px-2">
+                              {!isSubtask && hasSubtasks ? (
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => toggleExpand(task.id)}>
+                                  {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                </Button>
+                              ) : isSubtask ? (
+                                <div className="w-4 h-4 ml-2 border-l-2 border-b-2 border-muted-foreground/30 rounded-bl-sm" />
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="font-medium max-w-[300px]" title={t.nome}>
+                              <div className="flex items-center gap-2">
+                                <span className={`truncate ${isSubtask ? 'text-sm text-muted-foreground' : ''}`}>
+                                  {t.nome}
+                                </span>
+                                {!isSubtask && hasSubtasks && (
+                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">
+                                    {completedSubtasks}/{totalSubtasks}
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={
+                                  tCompleted
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                    : t.status?.toLowerCase() === 'em andamento' || t.status?.toLowerCase() === 'in progress'
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                }
+                                variant="outline"
+                              >
+                                {t.status || 'a fazer'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                className={
+                                  t.prioridade?.toLowerCase() === 'alta' || t.prioridade?.toLowerCase() === 'urgente'
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                    : t.prioridade?.toLowerCase() === 'normal'
+                                    ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+                                }
+                                variant="outline"
+                              >
+                                <Flag className="w-3 h-3 mr-1" />
+                                {t.prioridade || 'normal'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {t.responsavel || '-'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {t.dataLimite ? new Date(t.dataLimite).toLocaleDateString('pt-BR') : '-'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {t.equipe || '-'}
+                            </TableCell>
+                            <TableCell className="w-10 px-1">
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEditModal(t)}>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      };
+
                       return (
-                        <TableRow key={task.id} className="hover-elevate" data-testid={`task-row-${task.id}`}>
-                          <TableCell className="font-medium max-w-[300px] truncate" data-testid={`task-nome-${task.id}`} title={task.nome}>
-                            {task.nome}
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              className={
-                                isCompleted
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                  : task.status?.toLowerCase() === 'in progress' || task.status?.toLowerCase() === 'em progresso' || task.status?.toLowerCase() === 'em andamento'
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                              }
-                              variant="outline"
-                              data-testid={`task-status-${task.id}`}
-                            >
-                              {task.status || 'Pendente'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              className={
-                                task.prioridade?.toLowerCase() === 'alta' || task.prioridade?.toLowerCase() === 'urgent' || task.prioridade?.toLowerCase() === 'high'
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                  : task.prioridade?.toLowerCase() === 'média' || task.prioridade?.toLowerCase() === 'normal' || task.prioridade?.toLowerCase() === 'medium'
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                              }
-                              variant="outline"
-                              data-testid={`task-prioridade-${task.id}`}
-                            >
-                              <Flag className="w-3 h-3 mr-1" />
-                              {task.prioridade || 'Baixa'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`task-responsavel-${task.id}`}>
-                            {task.responsavel || '-'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`task-data-${task.id}`}>
-                            {task.dataLimite ? new Date(task.dataLimite).toLocaleDateString('pt-BR') : '-'}
-                          </TableCell>
-                          <TableCell data-testid={`task-dias-aberta-${task.id}`}>
-                            <Badge 
-                              variant="outline"
-                              className={
-                                isCompleted
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                  : diasAberta > 30
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                  : diasAberta > 14
-                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-                              }
-                            >
-                              {diasAberta !== null ? `${diasAberta} dias` : '-'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground" data-testid={`task-equipe-${task.id}`}>
-                            {task.equipe || '-'}
-                          </TableCell>
-                        </TableRow>
+                        <Fragment key={`group-${task.id}`}>
+                          {renderTaskRow(task, false)}
+                          {isExpanded && hasSubtasks && task.subtasks!.map(st => renderTaskRow(st, true))}
+                        </Fragment>
                       );
                     })}
                   </TableBody>
                 </Table>
+
+                {/* Edit Task Modal */}
+                <Dialog open={!!editingTask} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
+                  <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                      <DialogTitle>Editar Tarefa</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Nome</label>
+                        <Input
+                          value={taskEditData.nome}
+                          onChange={(e) => setTaskEditData(prev => ({ ...prev, nome: e.target.value }))}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Status</label>
+                          <Select value={taskEditData.status} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, status: val }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {TASK_STATUS_LIST.map(s => (
+                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Prioridade</label>
+                          <Select value={taskEditData.prioridade} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, prioridade: val }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {PRIORIDADE_LIST.map(p => (
+                                <SelectItem key={p} value={p}>{p}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-sm font-medium">Responsável</label>
+                        <Select value={taskEditData.responsavel || '__none__'} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, responsavel: val === '__none__' ? '' : val }))}>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Nenhum</SelectItem>
+                            {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                              <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Equipe</label>
+                          <Select value={taskEditData.equipe || '__none__'} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, equipe: val === '__none__' ? '' : val }))}>
+                            <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Nenhuma</SelectItem>
+                              {TASK_SQUAD_LIST.map(sq => (
+                                <SelectItem key={sq} value={sq}>{sq}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-sm font-medium">Data Limite</label>
+                          <Input
+                            type="date"
+                            value={taskEditData.data_vencimento}
+                            onChange={(e) => setTaskEditData(prev => ({ ...prev, data_vencimento: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter className="flex justify-between">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          if (editingTask && confirm('Tem certeza que deseja excluir esta tarefa?')) {
+                            deleteTaskMutation.mutate(editingTask.id);
+                            setEditingTask(null);
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-1" />
+                        Excluir
+                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setEditingTask(null)}>Cancelar</Button>
+                        <Button onClick={handleSaveTask} disabled={updateTaskMutation.isPending}>
+                          {updateTaskMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                          Salvar
+                        </Button>
+                      </div>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                </>
               ) : tasks && tasks.length > 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center" data-testid="no-tasks-filtered">
                   <ListTodo className="w-12 h-12 text-muted-foreground mb-4" />
