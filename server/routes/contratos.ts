@@ -543,6 +543,25 @@ async function ensureContratosTablesExist() {
       )
     `);
     
+    // Migrate tarefas_clientes: add parent_id, descricao, prioridade, expand nome to TEXT
+    try {
+      await db.execute(sql`
+        ALTER TABLE cortex_core.tarefas_clientes
+          ALTER COLUMN nome TYPE TEXT
+      `);
+    } catch (e) { /* already TEXT */ }
+    try {
+      await db.execute(sql`
+        ALTER TABLE cortex_core.tarefas_clientes
+          ADD COLUMN IF NOT EXISTS descricao TEXT,
+          ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES cortex_core.tarefas_clientes(id) ON DELETE CASCADE,
+          ADD COLUMN IF NOT EXISTS prioridade VARCHAR(50) DEFAULT 'normal'
+      `);
+      console.log("[contratos] tarefas_clientes columns migrated");
+    } catch (migErr: any) {
+      console.log("[contratos] tarefas_clientes migration skipped:", migErr.message);
+    }
+
     tablesInitialized = true;
     console.log("[contratos] All tables initialized successfully");
     
@@ -566,6 +585,61 @@ async function ensureContratosTablesExist() {
 
 export function registerContratosRoutes(app: Express) {
   ensureContratosTablesExist();
+
+  // Helper: parseia texto de escopo em linhas individuais de tasks (fallback simples)
+  function parseEscopoToTasks(escopo: string): string[] {
+    return escopo
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(line => line.replace(/^(?:\d+\.|[ivx]+\.|[-•*])\s*/, '').trim())
+      .filter(line => line.length > 2);
+  }
+
+  // Helper: parsing inteligente do escopo usando OpenAI
+  async function parseEscopoWithAI(escopo: string, servicoNome: string): Promise<{nome: string, quantidade: number}[]> {
+    try {
+      const openai = getOpenAIClient();
+      if (!openai) throw new Error("OpenAI not configured");
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [{
+          role: "system",
+          content: `Extraia os entregáveis de um escopo de serviço de marketing/publicidade. Para cada entregável, retorne o nome curto e a quantidade.
+Responda APENAS em JSON: {"entregas": [{"nome": "Nome curto do entregável", "quantidade": 1}]}
+Se o escopo mencionar quantidades (ex: "48 vídeos", "12 conteúdos", "4 variações"), use-as.
+Se não houver quantidade explícita, use 1.
+Exemplos:
+- "Produção de 48 vídeos UGC" → {"entregas": [{"nome": "Vídeo UGC", "quantidade": 48}]}
+- "Gestão de comunidade com captação, curadoria, engajamento" → {"entregas": [{"nome": "Captação de Creators", "quantidade": 1}, {"nome": "Curadoria", "quantidade": 1}, {"nome": "Engajamento", "quantidade": 1}]}
+- "4 posts estáticos + 8 stories + gestão de tráfego" → {"entregas": [{"nome": "Post Estático", "quantidade": 4}, {"nome": "Story", "quantidade": 8}, {"nome": "Gestão de Tráfego", "quantidade": 1}]}`
+        }, {
+          role: "user",
+          content: `Serviço: ${servicoNome}\nEscopo: ${escopo}`
+        }]
+      });
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) throw new Error("Empty AI response");
+
+      const parsed = JSON.parse(content);
+      const entregas = parsed.entregas;
+      if (!Array.isArray(entregas) || entregas.length === 0) throw new Error("No entregas in response");
+
+      return entregas.map((e: any) => ({
+        nome: String(e.nome || "Entregável"),
+        quantidade: Math.max(1, parseInt(e.quantidade) || 1)
+      }));
+    } catch (error: any) {
+      console.log(`[parseEscopo] AI parsing failed, using fallback: ${error.message}`);
+      // Fallback: usar parser simples, cada linha = 1 entregável sem subtasks
+      const linhas = parseEscopoToTasks(escopo);
+      return linhas.map(linha => ({ nome: linha, quantidade: 1 }));
+    }
+  }
 
   // Helper: ao assinar contrato, cria card do cliente em cup_clientes + serviços em cup_contratos
   async function syncClienteFromSignedContract(contratoId: number) {
@@ -616,6 +690,7 @@ export function registerContratosRoutes(app: Express) {
       // 3. Buscar itens do contrato com serviço e plano
       const itensResult = await db.execute(sql`
         SELECT ci.id, ci.modalidade, ci.valor_negociado,
+               ci.escopo, ps.escopo AS plano_escopo,
                s.nome AS servico_nome,
                ps.nome AS plano_nome
         FROM staging.contratos_itens ci
@@ -653,6 +728,55 @@ export function registerContratosRoutes(app: Express) {
             vendedor = EXCLUDED.vendedor
         `);
         console.log(`[sync-cliente] Contrato-item ${idSubtask} sincronizado (${servicoNome})`);
+      }
+
+      // 5. Gerar tasks de entregáveis baseadas no escopo de cada item (com parsing inteligente)
+      const existingTasks = await db.execute(sql`
+        SELECT id FROM cortex_core.tarefas_clientes
+        WHERE LOWER(TRIM(cliente)) = LOWER(TRIM(${contrato.nome}))
+          AND tipo_task = 'entregável'
+          AND parent_id IS NULL
+        LIMIT 1
+      `);
+
+      if (existingTasks.rows.length === 0) {
+        let totalTasks = 0;
+        for (const item of itensResult.rows as any[]) {
+          const escopo = item.escopo || item.plano_escopo;
+          if (!escopo) continue;
+
+          const servicoNome = `${item.servico_nome} - ${item.plano_nome}`;
+          const entregas = await parseEscopoWithAI(escopo, servicoNome);
+
+          for (const entrega of entregas) {
+            // Insert parent task
+            const nomeTaskPai = `[${servicoNome}] ${entrega.nome}`;
+            const parentResult = await db.execute(sql`
+              INSERT INTO cortex_core.tarefas_clientes (nome, descricao, status, cliente, tipo_task, prioridade, created_at)
+              VALUES (${nomeTaskPai}, ${escopo}, 'a fazer', ${contrato.nome}, 'entregável', 'normal', NOW())
+              RETURNING id
+            `);
+            const parentId = (parentResult.rows[0] as any).id;
+            totalTasks++;
+
+            // If quantity > 1, create numbered subtasks
+            if (entrega.quantidade > 1) {
+              for (let i = 1; i <= entrega.quantidade; i++) {
+                const nomeSubtask = `${entrega.nome} #${i}`;
+                await db.execute(sql`
+                  INSERT INTO cortex_core.tarefas_clientes (nome, status, cliente, tipo_task, prioridade, parent_id, created_at)
+                  VALUES (${nomeSubtask}, 'a fazer', ${contrato.nome}, 'entregável', 'normal', ${parentId}, NOW())
+                `);
+                totalTasks++;
+              }
+            }
+          }
+        }
+        if (totalTasks > 0) {
+          console.log(`[sync-cliente] ${totalTasks} tasks de entregáveis criadas para ${contrato.nome}`);
+        }
+      } else {
+        console.log(`[sync-cliente] Tasks de entregáveis já existem para ${contrato.nome}, pulando`);
       }
 
       console.log(`[sync-cliente] Sync concluído para contrato ${contratoId}: ${itensResult.rows.length} itens`);
@@ -3156,6 +3280,46 @@ export function registerContratosRoutes(app: Express) {
     } catch (error: any) {
       console.error("[assinafy] Erro ao consultar status:", error);
       res.status(500).json({ error: "Erro ao consultar status", details: error.message });
+    }
+  });
+
+  // Endpoint para SIMULAR assinatura (teste de fluxo)
+  app.post("/api/contratos/:id/simular-assinatura", isAuthenticated, async (req, res) => {
+    try {
+      const contratoId = parseInt(req.params.id);
+
+      const contratoResult = await db.execute(sql`
+        SELECT id, status, assinafy_document_id FROM staging.contratos WHERE id = ${contratoId}
+      `);
+      if (contratoResult.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+
+      // Atualizar como se Assinafy retornasse "signed"
+      await db.execute(sql`
+        UPDATE staging.contratos SET
+          status = 'assinado',
+          assinafy_status = 'signed',
+          signature_completed_at = COALESCE(signature_completed_at, NOW()),
+          data_atualizacao = NOW()
+        WHERE id = ${contratoId}
+      `);
+
+      console.log(`[simular-assinatura] Contrato ${contratoId} marcado como assinado (simulação)`);
+
+      // Executar o mesmo sync do fluxo real
+      await syncClienteFromSignedContract(contratoId);
+
+      res.json({
+        contratoId,
+        status: "assinado",
+        assinafyStatus: "signed",
+        simulado: true,
+        mensagem: "Assinatura simulada com sucesso. Sync de cliente executado.",
+      });
+    } catch (error: any) {
+      console.error("[simular-assinatura] Erro:", error);
+      res.status(500).json({ error: "Erro ao simular assinatura", details: error.message });
     }
   });
 
