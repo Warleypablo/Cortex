@@ -608,13 +608,16 @@ export function registerContratosRoutes(app: Express) {
         response_format: { type: "json_object" },
         messages: [{
           role: "system",
-          content: `Extraia os entregáveis de um escopo de serviço de marketing/publicidade. Para cada entregável, retorne o nome curto e a quantidade.
-Responda APENAS em JSON: {"entregas": [{"nome": "Nome curto do entregável", "quantidade": 1}]}
-Se o escopo mencionar quantidades (ex: "48 vídeos", "12 conteúdos", "4 variações"), use-as.
-Se não houver quantidade explícita, use 1.
+          content: `Você é um parser de escopos de serviços de marketing. Extraia SOMENTE os entregáveis concretos que o cliente vai receber.
+Responda em JSON: {"entregas": [{"nome": "Nome Curto do Entregável", "quantidade": N}]}
+REGRAS:
+1) Foque no PRODUTO FINAL entregue ao cliente (ex: vídeo, post, story, relatório).
+2) NÃO liste componentes internos do processo (variações de gancho, conteúdos-base, briefings são parte do entregável principal, não entregáveis separados).
+3) NÃO liste número de creators/profissionais como entregável.
+4) Se o escopo descreve gestão contínua sem entregáveis contáveis, extraia as atividades como entregáveis com quantidade 1.
+5) Use nomes capitalizados (ex: "Vídeo UGC", "Post Estático", "Story").
 Exemplos:
-- "Produção de 48 vídeos UGC" → {"entregas": [{"nome": "Vídeo UGC", "quantidade": 48}]}
-- "Gestão de comunidade com captação, curadoria, engajamento" → {"entregas": [{"nome": "Captação de Creators", "quantidade": 1}, {"nome": "Curadoria", "quantidade": 1}, {"nome": "Engajamento", "quantidade": 1}]}
+- "Produção de 48 vídeos UGC por 8 creators, 12 conteúdos com 4 variações" → {"entregas": [{"nome": "Vídeo UGC", "quantidade": 48}]}
 - "4 posts estáticos + 8 stories + gestão de tráfego" → {"entregas": [{"nome": "Post Estático", "quantidade": 4}, {"nome": "Story", "quantidade": 8}, {"nome": "Gestão de Tráfego", "quantidade": 1}]}`
         }, {
           role: "user",
@@ -731,52 +734,55 @@ Exemplos:
       }
 
       // 5. Gerar tasks de entregáveis baseadas no escopo de cada item (com parsing inteligente)
-      const existingTasks = await db.execute(sql`
-        SELECT id FROM cortex_core.tarefas_clientes
-        WHERE LOWER(TRIM(cliente)) = LOWER(TRIM(${contrato.nome}))
-          AND tipo_task = 'entregável'
-          AND parent_id IS NULL
-        LIMIT 1
-      `);
+      let totalTasks = 0;
+      for (const item of itensResult.rows as any[]) {
+        const escopo = item.escopo || item.plano_escopo;
+        if (!escopo) continue;
 
-      if (existingTasks.rows.length === 0) {
-        let totalTasks = 0;
-        for (const item of itensResult.rows as any[]) {
-          const escopo = item.escopo || item.plano_escopo;
-          if (!escopo) continue;
+        const servicoNome = `${item.servico_nome} - ${item.plano_nome}`;
 
-          const servicoNome = `${item.servico_nome} - ${item.plano_nome}`;
-          const entregas = await parseEscopoWithAI(escopo, servicoNome);
+        // Check if tasks already exist for this specific service (avoid duplicates per item)
+        const existingForItem = await db.execute(sql`
+          SELECT id FROM cortex_core.tarefas_clientes
+          WHERE LOWER(TRIM(cliente)) = LOWER(TRIM(${contrato.nome}))
+            AND tipo_task = 'entregável'
+            AND parent_id IS NULL
+            AND nome LIKE ${`[${servicoNome}]%`}
+          LIMIT 1
+        `);
+        if (existingForItem.rows.length > 0) {
+          console.log(`[sync-cliente] Tasks para "${servicoNome}" já existem, pulando`);
+          continue;
+        }
 
-          for (const entrega of entregas) {
-            // Insert parent task
-            const nomeTaskPai = `[${servicoNome}] ${entrega.nome}`;
-            const parentResult = await db.execute(sql`
-              INSERT INTO cortex_core.tarefas_clientes (nome, descricao, status, cliente, tipo_task, prioridade, created_at)
-              VALUES (${nomeTaskPai}, ${escopo}, 'a fazer', ${contrato.nome}, 'entregável', 'normal', NOW())
-              RETURNING id
-            `);
-            const parentId = (parentResult.rows[0] as any).id;
-            totalTasks++;
+        const entregas = await parseEscopoWithAI(escopo, servicoNome);
 
-            // If quantity > 1, create numbered subtasks
-            if (entrega.quantidade > 1) {
-              for (let i = 1; i <= entrega.quantidade; i++) {
-                const nomeSubtask = `${entrega.nome} #${i}`;
-                await db.execute(sql`
-                  INSERT INTO cortex_core.tarefas_clientes (nome, status, cliente, tipo_task, prioridade, parent_id, created_at)
-                  VALUES (${nomeSubtask}, 'a fazer', ${contrato.nome}, 'entregável', 'normal', ${parentId}, NOW())
-                `);
-                totalTasks++;
-              }
+        for (const entrega of entregas) {
+          // Insert parent task
+          const nomeTaskPai = `[${servicoNome}] ${entrega.nome}`;
+          const parentResult = await db.execute(sql`
+            INSERT INTO cortex_core.tarefas_clientes (nome, descricao, status, cliente, tipo_task, prioridade, created_at)
+            VALUES (${nomeTaskPai}, ${escopo}, 'a fazer', ${contrato.nome}, 'entregável', 'normal', NOW())
+            RETURNING id
+          `);
+          const parentId = (parentResult.rows[0] as any).id;
+          totalTasks++;
+
+          // If quantity > 1, create numbered subtasks
+          if (entrega.quantidade > 1) {
+            for (let i = 1; i <= entrega.quantidade; i++) {
+              const nomeSubtask = `${entrega.nome} #${i}`;
+              await db.execute(sql`
+                INSERT INTO cortex_core.tarefas_clientes (nome, status, cliente, tipo_task, prioridade, parent_id, created_at)
+                VALUES (${nomeSubtask}, 'a fazer', ${contrato.nome}, 'entregável', 'normal', ${parentId}, NOW())
+              `);
+              totalTasks++;
             }
           }
         }
-        if (totalTasks > 0) {
-          console.log(`[sync-cliente] ${totalTasks} tasks de entregáveis criadas para ${contrato.nome}`);
-        }
-      } else {
-        console.log(`[sync-cliente] Tasks de entregáveis já existem para ${contrato.nome}, pulando`);
+      }
+      if (totalTasks > 0) {
+        console.log(`[sync-cliente] ${totalTasks} tasks de entregáveis criadas para ${contrato.nome}`);
       }
 
       console.log(`[sync-cliente] Sync concluído para contrato ${contratoId}: ${itensResult.rows.length} itens`);
@@ -3320,6 +3326,70 @@ Exemplos:
     } catch (error: any) {
       console.error("[simular-assinatura] Erro:", error);
       res.status(500).json({ error: "Erro ao simular assinatura", details: error.message });
+    }
+  });
+
+  // Re-sync tasks de entregáveis para um contrato (recria do zero com OpenAI)
+  // Deleta tasks antigas e reprocessa TODOS os contratos assinados do mesmo cliente
+  app.post("/api/contratos/:id/resync-tasks", isAuthenticated, async (req, res) => {
+    try {
+      const contratoId = parseInt(req.params.id);
+
+      // Buscar contrato + entidade
+      const contratoResult = await db.execute(sql`
+        SELECT c.id, e.nome, e.id as entidade_id FROM staging.contratos c
+        JOIN staging.entidades e ON e.id = c.entidade_id
+        WHERE c.id = ${contratoId}
+      `);
+      if (contratoResult.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+      const clienteNome = (contratoResult.rows[0] as any).nome;
+      const entidadeId = (contratoResult.rows[0] as any).entidade_id;
+
+      // Deletar TODAS as tasks de entregáveis deste cliente (para recriar)
+      const deleteResult = await db.execute(sql`
+        DELETE FROM cortex_core.tarefas_clientes
+        WHERE LOWER(TRIM(cliente)) = LOWER(TRIM(${clienteNome}))
+          AND tipo_task = 'entregável'
+      `);
+      console.log(`[resync-tasks] Deletadas tasks existentes de ${clienteNome}`);
+
+      // Buscar TODOS os contratos assinados desta entidade
+      const allContratos = await db.execute(sql`
+        SELECT id FROM staging.contratos
+        WHERE entidade_id = ${entidadeId} AND status = 'assinado'
+        ORDER BY id
+      `);
+
+      // Re-executar sync para cada contrato
+      for (const c of allContratos.rows as any[]) {
+        await syncClienteFromSignedContract(c.id);
+      }
+
+      // Contar tasks criadas
+      const countResult = await db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE parent_id IS NULL) as parents,
+          COUNT(*) FILTER (WHERE parent_id IS NOT NULL) as subtasks,
+          COUNT(*) as total
+        FROM cortex_core.tarefas_clientes
+        WHERE LOWER(TRIM(cliente)) = LOWER(TRIM(${clienteNome}))
+          AND tipo_task = 'entregável'
+      `);
+      const counts = countResult.rows[0] as any;
+
+      res.json({
+        success: true,
+        cliente: clienteNome,
+        contratosProcessados: allContratos.rows.length,
+        tasksPai: parseInt(counts.parents),
+        subtasks: parseInt(counts.subtasks),
+        totalTasks: parseInt(counts.total),
+      });
+    } catch (error: any) {
+      console.error("[resync-tasks] Erro:", error);
+      res.status(500).json({ error: "Erro ao re-sincronizar tasks", details: error.message });
     }
   });
 
