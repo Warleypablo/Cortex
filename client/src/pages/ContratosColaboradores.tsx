@@ -396,7 +396,7 @@ Parágrafo Terceiro. As partes declaram que qualquer conduta incompatível com a
 
 CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE
 
-12.1. A CONTRATANTE disponibilizará, em regime de comodato, exclusivamente por razões de segurança da informação, padronização tecnológica e proteção de dados corporativos, {{PATRIMONIO_LISTA}}, de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.
+12.1. A CONTRATANTE disponibilizará, em regime de comodato, exclusivamente por razões de segurança da informação, padronização tecnológica e proteção de dados corporativos, um computador MacBook modelo {{PATRIMONIO_LISTA}}, um Fone Logitech H390, Mouse Logitech Bluetooth e um Adaptador Hub USB-C HDMI com ao menos 2 entradas USB-A, de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.
 
 12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado, abstendo-se de utilizá-lo para fins pessoais, atividades não relacionadas ao presente contrato, ou por terceiros.
 
