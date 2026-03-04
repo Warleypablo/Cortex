@@ -12983,7 +12983,7 @@ export class DbStorage implements IStorage {
       FROM "Inhire".rh_pessoal c
       LEFT JOIN LATERAL (
         SELECT descricao FROM "Inhire".rh_patrimonio
-        WHERE responsavel_id = c.id
+        WHERE (responsavel_id = c.id OR (responsavel_id IS NULL AND responsavel_atual = c.nome))
           AND (ativo ILIKE '%notebook%' OR ativo ILIKE '%macbook%' OR ativo ILIKE '%computador%' OR ativo ILIKE '%mac%' OR descricao ILIKE '%macbook%')
         ORDER BY id DESC LIMIT 1
       ) p ON true
