@@ -12022,10 +12022,33 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   
   app.get("/api/closers/list", async (req, res) => {
     try {
-      const result = await db.execute(sql`
-        SELECT id, nome as name, email, active FROM "Bitrix".crm_closers ORDER BY nome
+      // Check which columns exist
+      const colCheck = await db.execute(sql`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'Bitrix' AND table_name = 'crm_closers'
       `);
-      res.json(result.rows);
+      const cols = (colCheck.rows as any[]).map(r => r.column_name);
+      const hasEmail = cols.includes('email');
+      const hasActive = cols.includes('active');
+
+      const selectParts = ['id', 'nome as name'];
+      if (hasEmail) selectParts.push('email');
+      if (hasActive) selectParts.push('active');
+
+      const result = await db.execute(sql.raw(`
+        SELECT ${selectParts.join(', ')} FROM "Bitrix".crm_closers ORDER BY nome
+      `));
+
+      // Ensure all rows have email and active fields
+      const rows = (result.rows as any[]).map(r => ({
+        id: r.id,
+        name: r.name,
+        email: r.email || null,
+        active: r.active !== undefined ? r.active : true,
+      }));
+
+      console.log(`[closers/list] Total: ${rows.length}, active(!false): ${rows.filter((r: any) => r.active !== false).length}, cols: ${cols.join(',')}, sample:`, rows.slice(0, 3));
+      res.json(rows);
     } catch (error) {
       console.error("[api] Error fetching closers list:", error);
       res.status(500).json({ error: "Failed to fetch closers list" });

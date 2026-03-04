@@ -388,7 +388,7 @@ export default function PresentationMode() {
     const receitaMap = new Map((chartReceita || []).map(c => [c.closer, c]));
     const allCloserNames = new Set<string>([
       ...(chartReceita || []).map(c => c.closer),
-      ...(closersList || []).filter(c => c.active).map(c => c.name),
+      ...(closersList || []).map(c => c.name),
     ]);
     return Array.from(allCloserNames).map(name => {
       const receita = receitaMap.get(name);
@@ -405,7 +405,7 @@ export default function PresentationMode() {
         trend: 'stable' as const,
       };
     })
-    .sort((a, b) => b.mrr - a.mrr)
+    .sort((a, b) => b.mrr - a.mrr || b.pontual - a.pontual || b.reunioes - a.reunioes)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
   })();
 
