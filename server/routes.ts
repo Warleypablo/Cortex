@@ -7214,52 +7214,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST - Enviar contrato de colaborador para assinatura via Assinafy
   app.post("/api/juridico/colaboradores-contrato/:id/enviar-assinatura", async (req, res) => {
     const colaboradorId = parseInt(req.params.id);
-    
+    const startTime = Date.now();
+
     try {
       console.log(`[assinafy-colab] Iniciando envio para assinatura - Colaborador ID: ${colaboradorId}`);
-      
-      // 1. Buscar configuração do Assinafy para colaboradores
-      const configResult = await db.execute(sql`
-        SELECT account_id, api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'colaboradores' LIMIT 1
-      `);
-      
+
+      // 1. Buscar config e dados do colaborador em paralelo
+      const [configResult, colaboradorResult] = await Promise.all([
+        db.execute(sql`
+          SELECT account_id, api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'colaboradores' LIMIT 1
+        `),
+        db.execute(sql`
+          SELECT id, nome, cpf, cnpj, endereco, estado, cargo, setor, admissao::text as admissao,
+                 COALESCE(email_pessoal, email_turbo) as email, salario
+          FROM "Inhire".rh_pessoal
+          WHERE id = ${colaboradorId}
+        `)
+      ]);
+
       if (configResult.rows.length === 0) {
         return res.status(500).json({ error: "Configuração do Assinafy para colaboradores não encontrada" });
       }
-      
-      const config = configResult.rows[0] as { account_id: string; api_key: string; api_url: string };
-      
-      // 2. Buscar dados do colaborador
-      const colaboradorResult = await db.execute(sql`
-        SELECT id, nome, cpf, cnpj, endereco, estado, cargo, setor, admissao::text as admissao,
-               COALESCE(email_pessoal, email_turbo) as email, salario
-        FROM "Inhire".rh_pessoal
-        WHERE id = ${colaboradorId}
-      `);
-      
       if (colaboradorResult.rows.length === 0) {
         return res.status(404).json({ error: "Colaborador não encontrado" });
       }
-      
+
+      const config = configResult.rows[0] as { account_id: string; api_key: string; api_url: string };
       const colaborador = colaboradorResult.rows[0] as any;
-      
+
       if (!colaborador.email) {
         return res.status(400).json({ error: "Colaborador não possui email cadastrado. Cadastre o email antes de enviar para assinatura." });
       }
-      
-      console.log(`[assinafy-colab] Signatário: ${colaborador.nome} (${colaborador.email})`);
 
-      // 3. Buscar patrimônio do colaborador
-      const patrimonioResult = await db.execute(sql`
-        SELECT descricao FROM "Inhire".rh_patrimonio
-        WHERE (responsavel_id = ${colaboradorId} OR responsavel_atual = ${colaborador.nome})
-          AND (ativo ILIKE '%notebook%' OR ativo ILIKE '%macbook%' OR ativo ILIKE '%computador%' OR ativo ILIKE '%mac%' OR descricao ILIKE '%macbook%')
-          AND descricao IS NOT NULL
-        ORDER BY id DESC LIMIT 1
-      `);
+      console.log(`[assinafy-colab] Signatário: ${colaborador.nome} (${colaborador.email}) [${Date.now() - startTime}ms]`);
+
+      // 2. Buscar patrimônio e gerar PDF em paralelo
+      const [patrimonioResult, FormDataModule] = await Promise.all([
+        db.execute(sql`
+          SELECT descricao FROM "Inhire".rh_patrimonio
+          WHERE (responsavel_id = ${colaboradorId} OR responsavel_atual = ${colaborador.nome})
+            AND (ativo ILIKE '%notebook%' OR ativo ILIKE '%macbook%' OR ativo ILIKE '%computador%' OR ativo ILIKE '%mac%' OR descricao ILIKE '%macbook%')
+            AND descricao IS NOT NULL
+          ORDER BY id DESC LIMIT 1
+        `),
+        import('form-data')
+      ]);
       const patrimonio = (patrimonioResult.rows[0] as any)?.descricao || null;
 
-      // 4. Gerar PDF do contrato usando função compartilhada
       const pdfBuffer = await gerarContratoPDF({
         nome: colaborador.nome,
         cpf: colaborador.cpf,
@@ -7270,16 +7271,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         salario: colaborador.salario?.toString() || '0',
         patrimonio,
       });
-      console.log(`[assinafy-colab] PDF gerado: ${pdfBuffer.length} bytes`);
+      console.log(`[assinafy-colab] PDF gerado: ${pdfBuffer.length} bytes [${Date.now() - startTime}ms]`);
 
-      // 5. Upload do PDF para Assinafy
-      const FormData = (await import('form-data')).default;
+      // 3. Upload do PDF para Assinafy
+      const FormData = FormDataModule.default;
       const formData = new FormData();
       formData.append('file', pdfBuffer, {
         filename: `contrato_colaborador_${colaboradorId}.pdf`,
         contentType: 'application/pdf'
       });
-      
+
       const uploadUrl = `${config.api_url}/accounts/${config.account_id}/documents`;
       const uploadResponse = await fetch(uploadUrl, {
         method: 'POST',
@@ -7289,42 +7290,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         body: formData.getBuffer()
       });
-      
+
       const uploadResult = await uploadResponse.json() as any;
-      
+
       if (uploadResult.status !== 200 && !uploadResult.id) {
         console.error('[assinafy-colab] Erro no upload:', uploadResult);
         return res.status(500).json({ error: "Erro ao fazer upload do documento", details: uploadResult.message });
       }
-      
+
       const documentId = uploadResult.id || uploadResult.data?.id;
-      console.log(`[assinafy-colab] Documento criado: ${documentId}`);
-      
-      // 5. Buscar ou criar signatários
+      console.log(`[assinafy-colab] Documento criado: ${documentId} [${Date.now() - startTime}ms]`);
+
+      // 4. Buscar/criar signatários EM PARALELO com o polling do documento
       const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
-      
+
       const sociosResponsaveis = [
         { nome: "Rodrigo Queiroz Santos", email: "rodrigo.queiroz@turbopartners.com.br" },
         { nome: "Victor Peixoto", email: "victor.peixoto@turbopartners.com.br" },
         { nome: "Julia Viana", email: "julia.viana@turbopartners.com.br" }
       ];
-      
+
       const getOrCreateSigner = async (nome: string, email: string): Promise<string> => {
         const searchUrl = `${signerUrl}?search=${encodeURIComponent(email)}`;
         const searchResponse = await fetch(searchUrl, {
           method: 'GET',
           headers: { 'X-Api-Key': config.api_key }
         });
-        
+
         const searchResult = await searchResponse.json() as any;
-        
+
         if (searchResult.status === 200 && searchResult.data && Array.isArray(searchResult.data)) {
-          const existingSigner = searchResult.data.find((s: any) => 
+          const existingSigner = searchResult.data.find((s: any) =>
             s.email?.toLowerCase() === email.toLowerCase()
           );
           if (existingSigner) return existingSigner.id;
         }
-        
+
         const signerResponse = await fetch(signerUrl, {
           method: 'POST',
           headers: {
@@ -7333,63 +7334,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           body: JSON.stringify({ full_name: nome, email: email })
         });
-        
+
         const signerResult = await signerResponse.json() as any;
         return signerResult.data?.id || signerResult.id;
       };
-      
-      const colaboradorSignerId = await getOrCreateSigner(colaborador.nome, colaborador.email);
-      
-      // Criar signatários para todos os sócios
-      const sociosSignerIds: string[] = [];
-      for (const socio of sociosResponsaveis) {
-        const signerId = await getOrCreateSigner(socio.nome, socio.email);
-        sociosSignerIds.push(signerId);
-      }
-      
-      const signerIds = [colaboradorSignerId, ...sociosSignerIds];
-      console.log(`[assinafy-colab] Signatários: Colaborador=${colaboradorSignerId}, Sócios=${sociosSignerIds.join(', ')}`);
-      
-      // 6. Aguardar documento estar pronto (polling) - precisa chegar em metadata_ready
-      const statusUrl = `${config.api_url}/documents/${documentId}`;
-      let documentReady = false;
-      let lastStatus = '';
-      
-      for (let attempt = 1; attempt <= 30; attempt++) {
-        const statusResponse = await fetch(statusUrl, {
-          method: 'GET',
-          headers: { 'X-Api-Key': config.api_key }
-        });
-        const statusResult = await statusResponse.json() as any;
-        const currentStatus = statusResult.data?.status || statusResult.status;
-        lastStatus = currentStatus;
-        
-        if (attempt === 1 || attempt % 5 === 0) {
-          console.log(`[assinafy-colab] Status (tentativa ${attempt}/30): ${currentStatus}`);
+
+      // Polling do documento e busca de signatários rodam em paralelo
+      const waitForDocument = async (): Promise<boolean> => {
+        const statusUrl = `${config.api_url}/documents/${documentId}`;
+        for (let attempt = 1; attempt <= 30; attempt++) {
+          const statusResponse = await fetch(statusUrl, {
+            method: 'GET',
+            headers: { 'X-Api-Key': config.api_key }
+          });
+          const statusResult = await statusResponse.json() as any;
+          const currentStatus = statusResult.data?.status || statusResult.status;
+
+          if (attempt === 1 || attempt % 5 === 0) {
+            console.log(`[assinafy-colab] Status (tentativa ${attempt}/30): ${currentStatus} [${Date.now() - startTime}ms]`);
+          }
+
+          if (currentStatus === 'metadata_ready') {
+            console.log(`[assinafy-colab] Documento pronto! [${Date.now() - startTime}ms]`);
+            return true;
+          }
+
+          if (currentStatus === 'failed' || currentStatus === 'error') {
+            return false;
+          }
+
+          // Polling progressivo: 500ms nas primeiras 5, depois 1s
+          await new Promise(resolve => setTimeout(resolve, attempt <= 5 ? 500 : 1000));
         }
-        
-        // Documento precisa estar em metadata_ready para criar assignment
-        if (currentStatus === 'metadata_ready') {
-          console.log(`[assinafy-colab] Documento pronto! Status: ${currentStatus}`);
-          documentReady = true;
-          break;
-        }
-        
-        // Se chegou em um status de erro, parar
-        if (currentStatus === 'failed' || currentStatus === 'error') {
-          console.error(`[assinafy-colab] Documento com erro: ${currentStatus}`);
-          return res.status(500).json({ error: "Documento falhou no processamento", documentId, status: currentStatus });
-        }
-        
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-      
+        return false;
+      };
+
+      const [documentReady, signerIds] = await Promise.all([
+        waitForDocument(),
+        Promise.all([
+          getOrCreateSigner(colaborador.nome, colaborador.email),
+          ...sociosResponsaveis.map(s => getOrCreateSigner(s.nome, s.email))
+        ])
+      ]);
+
+      console.log(`[assinafy-colab] Signatários: ${signerIds.join(', ')} [${Date.now() - startTime}ms]`);
+
       if (!documentReady) {
-        console.error(`[assinafy-colab] Timeout aguardando metadata_ready. Último status: ${lastStatus}`);
-        return res.status(500).json({ error: `Documento não ficou pronto (status: ${lastStatus}). Tente novamente.`, documentId });
+        return res.status(500).json({ error: "Documento não ficou pronto. Tente novamente.", documentId });
       }
-      
-      // 7. Enviar para assinatura usando assignments
+
+      // 5. Enviar para assinatura
       const assignmentUrl = `${config.api_url}/documents/${documentId}/assignments`;
       const assignmentResponse = await fetch(assignmentUrl, {
         method: 'POST',
@@ -7402,32 +7396,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           signerIds: signerIds
         })
       });
-      
+
       const assignmentResult = await assignmentResponse.json() as any;
-      console.log(`[assinafy-colab] Assignment result:`, assignmentResult);
-      
+
       if (assignmentResult.status !== 200 && assignmentResult.status !== 201) {
         return res.status(500).json({ error: "Erro ao enviar para assinatura", details: assignmentResult.message });
       }
-      
-      console.log(`[assinafy-colab] Contrato enviado para assinatura com sucesso`);
-      
-      // 8. Salvar status do contrato na tabela de controle
-      await ensureContratosColabStatusTable();
-      await db.execute(sql`
-        INSERT INTO cortex_core.contratos_colaboradores_status 
-        (colaborador_id, colaborador_nome, colaborador_email, documento_id, status, data_envio)
-        VALUES (${colaboradorId}, ${colaborador.nome}, ${colaborador.email}, ${documentId}, 'Enviado para assinatura', NOW())
-      `);
-      console.log(`[assinafy-colab] Status salvo: Enviado para assinatura`);
-      
-      res.json({ 
-        success: true, 
-        documentId, 
+
+      // 6. Salvar status em paralelo com a resposta
+      ensureContratosColabStatusTable().then(() =>
+        db.execute(sql`
+          INSERT INTO cortex_core.contratos_colaboradores_status
+          (colaborador_id, colaborador_nome, colaborador_email, documento_id, status, data_envio)
+          VALUES (${colaboradorId}, ${colaborador.nome}, ${colaborador.email}, ${documentId}, 'Enviado para assinatura', NOW())
+        `)
+      ).catch(err => console.error('[assinafy-colab] Erro ao salvar status:', err));
+
+      const elapsed = Date.now() - startTime;
+      console.log(`[assinafy-colab] Contrato enviado com sucesso em ${elapsed}ms`);
+
+      res.json({
+        success: true,
+        documentId,
         emailEnviado: colaborador.email,
         message: "Contrato enviado para assinatura com sucesso"
       });
-      
+
     } catch (error) {
       console.error("[assinafy-colab] Erro:", error);
       res.status(500).json({ error: "Erro ao enviar para assinatura" });
