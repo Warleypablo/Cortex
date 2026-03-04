@@ -71,6 +71,9 @@ interface DashboardMetrics {
   churn_brl: number | null;
   logo_churn_percentual: number | null;
   vendas_mrr: number | null;
+  vendas_mrr_novo: number | null;
+  crosssell_mrr: number | null;
+  nrr_pct: number | null;
   clientes_ativos: number;
   headcount: number;
   receita_por_head: number;
@@ -613,7 +616,8 @@ function HeroCard({
   tooltip,
   status,
   href,
-  onClick
+  onClick,
+  subtitle
 }: {
   title: string;
   value: number | null;
@@ -625,6 +629,7 @@ function HeroCard({
   status?: "green" | "yellow" | "red";
   href?: string;
   onClick?: () => void;
+  subtitle?: React.ReactNode;
 }) {
   const formatValue = (v: number) => {
     if (format === "currency") return formatCurrency(v);
@@ -738,6 +743,11 @@ function HeroCard({
             {progress !== null && (
               <Progress value={progress} className="h-1.5" />
             )}
+          </div>
+        )}
+        {subtitle && (
+          <div className="pt-1 border-t border-border/50 mt-1">
+            {subtitle}
           </div>
         )}
       </CardContent>
@@ -2203,6 +2213,12 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
             : `Meta ${selectedQuarter}: ${formatCurrency(vendasMrrTarget)}`}
           href="/dashboard/comercial/closers"
           onClick={() => setDrillDownMetric({ metric: "vendas_mrr", title: "Vendas MRR — Detalhamento" })}
+          subtitle={vendasMrrValue > 0 ? (
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>Novo: {formatCurrency(metrics.vendas_mrr_novo ?? 0)}</span>
+              <span className="text-blue-600 dark:text-blue-400">Cross-sell: {formatCurrency(metrics.crosssell_mrr ?? 0)}</span>
+            </div>
+          ) : undefined}
         />
         <HeroCard
           title="Inadimplência"
@@ -2231,6 +2247,12 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
           status={isSelectedMonthFuture ? undefined : churnStatus}
           href="/dashboard/churn-detalhamento"
           onClick={() => setDrillDownMetric({ metric: "churn", title: "Churn — Detalhamento" })}
+          subtitle={metrics.nrr_pct != null ? (
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>NRR: <span className={metrics.nrr_pct >= 100 ? "text-green-600 dark:text-green-400 font-medium" : "text-red-600 dark:text-red-400 font-medium"}>{metrics.nrr_pct.toFixed(1)}%</span></span>
+              <span>Cross-sell: {formatCurrency(metrics.crosssell_mrr ?? 0)}</span>
+            </div>
+          ) : undefined}
         />
         <HeroCard
           title="Vendas Pontuais"

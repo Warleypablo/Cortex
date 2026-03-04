@@ -287,7 +287,7 @@ export function AppSidebar() {
               </div>
             )}
             <div className="space-y-0.5">
-              {NAV_CONFIG.quickAccess.map(item => renderNavItem(item))}
+              {NAV_CONFIG.quickAccess.map(category => renderCategorySection(category))}
             </div>
           </nav>
         </ScrollArea>

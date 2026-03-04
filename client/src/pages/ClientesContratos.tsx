@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { usePersistentFilters } from "@/hooks/use-persistent-filters";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Users, FileText, Search, Filter, X, Check, Save, Bookmark, Trash2, Plus } from "lucide-react";
+import { Users, FileText, Search, Filter, X, Check, Save, Bookmark, Trash2, Plus, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePageInfo } from "@/contexts/PageContext";
 import { useToast } from "@/hooks/use-toast";
@@ -25,10 +25,11 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import Clients from "./Clients";
 import Contracts from "./Contracts";
+import ContratosNaRua from "./ContratosNaRua";
 import type { ClienteCompleto } from "../../../server/storage";
 import type { ContratoCompleto } from "@shared/schema";
 
-type Tab = "clientes" | "contratos";
+type Tab = "clientes" | "contratos" | "contratos-na-rua";
 
 type SavedFilter = {
   id: string;
@@ -65,6 +66,7 @@ const CONTRACT_SAVED_FILTERS_KEY = "turbo-cortex-contract-filters";
 const TAB_TITLES: Record<Tab, { title: string; subtitle: string }> = {
   clientes: { title: "Clientes", subtitle: "Gestão de clientes ativos" },
   contratos: { title: "Contratos", subtitle: "Acompanhamento de contratos e serviços" },
+  "contratos-na-rua": { title: "Contratos na Rua", subtitle: "Contratos enviados para assinatura" },
 };
 
 const mapClusterToName = (cluster: string | null): string => {
@@ -415,6 +417,7 @@ export default function ClientesContratos() {
   const tabs = [
     { id: "clientes" as Tab, label: "Clientes", icon: Users },
     { id: "contratos" as Tab, label: "Contratos", icon: FileText },
+    { id: "contratos-na-rua" as Tab, label: "Contratos na Rua", icon: Send },
   ];
 
   return (
@@ -1022,6 +1025,9 @@ export default function ClientesContratos() {
             produtoFilter={contractProdutoFilter}
             squadFilter={contractSquadFilter}
           />
+        )}
+        {activeTab === "contratos-na-rua" && (
+          <ContratosNaRua />
         )}
       </div>
     </div>

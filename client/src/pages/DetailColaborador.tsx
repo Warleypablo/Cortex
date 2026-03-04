@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SelectWithAdd } from "@/components/ui/select-with-add";
-import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, CalendarDays, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List, ListChecks, Info, HelpCircle, Paperclip, X, Trash2, Sparkles, ThumbsUp, ThumbsDown, Lightbulb, AlertOctagon, ArrowRight } from "lucide-react";
+import { ArrowLeft, Pencil, Loader2, Mail, Phone, MapPin, Calendar, CalendarDays, Briefcase, Award, CreditCard, Building2, Package, User, DollarSign, Plus, TrendingUp, TrendingDown, Minus, UserCircle, ExternalLink, Search, MessageSquare, Target, BarChart2, FileText, Check, ChevronDown, ChevronUp, Hash, Clock, CheckCircle2, AlertTriangle, AlertCircle, Upload, Receipt, Download, Eye, LayoutGrid, List, ListChecks, Info, HelpCircle, Paperclip, X, Trash2, Sparkles, ThumbsUp, ThumbsDown, Lightbulb, AlertOctagon, ArrowRight, Send, FileCheck } from "lucide-react";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea, ReferenceLine, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 import { Progress } from "@/components/ui/progress";
@@ -5575,6 +5575,91 @@ function HealthCard({ colaboradorId }: { colaboradorId: string }) {
   );
 }
 
+function ContratoTab({ colaboradorId }: { colaboradorId: string }) {
+  const { data: contratoStatus, isLoading } = useQuery({
+    queryKey: ["/api/juridico/colaboradores-contrato", colaboradorId, "status"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/juridico/colaboradores-contrato/${colaboradorId}/status`);
+      return res.json();
+    },
+    enabled: !!colaboradorId,
+  });
+
+  const statusConfig: Record<string, { label: string; color: string }> = {
+    "Enviado": { label: "Enviado", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300" },
+    "Assinado": { label: "Assinado", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300" },
+    "Recusado": { label: "Recusado", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300" },
+    "Cancelado": { label: "Cancelado", color: "bg-gray-100 text-gray-800 dark:bg-zinc-700 dark:text-zinc-300" },
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="p-6">
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </Card>
+    );
+  }
+
+  if (!contratoStatus || contratoStatus.status === null) {
+    return (
+      <Card className="p-6">
+        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground gap-2">
+          <FileCheck className="h-10 w-10 opacity-40" />
+          <p className="text-sm">Nenhum contrato enviado para este colaborador.</p>
+        </div>
+      </Card>
+    );
+  }
+
+  const cfg = statusConfig[contratoStatus.status] || statusConfig["Enviado"];
+
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <FileCheck className="h-5 w-5" />
+        Contrato de Prestação de Serviços
+      </h3>
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground w-32">Status:</span>
+          <Badge className={cfg.color}>{cfg.label}</Badge>
+        </div>
+        {contratoStatus.data_envio && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground w-32">Data de envio:</span>
+            <span className="text-sm">
+              {format(new Date(contratoStatus.data_envio), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            </span>
+          </div>
+        )}
+        {contratoStatus.data_assinatura && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground w-32">Data assinatura:</span>
+            <span className="text-sm">
+              {format(new Date(contratoStatus.data_assinatura), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+            </span>
+          </div>
+        )}
+        {contratoStatus.documento_id && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-muted-foreground w-32">Documento:</span>
+            <a
+              href={`https://app.assinafy.com.br/documents/${contratoStatus.documento_id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+            >
+              Ver no Assinafy <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function DetailColaborador() {
   usePageTitle("Detalhes do Colaborador");
   const { setPageInfo } = usePageInfo();
@@ -5800,6 +5885,10 @@ export default function DetailColaborador() {
             <TabsTrigger value="indisponibilidade" className="gap-2" data-testid="tab-indisponibilidade">
               <Clock className="w-4 h-4" />
               Indisponibilidade
+            </TabsTrigger>
+            <TabsTrigger value="contrato" className="gap-2" data-testid="tab-contrato">
+              <FileCheck className="w-4 h-4" />
+              Contrato
             </TabsTrigger>
           </TabsList>
 
@@ -6229,6 +6318,10 @@ export default function DetailColaborador() {
               colaboradorEmail={colaborador.email}
               dataAdmissao={colaborador.admissao}
             />
+          </TabsContent>
+
+          <TabsContent value="contrato" data-testid="tab-content-contrato">
+            <ContratoTab colaboradorId={colaboradorId} />
           </TabsContent>
 
         </Tabs>
