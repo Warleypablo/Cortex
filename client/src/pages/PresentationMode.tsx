@@ -292,6 +292,10 @@ export default function PresentationMode() {
     refetchInterval: 30000,
   });
 
+  const { data: closersList } = useQuery<Array<{ id: number; name: string; email: string | null; active: boolean }>>({
+    queryKey: ["/api/closers/list"],
+  });
+
   const { data: closerPhotos } = useQuery<Record<string, string>>({
     queryKey: ["/api/closers/photos"],
     queryFn: async () => {
@@ -380,15 +384,21 @@ export default function PresentationMode() {
     refetchInterval: 30000,
   });
 
-  const closerRanking: RankingCloser[] = (chartReceita || [])
-    .map((c, idx) => {
-      const reunioesData = chartReunioesNegocios?.find(r => r.closer === c.closer);
+  const closerRanking: RankingCloser[] = (() => {
+    const receitaMap = new Map((chartReceita || []).map(c => [c.closer, c]));
+    const allCloserNames = new Set<string>([
+      ...(chartReceita || []).map(c => c.closer),
+      ...(closersList || []).filter(c => c.active).map(c => c.name),
+    ]);
+    return Array.from(allCloserNames).map(name => {
+      const receita = receitaMap.get(name);
+      const reunioesData = chartReunioesNegocios?.find(r => r.closer === name);
       return {
-        position: idx + 1,
-        name: c.closer,
-        mrr: c.mrr,
-        pontual: c.pontual,
-        total: c.mrr + c.pontual,
+        position: 0,
+        name,
+        mrr: receita?.mrr || 0,
+        pontual: receita?.pontual || 0,
+        total: (receita?.mrr || 0) + (receita?.pontual || 0),
         reunioes: reunioesData?.reunioes || 0,
         negocios: reunioesData?.negociosGanhos || 0,
         taxa: reunioesData?.taxaConversao || 0,
@@ -397,6 +407,7 @@ export default function PresentationMode() {
     })
     .sort((a, b) => b.mrr - a.mrr)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
+  })();
 
   const sdrMrrMap = new Map<string, { mrr: number; pontual: number; contratos: number }>();
   (sdrMrrData || []).forEach(m => {
@@ -424,24 +435,10 @@ export default function PresentationMode() {
   const closerTop3 = closerRanking.slice(0, 3);
   const sdrTop3 = sdrRanking.slice(0, 3);
 
-  const closerTop3Pontual: RankingCloser[] = (chartReceita || [])
-    .filter(c => c.pontual > 0)
+  const closerTop3Pontual: RankingCloser[] = [...closerRanking]
     .sort((a, b) => b.pontual - a.pontual)
     .slice(0, 3)
-    .map((c, idx) => {
-      const reunioesData = chartReunioesNegocios?.find(r => r.closer === c.closer);
-      return {
-        position: idx + 1,
-        name: c.closer,
-        mrr: c.mrr,
-        pontual: c.pontual,
-        total: c.mrr + c.pontual,
-        reunioes: reunioesData?.reunioes || 0,
-        negocios: reunioesData?.negociosGanhos || 0,
-        taxa: reunioesData?.taxaConversao || 0,
-        trend: 'stable' as const,
-      };
-    });
+    .map((c, idx) => ({ ...c, position: idx + 1 }));
 
   const getPositionIcon = (position: number) => {
     switch (position) {

@@ -28,7 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, RefreshCw, Bot, CheckCircle2, XCircle, Loader2, Megaphone } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, RefreshCw, Bot, CheckCircle2, XCircle, Loader2, Megaphone, Search } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -3360,6 +3360,7 @@ export default function AdminUsuarios() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   const { data, isLoading, error } = useQuery<DebugData>({
@@ -3433,6 +3434,18 @@ export default function AdminUsuarios() {
       return 0;
     });
   }, [data?.users, sortColumn, sortDirection]);
+
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm.trim()) return sortedUsers;
+    const term = searchTerm.toLowerCase().trim();
+    return sortedUsers.filter((user) =>
+      user.name?.toLowerCase().includes(term) ||
+      user.email?.toLowerCase().includes(term) ||
+      user.colaborador?.setor?.toLowerCase().includes(term) ||
+      user.colaborador?.cargo?.toLowerCase().includes(term) ||
+      user.colaborador?.squad?.toLowerCase().includes(term)
+    );
+  }, [sortedUsers, searchTerm]);
 
   if (isLoading) {
     return (
@@ -3583,49 +3596,60 @@ export default function AdminUsuarios() {
               Gerencie permissões e controle de acesso dos usuários
             </CardDescription>
           </div>
-          <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-user">
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Usuário
-          </Button>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome, email, setor..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 w-[280px]"
+              />
+            </div>
+            <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-user">
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Usuário
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          {sortedUsers.length === 0 ? (
+          {filteredUsers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Nenhum usuário cadastrado ainda</p>
+              <p>{searchTerm.trim() ? "Nenhum usuário encontrado para esta busca" : "Nenhum usuário cadastrado ainda"}</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableTableHead 
-                    column="name" 
-                    label="Usuário" 
-                    sortColumn={sortColumn} 
-                    sortDirection={sortDirection} 
-                    onSort={handleSort} 
+                  <SortableTableHead
+                    column="name"
+                    label="Usuário"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
                   />
-                  <SortableTableHead 
-                    column="email" 
-                    label="Email" 
-                    sortColumn={sortColumn} 
-                    sortDirection={sortDirection} 
-                    onSort={handleSort} 
+                  <SortableTableHead
+                    column="email"
+                    label="Email"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
                   />
                   <TableHead>Colaborador</TableHead>
-                  <SortableTableHead 
-                    column="role" 
-                    label="Função" 
-                    sortColumn={sortColumn} 
-                    sortDirection={sortDirection} 
-                    onSort={handleSort} 
+                  <SortableTableHead
+                    column="role"
+                    label="Função"
+                    sortColumn={sortColumn}
+                    sortDirection={sortDirection}
+                    onSort={handleSort}
                   />
                   <TableHead>Perfil de Acesso</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedUsers.map((user) => (
+                {filteredUsers.map((user) => (
                   <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                     <TableCell>
                       <div className="flex items-center gap-3">
