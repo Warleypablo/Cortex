@@ -6877,18 +6877,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('[gerarContratoPDF] Logo não encontrada');
     }
 
-    doc.moveDown(4);
+    doc.moveDown(3);
 
     // Header
-    doc.fontSize(13).font('Helvetica-Bold').text('CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
-    doc.moveDown(1.5);
+    doc.fontSize(12).font('Helvetica-Bold').text('CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
+    doc.moveDown(1);
 
     // Partes
-    doc.fontSize(10).font('Helvetica').text('Pelo presente instrumento particular, e na melhor forma de direito, as partes a seguir qualificadas:', j);
-    doc.moveDown(0.8);
-    doc.font('Helvetica-Bold').text('CONTRATANTE: ', { continued: true });
-    doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Av. João Batista Parra, 633 - 13° Andar - Enseada do Suá, Vitória - ES, CEP: 29052-123, neste ato representada por seu sócio Rodrigo Queiroz Santos;', j);
+    doc.fontSize(9).font('Helvetica').text('Pelo presente instrumento particular, e na melhor forma de direito, as partes a seguir qualificadas:', j);
     doc.moveDown(0.5);
+    doc.fontSize(9).font('Helvetica-Bold').text('CONTRATANTE: ', { continued: true });
+    doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Av. João Batista Parra, 633 - 13° Andar - Enseada do Suá, Vitória - ES, CEP: 29052-123, neste ato representada por seu sócio Rodrigo Queiroz Santos;', j);
+    doc.moveDown(0.3);
     doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
 
     // Detectar se é pessoa física (CPF) ou jurídica (CNPJ) e formatar qualificação
@@ -6927,56 +6927,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
 
     doc.font('Helvetica').text(gerarQualificacaoContratada(), j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
     doc.text('têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:', j);
-    doc.moveDown(1);
+    doc.moveDown(0.4);
 
     // CLÁUSULA PRIMEIRA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text(`1.1. A CONTRATADA prestará serviços como ${escopoInfo.titulo}, nos termos e condições deste instrumento. Para tanto, a CONTRATADA alocará profissionais com qualificação técnica compatível com o objeto, podendo substituí-los a qualquer tempo, sob sua exclusiva responsabilidade.`, j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text(`1.1. A CONTRATADA prestará serviços como ${escopoInfo.titulo}, nos termos e condições deste instrumento. Para tanto, a CONTRATADA alocará profissionais com qualificação técnica compatível com o objeto, podendo substituí-los a qualquer tempo, sob sua exclusiva responsabilidade.`, j);
+    doc.moveDown(0.15);
     doc.text(`1.1.1. Os serviços objeto deste contrato poderão ser executados diretamente pela CONTRATADA ou por profissionais por ela livremente indicados, contratados ou subcontratados, sob sua exclusiva responsabilidade técnica, jurídica e administrativa, e compreendem, de modo exemplificativo, as seguintes atribuições: ${escopoInfo.escopo}`, j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horária do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Segundo. Toda e qualquer pessoa eventualmente envolvida pela CONTRATADA na execução dos serviços contratados atuará em nome e por conta exclusiva da CONTRATADA, sendo esta a única responsável por sua relação jurídica, operacional e contratual com tais profissionais, inexistindo qualquer vínculo direto ou indireto com a CONTRATANTE. Assim, a comunicação à CONTRATANTE sobre a identidade dos profissionais eventualmente alocados terá caráter meramente informativo e não configurará pessoalidade na prestação dos serviços.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Terceiro. Quanto estiver atuando em dependências da CONTRATANTE, a CONTRATADA responsabiliza-se a fazer cumprir, por seu pessoal, as normas legais e internas da CONTRATANTE no tocante à segurança geral, higiene, proteção ao patrimônio e prevenção de incêndios.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA SEGUNDA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SEGUNDA – DO PRAZO');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text(`2.1 – O presente contrato tem prazo de 6 [seis] meses, com início em ${dataInicio} e fim em ${dataFim}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes, ocasião em que será reavaliado o escopo e as condições comerciais.`, j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA SEGUNDA – DO PRAZO');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text(`2.1 – O presente contrato tem prazo de 6 [seis] meses, com início em ${dataInicio} e fim em ${dataFim}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes, ocasião em que será reavaliado o escopo e as condições comerciais.`, j);
+    doc.moveDown(0.15);
     doc.text('Parágrafo único. A eventual renovação dependerá de manifestação expressa das partes, mediante aditivo escrito.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA TERCEIRA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração periódica pelos serviços prestados o montante de ${salarioFormatado} (${salarioNumerico > 0 ? 'valor bruto' : 'conforme acordado entre as partes'}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`, j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração periódica pelos serviços prestados o montante de ${salarioFormatado} (${salarioNumerico > 0 ? 'valor bruto' : 'conforme acordado entre as partes'}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`, j);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Primeiro. Os valores que resultarem do disposto nesta cláusula constituem os únicos valores/créditos devidos pela CONTRATANTE ao CONTRATADO em razão do presente contrato, eximindo-se a CONTRATANTE de responder por quaisquer outros valores que sejam cobrados pelo CONTRATADO.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Segundo. Até o 25° (vigésimo quinto) dia do mês subsequente à prestação dos serviços, a CONTRATANTE providenciará o pagamento da CONTRATADA, desde que cumpridas todo o escopo de entregas previstas no presente instrumento contratual.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Terceiro. Até o 10° (décimo) dia anterior à data de pagamento e condicionado à plena constatação de cumprimento das entregas previstas, o CONTRATADO deverá emitir a competente Nota Fiscal, remetendo-a imediatamente à CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Quarto. O CONTRATADO será o único responsável pelo pagamento de eventuais valores devidos a terceiros por si SUBCONTRATADOS, não subsistindo nenhuma obrigação da CONTRATANTE para com terceiros neste sentido, tampouco de pagamento de qualquer outra importância à definida neste CONTRATO.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Quinto. Caso em determinado exercício mensal haja a interrupção ou suspensão na prestação dos serviços, o pagamento será feito de modo proporcional ao período de efetiva execução das tarefas.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Sexto. O recolhimento dos tributos incidentes sobre os Serviços, assim como o cumprimento das correspondentes obrigações tributárias acessórias, são de exclusiva responsabilidade da CONTRATADA, exceto nas hipóteses em que a CONTRATANTE deva, em razão de disposição legal, promover a retenção dos valores a serem pagos ao Fisco (Municipal, Estadual ou Federal).', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Sétimo. O comprovante de depósito ou transferência servirá como recibo e prova de quitação e pagamento da obrigação ajustada.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA QUARTA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CONTRATADO');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('4.1 - São obrigações da CONTRATADA:', j);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DA CONTRATADA');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('4.1 - São obrigações da CONTRATADA:', j);
     doc.moveDown(0.2);
     doc.text('4.2. A CONTRATADA executará os serviços com plena autonomia técnica, operacional e organizacional, competindo-lhe definir os métodos, ferramentas, rotinas e estratégias de trabalho necessários à execução do objeto contratado. As diretrizes eventualmente fornecidas pela CONTRATANTE terão caráter meramente orientativo quanto aos objetivos do projeto, não configurando subordinação hierárquica ou poder diretivo sobre a CONTRATADA.', j);
     doc.moveDown(0.2);
@@ -6995,50 +6995,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     doc.text('4.9. A CONTRATADA compromete-se a observar os critérios técnicos e requisitos de qualidade previamente acordados entre as partes para fins de aceite dos entregáveis, podendo a CONTRATANTE recusar, fundamentadamente, materiais que não atendam ao escopo, às especificações e aos critérios de qualidade pactuados.', j);
     doc.moveDown(0.2);
     doc.text('4.10. A CONTRATADA compromete-se a não praticar qualquer ato que possa prejudicar a imagem, reputação ou credibilidade da CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Primeiro. O envolvimento da CONTRATADA em situação que gere repercussão negativa relevante autoriza a rescisão imediata do contrato, sem ônus para a CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Segundo. Os documentos pertencentes ou em posse da empresa contratante depositados em mídias físicas ou digitais somente devem ser abertos e tratados em computadores credenciados e de propriedade da CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Terceiro. Sobre os computadores e demais equipamentos fornecidos para a prestação dos serviços não devem ser instalados programas alheios sem a autorização da CONTRATANTE.', j);
-    doc.moveDown(0.8);
-
-    // Nova página
-    doc.addPage();
-
-    // Logo na segunda página
-    try {
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 60, 30, { width: 150 });
-      }
-    } catch (e) {}
-    doc.moveDown(4);
+    doc.moveDown(0.4);
 
     // CLÁUSULA QUINTA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATANTE');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('5.1. Sem prejuízo das demais obrigações expressamente ajustadas neste Contrato, a CONTRATANTE se obriga a:', j);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATANTE');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('5.1. Sem prejuízo das demais obrigações expressamente ajustadas neste Contrato, a CONTRATANTE se obriga a:', j);
     doc.moveDown(0.2);
     doc.text('5.2. A CONTRATANTE poderá fornecer informações estratégicas, objetivos comerciais ou parâmetros gerais relacionados ao escopo do projeto, os quais servirão exclusivamente como referência para o desenvolvimento das atividades pela CONTRATADA, preservada sua plena autonomia técnica e operacional.', j);
     doc.moveDown(0.2);
     doc.text('5.3. Efetuar o pagamento, nas datas e nos termos definidos neste contrato;', j);
     doc.moveDown(0.2);
     doc.text('5.4. Manifestar, de forma expressa, eventuais críticas, dúvidas, solicitações, novas orientações e sugestões pertinentes aos serviços, quando existirem;', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA SEXTA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SEXTA – DA RESCISÃO E EXTINÇÃO DO CONTRATO');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('6.1. A CONTRATANTE poderá, a seu exclusivo critério e independentemente de apresentação de justificativa, resilir unilateralmente o presente contrato a qualquer tempo, produzindo a rescisão efeitos imediatos a partir do recebimento da informação, sem que disso decorra qualquer direito a indenização, multa, compensação financeira ou ressarcimento em favor da CONTRATADA, ressalvado apenas o pagamento proporcional dos serviços comprovadamente prestados até a data da efetiva extinção contratual.', j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA SEXTA – DA RESCISÃO E EXTINÇÃO DO CONTRATO');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('6.1. A CONTRATANTE poderá, a seu exclusivo critério e independentemente de apresentação de justificativa, resilir unilateralmente o presente contrato a qualquer tempo, produzindo a rescisão efeitos imediatos a partir do recebimento da informação, sem que disso decorra qualquer direito a indenização, multa, compensação financeira ou ressarcimento em favor da CONTRATADA, ressalvado apenas o pagamento proporcional dos serviços comprovadamente prestados até a data da efetiva extinção contratual.', j);
+    doc.moveDown(0.15);
     doc.text('6.2. Rescindido o contrato, a CONTRATADA deverá, no prazo máximo de 48 (quarenta e oito) horas, devolver todos os bens, documentos, mídias, credenciais e acessos disponibilizados, bem como realizar a transferência organizada de informações necessárias à continuidade do projeto.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('§1º. No mesmo prazo, a CONTRATADA deverá (i) cessar imediatamente o uso de quaisquer credenciais, acessos e ambientes da CONTRATANTE; (ii) eliminar, de forma segura, quaisquer cópias de dados, informações e materiais da CONTRATANTE eventualmente mantidos fora dos ambientes autorizados; e (iii) fornecer declaração escrita de devolução/eliminação, sem prejuízo de auditoria.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('§2º. A CONTRATANTE poderá reter e compensar valores eventualmente devidos à CONTRATADA com quaisquer prejuízos comprovados, multas contratuais, custos de reparação/substituição de equipamentos e valores decorrentes do descumprimento de obrigações estipuladas no presente contrato.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('§3º. Fica expressamente pactuado que a CONTRATADA não fará jus a qualquer indenização por expectativa de renovação, continuidade, descontinuidade do projeto, investimentos realizados, perdas e danos indiretos ou lucros cessantes.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('6.2. Sem prejuízo das demais hipóteses previstas neste contrato ou na legislação aplicável, constituem motivos suficientes para a rescisão imediata do presente instrumento, independentemente de aviso prévio ou indenização à CONTRATADA:', j);
     doc.moveDown(0.2);
     doc.text('I – a execução inadequada, negligente ou tecnicamente deficiente dos serviços contratados;', j);
@@ -7046,196 +7035,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
     doc.text('III – a violação das obrigações de confidencialidade, proteção de dados, propriedade intelectual ou segurança da informação;', j);
     doc.text('IV – a prática de condutas que possam comprometer, direta ou indiretamente, a reputação, a imagem institucional ou a credibilidade da CONTRATANTE perante terceiros;', j);
     doc.text('V – a prática de atos contrários à boa-fé objetiva, à lealdade contratual e aos deveres de cooperação inerentes às relações empresariais.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('6.3 A extinção do presente contrato, por qualquer motivo, não afetará a validade ou exigibilidade das obrigações que, por sua natureza, devam subsistir após o término da relação contratual, especialmente aquelas relativas à confidencialidade, propriedade intelectual, proteção de dados e não aliciamento.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA SÉTIMA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO TRABALHISTA E SOCIETÁRIO');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('7.1. As partes reconhecem expressamente que a presente contratação possui natureza estritamente civil e empresarial, regida pelas disposições do Código Civil, inexistindo entre as partes qualquer relação de emprego ou vínculo trabalhista.', j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO TRABALHISTA E SOCIETÁRIO');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('7.1. As partes reconhecem expressamente que a presente contratação possui natureza estritamente civil e empresarial, regida pelas disposições do Código Civil, inexistindo entre as partes qualquer relação de emprego ou vínculo trabalhista.', j);
+    doc.moveDown(0.15);
     doc.text('7.2. A CONTRATADA exerce atividade empresarial própria, assumindo integralmente os riscos de sua atividade econômica, nos termos do art. 966 do Código Civil, inexistindo entre as partes quaisquer dos elementos caracterizadores da relação de emprego previstos no art. 3º da Consolidação das Leis do Trabalho, de modo que a CONTRATADA estabelecerá e concretizará a forma de realização dos serviços pactuados no presente termo.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Primeiro. O CONTRATADO tem ciência e declara que nenhum ex-empregado da CONTRATANTE cujo contrato de trabalho tenha se encerrado há menos de 18 (dezoito) meses poderá ser alocado pelo CONTRATADO na prestação dos serviços.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Segundo. O CONTRATADO tem ciência e declara que tem capacidade técnico-financeira para arcar com suas responsabilidades contratuais e extracontratuais, vinculada ou não a este contrato, e que não possui nem se colocará em situação de dependência econômica com relação ao resultado financeiro deste contrato.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Terceiro. O CONTRATADO declara assumir integralmente os riscos relacionados à atividade empresarial que exerce, inclusive quanto à gestão de sua equipe, métodos de trabalho, investimentos necessários e responsabilidade pelos resultados.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Quarto. O CONTRATADO tem ciência e declara que nada neste contrato poderá ser interpretado como tendo as partes, estabelecido qualquer forma de sociedade, associação, agência ou consórcio, de fato ou de direito, permanecendo cada uma das partes com as suas obrigações civis, comerciais, trabalhistas e tributárias, de forma autônoma.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Quinto. A execução dos serviços ocorrerá com plena autonomia técnica, organizacional e econômica da CONTRATADA, inexistindo controle de jornada, subordinação hierárquica ou exclusividade.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA OITAVA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('8.1 - As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato, o que inclui, mas não se limita a: todos e quaisquer dados, relatórios, análises, estudos, pesquisas, interpretações, previsões / estimativas, registros, materiais e quaisquer outros elementos que contenham informações referentes à outra Parte. As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.', j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('8.1 - As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato, o que inclui, mas não se limita a: todos e quaisquer dados, relatórios, análises, estudos, pesquisas, interpretações, previsões / estimativas, registros, materiais e quaisquer outros elementos que contenham informações referentes à outra Parte. As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.', j);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Primeiro. Para os propósitos, serão consideradas "informações confidenciais" todas e quaisquer informações e/ou dados de natureza confidencial (incluindo, sem limitação, os termos e condições deste contrato e todos os segredos e/ou informações operacionais, econômicas e técnicas, bem como demais informações comerciais ou "know-how") que tenham sido direta ou indiretamente fornecidos ou divulgados por uma das partes à outra sob ou em função deste contrato, incluindo-se as informações de natureza comercial e os Contratos celebrados com terceiros para a comercialização dos produtos e serviços, mesmo as obtidas durante as negociações precedentes à formalização deste instrumento.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Segundo. Caso a CONTRATADA venha a ser legalmente obrigada, por determinação judicial ou de autoridade administrativa competente, a revelar qualquer Informação Confidencial relacionada à CONTRATANTE, deverá comunicar formalmente à CONTRATANTE, por escrito e com a maior brevidade possível, acerca da referida exigência, fornecendo cópia da ordem recebida e todas as informações pertinentes, a fim de que a CONTRATANTE possa adotar as medidas judiciais ou administrativas cabíveis à preservação de seus direitos.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo único. A CONTRATADA limitar-se-á a revelar exclusivamente as informações estritamente exigidas pela autoridade competente, envidando seus melhores esforços para resguardar o caráter confidencial dos dados divulgados.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Terceiro. A CONTRATADA não poderá, em nenhuma hipótese, fazer qualquer outro uso, realizar qualquer outro negócio ou celebrar qualquer outro contrato relacionado, direta ou indiretamente, às Informações Confidenciais.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Quarto. Todas as Informações Confidenciais devem ser mantidas e tratadas como estritamente confidenciais e não poderão ser reveladas a qualquer terceiro, de forma alguma, no todo ou em parte, bem como não poderão ser utilizadas para qualquer finalidade que não esteja única e exclusivamente relacionada aos Serviços.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Quinto. Sem prejuízo de outras obrigações, a CONTRATADA se compromete desde logo a:', j);
     doc.text('1. Não divulgar quaisquer Informações Confidenciais a quaisquer terceiros;', j);
     doc.text('2. Utilizar quaisquer Informações Confidenciais exclusivamente para a execução da prestação dos serviços;', j);
     doc.text('3. Não analisar, providenciar análise, derivar ou sintetizar qualquer informação recebida da CONTRATANTE sem autorização prévia e fora dos limites da execução de seu trabalho.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('8.2. A CONTRATADA, por si e por quaisquer profissionais por ela alocados, será responsável por quaisquer danos causados à CONTRATANTE ou a terceiros em decorrência do descumprimento das obrigações de sigilo previstas nesta cláusula, independentemente de dolo ou culpa.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('8.3. O descumprimento das obrigações de confidencialidade ensejará a obrigação de indenizar integralmente os danos comprovadamente sofridos pela parte prejudicada, sem prejuízo das demais medidas judiciais cabíveis.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('8.4. A CONTRATADA reconhece que a violação das obrigações de confidencialidade e segurança da informação poderá causar dano de difícil reparação, razão pela qual a CONTRATANTE poderá pleitear tutela específica/inibitória e medidas de urgência para cessação do ilícito, sem prejuízo de perdas e danos.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA NONA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA NONA – DA INEXISTÊNCIA DE LICENÇAS');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('9.1. A CONTRATANTE reterá todo o direito, titularidade e interesse sobre as informações confidenciais presentes no presente contrato.', j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA NONA – DA INEXISTÊNCIA DE LICENÇAS');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('9.1. A CONTRATANTE reterá todo o direito, titularidade e interesse sobre as informações confidenciais presentes no presente contrato.', j);
+    doc.moveDown(0.15);
     doc.text('9.2. Nada contido neste CONTRATO, nem a revelação de Informações Confidenciais, deverá ser interpretado como cessão ou transferência de quaisquer direitos, por meio de licença ou de qualquer outra forma, referente a marcas, patentes, direitos autorais, informações tecnológicas, segredos comerciais e/ou industriais, ou outras Informações Confidenciais, ou qualquer outra propriedade intelectual, sendo certo que a CONTRATANTE permanecerá como única proprietária das Informações Confidenciais.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('9.3. São e serão considerados como propriedade intelectual e/ou industrial única e exclusiva da CONTRATANTE qualquer produto, criação, desenvolvimento, relatório, planilha, resultado, dentre outros, ainda que tenham sido desenvolvidos pela CONTRATADA. Nenhum direito de propriedade intelectual e/ou industrial será detido pela CONTRATADA, a qual, expressamente, cede e transfere à CONTRATANTE, desde logo, não onerosamente, todo e qualquer direito relacionado ou derivado a qualquer espécie de criação decorrente do relacionamento entre as Partes.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('9.4. Não assiste à CONTRATADA qualquer direito ou expectativa de direito de propriedade intelectual e/ou industrial ou de qualquer direito imaterial, tampouco lhe assiste qualquer direito de postular ou formular qualquer reivindicação.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('9.5. A CONTRATADA expressamente declara que todo e qualquer valor a título de eventuais direitos sobre propriedade intelectual e/ou industrial, direitos autorais ou qualquer espécie de direitos imateriais, já foi considerada pelas Partes na fixação do Preço (contraprestação), razão pela qual nenhuma quantia poderá ser reclamada, a qualquer título, pela CONTRATADA.', j);
-    doc.moveDown(0.8);
-
-    // Nova página
-    doc.addPage();
-
-    // Logo na terceira página
-    try {
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 60, 30, { width: 150 });
-      }
-    } catch (e) {}
-    doc.moveDown(4);
+    doc.moveDown(0.4);
 
     // CLÁUSULA DÉCIMA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA – DA ABSTENÇÃO DE ALICIAMENTO E INDUÇÃO DE TERCEIROS VINCULADOS À CONTRATANTE');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('10.1. Durante a vigência deste instrumento e por um período de 24 (vinte e quatro) meses após sua extinção, o CONTRATADO se compromete a não contratar, ou tentar contratar, direta ou indiretamente, qualquer empregado(a) da CONTRATANTE ou de qualquer outra empresa do grupo no Brasil ou no exterior, para trabalhar para seu novo empregador ou empresa da qual seja, direta ou indiretamente, ligado, inclusive como sócio.', j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA DÉCIMA – DA ABSTENÇÃO DE ALICIAMENTO E INDUÇÃO DE TERCEIROS VINCULADOS À CONTRATANTE');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('10.1. Durante a vigência deste instrumento e por um período de 24 (vinte e quatro) meses após sua extinção, o CONTRATADO se compromete a não contratar, ou tentar contratar, direta ou indiretamente, qualquer empregado(a) da CONTRATANTE ou de qualquer outra empresa do grupo no Brasil ou no exterior, para trabalhar para seu novo empregador ou empresa da qual seja, direta ou indiretamente, ligado, inclusive como sócio.', j);
+    doc.moveDown(0.15);
     doc.text('10.1.1. Durante o período mencionado na Cláusula Segunda e pelo mesmo prazo de 02 (dois) anos contados da rescisão do contrato, o CONTRATADO também se compromete a não ajudar terceiros a contratar empregados(as) da CONTRATANTE ou de outra empresa do grupo, tampouco a induzir ou convencer qualquer empregado(a) da CONTRATANTE a rescindir o contrato que mantém com a CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('10.2. O CONTRATADO, também neste ato, de forma irrevogável e irretratável, se compromete perante a CONTRATANTE a abster-se, durante a vigência do presente e pelo período de 03 (três) anos contados da rescisão contratual de direta ou indiretamente, aliciar, induzir, convidar, contratar, nem determinar que seja aliciado, induzido ou convidado:', j);
     doc.moveDown(0.2);
     doc.text('(i) Qualquer cliente atendido e/ou captado pela CONTRATANTE ou pelo CONTRATADO durante a prestação de seus serviços para que tal cliente seja atendido por outra personalidade jurídica concorrente da TURBO;', j);
     doc.text('(ii) Qualquer empregado, sócio, diretor ou outro prestador de serviços da TURBO e/ou qualquer de suas afiliadas;', j);
     doc.text('(iii) Qualquer pessoa a deixar de fazer negócios com a TURBO e/ou qualquer de suas afiliadas;', j);
     doc.text('(iv) Qualquer fornecedor ou cliente da TURBO a deixar de realizar ou diminuir os negócios realizados com a CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.font('Helvetica-Bold').text('10.3. Sem prejuízo das indenizações por perdas e danos e da responsabilidade criminal, o CONTRATADO, em caso de infração da presente cláusula, pagará ao CONTRATANTE uma multa não compensatória igual a R$ 100.000,00 (cem mil reais) por cada infração.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA DÉCIMA PRIMEIRA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço, comprometendo-se a: não utilizar as informações confidenciais a que tiver acesso pelo período de 05 (cinco) anos, para gerar benefício próprio exclusivo e/ou unilateral, presente ou futuro, ou para o uso de terceiros; não efetuar nenhuma gravação ou cópia da documentação confidencial a que tiver acesso; não apropriar-se para si ou para outrem de material confidencial e/ou sigiloso da tecnologia que venha a ser disponível e; não repassar o conhecimento das informações confidenciais, responsabilizando-se por todas as pessoas que vierem a ter acesso às informações, por seu intermédio, e obrigando-se, assim, a reparar a ocorrência de qualquer dano e/ou prejuízo oriundo de uma eventual quebra de sigilo das informações fornecidas.', j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço, comprometendo-se a: não utilizar as informações confidenciais a que tiver acesso pelo período de 05 (cinco) anos, para gerar benefício próprio exclusivo e/ou unilateral, presente ou futuro, ou para o uso de terceiros; não efetuar nenhuma gravação ou cópia da documentação confidencial a que tiver acesso; não apropriar-se para si ou para outrem de material confidencial e/ou sigiloso da tecnologia que venha a ser disponível e; não repassar o conhecimento das informações confidenciais, responsabilizando-se por todas as pessoas que vierem a ter acesso às informações, por seu intermédio, e obrigando-se, assim, a reparar a ocorrência de qualquer dano e/ou prejuízo oriundo de uma eventual quebra de sigilo das informações fornecidas.', j);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Primeiro. As partes se comprometem a não utilizar os dados pessoais que tiverem acesso para fins distintos da relação estabelecida, sendo vedada a transmissão para terceiros.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Segundo. As partes se comprometem em manter os compromissos acima, mesmo após o término da relação contratual.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo Terceiro. As partes declaram que qualquer conduta incompatível com as disposições acima será considerada uma grave violação deste contrato e será considerado motivo de justa causa para a rescisão imediata, sem prejuízo da adoção das medidas legalmente cabíveis.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA DÉCIMA SEGUNDA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE');
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE');
+    doc.moveDown(0.15);
     const patrimonioDescricao = patrimonio || 'a definir';
-    doc.font('Helvetica').fontSize(9).text(`12.1. A CONTRATANTE disponibilizará, em regime de comodato, exclusivamente por razões de segurança da informação, padronização tecnológica e proteção de dados corporativos, ${patrimonioDescricao}, de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.`, j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(8.5).text(`12.1. A CONTRATANTE disponibilizará, em regime de comodato, exclusivamente por razões de segurança da informação, padronização tecnológica e proteção de dados corporativos, um computador MacBook modelo ${patrimonioDescricao}, um Fone Logitech H390, Mouse Logitech Bluetooth e um Adaptador Hub USB-C HDMI com ao menos 2 entradas USB-A, de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.`, j);
+    doc.moveDown(0.15);
     doc.text('12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado, abstendo-se de utilizá-lo para fins pessoais, atividades não relacionadas ao presente contrato, ou por terceiros.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('12.3. A CONTRATADA será responsável integral por qualquer dano, perda, extravio, furto, roubo ou mau uso do equipamento, independentemente de culpa, obrigando-se a arcar com os custos de reparação ou substituição integral do bem, conforme orçamento técnico indicado pela CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('12.4. Em caso de dano parcial, a CONTRATADA deverá restituir à CONTRATANTE o valor referente ao reparo, no prazo máximo de 30 (trinta) dias após a notificação escrita.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('12.5. Em caso de perda total, extravio, furto ou roubo, a CONTRATADA deverá indenizar a CONTRATANTE com base no valor de mercado atualizado do bem à época do evento, conforme cotação de revendedor autorizado ou nota fiscal de aquisição, o que for mais benéfico à CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('12.6. O equipamento deverá ser devolvido à CONTRATANTE no ato de rescisão do contrato, em perfeito estado de funcionamento e conservação, ressalvado o desgaste natural decorrente do uso regular.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('12.7. A CONTRATANTE poderá, a qualquer tempo, solicitar a devolução imediata do equipamento, cabendo à CONTRATADA o cumprimento imediato da solicitação.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('12.8. O inadimplemento das obrigações previstas nesta cláusula autoriza a CONTRATANTE a reter valores devidos à CONTRATADA até o limite da indenização cabível e/ou de quaisquer multas e perdas e danos decorrentes do descumprimento contratual, sem prejuízo das demais medidas.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('12.9. A CONTRATANTE poderá realizar auditorias técnicas no equipamento disponibilizado, a qualquer tempo.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('12.10. O não cumprimento da obrigação de devolução dos equipamentos no prazo estipulado neste contrato sujeitará a CONTRATADA ao pagamento de multa diária de R$ 500,00 (quinhentos reais), a partir do primeiro dia de atraso, até a efetiva restituição dos bens à CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('Parágrafo único. A multa prevista nesta cláusula possui natureza moratória, não substituindo a obrigação de devolução dos equipamentos, nem afastando o direito da CONTRATANTE de exigir o pagamento do valor de reposição do bem ou a reparação de eventuais perdas e danos.', j);
-    doc.moveDown(0.8);
+    doc.moveDown(0.4);
 
     // CLÁUSULA DÉCIMA TERCEIRA - DIREITO DE USO DE IMAGEM
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA TERCEIRA – DO DIREITO DE USO DE IMAGEM');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('13. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ou não ao objeto deste contrato, em quaisquer meios físicos ou digitais, sem limitação territorial ou temporal, inclusive após o término da relação contratual, sem que disso decorra direito a remuneração adicional.', j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA DÉCIMA TERCEIRA – DO DIREITO DE USO DE IMAGEM');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('13. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ou não ao objeto deste contrato, em quaisquer meios físicos ou digitais, sem limitação territorial ou temporal, inclusive após o término da relação contratual, sem que disso decorra direito a remuneração adicional.', j);
+    doc.moveDown(0.15);
     doc.text('Parágrafo único. A utilização ora autorizada não implica exclusividade, vínculo empregatício ou societário, comprometendo-se a CONTRATANTE a utilizar a imagem do CONTRATADO de forma ética e compatível com a finalidade profissional pactuada.', j);
-    doc.moveDown(0.8);
-
-    // Nova página
-    doc.addPage();
-
-    // Logo na quarta página
-    try {
-      if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, 60, 30, { width: 150 });
-      }
-    } catch (e) {}
-    doc.moveDown(4);
+    doc.moveDown(0.4);
 
     // CLÁUSULA DÉCIMA QUARTA
-    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA QUARTA – DAS DISPOSIÇÕES GERAIS');
-    doc.moveDown(0.3);
-    doc.font('Helvetica').fontSize(9).text('14.1. Este Contrato constitui o entendimento integral e completo entre as partes, substituindo todos os entendimentos, compromissos, negociações, acordos e contratos anteriores, sejam eles verbais ou escritos, relativos ao objeto deste Contrato. Qualquer modificação ou emenda a este Contrato só será válida se formalizada por escrito e assinada pelos representantes legais de ambas as partes.', j);
-    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').fontSize(9).text('CLÁUSULA DÉCIMA QUARTA – DAS DISPOSIÇÕES GERAIS');
+    doc.moveDown(0.15);
+    doc.font('Helvetica').fontSize(8.5).text('14.1. Este Contrato constitui o entendimento integral e completo entre as partes, substituindo todos os entendimentos, compromissos, negociações, acordos e contratos anteriores, sejam eles verbais ou escritos, relativos ao objeto deste Contrato. Qualquer modificação ou emenda a este Contrato só será válida se formalizada por escrito e assinada pelos representantes legais de ambas as partes.', j);
+    doc.moveDown(0.15);
     doc.text('14.2. As partes reconhecem que a nulidade ou inexequibilidade de qualquer disposição deste Contrato não afetará a validade ou exequibilidade das demais disposições, que continuarão em pleno vigor e efeito. Caso qualquer disposição deste Contrato seja considerada inválida, ilegal ou inexequível, as partes negociarão de boa-fé para substituí-la por uma disposição que, na máxima extensão permitida por lei, preserve a intenção original da disposição inválida, ilegal ou inexequível.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.3. A CONTRATADA responderá integralmente por quaisquer danos, prejuízos ou responsabilidades decorrentes de atos praticados por si, por seus sócios, empregados, prepostos, colaboradores ou subcontratados no âmbito da execução dos serviços objeto deste contrato.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.4. Não se estabelece, por força deste instrumento, qualquer forma de sociedade, associação, agência, consórcio, participação societária, ou responsabilidade solidária entre as partes.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.5. O objeto deste contrato não visa proporcionar nenhuma espécie de vantagem fiscal, trabalhista ou previdenciária a qualquer Parte ou a terceiros, e não implica vínculo empregatício entre uma das partes e os funcionários/prepostos da outra, ficando a cargo de cada uma delas a responsabilidade referente aos encargos sociais, tributários, previdenciários e trabalhistas de seus respectivos colaboradores.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.6. Os tributos (impostos, taxas, emolumentos, contribuições fiscais e parafiscais) que sejam devidos em decorrência direta ou indireta do presente contrato ou de sua execução, serão de exclusiva responsabilidade do contribuinte, conforme definido na norma tributária, autorizadas as retenções legais, sem direito a reembolso.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.7. O presente CONTRATO é o instrumento que regula todos os direitos e obrigações acordadas entre as Partes, substituindo todo e qualquer CONTRATO ou entendimento previamente realizado pelas Partes.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.8. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria cível, tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.9. Durante a vigência deste contrato, a CONTRATADA compromete-se a não utilizar informações estratégicas, dados comerciais, metodologias, modelos de negócio, bases de dados ou qualquer outro ativo intelectual da CONTRATANTE em benefício próprio ou de terceiros, especialmente para atuação concorrente ou potencialmente prejudicial aos interesses comerciais da CONTRATANTE.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.10. O presente contrato não estabelece exclusividade entre as partes, nem gera expectativa de renovação automática ou volume mínimo de demandas, de modo que em nenhuma hipótese a CONTRATANTE será responsável por lucros cessantes, danos indiretos ou perdas financeiras da CONTRATADA.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.11. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.12. As partes reconhecem expressamente que o objeto do presente contrato não se vincula à atuação pessoal de qualquer indivíduo específico, inexistindo pessoalidade na prestação dos serviços, sendo a CONTRATADA integralmente responsável pela gestão de seus profissionais, colaboradores, empregados, prepostos ou subcontratados eventualmente envolvidos na execução do objeto contratual.', j);
-    doc.moveDown(0.3);
+    doc.moveDown(0.15);
     doc.text('14.13. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato.', j);
-    doc.moveDown(1);
+    doc.moveDown(0.5);
 
     doc.text('As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Contrato emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil.', j);
-    doc.moveDown(0.5);
+    doc.moveDown(0.3);
     doc.text('E assim, por estarem justas e CONTRATADAS, as partes assinam este presente contrato em 2 (duas) vias de igual teor, na presença das testemunhas abaixo.', j);
-    doc.moveDown(1.5);
+    doc.moveDown(1);
 
     // Assinaturas
-    doc.fontSize(10).text(`Vitória, ${dataAtual}.`, j);
-    doc.moveDown(2);
+    doc.fontSize(9).text(`Vitória, ${dataAtual}.`, j);
+    doc.moveDown(1.5);
     doc.text('____________________________________________________', { align: 'center' });
     doc.font('Helvetica-Bold').text('TURBO PARTNERS LTDA', { align: 'center' });
-    doc.moveDown(2);
+    doc.moveDown(1.5);
     doc.text('____________________________________________________', { align: 'center' });
     doc.font('Helvetica-Bold').text(nome.toUpperCase(), { align: 'center' });
 
