@@ -7252,8 +7252,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // 3. Buscar patrimônio do colaborador
       const patrimonioResult = await db.execute(sql`
         SELECT descricao FROM "Inhire".rh_patrimonio
-        WHERE (responsavel_id = ${colaboradorId} OR (responsavel_id IS NULL AND responsavel_atual = ${colaborador.nome}))
+        WHERE (responsavel_id = ${colaboradorId} OR responsavel_atual = ${colaborador.nome})
           AND (ativo ILIKE '%notebook%' OR ativo ILIKE '%macbook%' OR ativo ILIKE '%computador%' OR ativo ILIKE '%mac%' OR descricao ILIKE '%macbook%')
+          AND descricao IS NOT NULL
         ORDER BY id DESC LIMIT 1
       `);
       const patrimonio = (patrimonioResult.rows[0] as any)?.descricao || null;
