@@ -163,6 +163,14 @@ const ESCOPOS_POR_CARGO: Record<string, { titulo: string; escopo: string }> = {
     titulo: "ESPECIALISTA EM PRÉ-VENDAS",
     escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
   },
+  "ANALISTA DE DADOS": {
+    titulo: "ANALISTA DE DADOS",
+    escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, atuar em cooperação técnica com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "DADOS": {
+    titulo: "ANALISTA DE DADOS",
+    escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, atuar em cooperação técnica com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
 };
 
 // Função para obter escopo baseado no cargo
@@ -200,13 +208,13 @@ têm entre si, justo e contratado, o presente Contrato de Prestação de Serviç
 
 CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO
 
-1.1. O CONTRATADO prestará serviços como {{CARGO_TITULO}}. Para isso, deverá designar pessoa legalmente certificada e habilitada para a execução dos serviços.
+1.1. A CONTRATADA prestará serviços como {{CARGO_TITULO}}, nos termos e condições deste instrumento. Para tanto, a CONTRATADA alocará profissionais com qualificação técnica compatível com o objeto, podendo substituí-los a qualquer tempo, sob sua exclusiva responsabilidade.
 
-1.1.1. Os serviços serão prestados por pessoa previamente indicada pelo CONTRATADO e compreendem, de modo exemplificativo, as seguintes atribuições: {{ESCOPO_CARGO}}
+1.1.1. Os serviços objeto deste contrato poderão ser executados diretamente pela CONTRATADA ou por profissionais por ela livremente indicados, contratados ou subcontratados, sob sua exclusiva responsabilidade técnica, jurídica e administrativa, e compreendem, de modo exemplificativo, as seguintes atribuições: {{ESCOPO_CARGO}}
 
-Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horário do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.
+Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horária do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.
 
-Parágrafo Segundo. Toda e qualquer pessoa eventualmente envolvida pela CONTRATADA na execução dos serviços contratados atuará em nome e por conta exclusiva da própria CONTRATADA, sendo esta a única responsável por sua relação jurídica, operacional e contratual com tais profissionais, sem qualquer vínculo direto ou indireto com a CONTRATANTE.
+Parágrafo Segundo. Toda e qualquer pessoa eventualmente envolvida pela CONTRATADA na execução dos serviços contratados atuará em nome e por conta exclusiva da CONTRATADA, sendo esta a única responsável por sua relação jurídica, operacional e contratual com tais profissionais, inexistindo qualquer vínculo direto ou indireto com a CONTRATANTE. Assim, a comunicação à CONTRATANTE sobre a identidade dos profissionais eventualmente alocados terá caráter meramente informativo e não configurará pessoalidade na prestação dos serviços.
 
 Parágrafo Terceiro. Quanto estiver atuando em dependências da CONTRATANTE, a CONTRATADA responsabiliza-se a fazer cumprir, por seu pessoal, as normas legais e internas da CONTRATANTE no tocante à segurança geral, higiene, proteção ao patrimônio e prevenção de incêndios.
 
@@ -215,18 +223,12 @@ CLÁUSULA SEGUNDA – DO PRAZO
 
 2.1 – O presente contrato tem prazo de 6 [seis] meses, com início em {{DATA_INICIO}} e fim em {{DATA_FIM}}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes, ocasião em que será reavaliado o escopo e as condições comerciais.
 
-Parágrafo Primeiro. Ao final deste prazo, o contrato poderá ser renovado, sendo este realizado por simples aditivo contratual.
-
-2.2 A CONTRATANTE poderá rescindir o presente Contrato, a qualquer tempo, independentemente de motivação e sem necessidade de aviso prévio, mediante comunicação à CONTRATADA, operando-se a extinção imediata do vínculo contratual.
-
-Parágrafo Primeiro. Na hipótese de resilição ora prevista, serão devidos exclusivamente os valores proporcionais aos serviços comprovadamente prestados até a data da comunicação.
-
-Parágrafo Terceiro. No caso de encerramento do presente contrato, a CONTRATADA deverá devolver, à CONTRATANTE, todo material em seu poder e que pertença à CONTRATANTE. A CONTRATANTE deverá quitar quaisquer pagamentos devidos por eventuais perdas e danos.
+Parágrafo único. A eventual renovação dependerá de manifestação expressa das partes, mediante aditivo escrito.
 
 
 CLÁUSULA TERCEIRA – DA REMUNERAÇÃO
 
-3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração no valor de R$ {{VALOR_MENSAL}} ({{VALOR_EXTENSO}}) mensais, enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.
+3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração periódica pelos serviços prestados o montante de R$ {{VALOR_MENSAL}} ({{VALOR_EXTENSO}}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.
 
 Parágrafo Primeiro. Os valores que resultarem do disposto nesta cláusula constituem os únicos valores/créditos devidos pela CONTRATANTE ao CONTRATADO em razão do presente contrato, eximindo-se a CONTRATANTE de responder por quaisquer outros valores que sejam cobrados pelo CONTRATADO.
 
@@ -243,25 +245,25 @@ Parágrafo Sexto. O recolhimento dos tributos incidentes sobre os Serviços, ass
 Parágrafo Sétimo. O comprovante de depósito ou transferência servirá como recibo e prova de quitação e pagamento da obrigação ajustada.
 
 
-CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CONTRATADO
+CLÁUSULA QUARTA – DAS OBRIGAÇÕES DA CONTRATADA
 
-4.1 - São obrigações do CONTRATADO:
+4.1 - São obrigações da CONTRATADA:
 
-4.2. Prestar os serviços contratados em conformidade com os padrões de qualidade acordados e com a boa técnica profissional aplicável ao setor e estipulados e definidos pela CONTRATANTE.
+4.2. A CONTRATADA executará os serviços com plena autonomia técnica, operacional e organizacional, competindo-lhe definir os métodos, ferramentas, rotinas e estratégias de trabalho necessários à execução do objeto contratado. As diretrizes eventualmente fornecidas pela CONTRATANTE terão caráter meramente orientativo quanto aos objetivos do projeto, não configurando subordinação hierárquica ou poder diretivo sobre a CONTRATADA.
 
 4.3. Fornecer as notas fiscais referentes aos pagamentos efetuados pela CONTRATANTE dentro do prazo previamente estipulado por meio do presente instrumento;
 
 4.4. Arcar com todas as despesas de natureza tributária decorrentes dos serviços especificados neste contrato;
 
-4.5. Cumprir todas as determinações impostas estipuladas no escopo, dentro dos prazos estipulados, para o desenvolvimento das tarefas ora atribuídas ao CONTRATADO;
+4.5. Cumprir o escopo, os prazos, os entregáveis e os requisitos técnicos acordados entre as partes para a execução do objeto, preservada a autonomia técnica e operacional da CONTRATADA quanto aos meios e métodos empregados.
 
-4.6. Manter sigilosas, mesmo após findo este contrato, pelo período de 5 (cinco) anos, as informações privilegiadas de qualquer natureza às quais tenham acesso em virtude da execução destes serviços;
+4.6. Manter sob estrito sigilo todas as informações e dados recebidos ou a que tiver acesso em razão da execução do projeto objeto deste contrato, comprometendo-se a não divulgá-los, reproduzi-los ou utilizá-los para finalidade diversa daquela prevista neste instrumento, obrigação que subsistirá mesmo após o término ou rescisão contratual, pelo prazo de 5 (cinco) anos, abrangendo quaisquer informações confidenciais ou privilegiadas, de natureza técnica, comercial, estratégica ou de qualquer outra espécie.
 
-4.7. Comprometer-se a utilizar os equipamentos disponibilizados unicamente para fins profissionais relacionados às entregas pactuadas, observando as diretrizes técnicas definidas pela CONTRATANTE.
+4.7. A eventual disponibilização de equipamentos pela CONTRATANTE ocorrerá exclusivamente por razões de segurança da informação, padronização tecnológica e proteção de dados corporativos, não implicando integração da CONTRATADA à estrutura organizacional da CONTRATANTE, onde tal disponibilização não descaracteriza a autonomia empresarial da CONTRATADA, que permanece responsável pela organização de seus próprios meios de trabalho.
 
-4.8. A CONTRATANTE poderá ter acesso a qualquer momento, independente de consentimento, ao computador e informações contidas nos equipamentos disponibilizados para o CONTRATADO.
+4.8. A CONTRATANTE poderá, a qualquer tempo, realizar auditorias técnicas e de segurança da informação nos equipamentos disponibilizados em comodato, inclusive mediante acesso administrativo, exclusivamente para fins de proteção de dados, integridade de sistemas, prevenção de incidentes e verificação de conformidade com as políticas internas aplicáveis.
 
-4.9. A CONTRATADA compromete-se a observar os prazos e padrões técnicos definidos pela CONTRATANTE, podendo esta rejeitar materiais que não atendam às diretrizes estabelecidas.
+4.9. A CONTRATADA compromete-se a observar os critérios técnicos e requisitos de qualidade previamente acordados entre as partes para fins de aceite dos entregáveis, podendo a CONTRATANTE recusar, fundamentadamente, materiais que não atendam ao escopo, às especificações e aos critérios de qualidade pactuados.
 
 4.10. A CONTRATADA compromete-se a não praticar qualquer ato que possa prejudicar a imagem, reputação ou credibilidade da CONTRATANTE.
 
@@ -272,35 +274,45 @@ Parágrafo Segundo. Os documentos pertencentes ou em posse da empresa contratant
 Parágrafo Terceiro. Sobre os computadores e demais equipamentos fornecidos para a prestação dos serviços não devem ser instalados programas alheios sem a autorização da CONTRATANTE.
 
 
-CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATADA
+CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATANTE
 
-5.1. Sem prejuízo das demais obrigações expressamente ajustadas neste Contrato, a CONTRATADA se obriga a:
+5.1. Sem prejuízo das demais obrigações expressamente ajustadas neste Contrato, a CONTRATANTE se obriga a:
 
-5.1. Fornecer todas as informações necessárias à execução dos serviços, incluindo diretrizes e objetivos, respeitada a autonomia técnica e operacional da CONTRATADA quanto aos meios e métodos empregados.
+5.2. A CONTRATANTE poderá fornecer informações estratégicas, objetivos comerciais ou parâmetros gerais relacionados ao escopo do projeto, os quais servirão exclusivamente como referência para o desenvolvimento das atividades pela CONTRATADA, preservada sua plena autonomia técnica e operacional.
 
-5.2 Efetuar o pagamento, nas datas e nos termos definidos neste contrato;
+5.3. Efetuar o pagamento, nas datas e nos termos definidos neste contrato;
 
-5.3. Manifestar, de forma expressa, eventuais críticas, dúvidas, solicitações, novas orientações e sugestões pertinentes aos serviços, quando existirem;
+5.4. Manifestar, de forma expressa, eventuais críticas, dúvidas, solicitações, novas orientações e sugestões pertinentes aos serviços, quando existirem;
 
 
 CLÁUSULA SEXTA – DA RESCISÃO E EXTINÇÃO DO CONTRATO
 
-6.1. O presente contrato poderá ser rescindido, a qualquer tempo, por qualquer das partes, independentemente de motivação, independente de qualquer comunicação prévia à outra parte, sem antecedência mínima, sem que disso decorra o pagamento de multa ou indenização, ressalvadas as obrigações já vencidas.
+6.1. A CONTRATANTE poderá, a seu exclusivo critério e independentemente de apresentação de justificativa, resilir unilateralmente o presente contrato a qualquer tempo, produzindo a rescisão efeitos imediatos a partir do recebimento da informação, sem que disso decorra qualquer direito a indenização, multa, compensação financeira ou ressarcimento em favor da CONTRATADA, ressalvado apenas o pagamento proporcional dos serviços comprovadamente prestados até a data da efetiva extinção contratual.
 
-6.2. O contrato poderá ser rescindido de forma motivada, por qualquer das partes, independentemente de aviso prévio, nas seguintes hipóteses:
+6.2. Rescindido o contrato, a CONTRATADA deverá, no prazo máximo de 48 (quarenta e oito) horas, devolver todos os bens, documentos, mídias, credenciais e acessos disponibilizados, bem como realizar a transferência organizada de informações necessárias à continuidade do projeto.
 
-    6.2.1. Descumprimento, pela outra parte, de quaisquer obrigações assumidas neste contrato, inclusive atraso na entrega dos serviços, execução inadequada do objeto ou violação de cláusulas contratuais;
+§1º. No mesmo prazo, a CONTRATADA deverá (i) cessar imediatamente o uso de quaisquer credenciais, acessos e ambientes da CONTRATANTE; (ii) eliminar, de forma segura, quaisquer cópias de dados, informações e materiais da CONTRATANTE eventualmente mantidos fora dos ambientes autorizados; e (iii) fornecer declaração escrita de devolução/eliminação, sem prejuízo de auditoria.
 
-    6.2.3. Prática de atos que comprometam a continuidade, a regularidade ou a finalidade do contrato.
+§2º. A CONTRATANTE poderá reter e compensar valores eventualmente devidos à CONTRATADA com quaisquer prejuízos comprovados, multas contratuais, custos de reparação/substituição de equipamentos e valores decorrentes do descumprimento de obrigações estipuladas no presente contrato.
 
-6.3. A rescisão motivada não exime a parte inadimplente da responsabilidade pelo pagamento dos serviços efetivamente prestados até a data da rescisão, nem das perdas e danos eventualmente apurados.
+§3º. Fica expressamente pactuado que a CONTRATADA não fará jus a qualquer indenização por expectativa de renovação, continuidade, descontinuidade do projeto, investimentos realizados, perdas e danos indiretos ou lucros cessantes.
+
+6.2. Sem prejuízo das demais hipóteses previstas neste contrato ou na legislação aplicável, constituem motivos suficientes para a rescisão imediata do presente instrumento, independentemente de aviso prévio ou indenização à CONTRATADA:
+
+I – a execução inadequada, negligente ou tecnicamente deficiente dos serviços contratados;
+II – o descumprimento de prazos, entregas ou requisitos/critério de qualidade pactuados entre as partes;
+III – a violação das obrigações de confidencialidade, proteção de dados, propriedade intelectual ou segurança da informação;
+IV – a prática de condutas que possam comprometer, direta ou indiretamente, a reputação, a imagem institucional ou a credibilidade da CONTRATANTE perante terceiros;
+V – a prática de atos contrários à boa-fé objetiva, à lealdade contratual e aos deveres de cooperação inerentes às relações empresariais.
+
+6.3 A extinção do presente contrato, por qualquer motivo, não afetará a validade ou exigibilidade das obrigações que, por sua natureza, devam subsistir após o término da relação contratual, especialmente aquelas relativas à confidencialidade, propriedade intelectual, proteção de dados e não aliciamento.
 
 
 CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO TRABALHISTA E SOCIETÁRIO
 
-7.1 - Não se estabelece, por força do presente contrato, nenhum vínculo empregatício, nem enseja qualquer tipo de subordinação e pessoalidade entre a CONTRATANTE e o pessoal do CONTRATADO, sendo certo que as obrigações e direitos das partes limitam-se ao expressamente avençado neste contrato.
+7.1. As partes reconhecem expressamente que a presente contratação possui natureza estritamente civil e empresarial, regida pelas disposições do Código Civil, inexistindo entre as partes qualquer relação de emprego ou vínculo trabalhista.
 
-7.2. O próprio CONTRATADO, na qualidade de prestador de serviços estabelecerá e concretizará, cotidianamente, a forma de realização dos serviços pactuados no presente termo.
+7.2. A CONTRATADA exerce atividade empresarial própria, assumindo integralmente os riscos de sua atividade econômica, nos termos do art. 966 do Código Civil, inexistindo entre as partes quaisquer dos elementos caracterizadores da relação de emprego previstos no art. 3º da Consolidação das Leis do Trabalho, de modo que a CONTRATADA estabelecerá e concretizará a forma de realização dos serviços pactuados no presente termo.
 
 Parágrafo Primeiro. O CONTRATADO tem ciência e declara que nenhum ex-empregado da CONTRATANTE cujo contrato de trabalho tenha se encerrado há menos de 18 (dezoito) meses poderá ser alocado pelo CONTRATADO na prestação dos serviços.
 
@@ -310,7 +322,7 @@ Parágrafo Terceiro. O CONTRATADO declara assumir integralmente os riscos relaci
 
 Parágrafo Quarto. O CONTRATADO tem ciência e declara que nada neste contrato poderá ser interpretado como tendo as partes, estabelecido qualquer forma de sociedade, associação, agência ou consórcio, de fato ou de direito, permanecendo cada uma das partes com as suas obrigações civis, comerciais, trabalhistas e tributárias, de forma autônoma.
 
-Parágrafo Quinto. Não haverá controles de horários de chegada ou saída ou subordinação, ou controle de presença caso o CONTRATADO opte por ir em modelo presencial, com total autonomia da CONTRATADO em relação à CONTRATANTE, se comprometendo a CONTRATANTE a executar os serviços contratados através das horas necessárias à execução dos serviços, conforme acordado, sob pena dos respectivos descontos. Caso não seja solicitado por escrito pela CONTRATANTE, não serão devidas horas adicionais às expressamente contratadas nesta cláusula.
+Parágrafo Quinto. A execução dos serviços ocorrerá com plena autonomia técnica, organizacional e econômica da CONTRATADA, inexistindo controle de jornada, subordinação hierárquica ou exclusividade.
 
 
 CLÁUSULA OITAVA – DA CONFIDENCIALIDADE
@@ -332,9 +344,11 @@ Parágrafo Quinto. Sem prejuízo de outras obrigações, a CONTRATADA se comprom
 2. Utilizar quaisquer Informações Confidenciais exclusivamente para a execução da prestação dos serviços;
 3. Não analisar, providenciar análise, derivar ou sintetizar qualquer informação recebida da CONTRATANTE sem autorização prévia e fora dos limites da execução de seu trabalho;
 
-8.2. A CONTRATADA responderá direta, exclusiva e integralmente por qualquer divulgação, utilização indevida, vazamento, acesso não autorizado ou tratamento irregular de Informações Confidenciais ocorrido durante a execução deste Contrato, ainda que o ato seja praticado por seus empregados, prepostos, representantes, subcontratados, colaboradores ou quaisquer terceiros sob sua responsabilidade ou esfera de controle.
+8.2. A CONTRATADA, por si e por quaisquer profissionais por ela alocados, será responsável por quaisquer danos causados à CONTRATANTE ou a terceiros em decorrência do descumprimento das obrigações de sigilo previstas nesta cláusula, independentemente de dolo ou culpa.
 
-8.3. Verificada a ocorrência de qualquer das hipóteses acima, a CONTRATADA obriga-se a ressarcir integralmente a CONTRATANTE por todos os prejuízos suportados, inclusive aqueles decorrentes de condenação judicial, acordo, autuação administrativa ou qualquer tipo de sanção regulatória.
+8.3. O descumprimento das obrigações de confidencialidade ensejará a obrigação de indenizar integralmente os danos comprovadamente sofridos pela parte prejudicada, sem prejuízo das demais medidas judiciais cabíveis.
+
+8.4. A CONTRATADA reconhece que a violação das obrigações de confidencialidade e segurança da informação poderá causar dano de difícil reparação, razão pela qual a CONTRATANTE poderá pleitear tutela específica/inibitória e medidas de urgência para cessação do ilícito, sem prejuízo de perdas e danos.
 
 
 CLÁUSULA NONA – DA INEXISTÊNCIA DE LICENÇAS
@@ -382,7 +396,7 @@ Parágrafo Terceiro. As partes declaram que qualquer conduta incompatível com a
 
 CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE
 
-12.1. A CONTRATANTE disponibilizará, em regime de comodato, um computador MacBook modelo [X], de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.
+12.1. A CONTRATANTE disponibilizará, em regime de comodato, exclusivamente por razões de segurança da informação, padronização tecnológica e proteção de dados corporativos, {{PATRIMONIO_LISTA}}, de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.
 
 12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado, abstendo-se de utilizá-lo para fins pessoais, atividades não relacionadas ao presente contrato, ou por terceiros.
 
@@ -396,9 +410,13 @@ CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNE
 
 12.7. A CONTRATANTE poderá, a qualquer tempo, solicitar a devolução imediata do equipamento, cabendo à CONTRATADA o cumprimento imediato da solicitação.
 
-12.8. O inadimplemento das obrigações previstas nesta cláusula autoriza a CONTRATANTE a reter valores devidos à CONTRATADA até o limite da indenização cabível, sem prejuízo das demais medidas legais e contratuais aplicáveis.
+12.8. O inadimplemento das obrigações previstas nesta cláusula autoriza a CONTRATANTE a reter valores devidos à CONTRATADA até o limite da indenização cabível e/ou de quaisquer multas e perdas e danos decorrentes do descumprimento contratual, sem prejuízo das demais medidas.
 
-12.9. A CONTRATANTE poderá realizar auditorias técnicas remotas no equipamento disponibilizado, a qualquer tempo.
+12.9. A CONTRATANTE poderá realizar auditorias técnicas no equipamento disponibilizado, a qualquer tempo.
+
+12.10. O não cumprimento da obrigação de devolução dos equipamentos no prazo estipulado neste contrato sujeitará a CONTRATADA ao pagamento de multa diária de R$ 500,00 (quinhentos reais), a partir do primeiro dia de atraso, até a efetiva restituição dos bens à CONTRATANTE.
+
+Parágrafo único. A multa prevista nesta cláusula possui natureza moratória, não substituindo a obrigação de devolução dos equipamentos, nem afastando o direito da CONTRATANTE de exigir o pagamento do valor de reposição do bem ou a reparação de eventuais perdas e danos.
 
 
 CLÁUSULA DÉCIMA TERCEIRA - DO DIREITO DE USO DE IMAGEM
@@ -410,11 +428,11 @@ Parágrafo único. A utilização ora autorizada não implica exclusividade, ví
 
 CLÁUSULA DÉCIMA QUARTA – DAS DISPOSIÇÕES GERAIS
 
-14.1. O presente Contrato é celebrado em caráter irrevogável e irretratável, obrigando as Partes e seus sucessores a qualquer título, constituindo o acordo integral entre elas acerca do objeto ora pactuado, ficando expressamente revogados e substituídos quaisquer contratos, instrumentos, ajustes, propostas, entendimentos e negociações anteriores, verbais ou escritos, que versem sobre a mesma matéria.
+14.1. Este Contrato constitui o entendimento integral e completo entre as partes, substituindo todos os entendimentos, compromissos, negociações, acordos e contratos anteriores, sejam eles verbais ou escritos, relativos ao objeto deste Contrato. Qualquer modificação ou emenda a este Contrato só será válida se formalizada por escrito e assinada pelos representantes legais de ambas as partes.
 
-14.2. A tolerância das Partes com relação a inadimplemento ou não cumprimento de qualquer obrigação, cláusula, termo ou condição ora estabelecida não constitui precedente, renúncia a obrigações, emenda ou renovação do contrato, e sim mera liberalidade.
+14.2. As partes reconhecem que a nulidade ou inexequibilidade de qualquer disposição deste Contrato não afetará a validade ou exequibilidade das demais disposições, que continuarão em pleno vigor e efeito. Caso qualquer disposição deste Contrato seja considerada inválida, ilegal ou inexequível, as partes negociarão de boa-fé para substituí-la por uma disposição que, na máxima extensão permitida por lei, preserve a intenção original da disposição inválida, ilegal ou inexequível.
 
-14.3. A declaração de nulidade ou anulação de qualquer dos dispositivos contidos neste instrumento não invalidará suas demais disposições, as quais permanecerão em pleno vigor.
+14.3. A CONTRATADA responderá integralmente por quaisquer danos, prejuízos ou responsabilidades decorrentes de atos praticados por si, por seus sócios, empregados, prepostos, colaboradores ou subcontratados no âmbito da execução dos serviços objeto deste contrato.
 
 14.4. Não se estabelece, por força deste instrumento, qualquer forma de sociedade, associação, agência, consórcio, participação societária, ou responsabilidade solidária entre as partes.
 
@@ -424,15 +442,17 @@ CLÁUSULA DÉCIMA QUARTA – DAS DISPOSIÇÕES GERAIS
 
 14.7. O presente CONTRATO é o instrumento que regula todos os direitos e obrigações acordadas entre as Partes, substituindo todo e qualquer CONTRATO ou entendimento previamente realizado pelas Partes.
 
-14.8. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.
+14.8. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria cível, tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.
 
-14.9. Em nenhuma hipótese a CONTRATANTE será responsável por lucros cessantes, danos indiretos ou perdas financeiras da CONTRATADA.
+14.9. Durante a vigência deste contrato, a CONTRATADA compromete-se a não utilizar informações estratégicas, dados comerciais, metodologias, modelos de negócio, bases de dados ou qualquer outro ativo intelectual da CONTRATANTE em benefício próprio ou de terceiros, especialmente para atuação concorrente ou potencialmente prejudicial aos interesses comerciais da CONTRATANTE.
 
-14.10. O presente contrato não estabelece exclusividade entre as partes, nem gera expectativa de renovação automática ou volume mínimo de demandas.
+14.10. O presente contrato não estabelece exclusividade entre as partes, nem gera expectativa de renovação automática ou volume mínimo de demandas, de modo que em nenhuma hipótese a CONTRATANTE será responsável por lucros cessantes, danos indiretos ou perdas financeiras da CONTRATADA.
 
 14.11. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.
 
-14.12. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato.
+14.12. As partes reconhecem expressamente que o objeto do presente contrato não se vincula à atuação pessoal de qualquer indivíduo específico, inexistindo pessoalidade na prestação dos serviços, sendo a CONTRATADA integralmente responsável pela gestão de seus profissionais, colaboradores, empregados, prepostos ou subcontratados eventualmente envolvidos na execução do objeto contratual.
+
+14.13. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato.
 
 As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Contrato emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil.
 
@@ -886,7 +906,7 @@ export default function ContratosColaboradores() {
       .replace(/\{\{VALOR_MENSAL\}\}/g, "A DEFINIR")
       .replace(/\{\{VALOR_EXTENSO\}\}/g, "a definir")
       .replace(/\{\{DATA_ATUAL\}\}/g, dataAtual)
-      .replace(/\[X\]/g, patrimonioDescricao);
+      .replace(/\{\{PATRIMONIO_LISTA\}\}/g, patrimonioDescricao);
   };
 
   const handlePrint = () => {
