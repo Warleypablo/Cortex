@@ -182,7 +182,7 @@ export interface IStorage {
   getPatrimonios(): Promise<Patrimonio[]>;
   getPatrimonioById(id: number): Promise<PatrimonioComResponsavel | undefined>;
   createPatrimonio(patrimonio: InsertPatrimonio): Promise<Patrimonio>;
-  getColaboradoresDropdown(): Promise<{ id: number; nome: string }[]>;
+  getColaboradoresDropdown(): Promise<{ id: number; nome: string; email_turbo: string | null }[]>;
   updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio>;
   updatePatrimonioResponsavelById(id: number, responsavelId: number, responsavelNome: string): Promise<Patrimonio>;
   updatePatrimonio(id: number, data: Record<string, string | null>): Promise<Patrimonio>;
@@ -712,7 +712,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getColaboradoresDropdown(): Promise<{ id: number; nome: string }[]> {
+  async getColaboradoresDropdown(): Promise<{ id: number; nome: string; email_turbo: string | null }[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1763,8 +1763,8 @@ export class DbStorage implements IStorage {
     const result = await db.execute(sql`
       SELECT DISTINCT ON (cc.task_id)
         COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int) as id,
-        caz.nome,
-        caz.cnpj,
+        COALESCE(caz.nome, cc.nome) as nome,
+        COALESCE(caz.cnpj, cc.cnpj) as cnpj,
         caz.endereco,
         caz.ativo,
         caz.created_at as "createdAt",
@@ -1850,8 +1850,8 @@ export class DbStorage implements IStorage {
     const result = await db
       .select({
         id: sql<number>`COALESCE(${schema.cazClientes.id}, ('x' || substr(md5(${schema.cupClientes.taskId}), 1, 8))::bit(32)::int)`,
-        nome: schema.cazClientes.nome,
-        cnpj: schema.cazClientes.cnpj,
+        nome: sql<string | null>`COALESCE(${schema.cazClientes.nome}, ${schema.cupClientes.nome})`,
+        cnpj: sql<string | null>`COALESCE(${schema.cazClientes.cnpj}, ${schema.cupClientes.cnpj})`,
         endereco: schema.cazClientes.endereco,
         ativo: schema.cazClientes.ativo,
         createdAt: schema.cazClientes.createdAt,
@@ -2575,6 +2575,7 @@ export class DbStorage implements IStorage {
       LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
       WHERE caz.ids = ${clienteId}
         OR cc.task_id = ${clienteId}
+        OR ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int::text = ${clienteId}
         OR REPLACE(REPLACE(REPLACE(cc.cnpj, '.', ''), '-', ''), '/', '') = ${cleanId}
         OR REPLACE(REPLACE(REPLACE(caz.cnpj, '.', ''), '-', ''), '/', '') = ${cleanId}
       ORDER BY ct.id_subtask, caz.id DESC NULLS LAST, ct.data_inicio DESC
@@ -2710,17 +2711,18 @@ export class DbStorage implements IStorage {
     return newPatrimonio;
   }
 
-  async getColaboradoresDropdown(): Promise<{ id: number; nome: string; status: string | null }[]> {
+  async getColaboradoresDropdown(): Promise<{ id: number; nome: string; email_turbo: string | null; status: string | null }[]> {
     const result = await db
       .select({
         id: schema.rhPessoal.id,
         nome: schema.rhPessoal.nome,
+        emailTurbo: schema.rhPessoal.emailTurbo,
         status: schema.rhPessoal.status,
       })
       .from(schema.rhPessoal)
       .orderBy(schema.rhPessoal.nome);
-    
-    return result;
+
+    return result.map(r => ({ id: r.id, nome: r.nome, email_turbo: r.emailTurbo, status: r.status }));
   }
 
   async updatePatrimonioResponsavel(id: number, responsavelNome: string | null): Promise<Patrimonio> {
@@ -9403,7 +9405,9 @@ export class DbStorage implements IStorage {
     const hoje = new Date();
     const dataHoje = hoje.toISOString().split('T')[0];
     
-    const dataReferencia = dataHoje < ultimoDiaStr ? dataHoje : ultimoDiaStr;
+    // Para meses já encerrados, usar o dia seguinte ao último dia para incluir parcelas do último dia com <
+    const diaSeguinteUltimo = new Date(ano, mes, 1).toISOString().split('T')[0]; // primeiro dia do mês seguinte
+    const dataReferencia = dataHoje <= ultimoDiaStr ? dataHoje : diaSeguinteUltimo;
     
     const resumoResult = await db.execute(sql.raw(`
       SELECT
@@ -12960,27 +12964,34 @@ export class DbStorage implements IStorage {
     admissao: string | null;
     email: string | null;
     salario: string | null;
+    patrimonio: string | null;
   }[]> {
     const result = await db.execute(sql`
-      SELECT 
-        id,
-        nome,
-        cpf,
-        cnpj,
-        endereco,
-        estado,
-        cargo,
-        setor,
-        admissao::text as admissao,
-        COALESCE(email_pessoal, email_turbo) as email,
-        salario::text as salario
-      FROM "Inhire".rh_pessoal
-      WHERE status = 'Ativo'
-        AND nome IS NOT NULL
-        AND TRIM(nome) != ''
-      ORDER BY nome
+      SELECT
+        c.id,
+        c.nome,
+        c.cpf,
+        c.cnpj,
+        c.endereco,
+        c.estado,
+        c.cargo,
+        c.setor,
+        c.admissao::text as admissao,
+        COALESCE(c.email_pessoal, c.email_turbo) as email,
+        c.salario::text as salario,
+        p.descricao as patrimonio
+      FROM "Inhire".rh_pessoal c
+      LEFT JOIN LATERAL (
+        SELECT descricao FROM "Inhire".rh_patrimonio
+        WHERE responsavel_id = c.id AND ativo = 'Notebook'
+        ORDER BY id DESC LIMIT 1
+      ) p ON true
+      WHERE c.status = 'Ativo'
+        AND c.nome IS NOT NULL
+        AND TRIM(c.nome) != ''
+      ORDER BY c.nome
     `);
-    
+
     return result.rows.map((row: any) => ({
       id: row.id,
       nome: row.nome,
@@ -12993,6 +13004,7 @@ export class DbStorage implements IStorage {
       admissao: row.admissao,
       email: row.email,
       salario: row.salario,
+      patrimonio: row.patrimonio,
     }));
   }
 

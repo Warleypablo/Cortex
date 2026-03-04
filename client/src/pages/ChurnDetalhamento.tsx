@@ -476,6 +476,18 @@ export default function ChurnDetalhamento() {
   const [expandedOpTheme, setExpandedOpTheme] = useState<string | null>(null);
   const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
 
+  const { data: nrrData } = useQuery<{ nrr_pct: number; crosssell_mrr: number; crosssell_pontual: number; vendas_mrr_novo: number; vendas_mrr_total: number; gross_churn_mrr: number; mrr_inicio: number }>({
+    queryKey: ["/api/analytics/nrr", dataInicio, dataFim],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (dataInicio) params.set("startDate", dataInicio);
+      if (dataFim) params.set("endDate", dataFim);
+      const res = await fetch(`/api/analytics/nrr?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch NRR data");
+      return res.json();
+    },
+  });
+
   const { data, isLoading, error } = useQuery<ChurnDetalhamentoData>({
     queryKey: ["/api/analytics/churn-detalhamento", dataInicio, dataFim],
     queryFn: async () => {
@@ -1793,7 +1805,7 @@ export default function ChurnDetalhamento() {
           </div>
           
           <CardContent className="relative p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Coluna 1: Gauge e status */}
               <div className="flex flex-col items-center justify-center p-4 bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Taxa de Churn</h3>
@@ -1833,6 +1845,55 @@ export default function ChurnDetalhamento() {
                   </div>
                   <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(MRR_BASE_OVERRIDE)}</div>
                   <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base para cálculo do churn</div>
+                </div>
+              </div>
+
+              {/* Coluna NRR & Cross-sell */}
+              <div className="flex flex-col gap-3">
+                <div className={`flex-1 p-4 rounded-xl border flex flex-col justify-center ${
+                  (nrrData?.nrr_pct ?? 100) >= 100
+                    ? 'bg-green-50 dark:bg-green-950/30 border-green-100 dark:border-green-900/50'
+                    : 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50'
+                }`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-xs font-medium uppercase ${
+                      (nrrData?.nrr_pct ?? 100) >= 100
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }`}>NRR (Net Revenue Retention)</span>
+                    <Percent className={`h-4 w-4 ${
+                      (nrrData?.nrr_pct ?? 100) >= 100
+                        ? 'text-green-500'
+                        : 'text-red-500'
+                    }`} />
+                  </div>
+                  <div className={`text-2xl font-bold ${
+                    (nrrData?.nrr_pct ?? 100) >= 100
+                      ? 'text-green-700 dark:text-green-300'
+                      : 'text-red-700 dark:text-red-300'
+                  }`}>{(nrrData?.nrr_pct ?? 0).toFixed(1)}%</div>
+                  <div className="text-xs text-muted-foreground mt-1">(MRR Início - Churn + Cross-sell) / MRR Início</div>
+                </div>
+
+                <div className="flex-1 p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-900/50 flex flex-col justify-center">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase">Cross-sell MRR</span>
+                    <TrendingDown className="h-4 w-4 text-emerald-500 rotate-180" />
+                  </div>
+                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(nrrData?.crosssell_mrr ?? 0)}</div>
+                  <div className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">vendas para clientes existentes</div>
+                  {(nrrData?.crosssell_pontual ?? 0) > 0 && (
+                    <div className="text-xs text-emerald-600/50 dark:text-emerald-400/50 mt-0.5">Pontual: {formatCurrency(nrrData?.crosssell_pontual ?? 0)}</div>
+                  )}
+                </div>
+
+                <div className="flex-1 p-4 bg-gray-50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50 flex flex-col justify-center">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-muted-foreground uppercase">Vendas MRR (Novo)</span>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div className="text-2xl font-bold text-foreground">{formatCurrency(nrrData?.vendas_mrr_novo ?? 0)}</div>
+                  <div className="text-xs text-muted-foreground mt-1">vendas para clientes novos</div>
                 </div>
               </div>
               

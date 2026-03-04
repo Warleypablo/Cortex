@@ -28,6 +28,7 @@ export const PERMISSION_KEYS = {
     CONTRIBUICAO_COLABORADOR: 'fin.contribuicao_colaborador',
     CONTRIBUICAO_OPERADOR: 'fin.contribuicao_operador',
     MARGEM_CLIENTE: 'fin.margem_cliente',
+    TURBOZAP: 'fin.turbozap',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -188,6 +189,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/auditoria-sistemas': PERMISSION_KEYS.FIN.AUDITORIA,
   '/dashboard/contribuicao-operador': PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR,
   '/dashboard/margem-cliente': PERMISSION_KEYS.FIN.MARGEM_CLIENTE,
+  '/turbozap': PERMISSION_KEYS.FIN.TURBOZAP,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
@@ -304,17 +306,42 @@ export interface NavSection {
 export const NAV_CONFIG = {
   // Acesso Rápido - shortcuts to Geral pages
   quickAccess: [
-    { title: 'Meu Perfil', url: '/meu-perfil', icon: 'UserRound', permissionKey: PERMISSION_KEYS.GENERAL.PROFILE },
-    { title: 'Calendário', url: '/calendario', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GENERAL.CALENDAR },
-    { title: 'Acessos', url: '/acessos', icon: 'Key', permissionKey: PERMISSION_KEYS.GENERAL.ACESSOS },
-    { title: 'Conhecimento & Benefícios', url: '/conhecimentos', icon: 'BookOpen', permissionKey: PERMISSION_KEYS.GENERAL.CONHECIMENTO },
-    { title: 'GPTurbo', url: '/cases/chat', icon: 'Sparkles', permissionKey: PERMISSION_KEYS.GENERAL.GPTURBO },
-    { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
-    { title: 'Sugestões', url: '/sugestoes', icon: 'Lightbulb', permissionKey: PERMISSION_KEYS.GENERAL.SUGESTOES },
-    { title: 'Pesquisa E-NPS', url: '/rh/nps/responder', icon: 'ClipboardCheck', permissionKey: PERMISSION_KEYS.GENERAL.ENPS },
-    { title: 'Processos Internos', url: '/processos-internos', icon: 'FolderOpen', permissionKey: PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS },
-    { title: 'Chat Clientes', url: '/chat-clientes', icon: 'MessageSquare', permissionKey: PERMISSION_KEYS.GENERAL.CHAT_CLIENTES },
-    { title: 'Chamados', url: '/chamados', icon: 'Ticket', permissionKey: PERMISSION_KEYS.GENERAL.CHAMADOS },
+    {
+      title: 'Meu Espaço',
+      icon: 'UserRound',
+      items: [
+        { title: 'Meu Perfil', url: '/meu-perfil', icon: 'UserRound', permissionKey: PERMISSION_KEYS.GENERAL.PROFILE },
+        { title: 'Calendário', url: '/calendario', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GENERAL.CALENDAR },
+        { title: 'Conhecimento & Benefícios', url: '/conhecimentos', icon: 'BookOpen', permissionKey: PERMISSION_KEYS.GENERAL.CONHECIMENTO },
+      ],
+    },
+    {
+      title: 'Ferramentas',
+      icon: 'Wrench',
+      items: [
+        { title: 'GPTurbo', url: '/cases/chat', icon: 'Sparkles', permissionKey: PERMISSION_KEYS.GENERAL.GPTURBO },
+        { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
+        { title: 'Acessos', url: '/acessos', icon: 'Key', permissionKey: PERMISSION_KEYS.GENERAL.ACESSOS },
+      ],
+    },
+    {
+      title: 'Comunicação',
+      icon: 'MessageSquare',
+      items: [
+        { title: 'Chat Clientes', url: '/chat-clientes', icon: 'MessageSquare', permissionKey: PERMISSION_KEYS.GENERAL.CHAT_CLIENTES },
+        { title: 'TurboZap', url: '/turbozap', icon: 'Zap', permissionKey: PERMISSION_KEYS.FIN.TURBOZAP },
+        { title: 'Chamados', url: '/chamados', icon: 'Ticket', permissionKey: PERMISSION_KEYS.GENERAL.CHAMADOS },
+        { title: 'Sugestões', url: '/sugestoes', icon: 'Lightbulb', permissionKey: PERMISSION_KEYS.GENERAL.SUGESTOES },
+      ],
+    },
+    {
+      title: 'RH & Operações',
+      icon: 'ClipboardList',
+      items: [
+        { title: 'Pesquisa E-NPS', url: '/rh/nps/responder', icon: 'ClipboardCheck', permissionKey: PERMISSION_KEYS.GENERAL.ENPS },
+        { title: 'Processos Internos', url: '/processos-internos', icon: 'FolderOpen', permissionKey: PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS },
+      ],
+    },
   ],
   
   // Geral module
@@ -356,6 +383,7 @@ export const NAV_CONFIG = {
         { title: 'Inadimplência', url: '/dashboard/inadimplencia', icon: 'AlertTriangle', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
         { title: 'Contribuição por Squad', url: '/dashboard/contribuicao-operador', icon: 'Users2', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR },
         { title: 'Margem por Cliente', url: '/dashboard/margem-cliente', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.FIN.MARGEM_CLIENTE },
+        { title: 'TurboZap', url: '/turbozap', icon: 'Zap', permissionKey: PERMISSION_KEYS.FIN.TURBOZAP },
       ],
     },
     {
@@ -451,10 +479,6 @@ export const NAV_CONFIG = {
     icon: 'Settings',
     items: [
       { title: 'Usuários', url: '/admin/usuarios', icon: 'Users', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
-      { title: 'Regras de Notificações', url: '/admin/regras-notificacoes', icon: 'Bell', permissionKey: PERMISSION_KEYS.ADMIN.NOTIFICACOES },
-      { title: 'Design System', url: '/admin/design-system', icon: 'Palette', permissionKey: PERMISSION_KEYS.ADMIN.DESIGN_SYSTEM },
-      { title: 'Saúde do Sistema', url: '/admin/health', icon: 'Activity', permissionKey: PERMISSION_KEYS.ADMIN.HEALTH },
-      { title: 'Overrides KPI', url: '/admin/kpi', icon: 'Sliders', permissionKey: PERMISSION_KEYS.ADMIN.KPI },
       { title: 'Avisos', url: '/admin/avisos', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.ADMIN.AVISOS },
     ],
   },
@@ -607,5 +631,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
   [PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS]: 'Processos Internos',
   [PERMISSION_KEYS.GENERAL.CHAMADOS]: 'Chamados',
+  [PERMISSION_KEYS.FIN.TURBOZAP]: 'TurboZap',
   [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
 };

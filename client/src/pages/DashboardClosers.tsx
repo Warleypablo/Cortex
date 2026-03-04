@@ -223,16 +223,22 @@ export default function DashboardClosers() {
 
   const trends: Array<'up' | 'down' | 'stable'> = ['up', 'down', 'stable'];
   
-  const ranking: RankingCloser[] = (chartReceita || [])
-    .map((c, idx) => {
-      const reunioesData = chartReunioesNegocios?.find(r => r.closer === c.closer);
+  const ranking: RankingCloser[] = (() => {
+    const receitaMap = new Map((chartReceita || []).map(c => [c.closer, c]));
+    const allCloserNames = new Set<string>([
+      ...(chartReceita || []).map(c => c.closer),
+      ...(closers || []).filter(c => c.active).map(c => c.name),
+    ]);
+    return Array.from(allCloserNames).map(name => {
+      const receita = receitaMap.get(name);
+      const reunioesData = chartReunioesNegocios?.find(r => r.closer === name);
       const trend: 'up' | 'down' | 'stable' = trends[Math.floor(Math.random() * 3)];
       return {
-        position: idx + 1,
-        name: c.closer,
-        mrr: c.mrr,
-        pontual: c.pontual,
-        total: c.mrr + c.pontual,
+        position: 0,
+        name,
+        mrr: receita?.mrr || 0,
+        pontual: receita?.pontual || 0,
+        total: (receita?.mrr || 0) + (receita?.pontual || 0),
         reunioes: reunioesData?.reunioes || 0,
         negocios: reunioesData?.negociosGanhos || 0,
         taxa: reunioesData?.taxaConversao || 0,
@@ -241,24 +247,11 @@ export default function DashboardClosers() {
     })
     .sort((a, b) => b.mrr - a.mrr)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
+  })();
 
-  const rankingPontual: RankingCloser[] = (chartReceita || [])
-    .filter(c => c.pontual > 0)
+  const rankingPontual: RankingCloser[] = ranking
     .sort((a, b) => b.pontual - a.pontual)
-    .map((c, idx) => {
-      const reunioesData = chartReunioesNegocios?.find(r => r.closer === c.closer);
-      return {
-        position: idx + 1,
-        name: c.closer,
-        mrr: c.mrr,
-        pontual: c.pontual,
-        total: c.mrr + c.pontual,
-        reunioes: reunioesData?.reunioes || 0,
-        negocios: reunioesData?.negociosGanhos || 0,
-        taxa: reunioesData?.taxaConversao || 0,
-        trend: 'stable' as const,
-      };
-    });
+    .map((c, idx) => ({ ...c, position: idx + 1 }));
 
   const top3 = ranking.slice(0, 3);
   const top3Pontual = rankingPontual.slice(0, 3);

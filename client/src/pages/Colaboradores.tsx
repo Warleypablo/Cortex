@@ -2193,28 +2193,30 @@ export default function Colaboradores() {
   const canExport = selectedExportColumns.length > 0;
   const allExportColumnsSelected = selectedExportColumns.length === EXPORT_COLUMNS.length;
 
-  const buildExportUrl = useCallback((format: "xlsx" | "csv") => {
-    const params = new URLSearchParams();
-    if (format === "csv") {
-      params.set("formato", "csv");
-    }
+  const handleExport = useCallback(async (format: "xlsx" | "csv") => {
     const exportKeys = selectedExportColumns.length > 0
       ? selectedExportColumns
       : EXPORT_COLUMNS.map((column) => column.key);
-    exportKeys.forEach((key) => params.append("colunas", key));
-    const query = params.toString();
-    return `/api/colaboradores/exportar-excel${query ? `?${query}` : ""}`;
-  }, [selectedExportColumns]);
 
-  const handleExport = useCallback((format: "xlsx" | "csv") => {
-    const url = buildExportUrl(format);
+    const response = await fetch("/api/colaboradores/exportar-excel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ formato: format, colunas: exportKeys }),
+    });
+
+    if (!response.ok) return;
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.rel = "noopener";
+    const ext = format === "csv" ? "csv" : "xlsx";
+    link.download = `colaboradores_${new Date().toISOString().split("T")[0]}.${ext}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
-  }, [buildExportUrl]);
+    URL.revokeObjectURL(url);
+  }, [selectedExportColumns]);
 
   const { data: colaboradoresResponse, isLoading } = useQuery<{ data: ColaboradorComPatrimonios[]; total: number; page: number; limit: number } | ColaboradorComPatrimonios[]>({
     queryKey: ["/api/colaboradores/com-patrimonios"],

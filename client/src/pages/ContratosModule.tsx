@@ -2,7 +2,7 @@ import { useState, useMemo, useDeferredValue, useCallback, memo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Table,
   TableBody,
@@ -57,6 +70,8 @@ import {
   Send,
   RefreshCw,
   Sparkles,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -84,6 +99,13 @@ interface Entidade {
   observacoes: string | null;
   data_cadastro: string;
   data_atualizacao: string;
+}
+
+interface ColaboradorDropdownItem {
+  id: number;
+  nome: string;
+  email_turbo: string | null;
+  status: string | null;
 }
 
 interface ContratoItem {
@@ -1045,6 +1067,17 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
     },
   });
 
+  const { data: colaboradoresDropdown } = useQuery<ColaboradorDropdownItem[]>({
+    queryKey: ['/api/colaboradores/dropdown'],
+  });
+
+  const colaboradoresAtivos = useMemo(() =>
+    (colaboradoresDropdown || []).filter(c => c.status?.toLowerCase() === 'ativo'),
+    [colaboradoresDropdown]
+  );
+
+  const [comercialOpen, setComercialOpen] = useState(false);
+
   const { data: servicosData } = useQuery<{ servicos: Servico[] }>({
     queryKey: ['/api/contratos/servicos'],
   });
@@ -1284,11 +1317,47 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Comercial Responsável</Label>
-              <Input
-                data-testid="input-comercial-responsavel"
-                value={formData.comercial_nome}
-                onChange={(e) => setFormData({ ...formData, comercial_nome: e.target.value })}
-              />
+              <Popover open={comercialOpen} onOpenChange={setComercialOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={comercialOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="input-comercial-responsavel"
+                  >
+                    {formData.comercial_nome || "Selecione um colaborador..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[350px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar colaborador..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {colaboradoresAtivos.map((col) => (
+                          <CommandItem
+                            key={col.id}
+                            value={col.nome}
+                            onSelect={() => {
+                              setFormData({
+                                ...formData,
+                                comercial_nome: col.nome,
+                                comercial_email: col.email_turbo || '',
+                              });
+                              setComercialOpen(false);
+                            }}
+                          >
+                            <Check className={cn("mr-2 h-4 w-4", formData.comercial_nome === col.nome ? "opacity-100" : "opacity-0")} />
+                            {col.nome}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-2">
@@ -1297,7 +1366,8 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                 data-testid="input-comercial-email"
                 type="email"
                 value={formData.comercial_email}
-                onChange={(e) => setFormData({ ...formData, comercial_email: e.target.value })}
+                readOnly
+                className="bg-muted"
               />
             </div>
           </div>
@@ -1563,14 +1633,16 @@ function ContratosTab() {
 
   const enviarAssinaturaMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest('POST', `/api/contratos/${id}/enviar-assinatura`);
+      const res = await apiRequest('POST', `/api/contratos/${id}/enviar-assinatura`);
+      return await res.json();
     },
     onSuccess: (data: { emailEnviado?: string }) => {
-      toast({ 
-        title: "Contrato enviado para assinatura", 
+      toast({
+        title: "Contrato enviado para assinatura",
         description: data.emailEnviado ? `Email enviado para: ${data.emailEnviado}` : "Contrato enviado com sucesso"
       });
       queryClient.invalidateQueries({ queryKey: ['/api/contratos/contratos'] });
+      queryClient.invalidateQueries({ queryKey: ["contratos-na-rua"] });
       setViewDialogOpen(false);
     },
     onError: (error: any) => {
@@ -2180,6 +2252,17 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
     },
   });
 
+  const { data: colaboradoresDropdownNovo } = useQuery<ColaboradorDropdownItem[]>({
+    queryKey: ['/api/colaboradores/dropdown'],
+  });
+
+  const colaboradoresAtivosNovo = useMemo(() =>
+    (colaboradoresDropdownNovo || []).filter(c => c.status?.toLowerCase() === 'ativo'),
+    [colaboradoresDropdownNovo]
+  );
+
+  const [comercialOpenNovo, setComercialOpenNovo] = useState(false);
+
   const { data: servicosData } = useQuery<{ servicos: Servico[] }>({
     queryKey: ['/api/contratos/servicos'],
   });
@@ -2318,8 +2401,189 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
   const totalRecorrente = itens.filter(i => i.modalidade === 'recorrente').reduce((sum, i) => sum + (i.valor_negociado || 0), 0);
   const totalPontual = itens.filter(i => i.modalidade === 'pontual').reduce((sum, i) => sum + (i.valor_negociado || 0), 0);
 
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  const clienteSelecionado = entidadesData?.entidades.find(e => e.id === formData.cliente_id);
+
+  const formatDate = (d: string) => {
+    if (!d) return '-';
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
+  };
+
   return (
     <div className="space-y-6">
+      {/* Dialog de Revisão */}
+      <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-orange-500" />
+              Revisão do Contrato
+            </DialogTitle>
+            <DialogDescription>
+              Confira todos os dados antes de criar o contrato
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 py-2">
+            {/* Dados Básicos */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Dados do Contrato</h4>
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Número:</span>{' '}
+                    <span className="font-medium font-mono">{formData.numero_contrato || proximoNumero?.proximoNumero || 'AUTO'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">ID CRM:</span>{' '}
+                    <span className="font-medium">{formData.id_crm || '-'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Cliente:</span>{' '}
+                    <span className="font-medium">{clienteSelecionado?.nome || '-'}</span>
+                    {clienteSelecionado?.cpf_cnpj && <span className="text-muted-foreground ml-2">({clienteSelecionado.cpf_cnpj})</span>}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Comercial:</span>{' '}
+                    <span className="font-medium">{formData.comercial_nome || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Email:</span>{' '}
+                    <span className="font-medium">{formData.comercial_email || '-'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Datas */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Datas e Vigência</h4>
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-green-600">Recorrentes</p>
+                    <p className="text-sm"><span className="text-muted-foreground">Início serviço:</span> {formatDate(formData.data_inicio_recorrentes)}</p>
+                    <p className="text-sm"><span className="text-muted-foreground">Início cobrança:</span> {formatDate(formData.data_inicio_cobranca_recorrentes)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-purple-600">Pontuais</p>
+                    <p className="text-sm"><span className="text-muted-foreground">Início serviço:</span> {formatDate(formData.data_inicio_pontuais)}</p>
+                    <p className="text-sm"><span className="text-muted-foreground">Início cobrança:</span> {formatDate(formData.data_inicio_cobranca_pontuais)}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Serviços */}
+            {itens.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Serviços ({itens.length})</h4>
+                <div className="rounded-lg border divide-y">
+                  {itens.map((item, idx) => (
+                    <div key={idx} className="p-3 flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="text-xs">
+                          {item.modalidade === 'recorrente' ? 'Rec' : 'Pont'}
+                        </Badge>
+                        <div>
+                          <p className="font-medium">{item.servico_nome || item.descricao || item.plano_nome || 'Serviço'}</p>
+                          {item.plano_nome && item.servico_nome && (
+                            <p className="text-xs text-muted-foreground">{item.plano_nome}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">{formatCurrency(item.valor_negociado || item.valor_final || 0)}</p>
+                        {item.valor_tabela && item.valor_tabela > 0 && item.valor_tabela !== item.valor_negociado && (
+                          <p className="text-xs text-muted-foreground line-through">{formatCurrency(item.valor_tabela)}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Valores Totais */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Valores</h4>
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Recorrente (mensal)</span>
+                  <span className="font-medium text-green-600">{formatCurrency(totalRecorrente)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Pontual (único)</span>
+                  <span className="font-medium text-purple-600">{formatCurrency(totalPontual)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t font-semibold">
+                  <span>Total Geral</span>
+                  <span className="text-orange-600">{formatCurrency(totalRecorrente + totalPontual)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Observações */}
+            {formData.observacoes?.trim() && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Observações</h4>
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <p className="text-sm whitespace-pre-wrap">{formData.observacoes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setReviewOpen(false)}>
+              Voltar e Editar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/contratos/preview-pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      contrato: {
+                        ...formData,
+                        numero_contrato: formData.numero_contrato || proximoNumero?.proximoNumero,
+                      },
+                      itens,
+                    }),
+                  });
+                  if (!res.ok) {
+                    const errBody = await res.text();
+                    console.error('[preview-pdf] POST falhou:', res.status, errBody);
+                    throw new Error('Erro ao preparar PDF');
+                  }
+                  const data = await res.json();
+                  console.log('[preview-pdf] Token recebido:', data.token);
+                  window.open(`/api/contratos/preview-pdf/${data.token}`, '_blank');
+                } catch (err) {
+                  console.error('[preview-pdf] Erro:', err);
+                  toast({ title: 'Erro ao gerar preview do PDF', variant: 'destructive' });
+                }
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Ver PDF
+            </Button>
+            <Button
+              onClick={() => { setReviewOpen(false); createMutation.mutate(); }}
+              disabled={createMutation.isPending || !formData.cliente_id}
+            >
+              {createMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileCheck className="h-4 w-4 mr-2" />}
+              Confirmar e Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
       <Card className="border-orange-500/20 bg-gradient-to-r from-orange-500/5 to-transparent">
         <CardContent className="p-6">
@@ -2392,11 +2656,47 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Comercial Responsável</Label>
-                  <Input
-                    data-testid="input-comercial-novo"
-                    value={formData.comercial_nome}
-                    onChange={(e) => setFormData({ ...formData, comercial_nome: e.target.value })}
-                  />
+                  <Popover open={comercialOpenNovo} onOpenChange={setComercialOpenNovo}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={comercialOpenNovo}
+                        className="w-full justify-between font-normal"
+                        data-testid="input-comercial-novo"
+                      >
+                        {formData.comercial_nome || "Selecione um colaborador..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Buscar colaborador..." />
+                        <CommandList>
+                          <CommandEmpty>Nenhum colaborador encontrado.</CommandEmpty>
+                          <CommandGroup>
+                            {colaboradoresAtivosNovo.map((col) => (
+                              <CommandItem
+                                key={col.id}
+                                value={col.nome}
+                                onSelect={() => {
+                                  setFormData({
+                                    ...formData,
+                                    comercial_nome: col.nome,
+                                    comercial_email: col.email_turbo || '',
+                                  });
+                                  setComercialOpenNovo(false);
+                                }}
+                              >
+                                <Check className={cn("mr-2 h-4 w-4", formData.comercial_nome === col.nome ? "opacity-100" : "opacity-0")} />
+                                {col.nome}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>E-mail do Comercial</Label>
@@ -2404,7 +2704,8 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                     data-testid="input-email-comercial-novo"
                     type="email"
                     value={formData.comercial_email}
-                    onChange={(e) => setFormData({ ...formData, comercial_email: e.target.value })}
+                    readOnly
+                    className="bg-muted"
                   />
                 </div>
               </div>
@@ -2599,9 +2900,9 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
 
               <div className="pt-4 space-y-2">
                 <p className="text-sm text-muted-foreground">{itens.length} serviço(s) adicionado(s)</p>
-                <Button className="w-full" size="lg" onClick={() => createMutation.mutate()} disabled={createMutation.isPending || !formData.cliente_id} data-testid="button-criar-contrato">
-                  {createMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileCheck className="h-4 w-4 mr-2" />}
-                  Criar Contrato
+                <Button className="w-full" size="lg" onClick={() => setReviewOpen(true)} disabled={!formData.cliente_id} data-testid="button-revisar-contrato">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Revisar Contrato
                 </Button>
               </div>
             </CardContent>

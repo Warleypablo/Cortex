@@ -6629,6 +6629,599 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST - Sincronizar status dos contratos de colaboradores com Assinafy
+  app.post("/api/juridico/colaboradores-contrato/sync-status", async (req, res) => {
+    try {
+      await ensureContratosColabStatusTable();
+
+      // 1. Buscar config do Assinafy
+      const configResult = await db.execute(sql`
+        SELECT account_id, api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'colaboradores' LIMIT 1
+      `);
+
+      if (configResult.rows.length === 0) {
+        return res.status(500).json({ error: "Configuração do Assinafy para colaboradores não encontrada" });
+      }
+
+      const config = configResult.rows[0] as { account_id: string; api_key: string; api_url: string };
+
+      // 2. Buscar contratos com documento_id e status não-final
+      const contratosResult = await db.execute(sql`
+        SELECT id, colaborador_id, colaborador_nome, documento_id, status
+        FROM cortex_core.contratos_colaboradores_status
+        WHERE documento_id IS NOT NULL
+          AND status NOT IN ('Assinado', 'Recusado', 'Cancelado')
+      `);
+
+      const contratos = contratosResult.rows as any[];
+      console.log(`[sync-colab] Verificando ${contratos.length} contratos pendentes no Assinafy`);
+
+      let atualizados = 0;
+      const resultados: { colaborador: string; statusAnterior: string; statusNovo: string }[] = [];
+
+      for (const contrato of contratos) {
+        try {
+          // 3. Consultar status no Assinafy
+          const statusUrl = `${config.api_url}/documents/${contrato.documento_id}`;
+          const statusResponse = await fetch(statusUrl, {
+            method: 'GET',
+            headers: { 'X-Api-Key': config.api_key }
+          });
+
+          const statusResult = await statusResponse.json() as any;
+          const assStatus = statusResult.data?.status || statusResult.status;
+
+          // 4. Mapear status do Assinafy para status local
+          let novoStatus: string | null = null;
+
+          if (assStatus === 'signed' || assStatus === 'completed' || assStatus === 'certificated') {
+            novoStatus = 'Assinado';
+          } else if (assStatus === 'declined') {
+            novoStatus = 'Recusado';
+          } else if (assStatus === 'cancelled' || assStatus === 'expired') {
+            novoStatus = 'Cancelado';
+          } else if (assStatus === 'pending' || assStatus === 'waiting_signatures') {
+            novoStatus = 'Enviado para assinatura';
+          }
+
+          if (novoStatus && novoStatus !== contrato.status) {
+            const dataAssinatura = novoStatus === 'Assinado' ? sql`NOW()` : sql`NULL`;
+            await db.execute(sql`
+              UPDATE cortex_core.contratos_colaboradores_status
+              SET status = ${novoStatus},
+                  data_assinatura = ${dataAssinatura},
+                  updated_at = NOW()
+              WHERE id = ${contrato.id}
+            `);
+            atualizados++;
+            resultados.push({
+              colaborador: contrato.colaborador_nome,
+              statusAnterior: contrato.status,
+              statusNovo: novoStatus,
+            });
+            console.log(`[sync-colab] ${contrato.colaborador_nome}: ${contrato.status} → ${novoStatus}`);
+          }
+        } catch (err) {
+          console.error(`[sync-colab] Erro ao verificar contrato ${contrato.documento_id}:`, err);
+        }
+      }
+
+      console.log(`[sync-colab] Sync concluído: ${atualizados} de ${contratos.length} atualizados`);
+      res.json({ total: contratos.length, atualizados, resultados });
+    } catch (error) {
+      console.error("[sync-colab] Erro:", error);
+      res.status(500).json({ error: "Erro ao sincronizar status" });
+    }
+  });
+
+  // Função compartilhada para gerar PDF de contrato de colaborador
+  async function gerarContratoPDF(params: {
+    nome: string;
+    cpf: string;
+    cnpj: string;
+    endereco: string;
+    estado: string;
+    cargo: string;
+    salario: string;
+    patrimonio: string | null;
+  }): Promise<Buffer> {
+    const { nome, cpf, cnpj, endereco, estado, cargo, salario, patrimonio } = params;
+
+    // Calcular datas - Data de início é SEMPRE hoje, data fim é 6 meses depois
+    const dataInicioDate = new Date();
+    const dataInicio = dataInicioDate.toLocaleDateString('pt-BR');
+    const dataFimDate = new Date(dataInicioDate);
+    dataFimDate.setMonth(dataFimDate.getMonth() + 6);
+    const dataFim = dataFimDate.toLocaleDateString('pt-BR');
+    const dataAtual = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    // Formatar salário para exibição no contrato
+    const salarioNumerico = parseFloat((salario || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+    const salarioFormatado = salarioNumerico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    // Mapeamento de escopos por cargo
+    const escoposPorCargo: Record<string, { titulo: string; escopo: string }> = {
+      "ANALISTA DE CX": {
+        titulo: "ANALISTA DE CX",
+        escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "CXCS": {
+        titulo: "ANALISTA DE CX",
+        escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "ANALISTA DE COMUNICAÇÃO": {
+        titulo: "ANALISTA DE COMUNICAÇÃO",
+        escopo: "roteirizar vídeos UGC que sejam autênticos, criativos e impactantes para as marcas que trabalhamos; colaborar com as equipes de Social Media e Performance para garantir que o conteúdo gerado não apenas engaje, mas também converta de forma eficaz; criar copy criativa que se destaque e gere conversões reais, aplicando técnicas de storytelling para gerar conexão genuína com o público; estar sempre atualizado sobre novas tendências e formatos de vídeo, garantindo que seus conteúdos não fiquem para trás; colaborar com grandes marcas, entendendo suas necessidades e entregando resultados concretos, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "G&G": {
+        titulo: "G&G",
+        escopo: "conduzir processos de recrutamento e seleção do início ao fim para diferentes áreas da empresa, alinhar perfis com gestores, entendendo necessidades técnicas e comportamentais das vagas, criar e publicar anúncios de vagas em portais, redes sociais e plataformas especializadas, realizar triagem de currículos, entrevistas por competências e dinâmicas de grupo, aplicar testes comportamentais e técnicos, quando necessário, gerar relatórios de indicadores (tempo de contratação, fontes de recrutamento, etc), sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "GENTE E GESTÃO": {
+        titulo: "ANALISTA DE GENTE E GESTÃO",
+        escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "VIDEOMAKER": {
+        titulo: "VIDEOMAKER",
+        escopo: "editar vídeos corporativos, institucionais e de marketing, aplicando técnicas de edição para criar conteúdo impactante e engajador; implementar efeitos visuais, transições e tratamentos de imagem para elevar a qualidade do material produzido; revisar o trabalho com base no feedback do solicitante; garantir a entrega de vídeos finalizados dentro dos prazos e padrões de qualidade estabelecidos; trazer iniciativas externas de aprimoramento e atualização com base no mercado de edição, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "DESIGNER": {
+        titulo: "DESIGNER",
+        escopo: "desenvolvimento de logotipos, materiais gráficos e layouts para campanhas, incluindo redes sociais, e-mail marketing e peças publicitárias; criação e otimização de peças gráficas para plataformas digitais (site, e-commerce, redes sociais, etc.); colaborar com as equipes de marketing e comunicação para entender as necessidades de design e desenvolver soluções criativas que atendam às demandas; manter-se atualizado sobre as últimas tendências e ferramentas de design e edição de vídeos, com foco na criação de conteúdo visual impactante; elaborar apresentações para reuniões internas e externas, com layout atrativo e condizente com a identidade visual da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "GESTOR DE PERFORMANCE": {
+        titulo: "GESTOR DE PERFORMANCE",
+        escopo: "construir campanhas e atuar de forma tática na otimização de mídias; acompanhamento da jornada do cliente junto ao time de CX/CS; auxiliar na criação, implementação e otimização de campanhas em Google Ads e Meta Ads; desenvolver análises rotineiras para identificar padrões de otimização e reportar insights aos stakeholders; monitorar a performance das campanhas e gerar relatórios para análise; colaborar com a equipe para desenvolver estratégias que aumentem a eficácia das campanhas; acompanhar tendências do mercado e aplicar boas práticas em campanhas digitais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "PRÉ-VENDAS": {
+        titulo: "ANALISTA DE PRÉ-VENDAS",
+        escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "SDR": {
+        titulo: "ANALISTA DE PRÉ-VENDAS",
+        escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "BDR": {
+        titulo: "ANALISTA DE PRÉ-VENDAS",
+        escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "FINANCEIRO": {
+        titulo: "FINANCEIRO",
+        escopo: "planejamento e controle financeiro, interpretação de relatórios, avaliação e consultoria, controle de custos, análise de riscos, acompanhamento de resultados, criar, acompanhar e medir indicadores, contas a pagar, contas a receber, emissão de nota fiscal, lançamentos financeiros, elaboração de relatórios gerenciais, acompanhamento de processos operacionais, dentre outras atividades financeiras não listadas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "PO": {
+        titulo: "PRODUCT OWNER",
+        escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "PRODUCT OWNER": {
+        titulo: "PRODUCT OWNER",
+        escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "INSIDE SALES": {
+        titulo: "INSIDE SALES",
+        escopo: "realização de reuniões, apresentação de propostas e fechamento, gerir pipeline de vendas, construir relacionamento com clientes, atualizar o CRM, participar de reuniões internas, cumprimento de metas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "ANALISTA DE DADOS": {
+        titulo: "ANALISTA DE DADOS",
+        escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, trabalhar em estreita colaboração com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "UIUX": {
+        titulo: "UI/UX",
+        escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "UI/UX": {
+        titulo: "UI/UX",
+        escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "JURÍDICO": {
+        titulo: "JURÍDICO",
+        escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "JURIDICO": {
+        titulo: "JURÍDICO",
+        escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+      },
+      "DESENVOLVEDOR": {
+        titulo: "DESENVOLVEDOR",
+        escopo: "prestar à CONTRATANTE serviços técnicos especializados de desenvolvimento de software voltados a e-commerces na plataforma Shopify, abrangendo, de forma ampla e não exaustiva, a criação, customização, manutenção, correção, evolução e otimização de lojas virtuais, temas, funcionalidades, integrações, automações, APIs e aplicações relacionadas, bem como suporte técnico, ajustes de performance, segurança, conformidade técnica e boas práticas de desenvolvimento, de acordo com as demandas definidas pela CONTRATANTE, utilizando-se das tecnologias, recursos e padrões aplicáveis ao ecossistema Shopify, comprometendo-se a executar os serviços com diligência, qualidade técnica e observância às normas legais e contratuais vigentes"
+      }
+    };
+
+    const cargoOriginal = cargo || '';
+    const cargoUpper = cargoOriginal.toUpperCase().trim();
+
+    // Função para encontrar escopo com matching flexível
+    const findEscopo = (cargoParam: string): { titulo: string; escopo: string } | undefined => {
+      // Tenta match direto
+      if (escoposPorCargo[cargoParam]) return escoposPorCargo[cargoParam];
+
+      // Tenta match parcial (se o cargo contém a chave ou vice-versa)
+      for (const [key, value] of Object.entries(escoposPorCargo)) {
+        if (cargoParam.includes(key) || key.includes(cargoParam)) {
+          return value;
+        }
+      }
+      return undefined;
+    };
+
+    const escopoInfo = findEscopo(cargoUpper) || {
+      titulo: cargo || 'PRESTADOR DE SERVIÇOS',
+      escopo: 'prestar serviços conforme acordado entre as partes, respeitando as diretrizes técnicas e operacionais da CONTRATANTE'
+    };
+
+    console.log(`[gerarContratoPDF] Cargo original: "${cargoOriginal}", Upper: "${cargoUpper}", Titulo encontrado: "${escopoInfo.titulo}"`);
+
+    const doc = new PDFDocument({ margin: 60, size: 'A4' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+
+    const pdfPromise = new Promise<Buffer>((resolve) => {
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+    });
+
+    // Helper para texto justificado (padrão ABNT)
+    const j = { align: 'justify' as const };
+
+    // Logo no header
+    const logoPath = path.join(process.cwd(), 'server/assets/turbo_logo.png');
+    const fs = await import('fs');
+    try {
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 60, 30, { width: 150 });
+      }
+    } catch (e) {
+      console.log('[gerarContratoPDF] Logo não encontrada');
+    }
+
+    doc.moveDown(4);
+
+    // Header
+    doc.fontSize(13).font('Helvetica-Bold').text('CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
+    doc.moveDown(1.5);
+
+    // Partes
+    doc.fontSize(10).font('Helvetica').text('Pelo presente instrumento particular, e na melhor forma de direito, as partes a seguir qualificadas:', j);
+    doc.moveDown(0.8);
+    doc.font('Helvetica-Bold').text('CONTRATANTE: ', { continued: true });
+    doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Av. João Batista Parra, 633 - 13° Andar - Enseada do Suá, Vitória - ES, CEP: 29052-123, neste ato representada por seu sócio Rodrigo Queiroz Santos;', j);
+    doc.moveDown(0.5);
+    doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
+
+    // Detectar se é pessoa física (CPF) ou jurídica (CNPJ) e formatar qualificação
+    const gerarQualificacaoContratada = (): string => {
+      const cnpjLimpo = (cnpj || '').replace(/\D/g, '');
+      const cpfLimpo = (cpf || '').replace(/\D/g, '');
+      const enderecoFormatado = endereco || 'Não informado';
+      const estadoFormatado = estado ? `, ${estado}` : '';
+
+      // Formatar CNPJ se existir
+      const cnpjFormatado = cnpjLimpo.length === 14
+        ? (cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))
+        : null;
+
+      // Formatar CPF se existir
+      const cpfFormatado = cpfLimpo.length === 11
+        ? (cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'))
+        : null;
+
+      // Se tem CNPJ válido (pessoa jurídica)
+      if (cnpjFormatado) {
+        if (cpfFormatado) {
+          // Modelo completo: CNPJ + endereço + CPF
+          return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${enderecoFormatado}${estadoFormatado}, devidamente registrado no CPF ${cpfFormatado}.`;
+        }
+        return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${enderecoFormatado}${estadoFormatado}.`;
+      }
+
+      // Se tem apenas CPF (pessoa física)
+      if (cpfFormatado) {
+        return `${nome}, pessoa física, inscrita no CPF sob o n° ${cpfFormatado}, residente na ${enderecoFormatado}${estadoFormatado}.`;
+      }
+
+      // Fallback
+      return `${nome}, com endereço na ${enderecoFormatado}${estadoFormatado}.`;
+    };
+
+    doc.font('Helvetica').text(gerarQualificacaoContratada(), j);
+    doc.moveDown(0.8);
+    doc.text('têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:', j);
+    doc.moveDown(1);
+
+    // CLÁUSULA PRIMEIRA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text(`1.1. O CONTRATADO prestará serviços como ${escopoInfo.titulo}. Para isso, deverá designar pessoa legalmente certificada e habilitada para a execução dos serviços.`, j);
+    doc.moveDown(0.3);
+    doc.text(`1.1.1. Os serviços serão prestados por pessoa previamente indicada pelo CONTRATADO e compreendem, de modo exemplificativo, as seguintes atribuições: ${escopoInfo.escopo}`, j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horária do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Segundo. Toda e qualquer pessoa eventualmente envolvida pela CONTRATADA na execução dos serviços contratados atuará em nome e por conta exclusiva da própria CONTRATADA, sendo esta a única responsável por sua relação jurídica, operacional e contratual com tais profissionais, sem qualquer vínculo direto ou indireto com a CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Terceiro. Quanto estiver atuando em dependências da CONTRATANTE, a CONTRATADA responsabiliza-se a fazer cumprir, por seu pessoal, as normas legais e internas da CONTRATANTE no tocante à segurança geral, higiene, proteção ao patrimônio e prevenção de incêndios.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA SEGUNDA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SEGUNDA – DO PRAZO');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text(`2.1 – O presente contrato tem prazo de 6 [seis] meses, com início em ${dataInicio} e fim em ${dataFim}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes, ocasião em que será reavaliado o escopo e as condições comerciais.`, j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Primeiro. Ao final deste prazo, o contrato poderá ser renovado, sendo este realizado por simples aditivo contratual.', j);
+    doc.moveDown(0.3);
+    doc.text('2.2 A CONTRATANTE poderá rescindir o presente Contrato, a qualquer tempo, independentemente de motivação e sem necessidade de aviso prévio, mediante comunicação à CONTRATADA, operando-se a extinção imediata do vínculo contratual.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Primeiro. Na hipótese de resilição ora prevista, serão devidos exclusivamente os valores proporcionais aos serviços comprovadamente prestados até a data da comunicação.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Segundo. No caso de encerramento do presente contrato, a CONTRATADA deverá devolver, à CONTRATANTE, todo material em seu poder e que pertença à CONTRATANTE. A CONTRATANTE deverá quitar quaisquer pagamentos devidos por eventuais perdas e danos.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA TERCEIRA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração mensal de ${salarioFormatado} (${salarioNumerico > 0 ? 'valor bruto' : 'conforme acordado entre as partes'}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`, j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Primeiro. Os valores que resultarem do disposto nesta cláusula constituem os únicos valores/créditos devidos pela CONTRATANTE ao CONTRATADO em razão do presente contrato, eximindo-se a CONTRATANTE de responder por quaisquer outros valores que sejam cobrados pelo CONTRATADO.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Segundo. Até o 25° (vigésimo quinto) dia do mês subsequente à prestação dos serviços, a CONTRATANTE providenciará o pagamento da CONTRATADA, desde que cumpridas todo o escopo de entregas previstas no presente instrumento contratual.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Terceiro. Até o 10° (décimo) dia anterior à data de pagamento e condicionado à plena constatação de cumprimento das entregas previstas, o CONTRATADO deverá emitir a competente Nota Fiscal, remetendo-a imediatamente à CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Quarto. O CONTRATADO será o único responsável pelo pagamento de eventuais valores devidos a terceiros por si SUBCONTRATADOS, não subsistindo nenhuma obrigação da CONTRATANTE para com terceiros neste sentido, tampouco de pagamento de qualquer outra importância à definida neste CONTRATO.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Quinto. Caso em determinado exercício mensal haja a interrupção ou suspensão na prestação dos serviços, o pagamento será feito de modo proporcional ao período de efetiva execução das tarefas.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Sexto. O recolhimento dos tributos incidentes sobre os Serviços, assim como o cumprimento das correspondentes obrigações tributárias acessórias, são de exclusiva responsabilidade da CONTRATADA, exceto nas hipóteses em que a CONTRATANTE deva, em razão de disposição legal, promover a retenção dos valores a serem pagos ao Fisco (Municipal, Estadual ou Federal).', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Sétimo. O comprovante de depósito ou transferência servirá como recibo e prova de quitação e pagamento da obrigação ajustada.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA QUARTA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CONTRATADO');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('4.1 - São obrigações do CONTRATADO:', j);
+    doc.moveDown(0.2);
+    doc.text('4.2. Prestar os serviços contratados em conformidade com os padrões de qualidade acordados e com a boa técnica profissional aplicável ao setor e estipulados e definidos pela CONTRATANTE.', j);
+    doc.moveDown(0.2);
+    doc.text('4.3. Fornecer as notas fiscais referentes aos pagamentos efetuados pela CONTRATANTE dentro do prazo previamente estipulado por meio do presente instrumento;', j);
+    doc.moveDown(0.2);
+    doc.text('4.4. Arcar com todas as despesas de natureza tributária decorrentes dos serviços especificados neste contrato;', j);
+    doc.moveDown(0.2);
+    doc.text('4.5. Cumprir todas as determinações impostas estipuladas no escopo, dentro dos prazos estipulados, para o desenvolvimento das tarefas ora atribuídas ao CONTRATADO;', j);
+    doc.moveDown(0.2);
+    doc.text('4.6. Manter sigilosas, mesmo após findo este contrato, pelo período de 5 (cinco) anos, as informações privilegiadas de qualquer natureza às quais tenham acesso em virtude da execução destes serviços;', j);
+    doc.moveDown(0.2);
+    doc.text('4.7. Comprometer-se a utilizar os equipamentos disponibilizados unicamente para fins profissionais relacionados às entregas pactuadas, observando as diretrizes técnicas definidas pela CONTRATANTE.', j);
+    doc.moveDown(0.2);
+    doc.text('4.8. A CONTRATANTE poderá ter acesso a qualquer momento, independente de consentimento, ao computador e informações contidas nos equipamentos disponibilizados para o CONTRATADO.', j);
+    doc.moveDown(0.2);
+    doc.text('4.9. A CONTRATADA compromete-se a observar os prazos e padrões técnicos definidos pela CONTRATANTE, podendo esta rejeitar materiais que não atendam às diretrizes estabelecidas.', j);
+    doc.moveDown(0.2);
+    doc.text('4.10. A CONTRATADA compromete-se a não praticar qualquer ato que possa prejudicar a imagem, reputação ou credibilidade da CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Primeiro. O envolvimento da CONTRATADA em situação que gere repercussão negativa relevante autoriza a rescisão imediata do contrato, sem ônus para a CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Segundo. Os documentos pertencentes ou em posse da empresa contratante depositados em mídias físicas ou digitais somente devem ser abertos e tratados em computadores credenciados e de propriedade da CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Terceiro. Sobre os computadores e demais equipamentos fornecidos para a prestação dos serviços não devem ser instalados programas alheios sem a autorização da CONTRATANTE.', j);
+    doc.moveDown(0.8);
+
+    // Nova página
+    doc.addPage();
+
+    // Logo na segunda página
+    try {
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 60, 30, { width: 150 });
+      }
+    } catch (e) {}
+    doc.moveDown(4);
+
+    // CLÁUSULA QUINTA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATADA');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('5.1. Sem prejuízo das demais obrigações expressamente ajustadas neste Contrato, a CONTRATADA se obriga a:', j);
+    doc.text('I. Fornecer todas as informações necessárias à execução dos serviços, incluindo diretrizes e objetivos, respeitada a autonomia técnica e operacional da CONTRATADA quanto aos meios e métodos empregados.', j);
+    doc.text('II. Efetuar o pagamento, nas datas e nos termos definidos neste contrato;', j);
+    doc.text('III. Manifestar, de forma expressa, eventuais críticas, dúvidas, solicitações, novas orientações e sugestões pertinentes aos serviços, quando existirem;', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA SEXTA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SEXTA – DA RESCISÃO E EXTINÇÃO DO CONTRATO');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('6.1. O presente contrato poderá ser rescindido, a qualquer tempo, por qualquer das partes, independentemente de motivação, independente de qualquer comunicação prévia à outra parte, sem antecedência mínima, sem que disso decorra o pagamento de multa ou indenização, ressalvadas as obrigações já vencidas.', j);
+    doc.moveDown(0.3);
+    doc.text('6.2. O contrato poderá ser rescindido de forma motivada, por qualquer das partes, independentemente de aviso prévio, nas seguintes hipóteses:', j);
+    doc.text('    6.2.1. Descumprimento, pela outra parte, de quaisquer obrigações assumidas neste contrato, inclusive atraso na entrega dos serviços, execução inadequada do objeto ou violação de cláusulas contratuais;', j);
+    doc.text('    6.2.2. Prática de atos que comprometam a continuidade, a regularidade ou a finalidade do contrato.', j);
+    doc.text('    6.2.3. Prática de atos que comprometam a imagem, reputação ou credibilidade da outra parte.', j);
+    doc.moveDown(0.3);
+    doc.text('6.3. A rescisão motivada não exime a parte inadimplente da responsabilidade pelo pagamento dos serviços efetivamente prestados até a data da rescisão, nem das perdas e danos eventualmente apurados.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA SÉTIMA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO TRABALHISTA E SOCIETÁRIO');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('7.1. Não se estabelece, por força do presente contrato, nenhum vínculo empregatício, nem enseja qualquer tipo de subordinação e pessoalidade entre a CONTRATANTE e o pessoal do CONTRATADO, sendo certo que as obrigações e direitos das partes limitam-se ao expressamente avençado neste contrato.', j);
+    doc.moveDown(0.3);
+    doc.text('7.2. O próprio CONTRATADO, na qualidade de prestador de serviços estabelecerá e concretizará, cotidianamente, a forma de realização dos serviços pactuados no presente termo.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Primeiro. O CONTRATADO tem ciência e declara que nenhum ex-empregado da CONTRATANTE cujo contrato de trabalho tenha se encerrado há menos de 18 (dezoito) meses poderá ser alocado pelo CONTRATADO na prestação dos serviços.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Segundo. O CONTRATADO tem ciência e declara que tem capacidade técnico-financeira para arcar com suas responsabilidades contratuais e extracontratuais, vinculada ou não a este contrato, e que não possui nem se colocará em situação de dependência econômica com relação ao resultado financeiro deste contrato.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Terceiro. O CONTRATADO declara assumir integralmente os riscos relacionados à atividade empresarial que exerce, inclusive quanto à gestão de sua equipe, métodos de trabalho, investimentos necessários e responsabilidade pelos resultados.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Quarto. O CONTRATADO tem ciência e declara que nada neste contrato poderá ser interpretado como tendo as partes, estabelecido qualquer forma de sociedade, associação, agência ou consórcio, de fato ou de direito, permanecendo cada uma das partes com as suas obrigações civis, comerciais, trabalhistas e tributárias, de forma autônoma.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Quinto. Não haverá controles de horários de chegada ou saída ou controle de presença caso o CONTRATADO opte por ir em modelo presencial, ou subordinação, com total autonomia da CONTRATADA em relação à CONTRATANTE, se comprometendo a CONTRATANTE a executar os serviços contratados através das horas necessárias à execução dos serviços, conforme acordado, sob pena dos respectivos descontos. Caso não seja solicitado por escrito pela CONTRATANTE, não serão devidas horas adicionais às expressamente contratadas nesta cláusula.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA OITAVA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('8.1. As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato, o que inclui, mas não se limita a: todos e quaisquer dados, relatórios, análises, estudos, pesquisas, interpretações, previsões/estimativas, registros, materiais e quaisquer outros elementos que contenham informações referentes aos negócios objeto deste contrato, aos membros envolvidos e aos investidores, assim como dados pessoais nos termos da legislação vigente (Lei Geral de Proteção de Dados - LGPD). As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Primeiro. Para os propósitos, serão consideradas "informações confidenciais" todas e quaisquer informações e/ou dados de natureza confidencial (incluindo, sem limitação, os termos e condições deste contrato e todos os segredos e/ou informações operacionais, econômicas e técnicas, bem como demais informações comerciais ou "know-how") que tenham sido direta ou indiretamente fornecidos ou divulgados por uma das partes à outra sob ou em função deste contrato, a qualquer título e por qualquer modo, que não sejam, ou não venham a ser, de conhecimento público, que não por culpa imputável à parte receptora.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Segundo. Caso alguma das partes venha a ser legalmente obrigada a revelar qualquer informação confidencial, por qualquer juízo ou autoridade governamental competente, essa deverá notificar a contrária de tal ordem, para que possa adotar medidas cabíveis para resguardar os seus direitos ou dispensar a parte que cumprir as obrigações dispostas neste acordo.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Terceiro. A CONTRATADA não poderá, em nenhuma hipótese, fazer qualquer outro uso, realizar qualquer outro negócio ou celebrar qualquer outro contrato relacionado, direta ou indiretamente, às Informações Confidenciais.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Quarto. Todas as Informações Confidenciais devem ser mantidas e tratadas como estritamente confidenciais e não poderão ser reveladas a qualquer terceiro, de forma alguma, no todo ou em parte, bem como não poderão ser utilizadas para qualquer finalidade que não esteja única e exclusivamente relacionada aos Serviços.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Quinto. Sem prejuízo de outras obrigações, a CONTRATADA se compromete desde logo a:', j);
+    doc.text('1. Não divulgar quaisquer Informações Confidenciais a quaisquer terceiros;', j);
+    doc.text('2. Utilizar quaisquer Informações Confidenciais exclusivamente para a execução da prestação dos serviços;', j);
+    doc.text('3. Não analisar, providenciar análise, derivar ou sintetizar qualquer informação recebida da CONTRATANTE sem autorização prévia e fora dos limites da execução de seu trabalho.', j);
+    doc.moveDown(0.3);
+    doc.text('8.2. A CONTRATADA será responsável por quaisquer danos causados à CONTRATANTE ou a terceiros em decorrência do descumprimento das obrigações de sigilo previstas nesta cláusula, independentemente de dolo ou culpa.', j);
+    doc.moveDown(0.3);
+    doc.text('8.3. O descumprimento das obrigações de confidencialidade ensejará a obrigação de indenizar integralmente os danos comprovadamente sofridos pela parte prejudicada, sem prejuízo das demais medidas judiciais cabíveis.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA NONA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA NONA – DA INEXISTÊNCIA DE LICENÇAS');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('9.1. A CONTRATANTE reterá todo o direito, titularidade e interesse sobre as informações confidenciais presentes no presente contrato.', j);
+    doc.moveDown(0.3);
+    doc.text('9.2. Nenhum direito ou licença é concedido, implícita ou expressamente, pela CONTRATANTE à CONTRATADA, salvo o estritamente necessário para a execução dos serviços contratados.', j);
+    doc.moveDown(0.3);
+    doc.text('9.3. São e serão considerados como propriedade intelectual e/ou industrial única e exclusiva da CONTRATANTE qualquer produto, criação, desenvolvimento, relatório, planilha, resultado, dentre outros, ainda que tenham sido desenvolvidos pela CONTRATADA. Nenhum direito de propriedade intelectual e/ou industrial será detido pela CONTRATADA, a qual, expressamente, cede e transfere à CONTRATANTE, desde logo, não onerosamente, todo e qualquer direito relacionado ou derivado a qualquer espécie de criação decorrente do relacionamento entre as Partes.', j);
+    doc.moveDown(0.3);
+    doc.text('9.4. A CONTRATADA expressamente declara que não possui e não terá qualquer expectativa de direito sobre a propriedade intelectual e/ou industrial desenvolvida no âmbito deste contrato.', j);
+    doc.moveDown(0.3);
+    doc.text('9.5. A CONTRATADA expressamente declara que todo e qualquer valor a título de eventuais direitos sobre propriedade intelectual e/ou industrial, direitos autorais ou qualquer espécie de direitos imateriais, já foi considerada pelas Partes na fixação do Preço (contraprestação), razão pela qual nenhuma quantia poderá ser reclamada, a qualquer título, pela CONTRATADA.', j);
+    doc.moveDown(0.8);
+
+    // Nova página
+    doc.addPage();
+
+    // Logo na terceira página
+    try {
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 60, 30, { width: 150 });
+      }
+    } catch (e) {}
+    doc.moveDown(4);
+
+    // CLÁUSULA DÉCIMA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA – DA ABSTENÇÃO DE ALICIAMENTO E INDUÇÃO DE TERCEIROS VINCULADOS À CONTRATANTE');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('10.1. Durante a vigência deste instrumento e por um período de 24 (vinte e quatro) meses após sua extinção, o CONTRATADO se compromete a não contratar, ou tentar contratar, direta ou indiretamente, qualquer empregado(a) da CONTRATANTE ou de qualquer outra empresa do grupo no Brasil ou no exterior, para trabalhar para seu novo empregador ou empresa da qual seja, direta ou indiretamente, ligado, inclusive como sócio.', j);
+    doc.moveDown(0.3);
+    doc.text('10.1.1. Durante o período mencionado na Cláusula Segunda e pelo mesmo prazo de 03 (três) anos contados da rescisão do contrato, o CONTRATADO também se compromete a não ajudar terceiros a contratar empregados(as) da CONTRATANTE ou de outra empresa do grupo, tampouco a induzir ou convencer qualquer empregado(a) da CONTRATANTE a rescindir o contrato que mantém com a CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.text('10.2. O CONTRATADO, também neste ato, de forma irrevogável e irretratável, se compromete perante a CONTRATANTE a abster-se, durante a vigência do presente e pelo período de 03 (três) anos contados da rescisão contratual de direta ou indiretamente, aliciar, induzir, convidar, contratar, nem determinar que seja aliciado, induzido ou convidado:', j);
+    doc.moveDown(0.2);
+    doc.text('(i) Qualquer cliente atendido e/ou captado pela CONTRATANTE ou pelo CONTRATADO durante a prestação de seus serviços para que tal cliente seja atendido por outra personalidade jurídica concorrente da TURBO;', j);
+    doc.text('(ii) Qualquer empregado, sócio, diretor ou outro prestador de serviços da TURBO e/ou qualquer de suas afiliadas;', j);
+    doc.text('(iii) Qualquer pessoa a deixar de fazer negócios com a TURBO e/ou qualquer de suas afiliadas;', j);
+    doc.text('(iv) Qualquer fornecedor ou cliente da TURBO a deixar de realizar ou diminuir os negócios realizados com a CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.font('Helvetica-Bold').text('10.3. Sem prejuízo das indenizações por perdas e danos e da responsabilidade criminal, o CONTRATADO, em caso de infração da presente cláusula, pagará ao CONTRATANTE uma multa não compensatória igual a R$ 100.000,00 (cem mil reais) por cada infração.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA DÉCIMA PRIMEIRA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço, comprometendo-se a: não utilizar as informações confidenciais a que tiver acesso pelo período de 05 (cinco) anos, para gerar benefício próprio exclusivo e/ou unilateral, presente ou futuro, ou para o uso de terceiros; não efetuar nenhuma gravação ou cópia da documentação confidencial a que tiver acesso; não apropriar-se para si ou para outrem de material confidencial e/ou sigiloso da tecnologia que venha a ser disponível e; não repassar o conhecimento das informações confidenciais, responsabilizando-se por todas as pessoas que vierem a ter acesso às informações, por seu intermédio, e obrigando-se, assim, a reparar a ocorrência de qualquer dano e/ou prejuízo oriundo de uma eventual quebra de sigilo das informações fornecidas.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Primeiro. As partes se comprometem a não utilizar os dados pessoais que tiverem acesso para fins distintos da relação estabelecida, sendo vedada a transmissão para terceiros.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Segundo. As partes se comprometem em manter os compromissos acima, mesmo após o término da relação contratual, pelo período de 5 (cinco) anos.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo Terceiro. As partes declaram que qualquer conduta incompatível com as disposições acima será considerada uma grave violação deste contrato e será considerado motivo de justa causa para a rescisão imediata, sem prejuízo da adoção das medidas legalmente cabíveis.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA DÉCIMA SEGUNDA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE');
+    doc.moveDown(0.3);
+    const patrimonioDescricao = patrimonio || 'a definir';
+    doc.font('Helvetica').fontSize(9).text(`12.1. A CONTRATANTE disponibilizará, em regime de comodato, um computador MacBook modelo ${patrimonioDescricao}, de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.`, j);
+    doc.moveDown(0.3);
+    doc.text('12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado, abstendo-se de utilizá-lo para fins pessoais, atividades não relacionadas ao presente contrato, ou por terceiros.', j);
+    doc.moveDown(0.3);
+    doc.text('12.3. A CONTRATADA será responsável integral por qualquer dano, perda, extravio, furto, roubo ou mau uso do equipamento, independentemente de culpa, obrigando-se a arcar com os custos de reparação ou substituição integral do bem, conforme orçamento técnico indicado pela CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.text('12.4. Em caso de dano parcial, a CONTRATADA deverá restituir à CONTRATANTE o valor referente ao reparo, no prazo máximo de 30 (trinta) dias após a notificação escrita.', j);
+    doc.moveDown(0.3);
+    doc.text('12.5. Em caso de perda total, extravio, furto ou roubo, a CONTRATADA deverá indenizar a CONTRATANTE com base no valor de mercado atualizado do bem à época do evento, conforme cotação de revendedor autorizado ou nota fiscal de aquisição, o que for mais benéfico à CONTRATANTE.', j);
+    doc.moveDown(0.3);
+    doc.text('12.6. O equipamento deverá ser devolvido à CONTRATANTE no ato de rescisão do contrato, em perfeito estado de funcionamento e conservação, ressalvado o desgaste natural decorrente do uso regular.', j);
+    doc.moveDown(0.3);
+    doc.text('12.7. A CONTRATANTE poderá, a qualquer tempo, solicitar a devolução imediata do equipamento, cabendo à CONTRATADA o cumprimento imediato da solicitação.', j);
+    doc.moveDown(0.3);
+    doc.text('12.8. O inadimplemento das obrigações previstas nesta cláusula autoriza a CONTRATANTE a reter valores devidos à CONTRATADA até o limite da indenização cabível, sem prejuízo das demais medidas legais e contratuais aplicáveis.', j);
+    doc.moveDown(0.3);
+    doc.text('12.9. A CONTRATANTE poderá realizar auditorias técnicas remotas no equipamento disponibilizado, a qualquer tempo.', j);
+    doc.moveDown(0.8);
+
+    // CLÁUSULA DÉCIMA TERCEIRA - DIREITO DE USO DE IMAGEM
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA TERCEIRA – DO DIREITO DE USO DE IMAGEM');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('13. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ou não ao objeto deste contrato, em quaisquer meios físicos ou digitais, sem limitação territorial ou temporal, inclusive após o término da relação contratual, sem que disso decorra direito a remuneração adicional.', j);
+    doc.moveDown(0.3);
+    doc.text('Parágrafo único. A utilização ora autorizada não implica exclusividade, vínculo empregatício ou societário, comprometendo-se a CONTRATANTE a utilizar a imagem do CONTRATADO de forma ética e compatível com a finalidade profissional pactuada.', j);
+    doc.moveDown(0.8);
+
+    // Nova página
+    doc.addPage();
+
+    // Logo na quarta página
+    try {
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, 60, 30, { width: 150 });
+      }
+    } catch (e) {}
+    doc.moveDown(4);
+
+    // CLÁUSULA DÉCIMA QUARTA
+    doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA QUARTA – DAS DISPOSIÇÕES GERAIS');
+    doc.moveDown(0.3);
+    doc.font('Helvetica').fontSize(9).text('14.1. O presente contrato é celebrado em caráter irrevogável e irretratável, obrigando as Partes e seus sucessores, herdeiros e representantes legais a qualquer título.', j);
+    doc.moveDown(0.3);
+    doc.text('14.2. A tolerância das Partes com relação a inadimplemento ou não cumprimento de qualquer obrigação, cláusula, termo ou condição ora estabelecida não constitui precedente, renúncia a obrigações, emenda ou renovação do contrato, e sim mera liberalidade.', j);
+    doc.moveDown(0.3);
+    doc.text('14.3. A declaração de nulidade ou anulação de qualquer dos dispositivos contidos neste instrumento não invalidará suas demais disposições, as quais permanecerão em pleno vigor.', j);
+    doc.moveDown(0.3);
+    doc.text('14.4. Não se estabelece, por força deste instrumento, qualquer forma de sociedade, associação, agência, consórcio, participação societária, ou responsabilidade solidária entre as partes.', j);
+    doc.moveDown(0.3);
+    doc.text('14.5. O objeto deste contrato não visa proporcionar nenhuma espécie de vantagem fiscal, trabalhista ou previdenciária a qualquer Parte ou a terceiros, e não implica vínculo empregatício entre uma das partes e os funcionários/prepostos da outra, ficando a cargo de cada uma delas a responsabilidade referente aos encargos sociais, tributários, previdenciários e trabalhistas de seus respectivos colaboradores.', j);
+    doc.moveDown(0.3);
+    doc.text('14.6. Os tributos (impostos, taxas, emolumentos, contribuições fiscais e parafiscais) que sejam devidos em decorrência direta ou indireta do presente contrato ou de sua execução, serão de exclusiva responsabilidade do contribuinte, conforme definido na norma tributária, autorizadas as retenções legais, sem direito a reembolso.', j);
+    doc.moveDown(0.3);
+    doc.text('14.7. O presente CONTRATO é o instrumento que regula todos os direitos e obrigações acordadas entre as Partes, substituindo todo e qualquer CONTRATO ou entendimento previamente realizado pelas Partes.', j);
+    doc.moveDown(0.3);
+    doc.text('14.8. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.', j);
+    doc.moveDown(0.3);
+    doc.text('14.9. Em nenhuma hipótese a CONTRATANTE será responsável por lucros cessantes, danos indiretos ou perdas financeiras da CONTRATADA.', j);
+    doc.moveDown(0.3);
+    doc.text('14.10. O presente contrato não estabelece exclusividade entre as partes, nem gera expectativa de renovação automática ou volume mínimo de demandas.', j);
+    doc.moveDown(0.3);
+    doc.text('14.11. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.', j);
+    doc.moveDown(0.3);
+    doc.text('14.12. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato.', j);
+    doc.moveDown(1);
+
+    doc.text('As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Contrato emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil.', j);
+    doc.moveDown(0.5);
+    doc.text('E assim, por estarem justas e CONTRATADAS, as partes assinam este presente contrato em 2 (duas) vias de igual teor, na presença das testemunhas abaixo.', j);
+    doc.moveDown(1.5);
+
+    // Assinaturas
+    doc.fontSize(10).text(`Vitória, ${dataAtual}.`, j);
+    doc.moveDown(2);
+    doc.text('____________________________________________________', { align: 'center' });
+    doc.font('Helvetica-Bold').text('TURBO PARTNERS LTDA', { align: 'center' });
+    doc.moveDown(2);
+    doc.text('____________________________________________________', { align: 'center' });
+    doc.font('Helvetica-Bold').text(nome.toUpperCase(), { align: 'center' });
+
+    doc.end();
+
+    return pdfPromise;
+  }
+
   // POST - Enviar contrato de colaborador para assinatura via Assinafy
   app.post("/api/juridico/colaboradores-contrato/:id/enviar-assinatura", async (req, res) => {
     const colaboradorId = parseInt(req.params.id);
@@ -6666,473 +7259,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log(`[assinafy-colab] Signatário: ${colaborador.nome} (${colaborador.email})`);
-      
-      // 3. Gerar PDF do contrato com template completo
-      const dataAtual = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
-      // Data de início é SEMPRE hoje, data fim é 6 meses depois
-      const dataInicioDate = new Date();
-      const dataInicio = dataInicioDate.toLocaleDateString('pt-BR');
-      const dataFimDate = new Date(dataInicioDate);
-      dataFimDate.setMonth(dataFimDate.getMonth() + 6);
-      const dataFim = dataFimDate.toLocaleDateString('pt-BR');
-      
-      // Mapeamento de escopos por cargo
-      const escoposPorCargo: Record<string, { titulo: string; escopo: string }> = {
-        "ANALISTA DE CX": {
-          titulo: "ANALISTA DE CX",
-          escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "CXCS": {
-          titulo: "ANALISTA DE CX",
-          escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "ANALISTA DE COMUNICAÇÃO": {
-          titulo: "ANALISTA DE COMUNICAÇÃO",
-          escopo: "roteirizar vídeos UGC que sejam autênticos, criativos e impactantes para as marcas que trabalhamos; colaborar com as equipes de Social Media e Performance para garantir que o conteúdo gerado não apenas engaje, mas também converta de forma eficaz; criar copy criativa que se destaque e gere conversões reais, aplicando técnicas de storytelling para gerar conexão genuína com o público; estar sempre atualizado sobre novas tendências e formatos de vídeo, garantindo que seus conteúdos não fiquem para trás; colaborar com grandes marcas, entendendo suas necessidades e entregando resultados concretos, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "G&G": {
-          titulo: "ANALISTA DE GENTE E GESTÃO",
-          escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "GENTE E GESTÃO": {
-          titulo: "ANALISTA DE GENTE E GESTÃO",
-          escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "VIDEOMAKER": {
-          titulo: "VIDEOMAKER",
-          escopo: "editar vídeos corporativos, institucionais e de marketing, aplicando técnicas de edição para criar conteúdo impactante e engajador; implementar efeitos visuais, transições e tratamentos de imagem para elevar a qualidade do material produzido; revisar o trabalho com base no feedback do solicitante; garantir a entrega de vídeos finalizados dentro dos prazos e padrões de qualidade estabelecidos; trazer iniciativas externas de aprimoramento e atualização com base no mercado de edição, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "DESIGNER": {
-          titulo: "DESIGNER",
-          escopo: "desenvolvimento de logotipos, materiais gráficos e layouts para campanhas, incluindo redes sociais, e-mail marketing e peças publicitárias; criação e otimização de peças gráficas para plataformas digitais (site, e-commerce, redes sociais, etc.); colaborar com as equipes de marketing e comunicação para entender as necessidades de design e desenvolver soluções criativas que atendam às demandas; manter-se atualizado sobre as últimas tendências e ferramentas de design e edição de vídeos, com foco na criação de conteúdo visual impactante; elaborar apresentações para reuniões internas e externas, com layout atrativo e condizente com a identidade visual da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "GESTOR DE PERFORMANCE": {
-          titulo: "GESTOR DE PERFORMANCE",
-          escopo: "construir campanhas e atuar de forma tática na otimização de mídias; acompanhamento da jornada do cliente junto ao time de CX/CS; auxiliar na criação, implementação e otimização de campanhas em Google Ads e Meta Ads; desenvolver análises rotineiras para identificar padrões de otimização e reportar insights aos stakeholders; monitorar a performance das campanhas e gerar relatórios para análise; colaborar com a equipe para desenvolver estratégias que aumentem a eficácia das campanhas; acompanhar tendências do mercado e aplicar boas práticas em campanhas digitais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "PRÉ-VENDAS": {
-          titulo: "ANALISTA DE PRÉ-VENDAS",
-          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "SDR": {
-          titulo: "ANALISTA DE PRÉ-VENDAS",
-          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "BDR": {
-          titulo: "ANALISTA DE PRÉ-VENDAS",
-          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "FINANCEIRO": {
-          titulo: "FINANCEIRO",
-          escopo: "planejamento e controle financeiro, interpretação de relatórios, avaliação e consultoria, controle de custos, análise de riscos, acompanhamento de resultados, criar, acompanhar e medir indicadores, contas a pagar, contas a receber, emissão de nota fiscal, lançamentos financeiros, elaboração de relatórios gerenciais, acompanhamento de processos operacionais, dentre outras atividades financeiras não listadas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "PO": {
-          titulo: "PRODUCT OWNER",
-          escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "PRODUCT OWNER": {
-          titulo: "PRODUCT OWNER",
-          escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "INSIDE SALES": {
-          titulo: "INSIDE SALES",
-          escopo: "realização de reuniões, apresentação de propostas e fechamento, gerir pipeline de vendas, construir relacionamento com clientes, atualizar o CRM, participar de reuniões internas, cumprimento de metas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "ANALISTA DE DADOS": {
-          titulo: "ANALISTA DE DADOS",
-          escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, trabalhar em estreita colaboração com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "G&G": {
-          titulo: "G&G",
-          escopo: "conduzir processos de recrutamento e seleção do início ao fim para diferentes áreas da empresa, alinhar perfis com gestores, entendendo necessidades técnicas e comportamentais das vagas, criar e publicar anúncios de vagas em portais, redes sociais e plataformas especializadas, realizar triagem de currículos, entrevistas por competências e dinâmicas de grupo, aplicar testes comportamentais e técnicos, quando necessário, gerar relatórios de indicadores (tempo de contratação, fontes de recrutamento, etc), sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "UIUX": {
-          titulo: "UI/UX",
-          escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "UI/UX": {
-          titulo: "UI/UX",
-          escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "JURÍDICO": {
-          titulo: "JURÍDICO",
-          escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "JURIDICO": {
-          titulo: "JURÍDICO",
-          escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "DESENVOLVEDOR": {
-          titulo: "DESENVOLVEDOR",
-          escopo: "prestar à CONTRATANTE serviços técnicos especializados de desenvolvimento de software voltados a e-commerces na plataforma Shopify, abrangendo, de forma ampla e não exaustiva, a criação, customização, manutenção, correção, evolução e otimização de lojas virtuais, temas, funcionalidades, integrações, automações, APIs e aplicações relacionadas, bem como suporte técnico, ajustes de performance, segurança, conformidade técnica e boas práticas de desenvolvimento, de acordo com as demandas definidas pela CONTRATANTE, utilizando-se das tecnologias, recursos e padrões aplicáveis ao ecossistema Shopify, comprometendo-se a executar os serviços com diligência, qualidade técnica e observância às normas legais e contratuais vigentes"
-        }
-      };
-      
-      const cargoOriginal = colaborador.cargo || '';
-      const cargoUpper = cargoOriginal.toUpperCase().trim();
-      
-      // Função para encontrar escopo com matching flexível
-      const findEscopo = (cargo: string): { titulo: string; escopo: string } | undefined => {
-        // Tenta match direto
-        if (escoposPorCargo[cargo]) return escoposPorCargo[cargo];
-        
-        // Tenta match parcial (se o cargo contém a chave ou vice-versa)
-        for (const [key, value] of Object.entries(escoposPorCargo)) {
-          if (cargo.includes(key) || key.includes(cargo)) {
-            return value;
-          }
-        }
-        return undefined;
-      };
-      
-      const escopoInfo = findEscopo(cargoUpper) || { 
-        titulo: colaborador.cargo || 'PRESTADOR DE SERVIÇOS', 
-        escopo: 'prestar serviços conforme acordado entre as partes, respeitando as diretrizes técnicas e operacionais da CONTRATANTE' 
-      };
-      
-      console.log(`[assinafy-colab] Cargo original: "${cargoOriginal}", Upper: "${cargoUpper}", Titulo encontrado: "${escopoInfo.titulo}"`);
-      
-      // Formatar salário para exibição no contrato
-      const salarioNumerico = parseFloat((colaborador.salario || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-      const salarioFormatado = salarioNumerico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      
-      const doc = new PDFDocument({ margin: 60, size: 'A4' });
-      const chunks: Buffer[] = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-      
-      const pdfPromise = new Promise<Buffer>((resolve) => {
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
+
+      // 3. Buscar patrimônio do colaborador
+      const patrimonioResult = await db.execute(sql`
+        SELECT descricao FROM "Inhire".rh_patrimonio
+        WHERE responsavel_id = ${colaboradorId} AND ativo = 'Notebook'
+        ORDER BY id DESC LIMIT 1
+      `);
+      const patrimonio = (patrimonioResult.rows[0] as any)?.descricao || null;
+
+      // 4. Gerar PDF do contrato usando função compartilhada
+      const pdfBuffer = await gerarContratoPDF({
+        nome: colaborador.nome,
+        cpf: colaborador.cpf,
+        cnpj: colaborador.cnpj,
+        endereco: colaborador.endereco,
+        estado: colaborador.estado,
+        cargo: colaborador.cargo,
+        salario: colaborador.salario?.toString() || '0',
+        patrimonio,
       });
-
-      // Logo no header
-      const logoPath = path.join(process.cwd(), 'server/assets/turbo_logo.png');
-      try {
-        const fs = await import('fs');
-        if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, 60, 30, { width: 150 });
-        }
-      } catch (e) {
-        console.log('[pdf] Logo não encontrada, continuando sem logo');
-      }
-      
-      doc.moveDown(4);
-
-      // Header
-      doc.fontSize(13).font('Helvetica-Bold').text('CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
-      doc.moveDown(1.5);
-
-      // Partes
-      doc.fontSize(10).font('Helvetica').text('Pelo presente instrumento particular, e na melhor forma de direito, as partes a seguir qualificadas:');
-      doc.moveDown(0.8);
-      doc.font('Helvetica-Bold').text('CONTRATANTE: ', { continued: true });
-      doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Rodrigo Queiroz Santos;');
-      doc.moveDown(0.5);
-      doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
-      
-      // Detectar se é pessoa física (CPF) ou jurídica (CNPJ) e formatar qualificação
-      const gerarQualificacaoContratada = (): string => {
-        const cnpjLimpo = (colaborador.cnpj || '').replace(/\D/g, '');
-        const cpfLimpo = (colaborador.cpf || '').replace(/\D/g, '');
-        const nome = colaborador.nome || 'Não informado';
-        const endereco = colaborador.endereco || 'Não informado';
-        const estado = colaborador.estado ? `, ${colaborador.estado}` : '';
-        
-        // Formatar CNPJ se existir
-        const cnpjFormatado = cnpjLimpo.length === 14 
-          ? (colaborador.cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))
-          : null;
-        
-        // Formatar CPF se existir
-        const cpfFormatado = cpfLimpo.length === 11 
-          ? (colaborador.cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'))
-          : null;
-        
-        // Se tem CNPJ válido (pessoa jurídica)
-        if (cnpjFormatado) {
-          if (cpfFormatado) {
-            // Modelo completo: CNPJ + endereço + CPF
-            return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${endereco}${estado}, devidamente registrado no CPF ${cpfFormatado}.`;
-          }
-          return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${endereco}${estado}.`;
-        }
-        
-        // Se tem apenas CPF (pessoa física)
-        if (cpfFormatado) {
-          return `${nome}, pessoa física, inscrita no CPF sob o n° ${cpfFormatado}, residente na ${endereco}${estado}.`;
-        }
-        
-        // Fallback
-        return `${nome}, com endereço na ${endereco}${estado}.`;
-      };
-      
-      doc.font('Helvetica').text(gerarQualificacaoContratada());
-      doc.moveDown(0.8);
-      doc.text('Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:');
-      doc.moveDown(1);
-
-      // CLÁUSULA PRIMEIRA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text(`1.1. O CONTRATADO prestará serviços como ${escopoInfo.titulo}. Para isso, deverá designar pessoa legalmente certificada e habilitada para a execução dos serviços.`);
-      doc.moveDown(0.3);
-      doc.text(`1.1.1. Os serviços serão prestados por pessoa previamente indicada pelo CONTRATADO e compreendem, de modo exemplificativo, as seguintes atribuições: ${escopoInfo.escopo}`);
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horária do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. Toda e qualquer pessoa eventualmente envolvida pela CONTRATADA na execução dos serviços contratados atuará em nome e por conta exclusiva da própria CONTRATADA, sendo esta a única responsável por sua relação jurídica, operacional e contratual com tais profissionais, sem qualquer vínculo direto ou indireto com a CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. As atribuições descritas nesta cláusula são meramente exemplificativas e poderão variar conforme entendimento técnico da CONTRATADA, respeitados os objetivos finais acordados entre as Partes.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA SEGUNDA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SEGUNDA – DO PRAZO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text(`2.1 – O presente contrato tem prazo de 6 (seis) meses, com início em ${dataInicio} e fim em ${dataFim}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes, ocasião em que será reavaliado o escopo e as condições comerciais, desde que nenhuma das partes se manifeste no prazo de antecedência mínimo de 30 (trinta) dias anteriores ao término temporal contratual.`);
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Ao final deste prazo, o contrato poderá ser renovado, sendo este realizado por simples aditivo contratual.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. O presente contrato será considerado rescindido de pleno direito, no caso de falência, concordata ou liquidação, de quaisquer das partes, não sendo aplicável nesse caso nenhuma multa ou indenização.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. No caso de encerramento do presente contrato, a CONTRATADA deverá devolver, à CONTRATANTE, todo material em seu poder e que pertença à CONTRATANTE. A CONTRATANTE deverá quitar quaisquer pagamentos devidos por eventuais perdas e danos.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA TERCEIRA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração mensal de ${salarioFormatado} (${salarioNumerico > 0 ? 'valor bruto' : 'conforme acordado entre as partes'}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`);
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Os valores que resultarem do disposto nesta cláusula constituem os únicos valores/créditos devidos pela CONTRATANTE ao CONTRATADO em razão do presente contrato, eximindo-se a CONTRATANTE de responder por quaisquer outros valores que sejam cobrados pelo CONTRATADO.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. Até o 25° (vigésimo quinto) dia do mês subsequente à prestação dos serviços, a CONTRATANTE providenciará o pagamento da CONTRATADA, desde que cumpridas todo o escopo de entregas previstas no presente instrumento contratual.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. Até o 10° (décimo) dia anterior à data de pagamento e condicionado à plena constatação de cumprimento das entregas previstas, o CONTRATADO deverá emitir a competente Nota Fiscal, remetendo-a imediatamente à CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quarto. Caso em determinado exercício mensal haja a interrupção ou suspensão na prestação dos serviços, o pagamento será feito de modo proporcional ao período de efetiva execução das tarefas.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quinto. O recolhimento dos tributos incidentes sobre os Serviços, assim como o cumprimento das correspondentes obrigações tributárias acessórias, são de exclusiva responsabilidade da CONTRATADA, exceto nas hipóteses em que a CONTRATANTE deva, em razão de disposição legal, promover a retenção dos valores a serem pagos ao Fisco (Municipal, Estadual ou Federal).');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Sexto. O comprovante de depósito ou transferência servirá como recibo e prova de quitação e pagamento da obrigação ajustada.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA QUARTA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CONTRATADO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('4.1 - São obrigações do CONTRATADO:');
-      doc.text('I. Prestar os serviços contratados em conformidade com os padrões de qualidade acordados e com a boa técnica profissional aplicável ao setor.');
-      doc.text('II. Fornecer as notas fiscais referentes aos pagamentos efetuados pela CONTRATANTE dentro do prazo previamente estipulado por meio do presente instrumento;');
-      doc.text('III. Arcar com todas as despesas de natureza tributária decorrentes dos serviços especificados neste contrato;');
-      doc.text('IV. Cumprir todas as determinações impostas pelas autoridades públicas competentes, referentes a estes serviços;');
-      doc.text('V. Manter sigilosas, mesmo após findo este contrato, as informações privilegiadas de qualquer natureza às quais tenham acesso em virtude da execução destes serviços, pelo prazo de 5 (cinco) anos;');
-      doc.text('VI. Comprometer-se a utilizar os equipamentos disponibilizados unicamente para fins profissionais relacionados às entregas pactuadas, observando as diretrizes técnicas definidas pela CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Os documentos pertencentes ou em posse da empresa contratante depositados em mídias físicas ou digitais somente devem ser abertos e tratados em computadores credenciados e de propriedade da CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. Sobre os computadores e demais equipamentos fornecidos para a prestação dos serviços não devem ser instalados programas alheios sem a autorização da CONTRATANTE.');
-      doc.moveDown(0.8);
-
-      // Nova página
-      doc.addPage();
-      
-      // Logo na segunda página
-      try {
-        const fs = await import('fs');
-        if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, 60, 30, { width: 150 });
-        }
-      } catch (e) {}
-      doc.moveDown(4);
-
-      // CLÁUSULA QUINTA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATANTE');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('5.1 - São obrigações da CONTRATANTE:');
-      doc.text('I. Fornecer todas as informações necessárias à execução dos serviços, incluindo diretrizes e objetivos, respeitada a autonomia técnica e operacional da CONTRATADA quanto aos meios e métodos empregados.');
-      doc.text('II. Efetuar o pagamento, nas datas e nos termos definidos neste contrato;');
-      doc.text('III. Manifestar, de forma expressa, eventuais críticas, dúvidas, solicitações, novas orientações e sugestões pertinentes aos serviços, quando existirem;');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA SEXTA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SEXTA – DA RESCISÃO E EXTINÇÃO DO CONTRATO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('6.1. O presente contrato poderá ser rescindido, a qualquer tempo, por qualquer das partes, independentemente de motivação, mediante comunicação prévia e escrita à outra parte, com antecedência mínima de 30 (trinta) dias, sem que disso decorra o pagamento de multa ou indenização, ressalvadas as obrigações já vencidas.');
-      doc.moveDown(0.3);
-      doc.text('6.2. O contrato poderá ser rescindido de forma motivada, por qualquer das partes, independentemente de aviso prévio, nas seguintes hipóteses:');
-      doc.text('    6.2.1. Descumprimento, pela outra parte, de quaisquer obrigações assumidas neste contrato, inclusive atraso na entrega dos serviços, execução inadequada do objeto ou violação de cláusulas contratuais;');
-      doc.text('    6.2.2. Prática de atos que comprometam a continuidade, a regularidade ou a finalidade do contrato.');
-      doc.moveDown(0.3);
-      doc.text('6.3. O contrato será considerado automaticamente extinto, independentemente de aviso ou notificação, nas seguintes hipóteses:');
-      doc.text('    6.3.1. Impossibilidade superveniente de execução do contrato por motivo de força maior ou caso fortuito, devidamente comprovado;');
-      doc.text('    6.3.2. Encerramento, dissolução ou extinção das atividades empresariais da CONTRATANTE.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA SÉTIMA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO TRABALHISTA E SOCIETÁRIO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('7.1. Não se estabelece, por força do presente contrato, nenhum vínculo empregatício, nem enseja qualquer tipo de subordinação e pessoalidade entre a CONTRATANTE e o pessoal do CONTRATADO, sendo certo que as obrigações e direitos das partes limita-se ao expressamente avençado neste contrato.');
-      doc.moveDown(0.3);
-      doc.text('7.2. O próprio CONTRATADO, na qualidade de prestador de serviços estabelecerá e concretizará, cotidianamente, a forma de realização dos serviços pactuados no presente termo.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. O CONTRATADO tem ciência e declara que nenhum ex-empregado da CONTRATANTE cujo contrato de trabalho tenha se encerrado há menos de 18 (dezoito) meses poderá ser alocado pelo CONTRATADO na prestação dos serviços.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. O CONTRATADO tem ciência e declara que tem capacidade técnico-financeira para arcar com suas responsabilidades contratuais e extracontratuais, vinculada ou não a este contrato, e que não possui nem se colocará em situação de dependência econômica com relação ao resultado financeiro deste contrato.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. O CONTRATADO declara assumir integralmente os riscos relacionados à atividade empresarial que exerce, inclusive quanto à gestão de sua equipe, métodos de trabalho, investimentos necessários e responsabilidade pelos resultados.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quarto. O CONTRATADO tem ciência e declara que nada neste contrato poderá ser interpretado como tendo as partes, estabelecido qualquer forma de sociedade, associação, agência ou consórcio, de fato ou de direito, permanecendo cada uma das partes com as suas obrigações civis, comerciais, trabalhistas e tributárias, de forma autônoma.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quinto. Não haverá controles de horários de chegada ou saída ou subordinação, com total autonomia da CONTRATADA em relação à CONTRATANTE, se comprometendo a CONTRATANTE a executar os serviços contratados através das horas necessárias à execução dos serviços, conforme acordado, sob pena dos respectivos descontos.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA OITAVA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE E DIREITO DE IMAGEM');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('8.1. As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato, o que inclui, mas não se limita a: todos e quaisquer dados, relatórios, análises, estudos, pesquisas, interpretações, previsões/estimativas, registros, materiais e quaisquer outros elementos que contenham informações referentes aos negócios objeto deste contrato, aos membros envolvidos e aos investidores, assim como dados pessoais nos termos da legislação vigente (Lei Geral de Proteção de Dados - LGPD). As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Para os propósitos, serão consideradas "informações confidenciais" todas e quaisquer informações e/ou dados de natureza confidencial (incluindo, sem limitação, os termos e condições deste contrato e todos os segredos e/ou informações operacionais, econômicas e técnicas, bem como demais informações comerciais ou "know-how") que tenham sido direta ou indiretamente fornecidos ou divulgados por uma das partes à outra sob ou em função deste contrato, a qualquer título e por qualquer modo, que não sejam, ou não venham a ser, de conhecimento público, que não por culpa imputável à parte receptora.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. Caso alguma das partes venha a ser legalmente obrigada a revelar qualquer informação confidencial, por qualquer juízo ou autoridade governamental competente, essa deverá notificar a contrária de tal ordem, para que possa adotar medidas cabíveis para resguardar os seus direitos ou dispensar a parte que cumprir as obrigações dispostas neste acordo.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. A CONTRATADA não poderá, em nenhuma hipótese, fazer qualquer outro uso, realizar qualquer outro negócio ou celebrar qualquer outro contrato relacionado, direta ou indiretamente, às Informações Confidenciais.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quarto. Todas as Informações Confidenciais devem ser mantidas e tratadas como estritamente confidenciais e não poderão ser reveladas a qualquer terceiro, de forma alguma, no todo ou em parte, bem como não poderão ser utilizadas para qualquer finalidade que não esteja única e exclusivamente relacionada aos Serviços.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quinto. Sem prejuízo de outras obrigações, a CONTRATADA se compromete desde logo a:');
-      doc.text('1. Não divulgar quaisquer Informações Confidenciais a quaisquer terceiros;');
-      doc.text('2. Utilizar quaisquer Informações Confidenciais exclusivamente para a execução da prestação dos serviços;');
-      doc.text('3. Não analisar, providenciar análise, derivar ou sintetizar qualquer informação recebida da CONTRATANTE sem autorização prévia e fora dos limites da execução de seu trabalho.');
-      doc.moveDown(0.3);
-      doc.font('Helvetica-Bold').text('Parágrafo Sexto. O descumprimento da presente cláusula enseja o pagamento, por parte da CONTRATADA ao CONTRATANTE, de multa não compensatória fixada em R$50.000,00 (cinquenta mil reais).');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').text('8.2. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ao objeto deste contrato, em quaisquer meios físicos ou digitais, sem limitação territorial ou temporal, inclusive após o término da relação contratual, sem que disso decorra direito a remuneração adicional.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo único. A utilização ora autorizada não implica exclusividade, vínculo empregatício ou societário, comprometendo-se a CONTRATANTE a utilizar a imagem do CONTRATADO de forma ética e compatível com a finalidade profissional pactuada.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA NONA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA NONA – DA INEXISTÊNCIA DE LICENÇAS');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('9.1. A CONTRATANTE reterá todo o direito, titularidade e interesse sobre as informações confidenciais presentes no presente contrato.');
-      doc.moveDown(0.3);
-      doc.text('9.2. São e serão considerados como propriedade intelectual e/ou industrial única e exclusiva da CONTRATANTE qualquer produto, criação, desenvolvimento, relatório, planilha, resultado, dentre outros, ainda que tenham sido desenvolvidos pela CONTRATADA.');
-      doc.moveDown(0.3);
-      doc.text('9.3. São e serão considerados como propriedade intelectual e/ou industrial única e exclusiva da CONTRATANTE qualquer produto, criação, desenvolvimento, relatório, planilha, resultado, dentre outros, ainda que tenham sido desenvolvidos pela CONTRATADA. Nenhum direito de propriedade intelectual e/ou industrial será detido pela CONTRATADA, a qual, expressamente, cede e transfere à CONTRATANTE, desde logo, não onerosamente, todo e qualquer direito relacionado ou derivado a qualquer espécie de criação decorrente do relacionamento entre as Partes.');
-      doc.moveDown(0.3);
-      doc.text('9.4. A CONTRATADA expressamente declara que todo e qualquer valor a título de eventuais direitos sobre propriedade intelectual e/ou industrial, direitos autorais ou qualquer espécie de direitos imateriais, já foi considerada pelas Partes na fixação do Preço (contraprestação), razão pela qual nenhuma quantia poderá ser reclamada, a qualquer título, pela CONTRATADA.');
-      doc.moveDown(0.8);
-
-      // Nova página
-      doc.addPage();
-      
-      // Logo na terceira página
-      try {
-        const fs = await import('fs');
-        if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, 60, 30, { width: 150 });
-        }
-      } catch (e) {}
-      doc.moveDown(4);
-
-      // CLÁUSULA DÉCIMA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA – DA ABSTENÇÃO DE ALICIAMENTO E INDUÇÃO DE TERCEIROS VINCULADOS À CONTRATANTE');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('10.1. Durante a vigência deste instrumento e por um período de 24 (vinte e quatro) meses após sua extinção, o CONTRATADO se compromete a não contratar, ou tentar contratar, direta ou indiretamente, qualquer empregado(a) da CONTRATANTE ou de qualquer outra empresa do grupo no Brasil ou no exterior, para trabalhar para seu novo empregador ou empresa da qual seja, direta ou indiretamente, ligado, inclusive como sócio.');
-      doc.moveDown(0.3);
-      doc.text('10.1.1. Durante o período mencionado na Cláusula Segunda e pelo mesmo prazo de 02 (dois) anos contados da rescisão do contrato, o CONTRATADO também se compromete a não ajudar terceiros a contratar empregados(as) da CONTRATANTE ou de outra empresa do grupo, tampouco a induzir ou convencer qualquer empregado(a) da CONTRATANTE a rescindir o contrato que mantém com a CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('10.2. O CONTRATADO, também neste ato, de forma irrevogável e irretratável, se compromete perante a CONTRATANTE a abster-se, durante a vigência do presente e pelo período de 02 (dois) anos contados da rescisão contratual de direta ou indiretamente, aliciar, induzir, convidar, contratar, nem determinar que seja aliciado, induzido ou convidado:');
-      doc.moveDown(0.2);
-      doc.text('(i) Qualquer cliente atendido e/ou captado pela CONTRATANTE ou pelo CONTRATADO durante a prestação de seus serviços para que tal cliente seja atendido por outra personalidade jurídica concorrente da TURBO;');
-      doc.text('(ii) Qualquer empregado, sócio, diretor ou outro prestador de serviços da TURBO e/ou qualquer de suas afiliadas;');
-      doc.text('(iii) Qualquer pessoa a deixar de fazer negócios com a TURBO e/ou qualquer de suas afiliadas;');
-      doc.text('(iv) Qualquer fornecedor ou cliente da TURBO a deixar de realizar ou diminuir os negócios realizados com a CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.font('Helvetica-Bold').text('10.3. Sem prejuízo das indenizações por perdas e danos e da responsabilidade criminal, o CONTRATADO, em caso de infração da presente cláusula, pagará ao CONTRATANTE uma multa não compensatória igual a R$ 100.000,00 (cem mil reais) por cada infração.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA DÉCIMA PRIMEIRA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço, comprometendo-se a: não utilizar as informações confidenciais a que tiver acesso pelo período de 05 (cinco) anos, para gerar benefício próprio exclusivo e/ou unilateral, presente ou futuro, ou para o uso de terceiros; não efetuar nenhuma gravação ou cópia da documentação confidencial a que tiver acesso; não apropriar-se para si ou para outrem de material confidencial e/ou sigiloso da tecnologia que venha a ser disponível e; não repassar o conhecimento das informações confidenciais, responsabilizando-se por todas as pessoas que vierem a ter acesso às informações, por seu intermédio, e obrigando-se, assim, a reparar a ocorrência de qualquer dano e/ou prejuízo oriundo de uma eventual quebra de sigilo das informações fornecidas.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. As partes se comprometem a não utilizar os dados pessoais que tiverem acesso para fins distintos da relação estabelecida, sendo vedada a transmissão para terceiros.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. As partes se comprometem em manter os compromissos acima, mesmo após o término da relação contratual, pelo período de 5 (cinco) anos.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. As partes declaram que qualquer conduta incompatível com as disposições acima será considerada uma grave violação deste contrato e será considerado motivo de justa causa para a rescisão imediata, sem prejuízo da adoção das medidas legalmente cabíveis.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA DÉCIMA SEGUNDA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('12.1. A CONTRATANTE poderá disponibilizar, em regime de comodato, um computador de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.');
-      doc.moveDown(0.3);
-      doc.text('12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado, abstendo-se de utilizá-lo para fins pessoais, atividades não relacionadas ao presente contrato, ou por terceiros.');
-      doc.moveDown(0.3);
-      doc.text('12.3. A CONTRATADA será responsável integral por qualquer dano, perda, extravio, furto, roubo ou mau uso do equipamento, independentemente de culpa, obrigando-se a arcar com os custos de reparação ou substituição integral do bem, conforme orçamento técnico indicado pela CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('12.4. Em caso de dano parcial, a CONTRATADA deverá restituir à CONTRATANTE o valor referente ao reparo, no prazo máximo de 30 (trinta) dias após a notificação escrita.');
-      doc.moveDown(0.3);
-      doc.text('12.5. Em caso de perda total, extravio, furto ou roubo, a CONTRATADA deverá indenizar a CONTRATANTE com base no valor de mercado atualizado do bem à época do evento, conforme cotação de revendedor autorizado ou nota fiscal de aquisição, o que for mais benéfico à CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('12.6. O equipamento deverá ser devolvido à CONTRATANTE no ato de rescisão do contrato, em perfeito estado de funcionamento e conservação, ressalvado o desgaste natural decorrente do uso regular.');
-      doc.moveDown(0.3);
-      doc.text('12.7. A CONTRATANTE poderá, a qualquer tempo, solicitar a devolução imediata do equipamento, cabendo à CONTRATADA o cumprimento imediato da solicitação.');
-      doc.moveDown(0.3);
-      doc.text('12.8. O inadimplemento das obrigações previstas nesta cláusula autoriza a CONTRATANTE a reter valores devidos à CONTRATADA até o limite da indenização cabível, sem prejuízo das demais medidas legais e contratuais aplicáveis.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA DÉCIMA TERCEIRA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA TERCEIRA – DAS DISPOSIÇÕES GERAIS');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('13.1. Nenhuma das Partes poderá ceder ou transferir quaisquer direitos ou obrigações decorrentes deste contrato a terceiros, total ou parcialmente, sem o prévio e expresso consentimento por escrito da outra Parte.');
-      doc.moveDown(0.3);
-      doc.text('13.2. O presente contrato é celebrado em caráter irrevogável e irretratável, obrigando as Partes e seus sucessores.');
-      doc.moveDown(0.3);
-      doc.text('13.3. A tolerância das Partes com relação a inadimplemento ou não cumprimento de qualquer obrigação, cláusula, termo ou condição ora estabelecida não constitui precedente, renúncia a obrigações, emenda ou renovação do contrato, e sim mera liberalidade.');
-      doc.moveDown(0.3);
-      doc.text('13.4. A declaração de nulidade ou anulação de qualquer dos dispositivos contidos neste instrumento não invalidará suas demais disposições, as quais permanecerão em pleno vigor.');
-      doc.moveDown(0.3);
-      doc.text('13.5. Não se estabelece, por força deste instrumento, qualquer forma de sociedade, associação, agência, consórcio, participação societária, ou responsabilidade solidária entre as partes.');
-      doc.moveDown(0.3);
-      doc.text('13.6. O objeto deste contrato não visa proporcionar nenhuma espécie de vantagem fiscal, trabalhista ou previdenciária a qualquer Parte ou a terceiros, e não implica vínculo empregatício entre uma das partes e os funcionários/prepostos da outra, ficando a cargo de cada uma delas a responsabilidade referente aos encargos sociais, tributários, previdenciários e trabalhistas de seus respectivos colaboradores.');
-      doc.moveDown(0.3);
-      doc.text('13.7. Os tributos (impostos, taxas, emolumentos, contribuições fiscais e parafiscais) que sejam devidos em decorrência direta ou indireta do presente contrato ou de sua execução, serão de exclusiva responsabilidade do contribuinte, conforme definido na norma tributária, autorizadas as retenções legais, sem direito a reembolso.');
-      doc.moveDown(0.3);
-      doc.text('13.8. O presente CONTRATO é o instrumento que regula todos os direitos e obrigações acordadas entre as Partes, substituindo todo e qualquer CONTRATO ou entendimento previamente realizado pelas Partes.');
-      doc.moveDown(0.3);
-      doc.text('13.9. Toda e qualquer modificação deste CONTRATO somente poderá ocorrer mediante aditamento, o qual deverá observar, obrigatoriamente, a forma escrita.');
-      doc.moveDown(0.3);
-      doc.text('13.10. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.');
-      doc.moveDown(0.3);
-      doc.text('13.11. Para fins de prova e, por derradeiro, para dirimir quaisquer dúvidas, controvérsias ou litígios oriundos do presente CONTRATO, tanto para procedimento judicial quanto arbitral ou de mediação, valerá a versão digital da via de cada Parte, com a devida certificação da plataforma digital utilizada para a assinatura eletrônica deste CONTRATO.');
-      doc.moveDown(0.3);
-      doc.text('13.12. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato, com renúncia expressa a qualquer outro, por mais privilegiado que seja.');
-      doc.moveDown(0.3);
-      doc.text('13.13. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.');
-      doc.moveDown(1);
-
-      doc.text('As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Contrato emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil.');
-      doc.moveDown(0.5);
-      doc.text('Em testemunho do quê, as PARTES assinaram este Memorando em 3 (três) vias contendo os mesmos termos e condições, conjuntamente com 2 (duas) testemunhas.');
-      doc.moveDown(1.5);
-
-      // Assinaturas
-      doc.fontSize(10).text(`Vitória, ${dataAtual}.`);
-      doc.moveDown(2);
-      doc.text('____________________________________________________', { align: 'center' });
-      doc.font('Helvetica-Bold').text('TURBO PARTNERS LTDA', { align: 'center' });
-      doc.font('Helvetica').text('CONTRATANTE', { align: 'center' });
-      doc.moveDown(2);
-      doc.text('____________________________________________________', { align: 'center' });
-      doc.font('Helvetica-Bold').text(colaborador.nome.toUpperCase(), { align: 'center' });
-      doc.font('Helvetica').text('CONTRATADO(A)', { align: 'center' });
-
-      doc.end();
-      
-      const pdfBuffer = await pdfPromise;
       console.log(`[assinafy-colab] PDF gerado: ${pdfBuffer.length} bytes`);
-      
-      // 4. Upload do PDF para Assinafy
+
+      // 5. Upload do PDF para Assinafy
       const FormData = (await import('form-data')).default;
       const formData = new FormData();
       formData.append('file', pdfBuffer, {
@@ -7297,476 +7446,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POST - Gerar PDF de contrato de colaborador (download direto)
   app.post("/api/juridico/colaboradores-contrato/pdf", async (req, res) => {
     try {
-      const { nome, cpf, cnpj, endereco, estado, cargo, dataAdmissao, dataAtual, salario } = req.body;
+      const { nome, cpf, cnpj, endereco, estado, cargo, salario, patrimonio } = req.body;
 
       if (!nome) {
         return res.status(400).json({ error: "Nome é obrigatório" });
       }
 
-      // Calcular datas - Data de início é SEMPRE hoje, data fim é 6 meses depois
-      const dataInicioDate = new Date();
-      const dataInicio = dataInicioDate.toLocaleDateString('pt-BR');
-      const dataFimDate = new Date(dataInicioDate);
-      dataFimDate.setMonth(dataFimDate.getMonth() + 6);
-      const dataFim = dataFimDate.toLocaleDateString('pt-BR');
-      
-      // Formatar salário para exibição no contrato
-      const salarioNumerico = parseFloat((salario || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
-      const salarioFormatado = salarioNumerico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      
-      // Mapeamento de escopos por cargo
-      const escoposPorCargo: Record<string, { titulo: string; escopo: string }> = {
-        "ANALISTA DE CX": {
-          titulo: "ANALISTA DE CX",
-          escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "CXCS": {
-          titulo: "ANALISTA DE CX",
-          escopo: "garantir a experiência do cliente em todas as interações com a empresa, criar estratégia para melhorar a experiência do cliente, identificando e implementando soluções para corrigir problemas, fornecer informações precisas e atualizadas sobre os produtos e serviços oferecidos pela empresa, interagir com outras equipes da empresa, como a equipe de performance e vendas, para garantir que as necessidades dos clientes sejam atendidas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "ANALISTA DE COMUNICAÇÃO": {
-          titulo: "ANALISTA DE COMUNICAÇÃO",
-          escopo: "roteirizar vídeos UGC que sejam autênticos, criativos e impactantes para as marcas que trabalhamos; colaborar com as equipes de Social Media e Performance para garantir que o conteúdo gerado não apenas engaje, mas também converta de forma eficaz; criar copy criativa que se destaque e gere conversões reais, aplicando técnicas de storytelling para gerar conexão genuína com o público; estar sempre atualizado sobre novas tendências e formatos de vídeo, garantindo que seus conteúdos não fiquem para trás; colaborar com grandes marcas, entendendo suas necessidades e entregando resultados concretos, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "G&G": {
-          titulo: "ANALISTA DE GENTE E GESTÃO",
-          escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "GENTE E GESTÃO": {
-          titulo: "ANALISTA DE GENTE E GESTÃO",
-          escopo: "conduzir processos seletivos completos, desde a triagem de currículos até a finalização da contratação; apoiar na implementação de programas de treinamento, desenvolvimento e avaliação de desempenho; acompanhar a performance dos colaboradores, realizar feedbacks construtivos e colaborar com a área de gestão para alinhamento de estratégias de pessoas; conduzir o processo de integração para novos colaboradores, assegurando um bom início na empresa; auxiliar nas rotinas administrativas relacionadas a benefícios, folha de pagamento e demais questões operacionais de recursos humanos; contribuir para a manutenção de um bom ambiente de trabalho, alinhado aos valores e à missão da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "VIDEOMAKER": {
-          titulo: "VIDEOMAKER",
-          escopo: "editar vídeos corporativos, institucionais e de marketing, aplicando técnicas de edição para criar conteúdo impactante e engajador; implementar efeitos visuais, transições e tratamentos de imagem para elevar a qualidade do material produzido; revisar o trabalho com base no feedback do solicitante; garantir a entrega de vídeos finalizados dentro dos prazos e padrões de qualidade estabelecidos; trazer iniciativas externas de aprimoramento e atualização com base no mercado de edição, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "DESIGNER": {
-          titulo: "DESIGNER",
-          escopo: "desenvolvimento de logotipos, materiais gráficos e layouts para campanhas, incluindo redes sociais, e-mail marketing e peças publicitárias; criação e otimização de peças gráficas para plataformas digitais (site, e-commerce, redes sociais, etc.); colaborar com as equipes de marketing e comunicação para entender as necessidades de design e desenvolver soluções criativas que atendam às demandas; manter-se atualizado sobre as últimas tendências e ferramentas de design e edição de vídeos, com foco na criação de conteúdo visual impactante; elaborar apresentações para reuniões internas e externas, com layout atrativo e condizente com a identidade visual da empresa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "GESTOR DE PERFORMANCE": {
-          titulo: "GESTOR DE PERFORMANCE",
-          escopo: "construir campanhas e atuar de forma tática na otimização de mídias; acompanhamento da jornada do cliente junto ao time de CX/CS; auxiliar na criação, implementação e otimização de campanhas em Google Ads e Meta Ads; desenvolver análises rotineiras para identificar padrões de otimização e reportar insights aos stakeholders; monitorar a performance das campanhas e gerar relatórios para análise; colaborar com a equipe para desenvolver estratégias que aumentem a eficácia das campanhas; acompanhar tendências do mercado e aplicar boas práticas em campanhas digitais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "PRÉ-VENDAS": {
-          titulo: "ANALISTA DE PRÉ-VENDAS",
-          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "SDR": {
-          titulo: "ANALISTA DE PRÉ-VENDAS",
-          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "BDR": {
-          titulo: "ANALISTA DE PRÉ-VENDAS",
-          escopo: "criação de listas para prospecção outbound (BDR); qualificação de leads; garantir o comparecimento do cliente na reunião agendada; construir um resumo do cliente para o closer ter contexto ao participar da reunião; atingir metas de reuniões agendadas; apresentação de pré reunião; desenvolvimento técnico comercial constante; construir relacionamento com clientes; atualizar o CRM; participar de reuniões internas; apresentação de Planos de Ação, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "FINANCEIRO": {
-          titulo: "FINANCEIRO",
-          escopo: "planejamento e controle financeiro, interpretação de relatórios, avaliação e consultoria, controle de custos, análise de riscos, acompanhamento de resultados, criar, acompanhar e medir indicadores, contas a pagar, contas a receber, emissão de nota fiscal, lançamentos financeiros, elaboração de relatórios gerenciais, acompanhamento de processos operacionais, dentre outras atividades financeiras não listadas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "PO": {
-          titulo: "PRODUCT OWNER",
-          escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "PRODUCT OWNER": {
-          titulo: "PRODUCT OWNER",
-          escopo: "atuar prestando suporte para nossos clientes de sites e e-commerces, identificar/resolver bugs e problemas gerais relacionados a sites (site fora do ar, problemas de cálculo de frete, entre outros), relacionamento com clientes para a exposição do ocorrido e verificação da melhor tratativa, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "INSIDE SALES": {
-          titulo: "INSIDE SALES",
-          escopo: "realização de reuniões, apresentação de propostas e fechamento, gerir pipeline de vendas, construir relacionamento com clientes, atualizar o CRM, participar de reuniões internas, cumprimento de metas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "ANALISTA DE DADOS": {
-          titulo: "ANALISTA DE DADOS",
-          escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, trabalhar em estreita colaboração com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "G&G": {
-          titulo: "G&G",
-          escopo: "conduzir processos de recrutamento e seleção do início ao fim para diferentes áreas da empresa, alinhar perfis com gestores, entendendo necessidades técnicas e comportamentais das vagas, criar e publicar anúncios de vagas em portais, redes sociais e plataformas especializadas, realizar triagem de currículos, entrevistas por competências e dinâmicas de grupo, aplicar testes comportamentais e técnicos, quando necessário, gerar relatórios de indicadores (tempo de contratação, fontes de recrutamento, etc), sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "UIUX": {
-          titulo: "UI/UX",
-          escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "UI/UX": {
-          titulo: "UI/UX",
-          escopo: "desenvolver soluções visuais criativas para campanhas de marketing e publicidade: materiais gráficos, impressos e outros formatos, como infográficos, moodboards, grids e edição de vídeos, acompanhar os projetos e propor inovações gráficas de comunicação e design, alinhadas ao propósito e identidade das marcas, noções de Motion Design será considerado diferencial, participar de cerimônias de aprendizados com a equipe de design, participar de reuniões de debriefing e alinhamento com clientes, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "JURÍDICO": {
-          titulo: "JURÍDICO",
-          escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "JURIDICO": {
-          titulo: "JURÍDICO",
-          escopo: "analisar, elaborar, revisar e negociar contratos, aditivos e instrumentos jurídicos da empresa, orientar preventivamente as áreas internas quanto a riscos legais, compliance, obrigações regulatórias e mitigação de passivos, acompanhar demandas administrativas e judiciais, gerenciar escritórios terceirizados e assegurar a defesa dos interesses institucionais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
-        },
-        "DESENVOLVEDOR": {
-          titulo: "DESENVOLVEDOR",
-          escopo: "prestar à CONTRATANTE serviços técnicos especializados de desenvolvimento de software voltados a e-commerces na plataforma Shopify, abrangendo, de forma ampla e não exaustiva, a criação, customização, manutenção, correção, evolução e otimização de lojas virtuais, temas, funcionalidades, integrações, automações, APIs e aplicações relacionadas, bem como suporte técnico, ajustes de performance, segurança, conformidade técnica e boas práticas de desenvolvimento, de acordo com as demandas definidas pela CONTRATANTE, utilizando-se das tecnologias, recursos e padrões aplicáveis ao ecossistema Shopify, comprometendo-se a executar os serviços com diligência, qualidade técnica e observância às normas legais e contratuais vigentes"
-        }
-      };
-      
-      const cargoOriginal = cargo || '';
-      const cargoUpper = cargoOriginal.toUpperCase().trim();
-      
-      // Função para encontrar escopo com matching flexível
-      const findEscopo = (cargoParam: string): { titulo: string; escopo: string } | undefined => {
-        // Tenta match direto
-        if (escoposPorCargo[cargoParam]) return escoposPorCargo[cargoParam];
-        
-        // Tenta match parcial (se o cargo contém a chave ou vice-versa)
-        for (const [key, value] of Object.entries(escoposPorCargo)) {
-          if (cargoParam.includes(key) || key.includes(cargoParam)) {
-            return value;
-          }
-        }
-        return undefined;
-      };
-      
-      const escopoInfo = findEscopo(cargoUpper) || { 
-        titulo: cargo || 'PRESTADOR DE SERVIÇOS', 
-        escopo: 'prestar serviços conforme acordado entre as partes, respeitando as diretrizes técnicas e operacionais da CONTRATANTE' 
-      };
-      
-      console.log(`[pdf-download] Cargo original: "${cargoOriginal}", Upper: "${cargoUpper}", Titulo encontrado: "${escopoInfo.titulo}"`);
+      const pdfBuffer = await gerarContratoPDF({ nome, cpf, cnpj, endereco, estado, cargo, salario: salario || '0', patrimonio });
 
-      const doc = new PDFDocument({ margin: 60, size: 'A4' });
-      const chunks: Buffer[] = [];
-
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => {
-        const pdfBuffer = Buffer.concat(chunks);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="Contrato_${nome.replace(/\s+/g, '_')}.pdf"`);
-        res.send(pdfBuffer);
-      });
-
-      // Logo no header
-      const logoPath = path.join(process.cwd(), 'server/assets/turbo_logo.png');
-      const fs = await import('fs');
-      try {
-        if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, 60, 30, { width: 150 });
-        }
-      } catch (e) {
-        console.log('[pdf-download] Logo não encontrada');
-      }
-      
-      doc.moveDown(4);
-
-      // Header
-      doc.fontSize(13).font('Helvetica-Bold').text('CONTRATO PARTICULAR DE PRESTAÇÃO DE SERVIÇOS', { align: 'center' });
-      doc.moveDown(1.5);
-
-      // Partes
-      doc.fontSize(10).font('Helvetica').text('Pelo presente instrumento particular, e na melhor forma de direito, as partes a seguir qualificadas:');
-      doc.moveDown(0.8);
-      doc.font('Helvetica-Bold').text('CONTRATANTE: ', { continued: true });
-      doc.font('Helvetica').text('TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o n° 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Rodrigo Queiroz Santos;');
-      doc.moveDown(0.5);
-      doc.font('Helvetica-Bold').text('CONTRATADA: ', { continued: true });
-      
-      // Detectar se é pessoa física (CPF) ou jurídica (CNPJ) e formatar qualificação
-      const gerarQualificacaoDownload = (): string => {
-        const cnpjLimpo = (cnpj || '').replace(/\D/g, '');
-        const cpfLimpo = (cpf || '').replace(/\D/g, '');
-        const enderecoFormatado = endereco || 'Não informado';
-        const estadoFormatado = estado ? `, ${estado}` : '';
-        
-        // Formatar CNPJ se existir
-        const cnpjFormatado = cnpjLimpo.length === 14 
-          ? (cnpj || cnpjLimpo.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))
-          : null;
-        
-        // Formatar CPF se existir
-        const cpfFormatado = cpfLimpo.length === 11 
-          ? (cpf || cpfLimpo.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'))
-          : null;
-        
-        // Se tem CNPJ válido (pessoa jurídica)
-        if (cnpjFormatado) {
-          if (cpfFormatado) {
-            // Modelo completo: CNPJ + endereço + CPF
-            return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${enderecoFormatado}${estadoFormatado}, devidamente registrado no CPF ${cpfFormatado}.`;
-          }
-          return `${nome}, pessoa jurídica de direito privado inscrita no CNPJ ${cnpjFormatado}, com sede na ${enderecoFormatado}${estadoFormatado}.`;
-        }
-        
-        // Se tem apenas CPF (pessoa física)
-        if (cpfFormatado) {
-          return `${nome}, pessoa física, inscrita no CPF sob o n° ${cpfFormatado}, residente na ${enderecoFormatado}${estadoFormatado}.`;
-        }
-        
-        // Fallback
-        return `${nome}, com endereço na ${enderecoFormatado}${estadoFormatado}.`;
-      };
-      
-      doc.font('Helvetica').text(gerarQualificacaoDownload());
-      doc.moveDown(0.8);
-      doc.text('Têm entre si, justo e contratado, o presente Contrato de Prestação de Serviços, mediante as seguintes cláusulas e condições:');
-      doc.moveDown(1);
-
-      // CLÁUSULA PRIMEIRA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text(`1.1. O CONTRATADO prestará serviços como ${escopoInfo.titulo}. Para isso, deverá designar pessoa legalmente certificada e habilitada para a execução dos serviços.`);
-      doc.moveDown(0.3);
-      doc.text(`1.1.1. Os serviços serão prestados por pessoa previamente indicada pelo CONTRATADO e compreendem, de modo exemplificativo, as seguintes atribuições: ${escopoInfo.escopo}`);
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horária do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. Toda e qualquer pessoa eventualmente envolvida pela CONTRATADA na execução dos serviços contratados atuará em nome e por conta exclusiva da própria CONTRATADA, sendo esta a única responsável por sua relação jurídica, operacional e contratual com tais profissionais, sem qualquer vínculo direto ou indireto com a CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. As atribuições descritas nesta cláusula são meramente exemplificativas e poderão variar conforme entendimento técnico da CONTRATADA, respeitados os objetivos finais acordados entre as Partes.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA SEGUNDA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SEGUNDA – DO PRAZO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text(`2.1 – O presente contrato tem prazo de 6 (seis) meses, com início em ${dataInicio} e fim em ${dataFim}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes, ocasião em que será reavaliado o escopo e as condições comerciais, desde que nenhuma das partes se manifeste no prazo de antecedência mínimo de 30 (trinta) dias anteriores ao término temporal contratual.`);
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Ao final deste prazo, o contrato poderá ser renovado, sendo este realizado por simples aditivo contratual.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. O presente contrato será considerado rescindido de pleno direito, no caso de falência, concordata ou liquidação, de quaisquer das partes, não sendo aplicável nesse caso nenhuma multa ou indenização.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. No caso de encerramento do presente contrato, a CONTRATADA deverá devolver, à CONTRATANTE, todo material em seu poder e que pertença à CONTRATANTE. A CONTRATANTE deverá quitar quaisquer pagamentos devidos por eventuais perdas e danos.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA TERCEIRA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração mensal de ${salarioFormatado} (${salarioNumerico > 0 ? 'valor bruto' : 'conforme acordado entre as partes'}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`);
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Os valores que resultarem do disposto nesta cláusula constituem os únicos valores/créditos devidos pela CONTRATANTE ao CONTRATADO em razão do presente contrato, eximindo-se a CONTRATANTE de responder por quaisquer outros valores que sejam cobrados pelo CONTRATADO.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. Até o 25° (vigésimo quinto) dia do mês subsequente à prestação dos serviços, a CONTRATANTE providenciará o pagamento da CONTRATADA, desde que cumpridas todo o escopo de entregas previstas no presente instrumento contratual.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. Até o 10° (décimo) dia anterior à data de pagamento e condicionado à plena constatação de cumprimento das entregas previstas, o CONTRATADO deverá emitir a competente Nota Fiscal, remetendo-a imediatamente à CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quarto. Caso em determinado exercício mensal haja a interrupção ou suspensão na prestação dos serviços, o pagamento será feito de modo proporcional ao período de efetiva execução das tarefas.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quinto. O recolhimento dos tributos incidentes sobre os Serviços, assim como o cumprimento das correspondentes obrigações tributárias acessórias, são de exclusiva responsabilidade da CONTRATADA, exceto nas hipóteses em que a CONTRATANTE deva, em razão de disposição legal, promover a retenção dos valores a serem pagos ao Fisco (Municipal, Estadual ou Federal).');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Sexto. O comprovante de depósito ou transferência servirá como recibo e prova de quitação e pagamento da obrigação ajustada.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA QUARTA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA QUARTA – DAS OBRIGAÇÕES DO CONTRATADO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('4.1 - São obrigações do CONTRATADO:');
-      doc.text('I. Prestar os serviços contratados em conformidade com os padrões de qualidade acordados e com a boa técnica profissional aplicável ao setor.');
-      doc.text('II. Fornecer as notas fiscais referentes aos pagamentos efetuados pela CONTRATANTE dentro do prazo previamente estipulado por meio do presente instrumento;');
-      doc.text('III. Arcar com todas as despesas de natureza tributária decorrentes dos serviços especificados neste contrato;');
-      doc.text('IV. Cumprir todas as determinações impostas pelas autoridades públicas competentes, referentes a estes serviços;');
-      doc.text('V. Manter sigilosas, mesmo após findo este contrato, as informações privilegiadas de qualquer natureza às quais tenham acesso em virtude da execução destes serviços, pelo prazo de 5 (cinco) anos;');
-      doc.text('VI. Comprometer-se a utilizar os equipamentos disponibilizados unicamente para fins profissionais relacionados às entregas pactuadas, observando as diretrizes técnicas definidas pela CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Os documentos pertencentes ou em posse da empresa contratante depositados em mídias físicas ou digitais somente devem ser abertos e tratados em computadores credenciados e de propriedade da CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. Sobre os computadores e demais equipamentos fornecidos para a prestação dos serviços não devem ser instalados programas alheios sem a autorização da CONTRATANTE.');
-      doc.moveDown(0.8);
-
-      // Nova página
-      doc.addPage();
-      
-      // Logo na segunda página
-      try {
-        if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, 60, 30, { width: 150 });
-        }
-      } catch (e) {}
-      doc.moveDown(4);
-
-      // CLÁUSULA QUINTA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA QUINTA – DAS OBRIGAÇÕES DA CONTRATANTE');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('5.1 - São obrigações da CONTRATANTE:');
-      doc.text('I. Fornecer todas as informações necessárias à execução dos serviços, incluindo diretrizes e objetivos, respeitada a autonomia técnica e operacional da CONTRATADA quanto aos meios e métodos empregados.');
-      doc.text('II. Efetuar o pagamento, nas datas e nos termos definidos neste contrato;');
-      doc.text('III. Manifestar, de forma expressa, eventuais críticas, dúvidas, solicitações, novas orientações e sugestões pertinentes aos serviços, quando existirem;');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA SEXTA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SEXTA – DA RESCISÃO E EXTINÇÃO DO CONTRATO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('6.1. O presente contrato poderá ser rescindido, a qualquer tempo, por qualquer das partes, independentemente de motivação, mediante comunicação prévia e escrita à outra parte, com antecedência mínima de 30 (trinta) dias, sem que disso decorra o pagamento de multa ou indenização, ressalvadas as obrigações já vencidas.');
-      doc.moveDown(0.3);
-      doc.text('6.2. O contrato poderá ser rescindido de forma motivada, por qualquer das partes, independentemente de aviso prévio, nas seguintes hipóteses:');
-      doc.text('    6.2.1. Descumprimento, pela outra parte, de quaisquer obrigações assumidas neste contrato, inclusive atraso na entrega dos serviços, execução inadequada do objeto ou violação de cláusulas contratuais;');
-      doc.text('    6.2.2. Prática de atos que comprometam a continuidade, a regularidade ou a finalidade do contrato.');
-      doc.moveDown(0.3);
-      doc.text('6.3. O contrato será considerado automaticamente extinto, independentemente de aviso ou notificação, nas seguintes hipóteses:');
-      doc.text('    6.3.1. Impossibilidade superveniente de execução do contrato por motivo de força maior ou caso fortuito, devidamente comprovado;');
-      doc.text('    6.3.2. Encerramento, dissolução ou extinção das atividades empresariais da CONTRATANTE.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA SÉTIMA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO TRABALHISTA E SOCIETÁRIO');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('7.1. Não se estabelece, por força do presente contrato, nenhum vínculo empregatício, nem enseja qualquer tipo de subordinação e pessoalidade entre a CONTRATANTE e o pessoal do CONTRATADO, sendo certo que as obrigações e direitos das partes limita-se ao expressamente avençado neste contrato.');
-      doc.moveDown(0.3);
-      doc.text('7.2. O próprio CONTRATADO, na qualidade de prestador de serviços estabelecerá e concretizará, cotidianamente, a forma de realização dos serviços pactuados no presente termo.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. O CONTRATADO tem ciência e declara que nenhum ex-empregado da CONTRATANTE cujo contrato de trabalho tenha se encerrado há menos de 18 (dezoito) meses poderá ser alocado pelo CONTRATADO na prestação dos serviços.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. O CONTRATADO tem ciência e declara que tem capacidade técnico-financeira para arcar com suas responsabilidades contratuais e extracontratuais, vinculada ou não a este contrato, e que não possui nem se colocará em situação de dependência econômica com relação ao resultado financeiro deste contrato.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. O CONTRATADO declara assumir integralmente os riscos relacionados à atividade empresarial que exerce, inclusive quanto à gestão de sua equipe, métodos de trabalho, investimentos necessários e responsabilidade pelos resultados.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quarto. O CONTRATADO tem ciência e declara que nada neste contrato poderá ser interpretado como tendo as partes, estabelecido qualquer forma de sociedade, associação, agência ou consórcio, de fato ou de direito, permanecendo cada uma das partes com as suas obrigações civis, comerciais, trabalhistas e tributárias, de forma autônoma.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quinto. Não haverá controles de horários de chegada ou saída ou subordinação, com total autonomia da CONTRATADA em relação à CONTRATANTE, se comprometendo a CONTRATANTE a executar os serviços contratados através das horas necessárias à execução dos serviços, conforme acordado, sob pena dos respectivos descontos.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA OITAVA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA OITAVA – DA CONFIDENCIALIDADE E DIREITO DE IMAGEM');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('8.1. As partes concordam que, sem o consentimento escrito, não poderão revelar ou divulgar, direta ou indiretamente, no todo ou em parte, isolada ou juntamente com terceiros, qualquer informação confidencial referente ao presente contrato, o que inclui, mas não se limita a: todos e quaisquer dados, relatórios, análises, estudos, pesquisas, interpretações, previsões/estimativas, registros, materiais e quaisquer outros elementos que contenham informações referentes aos negócios objeto deste contrato, aos membros envolvidos e aos investidores, assim como dados pessoais nos termos da legislação vigente (Lei Geral de Proteção de Dados - LGPD). As disposições desta cláusula sobreviverão após o prazo de 05 (cinco) anos posteriores à vigência deste contrato ou à rescisão do mesmo por qualquer razão.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. Para os propósitos, serão consideradas "informações confidenciais" todas e quaisquer informações e/ou dados de natureza confidencial (incluindo, sem limitação, os termos e condições deste contrato e todos os segredos e/ou informações operacionais, econômicas e técnicas, bem como demais informações comerciais ou "know-how") que tenham sido direta ou indiretamente fornecidos ou divulgados por uma das partes à outra sob ou em função deste contrato, a qualquer título e por qualquer modo, que não sejam, ou não venham a ser, de conhecimento público, que não por culpa imputável à parte receptora.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. Caso alguma das partes venha a ser legalmente obrigada a revelar qualquer informação confidencial, por qualquer juízo ou autoridade governamental competente, essa deverá notificar a contrária de tal ordem, para que possa adotar medidas cabíveis para resguardar os seus direitos ou dispensar a parte que cumprir as obrigações dispostas neste acordo.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. A CONTRATADA não poderá, em nenhuma hipótese, fazer qualquer outro uso, realizar qualquer outro negócio ou celebrar qualquer outro contrato relacionado, direta ou indiretamente, às Informações Confidenciais.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quarto. Todas as Informações Confidenciais devem ser mantidas e tratadas como estritamente confidenciais e não poderão ser reveladas a qualquer terceiro, de forma alguma, no todo ou em parte, bem como não poderão ser utilizadas para qualquer finalidade que não esteja única e exclusivamente relacionada aos Serviços.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Quinto. Sem prejuízo de outras obrigações, a CONTRATADA se compromete desde logo a:');
-      doc.text('1. Não divulgar quaisquer Informações Confidenciais a quaisquer terceiros;');
-      doc.text('2. Utilizar quaisquer Informações Confidenciais exclusivamente para a execução da prestação dos serviços;');
-      doc.text('3. Não analisar, providenciar análise, derivar ou sintetizar qualquer informação recebida da CONTRATANTE sem autorização prévia e fora dos limites da execução de seu trabalho.');
-      doc.moveDown(0.3);
-      doc.font('Helvetica-Bold').text('Parágrafo Sexto. O descumprimento da presente cláusula enseja o pagamento, por parte da CONTRATADA ao CONTRATANTE, de multa não compensatória fixada em R$50.000,00 (cinquenta mil reais).');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').text('8.2. O CONTRATADO autoriza, de forma livre, expressa, irrevogável e irretratável, a utilização de sua imagem, nome e voz pela CONTRATANTE, para fins institucionais, comerciais e publicitários relacionados ao objeto deste contrato, em quaisquer meios físicos ou digitais, sem limitação territorial ou temporal, inclusive após o término da relação contratual, sem que disso decorra direito a remuneração adicional.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo único. A utilização ora autorizada não implica exclusividade, vínculo empregatício ou societário, comprometendo-se a CONTRATANTE a utilizar a imagem do CONTRATADO de forma ética e compatível com a finalidade profissional pactuada.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA NONA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA NONA – DA INEXISTÊNCIA DE LICENÇAS');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('9.1. A CONTRATANTE reterá todo o direito, titularidade e interesse sobre as informações confidenciais presentes no presente contrato.');
-      doc.moveDown(0.3);
-      doc.text('9.2. São e serão considerados como propriedade intelectual e/ou industrial única e exclusiva da CONTRATANTE qualquer produto, criação, desenvolvimento, relatório, planilha, resultado, dentre outros, ainda que tenham sido desenvolvidos pela CONTRATADA.');
-      doc.moveDown(0.3);
-      doc.text('9.3. São e serão considerados como propriedade intelectual e/ou industrial única e exclusiva da CONTRATANTE qualquer produto, criação, desenvolvimento, relatório, planilha, resultado, dentre outros, ainda que tenham sido desenvolvidos pela CONTRATADA. Nenhum direito de propriedade intelectual e/ou industrial será detido pela CONTRATADA, a qual, expressamente, cede e transfere à CONTRATANTE, desde logo, não onerosamente, todo e qualquer direito relacionado ou derivado a qualquer espécie de criação decorrente do relacionamento entre as Partes.');
-      doc.moveDown(0.3);
-      doc.text('9.4. A CONTRATADA expressamente declara que todo e qualquer valor a título de eventuais direitos sobre propriedade intelectual e/ou industrial, direitos autorais ou qualquer espécie de direitos imateriais, já foi considerada pelas Partes na fixação do Preço (contraprestação), razão pela qual nenhuma quantia poderá ser reclamada, a qualquer título, pela CONTRATADA.');
-      doc.moveDown(0.8);
-
-      // Nova página
-      doc.addPage();
-      
-      // Logo na terceira página
-      try {
-        if (fs.existsSync(logoPath)) {
-          doc.image(logoPath, 60, 30, { width: 150 });
-        }
-      } catch (e) {}
-      doc.moveDown(4);
-
-      // CLÁUSULA DÉCIMA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA – DA ABSTENÇÃO DE ALICIAMENTO E INDUÇÃO DE TERCEIROS VINCULADOS À CONTRATANTE');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('10.1. Durante a vigência deste instrumento e por um período de 24 (vinte e quatro) meses após sua extinção, o CONTRATADO se compromete a não contratar, ou tentar contratar, direta ou indiretamente, qualquer empregado(a) da CONTRATANTE ou de qualquer outra empresa do grupo no Brasil ou no exterior, para trabalhar para seu novo empregador ou empresa da qual seja, direta ou indiretamente, ligado, inclusive como sócio.');
-      doc.moveDown(0.3);
-      doc.text('10.1.1. Durante o período mencionado na Cláusula Segunda e pelo mesmo prazo de 02 (dois) anos contados da rescisão do contrato, o CONTRATADO também se compromete a não ajudar terceiros a contratar empregados(as) da CONTRATANTE ou de outra empresa do grupo, tampouco a induzir ou convencer qualquer empregado(a) da CONTRATANTE a rescindir o contrato que mantém com a CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('10.2. O CONTRATADO, também neste ato, de forma irrevogável e irretratável, se compromete perante a CONTRATANTE a abster-se, durante a vigência do presente e pelo período de 02 (dois) anos contados da rescisão contratual de direta ou indiretamente, aliciar, induzir, convidar, contratar, nem determinar que seja aliciado, induzido ou convidado:');
-      doc.moveDown(0.2);
-      doc.text('(i) Qualquer cliente atendido e/ou captado pela CONTRATANTE ou pelo CONTRATADO durante a prestação de seus serviços para que tal cliente seja atendido por outra personalidade jurídica concorrente da TURBO;');
-      doc.text('(ii) Qualquer empregado, sócio, diretor ou outro prestador de serviços da TURBO e/ou qualquer de suas afiliadas;');
-      doc.text('(iii) Qualquer pessoa a deixar de fazer negócios com a TURBO e/ou qualquer de suas afiliadas;');
-      doc.text('(iv) Qualquer fornecedor ou cliente da TURBO a deixar de realizar ou diminuir os negócios realizados com a CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.font('Helvetica-Bold').text('10.3. Sem prejuízo das indenizações por perdas e danos e da responsabilidade criminal, o CONTRATADO, em caso de infração da presente cláusula, pagará ao CONTRATANTE uma multa não compensatória igual a R$ 100.000,00 (cem mil reais) por cada infração.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA DÉCIMA PRIMEIRA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA PRIMEIRA – DA PROTEÇÃO DE DADOS PESSOAIS');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('11.1. Seguindo as determinações da Lei 13.709/2018 ("Lei Geral de Proteção de Dados Pessoais") o CONTRATADO se compromete a manter segredo absoluto dos assuntos relacionados aos serviços prestados, bem como de todos os dados e informações relativos aos resultados obtidos na prestação do serviço, comprometendo-se a: não utilizar as informações confidenciais a que tiver acesso pelo período de 05 (cinco) anos, para gerar benefício próprio exclusivo e/ou unilateral, presente ou futuro, ou para o uso de terceiros; não efetuar nenhuma gravação ou cópia da documentação confidencial a que tiver acesso; não apropriar-se para si ou para outrem de material confidencial e/ou sigiloso da tecnologia que venha a ser disponível e; não repassar o conhecimento das informações confidenciais, responsabilizando-se por todas as pessoas que vierem a ter acesso às informações, por seu intermédio, e obrigando-se, assim, a reparar a ocorrência de qualquer dano e/ou prejuízo oriundo de uma eventual quebra de sigilo das informações fornecidas.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Primeiro. As partes se comprometem a não utilizar os dados pessoais que tiverem acesso para fins distintos da relação estabelecida, sendo vedada a transmissão para terceiros.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Segundo. As partes se comprometem em manter os compromissos acima, mesmo após o término da relação contratual, pelo período de 5 (cinco) anos.');
-      doc.moveDown(0.3);
-      doc.text('Parágrafo Terceiro. As partes declaram que qualquer conduta incompatível com as disposições acima será considerada uma grave violação deste contrato e será considerado motivo de justa causa para a rescisão imediata, sem prejuízo da adoção das medidas legalmente cabíveis.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA DÉCIMA SEGUNDA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA SEGUNDA – DO USO E RESPONSABILIDADE PELOS EQUIPAMENTOS FORNECIDOS PELA CONTRATANTE');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('12.1. A CONTRATANTE poderá disponibilizar, em regime de comodato, um computador de sua propriedade, para uso exclusivo da CONTRATADA na execução dos serviços contratados neste instrumento.');
-      doc.moveDown(0.3);
-      doc.text('12.2. A CONTRATADA compromete-se a zelar pelo bom estado de conservação, uso adequado e exclusivo do equipamento disponibilizado, abstendo-se de utilizá-lo para fins pessoais, atividades não relacionadas ao presente contrato, ou por terceiros.');
-      doc.moveDown(0.3);
-      doc.text('12.3. A CONTRATADA será responsável integral por qualquer dano, perda, extravio, furto, roubo ou mau uso do equipamento, independentemente de culpa, obrigando-se a arcar com os custos de reparação ou substituição integral do bem, conforme orçamento técnico indicado pela CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('12.4. Em caso de dano parcial, a CONTRATADA deverá restituir à CONTRATANTE o valor referente ao reparo, no prazo máximo de 30 (trinta) dias após a notificação escrita.');
-      doc.moveDown(0.3);
-      doc.text('12.5. Em caso de perda total, extravio, furto ou roubo, a CONTRATADA deverá indenizar a CONTRATANTE com base no valor de mercado atualizado do bem à época do evento, conforme cotação de revendedor autorizado ou nota fiscal de aquisição, o que for mais benéfico à CONTRATANTE.');
-      doc.moveDown(0.3);
-      doc.text('12.6. O equipamento deverá ser devolvido à CONTRATANTE no ato de rescisão do contrato, em perfeito estado de funcionamento e conservação, ressalvado o desgaste natural decorrente do uso regular.');
-      doc.moveDown(0.3);
-      doc.text('12.7. A CONTRATANTE poderá, a qualquer tempo, solicitar a devolução imediata do equipamento, cabendo à CONTRATADA o cumprimento imediato da solicitação.');
-      doc.moveDown(0.3);
-      doc.text('12.8. O inadimplemento das obrigações previstas nesta cláusula autoriza a CONTRATANTE a reter valores devidos à CONTRATADA até o limite da indenização cabível, sem prejuízo das demais medidas legais e contratuais aplicáveis.');
-      doc.moveDown(0.8);
-
-      // CLÁUSULA DÉCIMA TERCEIRA
-      doc.font('Helvetica-Bold').fontSize(10).text('CLÁUSULA DÉCIMA TERCEIRA – DAS DISPOSIÇÕES GERAIS');
-      doc.moveDown(0.3);
-      doc.font('Helvetica').fontSize(9).text('13.1. Nenhuma das Partes poderá ceder ou transferir quaisquer direitos ou obrigações decorrentes deste contrato a terceiros, total ou parcialmente, sem o prévio e expresso consentimento por escrito da outra Parte.');
-      doc.moveDown(0.3);
-      doc.text('13.2. O presente contrato é celebrado em caráter irrevogável e irretratável, obrigando as Partes e seus sucessores.');
-      doc.moveDown(0.3);
-      doc.text('13.3. A tolerância das Partes com relação a inadimplemento ou não cumprimento de qualquer obrigação, cláusula, termo ou condição ora estabelecida não constitui precedente, renúncia a obrigações, emenda ou renovação do contrato, e sim mera liberalidade.');
-      doc.moveDown(0.3);
-      doc.text('13.4. A declaração de nulidade ou anulação de qualquer dos dispositivos contidos neste instrumento não invalidará suas demais disposições, as quais permanecerão em pleno vigor.');
-      doc.moveDown(0.3);
-      doc.text('13.5. Não se estabelece, por força deste instrumento, qualquer forma de sociedade, associação, agência, consórcio, participação societária, ou responsabilidade solidária entre as partes.');
-      doc.moveDown(0.3);
-      doc.text('13.6. O objeto deste contrato não visa proporcionar nenhuma espécie de vantagem fiscal, trabalhista ou previdenciária a qualquer Parte ou a terceiros, e não implica vínculo empregatício entre uma das partes e os funcionários/prepostos da outra, ficando a cargo de cada uma delas a responsabilidade referente aos encargos sociais, tributários, previdenciários e trabalhistas de seus respectivos colaboradores.');
-      doc.moveDown(0.3);
-      doc.text('13.7. Os tributos (impostos, taxas, emolumentos, contribuições fiscais e parafiscais) que sejam devidos em decorrência direta ou indireta do presente contrato ou de sua execução, serão de exclusiva responsabilidade do contribuinte, conforme definido na norma tributária, autorizadas as retenções legais, sem direito a reembolso.');
-      doc.moveDown(0.3);
-      doc.text('13.8. O presente CONTRATO é o instrumento que regula todos os direitos e obrigações acordadas entre as Partes, substituindo todo e qualquer CONTRATO ou entendimento previamente realizado pelas Partes.');
-      doc.moveDown(0.3);
-      doc.text('13.9. Toda e qualquer modificação deste CONTRATO somente poderá ocorrer mediante aditamento, o qual deverá observar, obrigatoriamente, a forma escrita.');
-      doc.moveDown(0.3);
-      doc.text('13.10. Na hipótese de qualquer autuação, fiscalização, imposição de multa, desenquadramento ou fixação de qualquer outra sanção, de qualquer natureza, em desfavor da CONTRATADA, em especial em matéria tributária ou trabalhista, nenhuma responsabilidade incumbirá à CONTRATANTE, a qual fica desobrigada de qualquer pagamento ou assunção de despesas, sendo de rigor, ao revés, a obrigação de a CONTRATADA indenizar a CONTRATANTE por eventuais prejuízos decorrentes de tais eventos.');
-      doc.moveDown(0.3);
-      doc.text('13.11. Para fins de prova e, por derradeiro, para dirimir quaisquer dúvidas, controvérsias ou litígios oriundos do presente CONTRATO, tanto para procedimento judicial quanto arbitral ou de mediação, valerá a versão digital da via de cada Parte, com a devida certificação da plataforma digital utilizada para a assinatura eletrônica deste CONTRATO.');
-      doc.moveDown(0.3);
-      doc.text('13.12. Fica eleito o Foro da Comarca de Vitória/ES para nele serem dirimidas eventuais dúvidas ou questões oriundas deste contrato, com renúncia expressa a qualquer outro, por mais privilegiado que seja.');
-      doc.moveDown(0.3);
-      doc.text('13.13. Declaram as Partes que as obrigações aqui presentes são celebradas de boa-fé, livremente e de comum acordo, não existindo quaisquer vícios ou defeitos que possam acarretar a sua nulidade, em especial aqueles relacionados com dolo, erro, fraude, simulação ou coação, inexistindo também qualquer fato que possa ser configurado como estado de perigo ou de necessidade.');
-      doc.moveDown(1);
-
-      doc.text('As Partes neste ato declaram que (i) é admitida como válida e verdadeira a assinatura deste Contrato por meio de certificado digital emitido por entidades credenciadas para tanto pela Infraestrutura de Chaves Públicas Brasileira - ICP-Brasil; e (ii) são admitidas como válidas e originais as vias deste Contrato emitidas por meios de comprovação da autoria e integridade de documentos em forma eletrônica, inclusive os que utilizem certificados não emitidos pela ICP-Brasil.');
-      doc.moveDown(0.5);
-      doc.text('Em testemunho do quê, as PARTES assinaram este Memorando em 3 (três) vias contendo os mesmos termos e condições, conjuntamente com 2 (duas) testemunhas.');
-      doc.moveDown(1.5);
-
-      // Assinaturas
-      doc.fontSize(10).text(`Vitória, ${dataAtual}.`);
-      doc.moveDown(2);
-      doc.text('____________________________________________________', { align: 'center' });
-      doc.font('Helvetica-Bold').text('TURBO PARTNERS LTDA', { align: 'center' });
-      doc.font('Helvetica').text('CONTRATANTE', { align: 'center' });
-      doc.moveDown(2);
-      doc.text('____________________________________________________', { align: 'center' });
-      doc.font('Helvetica-Bold').text(nome.toUpperCase(), { align: 'center' });
-      doc.font('Helvetica').text('CONTRATADO(A)', { align: 'center' });
-
-      doc.end();
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Contrato_${nome.replace(/\s+/g, '_')}.pdf"`);
+      res.send(pdfBuffer);
     } catch (error) {
       console.error("[api] Error generating contract PDF:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
     }
   });
+
 
   // ==================== JURÍDICO - Regras de Escalonamento ====================
   // Note: Table creation and seeding is handled by ensureEscalationRulesTable() above
@@ -9652,6 +9348,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error recalculating churn risk:", error);
       res.status(500).json({ error: "Falha ao recalcular scores de risco" });
+    }
+  });
+
+  // NRR & Cross-sell breakdown por período
+  app.get("/api/analytics/nrr", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      const { getNrrForPeriod, getNrr } = await import("./okr2026/metricsAdapter");
+
+      if (startDate && endDate) {
+        const result = await getNrrForPeriod(startDate, endDate);
+        res.json(result);
+      } else {
+        const result = await getNrr();
+        res.json({ ...result, vendas_mrr_novo: 0, vendas_mrr_total: 0 });
+      }
+    } catch (error) {
+      console.error("[api] Error fetching NRR:", error);
+      res.status(500).json({ error: "Failed to fetch NRR" });
     }
   });
 
@@ -16368,6 +16084,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           // O1 - Bigger KRs
           faturamento_legado: metrics.receita_total_ytd,
           vendas_mrr: metrics.vendas_mrr,
+          vendas_mrr_novo: metrics.vendas_mrr_novo,
+          crosssell_mrr: metrics.crosssell_mrr,
+          nrr_pct: metrics.nrr_pct,
           vendas_pontual: metrics.vendas_pontual,
           faturamento_ventures: metrics.turbooh_receita,
           projetos_tech: metrics.tech_projetos_valor,
@@ -16805,9 +16524,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as capex FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND categoria_nome LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll FROM "Conta Azul".caz_parcelas WHERE status IN ('QUITADO','RECEBIDO_PARCIAL') AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(valorr::numeric), 0) as churn FROM "Clickup".cup_contratos WHERE data_solicitacao_encerramento >= '${mStart}' AND data_solicitacao_encerramento <= '${mEnd}'`)),
-              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE status = 'Ativo'`)),
-              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_clientes WHERE status IN ('ativo', 'triagem', 'onboarding')`)),
-              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${mEnd}'::date AND status IN ('ativo', 'triagem', 'onboarding')`)),
+              db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE admissao IS NOT NULL AND admissao::date <= '${mEnd}'::date AND (demissao IS NULL OR demissao::date > '${mEnd}'::date)`)),
+              db.execute(sql.raw(`SELECT COUNT(DISTINCT id_task) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${mEnd}'::date AND status IN ('ativo', 'triagem', 'onboarding')`)),
+              db.execute(sql.raw(`SELECT COUNT(DISTINCT id_subtask) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${mEnd}'::date AND status IN ('ativo', 'triagem', 'onboarding')`)),
             ]);
 
             const sMrr = parseFloat((snapMrr.rows[0] as any)?.mrr || "0");
@@ -17469,9 +17188,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const churnMrr = parseFloat((churnResult.rows[0] as any)?.churn || "0");
 
       // Headcount, Clientes, Contratos
-      const headcountResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE status = 'Ativo'`));
-      const clientesResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_clientes WHERE status IN ('ativo', 'triagem', 'onboarding')`));
-      const contratosResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${endStr}'::date AND status IN ('ativo', 'triagem', 'onboarding')`));
+      const headcountResult = await db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE admissao IS NOT NULL AND admissao::date <= '${endStr}'::date AND (demissao IS NULL OR demissao::date > '${endStr}'::date)`));
+      const clientesResult = await db.execute(sql.raw(`SELECT COUNT(DISTINCT id_task) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${endStr}'::date AND status IN ('ativo', 'triagem', 'onboarding')`));
+      const contratosResult = await db.execute(sql.raw(`SELECT COUNT(DISTINCT id_subtask) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${endStr}'::date AND status IN ('ativo', 'triagem', 'onboarding')`));
 
       const receitaTotalFaturavel = mrrAtivo + receitaPontual + outrasReceitas;
       const receitaLiquida = receitaTotalFaturavel - inadimplencia - impostos;
