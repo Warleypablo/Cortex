@@ -2061,7 +2061,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           t.cliente,
           t.equipe,
           t.tipo_task as "tipoTask",
-          t.parent_id as "parentId"
+          t.parent_id as "parentId",
+          COALESCE((SELECT COUNT(*) FROM cortex_core.tarefa_comentarios tc WHERE tc.tarefa_id = t.id), 0)::int as "comentariosCount",
+          COALESCE((SELECT COUNT(*) FROM cortex_core.tarefa_anexos ta WHERE ta.tarefa_id = t.id), 0)::int as "anexosCount"
         FROM cortex_core.tarefas_clientes t
         WHERE LOWER(TRIM(t.cliente)) = LOWER(TRIM(${clienteNome}))
            OR t.cliente ILIKE ${`%${clienteNome}%`}
@@ -2155,6 +2157,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error deleting task:", error);
       res.status(500).json({ error: "Failed to delete task" });
+    }
+  });
+
+  // ============================================
+  // Task Comments API
+  // ============================================
+
+  app.get("/api/cliente/tasks/:id/comentarios", async (req, res) => {
+    try {
+      const tarefaId = parseInt(req.params.id);
+      const result = await db.execute(sql`
+        SELECT id, tarefa_id as "tarefaId", autor, conteudo, created_at as "createdAt"
+        FROM cortex_core.tarefa_comentarios
+        WHERE tarefa_id = ${tarefaId}
+        ORDER BY created_at ASC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  app.post("/api/cliente/tasks/:id/comentarios", async (req, res) => {
+    try {
+      const tarefaId = parseInt(req.params.id);
+      const { conteudo, autor } = req.body;
+      if (!conteudo) return res.status(400).json({ error: "conteudo is required" });
+
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.tarefa_comentarios (tarefa_id, autor, conteudo)
+        VALUES (${tarefaId}, ${autor ?? null}, ${conteudo})
+        RETURNING id, tarefa_id as "tarefaId", autor, conteudo, created_at as "createdAt"
+      `);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating comment:", error);
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  app.delete("/api/cliente/tasks/:id/comentarios/:comentarioId", async (req, res) => {
+    try {
+      const comentarioId = parseInt(req.params.comentarioId);
+      await db.execute(sql`
+        DELETE FROM cortex_core.tarefa_comentarios WHERE id = ${comentarioId}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting comment:", error);
+      res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
+  // ============================================
+  // Task Attachments API
+  // ============================================
+
+  app.get("/api/cliente/tasks/:id/anexos", async (req, res) => {
+    try {
+      const tarefaId = parseInt(req.params.id);
+      const result = await db.execute(sql`
+        SELECT id, tarefa_id as "tarefaId", nome_arquivo as "nomeArquivo", object_path as "objectPath",
+               content_type as "contentType", tamanho, autor, created_at as "createdAt"
+        FROM cortex_core.tarefa_anexos
+        WHERE tarefa_id = ${tarefaId}
+        ORDER BY created_at DESC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching attachments:", error);
+      res.status(500).json({ error: "Failed to fetch attachments" });
+    }
+  });
+
+  app.post("/api/cliente/tasks/:id/anexos", async (req, res) => {
+    try {
+      const tarefaId = parseInt(req.params.id);
+      const { nome_arquivo, object_path, content_type, tamanho, autor } = req.body;
+      if (!nome_arquivo || !object_path) return res.status(400).json({ error: "nome_arquivo and object_path are required" });
+
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.tarefa_anexos (tarefa_id, nome_arquivo, object_path, content_type, tamanho, autor)
+        VALUES (${tarefaId}, ${nome_arquivo}, ${object_path}, ${content_type ?? null}, ${tamanho ?? null}, ${autor ?? null})
+        RETURNING id, tarefa_id as "tarefaId", nome_arquivo as "nomeArquivo", object_path as "objectPath",
+                  content_type as "contentType", tamanho, autor, created_at as "createdAt"
+      `);
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating attachment:", error);
+      res.status(500).json({ error: "Failed to create attachment" });
+    }
+  });
+
+  app.delete("/api/cliente/tasks/:id/anexos/:anexoId", async (req, res) => {
+    try {
+      const anexoId = parseInt(req.params.anexoId);
+      await db.execute(sql`
+        DELETE FROM cortex_core.tarefa_anexos WHERE id = ${anexoId}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting attachment:", error);
+      res.status(500).json({ error: "Failed to delete attachment" });
     }
   });
 

@@ -562,6 +562,32 @@ async function ensureContratosTablesExist() {
       console.log("[contratos] tarefas_clientes migration skipped:", migErr.message);
     }
 
+    // Comments on tasks
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.tarefa_comentarios (
+        id SERIAL PRIMARY KEY,
+        tarefa_id INTEGER NOT NULL REFERENCES cortex_core.tarefas_clientes(id) ON DELETE CASCADE,
+        autor VARCHAR(255),
+        conteudo TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    // Attachments on tasks
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.tarefa_anexos (
+        id SERIAL PRIMARY KEY,
+        tarefa_id INTEGER NOT NULL REFERENCES cortex_core.tarefas_clientes(id) ON DELETE CASCADE,
+        nome_arquivo VARCHAR(500) NOT NULL,
+        object_path TEXT NOT NULL,
+        content_type VARCHAR(100),
+        tamanho INTEGER,
+        autor VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log("[contratos] tarefa_comentarios & tarefa_anexos tables ready");
+
     tablesInitialized = true;
     console.log("[contratos] All tables initialized successfully");
     
