@@ -14,10 +14,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useUpload } from "@/hooks/use-upload";
 import StatsCard from "@/components/StatsCard";
 import RevenueChart from "@/components/RevenueChart";
 import { TurbodashKPICards } from "@/components/TurbodashKPICards";
-import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, ChevronRight, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown, XCircle, Star, MessageCircle, Wrench, Lock, Settings, Plug, Trash2 } from "lucide-react";
+import { ArrowLeft, DollarSign, TrendingUp, Receipt, Loader2, ExternalLink, Key, Eye, EyeOff, Copy, Building2, MapPin, Phone, User, Calendar as CalendarIcon, Briefcase, Layers, CheckCircle, FileText, ChevronUp, ChevronDown, ChevronRight, CreditCard, Activity, Globe, Mail, Link2, ListTodo, Pencil, Crown, Check, X, MessageSquare, Scale, AlertTriangle, Clock, Flag, Send, Plus, ChevronsUpDown, XCircle, Star, MessageCircle, Wrench, Lock, Settings, Plug, Trash2, Paperclip, Play, File, Image, Download, Upload } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -138,6 +140,27 @@ interface ClienteTask {
   tipoTask: string | null;
   parentId: number | null;
   subtasks?: ClienteTask[];
+  comentariosCount?: number;
+  anexosCount?: number;
+}
+
+interface TarefaComentario {
+  id: number;
+  tarefaId: number;
+  autor: string | null;
+  conteudo: string;
+  createdAt: string;
+}
+
+interface TarefaAnexo {
+  id: number;
+  tarefaId: number;
+  nomeArquivo: string;
+  objectPath: string;
+  contentType: string | null;
+  tamanho: number | null;
+  autor: string | null;
+  createdAt: string;
 }
 
 interface ClienteComunicacao {
@@ -198,6 +221,9 @@ export default function ClientDetail() {
   });
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [editingTask, setEditingTask] = useState<ClienteTask | null>(null);
+  const [taskDetailTab, setTaskDetailTab] = useState("detalhes");
+  const [newComment, setNewComment] = useState("");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [taskEditData, setTaskEditData] = useState({
     nome: '',
     status: '',
@@ -458,8 +484,156 @@ export default function ClientDetail() {
     },
   });
 
+  // Comments & Attachments queries
+  const { data: taskComentarios, isLoading: isLoadingComentarios } = useQuery<TarefaComentario[]>({
+    queryKey: ["/api/cliente/tasks", editingTask?.id, "comentarios"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cliente/tasks/${editingTask!.id}/comentarios`);
+      if (!res.ok) throw new Error("Failed to fetch comments");
+      return res.json();
+    },
+    enabled: !!editingTask,
+  });
+
+  const { data: taskAnexos, isLoading: isLoadingAnexos } = useQuery<TarefaAnexo[]>({
+    queryKey: ["/api/cliente/tasks", editingTask?.id, "anexos"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cliente/tasks/${editingTask!.id}/anexos`);
+      if (!res.ok) throw new Error("Failed to fetch attachments");
+      return res.json();
+    },
+    enabled: !!editingTask,
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: async ({ taskId, conteudo, autor }: { taskId: string; conteudo: string; autor: string }) => {
+      const res = await fetch(`/api/cliente/tasks/${taskId}/comentarios`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conteudo, autor }),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`${res.status}: ${errBody}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente/tasks", editingTask?.id, "comentarios"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", cliente?.cnpj, "tasks"] });
+      setNewComment("");
+    },
+    onError: (err: any) => {
+      console.error("[addComment] Error:", err);
+      toast({ title: "Erro", description: `Não foi possível adicionar o comentário: ${err?.message || 'Erro desconhecido'}`, variant: "destructive" });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async ({ taskId, comentarioId }: { taskId: string; comentarioId: number }) => {
+      await apiRequest("DELETE", `/api/cliente/tasks/${taskId}/comentarios/${comentarioId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente/tasks", editingTask?.id, "comentarios"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", cliente?.cnpj, "tasks"] });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível excluir o comentário.", variant: "destructive" });
+    },
+  });
+
+  const addAnexoMutation = useMutation({
+    mutationFn: async ({ taskId, data }: { taskId: string; data: Record<string, any> }) => {
+      const res = await fetch(`/api/cliente/tasks/${taskId}/anexos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`${res.status}: ${errBody}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente/tasks", editingTask?.id, "anexos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", cliente?.cnpj, "tasks"] });
+      toast({ title: "Arquivo anexado", description: "O arquivo foi anexado com sucesso." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível registrar o anexo.", variant: "destructive" });
+    },
+  });
+
+  const deleteAnexoMutation = useMutation({
+    mutationFn: async ({ taskId, anexoId }: { taskId: string; anexoId: number }) => {
+      await apiRequest("DELETE", `/api/cliente/tasks/${taskId}/anexos/${anexoId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente/tasks", editingTask?.id, "anexos"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cliente", cliente?.cnpj, "tasks"] });
+      toast({ title: "Anexo removido", description: "O anexo foi removido com sucesso." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível excluir o anexo.", variant: "destructive" });
+    },
+  });
+
+  const { uploadFile, isUploading: isUploadingFile } = useUpload();
+
+  const ALLOWED_TYPES = [
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/quicktime', 'video/webm',
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ];
+  const MAX_SIZE_VIDEO = 50 * 1024 * 1024;
+  const MAX_SIZE_OTHER = 10 * 1024 * 1024;
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingTask) return;
+    e.target.value = '';
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast({ title: "Tipo não suportado", description: "Use imagens (jpg, png, gif, webp), vídeos (mp4, mov, webm) ou documentos (pdf, docx, xlsx).", variant: "destructive" });
+      return;
+    }
+    const maxSize = file.type.startsWith('video/') ? MAX_SIZE_VIDEO : MAX_SIZE_OTHER;
+    if (file.size > maxSize) {
+      toast({ title: "Arquivo muito grande", description: `Máximo: ${file.type.startsWith('video/') ? '50MB' : '10MB'}.`, variant: "destructive" });
+      return;
+    }
+
+    const result = await uploadFile(file);
+    if (result) {
+      addAnexoMutation.mutate({
+        taskId: editingTask.id,
+        data: {
+          nome_arquivo: file.name,
+          object_path: result.objectPath,
+          content_type: file.type,
+          tamanho: file.size,
+          autor: "Equipe",
+        },
+      });
+    }
+  };
+
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const openEditModal = (task: ClienteTask) => {
     setEditingTask(task);
+    setTaskDetailTab("detalhes");
+    setNewComment("");
     setTaskEditData({
       nome: task.nome || '',
       status: task.status || 'a fazer',
@@ -3504,6 +3678,18 @@ export default function ClientDetail() {
                                     {completedSubtasks}/{totalSubtasks}
                                   </Badge>
                                 )}
+                                {(t.comentariosCount ?? 0) > 0 && (
+                                  <span className="flex items-center gap-0.5 text-muted-foreground shrink-0" title={`${t.comentariosCount} comentário(s)`}>
+                                    <MessageSquare className="w-3 h-3" />
+                                    <span className="text-[10px]">{t.comentariosCount}</span>
+                                  </span>
+                                )}
+                                {(t.anexosCount ?? 0) > 0 && (
+                                  <span className="flex items-center gap-0.5 text-muted-foreground shrink-0" title={`${t.anexosCount} anexo(s)`}>
+                                    <Paperclip className="w-3 h-3" />
+                                    <span className="text-[10px]">{t.anexosCount}</span>
+                                  </span>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -3563,101 +3749,339 @@ export default function ClientDetail() {
                   </TableBody>
                 </Table>
 
-                {/* Edit Task Modal */}
-                <Dialog open={!!editingTask} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
-                  <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                      <DialogTitle>Editar Tarefa</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Nome</label>
-                        <Input
-                          value={taskEditData.nome}
-                          onChange={(e) => setTaskEditData(prev => ({ ...prev, nome: e.target.value }))}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium">Status</label>
-                          <Select value={taskEditData.status} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, status: val }))}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {TASK_STATUS_LIST.map(s => (
-                                <SelectItem key={s} value={s}>{s}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                {/* Task Detail Sheet */}
+                <Sheet open={!!editingTask} onOpenChange={(open) => { if (!open) setEditingTask(null); }}>
+                  <SheetContent side="right" className="!max-w-[580px] w-full p-0 flex flex-col gap-0 h-full">
+                    {/* Header */}
+                    <div className="px-6 pt-6 pb-4 border-b bg-muted/30">
+                      <SheetHeader>
+                        <div className="flex items-start gap-3 pr-8">
+                          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                            <ListTodo className="w-4.5 h-4.5 text-primary" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <SheetTitle className="text-base font-semibold leading-tight truncate">{editingTask?.nome || 'Tarefa'}</SheetTitle>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              {editingTask?.tipoTask && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal capitalize">{editingTask.tipoTask}</Badge>
+                              )}
+                              {editingTask?.dataCriacao && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  Criada em {new Date(editingTask.dataCriacao).toLocaleDateString('pt-BR')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium">Prioridade</label>
-                          <Select value={taskEditData.prioridade} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, prioridade: val }))}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {PRIORIDADE_LIST.map(p => (
-                                <SelectItem key={p} value={p}>{p}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-sm font-medium">Responsável</label>
-                        <Select value={taskEditData.responsavel || '__none__'} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, responsavel: val === '__none__' ? '' : val }))}>
-                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">Nenhum</SelectItem>
-                            {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
-                              <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium">Equipe</label>
-                          <Select value={taskEditData.equipe || '__none__'} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, equipe: val === '__none__' ? '' : val }))}>
-                            <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__none__">Nenhuma</SelectItem>
-                              {TASK_SQUAD_LIST.map(sq => (
-                                <SelectItem key={sq} value={sq}>{sq}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="text-sm font-medium">Data Limite</label>
-                          <Input
-                            type="date"
-                            value={taskEditData.data_vencimento}
-                            onChange={(e) => setTaskEditData(prev => ({ ...prev, data_vencimento: e.target.value }))}
-                          />
-                        </div>
-                      </div>
+                      </SheetHeader>
                     </div>
-                    <DialogFooter className="flex justify-between">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          if (editingTask && confirm('Tem certeza que deseja excluir esta tarefa?')) {
-                            deleteTaskMutation.mutate(editingTask.id);
-                            setEditingTask(null);
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5 mr-1" />
-                        Excluir
-                      </Button>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setEditingTask(null)}>Cancelar</Button>
-                        <Button onClick={handleSaveTask} disabled={updateTaskMutation.isPending}>
-                          {updateTaskMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
-                          Salvar
-                        </Button>
+
+                    <Tabs value={taskDetailTab} onValueChange={setTaskDetailTab} className="flex-1 flex flex-col min-h-0">
+                      <div className="px-6 pt-3 pb-1 shrink-0">
+                        <TabsList className="grid w-full grid-cols-3 h-9">
+                          <TabsTrigger value="detalhes" className="text-xs gap-1.5">
+                            <Pencil className="w-3 h-3" />
+                            Detalhes
+                          </TabsTrigger>
+                          <TabsTrigger value="comentarios" className="text-xs gap-1.5">
+                            <MessageSquare className="w-3 h-3" />
+                            Comentários
+                            {(taskComentarios?.length ?? 0) > 0 && (
+                              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 min-w-[16px] leading-none">{taskComentarios!.length}</Badge>
+                            )}
+                          </TabsTrigger>
+                          <TabsTrigger value="anexos" className="text-xs gap-1.5">
+                            <Paperclip className="w-3 h-3" />
+                            Anexos
+                            {(taskAnexos?.length ?? 0) > 0 && (
+                              <Badge variant="secondary" className="text-[9px] px-1 py-0 h-3.5 min-w-[16px] leading-none">{taskAnexos!.length}</Badge>
+                            )}
+                          </TabsTrigger>
+                        </TabsList>
                       </div>
-                    </DialogFooter>
+
+                      {/* Detalhes Tab */}
+                      <TabsContent value="detalhes" className="mt-0 flex-1 min-h-0" style={{ display: taskDetailTab === 'detalhes' ? 'flex' : undefined, flexDirection: 'column' }}>
+                        <div className="flex-1 overflow-y-auto px-6 py-4">
+                          <div className="space-y-5">
+                            {/* Nome */}
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Nome da tarefa</label>
+                              <Input
+                                value={taskEditData.nome}
+                                onChange={(e) => setTaskEditData(prev => ({ ...prev, nome: e.target.value }))}
+                                className="h-10"
+                              />
+                            </div>
+
+                            {/* Descrição */}
+                            {editingTask?.descricao && (
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Descrição do escopo</label>
+                                <div className="text-sm text-muted-foreground bg-muted/40 rounded-lg p-3.5 whitespace-pre-wrap border border-border/50 max-h-[120px] overflow-y-auto">{editingTask.descricao}</div>
+                              </div>
+                            )}
+
+                            {/* Status & Prioridade */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</label>
+                                <Select value={taskEditData.status} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, status: val }))}>
+                                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {TASK_STATUS_LIST.map(s => (
+                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Prioridade</label>
+                                <Select value={taskEditData.prioridade} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, prioridade: val }))}>
+                                  <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {PRIORIDADE_LIST.map(p => (
+                                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            {/* Responsável */}
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Responsável</label>
+                              <Select value={taskEditData.responsavel || '__none__'} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, responsavel: val === '__none__' ? '' : val }))}>
+                                <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">Nenhum</SelectItem>
+                                  {colaboradoresDropdown?.filter(c => c.status === "Ativo").map((c) => (
+                                    <SelectItem key={c.id} value={c.nome}>{c.nome}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Equipe & Data Limite */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Equipe</label>
+                                <Select value={taskEditData.equipe || '__none__'} onValueChange={(val) => setTaskEditData(prev => ({ ...prev, equipe: val === '__none__' ? '' : val }))}>
+                                  <SelectTrigger className="h-10"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                                    {TASK_SQUAD_LIST.map(sq => (
+                                      <SelectItem key={sq} value={sq}>{sq}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data Limite</label>
+                                <Input
+                                  type="date"
+                                  className="h-10"
+                                  value={taskEditData.data_vencimento}
+                                  onChange={(e) => setTaskEditData(prev => ({ ...prev, data_vencimento: e.target.value }))}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Footer fixo */}
+                        <div className="flex items-center justify-between px-6 py-3 border-t bg-muted/20 shrink-0 mt-auto">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-3 text-xs"
+                            onClick={() => {
+                              if (editingTask && confirm('Tem certeza que deseja excluir esta tarefa?')) {
+                                deleteTaskMutation.mutate(editingTask.id);
+                                setEditingTask(null);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                            Excluir
+                          </Button>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" className="h-8 px-4 text-xs" onClick={() => setEditingTask(null)}>Cancelar</Button>
+                            <Button size="sm" className="h-8 px-4 text-xs" onClick={handleSaveTask} disabled={updateTaskMutation.isPending}>
+                              {updateTaskMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Check className="w-3.5 h-3.5 mr-1.5" />}
+                              Salvar
+                            </Button>
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      {/* Comentários Tab */}
+                      <TabsContent value="comentarios" className="mt-0 flex-1 min-h-0" style={{ display: taskDetailTab === 'comentarios' ? 'flex' : undefined, flexDirection: 'column' }}>
+                        <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
+                          {isLoadingComentarios ? (
+                            <div className="flex items-center justify-center py-12">
+                              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : !taskComentarios || taskComentarios.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                              <div className="w-14 h-14 rounded-full bg-muted/60 flex items-center justify-center mb-4">
+                                <MessageSquare className="w-6 h-6 text-muted-foreground/50" />
+                              </div>
+                              <p className="text-sm font-medium text-muted-foreground">Nenhum comentário ainda</p>
+                              <p className="text-xs text-muted-foreground/60 mt-1">Seja o primeiro a comentar nesta tarefa</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {taskComentarios.map((c) => (
+                                <div key={c.id} className="group relative">
+                                  <div className="flex gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                                      {(c.autor || 'U')[0].toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-0.5">
+                                        <span className="text-sm font-medium">{c.autor || 'Usuário'}</span>
+                                        <span className="text-[11px] text-muted-foreground">
+                                          {new Date(c.createdAt).toLocaleDateString('pt-BR')} {new Date(c.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                      <div className="text-sm text-foreground/90 whitespace-pre-wrap bg-muted/30 rounded-lg rounded-tl-none px-3 py-2 border border-border/40">
+                                        {c.conteudo}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 self-start mt-0.5"
+                                      onClick={() => editingTask && deleteCommentMutation.mutate({ taskId: editingTask.id, comentarioId: c.id })}
+                                    >
+                                      <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-t bg-muted/20 px-6 py-3 shrink-0 mt-auto">
+                          <div className="flex gap-2 items-end">
+                            <Textarea
+                              placeholder="Escreva um comentário..."
+                              value={newComment}
+                              onChange={(e) => setNewComment(e.target.value)}
+                              className="min-h-[56px] max-h-[120px] resize-none text-sm"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && newComment.trim()) {
+                                  addCommentMutation.mutate({ taskId: editingTask!.id, conteudo: newComment.trim(), autor: "Equipe" });
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              className="h-9 px-3 shrink-0"
+                              disabled={!newComment.trim() || addCommentMutation.isPending}
+                              onClick={() => {
+                                if (editingTask && newComment.trim()) {
+                                  addCommentMutation.mutate({ taskId: editingTask.id, conteudo: newComment.trim(), autor: "Equipe" });
+                                }
+                              }}
+                            >
+                              {addCommentMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground/60 mt-1.5">Ctrl+Enter para enviar</p>
+                        </div>
+                      </TabsContent>
+
+                      {/* Anexos Tab */}
+                      <TabsContent value="anexos" className="mt-0 flex-1 min-h-0" style={{ display: taskDetailTab === 'anexos' ? 'flex' : undefined, flexDirection: 'column' }}>
+                        <div className="flex-1 overflow-y-auto px-6 py-3 min-h-0">
+                          {isLoadingAnexos ? (
+                            <div className="flex items-center justify-center py-12">
+                              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : !taskAnexos || taskAnexos.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                              <div className="w-14 h-14 rounded-full bg-muted/60 flex items-center justify-center mb-4">
+                                <Paperclip className="w-6 h-6 text-muted-foreground/50" />
+                              </div>
+                              <p className="text-sm font-medium text-muted-foreground">Nenhum anexo ainda</p>
+                              <p className="text-xs text-muted-foreground/60 mt-1">Anexe imagens, vídeos ou documentos</p>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                              {taskAnexos.map((a) => {
+                                const isImage = a.contentType?.startsWith('image/');
+                                const isVideo = a.contentType?.startsWith('video/');
+                                const fileUrl = `/objects/${a.objectPath}`;
+                                return (
+                                  <div key={a.id} className="group relative rounded-xl border bg-card overflow-hidden hover:border-primary/30 transition-colors">
+                                    {isImage ? (
+                                      <div
+                                        className="aspect-video bg-muted cursor-pointer relative overflow-hidden"
+                                        onClick={() => setPreviewImage(fileUrl)}
+                                      >
+                                        <img src={fileUrl} alt={a.nomeArquivo} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                          <Eye className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+                                        </div>
+                                      </div>
+                                    ) : isVideo ? (
+                                      <div className="aspect-video bg-black/90 flex items-center justify-center relative">
+                                        <video src={fileUrl} controls className="w-full h-full object-contain" />
+                                      </div>
+                                    ) : (
+                                      <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="aspect-video bg-muted/50 flex flex-col items-center justify-center gap-1.5 hover:bg-muted/80 transition-colors">
+                                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                          <File className="w-5 h-5 text-primary" />
+                                        </div>
+                                        <span className="text-[10px] text-muted-foreground font-medium">Abrir arquivo</span>
+                                      </a>
+                                    )}
+                                    <div className="px-2.5 py-2">
+                                      <p className="text-xs font-medium truncate" title={a.nomeArquivo}>{a.nomeArquivo}</p>
+                                      <div className="flex items-center justify-between mt-0.5">
+                                        <span className="text-[10px] text-muted-foreground">{formatFileSize(a.tamanho)}</span>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={() => editingTask && deleteAnexoMutation.mutate({ taskId: editingTask.id, anexoId: a.id })}
+                                        >
+                                          <Trash2 className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                        <div className="border-t bg-muted/20 px-6 py-3 shrink-0 mt-auto">
+                          <label className="cursor-pointer block">
+                            <input type="file" className="hidden" onChange={handleFileUpload} accept="image/*,video/*,.pdf,.docx,.xlsx" disabled={isUploadingFile} />
+                            <div className={`flex items-center justify-center gap-2 rounded-lg border-2 border-dashed py-3 text-sm transition-colors ${isUploadingFile ? 'border-primary/30 bg-primary/5 text-primary' : 'border-muted-foreground/20 hover:border-primary/40 hover:bg-primary/5 text-muted-foreground hover:text-primary cursor-pointer'}`}>
+                              {isUploadingFile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                              <span className="font-medium text-xs">{isUploadingFile ? 'Enviando arquivo...' : 'Clique para anexar arquivo'}</span>
+                            </div>
+                          </label>
+                          <p className="text-[10px] text-muted-foreground/60 mt-1.5 text-center">Imagens, vídeos (max 50MB), documentos (max 10MB)</p>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </SheetContent>
+                </Sheet>
+
+                {/* Image Lightbox */}
+                <Dialog open={!!previewImage} onOpenChange={(open) => { if (!open) setPreviewImage(null); }}>
+                  <DialogContent className="max-w-[90vw] max-h-[90vh] p-2">
+                    <DialogHeader className="sr-only">
+                      <DialogTitle>Preview da imagem</DialogTitle>
+                    </DialogHeader>
+                    {previewImage && (
+                      <img src={previewImage} alt="Preview" className="w-full h-full object-contain max-h-[85vh] rounded" />
+                    )}
                   </DialogContent>
                 </Dialog>
                 </>
