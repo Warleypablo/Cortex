@@ -47,6 +47,9 @@ export interface DashboardMetrics {
   expansion_mrr_ytd: number | null;
   vendas_pontual: number;
   vendas_mrr: number;
+  vendas_mrr_novo: number;
+  crosssell_mrr: number;
+  nrr_pct: number;
   aquisicao_pontual: number;
   valor_entregue_pontual: number;
   headcount: number;
@@ -692,22 +695,143 @@ export async function getVendasPontual(): Promise<number> {
   }
 }
 
-export async function getVendasMrr(): Promise<number> {
+export interface VendasMrrBreakdown {
+  total: number;
+  novo: number;
+  crosssell: number;
+  crosssell_pontual: number;
+}
+
+function buildVendasMrrQuery(startDate?: string, endDate?: string) {
+  // Cross-sell = source 'PARTNER' no Bitrix CRM
+  if (startDate && endDate) {
+    return sql`
+      SELECT
+        COALESCE(SUM(d.valor_recorrente::numeric), 0) as total,
+        COALESCE(SUM(CASE WHEN d.source != 'PARTNER' OR d.source IS NULL THEN d.valor_recorrente::numeric ELSE 0 END), 0) as novo,
+        COALESCE(SUM(CASE WHEN d.source = 'PARTNER' THEN d.valor_recorrente::numeric ELSE 0 END), 0) as crosssell,
+        COALESCE(SUM(CASE WHEN d.source = 'PARTNER' THEN d.valor_pontual::numeric ELSE 0 END), 0) as crosssell_pontual
+      FROM "Bitrix".crm_deal d
+      WHERE d.stage_name = 'Negócio Ganho'
+        AND d.data_fechamento IS NOT NULL
+        AND d.data_fechamento >= ${startDate}::date AND d.data_fechamento <= ${endDate}::date`;
+  }
+
+  return sql`
+    SELECT
+      COALESCE(SUM(d.valor_recorrente::numeric), 0) as total,
+      COALESCE(SUM(CASE WHEN d.source != 'PARTNER' OR d.source IS NULL THEN d.valor_recorrente::numeric ELSE 0 END), 0) as novo,
+      COALESCE(SUM(CASE WHEN d.source = 'PARTNER' THEN d.valor_recorrente::numeric ELSE 0 END), 0) as crosssell,
+      COALESCE(SUM(CASE WHEN d.source = 'PARTNER' THEN d.valor_pontual::numeric ELSE 0 END), 0) as crosssell_pontual
+    FROM "Bitrix".crm_deal d
+    WHERE d.stage_name = 'Negócio Ganho'
+      AND d.data_fechamento IS NOT NULL
+      AND TO_CHAR(d.data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')`;
+}
+
+export async function getVendasMrrBreakdown(startDate?: string, endDate?: string): Promise<VendasMrrBreakdown> {
   try {
-    // Vendas MRR = soma de valor_recorrente de deals com stage_name = 'Negócio Ganho' fechados no mês atual
-    const result = await db.execute(sql`
-      SELECT COALESCE(SUM(valor_recorrente::numeric), 0) as vendas_mrr
-      FROM "Bitrix".crm_deal
-      WHERE stage_name = 'Negócio Ganho'
-        AND data_fechamento IS NOT NULL
-        AND TO_CHAR(data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
-        AND valor_recorrente IS NOT NULL
-        AND valor_recorrente > 0
-    `);
-    return parseFloat((result.rows[0] as any)?.vendas_mrr || "0");
+    const result = await db.execute(buildVendasMrrQuery(startDate, endDate));
+    const row = result.rows[0] as any;
+    return {
+      total: parseFloat(row?.total || "0"),
+      novo: parseFloat(row?.novo || "0"),
+      crosssell: parseFloat(row?.crosssell || "0"),
+      crosssell_pontual: parseFloat(row?.crosssell_pontual || "0"),
+    };
   } catch (error) {
-    console.error("[OKR] Error fetching Vendas MRR:", error);
-    return 0;
+    console.error("[OKR] Error fetching Vendas MRR Breakdown:", error);
+    return { total: 0, novo: 0, crosssell: 0, crosssell_pontual: 0 };
+  }
+}
+
+export async function getVendasMrr(): Promise<number> {
+  const breakdown = await getVendasMrrBreakdown();
+  return breakdown.total;
+}
+
+export async function getCrosssellMrr(): Promise<number> {
+  const breakdown = await getVendasMrrBreakdown();
+  return breakdown.crosssell;
+}
+
+export async function getNrr(): Promise<{ nrr_pct: number; crosssell_mrr: number; gross_churn_mrr: number; mrr_inicio: number }> {
+  try {
+    const [breakdown, grossChurn, mrrInicio] = await Promise.all([
+      getVendasMrrBreakdown(),
+      getGrossChurnMrr(),
+      getMrrInicioMes(),
+    ]);
+    // NRR% = (MRR_Início - Churn + Cross-sell) / MRR_Início × 100
+    const nrr_pct = mrrInicio > 0
+      ? ((mrrInicio - grossChurn + breakdown.crosssell) / mrrInicio) * 100
+      : 100;
+    return {
+      nrr_pct,
+      crosssell_mrr: breakdown.crosssell,
+      gross_churn_mrr: grossChurn,
+      mrr_inicio: mrrInicio,
+    };
+  } catch (error) {
+    console.error("[OKR] Error calculating NRR:", error);
+    return { nrr_pct: 100, crosssell_mrr: 0, gross_churn_mrr: 0, mrr_inicio: 0 };
+  }
+}
+
+export async function getNrrForPeriod(startDate: string, endDate: string): Promise<{
+  nrr_pct: number;
+  crosssell_mrr: number;
+  crosssell_pontual: number;
+  vendas_mrr_novo: number;
+  vendas_mrr_total: number;
+  gross_churn_mrr: number;
+  mrr_inicio: number;
+}> {
+  try {
+    const [breakdown, churnResult, mrrResult] = await Promise.all([
+      getVendasMrrBreakdown(startDate, endDate),
+      // Gross churn no período
+      db.execute(sql`
+        SELECT COALESCE(SUM(valorr::numeric), 0) as gross_churn
+        FROM "Clickup".cup_contratos
+        WHERE valorr > 0
+          AND data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento::date >= ${startDate}::date
+          AND data_solicitacao_encerramento::date <= ${endDate}::date
+      `),
+      // MRR início = primeiro snapshot do mês de startDate
+      db.execute(sql`
+        WITH primeiro_snapshot AS (
+          SELECT MIN(data_snapshot) as data_primeiro
+          FROM "Clickup".cup_data_hist
+          WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(${startDate}::date, 'YYYY-MM')
+        )
+        SELECT COALESCE(SUM(h.valorr::numeric), 0) as mrr
+        FROM "Clickup".cup_data_hist h
+        JOIN primeiro_snapshot ps ON h.data_snapshot = ps.data_primeiro
+        WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          AND h.valorr IS NOT NULL AND h.valorr > 0
+      `),
+    ]);
+
+    const grossChurn = parseFloat((churnResult.rows[0] as any)?.gross_churn || "0");
+    const mrrInicio = parseFloat((mrrResult.rows[0] as any)?.mrr || "0");
+    const nrr_pct = mrrInicio > 0
+      ? ((mrrInicio - grossChurn + breakdown.crosssell) / mrrInicio) * 100
+      : 100;
+
+    return {
+      nrr_pct,
+      crosssell_mrr: breakdown.crosssell,
+      crosssell_pontual: breakdown.crosssell_pontual,
+      vendas_mrr_novo: breakdown.novo,
+      vendas_mrr_total: breakdown.total,
+      gross_churn_mrr: grossChurn,
+      mrr_inicio: mrrInicio,
+    };
+  } catch (error) {
+    console.error("[OKR] Error calculating NRR for period:", error);
+    return { nrr_pct: 100, crosssell_mrr: 0, vendas_mrr_novo: 0, vendas_mrr_total: 0, gross_churn_mrr: 0, mrr_inicio: 0 };
   }
 }
 
@@ -819,7 +943,9 @@ export async function getChurnDetail(): Promise<DrillDownResult> {
 export async function getVendasMrrDetail(): Promise<DrillDownResult> {
   try {
     const result = await db.execute(sql`
-      SELECT d.id, d.title, d.company_name, d.assigned_by_name, d.valor_recorrente::numeric as valor, d.data_fechamento
+      SELECT d.id, d.title, d.company_name, d.assigned_by_name, d.source,
+        d.valor_recorrente::numeric as valor, d.data_fechamento,
+        CASE WHEN d.source = 'PARTNER' THEN 'crosssell' ELSE 'novo' END as deal_type
       FROM "Bitrix".crm_deal d
       WHERE d.stage_name = 'Negócio Ganho'
         AND d.data_fechamento IS NOT NULL
@@ -833,7 +959,7 @@ export async function getVendasMrrDetail(): Promise<DrillDownResult> {
       label: r.title || "Sem título",
       sublabel: r.company_name || "",
       valor: parseFloat(r.valor || "0"),
-      details: { empresa: r.company_name, closer: r.assigned_by_name, data_fechamento: r.data_fechamento }
+      details: { empresa: r.company_name, closer: r.assigned_by_name, data_fechamento: r.data_fechamento, deal_type: r.deal_type }
     }));
     const total = items.reduce((s, i) => s + i.valor, 0);
     return { metric: "vendas_mrr", total, count: items.length, items };
@@ -2287,7 +2413,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     newMrrYTD,
     expansionMrr,
     vendasPontual,
-    vendasMrr,
+    vendasMrrBreakdown,
     aquisicaoPontual,
     valorEntreguePontual,
     geracaoCaixa,
@@ -2318,7 +2444,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     getNewMrrYTD(),
     getExpansionMrr(),
     getVendasPontual(),
-    getVendasMrr(),
+    getVendasMrrBreakdown(),
     getAquisicaoPontual(),
     getValorEntreguePontual(),
     getGeracaoCaixa(),
@@ -2369,7 +2495,12 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     expansion_mrr: expansionMrr,
     expansion_mrr_ytd: expansionMrr,
     vendas_pontual: vendasPontual,
-    vendas_mrr: vendasMrr,
+    vendas_mrr: vendasMrrBreakdown.total,
+    vendas_mrr_novo: vendasMrrBreakdown.novo,
+    crosssell_mrr: vendasMrrBreakdown.crosssell,
+    nrr_pct: mrrInicioMes > 0
+      ? ((mrrInicioMes - churnMRR.gross + vendasMrrBreakdown.crosssell) / mrrInicioMes) * 100
+      : 100,
     aquisicao_pontual: aquisicaoPontual,
     valor_entregue_pontual: valorEntreguePontual,
     headcount,
@@ -2619,7 +2750,7 @@ export function getCoverage(): { covered: number; total: number; percentage: num
     "inadimplencia_pct", "inadimplencia_valor", "gross_churn_pct", "gross_churn_mrr",
     "net_churn_pct", "net_churn_mrr", "logo_churn", "logo_churn_pct",
     "clients_active", "headcount_total", "revenue_per_head", "mrr_por_head",
-    "new_mrr", "expansion_mrr", "vendas_pontual",
+    "new_mrr", "expansion_mrr", "vendas_pontual", "crosssell_mrr", "nrr_pct",
     "turbooh_receita", "turbooh_resultado", "turbooh_margem_pct",
     "tech_projetos_entregues", "tech_freelancers_custo", "tech_freelancers_pct"
   ]);
@@ -2666,6 +2797,8 @@ export async function getMetricValue(metricKey: string): Promise<MetricValue> {
     new_mrr: metrics.new_mrr,
     expansion_mrr: metrics.expansion_mrr,
     vendas_pontual: metrics.vendas_pontual,
+    crosssell_mrr: metrics.crosssell_mrr,
+    nrr_pct: metrics.nrr_pct,
     turbooh_receita: metrics.turbooh_receita,
     turbooh_resultado: metrics.turbooh_resultado,
     turbooh_margem_pct: metrics.turbooh_margem_pct,
