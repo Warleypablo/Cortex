@@ -56,6 +56,82 @@ export interface ContratosMes {
   tmPontual: number;
 }
 
+export interface TurboMetrics {
+  mrrAtivo: number;
+  ticketMedio: number;
+  clientesAtivos: number;
+  contratosAtivos: number;
+  clientesTotais: number;
+  contratosTotais: number;
+  mrrAdicionado: number;
+  churnMrr: number;
+  churnCount: number;
+  pausadosMrr: number;
+  pausadosCount: number;
+  crosssellMrr: number;
+  crosssellPontual: number;
+  cxcsSolicitacoes: number;
+  faturamentoTotal: number;
+  faturamentoPago: number;
+  churnMetaMensal: number;
+  receitaChurnSeries: ReceitaChurnMes[];
+}
+
+export interface ReceitaChurnMes {
+  month: string;
+  label: string;
+  mrr: number;
+  churnBrl: number;
+  churnPct: number;
+}
+
+export interface SquadDetail {
+  squad: string;
+  mrr: number;
+  pontual: number;
+  ticketMedio: number;
+  clientes: number;
+  churnPct: number;
+  churnBrl: number;
+  evolucaoMrr: number;
+}
+
+export interface SquadRanking {
+  squad: string;
+  mrr: number;
+  contratos: number;
+  clientes: number;
+  posicao: number;
+}
+
+export interface TechKpis {
+  entregues: number;
+  valorEntregues: number;
+  tempoMedio: number;
+  adicionados: number;
+  valorAdicionados: number;
+}
+
+export interface TechTipoMes {
+  month: string;
+  label: string;
+  [tipo: string]: string | number;
+}
+
+export interface TechEmAberto {
+  tipo: string;
+  quantidade: number;
+  valor: number;
+}
+
+export interface TechSlideData {
+  kpis: TechKpis;
+  mesLabel: string;
+  entregasPorTipo: TechTipoMes[];
+  receitaPorTipo: TechTipoMes[];
+  emAbertoPorTipo: TechEmAberto[];
+}
+
 export interface RelatorioMensalData {
   mesReferencia: string;
   mesLabel: string;
@@ -67,4 +143,8 @@ export interface RelatorioMensalData {
   rankingClosers: CloserRanking[];
   topPontual: CloserRanking | null;
   contratosMes: ContratosMes;
+  turboMetrics: TurboMetrics;
+  rankingSquads: SquadRanking[];
+  squadDetails: SquadDetail[];
+  techData: TechSlideData;
 }
