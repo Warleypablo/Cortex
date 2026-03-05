@@ -106,6 +106,7 @@ const JuridicoClientes = lazyWithRetry(() => import("@/pages/JuridicoClientes"))
 const ProcessosJuridico = lazyWithRetry(() => import("@/pages/ProcessosJuridico"));
 const ContratosColaboradores = lazyWithRetry(() => import("@/pages/ContratosColaboradores"));
 const InvestorsReport = lazyWithRetry(() => import("@/pages/InvestorsReport"));
+const RelatorioMensal = lazyWithRetry(() => import("@/pages/RelatorioMensal"));
 const Acessos = lazyWithRetry(() => import("@/pages/Acessos"));
 const Conhecimentos = lazyWithRetry(() => import("@/pages/Conhecimentos"));
 const Beneficios = lazyWithRetry(() => import("@/pages/Beneficios"));
@@ -331,6 +332,7 @@ function ProtectedRouter() {
       
       {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
+      <Route path="/reports/mensal">{() => <ProtectedRoute path="/reports/mensal" component={RelatorioMensal} />}</Route>
       
       {/* OKR 2026 */}
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
