@@ -13,8 +13,12 @@ import SlideCapaComercial from "./relatorio-mensal/SlideCapaComercial";
 import SlideRankingClosers from "./relatorio-mensal/SlideRankingClosers";
 import SlideGraficoContratos from "./relatorio-mensal/SlideGraficoContratos";
 import SlideIndicacoes from "./relatorio-mensal/SlideIndicacoes";
+import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
+import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
+import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
+import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
 
-const TOTAL_SLIDES = 10;
+const TOTAL_SLIDES = 14;
 
 const MESES_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -142,7 +146,7 @@ export default function RelatorioMensal() {
   const slideNames = [
     "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
     "KRs", "Commerce", "Comercial", "Ranking Closers",
-    "Contratos", "Indicações"
+    "Contratos", "Turbo Metrics", "Ranking Squads", "Squad Details", "Area Tech", "Indicações"
   ];
 
   const renderSlide = () => {
@@ -157,7 +161,11 @@ export default function RelatorioMensal() {
       case 6: return <SlideCapaComercial />;
       case 7: return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
       case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
-      case 9: return <SlideIndicacoes />;
+      case 9: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 10: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 11: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
+      case 12: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 13: return <SlideIndicacoes />;
       default: return null;
     }
   };
