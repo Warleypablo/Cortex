@@ -1695,10 +1695,17 @@ Exemplos:
       const tipo = req.query.tipo as string || 'clientes';
       
       // Buscar configuração do Assinafy baseada no tipo (colaboradores ou clientes)
-      const configResult = await db.execute(sql`
+      let configResult = await db.execute(sql`
         SELECT api_key, api_url FROM staging.assinafy_config WHERE ativo = true AND tipo = ${tipo} LIMIT 1
       `);
-      
+
+      // Fallback para cortex_core (usado por colaboradores - tabela pode não ter coluna tipo)
+      if (configResult.rows.length === 0) {
+        configResult = await db.execute(sql`
+          SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true LIMIT 1
+        `);
+      }
+
       if (configResult.rows.length === 0) {
         return res.status(500).json({ error: `Configuração Assinafy para ${tipo} não encontrada` });
       }
