@@ -92,6 +92,7 @@ export const PERMISSION_KEYS = {
   REPORTS: {
     INVESTORS: 'reports.investors',
     AUTO_REPORT: 'reports.auto_report',
+    MENSAL: 'reports.mensal',
   },
   // Administração
   ADMIN: {
@@ -240,6 +241,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/juridico/contratos-colaborador': PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES,
   // Reports
   '/investors-report': PERMISSION_KEYS.REPORTS.INVESTORS,
+  '/reports/mensal': PERMISSION_KEYS.REPORTS.MENSAL,
   // Administração
   '/admin/usuarios': PERMISSION_KEYS.ADMIN.USUARIOS,
   '/admin/regras-notificacoes': PERMISSION_KEYS.ADMIN.NOTIFICACOES,
@@ -469,6 +471,7 @@ export const NAV_CONFIG = {
       items: [
         { title: 'Investors Report', url: '/investors-report', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.REPORTS.INVESTORS },
         { title: 'Auto Report', url: '/growth/auto-report', icon: 'FileText', permissionKey: PERMISSION_KEYS.REPORTS.AUTO_REPORT },
+        { title: 'Reporte Mensal', url: '/reports/mensal', icon: 'Presentation', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
       ],
     },
   ],
@@ -629,6 +632,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
+  [PERMISSION_KEYS.REPORTS.MENSAL]: 'Reporte Mensal',
   [PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS]: 'Processos Internos',
   [PERMISSION_KEYS.GENERAL.CHAMADOS]: 'Chamados',
   [PERMISSION_KEYS.FIN.TURBOZAP]: 'TurboZap',
