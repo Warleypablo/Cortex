@@ -23,6 +23,7 @@ import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
 import { registerRelatorioMensalRoutes } from "./routes/relatorioMensal";
+import { registerRelatorioMensalSlidesRoutes } from "./routes/relatorioMensalSlides";
 import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
 import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
@@ -6590,6 +6591,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // GET - Download do documento assinado no Assinafy (colaboradores)
+  app.get("/api/juridico/colaboradores-contrato/download/:documentId", async (req, res) => {
+    try {
+      const { documentId } = req.params;
+
+      const configResult = await db.execute(sql`
+        SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'colaboradores' LIMIT 1
+      `);
+
+      if (configResult.rows.length === 0) {
+        // Fallback: buscar qualquer config ativa (tabela pode não ter coluna tipo)
+        const fallback = await db.execute(sql`
+          SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true LIMIT 1
+        `);
+        if (fallback.rows.length === 0) {
+          return res.status(500).json({ error: "Configuração Assinafy não encontrada" });
+        }
+        configResult.rows = fallback.rows;
+      }
+
+      const config = configResult.rows[0] as { api_key: string; api_url: string };
+      const downloadUrl = `${config.api_url}/documents/${documentId}/download/certificated`;
+
+      let response = await fetch(downloadUrl, {
+        headers: { 'X-Api-Key': config.api_key, 'Accept': '*/*' }
+      });
+
+      // Fallback: tentar download sem /certificated (documento ainda não certificado)
+      if (!response.ok) {
+        const downloadUrl2 = `${config.api_url}/documents/${documentId}/download`;
+        response = await fetch(downloadUrl2, {
+          headers: { 'X-Api-Key': config.api_key, 'Accept': '*/*' }
+        });
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("[assinafy-colab] Download error:", response.status, errorText);
+        return res.status(response.status).json({ error: "Erro ao baixar documento", details: errorText });
+      }
+
+      const contentType = response.headers.get('content-type') || 'application/pdf';
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `inline; filename="contrato-${documentId}.pdf"`);
+
+      const buffer = await response.arrayBuffer();
+      res.send(Buffer.from(buffer));
+    } catch (error: any) {
+      console.error("[assinafy-colab] Download error:", error);
+      res.status(500).json({ error: "Erro ao baixar documento", details: error.message });
+    }
+  });
+
   // PATCH - Atualizar status de contrato (para marcar como assinado manualmente)
   app.patch("/api/juridico/colaboradores-contrato/:id/status", async (req, res) => {
     try {
@@ -14606,6 +14660,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Relatório Mensal PDF - registered from separate file
   registerRelatorioMensalRoutes(app, db);
+
+  // Relatório Mensal Slides (Reporte Mensal)
+  registerRelatorioMensalSlidesRoutes(app, db);
 
   // Contratos Module - registered from separate file
   registerContratosRoutes(app);

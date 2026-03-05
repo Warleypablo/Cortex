@@ -5645,14 +5645,24 @@ function ContratoTab({ colaboradorId }: { colaboradorId: string }) {
         {contratoStatus.documento_id && (
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground w-32">Documento:</span>
-            <a
-              href={`https://app.assinafy.com.br/documents/${contratoStatus.documento_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(`/api/juridico/colaboradores-contrato/download/${contratoStatus.documento_id}`, {
+                    credentials: 'include',
+                  });
+                  if (!res.ok) throw new Error('Erro ao baixar documento');
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  window.open(url, '_blank');
+                } catch (err) {
+                  console.error('Erro ao abrir contrato:', err);
+                }
+              }}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-none p-0"
             >
-              Ver no Assinafy <ExternalLink className="h-3 w-3" />
-            </a>
+              Ver Contrato <ExternalLink className="h-3 w-3" />
+            </button>
           </div>
         )}
       </div>
