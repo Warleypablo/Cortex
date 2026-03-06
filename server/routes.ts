@@ -19,6 +19,7 @@ import * as fs from "fs";
 import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
+import { registerDRERoutes } from "./routes/dre";
 import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
@@ -10669,6 +10670,263 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   });
 
   // ========================================
+  // ANALISE SQUADS - DETALHE POR SQUAD
+  // ========================================
+  app.get("/api/analise-squads/detalhe", async (req, res) => {
+    try {
+      const mesAno = req.query.mesAno as string;
+      const squad = req.query.squad as string;
+
+      if (!mesAno || !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+      }
+      if (!squad) {
+        return res.status(400).json({ error: "Missing squad parameter" });
+      }
+
+      const [ano, mes] = mesAno.split('-').map(Number);
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+      const inicioMesStr = inicioMes.toISOString().split('T')[0];
+      const fimMesStr = fimMes.toISOString().split('T')[0];
+
+      const evolucaoStart = new Date(ano, mes - 7, 1);
+      const evolucaoStartStr = evolucaoStart.toISOString().split('T')[0];
+
+      const agora = new Date();
+      const isMesAtual = ano === agora.getFullYear() && mes === (agora.getMonth() + 1);
+
+      // 1) MRR por operador no squad selecionado
+      let mrrPorOperadorRows: any[];
+      if (isMesAtual) {
+        const result = await db.execute(sql`
+          SELECT
+            COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável') as responsavel,
+            COALESCE(SUM(valorr::numeric), 0) as mrr,
+            COUNT(DISTINCT id_subtask) as contratos,
+            COUNT(DISTINCT id_task) as clientes
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND valorr IS NOT NULL AND valorr > 0
+            AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+          GROUP BY COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável')
+          ORDER BY mrr DESC
+        `);
+        mrrPorOperadorRows = result.rows as any[];
+      } else {
+        const snapshotResult = await db.execute(sql`
+          SELECT MAX(data_snapshot) as ds
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= ${inicioMes}::timestamp
+            AND data_snapshot <= ${fimMes}::timestamp
+        `);
+        const dataSnapshot = (snapshotResult.rows[0] as any)?.ds;
+
+        if (dataSnapshot) {
+          const result = await db.execute(sql`
+            SELECT
+              COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável') as responsavel,
+              COALESCE(SUM(valorr::numeric), 0) as mrr,
+              COUNT(DISTINCT id_subtask) as contratos,
+              COUNT(DISTINCT id_task) as clientes
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot = ${dataSnapshot}::timestamp
+              AND status IN ('ativo', 'onboarding', 'triagem')
+              AND valorr IS NOT NULL AND valorr > 0
+              AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+            GROUP BY COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável')
+            ORDER BY mrr DESC
+          `);
+          mrrPorOperadorRows = result.rows as any[];
+        } else {
+          const result = await db.execute(sql`
+            SELECT
+              COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável') as responsavel,
+              COALESCE(SUM(valorr::numeric), 0) as mrr,
+              COUNT(DISTINCT id_subtask) as contratos,
+              COUNT(DISTINCT id_task) as clientes
+            FROM "Clickup".cup_contratos
+            WHERE status IN ('ativo', 'onboarding', 'triagem')
+              AND valorr IS NOT NULL AND valorr > 0
+              AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+            GROUP BY COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável')
+            ORDER BY mrr DESC
+          `);
+          mrrPorOperadorRows = result.rows as any[];
+        }
+      }
+
+      // 2) Churn por operador no squad selecionado (tabela curada cup_churn)
+      const churnResult = await db.execute(sql`
+        SELECT
+          COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
+          COUNT(*) as churns,
+          COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento >= ${inicioMesStr}::date
+          AND data_solicitacao_encerramento <= ${fimMesStr}::date
+          AND valor_r > 0
+          AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+        GROUP BY COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável')
+      `);
+      const churnPorOperadorRows = churnResult.rows as any[];
+
+      // 3) Evolução MRR do squad (últimos 6 meses)
+      const evolucaoMrrResult = await db.execute(sql`
+        WITH snapshots_mensais AS (
+          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
+            DATE_TRUNC('month', data_snapshot) as mes,
+            data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE DATE(data_snapshot) >= ${evolucaoStartStr}::date
+            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
+          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        ),
+        historical_data AS (
+          SELECT
+            TO_CHAR(sm.mes, 'YYYY-MM') as mes,
+            COALESCE(SUM(h.valorr::numeric), 0) as mrr
+          FROM snapshots_mensais sm
+          JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND COALESCE(NULLIF(TRIM(h.squad), ''), 'Sem Squad') = ${squad}
+          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM')
+        ),
+        current_month_data AS (
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', CURRENT_DATE), 'YYYY-MM') as mes,
+            COALESCE(SUM(valorr::numeric), 0) as mrr
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+        )
+        SELECT * FROM historical_data
+        UNION ALL
+        SELECT * FROM current_month_data
+        ORDER BY mes
+      `);
+
+      // 4) Evolução MRR por operador nos últimos 6 meses
+      const evolucaoOperadoresResult = await db.execute(sql`
+        WITH snapshots_mensais AS (
+          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
+            DATE_TRUNC('month', data_snapshot) as mes,
+            data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE DATE(data_snapshot) >= ${evolucaoStartStr}::date
+            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
+          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        ),
+        historical_data AS (
+          SELECT
+            TO_CHAR(sm.mes, 'YYYY-MM') as mes,
+            COALESCE(NULLIF(TRIM(h.responsavel), ''), 'Sem Responsável') as operador,
+            COALESCE(SUM(h.valorr::numeric), 0) as mrr
+          FROM snapshots_mensais sm
+          JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND COALESCE(NULLIF(TRIM(h.squad), ''), 'Sem Squad') = ${squad}
+          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), COALESCE(NULLIF(TRIM(h.responsavel), ''), 'Sem Responsável')
+        ),
+        current_month_data AS (
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', CURRENT_DATE), 'YYYY-MM') as mes,
+            COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável') as operador,
+            COALESCE(SUM(valorr::numeric), 0) as mrr
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+          GROUP BY COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável')
+        )
+        SELECT * FROM historical_data
+        UNION ALL
+        SELECT * FROM current_month_data
+        ORDER BY mes, operador
+      `);
+
+      // 5) Contratos churned no mês (lista detalhada via cup_churn)
+      const contratosChurnResult = await db.execute(sql`
+        SELECT
+          c.nome as cliente,
+          c.produto as contrato,
+          c.valor_r::numeric as valorr,
+          COALESCE(NULLIF(TRIM(c.responsavel_geral), ''), 'Sem Responsável') as responsavel,
+          c.data_solicitacao_encerramento as data_encerramento,
+          c.motivo_cancelamento,
+          c.submotivo_cancelamento,
+          c.status_cancelamento
+        FROM "Clickup".cup_churn c
+        WHERE c.data_solicitacao_encerramento IS NOT NULL
+          AND c.data_solicitacao_encerramento >= ${inicioMesStr}::date
+          AND c.data_solicitacao_encerramento <= ${fimMesStr}::date
+          AND c.valor_r > 0
+          AND COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squad}
+        ORDER BY c.valor_r::numeric DESC
+      `);
+
+      // Montar dados por operador
+      const churnMap = new Map<string, { churns: number; mrrChurn: number }>();
+      for (const row of churnPorOperadorRows) {
+        churnMap.set(row.responsavel, {
+          churns: parseInt(row.churns) || 0,
+          mrrChurn: parseFloat(row.mrr_churn) || 0,
+        });
+      }
+
+      const operadores = mrrPorOperadorRows.map((row) => {
+        const mrr = parseFloat(row.mrr) || 0;
+        const contratos = parseInt(row.contratos) || 0;
+        const clientes = parseInt(row.clientes) || 0;
+        const churnData = churnMap.get(row.responsavel) || { churns: 0, mrrChurn: 0 };
+        const churnRate = contratos > 0 ? (churnData.churns / contratos) * 100 : 0;
+        const ticketMedio = contratos > 0 ? mrr / contratos : 0;
+
+        return {
+          nome: row.responsavel,
+          mrr,
+          contratos,
+          clientes,
+          churns: churnData.churns,
+          mrrChurn: churnData.mrrChurn,
+          churnRate: Math.round(churnRate * 100) / 100,
+          ticketMedio: Math.round(ticketMedio * 100) / 100,
+        };
+      });
+
+      // Totais do squad
+      const totalMrr = operadores.reduce((s, o) => s + o.mrr, 0);
+      const totalContratos = operadores.reduce((s, o) => s + o.contratos, 0);
+      const totalClientes = operadores.reduce((s, o) => s + o.clientes, 0);
+      const totalChurns = operadores.reduce((s, o) => s + o.churns, 0);
+      const churnRate = totalContratos > 0 ? Math.round((totalChurns / totalContratos) * 10000) / 100 : 0;
+      const totalMrrChurn = operadores.reduce((s, o) => s + o.mrrChurn, 0);
+      const ticketMedio = totalContratos > 0 ? Math.round((totalMrr / totalContratos) * 100) / 100 : 0;
+
+      res.json({
+        squad,
+        mesAno,
+        totais: {
+          mrr: totalMrr,
+          contratos: totalContratos,
+          clientes: totalClientes,
+          churns: totalChurns,
+          churnRate,
+          mrrChurn: totalMrrChurn,
+          ticketMedio,
+        },
+        operadores,
+        evolucaoMrr: evolucaoMrrResult.rows,
+        evolucaoOperadores: evolucaoOperadoresResult.rows,
+        contratosChurn: contratosChurnResult.rows,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching analise squads detalhe:", error);
+      res.status(500).json({ error: "Failed to fetch analise squads detalhe" });
+    }
+  });
+
+  // ========================================
   // GPTURBO CHAT API ENDPOINT (powered by OpenAI)
   // ========================================
   app.post("/api/cases/chat", async (req, res) => {
@@ -14651,6 +14909,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
+
+  // DRE (Demonstrativo de Resultado) - registered from separate file
+  registerDRERoutes(app, db, storage);
 
   // Metas & Notifications Module - registered from separate file
   await registerMetasRoutes(app, db, storage);
