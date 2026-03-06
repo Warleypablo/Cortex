@@ -601,7 +601,7 @@ export default function ChurnDetalhamento() {
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
-      return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0, total_abonado: 0, mrr_abonado: 0 };
+      return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0, total_abonado: 0, mrr_abonado: 0, abonado_por_motivo: {} as Record<string, { count: number; mrr: number }> };
     }
 
     // Separar contratos regulares de abonados
@@ -619,6 +619,15 @@ export default function ChurnDetalhamento() {
     const totalAbonado = abonados.length;
     const mrrAbonado = abonados.reduce((sum, c) => sum + (c.valorr || 0), 0);
 
+    // Breakdown abonado por motivo
+    const abonadoPorMotivo: Record<string, { count: number; mrr: number }> = {};
+    abonados.forEach(c => {
+      const motivo = c.motivo_cancelamento || 'Outros';
+      if (!abonadoPorMotivo[motivo]) abonadoPorMotivo[motivo] = { count: 0, mrr: 0 };
+      abonadoPorMotivo[motivo].count++;
+      abonadoPorMotivo[motivo].mrr += c.valorr || 0;
+    });
+
     return {
       total_churned: totalChurned,
       total_pausados: totalPausados,
@@ -629,6 +638,7 @@ export default function ChurnDetalhamento() {
       ticket_medio: ticketMedio,
       total_abonado: totalAbonado,
       mrr_abonado: mrrAbonado,
+      abonado_por_motivo: abonadoPorMotivo,
     };
   }, [filteredContratos]);
 
@@ -1847,6 +1857,18 @@ export default function ChurnDetalhamento() {
                   </div>
                   <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(filteredMetricas.mrr_abonado || 0)}</div>
                   <div className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">{filteredMetricas.total_abonado || 0} contratos abonados</div>
+                  {filteredMetricas.abonado_por_motivo && Object.keys(filteredMetricas.abonado_por_motivo).length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-800/50 space-y-1">
+                      {Object.entries(filteredMetricas.abonado_por_motivo)
+                        .sort(([,a], [,b]) => b.mrr - a.mrr)
+                        .map(([motivo, info]) => (
+                          <div key={motivo} className="flex items-center justify-between text-[11px]">
+                            <span className="text-amber-700 dark:text-amber-400 truncate max-w-[140px]">{motivo}</span>
+                            <span className="text-amber-800 dark:text-amber-300 font-semibold tabular-nums ml-2">{info.count}x · {formatCurrencyNoDecimals(info.mrr)}</span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex-1 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 flex flex-col justify-center">
