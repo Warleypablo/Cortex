@@ -80,6 +80,7 @@ const TechProjetos = lazyWithRetry(() => import("@/pages/TechProjetos"));
 const TechEvolucao = lazyWithRetry(() => import("@/pages/TechEvolucao"));
 const TechFinanceiro = lazyWithRetry(() => import("@/pages/TechFinanceiro"));
 const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
+const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
 const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
 const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
@@ -288,6 +289,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/contribuicao-operador">{() => <ProtectedRoute path="/dashboard/contribuicao-operador" component={ContribuicaoOperador} />}</Route>
       <Route path="/dashboard/contribuicao-squad">{() => <ProtectedRoute path="/dashboard/contribuicao-squad" component={ContribuicaoSquad} />}</Route>
       <Route path="/dashboard/margem-cliente">{() => <ProtectedRoute path="/dashboard/margem-cliente" component={MargemCliente} />}</Route>
+      <Route path="/dashboard/dre">{() => <ProtectedRoute path="/dashboard/dre" component={DRE} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}
