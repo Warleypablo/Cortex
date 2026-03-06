@@ -18,6 +18,8 @@ interface DRELineItem {
   categoria_nome: string;
   grupo: string;
   grupo_nome: string;
+  parent_key: string;
+  parent_nome: string;
   tipo: "receita" | "despesa";
   valores: Record<string, number>;
 }
@@ -26,6 +28,7 @@ interface DREData {
   ano: number;
   empresa: string;
   linhas: DRELineItem[];
+  parentCategories: Record<string, string>;
   subtotais: {
     receita_bruta_operacional: Record<string, number>;
     receitas_nao_operacionais: Record<string, number>;
@@ -165,6 +168,7 @@ export default function DRE() {
     new Set(["03", "04", "05", "06", "07"])
   );
   const [showAV, setShowAV] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<"agrupada" | "expandida">("agrupada");
 
   const { data, isLoading } = useQuery<DREData>({
     queryKey: ["/api/financeiro/dre", ano, empresa],
@@ -184,6 +188,35 @@ export default function DRE() {
   const receitaBrutaTotalAcum = useMemo(() => {
     if (!data) return 0;
     return computeAccumulated(data.subtotais.receita_bruta_total);
+  }, [data]);
+
+  // Group lines by parent_key (XX.YY) for grouped view
+  const groupedLinhas = useMemo(() => {
+    if (!data) return [];
+    const map = new Map<string, DRELineItem>();
+    for (const linha of data.linhas) {
+      const key = linha.parent_key;
+      if (!map.has(key)) {
+        map.set(key, {
+          categoria_id: key,
+          categoria_nome: `${key} ${linha.parent_nome}`,
+          grupo: linha.grupo,
+          grupo_nome: linha.grupo_nome,
+          parent_key: key,
+          parent_nome: linha.parent_nome,
+          tipo: linha.tipo,
+          valores: emptyMonthsRecord(),
+        });
+      }
+      const grouped = map.get(key)!;
+      for (const mk of MONTH_KEYS) {
+        grouped.valores[mk] += linha.valores[mk] ?? 0;
+      }
+      grouped.valores.acumulado += linha.valores.acumulado ?? 0;
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.categoria_nome.localeCompare(b.categoria_nome)
+    );
   }, [data]);
 
   const toggleGroup = (key: string) => {
@@ -239,9 +272,13 @@ export default function DRE() {
   function renderGroupSection(section: DREGroup) {
     if (!data) return null;
     const isExpanded = expandedGroups.has(section.key);
-    const linhas = data.linhas.filter((l) => l.grupo === section.grupoFilter);
     const subtotal = data.subtotais[section.subtotalKey];
     const subtotalAccum = computeAccumulated(subtotal);
+
+    // Choose lines based on view mode
+    const displayLinhas = viewMode === "agrupada"
+      ? groupedLinhas.filter((l) => l.grupo === section.grupoFilter)
+      : data.linhas.filter((l) => l.grupo === section.grupoFilter);
 
     return (
       <Fragment key={`group-${section.key}`}>
@@ -270,27 +307,65 @@ export default function DRE() {
           {showAV && <td className="px-2 py-2" />}
         </tr>
 
-        {/* Subcategory rows (when expanded) */}
+        {/* Rows (when expanded) */}
         {isExpanded &&
-          linhas.map((linha) => {
+          displayLinhas.map((linha) => {
             const acum = computeAccumulated(linha.valores);
+            // In grouped mode, check if this parent is expanded to show children
+            const isParentRow = viewMode === "agrupada";
+            const isParentExpanded = isParentRow && expandedGroups.has(linha.parent_key);
+            const childLinhas = isParentRow
+              ? data.linhas.filter((l) => l.parent_key === linha.parent_key)
+              : [];
+
             return (
-              <tr
-                key={`cat-${linha.categoria_id}`}
-                className="hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
-              >
-                <td className="px-3 py-1.5 pl-9 text-xs text-gray-700 dark:text-zinc-300 sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap">
-                  {linha.categoria_nome}
-                </td>
-                {MONTH_KEYS.map((mk) => (
-                  <Fragment key={`${linha.categoria_id}-${mk}-wrap`}>
-                    {renderValueCell(linha.valores[mk] ?? 0, `${linha.categoria_id}-${mk}`)}
-                    {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${linha.categoria_id}-av-${mk}`)}
-                  </Fragment>
-                ))}
-                {renderValueCell(acum, `${linha.categoria_id}-acum`)}
-                {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${linha.categoria_id}-av-acum`)}
-              </tr>
+              <Fragment key={`cat-${linha.categoria_id}`}>
+                <tr
+                  className={`hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors ${isParentRow ? "cursor-pointer" : ""}`}
+                  onClick={isParentRow ? () => toggleGroup(linha.parent_key) : undefined}
+                >
+                  <td className={`px-3 py-1.5 text-xs sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap ${isParentRow ? "pl-7 font-medium text-gray-800 dark:text-zinc-200" : "pl-9 text-gray-700 dark:text-zinc-300"}`}>
+                    <span className="inline-flex items-center gap-1">
+                      {isParentRow && (
+                        isParentExpanded
+                          ? <ChevronDown className="w-3 h-3 text-gray-400 dark:text-zinc-500" />
+                          : <ChevronRight className="w-3 h-3 text-gray-400 dark:text-zinc-500" />
+                      )}
+                      {linha.categoria_nome}
+                    </span>
+                  </td>
+                  {MONTH_KEYS.map((mk) => (
+                    <Fragment key={`${linha.categoria_id}-${mk}-wrap`}>
+                      {renderValueCell(linha.valores[mk] ?? 0, `${linha.categoria_id}-${mk}`)}
+                      {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${linha.categoria_id}-av-${mk}`)}
+                    </Fragment>
+                  ))}
+                  {renderValueCell(acum, `${linha.categoria_id}-acum`)}
+                  {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${linha.categoria_id}-av-acum`)}
+                </tr>
+                {/* Child rows in grouped mode when parent is expanded */}
+                {isParentExpanded && childLinhas.map((child) => {
+                  const childAcum = computeAccumulated(child.valores);
+                  return (
+                    <tr
+                      key={`child-${child.categoria_id}`}
+                      className="hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors bg-gray-50/50 dark:bg-zinc-900/50"
+                    >
+                      <td className="px-3 py-1 pl-12 text-xs text-gray-500 dark:text-zinc-400 sticky left-0 bg-gray-50/50 dark:bg-zinc-900/50 z-10 whitespace-nowrap">
+                        {child.categoria_nome}
+                      </td>
+                      {MONTH_KEYS.map((mk) => (
+                        <Fragment key={`${child.categoria_id}-${mk}-wrap`}>
+                          {renderValueCell(child.valores[mk] ?? 0, `${child.categoria_id}-${mk}`)}
+                          {showAV && renderAVCell(child.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${child.categoria_id}-av-${mk}`)}
+                        </Fragment>
+                      ))}
+                      {renderValueCell(childAcum, `${child.categoria_id}-acum`)}
+                      {showAV && renderAVCell(childAcum, receitaBrutaTotalAcum, `${child.categoria_id}-av-acum`)}
+                    </tr>
+                  );
+                })}
+              </Fragment>
             );
           })}
 
@@ -422,6 +497,20 @@ export default function DRE() {
                       {emp}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* View mode selector */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-gray-600 dark:text-zinc-400">Visão:</Label>
+              <Select value={viewMode} onValueChange={(v) => setViewMode(v as "agrupada" | "expandida")}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="agrupada">Agrupada</SelectItem>
+                  <SelectItem value="expandida">Expandida</SelectItem>
                 </SelectContent>
               </Select>
             </div>

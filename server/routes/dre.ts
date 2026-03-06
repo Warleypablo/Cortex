@@ -7,6 +7,8 @@ interface DRELineItem {
   categoria_nome: string;
   grupo: string;
   grupo_nome: string;
+  parent_key: string;       // e.g. "05.01"
+  parent_nome: string;      // e.g. "Mão de Obra Operacional"
   tipo: 'receita' | 'despesa';
   valores: Record<string, number>; // mes_01..mes_12 + acumulado
 }
@@ -15,6 +17,7 @@ interface DREResponse {
   ano: number;
   empresa: string;
   linhas: DRELineItem[];
+  parentCategories: Record<string, string>; // "05.01" -> "Mão de Obra Operacional"
   subtotais: {
     receita_bruta_operacional: Record<string, number>;
     receitas_nao_operacionais: Record<string, number>;
@@ -82,6 +85,21 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
         ORDER BY categoria_nome, mes
       `);
 
+      // Fetch parent category names (XX.YY level) from caz_categorias
+      const parentCatResult = await db.execute(sql`
+        SELECT nome FROM "Conta Azul".caz_categorias
+        WHERE nome ~ '^\d{2}\.\d{2}\s'
+        ORDER BY nome
+      `);
+      const parentCategories: Record<string, string> = {};
+      for (const row of parentCatResult.rows) {
+        const nome = (row.nome as string).trim();
+        const match = nome.match(/^(\d{2}\.\d{2})\s+(.+)/);
+        if (match) {
+          parentCategories[match[1]] = match[2];
+        }
+      }
+
       // Build line items grouped by category
       const categoriaMap = new Map<string, DRELineItem>();
 
@@ -90,9 +108,10 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
         const mes = parseInt(row.mes as string);
         const total = parseFloat(row.total as string) || 0;
 
-        // Derive grupo from categoria prefix (e.g., "03.01" -> "03")
-        const prefixMatch = catNome.match(/^(\d{2})\./);
+        // Derive grupo from categoria prefix (e.g., "03.01.01" -> grupo "03", parent "03.01")
+        const prefixMatch = catNome.match(/^(\d{2})\.(\d{2})/);
         const grupoKey = prefixMatch ? prefixMatch[1] : '99';
+        const parentKey = prefixMatch ? `${prefixMatch[1]}.${prefixMatch[2]}` : '99.99';
         const grupoInfo = GRUPO_MAP[grupoKey];
 
         if (!grupoInfo) continue; // Skip categories outside 03-07
@@ -103,6 +122,8 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
             categoria_nome: catNome,
             grupo: grupoKey,
             grupo_nome: grupoInfo.nome,
+            parent_key: parentKey,
+            parent_nome: parentCategories[parentKey] || parentKey,
             tipo: grupoInfo.tipo,
             valores: emptyMonths(),
           });
@@ -167,6 +188,7 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
         ano,
         empresa,
         linhas,
+        parentCategories,
         subtotais,
         empresas: empresasResult.rows.map((r: any) => r.empresa as string),
       };
