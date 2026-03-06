@@ -1046,24 +1046,31 @@ export default function ChurnDetalhamento() {
 
   const churnPorMes = useMemo(() => {
     if (filteredContratos.length === 0) return [];
-    
-    const meses: Record<string, { count: number; mrr: number; sortKey: string }> = {};
+
+    const meses: Record<string, { count: number; countAbonado: number; mrr: number; mrrAbonado: number; sortKey: string }> = {};
     filteredContratos.forEach(c => {
       const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
       if (!refDate) return;
       const parsedDate = parseISO(refDate);
       const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
       const sortKey = format(parsedDate, "yyyy-MM");
-      if (!meses[mes]) meses[mes] = { count: 0, mrr: 0, sortKey };
-      meses[mes].count++;
-      meses[mes].mrr += c.valorr || 0;
+      if (!meses[mes]) meses[mes] = { count: 0, countAbonado: 0, mrr: 0, mrrAbonado: 0, sortKey };
+      if (c.is_abonado) {
+        meses[mes].countAbonado++;
+        meses[mes].mrrAbonado += c.valorr || 0;
+      } else {
+        meses[mes].count++;
+        meses[mes].mrr += c.valorr || 0;
+      }
     });
-    
+
     return Object.entries(meses)
       .map(([mes, data]) => ({
         mes,
         count: data.count,
+        countAbonado: data.countAbonado,
         mrr: data.mrr,
+        mrrAbonado: data.mrrAbonado,
         sortKey: data.sortKey
       }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
@@ -1463,19 +1470,22 @@ export default function ChurnDetalhamento() {
   // Comparativo Churn vs Pausado por mês
   const comparativoMensal = useMemo(() => {
     if (filteredContratos.length === 0) return [];
-    
-    const meses: Record<string, { churn: number; pausado: number; mrrChurn: number; mrrPausado: number; sortKey: string }> = {};
-    
+
+    const meses: Record<string, { churn: number; pausado: number; abonado: number; mrrChurn: number; mrrPausado: number; mrrAbonado: number; sortKey: string }> = {};
+
     filteredContratos.forEach(c => {
       const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
       if (!refDate) return;
       const parsedDate = parseISO(refDate);
       const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
       const sortKey = format(parsedDate, "yyyy-MM");
-      
-      if (!meses[mes]) meses[mes] = { churn: 0, pausado: 0, mrrChurn: 0, mrrPausado: 0, sortKey };
-      
-      if (c.tipo === 'churn' && !c.is_abonado) {
+
+      if (!meses[mes]) meses[mes] = { churn: 0, pausado: 0, abonado: 0, mrrChurn: 0, mrrPausado: 0, mrrAbonado: 0, sortKey };
+
+      if (c.is_abonado) {
+        meses[mes].abonado++;
+        meses[mes].mrrAbonado += c.valorr || 0;
+      } else if (c.tipo === 'churn') {
         meses[mes].churn++;
         meses[mes].mrrChurn += c.valorr || 0;
       } else if (c.tipo === 'pausado') {
@@ -1483,7 +1493,7 @@ export default function ChurnDetalhamento() {
         meses[mes].mrrPausado += c.valorr || 0;
       }
     });
-    
+
     return Object.entries(meses)
       .map(([mes, data]) => ({ mes, ...data }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
@@ -1566,21 +1576,25 @@ export default function ChurnDetalhamento() {
   const mrrPerdidoPorMes = useMemo(() => {
     if (filteredContratos.length === 0) return [];
 
-    const meses: Record<string, { mrr: number; sortKey: string }> = {};
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
-    
-    churnContratos.forEach(c => {
+    const meses: Record<string, { mrr: number; mrrAbonado: number; sortKey: string }> = {};
+
+    filteredContratos.forEach(c => {
+      if (c.tipo !== 'churn') return;
       if (!c.data_encerramento) return;
       const parsedDate = parseISO(c.data_encerramento);
       const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
       const sortKey = format(parsedDate, "yyyy-MM");
-      
-      if (!meses[mes]) meses[mes] = { mrr: 0, sortKey };
-      meses[mes].mrr += c.valorr || 0;
+
+      if (!meses[mes]) meses[mes] = { mrr: 0, mrrAbonado: 0, sortKey };
+      if (c.is_abonado) {
+        meses[mes].mrrAbonado += c.valorr || 0;
+      } else {
+        meses[mes].mrr += c.valorr || 0;
+      }
     });
-    
+
     return Object.entries(meses)
-      .map(([mes, data]) => ({ mes, mrr: data.mrr, sortKey: data.sortKey }))
+      .map(([mes, data]) => ({ mes, mrr: data.mrr, mrrAbonado: data.mrrAbonado, sortKey: data.sortKey }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .slice(-12);
   }, [filteredContratos]);
@@ -1711,7 +1725,9 @@ export default function ChurnDetalhamento() {
   const mrrSquadTotal = distribuicaoPorSquad.reduce((sum, item) => sum + item.mrr, 0);
   const mrrResponsavelTotal = distribuicaoPorResponsavel.reduce((sum, item) => sum + item.mrr, 0);
   const mrrPerdidoTotal = mrrPerdidoPorMes.reduce((sum, item) => sum + item.mrr, 0);
+  const mrrAbonadoTotal = mrrPerdidoPorMes.reduce((sum, item) => sum + item.mrrAbonado, 0);
   const comparativoChurnTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrChurn, 0);
+  const comparativoAbonadoTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrAbonado, 0);
   const comparativoPausadoTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrPausado, 0);
   const cohortMediaGeral = cohortAnalysis.length > 0
     ? cohortAnalysis.reduce((sum, item) => sum + item.avgLifetime, 0) / cohortAnalysis.length
@@ -2343,7 +2359,9 @@ export default function ChurnDetalhamento() {
                   className="fill-muted-foreground"
                 />
                 <Tooltip content={<CustomTooltip valueFormatter={(v: number) => `${v} contratos`} />} />
-                <Bar dataKey="count" fill="url(#barGradient)" radius={[4, 4, 0, 0]} name="Quantidade" />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Bar dataKey="count" stackId="a" fill="url(#barGradient)" radius={[0, 0, 0, 0]} name="Churn Efetivo" />
+                <Bar dataKey="countAbonado" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Abonado" />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -2597,15 +2615,14 @@ export default function ChurnDetalhamento() {
         {/* MRR Perdido por Mês */}
         <TechChartCard
           title="Evolução do MRR Perdido"
-          subtitle="Valor perdido mensalmente"
+          subtitle="Churn efetivo + abonado por mês"
           icon={DollarSign}
           iconBg="bg-gradient-to-r from-red-500 to-rose-500"
           meta={
-            <StatPill
-              label="Total 12m"
-              value={formatCurrencyNoDecimals(mrrPerdidoTotal)}
-              tone="danger"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <StatPill label="Efetivo 12m" value={formatCurrencyNoDecimals(mrrPerdidoTotal)} tone="danger" />
+              {mrrAbonadoTotal > 0 && <StatPill label="Abonado 12m" value={formatCurrencyNoDecimals(mrrAbonadoTotal)} tone="warning" />}
+            </div>
           }
         >
           {isLoading ? (
@@ -2623,22 +2640,24 @@ export default function ChurnDetalhamento() {
                     <stop offset="100%" stopColor="#dc2626" stopOpacity={0.7}/>
                   </linearGradient>
                 </defs>
-                <XAxis 
-                  dataKey="mes" 
-                  tick={{ fontSize: 10 }} 
+                <XAxis
+                  dataKey="mes"
+                  tick={{ fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                   className="fill-muted-foreground"
                 />
-                <YAxis 
-                  tick={{ fontSize: 10 }} 
+                <YAxis
+                  tick={{ fontSize: 10 }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `${(v/1000).toFixed(0)}k`}
                   className="fill-muted-foreground"
                 />
                 <Tooltip content={<CustomTooltip valueFormatter={(v: number) => formatCurrency(v)} />} />
-                <Bar dataKey="mrr" fill="url(#mrrGradient)" radius={[4, 4, 0, 0]} name="MRR Perdido" />
+                <Legend wrapperStyle={{ fontSize: 10 }} />
+                <Bar dataKey="mrr" stackId="a" fill="url(#mrrGradient)" radius={[0, 0, 0, 0]} name="Churn Efetivo" />
+                <Bar dataKey="mrrAbonado" stackId="a" fill="#f59e0b" radius={[4, 4, 0, 0]} name="Churn Abonado" />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -2646,14 +2665,14 @@ export default function ChurnDetalhamento() {
 
         {/* Comparativo MRR Churn vs Pausado */}
         <TechChartCard
-          title="MRR Churn vs Pausados"
+          title="MRR Churn vs Abonado"
           subtitle="Comparativo mensal de valor (R$)"
           icon={DollarSign}
           iconBg="bg-gradient-to-r from-amber-500 to-yellow-500"
           meta={
             <div className="flex flex-wrap items-center gap-2">
               <StatPill label="Churn" value={formatCurrencyNoDecimals(comparativoChurnTotal)} tone="danger" />
-              <StatPill label="Pausado" value={formatCurrencyNoDecimals(comparativoPausadoTotal)} tone="warning" />
+              <StatPill label="Abonado" value={formatCurrencyNoDecimals(comparativoAbonadoTotal)} tone="warning" />
             </div>
           }
         >
@@ -2683,7 +2702,7 @@ export default function ChurnDetalhamento() {
                 <Tooltip content={<CustomTooltip valueFormatter={(v: number) => formatCurrency(v)} />} />
                 <Legend wrapperStyle={{ fontSize: 10 }} />
                 <Bar dataKey="mrrChurn" fill="#ef4444" radius={[4, 4, 0, 0]} name="MRR Churn" />
-                <Bar dataKey="mrrPausado" fill="#f59e0b" radius={[4, 4, 0, 0]} name="MRR Pausado" />
+                <Bar dataKey="mrrAbonado" fill="#f59e0b" radius={[4, 4, 0, 0]} name="MRR Abonado" />
               </BarChart>
             </ResponsiveContainer>
           )}
