@@ -29,6 +29,7 @@ export const PERMISSION_KEYS = {
     CONTRIBUICAO_OPERADOR: 'fin.contribuicao_operador',
     MARGEM_CLIENTE: 'fin.margem_cliente',
     TURBOZAP: 'fin.turbozap',
+    DRE: 'fin.dre',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -191,6 +192,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/contribuicao-operador': PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR,
   '/dashboard/margem-cliente': PERMISSION_KEYS.FIN.MARGEM_CLIENTE,
   '/turbozap': PERMISSION_KEYS.FIN.TURBOZAP,
+  '/dashboard/dre': PERMISSION_KEYS.FIN.DRE,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
@@ -380,6 +382,7 @@ export const NAV_CONFIG = {
       items: [
         { title: 'Visão Geral', url: '/dashboard/financeiro', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.FIN.VISAO_GERAL },
         { title: 'DFC', url: '/dashboard/dfc', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.FIN.DFC },
+        { title: 'DRE', url: '/dashboard/dre', icon: 'FileBarChart', permissionKey: PERMISSION_KEYS.FIN.DRE },
         { title: 'Fluxo de Caixa', url: '/dashboard/fluxo-caixa', icon: 'Wallet', permissionKey: PERMISSION_KEYS.FIN.FLUXO_CAIXA },
         { title: 'Revenue Goals', url: '/dashboard/revenue-goals', icon: 'Target', permissionKey: PERMISSION_KEYS.FIN.REVENUE_GOALS },
         { title: 'Inadimplência', url: '/dashboard/inadimplencia', icon: 'AlertTriangle', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
@@ -636,5 +639,6 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS]: 'Processos Internos',
   [PERMISSION_KEYS.GENERAL.CHAMADOS]: 'Chamados',
   [PERMISSION_KEYS.FIN.TURBOZAP]: 'TurboZap',
+  [PERMISSION_KEYS.FIN.DRE]: 'DRE',
   [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
 };
