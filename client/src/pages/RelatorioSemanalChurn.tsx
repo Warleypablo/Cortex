@@ -80,6 +80,7 @@ interface ChurnContract {
   tipo: "churn" | "pausado";
   lifetime_meses: number;
   ltv: number;
+  is_abonado?: boolean;
 }
 
 interface ChurnPorSquad {
@@ -311,10 +312,13 @@ export default function RelatorioSemanalChurn() {
   const weekMetrics = useMemo(() => {
     if (!currentData?.contratos) return null;
 
-    const churnContratos = currentData.contratos.filter((c) => c.tipo === "churn");
+    const churnContratos = currentData.contratos.filter((c) => c.tipo === "churn" && !c.is_abonado);
+    const abonadoContratos = currentData.contratos.filter((c) => c.is_abonado);
     const pausados = currentData.contratos.filter((c) => c.tipo === "pausado");
     const totalChurns = churnContratos.length;
     const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    const totalAbonados = abonadoContratos.length;
+    const mrrAbonado = abonadoContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const mrrBase = currentData.metricas?.mrr_ativo_ref || 0;
     const churnRate = mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
 
@@ -372,6 +376,8 @@ export default function RelatorioSemanalChurn() {
       motivoData,
       respData,
       contratos: churnContratos,
+      totalAbonados,
+      mrrAbonado,
     };
   }, [currentData]);
 
@@ -379,7 +385,7 @@ export default function RelatorioSemanalChurn() {
   const comparison = useMemo(() => {
     if (!weekMetrics || !prevData?.contratos) return null;
 
-    const prevChurn = prevData.contratos.filter((c) => c.tipo === "churn");
+    const prevChurn = prevData.contratos.filter((c) => c.tipo === "churn" && !c.is_abonado);
     const prevCount = prevChurn.length;
     const prevMrr = prevChurn.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const prevMrrBase = prevData.metricas?.mrr_ativo_ref || 0;
@@ -395,7 +401,7 @@ export default function RelatorioSemanalChurn() {
   // Consolidated monthly metrics
   const monthMetrics = useMemo(() => {
     if (!monthData?.contratos) return null;
-    const churnContratos = monthData.contratos.filter((c) => c.tipo === "churn");
+    const churnContratos = monthData.contratos.filter((c) => c.tipo === "churn" && !c.is_abonado);
     const totalChurns = churnContratos.length;
     const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const mrrBase = monthData.metricas?.mrr_ativo_ref || 0;
@@ -488,6 +494,9 @@ export default function RelatorioSemanalChurn() {
     report += `- MRR Perdido: ${formatCurrencyNoDecimals(weekMetrics.mrrPerdido)}\n`;
     report += `- Taxa de Churn Semanal: ${weekMetrics.churnRate.toFixed(2)}%\n`;
     report += `- Pausados: ${weekMetrics.totalPausados}\n`;
+    if (weekMetrics.totalAbonados > 0) {
+      report += `- Churn Abonado: ${weekMetrics.totalAbonados} contratos, ${formatCurrencyNoDecimals(weekMetrics.mrrAbonado)}\n`;
+    }
     if (monthMetrics) {
       report += `\nCONSOLIDADO DO MÊS (${monthLabel})\n`;
       report += `- Churn Rate Mensal: ${monthMetrics.churnRate.toFixed(2)}%\n`;

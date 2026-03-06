@@ -4346,6 +4346,8 @@ export class DbStorage implements IStorage {
         FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento >= ${inicioMes}::timestamp
           AND data_solicitacao_encerramento <= ${fimMes}::timestamp
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
       `);
       churnBase = parseFloat((cupChurnQuery.rows[0] as any)?.churn_total || '0');
     }
