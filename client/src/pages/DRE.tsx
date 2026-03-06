@@ -167,6 +167,7 @@ export default function DRE() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(["03", "04", "05", "06", "07"])
   );
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [showAV, setShowAV] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"agrupada" | "expandida">("agrupada");
 
@@ -231,6 +232,18 @@ export default function DRE() {
     });
   };
 
+  const toggleParent = (key: string) => {
+    setExpandedParents((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
   const yearOptions = useMemo(() => {
     const years: number[] = [];
     for (let y = currentYear - 2; y <= currentYear + 2; y++) {
@@ -267,29 +280,59 @@ export default function DRE() {
     );
   }
 
+  // ---------- Render a value row (reusable) ----------
+
+  function renderLineRow(
+    linha: DRELineItem,
+    keyPrefix: string,
+    tdClass: string,
+    bgClass: string,
+    options?: { clickable?: boolean; onClick?: () => void; chevron?: "expanded" | "collapsed" | null }
+  ) {
+    const acum = computeAccumulated(linha.valores);
+    return (
+      <tr
+        key={`${keyPrefix}-${linha.categoria_id}`}
+        className={`hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors ${bgClass} ${options?.clickable ? "cursor-pointer" : ""}`}
+        onClick={options?.onClick}
+      >
+        <td className={`px-3 py-1.5 text-xs sticky left-0 z-10 whitespace-nowrap ${tdClass} ${bgClass || "bg-white dark:bg-zinc-900"}`}>
+          <span className="inline-flex items-center gap-1">
+            {options?.chevron === "expanded" && <ChevronDown className="w-3 h-3 text-gray-400 dark:text-zinc-500" />}
+            {options?.chevron === "collapsed" && <ChevronRight className="w-3 h-3 text-gray-400 dark:text-zinc-500" />}
+            {linha.categoria_nome}
+          </span>
+        </td>
+        {MONTH_KEYS.map((mk) => (
+          <Fragment key={`${keyPrefix}-${linha.categoria_id}-${mk}-wrap`}>
+            {renderValueCell(linha.valores[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-${mk}`)}
+            {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`)}
+          </Fragment>
+        ))}
+        {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`)}
+        {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
+      </tr>
+    );
+  }
+
   // ---------- Render rows for a group section ----------
 
   function renderGroupSection(section: DREGroup) {
     if (!data) return null;
-    const isExpanded = expandedGroups.has(section.key);
+    const isGroupExpanded = expandedGroups.has(section.key);
     const subtotal = data.subtotais[section.subtotalKey];
     const subtotalAccum = computeAccumulated(subtotal);
 
-    // Choose lines based on view mode
-    const displayLinhas = viewMode === "agrupada"
-      ? groupedLinhas.filter((l) => l.grupo === section.grupoFilter)
-      : data.linhas.filter((l) => l.grupo === section.grupoFilter);
-
     return (
       <Fragment key={`group-${section.key}`}>
-        {/* Group header row */}
+        {/* Level 1: Group header (e.g., "CUSTOS OPERACIONAIS") */}
         <tr
           className="bg-gray-100 dark:bg-zinc-800 cursor-pointer hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
           onClick={() => toggleGroup(section.key)}
         >
           <td className="px-3 py-2 font-bold text-sm text-gray-900 dark:text-white sticky left-0 bg-gray-100 dark:bg-zinc-800 z-10 whitespace-nowrap">
             <span className="inline-flex items-center gap-1">
-              {isExpanded ? (
+              {isGroupExpanded ? (
                 <ChevronDown className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
               ) : (
                 <ChevronRight className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
@@ -303,71 +346,58 @@ export default function DRE() {
               {showAV && <td className="px-2 py-2" />}
             </Fragment>
           ))}
-          <td className="px-2 py-2" /> {/* Acumulado */}
+          <td className="px-2 py-2" />
           {showAV && <td className="px-2 py-2" />}
         </tr>
 
-        {/* Rows (when expanded) */}
-        {isExpanded &&
-          displayLinhas.map((linha) => {
-            const acum = computeAccumulated(linha.valores);
-            // In grouped mode, check if this parent is expanded to show children
-            const isParentRow = viewMode === "agrupada";
-            const isParentExpanded = isParentRow && expandedGroups.has(linha.parent_key);
-            const childLinhas = isParentRow
-              ? data.linhas.filter((l) => l.parent_key === linha.parent_key)
-              : [];
+        {/* Inner rows (when group is expanded) */}
+        {isGroupExpanded && viewMode === "expandida" &&
+          // Expanded mode: show all individual categories (XX.YY.ZZ)
+          data.linhas
+            .filter((l) => l.grupo === section.grupoFilter)
+            .map((linha) =>
+              renderLineRow(linha, "exp", "pl-9 text-gray-700 dark:text-zinc-300", "")
+            )
+        }
 
-            return (
-              <Fragment key={`cat-${linha.categoria_id}`}>
-                <tr
-                  className={`hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors ${isParentRow ? "cursor-pointer" : ""}`}
-                  onClick={isParentRow ? () => toggleGroup(linha.parent_key) : undefined}
-                >
-                  <td className={`px-3 py-1.5 text-xs sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap ${isParentRow ? "pl-7 font-medium text-gray-800 dark:text-zinc-200" : "pl-9 text-gray-700 dark:text-zinc-300"}`}>
-                    <span className="inline-flex items-center gap-1">
-                      {isParentRow && (
-                        isParentExpanded
-                          ? <ChevronDown className="w-3 h-3 text-gray-400 dark:text-zinc-500" />
-                          : <ChevronRight className="w-3 h-3 text-gray-400 dark:text-zinc-500" />
-                      )}
-                      {linha.categoria_nome}
-                    </span>
-                  </td>
-                  {MONTH_KEYS.map((mk) => (
-                    <Fragment key={`${linha.categoria_id}-${mk}-wrap`}>
-                      {renderValueCell(linha.valores[mk] ?? 0, `${linha.categoria_id}-${mk}`)}
-                      {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${linha.categoria_id}-av-${mk}`)}
-                    </Fragment>
-                  ))}
-                  {renderValueCell(acum, `${linha.categoria_id}-acum`)}
-                  {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${linha.categoria_id}-av-acum`)}
-                </tr>
-                {/* Child rows in grouped mode when parent is expanded */}
-                {isParentExpanded && childLinhas.map((child) => {
-                  const childAcum = computeAccumulated(child.valores);
-                  return (
-                    <tr
-                      key={`child-${child.categoria_id}`}
-                      className="hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors bg-gray-50/50 dark:bg-zinc-900/50"
-                    >
-                      <td className="px-3 py-1 pl-12 text-xs text-gray-500 dark:text-zinc-400 sticky left-0 bg-gray-50/50 dark:bg-zinc-900/50 z-10 whitespace-nowrap">
-                        {child.categoria_nome}
-                      </td>
-                      {MONTH_KEYS.map((mk) => (
-                        <Fragment key={`${child.categoria_id}-${mk}-wrap`}>
-                          {renderValueCell(child.valores[mk] ?? 0, `${child.categoria_id}-${mk}`)}
-                          {showAV && renderAVCell(child.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${child.categoria_id}-av-${mk}`)}
-                        </Fragment>
-                      ))}
-                      {renderValueCell(childAcum, `${child.categoria_id}-acum`)}
-                      {showAV && renderAVCell(childAcum, receitaBrutaTotalAcum, `${child.categoria_id}-av-acum`)}
-                    </tr>
-                  );
-                })}
-              </Fragment>
-            );
-          })}
+        {isGroupExpanded && viewMode === "agrupada" &&
+          // Grouped mode: show parent categories (XX.YY), expandable to children
+          groupedLinhas
+            .filter((l) => l.grupo === section.grupoFilter)
+            .map((parentLinha) => {
+              const isParentOpen = expandedParents.has(parentLinha.parent_key);
+              const children = data.linhas.filter((l) => l.parent_key === parentLinha.parent_key);
+
+              return (
+                <Fragment key={`parent-${parentLinha.parent_key}`}>
+                  {/* Level 2: Parent category (e.g., "05.01 Mão de Obra Operacional") */}
+                  {renderLineRow(
+                    parentLinha,
+                    "grp",
+                    "pl-7 font-medium text-gray-800 dark:text-zinc-200",
+                    "",
+                    {
+                      clickable: true,
+                      onClick: () => toggleParent(parentLinha.parent_key),
+                      chevron: isParentOpen ? "expanded" : "collapsed",
+                    }
+                  )}
+
+                  {/* Level 3: Child categories (e.g., "05.01.01 Lider de Squad") */}
+                  {isParentOpen &&
+                    children.map((child) =>
+                      renderLineRow(
+                        child,
+                        "child",
+                        "pl-12 text-gray-500 dark:text-zinc-400",
+                        "bg-gray-50/50 dark:bg-zinc-900/50"
+                      )
+                    )
+                  }
+                </Fragment>
+              );
+            })
+        }
 
         {/* Subtotal row (always visible) */}
         <tr className="border-b border-gray-200 dark:border-zinc-700">
