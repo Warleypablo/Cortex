@@ -93,6 +93,13 @@ function getValueClass(value: number): string {
   return "text-gray-900 dark:text-white";
 }
 
+function emptyMonthsRecord(): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const mk of MONTH_KEYS) m[mk] = 0;
+  m.acumulado = 0;
+  return m;
+}
+
 function computeAccumulated(valores: Record<string, number>): number {
   return MONTH_KEYS.reduce((acc, mk) => acc + (valores[mk] ?? 0), 0);
 }
@@ -168,7 +175,12 @@ export default function DRE() {
     },
   });
 
-  // Compute receita bruta total accumulated for AV% base
+  // Compute receita bruta total per month + accumulated for AV% base
+  const receitaBrutaTotal = useMemo(() => {
+    if (!data) return emptyMonthsRecord();
+    return data.subtotais.receita_bruta_total;
+  }, [data]);
+
   const receitaBrutaTotalAcum = useMemo(() => {
     if (!data) return 0;
     return computeAccumulated(data.subtotais.receita_bruta_total);
@@ -249,7 +261,10 @@ export default function DRE() {
             </span>
           </td>
           {MONTH_KEYS.map((mk) => (
-            <td key={mk} className="px-2 py-2" />
+            <Fragment key={`hdr-${section.key}-${mk}-wrap`}>
+              <td className="px-2 py-2" />
+              {showAV && <td className="px-2 py-2" />}
+            </Fragment>
           ))}
           <td className="px-2 py-2" /> {/* Acumulado */}
           {showAV && <td className="px-2 py-2" />}
@@ -267,9 +282,12 @@ export default function DRE() {
                 <td className="px-3 py-1.5 pl-9 text-xs text-gray-700 dark:text-zinc-300 sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap">
                   {linha.categoria_nome}
                 </td>
-                {MONTH_KEYS.map((mk) =>
-                  renderValueCell(linha.valores[mk] ?? 0, `${linha.categoria_id}-${mk}`)
-                )}
+                {MONTH_KEYS.map((mk) => (
+                  <Fragment key={`${linha.categoria_id}-${mk}-wrap`}>
+                    {renderValueCell(linha.valores[mk] ?? 0, `${linha.categoria_id}-${mk}`)}
+                    {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${linha.categoria_id}-av-${mk}`)}
+                  </Fragment>
+                ))}
                 {renderValueCell(acum, `${linha.categoria_id}-acum`)}
                 {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${linha.categoria_id}-av-acum`)}
               </tr>
@@ -281,9 +299,12 @@ export default function DRE() {
           <td className="px-3 py-1.5 pl-5 text-xs font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap">
             Subtotal
           </td>
-          {MONTH_KEYS.map((mk) =>
-            renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium")
-          )}
+          {MONTH_KEYS.map((mk) => (
+            <Fragment key={`sub-${section.key}-${mk}-wrap`}>
+              {renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium")}
+              {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`)}
+            </Fragment>
+          ))}
           {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium")}
           {showAV && renderAVCell(subtotalAccum, receitaBrutaTotalAcum, `sub-${section.key}-av-acum`)}
         </tr>
@@ -308,13 +329,17 @@ export default function DRE() {
         >
           {section.label}
         </td>
-        {MONTH_KEYS.map((mk) =>
-          renderValueCell(
-            subtotal[mk] ?? 0,
-            `derived-${section.subtotalKey}-${mk}`,
-            `font-bold ${section.textClass ?? ""}`
-          )
-        )}
+        {MONTH_KEYS.map((mk) => (
+          <Fragment key={`derived-${section.subtotalKey}-${mk}-wrap`}>
+            {renderValueCell(
+              subtotal[mk] ?? 0,
+              `derived-${section.subtotalKey}-${mk}`,
+              `font-bold ${section.textClass ?? ""}`
+            )}
+            {showAV &&
+              renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`)}
+          </Fragment>
+        ))}
         {renderValueCell(
           acum,
           `derived-${section.subtotalKey}-acum`,
@@ -456,19 +481,23 @@ export default function DRE() {
                       Conta
                     </th>
                     {MONTHS.map((m) => (
-                      <th
-                        key={m}
-                        className="px-2 py-2 text-right text-xs font-semibold text-gray-600 dark:text-zinc-400 min-w-[90px]"
-                      >
-                        {m}
-                      </th>
+                      <Fragment key={`hdr-${m}`}>
+                        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600 dark:text-zinc-400 min-w-[90px]">
+                          {m}
+                        </th>
+                        {showAV && (
+                          <th className="px-2 py-2 text-right text-xs font-semibold text-gray-400 dark:text-zinc-500 min-w-[50px]">
+                            %
+                          </th>
+                        )}
+                      </Fragment>
                     ))}
                     <th className="px-2 py-2 text-right text-xs font-semibold text-gray-900 dark:text-white min-w-[100px] bg-gray-100 dark:bg-zinc-700/50">
                       Acumulado
                     </th>
                     {showAV && (
-                      <th className="px-2 py-2 text-right text-xs font-semibold text-gray-500 dark:text-zinc-400 min-w-[60px]">
-                        AV%
+                      <th className="px-2 py-2 text-right text-xs font-semibold text-gray-400 dark:text-zinc-500 min-w-[50px] bg-gray-100 dark:bg-zinc-700/50">
+                        %
                       </th>
                     )}
                   </tr>
