@@ -67,7 +67,7 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
             p.tipo_evento,
             p.empresa,
             EXTRACT(MONTH FROM p.data_quitacao::date)::int AS mes,
-            COALESCE(p.valor_categoria::numeric, p.valor_pago::numeric, 0) AS valor
+            COALESCE(p.valor_pago::numeric, 0) AS valor
           FROM "Conta Azul".caz_parcelas p,
                regexp_split_to_table(p.categoria_nome, ';') AS cat(categoria)
           WHERE p.status = 'QUITADO'
