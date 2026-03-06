@@ -88,7 +88,7 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
       // Fetch parent category names (XX.YY level) from caz_categorias
       const parentCatResult = await db.execute(sql`
         SELECT nome FROM "Conta Azul".caz_categorias
-        WHERE nome ~ '^\d{2}\.\d{2}\s'
+        WHERE nome ~ ${'^[0-9]{2}[.][0-9]{2} '}
         ORDER BY nome
       `);
       const parentCategories: Record<string, string> = {};
