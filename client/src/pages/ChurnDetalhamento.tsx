@@ -104,6 +104,7 @@ interface ChurnContract {
   status_cancelamento?: string | null;
   status_conta?: string | null;
   ultimo_dia_operacao?: string | null;
+  is_abonado?: boolean;
 }
 
 interface ChurnPorSquad {
@@ -153,6 +154,8 @@ interface ChurnDetalhamentoData {
     churn_por_cluster?: ChurnBreakdownItem[];
     churn_por_plano?: ChurnBreakdownItem[];
     periodo_referencia?: string;
+    total_abonado?: number;
+    mrr_abonado?: number;
   };
   filtros: {
     squads: string[];
@@ -598,18 +601,24 @@ export default function ChurnDetalhamento() {
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
-      return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0 };
+      return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0, total_abonado: 0, mrr_abonado: 0 };
     }
 
-    // Todos os contratos de cup_churn são churn
-    const totalChurned = filteredContratos.length;
+    // Separar contratos regulares de abonados
+    const regulares = filteredContratos.filter(c => !c.is_abonado);
+    const abonados = filteredContratos.filter(c => c.is_abonado);
+
+    const totalChurned = regulares.length;
     const totalPausados = 0;
-    const mrrPerdido = filteredContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    const mrrPerdido = regulares.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const mrrPausado = 0;
-    const ltvTotal = filteredContratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
-    const ltMedio = totalChurned > 0 ? filteredContratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
+    const ltvTotal = regulares.reduce((sum, c) => sum + (c.ltv || 0), 0);
+    const ltMedio = totalChurned > 0 ? regulares.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
     const ticketMedio = totalChurned > 0 ? mrrPerdido / totalChurned : 0;
-    
+
+    const totalAbonado = abonados.length;
+    const mrrAbonado = abonados.reduce((sum, c) => sum + (c.valorr || 0), 0);
+
     return {
       total_churned: totalChurned,
       total_pausados: totalPausados,
@@ -617,14 +626,16 @@ export default function ChurnDetalhamento() {
       mrr_pausado: mrrPausado,
       ltv_total: ltvTotal,
       lt_medio: ltMedio,
-      ticket_medio: ticketMedio
+      ticket_medio: ticketMedio,
+      total_abonado: totalAbonado,
+      mrr_abonado: mrrAbonado,
     };
   }, [filteredContratos]);
 
   const filteredChurnPorSquad = useMemo(() => {
     if (filteredContratos.length === 0 || !data?.metricas?.churn_por_squad) return [];
-    
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
     if (churnContratos.length === 0) return [];
     
     const squadData: Record<string, { mrr_perdido: number; mrr_base: number }> = {};
@@ -776,7 +787,7 @@ export default function ChurnDetalhamento() {
   }, [churnDailyInsights.status]);
 
   const distribuicaoPorSquad = useMemo(() => {
-    const churnOnly = filteredContratos.filter(c => c.tipo === 'churn');
+    const churnOnly = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
     if (churnOnly.length === 0) return [];
 
     const squadCounts: Record<string, { count: number; mrr: number }> = {};
@@ -890,8 +901,8 @@ export default function ChurnDetalhamento() {
 
   const churnPorTipoErro = useMemo(() => {
     if (filteredContratos.length === 0) return [];
-    
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
     if (churnContratos.length === 0) return [];
     
     const tiposErro: Record<string, ChurnTipoErro> = {};
@@ -1052,8 +1063,8 @@ export default function ChurnDetalhamento() {
   // Top clientes perdidos (maior impacto financeiro)
   const topClientesPerdidos = useMemo(() => {
     if (filteredContratos.length === 0) return [];
-    
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
     return churnContratos
       .sort((a, b) => b.valorr - a.valorr)
       .slice(0, 10);
@@ -1454,10 +1465,10 @@ export default function ChurnDetalhamento() {
       
       if (!meses[mes]) meses[mes] = { churn: 0, pausado: 0, mrrChurn: 0, mrrPausado: 0, sortKey };
       
-      if (c.tipo === 'churn') {
+      if (c.tipo === 'churn' && !c.is_abonado) {
         meses[mes].churn++;
         meses[mes].mrrChurn += c.valorr || 0;
-      } else {
+      } else if (c.tipo === 'pausado') {
         meses[mes].pausado++;
         meses[mes].mrrPausado += c.valorr || 0;
       }
@@ -1473,7 +1484,7 @@ export default function ChurnDetalhamento() {
   const cohortAnalysis = useMemo(() => {
     if (filteredContratos.length === 0) return [];
     
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && c.data_inicio);
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado && c.data_inicio);
     if (churnContratos.length === 0) return [];
     
     const cohorts: Record<string, { count: number; totalLifetime: number; totalMrr: number }> = {};
@@ -1544,9 +1555,9 @@ export default function ChurnDetalhamento() {
   // MRR perdido por mês (evolução)
   const mrrPerdidoPorMes = useMemo(() => {
     if (filteredContratos.length === 0) return [];
-    
+
     const meses: Record<string, { mrr: number; sortKey: string }> = {};
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn');
+    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
     
     churnContratos.forEach(c => {
       if (!c.data_encerramento) return;
@@ -1831,11 +1842,11 @@ export default function ChurnDetalhamento() {
                 
                 <div className="flex-1 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">MRR Pausado</span>
+                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">Churn Abonado</span>
                     <Pause className="h-4 w-4 text-amber-500" />
                   </div>
-                  <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(filteredMetricas.mrr_pausado)}</div>
-                  <div className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">{filteredMetricas.total_pausados} contratos pausados</div>
+                  <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(filteredMetricas.mrr_abonado || 0)}</div>
+                  <div className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">{filteredMetricas.total_abonado || 0} contratos abonados</div>
                 </div>
                 
                 <div className="flex-1 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 flex flex-col justify-center">
@@ -2225,8 +2236,13 @@ export default function ChurnDetalhamento() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div>
+                        <div className="flex items-center gap-1.5">
                           <span className="font-medium">{c.cliente_nome}</span>
+                          {c.is_abonado && (
+                            <Badge variant="outline" className="text-[9px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                              Abonado
+                            </Badge>
+                          )}
                           {c.cnpj && <p className="text-xs text-muted-foreground">{c.cnpj}</p>}
                         </div>
                       </TableCell>
@@ -3838,7 +3854,14 @@ export default function ChurnDetalhamento() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm font-medium text-foreground">{c.cliente_nome}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-medium text-foreground">{c.cliente_nome}</span>
+                            {c.is_abonado && (
+                              <Badge variant="outline" className="text-[9px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                                Abonado
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <span className="text-xs text-muted-foreground">{c.motivo_cancelamento || '-'}</span>
@@ -4176,7 +4199,14 @@ export default function ChurnDetalhamento() {
                             </TableCell>
                             <TableCell>
                               <div className="flex flex-col">
-                                <span className="font-medium text-sm">{contrato.cliente_nome || "-"}</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-medium text-sm">{contrato.cliente_nome || "-"}</span>
+                                  {contrato.is_abonado && (
+                                    <Badge variant="outline" className="text-[9px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                                      Abonado
+                                    </Badge>
+                                  )}
+                                </div>
                                 {contrato.motivo_cancelamento && contrato.motivo_cancelamento !== 'Não especificado' && (
                                   <span className="text-[10px] text-muted-foreground">{contrato.motivo_cancelamento}</span>
                                 )}
@@ -4184,10 +4214,10 @@ export default function ChurnDetalhamento() {
                             </TableCell>
                             <TableCell>
                               <Badge
-                                variant={contrato.status?.toLowerCase().includes('em cancelamento') ? 'secondary' : 'destructive'}
-                                className={contrato.status?.toLowerCase().includes('em cancelamento') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : 'text-[10px]'}
+                                variant={contrato.is_abonado ? 'secondary' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'secondary' : 'destructive'}
+                                className={contrato.is_abonado ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : 'text-[10px]'}
                               >
-                                {contrato.status?.toLowerCase().includes('em cancelamento') ? 'Em Cancel.' : 'Churn'}
+                                {contrato.is_abonado ? 'Abonado' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'Em Cancel.' : 'Churn'}
                               </Badge>
                               {contrato.status_cancelamento && (
                                 <div className="text-[10px] text-muted-foreground mt-0.5">{contrato.status_cancelamento}</div>

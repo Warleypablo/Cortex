@@ -4181,7 +4181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY mes, squad, responsavel
       `);
       
-      // Buscar churns por mês da tabela curada cup_churn
+      // Buscar churns por mês da tabela curada cup_churn (excluindo churn abonado)
       const churnResult = await db.execute(sql`
         SELECT
           TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
@@ -4193,6 +4193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
         ORDER BY mes, squad, responsavel_geral
       `);
@@ -9471,9 +9473,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allContratos = churnResult.rows.map((row: any) => {
         const ltValue = row.lt ? Math.abs(parseFloat(row.lt)) : 0;
         const valorr = Number(row.valor_r) || 0;
-        // Todos os registros de cup_churn são churn (a tabela é curada para isso)
-        // O status original (cancelado/inativo, em cancelamento) fica em status_cancelamento
         const tipo = 'churn' as const;
+        const motivo = row.motivo_cancelamento || 'Não especificado';
+        const isAbonado = row.abonar_churn === 'Sim' ||
+          motivo === 'Inadimplente 1º Mês' ||
+          motivo === 'Não começou';
 
         return {
           id: row.task_id,
@@ -9490,11 +9494,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data_pausa: null,
           status: row.status || 'encerrado',
           servico: row.produto || 'Não especificado',
-          motivo_cancelamento: row.motivo_cancelamento || 'Não especificado',
+          motivo_cancelamento: motivo,
           tipo: tipo,
           lifetime_meses: ltValue,
           ltv: valorr * ltValue,
-          // Novos campos de cup_churn
           plano: row.plano || null,
           cluster: row.cluster || null,
           submotivo: row.submotivo_cancelamento || null,
@@ -9506,6 +9509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status_cancelamento: row.status_cancelamento || null,
           status_conta: row.status_conta || null,
           ultimo_dia_operacao: row.ultimo_dia_operacao || null,
+          is_abonado: isAbonado,
         };
       });
 
@@ -9519,13 +9523,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const evitabilidades = Array.from(new Set(allContratos.map((c: any) => c.evitabilidade_churn).filter(Boolean))).sort();
       const possibilidades_retencao = Array.from(new Set(allContratos.map((c: any) => c.possibilidade_retencao).filter(Boolean))).sort();
 
-      // Métricas - todos são churn (cup_churn é tabela curada)
-      const totalChurned = allContratos.length;
+      // Separar contratos regulares de abonados
+      const contratosRegulares = allContratos.filter((c: any) => !c.is_abonado);
+      const contratosAbonados = allContratos.filter((c: any) => c.is_abonado);
+
+      // Métricas - apenas churn regular (excluindo abonado)
+      const totalChurned = contratosRegulares.length;
       const totalEmCancelamento = 0;
-      const mrrPerdidoChurn = allContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
+      const mrrPerdidoChurn = contratosRegulares.reduce((sum: number, c: any) => sum + c.valorr, 0);
       const mrrEmCancelamento = 0;
-      const ltvTotal = allContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
-      const ltMedio = totalChurned > 0 ? allContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
+      const ltvTotal = contratosRegulares.reduce((sum: number, c: any) => sum + c.ltv, 0);
+      const ltMedio = totalChurned > 0 ? contratosRegulares.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
+
+      // Métricas de churn abonado
+      const totalAbonado = contratosAbonados.length;
+      const mrrAbonado = contratosAbonados.reduce((sum: number, c: any) => sum + c.valorr, 0);
 
       // MRR ativo de referência via cup_data_hist
       let refDate: Date;
@@ -9684,6 +9696,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           churn_por_cluster: churnPorCluster,
           churn_por_plano: churnPorPlano,
           periodo_referencia: refDateStr,
+          // Churn abonado separado
+          total_abonado: totalAbonado,
+          mrr_abonado: mrrAbonado,
         },
         filtros: {
           squads,
@@ -10756,7 +10771,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
 
-      // 2) Churn por operador no squad selecionado (tabela curada cup_churn)
+      // 2) Churn por operador no squad selecionado (tabela curada cup_churn, excluindo abonado)
       const churnResult = await db.execute(sql`
         SELECT
           COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
@@ -10768,6 +10783,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
         GROUP BY COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável')
       `);
       const churnPorOperadorRows = churnResult.rows as any[];
@@ -10845,7 +10862,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         ORDER BY mes, operador
       `);
 
-      // 5) Contratos churned no mês (lista detalhada via cup_churn)
+      // 5) Contratos churned no mês (lista detalhada via cup_churn, excluindo abonado)
       const contratosChurnResult = await db.execute(sql`
         SELECT
           c.nome as cliente,
@@ -10862,6 +10879,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND c.data_solicitacao_encerramento <= ${fimMesStr}::date
           AND c.valor_r > 0
           AND COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squad}
+          AND COALESCE(c.abonar_churn, '') != 'Sim'
+          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
         ORDER BY c.valor_r::numeric DESC
       `);
 

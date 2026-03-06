@@ -385,6 +385,8 @@ export async function getGrossChurnMrr(): Promise<number> {
         FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
       `);
       return parseFloat((result.rows[0] as any)?.churn_mrr || "0");
     }
@@ -494,6 +496,8 @@ export async function getLogoChurn(): Promise<number> {
           FROM "Clickup".cup_churn c
           WHERE c.data_solicitacao_encerramento IS NOT NULL
             AND TO_CHAR(c.data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
+            AND COALESCE(c.abonar_churn, '') != 'Sim'
+            AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
         ),
         clientes_ainda_ativos AS (
           SELECT DISTINCT id_task
@@ -1610,6 +1614,8 @@ async function getChurnSeriesForRange(startDate: string, endDate: string): Promi
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= '2026-02-01'::date
           AND data_solicitacao_encerramento <= ${endDate}::date
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
         GROUP BY TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM')
       ) combined
       GROUP BY date
@@ -2018,6 +2024,8 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= '2026-02-01'::date
             AND data_solicitacao_encerramento <= ${endDate}::date
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
           GROUP BY TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM')
         ) combined
         GROUP BY month
@@ -2111,6 +2119,8 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= '2026-02-01'::date
             AND data_solicitacao_encerramento <= ${endDate}::date
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
             AND COALESCE(parent_id, task_id) NOT IN (
               SELECT DISTINCT id_task
               FROM "Clickup".cup_contratos
