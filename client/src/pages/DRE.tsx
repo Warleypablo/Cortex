@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // ---------- Types ----------
 
@@ -113,6 +114,20 @@ function computeAVPercent(value: number, receitaBrutaTotal: number): string {
   const pct = (value / receitaBrutaTotal) * 100;
   return pct.toFixed(1) + "%";
 }
+
+function computeVariation(current: number, previous: number): { pct: number; label: string } | null {
+  if (previous === 0 && current === 0) return null;
+  if (previous === 0) return { pct: 100, label: "novo" };
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  return { pct, label: `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` };
+}
+
+// Keys for derived rows that should show trend badges
+const RESULT_KEYS: Set<string> = new Set([
+  "lucro_bruto",
+  "resultado_operacional",
+  "resultado_liquido",
+]);
 
 // ---------- Export CSV ----------
 
@@ -266,19 +281,60 @@ export default function DRE() {
     key: string,
     extraClass?: string,
     monthKey?: string,
-    isAccum?: boolean
+    isAccum?: boolean,
+    prevValue?: number,
+    showBadge?: boolean
   ) {
     // If monthKey provided and that month has no data, show dash instead of R$ 0
     const isEmptyMonth = monthKey && !mesesComDados.has(monthKey) && value === 0;
     const accumBg = isAccum ? "bg-gray-50 dark:bg-zinc-800/50 font-semibold" : "";
-    return (
+
+    // Variation tooltip
+    const variation = (prevValue !== undefined && monthKey && !isEmptyMonth)
+      ? computeVariation(value, prevValue)
+      : null;
+    const prevMonthIdx = monthKey ? MONTH_KEYS.indexOf(monthKey) - 1 : -1;
+    const prevMonthName = prevMonthIdx >= 0 ? MONTHS[prevMonthIdx] : null;
+    const tooltipText = variation && prevMonthName
+      ? `${variation.label} vs ${prevMonthName}`
+      : null;
+
+    // Trend badge for result lines
+    const badge = showBadge && variation && !isEmptyMonth ? (
+      variation.pct > 0.5 ? (
+        <TrendingUp className="w-3 h-3 inline ml-1 text-emerald-500" />
+      ) : variation.pct < -0.5 ? (
+        <TrendingDown className="w-3 h-3 inline ml-1 text-red-500" />
+      ) : (
+        <Minus className="w-3 h-3 inline ml-1 text-gray-400 dark:text-zinc-500" />
+      )
+    ) : null;
+
+    const cell = (
       <td
         key={key}
         className={`px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap ${isEmptyMonth ? "text-gray-300 dark:text-zinc-600" : getValueClass(value)} ${accumBg} ${extraClass ?? ""}`}
       >
-        {isEmptyMonth ? "—" : formatCurrencyNoDecimals(value)}
+        {isEmptyMonth ? "—" : (
+          <span className="inline-flex items-center justify-end">
+            {formatCurrencyNoDecimals(value)}
+            {badge}
+          </span>
+        )}
       </td>
     );
+
+    if (tooltipText && !isEmptyMonth) {
+      return (
+        <Tooltip key={key}>
+          <TooltipTrigger asChild>{cell}</TooltipTrigger>
+          <TooltipContent side="top" className="text-xs">
+            {tooltipText}
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+    return cell;
   }
 
   function renderAVCell(value: number, base: number, key: string, monthKey?: string) {
@@ -316,12 +372,16 @@ export default function DRE() {
             {linha.categoria_nome}
           </span>
         </td>
-        {MONTH_KEYS.map((mk) => (
-          <Fragment key={`${keyPrefix}-${linha.categoria_id}-${mk}-wrap`}>
-            {renderValueCell(linha.valores[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-${mk}`, undefined, mk)}
-            {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`, mk)}
-          </Fragment>
-        ))}
+        {MONTH_KEYS.map((mk, idx) => {
+          const prevMk = idx > 0 ? MONTH_KEYS[idx - 1] : undefined;
+          const prevVal = prevMk ? (linha.valores[prevMk] ?? 0) : undefined;
+          return (
+            <Fragment key={`${keyPrefix}-${linha.categoria_id}-${mk}-wrap`}>
+              {renderValueCell(linha.valores[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-${mk}`, undefined, mk, false, prevVal)}
+              {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`, mk)}
+            </Fragment>
+          );
+        })}
         {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`, undefined, undefined, true)}
         {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
       </tr>
@@ -417,12 +477,16 @@ export default function DRE() {
           <td className="px-3 py-1.5 pl-5 text-xs font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap">
             Subtotal
           </td>
-          {MONTH_KEYS.map((mk) => (
-            <Fragment key={`sub-${section.key}-${mk}-wrap`}>
-              {renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium", mk)}
-              {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
-            </Fragment>
-          ))}
+          {MONTH_KEYS.map((mk, idx) => {
+            const prevMk = idx > 0 ? MONTH_KEYS[idx - 1] : undefined;
+            const prevVal = prevMk ? (subtotal[prevMk] ?? 0) : undefined;
+            return (
+              <Fragment key={`sub-${section.key}-${mk}-wrap`}>
+                {renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium", mk, false, prevVal)}
+                {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
+              </Fragment>
+            );
+          })}
           {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium", undefined, true)}
           {showAV && renderAVCell(subtotalAccum, receitaBrutaTotalAcum, `sub-${section.key}-av-acum`)}
         </tr>
@@ -447,18 +511,26 @@ export default function DRE() {
         >
           {section.label}
         </td>
-        {MONTH_KEYS.map((mk) => (
-          <Fragment key={`derived-${section.subtotalKey}-${mk}-wrap`}>
-            {renderValueCell(
-              subtotal[mk] ?? 0,
-              `derived-${section.subtotalKey}-${mk}`,
-              `font-bold ${section.textClass ?? ""}`,
-              mk
-            )}
-            {showAV &&
-              renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`, mk)}
-          </Fragment>
-        ))}
+        {MONTH_KEYS.map((mk, idx) => {
+          const prevMk = idx > 0 ? MONTH_KEYS[idx - 1] : undefined;
+          const prevVal = prevMk ? (subtotal[prevMk] ?? 0) : undefined;
+          const isResultRow = RESULT_KEYS.has(section.subtotalKey);
+          return (
+            <Fragment key={`derived-${section.subtotalKey}-${mk}-wrap`}>
+              {renderValueCell(
+                subtotal[mk] ?? 0,
+                `derived-${section.subtotalKey}-${mk}`,
+                `font-bold ${section.textClass ?? ""}`,
+                mk,
+                false,
+                prevVal,
+                isResultRow
+              )}
+              {showAV &&
+                renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`, mk)}
+            </Fragment>
+          );
+        })}
         {renderValueCell(
           acum,
           `derived-${section.subtotalKey}-acum`,
@@ -507,6 +579,7 @@ export default function DRE() {
   // ---------- Main render ----------
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="space-y-4">
       {/* Filters bar */}
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
@@ -652,5 +725,6 @@ export default function DRE() {
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 }
