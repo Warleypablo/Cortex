@@ -208,7 +208,7 @@ export interface IStorage {
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
   getTopClientesByLTV(limit?: number): Promise<{ nome: string; ltv: number; ltMeses: number; servicos: string }[]>;
-  getDfc(dataInicio?: string, dataFim?: string): Promise<DfcHierarchicalResponse>;
+  getDfc(dataInicio?: string, dataFim?: string, empresa?: string): Promise<DfcHierarchicalResponse>;
   getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
   getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
   getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
@@ -816,7 +816,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getDfc(dataInicio?: string, dataFim?: string): Promise<DfcHierarchicalResponse> {
+  async getDfc(dataInicio?: string, dataFim?: string, empresa?: string): Promise<DfcHierarchicalResponse> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -4685,7 +4685,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getDfc(dataInicio?: string, dataFim?: string): Promise<DfcHierarchicalResponse> {
+  async getDfc(dataInicio?: string, dataFim?: string, empresa?: string): Promise<DfcHierarchicalResponse> {
     // Buscar nomes reais das categorias da tabela caz_categorias
     // IMPORTANTE: O campo 'nome' contém CÓDIGO + DESCRIÇÃO juntos, ex: "06.10 Despesas Administrativas"
     const categoriasReais = await db.execute(sql.raw(`
@@ -4714,6 +4714,11 @@ export class DbStorage implements IStorage {
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
     
     const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status IN ('QUITADO', 'RECEBIDO_PARCIAL')"];
+
+    // Filtrar por empresa se especificado
+    if (empresa && empresa !== 'todas') {
+      whereClauses.push(`p.empresa = '${empresa.replace(/'/g, "''")}'`);
+    }
 
     // Sempre filtrar a partir de janeiro de 2025 (mínimo)
     const dataMinima = '2025-01-01';
@@ -4879,6 +4884,15 @@ export class DbStorage implements IStorage {
     // Os meses históricos ficam em valuesByMonth para cálculo de variação no frontend
     const mesInicioOriginal = dataInicioOriginal.substring(0, 7); // "YYYY-MM"
     result.meses = result.meses.filter(m => m >= mesInicioOriginal);
+
+    // Buscar empresas disponíveis para o filtro
+    const empresasResult = await db.execute(sql.raw(`
+      SELECT DISTINCT empresa
+      FROM "Conta Azul".caz_parcelas
+      WHERE empresa IS NOT NULL AND empresa != ''
+      ORDER BY empresa
+    `));
+    (result as any).empresas = empresasResult.rows.map((r: any) => r.empresa as string);
 
     return result;
   }
