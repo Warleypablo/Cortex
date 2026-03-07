@@ -342,11 +342,6 @@ export default function RevenueGoals() {
     return data.resumo.totalRecebido + (mediaDiariaRecebida * diasRestantes);
   }, [data, mediaDiariaRecebida, diasRestantes]);
 
-  const atingimentoMeta = useMemo(() => {
-    if (!data || data.resumo.totalPrevisto === 0) return 0;
-    return (data.resumo.totalRecebido / data.resumo.totalPrevisto) * 100;
-  }, [data]);
-  
   return (
     <div className="p-6 space-y-6" data-testid="page-revenue-goals">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -375,58 +370,6 @@ export default function RevenueGoals() {
         </div>
       ) : data ? (
         <>
-          {/* Atingimento da Meta — Hero section */}
-          <Card className="overflow-hidden border-primary/20 transition-all duration-200 hover:shadow-md">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10 opacity-50" />
-            <CardContent className="relative p-6">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-5 h-5 text-primary" />
-                    <h3 className="font-semibold">Atingimento da Meta</h3>
-                    {atingimentoMeta < 50 && (
-                      <Badge variant="destructive" className="text-xs">Abaixo da meta</Badge>
-                    )}
-                    {atingimentoMeta >= 50 && atingimentoMeta < 100 && (
-                      <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-300 dark:border-amber-700">Em progresso</Badge>
-                    )}
-                    {atingimentoMeta >= 100 && (
-                      <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-300 dark:border-emerald-700">Meta atingida</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-end gap-3">
-                    <span className={`text-4xl font-bold ${atingimentoMeta >= 100 ? 'text-emerald-600' : atingimentoMeta >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
-                      {atingimentoMeta.toFixed(1)}%
-                    </span>
-                    <span className="text-muted-foreground pb-1">do objetivo mensal</span>
-                  </div>
-                  <Progress
-                    value={Math.min(atingimentoMeta, 100)}
-                    className="h-3 mt-4"
-                  />
-                </div>
-                <div className="lg:w-px lg:h-20 lg:bg-border" />
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Falta Receber</p>
-                    <p className="text-xl font-bold text-amber-600">
-                      {formatCurrency(data.resumo.totalPendente + data.resumo.totalInadimplente)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Gap para Meta</p>
-                    <p className={`text-xl font-bold ${data.resumo.totalRecebido >= data.resumo.totalPrevisto ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {formatCurrency(Math.abs(data.resumo.totalPrevisto - data.resumo.totalRecebido))}
-                      {data.resumo.totalRecebido >= data.resumo.totalPrevisto && (
-                        <span className="text-sm font-normal text-emerald-600 ml-2">acima</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* KPIs Principais — Row 1: 3 large cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KPICard
