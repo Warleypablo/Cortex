@@ -265,14 +265,16 @@ export default function DRE() {
     value: number,
     key: string,
     extraClass?: string,
-    monthKey?: string
+    monthKey?: string,
+    isAccum?: boolean
   ) {
     // If monthKey provided and that month has no data, show dash instead of R$ 0
     const isEmptyMonth = monthKey && !mesesComDados.has(monthKey) && value === 0;
+    const accumBg = isAccum ? "bg-gray-50 dark:bg-zinc-800/50 font-semibold" : "";
     return (
       <td
         key={key}
-        className={`px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap ${isEmptyMonth ? "text-gray-300 dark:text-zinc-600" : getValueClass(value)} ${extraClass ?? ""}`}
+        className={`px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap ${isEmptyMonth ? "text-gray-300 dark:text-zinc-600" : getValueClass(value)} ${accumBg} ${extraClass ?? ""}`}
       >
         {isEmptyMonth ? "—" : formatCurrencyNoDecimals(value)}
       </td>
@@ -320,7 +322,7 @@ export default function DRE() {
             {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`, mk)}
           </Fragment>
         ))}
-        {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`, undefined)}
+        {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`, undefined, undefined, true)}
         {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
       </tr>
     );
@@ -421,7 +423,7 @@ export default function DRE() {
               {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
             </Fragment>
           ))}
-          {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium", undefined)}
+          {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium", undefined, true)}
           {showAV && renderAVCell(subtotalAccum, receitaBrutaTotalAcum, `sub-${section.key}-av-acum`)}
         </tr>
       </Fragment>
@@ -461,7 +463,8 @@ export default function DRE() {
           acum,
           `derived-${section.subtotalKey}-acum`,
           `font-bold ${section.textClass ?? ""}`,
-          undefined
+          undefined,
+          true
         )}
         {showAV &&
           renderAVCell(acum, receitaBrutaTotalAcum, `derived-${section.subtotalKey}-av-acum`)}
