@@ -1464,6 +1464,28 @@ export const insertJuridicoProcessoSchema = createInsertSchema(juridicoProcessos
 export type JuridicoProcesso = typeof juridicoProcessos.$inferSelect;
 export type InsertJuridicoProcesso = z.infer<typeof insertJuridicoProcessoSchema>;
 
+// Tabela para conversas do assistente jurídico
+export const juridicoChatConversas = cortexCoreSchema.table("juridico_chat_conversas", {
+  id: serial("id").primaryKey(),
+  usuarioId: varchar("usuario_id", { length: 100 }).notNull(),
+  titulo: varchar("titulo", { length: 200 }),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type JuridicoChatConversa = typeof juridicoChatConversas.$inferSelect;
+
+// Tabela para mensagens do assistente jurídico
+export const juridicoChatMensagens = cortexCoreSchema.table("juridico_chat_mensagens", {
+  id: serial("id").primaryKey(),
+  conversaId: integer("conversa_id").notNull(),
+  role: varchar("role", { length: 20 }).notNull(), // 'user' | 'assistant'
+  conteudo: text("conteudo").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type JuridicoChatMensagem = typeof juridicoChatMensagens.$inferSelect;
+
 // Tabela para comunicações/avisos internos sobre clientes
 export const clienteComunicacoes = pgTable("cliente_comunicacoes", {
   id: serial("id").primaryKey(),
