@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-03-06 | feat(squad): overhaul completo da página Contribuição por Squad
+
+**O que foi feito:**
+- [BACKEND] Novo campo `resumoPorSquad` no endpoint bulk com totais por squad, breakdown mensal e contagem de contratos
+- [HERO] Ranking de Squads no topo: cards ordenados por contribuição %, sparklines de tendência, clicáveis para filtrar
+- [TABELA] Resumo Anual com colunas: Squad, Receita Bruta, Impostos, Líquido, Contribuição %, Tendência
+- [TAXA] Alíquota de imposto configurável (input no header, default 18%) — remove todo hardcode 0.18/0.82
+- [DETAIL] Detalhamento mensal colapsável (começa fechado para visão executiva rápida)
+- [UX] Empty state, botão "Voltar para todos", loading skeletons adequados
+- KPI cards só aparecem no modo squad individual; ranking + tabela resumo no modo "Todos"
+
+**Por que:**
+- CEO precisa ver contribuição % líquida de cada squad imediatamente, sem scroll horizontal em tabela de 12 colunas
+
+**Arquivos alterados:**
+- `server/routes.ts` - resumoPorSquad no endpoint bulk
+- `client/src/pages/ContribuicaoSquad.tsx` - redesign completo (hero, tabela resumo, detail colapsável, taxa configurável)
+
+**Impacto arquitetural:** Campo additive na API (não breaking)
+
+---
+
 ## 2026-03-06 | feat(metas): overhaul completo da página Metas de Receita
 
 **O que foi feito:**
