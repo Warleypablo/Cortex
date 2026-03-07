@@ -41,6 +41,13 @@ export function MonthYearPicker({
     return `${MESES[value.month - 1]} ${value.year}`;
   }, [value]);
 
+  const handleOpenChange = (isOpen: boolean) => {
+    if (isOpen) {
+      setViewYear(value.year);
+    }
+    setOpen(isOpen);
+  };
+
   const handleMonthSelect = (month: number) => {
     onChange({ month, year: viewYear });
     setOpen(false);
@@ -59,7 +66,7 @@ export function MonthYearPicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
