@@ -123,9 +123,9 @@ function computeAccumulated(valores: Record<string, number>): number {
   return MONTH_KEYS.reduce((acc, mk) => acc + (valores[mk] ?? 0), 0);
 }
 
-function computeAVPercent(value: number, receitaBrutaTotal: number): string {
-  if (receitaBrutaTotal === 0) return "-";
-  const pct = (value / receitaBrutaTotal) * 100;
+function computeAVPercent(value: number, base: number): string {
+  if (base === 0) return "-";
+  const pct = (value / base) * 100;
   return pct.toFixed(1) + "%";
 }
 
