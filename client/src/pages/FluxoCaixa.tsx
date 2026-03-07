@@ -35,7 +35,7 @@ import {
   Loader2, X, Users, UserCheck, UserX, AlertTriangle, BarChart3
 } from "lucide-react";
 import {
-  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell, Area
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell, Area, ReferenceLine
 } from "recharts";
 import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco, ClassificacaoClientesResponse, FluxoCaixaMensalResponse } from "@shared/schema";
 import { cn } from "@/lib/utils";
@@ -244,6 +244,13 @@ export default function FluxoCaixa() {
       lineMax: Math.ceil((lineMax + linePadding) / 100000) * 100000,
     };
   }, [chartData, hasSnapshot]);
+
+  const hojeFormatado = useMemo(() => {
+    if (viewMode !== 'diario' || !chartData || chartData.length === 0) return null;
+    const hojeStr = new Date().toISOString().split('T')[0];
+    const hojeItem = chartData.find(d => d.data === hojeStr);
+    return hojeItem ? hojeItem.dataFormatada : null;
+  }, [viewMode, chartData]);
 
   const totais = useMemo(() => {
     if (!chartData || chartData.length === 0) {
@@ -797,6 +804,16 @@ export default function FluxoCaixa() {
                         strokeDasharray="5 5"
                         dot={false}
                         activeDot={{ r: 5, fill: '#fbbf24', stroke: '#0f172a', strokeWidth: 2 }}
+                      />
+                    )}
+                    {viewMode === 'diario' && hojeFormatado && (
+                      <ReferenceLine
+                        x={hojeFormatado}
+                        yAxisId="bars"
+                        stroke="#94a3b8"
+                        strokeDasharray="4 4"
+                        strokeWidth={1.5}
+                        label={{ value: 'Hoje', position: 'top', fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
                       />
                     )}
                   </ComposedChart>
