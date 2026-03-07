@@ -5,6 +5,8 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatCurrencyCompact } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
@@ -94,6 +96,7 @@ export default function FluxoCaixa() {
   const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
   const [selectedYear, setSelectedYear] = useState(hoje.getFullYear());
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
+  const [showInactiveAccounts, setShowInactiveAccounts] = useState(false);
 
   const dataInicio = useMemo(() => {
     return new Date(selectedMonth.year, selectedMonth.month - 1, 1).toISOString().split('T')[0];
@@ -761,9 +764,21 @@ export default function FluxoCaixa() {
         {/* Contas Bancárias */}
         <Card className="mt-6" data-testid="card-contas-bancos">
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-muted-foreground" />
-              <CardTitle className="text-base">Contas Bancárias</CardTitle>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-muted-foreground" />
+                <CardTitle className="text-base">Contas Bancárias</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="toggle-inativas"
+                  checked={showInactiveAccounts}
+                  onCheckedChange={setShowInactiveAccounts}
+                />
+                <Label htmlFor="toggle-inativas" className="text-xs text-muted-foreground cursor-pointer">
+                  Exibir inativas
+                </Label>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -775,18 +790,28 @@ export default function FluxoCaixa() {
               <p className="text-sm text-muted-foreground">Nenhuma conta bancária encontrada</p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {contasBancos.map((conta, index) => (
-                  <div
-                    key={conta.id || index}
-                    className="p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
-                    data-testid={`card-conta-${index}`}
-                  >
-                    <p className="text-xs font-medium text-muted-foreground truncate">{conta.nome}</p>
-                    <p className={`text-base font-bold ${conta.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatCurrency(conta.saldo)}
-                    </p>
-                  </div>
-                ))}
+                {contasBancos
+                  .filter((conta) => showInactiveAccounts || Math.abs(conta.saldo) >= 10)
+                  .map((conta, index) => {
+                    const isInactive = Math.abs(conta.saldo) < 10;
+                    return (
+                      <div
+                        key={conta.id || index}
+                        className={`p-3 rounded-lg transition-colors ${isInactive ? 'bg-muted/30 opacity-60' : 'bg-muted/50 hover:bg-muted/70'}`}
+                        data-testid={`card-conta-${index}`}
+                      >
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs font-medium text-muted-foreground truncate">{conta.nome}</p>
+                          {isInactive && (
+                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">Inativa</Badge>
+                          )}
+                        </div>
+                        <p className={`text-base font-bold ${conta.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(conta.saldo)}
+                        </p>
+                      </div>
+                    );
+                  })}
               </div>
             )}
           </CardContent>
