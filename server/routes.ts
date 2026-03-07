@@ -9849,16 +9849,17 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     try {
       const dataInicio = req.query.dataInicio as string | undefined;
       const dataFim = req.query.dataFim as string | undefined;
-      
+      const empresa = req.query.empresa as string | undefined;
+
       if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
         return res.status(400).json({ error: "Invalid dataInicio parameter. Expected format: YYYY-MM-DD" });
       }
-      
+
       if (dataFim && !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
         return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
       }
 
-      const dfcData = await storage.getDfc(dataInicio, dataFim);
+      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa);
       res.json(dfcData);
     } catch (error) {
       console.error("[api] Error fetching DFC data:", error);
@@ -9868,17 +9869,17 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   app.post("/api/dfc/analyze", async (req, res) => {
     try {
-      const { dataInicio, dataFim } = req.body;
-      
+      const { dataInicio, dataFim, empresa } = req.body;
+
       if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
         return res.status(400).json({ error: "Invalid dataInicio parameter. Expected format: YYYY-MM-DD" });
       }
-      
+
       if (dataFim && !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
         return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
       }
 
-      const dfcData = await storage.getDfc(dataInicio, dataFim);
+      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa);
       
       if (!dfcData.nodes || dfcData.nodes.length === 0) {
         return res.status(400).json({ error: "Não há dados suficientes para análise no período selecionado" });
@@ -9894,21 +9895,21 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   app.post("/api/dfc/chat", async (req, res) => {
     try {
-      const { pergunta, historico, dataInicio, dataFim } = req.body;
-      
+      const { pergunta, historico, dataInicio, dataFim, empresa } = req.body;
+
       if (!pergunta || typeof pergunta !== 'string' || pergunta.trim().length === 0) {
         return res.status(400).json({ error: "Pergunta é obrigatória" });
       }
-      
+
       if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
         return res.status(400).json({ error: "Invalid dataInicio parameter. Expected format: YYYY-MM-DD" });
       }
-      
+
       if (dataFim && !/^\d{4}-\d{2}-\d{2}$/.test(dataFim)) {
         return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
       }
 
-      const dfcData = await storage.getDfc(dataInicio, dataFim);
+      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa);
       
       if (!dfcData.nodes || dfcData.nodes.length === 0) {
         return res.json({ 
