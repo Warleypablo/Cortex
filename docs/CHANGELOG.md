@@ -1,5 +1,86 @@
 # Changelog
 
+## 2026-03-06 | feat(dfc): exportação CSV/Excel nos modos Diário e Mensal
+
+**O que foi feito:**
+- Dropdown "Exportar" com opções CSV e Excel no card do gráfico principal
+- CSV com BOM para acentuação correta, Excel com colunas auto-dimensionadas
+- Disponível nos modos Diário e Mensal (Semanal já tinha exportação própria)
+
+**Arquivos alterados:**
+- `client/src/pages/FluxoCaixa.tsx` - funções exportFluxoCSV/exportFluxoXLSX, DropdownMenu
+
+**Impacto arquitetural:** Nenhum — usa xlsx já instalado
+
+---
+
+## 2026-03-06 | feat(dfc): marcação do dia atual no gráfico diário
+
+**O que foi feito:**
+- Linha vertical tracejada com label "Hoje" no gráfico diário usando ReferenceLine do recharts
+- Só aparece quando o dia atual está dentro do período selecionado
+
+**Arquivos alterados:**
+- `client/src/pages/FluxoCaixa.tsx` - hojeFormatado useMemo, ReferenceLine component
+
+**Impacto arquitetural:** Nenhum
+
+---
+
+## 2026-03-06 | feat(dfc): colunas ordenáveis na tabela Maiores Inadimplentes
+
+**O que foi feito:**
+- Colunas Valor Total, Parcelas e Dias Atraso clicáveis para ordenação asc/desc
+- Ícone ArrowUpDown nos headers para indicar que são clicáveis
+
+**Arquivos alterados:**
+- `client/src/pages/RelatorioSemanalFinanceiro.tsx` - inadimSort state, sortedInadimClientes, headers clicáveis
+
+**Impacto arquitetural:** Nenhum
+
+---
+
+## 2026-03-06 | feat(dfc): tooltip de contexto nas variações semanais
+
+**O que foi feito:**
+- VariationBadge nos KPI cards do relatório semanal agora mostra tooltip "vs. semana anterior (dd/MM - dd/MM)"
+- KpiCard aceita prop `deltaTooltip` opcional
+
+**Arquivos alterados:**
+- `client/src/pages/RelatorioSemanalFinanceiro.tsx` - KpiCard deltaTooltip prop, TooltipUI wrapper, prevWeekLabel
+
+**Impacto arquitetural:** Nenhum
+
+---
+
+## 2026-03-06 | feat(dfc): filtro por conta financeira no modo Diário
+
+**O que foi feito:**
+- Novo endpoint `/api/fluxo-caixa/contas-financeiras` retorna contas distintas
+- Parâmetro `contaFinanceira` no endpoint diario-completo filtra por nome_conta_financeira
+- Select dropdown no card do gráfico para selecionar conta específica
+
+**Arquivos alterados:**
+- `server/routes.ts` - novo endpoint, filtro SQL em ambos os branches
+- `server/storage.ts` - parâmetro contasFinanceiras na query principal
+- `client/src/pages/FluxoCaixa.tsx` - Select dropdown, query state
+
+**Impacto arquitetural:** Novo endpoint de API (não breaking)
+
+---
+
+## 2026-03-06 | feat(dfc): tooltip de metodologia no Saldo Projetado
+
+**O que foi feito:**
+- Ícone Info (i) ao lado do label "Saldo Projetado" com tooltip explicando o cálculo
+
+**Arquivos alterados:**
+- `client/src/pages/FluxoCaixa.tsx` - TooltipUI com Info icon no card Saldo Projetado
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-06 | feat(dre): sparklines de tendência nas linhas principais
 
 **O que foi feito:**
