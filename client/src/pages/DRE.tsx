@@ -9,8 +9,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ChevronDown, ChevronRight, Download, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, TrendingUp, TrendingDown, Minus, FileSpreadsheet, FileText } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // ---------- Types ----------
 
@@ -129,38 +130,45 @@ const RESULT_KEYS: Set<string> = new Set([
   "resultado_liquido",
 ]);
 
-// ---------- Export CSV ----------
+// ---------- Export helpers ----------
 
-function exportCSV(data: DREData) {
+function buildExportRows(data: DREData): { rows: (string | number)[][]; header: string[] } {
   const header = ["Conta", ...MONTHS, "Acumulado"];
-  const rows: string[][] = [];
+  const rows: (string | number)[][] = [];
+
+  // Title row
+  rows.push([`DRE — ${data.empresa === "todas" ? "Consolidada" : data.empresa} — ${data.ano}`]);
+  rows.push([]); // blank line
 
   for (const section of DRE_SECTIONS) {
     if (isGroupSection(section)) {
-      // Group header
       rows.push([section.label]);
-      // Subcategory rows
       const linhas = data.linhas.filter((l) => l.grupo === section.grupoFilter);
       for (const linha of linhas) {
-        const vals = MONTH_KEYS.map((mk) => String(linha.valores[mk] ?? 0));
-        const acum = String(computeAccumulated(linha.valores));
+        const vals = MONTH_KEYS.map((mk) => linha.valores[mk] ?? 0);
+        const acum = computeAccumulated(linha.valores);
         rows.push([`  ${linha.categoria_nome}`, ...vals, acum]);
       }
-      // Subtotal
       const sub = data.subtotais[section.subtotalKey];
-      const subVals = MONTH_KEYS.map((mk) => String(sub[mk] ?? 0));
-      const subAcum = String(computeAccumulated(sub));
+      const subVals = MONTH_KEYS.map((mk) => sub[mk] ?? 0);
+      const subAcum = computeAccumulated(sub);
       rows.push([`Subtotal ${section.label}`, ...subVals, subAcum]);
+      rows.push([]); // separator
     } else {
-      // Derived total
       const sub = data.subtotais[section.subtotalKey];
-      const subVals = MONTH_KEYS.map((mk) => String(sub[mk] ?? 0));
-      const subAcum = String(computeAccumulated(sub));
+      const subVals = MONTH_KEYS.map((mk) => sub[mk] ?? 0);
+      const subAcum = computeAccumulated(sub);
       rows.push([section.label, ...subVals, subAcum]);
     }
   }
 
-  const csv = [header.join(";"), ...rows.map((r) => r.join(";"))].join("\n");
+  return { rows, header };
+}
+
+function exportCSV(data: DREData) {
+  const { rows, header } = buildExportRows(data);
+  const csvRows = rows.map((r) => r.map(String).join(";"));
+  const csv = [header.join(";"), ...csvRows].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -168,6 +176,24 @@ function exportCSV(data: DREData) {
   link.download = `DRE_${data.ano}_${data.empresa}.csv`;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+async function exportXLSX(data: DREData) {
+  const XLSX = await import("xlsx");
+  const { rows, header } = buildExportRows(data);
+  const wsData = [header, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Auto-size columns
+  ws["!cols"] = [
+    { wch: 40 }, // Conta
+    ...MONTHS.map(() => ({ wch: 14 })),
+    { wch: 16 }, // Acumulado
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "DRE");
+  XLSX.writeFile(wb, `DRE_${data.ano}_${data.empresa}.xlsx`);
 }
 
 // ---------- Component ----------
@@ -646,18 +672,26 @@ export default function DRE() {
               </Label>
             </div>
 
-            {/* Export CSV */}
+            {/* Export dropdown */}
             <div className="ml-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => data && exportCSV(data)}
-                disabled={!data}
-                className="gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Exportar CSV
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={!data} className="gap-2">
+                    <Download className="w-4 h-4" />
+                    Exportar
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => data && exportCSV(data)} className="gap-2 cursor-pointer">
+                    <FileText className="w-4 h-4" />
+                    Exportar CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => data && exportXLSX(data)} className="gap-2 cursor-pointer">
+                    <FileSpreadsheet className="w-4 h-4" />
+                    Exportar Excel (.xlsx)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardContent>
