@@ -32,8 +32,14 @@ import {
   Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle, Info,
   ArrowUpCircle, ArrowDownCircle, Banknote, CreditCard, Building2,
   ChevronRight, CircleDollarSign, CalendarDays, ArrowRight, Receipt,
-  Loader2, X, Users, UserCheck, UserX, AlertTriangle, BarChart3
+  Loader2, X, Users, UserCheck, UserX, AlertTriangle, BarChart3, Download
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell, Area, ReferenceLine
 } from "recharts";
@@ -261,7 +267,45 @@ export default function FluxoCaixa() {
     const saldoFinal = chartData[chartData.length - 1]?.saldoAcumulado || insightsPeriodo?.saldoAtual || 0;
     return { entradas, saidas, saldo: entradas - saidas, saldoFinal };
   }, [chartData, insightsPeriodo]);
-  
+
+  const exportFluxoCSV = () => {
+    if (!chartData || chartData.length === 0) return;
+    const isDaily = viewMode === 'diario';
+    const header = isDaily
+      ? 'Data,Entradas,Saídas,Saldo do Dia,Saldo Acumulado'
+      : 'Mês,Entradas,Saídas,Saldo do Mês,Saldo Acumulado';
+    const rows = chartData.map(d => {
+      const saldo = (d.entradas || 0) - (d.saidas || 0);
+      return `${d.dataFormatada},${(d.entradas || 0).toFixed(2)},${(d.saidas || 0).toFixed(2)},${saldo.toFixed(2)},${(d.saldoAcumulado || 0).toFixed(2)}`;
+    });
+    const csv = [header, ...rows].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `fluxo-caixa-${isDaily ? 'diario' : 'mensal'}-${isDaily ? `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}` : selectedYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportFluxoXLSX = async () => {
+    if (!chartData || chartData.length === 0) return;
+    const XLSX = await import('xlsx');
+    const isDaily = viewMode === 'diario';
+    const headers = isDaily
+      ? ['Data', 'Entradas', 'Saídas', 'Saldo do Dia', 'Saldo Acumulado']
+      : ['Mês', 'Entradas', 'Saídas', 'Saldo do Mês', 'Saldo Acumulado'];
+    const data = chartData.map(d => {
+      const saldo = (d.entradas || 0) - (d.saidas || 0);
+      return [d.dataFormatada, d.entradas || 0, d.saidas || 0, saldo, d.saldoAcumulado || 0];
+    });
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    ws['!cols'] = headers.map(() => ({ wch: 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, isDaily ? 'Diário' : 'Mensal');
+    XLSX.writeFile(wb, `fluxo-caixa-${isDaily ? 'diario' : 'mensal'}-${isDaily ? `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}` : selectedYear}.xlsx`);
+  };
+
   return (
     <div className="bg-background min-h-screen">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
@@ -552,7 +596,7 @@ export default function FluxoCaixa() {
                 )}
               </div>
               
-              <div className="flex gap-4">
+              <div className="flex items-center gap-4">
                 <div className="text-center px-4 py-2 rounded-lg bg-green-500/10">
                   <p className="text-xs text-muted-foreground">Entradas</p>
                   <p className="text-sm font-semibold text-green-600" data-testid="text-total-entradas">
@@ -571,6 +615,24 @@ export default function FluxoCaixa() {
                     {formatCurrencyCompact(totais.saldoFinal)}
                   </p>
                 </div>
+                {viewMode !== 'semanal' && chartData && chartData.length > 0 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 gap-1">
+                        <Download className="w-3.5 h-3.5" />
+                        <span className="text-xs">Exportar</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={exportFluxoCSV}>
+                        Exportar CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={exportFluxoXLSX}>
+                        Exportar Excel (.xlsx)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
           </CardHeader>
