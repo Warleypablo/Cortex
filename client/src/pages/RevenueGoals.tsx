@@ -31,18 +31,16 @@ import {
   Briefcase,
   MessageCircle
 } from "lucide-react";
-import { 
-  ComposedChart, 
-  Bar, 
+import {
+  ComposedChart,
+  Bar,
   Line,
-  Area,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer,
-  ReferenceLine
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
 } from "recharts";
 
 interface RevenueGoalsData {
@@ -370,63 +368,139 @@ export default function RevenueGoals() {
         </div>
       ) : data ? (
         <>
-          {/* KPIs Principais — Row 1: 3 large cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <KPICard
-              title="Total a Receber"
-              value={formatCurrency(data.resumo.totalPrevisto)}
-              subtitle={`${data.resumo.quantidadeParcelas} parcelas no mês`}
-              icon={<Target className="w-5 h-5" />}
-              color="default"
-            />
-            <KPICard
-              title="Recebido"
-              value={formatCurrency(data.resumo.totalRecebido)}
-              subtitle={`${data.resumo.quantidadeRecebidas} parcelas`}
-              icon={<CheckCircle className="w-5 h-5" />}
-              color="success"
-              progress={data.resumo.totalPrevisto > 0 ? (data.resumo.totalRecebido / data.resumo.totalPrevisto) * 100 : 0}
-            />
-            <KPICard
-              title="Pendente"
-              value={formatCurrency(data.resumo.totalPendente)}
-              subtitle={`${data.resumo.quantidadePendentes} parcelas`}
-              icon={<Clock className="w-5 h-5" />}
-              color="warning"
-            />
-          </div>
+          {/* Gráfico Principal */}
+          <Card className="overflow-hidden">
+            <CardHeader className="pb-2">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                    Evolução de Recebimentos
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Análise diária com comparativo de meta acumulada
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+                    {formatCurrency(data.resumo.totalRecebido)}
+                  </Badge>
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800">
+                    <Clock className="w-3.5 h-3.5 mr-1.5" />
+                    {formatCurrency(data.resumo.totalPendente)}
+                  </Badge>
+                  <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-200 dark:border-red-800">
+                    <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />
+                    {formatCurrency(data.resumo.totalInadimplente)}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="h-[420px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
+                    <defs>
+                      <linearGradient id="recebidoGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.6}/>
+                      </linearGradient>
+                      <linearGradient id="pendenteGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.6}/>
+                      </linearGradient>
+                      <linearGradient id="inadimplenteGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.9}/>
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.6}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                    <XAxis
+                      dataKey="dia"
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      tickLine={false}
+                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                    />
+                    <YAxis
+                      yAxisId="bars"
+                      tickFormatter={(value) => {
+                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                        if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                        return value.toString();
+                      }}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      tickLine={false}
+                      axisLine={false}
+                      label={{ value: 'R$ Diário', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
+                    />
+                    <YAxis
+                      yAxisId="lines"
+                      orientation="right"
+                      tickFormatter={(value) => {
+                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                        if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                        return value.toString();
+                      }}
+                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      tickLine={false}
+                      axisLine={false}
+                      label={{ value: 'R$ Acumulado', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
+                    />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }} />
+                    <Legend content={<CustomLegend />} />
 
-          {/* KPIs Secundários — Row 2: 3 compact cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <KPICard
-              title="Inadimplente"
-              value={formatCurrency(data.resumo.totalInadimplente)}
-              subtitle={`${data.resumo.quantidadeInadimplentes} parcelas · ${formatPercent(data.resumo.percentualInadimplencia)}`}
-              icon={<AlertTriangle className="w-4 h-4" />}
-              trend={data.resumo.percentualInadimplencia > 10 ? 'down' : 'up'}
-              trendValue={data.resumo.percentualInadimplencia > 10 ? 'Acima de 10%' : 'Controlado'}
-              color="danger"
-              compact
-            />
-            <KPICard
-              title="Projeção Final"
-              value={formatCurrency(projecaoFinal)}
-              subtitle={`${diasRestantes} dias restantes`}
-              icon={<Zap className="w-4 h-4" />}
-              trend={projecaoFinal >= data.resumo.totalPrevisto ? 'up' : 'down'}
-              trendValue={projecaoFinal >= data.resumo.totalPrevisto ? 'Acima da meta' : 'Abaixo da meta'}
-              color={projecaoFinal >= data.resumo.totalPrevisto ? 'success' : 'warning'}
-              compact
-            />
-            <KPICard
-              title="Média Diária"
-              value={formatCurrency(mediaDiariaRecebida)}
-              subtitle="Por dia com recebimento"
-              icon={<BarChart3 className="w-4 h-4" />}
-              color="default"
-              compact
-            />
-          </div>
+                    <Bar
+                      yAxisId="bars"
+                      dataKey="recebido"
+                      name="Recebido"
+                      stackId="a"
+                      fill="url(#recebidoGradient)"
+                      radius={[0, 0, 0, 0]}
+                    />
+                    <Bar
+                      yAxisId="bars"
+                      dataKey="pendente"
+                      name="Pendente"
+                      stackId="a"
+                      fill="url(#pendenteGradient)"
+                      radius={[0, 0, 0, 0]}
+                    />
+                    <Bar
+                      yAxisId="bars"
+                      dataKey="inadimplente"
+                      name="Inadimplente"
+                      stackId="a"
+                      fill="url(#inadimplenteGradient)"
+                      radius={[4, 4, 0, 0]}
+                    />
+
+                    <Line
+                      yAxisId="lines"
+                      type="monotone"
+                      dataKey="metaAcumulada"
+                      name="Meta Acumulada"
+                      stroke="#3b82f6"
+                      strokeWidth={2.5}
+                      dot={false}
+                      activeDot={{ r: 6, strokeWidth: 2, fill: '#3b82f6' }}
+                    />
+                    <Line
+                      yAxisId="lines"
+                      type="monotone"
+                      dataKey="recebidoAcumulado"
+                      name="Recebido Acumulado"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                      activeDot={{ r: 5, strokeWidth: 2, fill: '#10b981' }}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Metas de Inadimplência */}
           {(() => {
@@ -547,139 +621,19 @@ export default function RevenueGoals() {
             );
           })()}
 
-          {/* Gráfico Principal */}
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-2">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <BarChart3 className="w-5 h-5 text-primary" />
-                    Evolução de Recebimentos
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    Análise diária com comparativo de meta acumulada
-                  </CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800">
-                    <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
-                    {formatCurrency(data.resumo.totalRecebido)}
-                  </Badge>
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800">
-                    <Clock className="w-3.5 h-3.5 mr-1.5" />
-                    {formatCurrency(data.resumo.totalPendente)}
-                  </Badge>
-                  <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-200 dark:border-red-800">
-                    <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />
-                    {formatCurrency(data.resumo.totalInadimplente)}
-                  </Badge>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-4">
-              <div className="h-[420px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
-                    <defs>
-                      <linearGradient id="recebidoGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.9}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.6}/>
-                      </linearGradient>
-                      <linearGradient id="pendenteGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.9}/>
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.6}/>
-                      </linearGradient>
-                      <linearGradient id="inadimplenteGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.9}/>
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.6}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                    <XAxis 
-                      dataKey="dia" 
-                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                      tickLine={false}
-                      axisLine={{ stroke: 'hsl(var(--border))' }}
-                    />
-                    <YAxis
-                      yAxisId="bars"
-                      tickFormatter={(value) => {
-                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                        if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                        return value.toString();
-                      }}
-                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                      tickLine={false}
-                      axisLine={false}
-                      label={{ value: 'R$ Diário', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
-                    />
-                    <YAxis
-                      yAxisId="lines"
-                      orientation="right"
-                      tickFormatter={(value) => {
-                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                        if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
-                        return value.toString();
-                      }}
-                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                      tickLine={false}
-                      axisLine={false}
-                      label={{ value: 'R$ Acumulado', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
-                    />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }} />
-                    <Legend content={<CustomLegend />} />
-                    
-                    <Bar 
-                      yAxisId="bars"
-                      dataKey="recebido" 
-                      name="Recebido" 
-                      stackId="a" 
-                      fill="url(#recebidoGradient)"
-                      radius={[0, 0, 0, 0]}
-                    />
-                    <Bar 
-                      yAxisId="bars"
-                      dataKey="pendente" 
-                      name="Pendente" 
-                      stackId="a" 
-                      fill="url(#pendenteGradient)"
-                      radius={[0, 0, 0, 0]}
-                    />
-                    <Bar 
-                      yAxisId="bars"
-                      dataKey="inadimplente" 
-                      name="Inadimplente" 
-                      stackId="a" 
-                      fill="url(#inadimplenteGradient)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                    
-                    <Line 
-                      yAxisId="lines"
-                      type="monotone" 
-                      dataKey="metaAcumulada" 
-                      name="Meta Acumulada"
-                      stroke="#3b82f6" 
-                      strokeWidth={2.5}
-                      dot={false}
-                      activeDot={{ r: 6, strokeWidth: 2, fill: '#3b82f6' }}
-                    />
-                    <Line 
-                      yAxisId="lines"
-                      type="monotone" 
-                      dataKey="recebidoAcumulado" 
-                      name="Recebido Acumulado"
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={false}
-                      activeDot={{ r: 5, strokeWidth: 2, fill: '#10b981' }}
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
+          {/* KPIs Principais — Row 1: 3 large cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KPICard title="Total a Receber" value={formatCurrency(data.resumo.totalPrevisto)} subtitle={`${data.resumo.quantidadeParcelas} parcelas no mês`} icon={<Target className="w-5 h-5" />} color="default" />
+            <KPICard title="Recebido" value={formatCurrency(data.resumo.totalRecebido)} subtitle={`${data.resumo.quantidadeRecebidas} parcelas`} icon={<CheckCircle className="w-5 h-5" />} color="success" progress={data.resumo.totalPrevisto > 0 ? (data.resumo.totalRecebido / data.resumo.totalPrevisto) * 100 : 0} />
+            <KPICard title="Pendente" value={formatCurrency(data.resumo.totalPendente)} subtitle={`${data.resumo.quantidadePendentes} parcelas`} icon={<Clock className="w-5 h-5" />} color="warning" />
+          </div>
+
+          {/* KPIs Secundários — Row 2: 3 compact cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KPICard title="Inadimplente" value={formatCurrency(data.resumo.totalInadimplente)} subtitle={`${data.resumo.quantidadeInadimplentes} parcelas · ${formatPercent(data.resumo.percentualInadimplencia)}`} icon={<AlertTriangle className="w-4 h-4" />} trend={data.resumo.percentualInadimplencia > 10 ? 'down' : 'up'} trendValue={data.resumo.percentualInadimplencia > 10 ? 'Acima de 10%' : 'Controlado'} color="danger" compact />
+            <KPICard title="Projeção Final" value={formatCurrency(projecaoFinal)} subtitle={`${diasRestantes} dias restantes`} icon={<Zap className="w-4 h-4" />} trend={projecaoFinal >= data.resumo.totalPrevisto ? 'up' : 'down'} trendValue={projecaoFinal >= data.resumo.totalPrevisto ? 'Acima da meta' : 'Abaixo da meta'} color={projecaoFinal >= data.resumo.totalPrevisto ? 'success' : 'warning'} compact />
+            <KPICard title="Média Diária" value={formatCurrency(mediaDiariaRecebida)} subtitle="Por dia com recebimento" icon={<BarChart3 className="w-4 h-4" />} color="default" compact />
+          </div>
 
           {/* Ticket Médio */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
