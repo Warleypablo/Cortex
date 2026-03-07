@@ -286,6 +286,31 @@ export async function initTurboZapTables(): Promise<void> {
       `);
     }
 
+    // Create pipeline juridico table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.turbozap_pipeline_juridico (
+        id SERIAL PRIMARY KEY,
+        cnpj TEXT NOT NULL,
+        cliente_nome TEXT,
+        data_vencimento DATE NOT NULL,
+        valor DECIMAL(12,2),
+        etapa TEXT DEFAULT 'formalizado',
+        protesto_efetivado BOOLEAN DEFAULT false,
+        negativacao_efetivada BOOLEAN DEFAULT false,
+        observacoes TEXT,
+        atualizado_por TEXT,
+        criado_em TIMESTAMP DEFAULT NOW(),
+        atualizado_em TIMESTAMP DEFAULT NOW(),
+        UNIQUE(cnpj, data_vencimento)
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_turbozap_pipeline_cnpj ON cortex_core.turbozap_pipeline_juridico(cnpj)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_turbozap_pipeline_etapa ON cortex_core.turbozap_pipeline_juridico(etapa)
+    `);
+
     console.log("[turbozap] Tables initialized successfully");
   } catch (error) {
     console.error("[turbozap] Error initializing tables:", error);
@@ -746,4 +771,69 @@ export async function updateConfiguracao(
     throw new Error(`Configuração '${chave}' não encontrada`);
   }
   return result.rows[0] as TurboZapConfiguracao;
+}
+
+// ============================================
+// Pipeline Jurídico CRUD
+// ============================================
+
+export interface PipelineJuridico {
+  id: number;
+  cnpj: string;
+  cliente_nome: string;
+  data_vencimento: string;
+  valor: number;
+  etapa: string;
+  protesto_efetivado: boolean;
+  negativacao_efetivada: boolean;
+  observacoes: string | null;
+  atualizado_por: string | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+export async function getPipelineJuridico(): Promise<PipelineJuridico[]> {
+  const result = await db.execute(sql`
+    SELECT * FROM cortex_core.turbozap_pipeline_juridico
+    ORDER BY criado_em DESC
+    LIMIT 200
+  `);
+  return result.rows as PipelineJuridico[];
+}
+
+export async function updatePipelineJuridico(
+  id: number,
+  updates: { etapa?: string; protesto_efetivado?: boolean; negativacao_efetivada?: boolean; observacoes?: string },
+  atualizadoPor: string,
+): Promise<PipelineJuridico> {
+  const setClauses: string[] = ["atualizado_em = NOW()"];
+  const safeUser = atualizadoPor.replace(/'/g, "''");
+  setClauses.push(`atualizado_por = '${safeUser}'`);
+
+  if (updates.etapa !== undefined) {
+    setClauses.push(`etapa = '${updates.etapa.replace(/'/g, "''")}'`);
+  }
+  if (updates.protesto_efetivado !== undefined) {
+    setClauses.push(`protesto_efetivado = ${updates.protesto_efetivado}`);
+  }
+  if (updates.negativacao_efetivada !== undefined) {
+    setClauses.push(`negativacao_efetivada = ${updates.negativacao_efetivada}`);
+  }
+  if (updates.observacoes !== undefined) {
+    setClauses.push(`observacoes = '${updates.observacoes.replace(/'/g, "''")}'`);
+  }
+
+  const result = await db.execute(
+    sql.raw(`
+      UPDATE cortex_core.turbozap_pipeline_juridico
+      SET ${setClauses.join(", ")}
+      WHERE id = ${id}
+      RETURNING *
+    `),
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error(`Pipeline record #${id} não encontrado`);
+  }
+  return result.rows[0] as PipelineJuridico;
 }
