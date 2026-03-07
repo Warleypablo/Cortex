@@ -28,7 +28,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip as TooltipUI, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle,
+  Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle, Info,
   ArrowUpCircle, ArrowDownCircle, Banknote, CreditCard, Building2,
   ChevronRight, CircleDollarSign, CalendarDays, ArrowRight, Receipt,
   Loader2, X, Users, UserCheck, UserX, AlertTriangle, BarChart3
@@ -321,7 +321,19 @@ export default function FluxoCaixa() {
           <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-saldo-final">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">{viewMode === 'diario' ? 'Saldo Projetado (Fim do Mês)' : 'Saldo Projetado (Fim do Ano)'}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-medium text-muted-foreground">{viewMode === 'diario' ? 'Saldo Projetado (Fim do Mês)' : 'Saldo Projetado (Fim do Ano)'}</span>
+                  <TooltipProvider delayDuration={200}>
+                    <TooltipUI>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[260px] text-xs">
+                        <p>Saldo atual + entradas previstas − saídas previstas para o período selecionado.</p>
+                      </TooltipContent>
+                    </TooltipUI>
+                  </TooltipProvider>
+                </div>
                 <TrendingUp className="w-5 h-5 text-blue-500" />
               </div>
               {isLoadingInsights ? (
