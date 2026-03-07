@@ -170,25 +170,27 @@ const KpiCard = ({
   deltaFmt?: "number" | "currency" | "percent";
   invertColors?: boolean;
 }) => (
-  <Card className="relative overflow-hidden border-border/50 hover:border-border transition-all hover:shadow-lg">
+  <Card className="relative border-border/50 hover:border-border transition-all hover:shadow-lg">
     <CardContent className="p-4">
       <div className="flex items-center justify-between mb-2">
         <span className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">
           {title}
         </span>
-        <div className={`rounded-md ${gradient} p-1.5`}>
+        <div className={`rounded-md ${gradient} p-1.5 shrink-0`}>
           <Icon className="text-white h-3 w-3" />
         </div>
       </div>
-      <div className="font-bold text-foreground tracking-tight text-xl">
+      <div className="font-bold text-foreground tracking-tight text-xl whitespace-nowrap">
         {value}
       </div>
-      <div className="flex items-center justify-between mt-1">
+      <div className="flex items-center justify-between mt-1 gap-1 min-w-0">
         {subtitle && (
-          <p className="text-[10px] text-muted-foreground">{subtitle}</p>
+          <p className="text-[10px] text-muted-foreground truncate min-w-0">{subtitle}</p>
         )}
         {delta !== undefined && (
-          <VariationBadge value={delta} fmt={deltaFmt || "number"} invertColors={invertColors} />
+          <span className="shrink-0">
+            <VariationBadge value={delta} fmt={deltaFmt || "number"} invertColors={invertColors} />
+          </span>
         )}
       </div>
     </CardContent>
