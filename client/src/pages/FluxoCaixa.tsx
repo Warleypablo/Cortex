@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import { YearPicker } from "@/components/ui/year-picker";
@@ -97,6 +98,7 @@ export default function FluxoCaixa() {
   const [selectedYear, setSelectedYear] = useState(hoje.getFullYear());
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   const [showInactiveAccounts, setShowInactiveAccounts] = useState(false);
+  const [contaFinanceiraFiltro, setContaFinanceiraFiltro] = useState<string>('todas');
 
   const dataInicio = useMemo(() => {
     return new Date(selectedMonth.year, selectedMonth.month - 1, 1).toISOString().split('T')[0];
@@ -133,6 +135,10 @@ export default function FluxoCaixa() {
     queryKey: ['/api/fluxo-caixa/contas-bancos'],
   });
 
+  const { data: contasFinanceiras } = useQuery<string[]>({
+    queryKey: ['/api/fluxo-caixa/contas-financeiras'],
+  });
+
   const { data: classificacaoData, isLoading: isLoadingClassificacao } = useQuery<ClassificacaoClientesResponse>({
     queryKey: ['/api/fluxo-caixa/classificacao-clientes'],
   });
@@ -147,12 +153,17 @@ export default function FluxoCaixa() {
 
   const classificacaoParam = classificacaoFiltro.length > 0 ? classificacaoFiltro.join(',') : undefined;
 
+  const contaFinanceiraParam = contaFinanceiraFiltro !== 'todas' ? contaFinanceiraFiltro : undefined;
+
   const { data: fluxoDiarioResponse, isLoading: isLoadingFluxo } = useQuery<{ hasSnapshot: boolean; snapshotDate: string | null; dados: FluxoCaixaDiarioCompleto[] }>({
-    queryKey: ['/api/fluxo-caixa/diario-completo', { dataInicio, dataFim, classificacao: classificacaoParam }],
+    queryKey: ['/api/fluxo-caixa/diario-completo', { dataInicio, dataFim, classificacao: classificacaoParam, contaFinanceira: contaFinanceiraParam }],
     queryFn: async () => {
       const params = new URLSearchParams({ dataInicio, dataFim });
       if (classificacaoParam) {
         params.append('classificacao', classificacaoParam);
+      }
+      if (contaFinanceiraParam) {
+        params.append('contaFinanceira', contaFinanceiraParam);
       }
       const res = await fetch(`/api/fluxo-caixa/diario-completo?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to fetch fluxo diario");
@@ -510,6 +521,28 @@ export default function FluxoCaixa() {
                   )}
                 </CardTitle>
                 <CardDescription>Evolução do saldo no período selecionado</CardDescription>
+                {viewMode === 'diario' && contasFinanceiras && contasFinanceiras.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <Building2 className="w-4 h-4 text-muted-foreground" />
+                    <Select value={contaFinanceiraFiltro} onValueChange={setContaFinanceiraFiltro}>
+                      <SelectTrigger className="w-[220px] h-8 text-xs">
+                        <SelectValue placeholder="Todas as contas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todas">Todas as contas</SelectItem>
+                        {contasFinanceiras.map(conta => (
+                          <SelectItem key={conta} value={conta}>{conta}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {contaFinanceiraFiltro !== 'todas' && (
+                      <Badge variant="outline" className="text-xs">
+                        {contaFinanceiraFiltro}
+                        <X className="w-3 h-3 ml-1 cursor-pointer" onClick={() => setContaFinanceiraFiltro('todas')} />
+                      </Badge>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div className="flex gap-4">
