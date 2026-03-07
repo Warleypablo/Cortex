@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ChevronDown, ChevronRight, Download, TrendingUp, TrendingDown, Minus, FileSpreadsheet, FileText } from "lucide-react";
+import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -129,6 +130,44 @@ const RESULT_KEYS: Set<string> = new Set([
   "resultado_operacional",
   "resultado_liquido",
 ]);
+
+// Keys for rows that get sparklines
+const SPARKLINE_KEYS: Set<string> = new Set([
+  "receita_bruta_total",
+  "lucro_bruto",
+  "resultado_liquido",
+]);
+
+// ---------- Sparkline ----------
+
+function Sparkline({ valores, mesesComDados }: { valores: Record<string, number>; mesesComDados: Set<string> }) {
+  const chartData = MONTH_KEYS
+    .filter((mk) => mesesComDados.has(mk))
+    .map((mk) => ({ value: valores[mk] ?? 0 }));
+
+  if (chartData.length < 2) return <td className="px-1 py-1" />;
+
+  const lastVal = chartData[chartData.length - 1].value;
+  const color = lastVal >= 0 ? "#10b981" : "#ef4444";
+
+  return (
+    <td className="px-1 py-1 min-w-[80px]">
+      <ResponsiveContainer width="100%" height={24}>
+        <AreaChart data={chartData} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={color}
+            fill={color}
+            fillOpacity={0.15}
+            strokeWidth={1.5}
+            dot={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </td>
+  );
+}
 
 // ---------- Export helpers ----------
 
@@ -410,6 +449,7 @@ export default function DRE() {
         })}
         {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`, undefined, undefined, true)}
         {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
+        <td className="px-1 py-1" />
       </tr>
     );
   }
@@ -447,6 +487,7 @@ export default function DRE() {
           ))}
           <td className="px-2 py-2" />
           {showAV && <td className="px-2 py-2" />}
+          <td className="px-1 py-1" />
         </tr>
 
         {/* Inner rows (when group is expanded) */}
@@ -515,6 +556,7 @@ export default function DRE() {
           })}
           {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium", undefined, true)}
           {showAV && renderAVCell(subtotalAccum, receitaBrutaTotalAcum, `sub-${section.key}-av-acum`)}
+          <td className="px-1 py-1" />
         </tr>
       </Fragment>
     );
@@ -566,6 +608,11 @@ export default function DRE() {
         )}
         {showAV &&
           renderAVCell(acum, receitaBrutaTotalAcum, `derived-${section.subtotalKey}-av-acum`)}
+        {SPARKLINE_KEYS.has(section.subtotalKey) ? (
+          <Sparkline valores={subtotal} mesesComDados={mesesComDados} />
+        ) : (
+          <td className="px-1 py-1" />
+        )}
       </tr>
     );
   }
@@ -742,6 +789,9 @@ export default function DRE() {
                         AV%
                       </th>
                     )}
+                    <th className="px-2 py-2 text-center text-xs font-semibold text-gray-600 dark:text-zinc-400 min-w-[80px]">
+                      Tendência
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
