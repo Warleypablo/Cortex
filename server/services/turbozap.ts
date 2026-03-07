@@ -24,6 +24,8 @@ export interface PreviewNivel {
   data_vencimento: string;
   clientes: ClienteCobranca[];
   total_valor: number;
+  instancia: "financeiro" | "juridico";
+  condicional?: string;
 }
 
 export interface EnvioRegistro {
@@ -63,14 +65,27 @@ export interface TurboZapConfiguracao {
 // Níveis de escalação
 // ============================================
 
-const NIVEIS_COBRANCA = [
-  { tipo: "D-3", label: "D-3 (Lembrete)", dias: -3 },
-  { tipo: "D+0", label: "D+0 (Vencimento)", dias: 0 },
-  { tipo: "D+3", label: "D+3 (3 dias)", dias: 3 },
-  { tipo: "D+7", label: "D+7 (Suspensão)", dias: 7 },
-  { tipo: "D+10", label: "D+10 (Rescisão)", dias: 10 },
-  { tipo: "D+15", label: "D+15 (Encerramento)", dias: 15 },
-  { tipo: "D+20", label: "D+20 (Cancelado)", dias: 20 },
+interface NivelCobranca {
+  tipo: string;
+  label: string;
+  dias: number;
+  instancia: "financeiro" | "juridico";
+  condicional?: string;
+}
+
+const NIVEIS_COBRANCA: NivelCobranca[] = [
+  { tipo: "D-3", label: "D-3 (Lembrete)", dias: -3, instancia: "financeiro" },
+  { tipo: "D+0", label: "D+0 (Vencimento)", dias: 0, instancia: "financeiro" },
+  { tipo: "D+3", label: "D+3 (3 dias)", dias: 3, instancia: "financeiro" },
+  { tipo: "D+7", label: "D+7 (Suspensão)", dias: 7, instancia: "financeiro" },
+  { tipo: "D+10", label: "D+10 (Rescisão)", dias: 10, instancia: "financeiro" },
+  { tipo: "D+15", label: "D+15 (Encerramento)", dias: 15, instancia: "financeiro" },
+  { tipo: "D+20", label: "D+20 (Cancelado)", dias: 20, instancia: "financeiro" },
+  { tipo: "D+30", label: "D+30 (Formalização Jurídica)", dias: 30, instancia: "juridico" },
+  { tipo: "D+40", label: "D+40 (Comunicação Protesto)", dias: 40, instancia: "juridico" },
+  { tipo: "D+45", label: "D+45 (Protesto Efetivado)", dias: 45, instancia: "juridico", condicional: "protesto_efetivado" },
+  { tipo: "D+50", label: "D+50 (Aviso Negativação)", dias: 50, instancia: "juridico" },
+  { tipo: "D+55", label: "D+55 (Negativação Efetivada)", dias: 55, instancia: "juridico", condicional: "negativacao_efetivada" },
 ];
 
 // ============================================
@@ -142,6 +157,44 @@ Caso haja interesse na regularização do débito, segue abaixo o boleto atualiz
 Qualquer dúvida, estamos à disposição.\n
 
 — Time Financeiro | Turbo Partners`,
+
+  "D+30": `Prezado(a), {nome}\n
+Informamos que, em razão da inadimplência referente à fatura vencida em {vencimento}, no valor de R$ {valor}, o caso foi formalmente encaminhado ao departamento jurídico da empresa.\n
+A partir desta data, todas as tratativas relacionadas ao débito serão conduzidas exclusivamente pela área jurídica.\n
+Caso haja interesse na regularização imediata do débito, segue abaixo o boleto atualizado:\n
+{link_pagamento}\n
+Orientamos que o pagamento seja realizado com a maior brevidade possível, a fim de evitar a adoção de medidas legais cabíveis.\n
+— Departamento Jurídico | Turbo Partners`,
+
+  "D+40": `Prezado(a), {nome}\n
+Na qualidade de representante legal, informamos que foi iniciado o procedimento de protesto extrajudicial referente ao débito vencido em {vencimento}, no valor de R$ {valor}.\n
+O protesto será formalizado junto ao cartório competente no prazo de até 5 (cinco) dias úteis, caso a pendência não seja regularizada.\n
+Para evitar o registro do protesto, providencie o pagamento através do link abaixo:\n
+{link_pagamento}\n
+Alertamos que o protesto implica em restrições de crédito e pode impactar diretamente a capacidade de obtenção de financiamentos e participação em licitações.\n
+— Departamento Jurídico | Turbo Partners`,
+
+  "D+45": `Prezado(a), {nome}\n
+Informamos que o protesto referente ao débito vencido em {vencimento}, no valor de R$ {valor}, foi efetivado junto ao cartório competente.\n
+O registro do protesto gera implicações legais e financeiras imediatas, incluindo restrição cadastral e impacto na obtenção de crédito.\n
+Ainda é possível regularizar a situação mediante pagamento integral do débito. Após a confirmação do pagamento, providenciaremos a baixa do protesto.\n
+{link_pagamento}\n
+— Departamento Jurídico | Turbo Partners`,
+
+  "D+50": `Prezado(a), {nome}\n
+Na qualidade de representante legal, informamos que, diante da manutenção da inadimplência e do protesto já efetivado, será realizada a negativação do débito junto aos órgãos de proteção ao crédito (SPC/Serasa).\n
+O débito de R$ {valor}, vencido em {vencimento}, será registrado no prazo de 5 (cinco) dias úteis, caso não haja regularização.\n
+Para evitar a negativação, providencie o pagamento:\n
+{link_pagamento}\n
+Alertamos que a negativação impacta diretamente o score de crédito e pode restringir operações financeiras da empresa.\n
+— Departamento Jurídico | Turbo Partners`,
+
+  "D+55": `Prezado(a), {nome}\n
+Informamos que a negativação referente ao débito de R$ {valor}, vencido em {vencimento}, foi efetivada junto aos órgãos de proteção ao crédito (SPC/Serasa).\n
+O registro permanecerá ativo até a quitação integral do débito ou pelo prazo legal de 5 anos.\n
+Após a confirmação do pagamento, providenciaremos a exclusão da negativação no prazo de até 5 (cinco) dias úteis.\n
+{link_pagamento}\n
+— Departamento Jurídico | Turbo Partners`,
 };
 
 const DEFAULT_SKIP_NUMEROS = [
@@ -217,6 +270,12 @@ export async function initTurboZapTables(): Promise<void> {
       { chave: "delay_min", valor: "10" },
       { chave: "delay_max", valor: "20" },
       { chave: "dry_run", valor: "false" },
+      { chave: "template_D+30", valor: DEFAULT_TEMPLATES["D+30"] },
+      { chave: "template_D+40", valor: DEFAULT_TEMPLATES["D+40"] },
+      { chave: "template_D+45", valor: DEFAULT_TEMPLATES["D+45"] },
+      { chave: "template_D+50", valor: DEFAULT_TEMPLATES["D+50"] },
+      { chave: "template_D+55", valor: DEFAULT_TEMPLATES["D+55"] },
+      { chave: "dry_run_juridico", valor: "true" },
     ];
 
     for (const cfg of seedConfigs) {
@@ -377,6 +436,8 @@ export async function previewCobrancas(): Promise<PreviewNivel[]> {
       data_vencimento: dataVencimento,
       clientes: unicos,
       total_valor: totalValor,
+      instancia: nivel.instancia,
+      condicional: nivel.condicional,
     });
   }
 
@@ -390,18 +451,22 @@ export async function previewCobrancas(): Promise<PreviewNivel[]> {
 async function enviarMensagemWhatsApp(
   numero: string,
   texto: string,
+  instancia: "financeiro" | "juridico" = "financeiro",
 ): Promise<{ success: boolean; error?: string }> {
   const serverUrl = process.env.EVOLUTION_SERVER_URL;
-  const instanceId = process.env.EVOLUTION_INSTANCE_ID;
+  const instanceId = instancia === "juridico"
+    ? process.env.EVOLUTION_JURIDICO_INSTANCE_ID
+    : process.env.EVOLUTION_INSTANCE_ID;
   const token = process.env.EVOLUTION_TOKEN;
 
   if (!serverUrl || !instanceId || !token) {
-    return { success: false, error: "Evolution API não configurada (env vars faltando)" };
+    return { success: false, error: `Evolution API não configurada para instância '${instancia}'` };
   }
 
-  const dryRun = await getConfiguracao("dry_run");
+  const dryRunKey = instancia === "juridico" ? "dry_run_juridico" : "dry_run";
+  const dryRun = await getConfiguracao(dryRunKey);
   if (dryRun === "true") {
-    console.log(`[turbozap][DRY_RUN] Não enviando para ${numero}`);
+    console.log(`[turbozap][DRY_RUN][${instancia}] Não enviando para ${numero}`);
     return { success: true };
   }
 
@@ -430,6 +495,19 @@ async function enviarMensagemWhatsApp(
   } catch (error: any) {
     return { success: false, error: error.message || "Erro de conexão" };
   }
+}
+
+// ============================================
+// Pipeline Jurídico helper
+// ============================================
+
+async function checkPipelineJuridico(cnpj: string, dataVencimento: string): Promise<Record<string, any> | null> {
+  const result = await db.execute(sql`
+    SELECT * FROM cortex_core.turbozap_pipeline_juridico
+    WHERE cnpj = ${cnpj} AND data_vencimento = ${dataVencimento}
+    LIMIT 1
+  `);
+  return result.rows.length > 0 ? (result.rows[0] as Record<string, any>) : null;
 }
 
 // ============================================
@@ -490,10 +568,33 @@ export async function executarCobrancas(
         continue;
       }
 
+      // Check conditional pipeline flag (D+45, D+55)
+      if (nivel.condicional) {
+        const pipeline = await checkPipelineJuridico(cliente.cnpj, cliente.data_vencimento);
+        if (!pipeline || !(pipeline as any)[nivel.condicional]) {
+          pulados++;
+          await db.execute(sql`
+            INSERT INTO cortex_core.turbozap_envios (
+              id_cliente, cliente_nome, cnpj, telefone,
+              data_vencimento, valor, link_pagamento,
+              tipo_cobranca, mensagem_enviada, status, erro_detalhe,
+              executado_por, execucao_id
+            ) VALUES (
+              ${cliente.id_cliente}, ${cliente.cliente_nome}, ${cliente.cnpj || ""},
+              ${cliente.telefone}, ${cliente.data_vencimento}, ${Number(cliente.total)},
+              ${cliente.link_pagamento || ""}, ${nivel.tipo}, ${""},
+              'pulado', ${"Condicional não atendido: " + nivel.condicional},
+              ${executadoPor}, ${execucaoId}
+            )
+          `);
+          continue;
+        }
+      }
+
       const numero = normalizarNumero(cliente.telefone);
       const mensagem = formatarMensagem(template, cliente);
 
-      const resultado = await enviarMensagemWhatsApp(numero, mensagem);
+      const resultado = await enviarMensagemWhatsApp(numero, mensagem, nivel.instancia);
 
       if (resultado.success) {
         enviados++;
@@ -510,6 +611,15 @@ export async function executarCobrancas(
             'enviado', ${executadoPor}, ${execucaoId}
           )
         `);
+
+        // Auto-create pipeline record when D+30 is sent
+        if (nivel.tipo === "D+30") {
+          await db.execute(sql`
+            INSERT INTO cortex_core.turbozap_pipeline_juridico (cnpj, cliente_nome, data_vencimento, valor, etapa)
+            VALUES (${cliente.cnpj || ""}, ${cliente.cliente_nome}, ${cliente.data_vencimento}, ${Number(cliente.total)}, 'formalizado')
+            ON CONFLICT (cnpj, data_vencimento) DO NOTHING
+          `);
+        }
       } else {
         erros++;
         await db.execute(sql`
