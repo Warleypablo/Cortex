@@ -184,13 +184,25 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
         ORDER BY empresa
       `);
 
-      const response: DREResponse & { empresas: string[] } = {
+      // Determine which months have actual data (any row with non-zero value)
+      const mesesComDados: Set<string> = new Set();
+      for (const linha of linhas) {
+        for (let i = 1; i <= 12; i++) {
+          const mk = `mes_${String(i).padStart(2, '0')}`;
+          if (linha.valores[mk] !== 0) {
+            mesesComDados.add(mk);
+          }
+        }
+      }
+
+      const response: DREResponse & { empresas: string[]; mesesComDados: string[] } = {
         ano,
         empresa,
         linhas,
         parentCategories,
         subtotais,
         empresas: empresasResult.rows.map((r: any) => r.empresa as string),
+        mesesComDados: Array.from(mesesComDados),
       };
 
       res.json(response);
