@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-03-07 | feat(dre): reclassifica deduções e adiciona receita líquida, LAIR, IR/CSLL no backend
+
+**O que foi feito:**
+- Adiciona grupo 08 (IR E CONTRIBUIÇÃO SOCIAL) e grupo virtual DD (DEDUÇÕES DA RECEITA BRUTA) ao GRUPO_MAP
+- Reclassifica categorias 05.05/05.06 (ISS, PIS, COFINS) de custos operacionais para deduções da receita bruta
+- Adiciona novos subtotais: deducoes_receita_bruta, receita_operacional_liquida, receita_liquida_total, lair, ir_csll
+- Atualiza cálculos derivados seguindo estrutura contábil: Receita Bruta - Deduções = Receita Líquida - Custos = Lucro Bruto - Despesas = LAIR - IR/CSLL = Resultado Líquido
+
+**Por que:**
+- Categorias 05.05 (ISS) e 05.06 (PIS/COFINS) são deduções tributárias sobre receita, não custos operacionais
+- A DRE precisa separar Receita Bruta de Receita Líquida para análise correta
+- LAIR (Lucro Antes do IR) e IR/CSLL são obrigatórios numa DRE completa
+- Grupo 08 já existia no plano de contas mas não era processado
+
+**Arquivos alterados:**
+- `server/routes/dre.ts` - GRUPO_MAP expandido, DREResponse com novos subtotais, reclassificação 05.05/05.06→DD, cálculos derivados atualizados
+
+**Impacto arquitetural:** Mudança no contrato da API /api/financeiro/dre — subtotais renomeados (receita_bruta_total→receita_liquida_total) e novos campos adicionados. Frontend precisará ser atualizado para consumir os novos subtotais.
+
+---
+
 ## 2026-03-06 | feat(squad): overhaul completo da página Contribuição por Squad
 
 **O que foi feito:**
