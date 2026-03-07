@@ -23,6 +23,7 @@ import {
   Sparkles, BrainCircuit, Send, MessageCircle, Bot, User, Minus, LayoutGrid, Table2,
   RotateCcw
 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRange } from "react-day-picker";
 import { format, startOfYear } from "date-fns";
@@ -63,6 +64,7 @@ export default function DashboardDFC() {
     from: startOfYear(new Date()),
     to: undefined
   });
+  const [empresa, setEmpresa] = useState<string>("todas");
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
   
   const filterDataInicio = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
@@ -81,6 +83,7 @@ export default function DashboardDFC() {
         historico,
         dataInicio: filterDataInicio || undefined,
         dataFim: filterDataFim || undefined,
+        empresa: empresa !== "todas" ? empresa : undefined,
       });
       return response.json();
     },
@@ -129,13 +132,14 @@ export default function DashboardDFC() {
     "Compare receitas e despesas dos últimos meses",
   ];
 
-  const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse>({
-    queryKey: ["/api/dfc", filterDataInicio, filterDataFim],
+  const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse & { empresas?: string[] }>({
+    queryKey: ["/api/dfc", filterDataInicio, filterDataFim, empresa],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filterDataInicio) params.append("dataInicio", filterDataInicio);
       if (filterDataFim) params.append("dataFim", filterDataFim);
-      
+      if (empresa && empresa !== "todas") params.append("empresa", empresa);
+
       const res = await fetch(`/api/dfc?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch DFC data");
       return res.json();
@@ -374,6 +378,20 @@ export default function DashboardDFC() {
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Filtro de empresa */}
+            <Select value={empresa} onValueChange={setEmpresa}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Consolidada</SelectItem>
+                {dfcData?.empresas?.map((emp) => (
+                  <SelectItem key={emp} value={emp}>
+                    {emp}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {/* Date Range Picker no header */}
             <div className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 rounded-xl px-3 py-2 border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
               <DateRangePicker
