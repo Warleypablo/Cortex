@@ -88,6 +88,7 @@ export const PERMISSION_KEYS = {
     CONTRATOS_MODULE: 'jur.contratos_module',
     CONTRATOS_COLABORADORES: 'jur.contratos_colaboradores',
     PROCESSOS: 'jur.processos',
+    ASSISTENTE: 'jur.assistente',
   },
   // Reports
   REPORTS: {
@@ -238,6 +239,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/patrimonio': PERMISSION_KEYS.GG.PATRIMONIO,
   '/gg/calendario-ferias': PERMISSION_KEYS.GG.CALENDARIO_FERIAS,
   // Jurídico
+  '/juridico/assistente': PERMISSION_KEYS.JUR.ASSISTENTE,
   '/juridico/clientes': PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES,
   '/juridico/processos': PERMISSION_KEYS.JUR.PROCESSOS,
   '/contratos-module': PERMISSION_KEYS.JUR.CONTRATOS_MODULE,
@@ -460,6 +462,7 @@ export const NAV_CONFIG = {
     title: 'Jurídico',
     icon: 'Scale',
     items: [
+      { title: 'Assistente IA', url: '/juridico/assistente', icon: 'Bot', permissionKey: PERMISSION_KEYS.JUR.ASSISTENTE },
       { title: 'Clientes Inadimplentes', url: '/juridico/clientes', icon: 'Gavel', permissionKey: PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES },
       { title: 'Processos', url: '/juridico/processos', icon: 'Scale', permissionKey: PERMISSION_KEYS.JUR.PROCESSOS },
       { title: 'Contratos', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_MODULE },
@@ -634,6 +637,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES]: 'Clientes Inadimplentes',
   [PERMISSION_KEYS.JUR.PROCESSOS]: 'Processos',
   [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
+  [PERMISSION_KEYS.JUR.ASSISTENTE]: 'Assistente IA',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
   [PERMISSION_KEYS.REPORTS.MENSAL]: 'Reporte Mensal',
