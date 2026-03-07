@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Zap, Send, History, Settings, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, SkipForward, Search, Loader2,
-  MessageSquare, TrendingUp, AlertTriangle, Phone, X,
+  MessageSquare, TrendingUp, AlertTriangle, Phone, X, Scale,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 
 // ============================================
 // Types
@@ -45,6 +46,8 @@ interface PreviewNivel {
   data_vencimento: string;
   clientes: ClienteCobranca[];
   total_valor: number;
+  instancia: "financeiro" | "juridico";
+  condicional?: string;
 }
 
 interface EnvioRegistro {
@@ -80,6 +83,29 @@ interface Configuracao {
   atualizado_em: string;
 }
 
+interface PipelineJuridico {
+  id: number;
+  cnpj: string;
+  cliente_nome: string;
+  data_vencimento: string;
+  valor: number;
+  etapa: string;
+  protesto_efetivado: boolean;
+  negativacao_efetivada: boolean;
+  observacoes: string | null;
+  atualizado_por: string | null;
+  criado_em: string;
+  atualizado_em: string;
+}
+
+const ETAPAS_PIPELINE = [
+  { value: "formalizado", label: "Formalizado", color: "text-violet-600 dark:text-violet-400" },
+  { value: "protesto_comunicado", label: "Protesto Comunicado", color: "text-fuchsia-600 dark:text-fuchsia-400" },
+  { value: "protesto_efetivado", label: "Protesto Efetivado", color: "text-pink-600 dark:text-pink-400" },
+  { value: "negativacao_comunicada", label: "Negativação Comunicada", color: "text-rose-600 dark:text-rose-400" },
+  { value: "negativacao_efetivada", label: "Negativação Efetivada", color: "text-red-600 dark:text-red-400" },
+];
+
 // ============================================
 // Constants
 // ============================================
@@ -92,6 +118,11 @@ const TIPO_COLORS: Record<string, { bg: string; text: string; border: string }> 
   "D+10": { bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-700 dark:text-red-300", border: "border-red-200 dark:border-red-800" },
   "D+15": { bg: "bg-rose-50 dark:bg-rose-950/30", text: "text-rose-700 dark:text-rose-300", border: "border-rose-200 dark:border-rose-800" },
   "D+20": { bg: "bg-purple-50 dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-300", border: "border-purple-200 dark:border-purple-800" },
+  "D+30": { bg: "bg-violet-50 dark:bg-violet-950/30", text: "text-violet-700 dark:text-violet-300", border: "border-violet-200 dark:border-violet-800" },
+  "D+40": { bg: "bg-fuchsia-50 dark:bg-fuchsia-950/30", text: "text-fuchsia-700 dark:text-fuchsia-300", border: "border-fuchsia-200 dark:border-fuchsia-800" },
+  "D+45": { bg: "bg-pink-50 dark:bg-pink-950/30", text: "text-pink-700 dark:text-pink-300", border: "border-pink-200 dark:border-pink-800" },
+  "D+50": { bg: "bg-rose-50 dark:bg-rose-950/30", text: "text-rose-700 dark:text-rose-300", border: "border-rose-200 dark:border-rose-800" },
+  "D+55": { bg: "bg-red-50 dark:bg-red-950/40", text: "text-red-800 dark:text-red-300", border: "border-red-300 dark:border-red-800" },
 };
 
 const STATUS_BADGE: Record<string, { variant: "default" | "destructive" | "outline" | "secondary"; label: string }> = {
@@ -162,12 +193,16 @@ export default function TurboZap() {
           <TabsTrigger value="configuracoes" className="gap-2">
             <Settings className="w-4 h-4" /> Configurações
           </TabsTrigger>
+          <TabsTrigger value="pipeline" className="gap-2">
+            <Scale className="w-4 h-4" /> Pipeline Jurídico
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
       {activeTab === "preview" && <PreviewTab />}
       {activeTab === "historico" && <HistoricoTab />}
       {activeTab === "configuracoes" && <ConfiguracoesTab />}
+      {activeTab === "pipeline" && <PipelineJuridicoTab />}
     </div>
   );
 }
@@ -667,7 +702,8 @@ function ConfiguracoesTab() {
     );
   }
 
-  const templateKeys = ["D-3", "D+0", "D+3", "D+7", "D+10", "D+15", "D+20"];
+  const templateKeysFinanceiro = ["D-3", "D+0", "D+3", "D+7", "D+10", "D+15", "D+20"];
+  const templateKeysJuridico = ["D+30", "D+40", "D+45", "D+50", "D+55"];
   const skipNumerosRaw = getVal("skip_numeros");
   let skipNumeros: string[] = [];
   try {
@@ -707,17 +743,67 @@ function ConfiguracoesTab() {
         </div>
       )}
 
-      {/* Templates */}
+      {/* Templates Financeiro */}
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
         <CardHeader>
           <CardTitle className="text-gray-900 dark:text-white text-lg">
-            Templates de Mensagem
+            Templates — Financeiro
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {templateKeys.map((tipo) => {
+          {templateKeysFinanceiro.map((tipo) => {
             const chave = `template_${tipo}`;
             const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D-3"];
+            const isDirty = dirty.has(chave);
+            return (
+              <div key={tipo} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge className={`${colors.bg} ${colors.text} border-0`}>{tipo}</Badge>
+                    {isDirty && (
+                      <span className="text-xs text-yellow-600 dark:text-yellow-400">modificado</span>
+                    )}
+                  </div>
+                  {isDirty && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => saveMutation.mutate(chave)}
+                      disabled={saveMutation.isPending}
+                    >
+                      Salvar
+                    </Button>
+                  )}
+                </div>
+                <Textarea
+                  value={getVal(chave)}
+                  onChange={(e) => setVal(chave, e.target.value)}
+                  className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
+                  placeholder={`Template para ${tipo}...`}
+                />
+                <p className="text-xs text-gray-400 dark:text-zinc-500">
+                  Variáveis: {"{nome}"}, {"{valor}"}, {"{vencimento}"}, {"{link_pagamento}"}
+                </p>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      {/* Templates Jurídico */}
+      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+        <CardHeader>
+          <CardTitle className="text-gray-900 dark:text-white text-lg flex items-center gap-2">
+            Templates — Jurídico
+            <Badge variant="outline" className="text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700">
+              Instância Jurídico
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {templateKeysJuridico.map((tipo) => {
+            const chave = `template_${tipo}`;
+            const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D+30"];
             const isDirty = dirty.has(chave);
             return (
               <div key={tipo} className="space-y-2">
@@ -809,7 +895,7 @@ function ConfiguracoesTab() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
                 Delay mínimo (segundos)
@@ -849,9 +935,141 @@ function ConfiguracoesTab() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
+                Dry run Jurídico
+              </label>
+              <Select
+                value={getVal("dry_run_juridico")}
+                onValueChange={(v) => setVal("dry_run_juridico", v)}
+              >
+                <SelectTrigger className="bg-gray-50 dark:bg-zinc-800">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Ativado (não envia)</SelectItem>
+                  <SelectItem value="false">Desativado (envia de verdade)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ============================================
+// Pipeline Jurídico Tab
+// ============================================
+
+function PipelineJuridicoTab() {
+  const { toast } = useToast();
+
+  const { data: pipeline = [], isLoading } = useQuery<PipelineJuridico[]>({
+    queryKey: ["/api/turbozap/pipeline-juridico"],
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: number; updates: Record<string, any> }) => {
+      const res = await apiRequest("PUT", `/api/turbozap/pipeline-juridico/${id}`, updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/pipeline-juridico"] });
+      toast({ title: "Pipeline atualizado!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao atualizar", variant: "destructive" });
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  if (pipeline.length === 0) {
+    return (
+      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+        <CardContent className="py-16 text-center">
+          <Scale className="w-12 h-12 text-gray-300 dark:text-zinc-600 mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-zinc-400">Nenhum caso no pipeline jurídico.</p>
+          <p className="text-sm text-gray-400 dark:text-zinc-500 mt-1">
+            Registros são criados automaticamente quando mensagens D+30 são enviadas.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+      <CardHeader>
+        <CardTitle className="text-gray-900 dark:text-white text-lg flex items-center gap-2">
+          <Scale className="w-5 h-5" />
+          Pipeline Jurídico ({pipeline.length} casos)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-zinc-700">
+                <th className="text-left py-3 px-2 font-medium text-gray-600 dark:text-zinc-400">Cliente</th>
+                <th className="text-left py-3 px-2 font-medium text-gray-600 dark:text-zinc-400">CNPJ</th>
+                <th className="text-left py-3 px-2 font-medium text-gray-600 dark:text-zinc-400">Vencimento</th>
+                <th className="text-right py-3 px-2 font-medium text-gray-600 dark:text-zinc-400">Valor</th>
+                <th className="text-left py-3 px-2 font-medium text-gray-600 dark:text-zinc-400">Etapa</th>
+                <th className="text-center py-3 px-2 font-medium text-gray-600 dark:text-zinc-400">Protesto</th>
+                <th className="text-center py-3 px-2 font-medium text-gray-600 dark:text-zinc-400">Negativação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pipeline.map((item) => (
+                <tr key={item.id} className="border-b border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+                  <td className="py-3 px-2 text-gray-900 dark:text-white font-medium">{item.cliente_nome}</td>
+                  <td className="py-3 px-2 text-gray-600 dark:text-zinc-400 font-mono text-xs">{item.cnpj}</td>
+                  <td className="py-3 px-2 text-gray-600 dark:text-zinc-400">{formatDate(item.data_vencimento)}</td>
+                  <td className="py-3 px-2 text-right text-gray-900 dark:text-white">{formatCurrency(item.valor)}</td>
+                  <td className="py-3 px-2">
+                    <Select
+                      value={item.etapa}
+                      onValueChange={(v) => updateMutation.mutate({ id: item.id, updates: { etapa: v } })}
+                    >
+                      <SelectTrigger className="w-[200px] h-8 text-xs bg-gray-50 dark:bg-zinc-800">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ETAPAS_PIPELINE.map((e) => (
+                          <SelectItem key={e.value} value={e.value}>
+                            <span className={e.color}>{e.label}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <Switch
+                      checked={item.protesto_efetivado}
+                      onCheckedChange={(v) => updateMutation.mutate({ id: item.id, updates: { protesto_efetivado: v } })}
+                    />
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <Switch
+                      checked={item.negativacao_efetivada}
+                      onCheckedChange={(v) => updateMutation.mutate({ id: item.id, updates: { negativacao_efetivada: v } })}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
