@@ -195,7 +195,7 @@ export interface IStorage {
   getFluxoCaixaDiario(ano: number, mes: number): Promise<FluxoCaixaDiarioItem[]>;
   getTransacoesDia(ano: number, mes: number, dia: number): Promise<TransacaoDiaItem[]>;
   getContasBancos(): Promise<ContaBanco[]>;
-  getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse>;
+  getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string, contasFinanceiras?: string[]): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse>;
   getFluxoCaixaMensal(ano: number): Promise<import("@shared/schema").FluxoCaixaMensalResponse>;
   getFluxoDiaDetalhe(data: string): Promise<{ entradas: any[]; saidas: any[]; totalEntradas: number; totalSaidas: number; saldo: number }>;
   getDfcSnapshot(mesAno: string): Promise<import("@shared/schema").DfcSnapshot | null>;
@@ -764,7 +764,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse> {
+  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string, contasFinanceiras?: string[]): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -3349,7 +3349,7 @@ export class DbStorage implements IStorage {
     return contas;
   }
 
-  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse> {
+  async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string, contasFinanceiras?: string[]): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse> {
     const saldoAtual = await this.getSaldoAtualBancos();
     
     const mesAno = dataInicio.substring(0, 7);
@@ -3364,6 +3364,10 @@ export class DbStorage implements IStorage {
       }
     }
     
+    const contaFilter = contasFinanceiras && contasFinanceiras.length > 0
+      ? sql.raw(`AND nome_conta_financeira IN (${contasFinanceiras.map(c => `'${c.replace(/'/g, "''")}'`).join(',')})`)
+      : sql``;
+
     const result = await db.execute(sql`
       WITH dates AS (
         SELECT generate_series(
@@ -3387,6 +3391,7 @@ export class DbStorage implements IStorage {
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status NOT IN ('PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          ${contaFilter}
         GROUP BY data_vencimento::date
       ),
       paid_transactions AS (
@@ -3399,6 +3404,7 @@ export class DbStorage implements IStorage {
           AND status = 'QUITADO'
           AND data_quitacao IS NOT NULL
           AND data_quitacao::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          ${contaFilter}
         GROUP BY data_quitacao::date
       )
       SELECT
