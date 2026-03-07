@@ -342,7 +342,7 @@ export default function DRE() {
     return (
       <td
         key={key}
-        className={`px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap ${isEmptyMonth ? "text-gray-300 dark:text-zinc-600" : "text-gray-500 dark:text-zinc-400"}`}
+        className={`px-1 py-1.5 text-right text-[10px] tabular-nums whitespace-nowrap italic ${isEmptyMonth ? "text-gray-300 dark:text-zinc-600" : "text-gray-400 dark:text-zinc-500"}`}
       >
         {isEmptyMonth ? "—" : computeAVPercent(value, base)}
       </td>
@@ -694,8 +694,8 @@ export default function DRE() {
                           {m}
                         </th>
                         {showAV && (
-                          <th className="px-2 py-2 text-right text-xs font-semibold text-gray-400 dark:text-zinc-500 min-w-[50px]">
-                            %
+                          <th className="px-1 py-2 text-right text-[10px] font-normal italic text-gray-400 dark:text-zinc-500 min-w-[45px]">
+                            AV%
                           </th>
                         )}
                       </Fragment>
@@ -704,8 +704,8 @@ export default function DRE() {
                       Acumulado
                     </th>
                     {showAV && (
-                      <th className="px-2 py-2 text-right text-xs font-semibold text-gray-400 dark:text-zinc-500 min-w-[50px] bg-gray-100 dark:bg-zinc-700/50">
-                        %
+                      <th className="px-1 py-2 text-right text-[10px] font-normal italic text-gray-400 dark:text-zinc-500 min-w-[45px] bg-gray-100 dark:bg-zinc-700/50">
+                        AV%
                       </th>
                     )}
                   </tr>
