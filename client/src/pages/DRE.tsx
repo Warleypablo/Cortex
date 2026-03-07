@@ -391,7 +391,7 @@ export default function DRE() {
         className={`hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors ${bgClass} ${options?.clickable ? "cursor-pointer" : ""}`}
         onClick={options?.onClick}
       >
-        <td className={`px-3 py-1.5 text-xs sticky left-0 z-10 whitespace-nowrap ${tdClass} ${bgClass || "bg-white dark:bg-zinc-900"}`}>
+        <td className={`px-3 py-1.5 text-xs sticky left-0 z-10 whitespace-nowrap border-r border-gray-200 dark:border-zinc-700 ${tdClass} ${bgClass || "bg-white dark:bg-zinc-900"}`}>
           <span className="inline-flex items-center gap-1">
             {options?.chevron === "expanded" && <ChevronDown className="w-3 h-3 text-gray-400 dark:text-zinc-500" />}
             {options?.chevron === "collapsed" && <ChevronRight className="w-3 h-3 text-gray-400 dark:text-zinc-500" />}
@@ -429,7 +429,7 @@ export default function DRE() {
           className="bg-gray-100 dark:bg-zinc-800 cursor-pointer hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
           onClick={() => toggleGroup(section.key)}
         >
-          <td className="px-3 py-2 font-bold text-sm text-gray-900 dark:text-white sticky left-0 bg-gray-100 dark:bg-zinc-800 z-10 whitespace-nowrap">
+          <td className="px-3 py-2 font-bold text-sm text-gray-900 dark:text-white sticky left-0 bg-gray-100 dark:bg-zinc-800 z-10 whitespace-nowrap border-r border-gray-200 dark:border-zinc-700">
             <span className="inline-flex items-center gap-1">
               {isGroupExpanded ? (
                 <ChevronDown className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
@@ -500,7 +500,7 @@ export default function DRE() {
 
         {/* Subtotal row (always visible) */}
         <tr className="border-b border-gray-200 dark:border-zinc-700">
-          <td className="px-3 py-1.5 pl-5 text-xs font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap">
+          <td className="px-3 py-1.5 pl-5 text-xs font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap border-r border-gray-200 dark:border-zinc-700">
             Subtotal
           </td>
           {MONTH_KEYS.map((mk, idx) => {
@@ -533,7 +533,7 @@ export default function DRE() {
         className={`${section.bgClass} ${section.borderClass} border-gray-300 dark:border-zinc-600`}
       >
         <td
-          className={`px-3 py-2 font-bold text-gray-900 dark:text-white sticky left-0 z-10 whitespace-nowrap ${section.bgClass} ${section.textClass ?? "text-sm"}`}
+          className={`px-3 py-2 font-bold text-gray-900 dark:text-white sticky left-0 z-10 whitespace-nowrap border-r border-gray-200 dark:border-zinc-700 ${section.bgClass} ${section.textClass ?? "text-sm"}`}
         >
           {section.label}
         </td>
@@ -719,12 +719,12 @@ export default function DRE() {
                 {/* Table header */}
                 <thead>
                   <tr className="bg-gray-50 dark:bg-zinc-800 border-b border-gray-200 dark:border-zinc-700">
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 sticky left-0 bg-gray-50 dark:bg-zinc-800 z-20 min-w-[240px]">
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 dark:text-zinc-400 sticky left-0 bg-gray-50 dark:bg-zinc-800 z-20 min-w-[240px] border-r border-gray-200 dark:border-zinc-700">
                       Conta
                     </th>
                     {MONTHS.map((m) => (
                       <Fragment key={`hdr-${m}`}>
-                        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600 dark:text-zinc-400 min-w-[90px]">
+                        <th className="px-2 py-2 text-right text-xs font-semibold text-gray-600 dark:text-zinc-400 min-w-[100px]">
                           {m}
                         </th>
                         {showAV && (
