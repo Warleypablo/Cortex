@@ -61,9 +61,9 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
 
       const result = await db.execute(sql`
         WITH categorias_expandidas AS (
-          SELECT
+          SELECT DISTINCT ON (p.id, REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g'))
             p.id,
-            TRIM(cat.categoria) AS categoria_nome,
+            REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g') AS categoria_nome,
             p.tipo_evento,
             p.empresa,
             EXTRACT(MONTH FROM p.data_quitacao::date)::int AS mes,
