@@ -28,6 +28,7 @@ import { registerRelatorioMensalSlidesRoutes } from "./routes/relatorioMensalSli
 import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
 import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
+import { registerJuridicoAssistenteRoutes } from "./routes/juridico-assistente";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -15014,6 +15015,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // TurboZap - Central de Cobranças via WhatsApp
   registerTurboZapRoutes(app);
   initTurboZapTables().catch((err) => console.error("[turbozap] Init error:", err));
+
+  // Jurídico Assistente IA - registered from separate file
+  registerJuridicoAssistenteRoutes(app);
 
   // ============================================
   // Sugestões API
