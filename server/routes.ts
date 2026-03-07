@@ -10287,11 +10287,39 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         });
       }
       
+      // Agregar resumo por squad a partir dos dados brutos
+      const squadSummaryMap = new Map<string, { total: number; porMes: number[]; contratos: Set<string> }>();
+      for (const row of result.rows as any[]) {
+        const sq = row.squad || 'Sem Squad';
+        if (!squadSummaryMap.has(sq)) {
+          squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
+        }
+        const entry = squadSummaryMap.get(sq)!;
+        const monthIdx = parseInt(row.mes.split('-')[1]) - 1;
+        const valor = Number(row.valor) || 0;
+        entry.total += valor;
+        entry.porMes[monthIdx] += valor;
+        // Usar combinação cliente+serviço+squad como identificador de contrato
+        const contratoKey = `${row.cliente_nome}|${row.servico_nome}|${sq}`;
+        entry.contratos.add(contratoKey);
+      }
+
+      const resumoPorSquad = Array.from(squadSummaryMap.entries())
+        .filter(([sq]) => !/\bOFF\b/i.test(sq))
+        .map(([squad, data]) => ({
+          squad,
+          receitaTotal: data.total,
+          porMes: data.porMes,
+          quantidadeContratos: data.contratos.size,
+        }))
+        .sort((a, b) => b.receitaTotal - a.receitaTotal);
+
       res.json({
         ano,
         squad: squadFilter || 'todos',
         squads: Array.from(squadsSet).sort(),
-        meses: monthlyData
+        meses: monthlyData,
+        resumoPorSquad
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
