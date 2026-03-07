@@ -20,13 +20,17 @@ interface DREResponse {
   parentCategories: Record<string, string>; // "05.01" -> "Mão de Obra Operacional"
   subtotais: {
     receita_bruta_operacional: Record<string, number>;
+    deducoes_receita_bruta: Record<string, number>;
+    receita_operacional_liquida: Record<string, number>;
     receitas_nao_operacionais: Record<string, number>;
-    receita_bruta_total: Record<string, number>;
+    receita_liquida_total: Record<string, number>;
     custos_operacionais: Record<string, number>;
     lucro_bruto: Record<string, number>;
     despesas_operacionais: Record<string, number>;
     resultado_operacional: Record<string, number>;
     despesas_nao_operacionais: Record<string, number>;
+    lair: Record<string, number>;
+    ir_csll: Record<string, number>;
     resultado_liquido: Record<string, number>;
   };
 }
@@ -37,6 +41,8 @@ const GRUPO_MAP: Record<string, { nome: string; tipo: 'receita' | 'despesa' }> =
   '05': { nome: 'CUSTOS OPERACIONAIS', tipo: 'despesa' },
   '06': { nome: 'DESPESAS OPERACIONAIS', tipo: 'despesa' },
   '07': { nome: 'DESPESAS NÃO OPERACIONAIS', tipo: 'despesa' },
+  '08': { nome: 'IR E CONTRIBUIÇÃO SOCIAL', tipo: 'despesa' },
+  'DD': { nome: 'DEDUÇÕES DA RECEITA BRUTA', tipo: 'despesa' },
 };
 
 function emptyMonths(): Record<string, number> {
@@ -114,17 +120,24 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
         const parentKey = prefixMatch ? `${prefixMatch[1]}.${prefixMatch[2]}` : '99.99';
         const grupoInfo = GRUPO_MAP[grupoKey];
 
-        if (!grupoInfo) continue; // Skip categories outside 03-07
+        if (!grupoInfo) continue; // Skip categories outside known groups
+
+        // Reclassify tax deductions (05.05, 05.06) from Custos to Deduções
+        const DEDUCAO_PARENTS = new Set(['05.05', '05.06']);
+        let effectiveGrupo = grupoKey;
+        if (DEDUCAO_PARENTS.has(parentKey)) {
+          effectiveGrupo = 'DD';
+        }
 
         if (!categoriaMap.has(catNome)) {
           categoriaMap.set(catNome, {
-            categoria_id: grupoKey + '.' + catNome,
+            categoria_id: effectiveGrupo + '.' + catNome,
             categoria_nome: catNome,
-            grupo: grupoKey,
-            grupo_nome: grupoInfo.nome,
+            grupo: effectiveGrupo,
+            grupo_nome: effectiveGrupo === 'DD' ? 'DEDUÇÕES DA RECEITA BRUTA' : grupoInfo.nome,
             parent_key: parentKey,
             parent_nome: parentCategories[parentKey] || parentKey,
-            tipo: grupoInfo.tipo,
+            tipo: effectiveGrupo === 'DD' ? 'despesa' : grupoInfo.tipo,
             valores: emptyMonths(),
           });
         }
@@ -142,13 +155,17 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
       // Calculate subtotals
       const subtotais = {
         receita_bruta_operacional: emptyMonths(),
+        deducoes_receita_bruta: emptyMonths(),
+        receita_operacional_liquida: emptyMonths(),
         receitas_nao_operacionais: emptyMonths(),
-        receita_bruta_total: emptyMonths(),
+        receita_liquida_total: emptyMonths(),
         custos_operacionais: emptyMonths(),
         lucro_bruto: emptyMonths(),
         despesas_operacionais: emptyMonths(),
         resultado_operacional: emptyMonths(),
         despesas_nao_operacionais: emptyMonths(),
+        lair: emptyMonths(),
+        ir_csll: emptyMonths(),
         resultado_liquido: emptyMonths(),
       };
 
@@ -156,24 +173,30 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
         const keys = Object.keys(linha.valores);
         for (const k of keys) {
           if (linha.grupo === '03') subtotais.receita_bruta_operacional[k] += linha.valores[k];
+          if (linha.grupo === 'DD') subtotais.deducoes_receita_bruta[k] += linha.valores[k];
           if (linha.grupo === '04') subtotais.receitas_nao_operacionais[k] += linha.valores[k];
           if (linha.grupo === '05') subtotais.custos_operacionais[k] += linha.valores[k];
           if (linha.grupo === '06') subtotais.despesas_operacionais[k] += linha.valores[k];
           if (linha.grupo === '07') subtotais.despesas_nao_operacionais[k] += linha.valores[k];
+          if (linha.grupo === '08') subtotais.ir_csll[k] += linha.valores[k];
         }
       }
 
       // Derived subtotals
       const keys = Object.keys(emptyMonths());
       for (const k of keys) {
-        subtotais.receita_bruta_total[k] =
-          subtotais.receita_bruta_operacional[k] + subtotais.receitas_nao_operacionais[k];
+        subtotais.receita_operacional_liquida[k] =
+          subtotais.receita_bruta_operacional[k] - subtotais.deducoes_receita_bruta[k];
+        subtotais.receita_liquida_total[k] =
+          subtotais.receita_operacional_liquida[k] + subtotais.receitas_nao_operacionais[k];
         subtotais.lucro_bruto[k] =
-          subtotais.receita_bruta_total[k] - subtotais.custos_operacionais[k];
+          subtotais.receita_liquida_total[k] - subtotais.custos_operacionais[k];
         subtotais.resultado_operacional[k] =
           subtotais.lucro_bruto[k] - subtotais.despesas_operacionais[k];
-        subtotais.resultado_liquido[k] =
+        subtotais.lair[k] =
           subtotais.resultado_operacional[k] - subtotais.despesas_nao_operacionais[k];
+        subtotais.resultado_liquido[k] =
+          subtotais.lair[k] - subtotais.ir_csll[k];
       }
 
       // Get available empresas for filter
