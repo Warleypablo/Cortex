@@ -115,13 +115,13 @@ interface KPICardProps {
   progress?: number;
 }
 
-function KPICard({ title, value, subtitle, icon, trend, trendValue, color = 'default', progress }: KPICardProps) {
+function KPICard({ title, value, subtitle, icon, trend, trendValue, color = 'default', progress, compact = false }: KPICardProps & { compact?: boolean }) {
   const colorConfig = {
     default: {
-      bg: 'bg-primary/10',
-      text: 'text-primary',
-      border: 'border-primary/20',
-      gradient: 'from-primary/5 to-primary/10'
+      bg: 'bg-blue-100 dark:bg-blue-900/30',
+      text: 'text-blue-600 dark:text-blue-400',
+      border: 'border-blue-200 dark:border-blue-800',
+      gradient: 'from-blue-500/5 to-blue-500/10'
     },
     success: {
       bg: 'bg-emerald-100 dark:bg-emerald-900/30',
@@ -146,22 +146,25 @@ function KPICard({ title, value, subtitle, icon, trend, trendValue, color = 'def
   const config = colorConfig[color];
 
   return (
-    <Card className={`relative overflow-hidden border ${config.border}`} data-testid={`card-kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+    <Card
+      className={`relative overflow-hidden border ${config.border} transition-all duration-200 hover:shadow-md hover:scale-[1.01] hover:border-opacity-80`}
+      data-testid={`card-kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}
+    >
       <div className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-50`} />
-      <CardContent className="relative p-5">
+      <CardContent className={`relative ${compact ? 'p-4' : 'p-5'}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-muted-foreground font-medium">{title}</p>
-            <p className="text-2xl font-bold mt-1.5 tracking-tight">{value}</p>
+            <p className={`text-muted-foreground font-medium ${compact ? 'text-xs' : 'text-sm'}`}>{title}</p>
+            <p className={`font-bold mt-1 tracking-tight ${compact ? 'text-lg' : 'text-xl'}`}>{value}</p>
             {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1.5">{subtitle}</p>
+              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
             )}
             {trend && trendValue && (
-              <div className="flex items-center gap-1.5 mt-2">
+              <div className="flex items-center gap-1.5 mt-1.5">
                 {trend === 'up' ? (
-                  <ArrowUpRight className="w-4 h-4 text-emerald-600" />
+                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600" />
                 ) : trend === 'down' ? (
-                  <ArrowDownRight className="w-4 h-4 text-red-500" />
+                  <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />
                 ) : null}
                 <span className={`text-xs font-medium ${trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-red-500' : 'text-muted-foreground'}`}>
                   {trendValue}
@@ -169,12 +172,12 @@ function KPICard({ title, value, subtitle, icon, trend, trendValue, color = 'def
               </div>
             )}
             {progress !== undefined && (
-              <div className="mt-3">
+              <div className="mt-2">
                 <Progress value={progress} className="h-1.5" />
               </div>
             )}
           </div>
-          <div className={`p-2.5 rounded-xl shrink-0 ${config.bg}`}>
+          <div className={`p-2 rounded-xl shrink-0 ${config.bg}`}>
             <div className={config.text}>{icon}</div>
           </div>
         </div>
@@ -230,28 +233,31 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 function CustomLegend({ payload }: any) {
-  const visibleItems = payload?.filter((item: any) => 
+  const barItems = payload?.filter((item: any) =>
     !['metaAcumulada', 'recebidoAcumulado'].includes(item.dataKey)
   ) || [];
-  
+
   return (
-    <div className="flex flex-wrap justify-center gap-4 mt-4">
-      {visibleItems.map((entry: any, index: number) => (
-        <div key={index} className="flex items-center gap-2">
-          <div 
-            className="w-3 h-3 rounded-full" 
+    <div className="flex flex-wrap justify-center items-center gap-3 mt-4">
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Diário:</span>
+      {barItems.map((entry: any, index: number) => (
+        <div key={index} className="flex items-center gap-1.5">
+          <div
+            className="w-3 h-3 rounded-sm"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-sm text-muted-foreground">{entry.value}</span>
+          <span className="text-xs text-muted-foreground">{entry.value}</span>
         </div>
       ))}
-      <div className="flex items-center gap-2">
-        <div className="w-6 h-0.5 bg-blue-500" />
-        <span className="text-sm text-muted-foreground">Meta Acumulada</span>
+      <span className="text-muted-foreground/30 mx-1">|</span>
+      <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Acumulado:</span>
+      <div className="flex items-center gap-1.5">
+        <div className="w-5 h-0.5 bg-blue-500 rounded" />
+        <span className="text-xs text-muted-foreground">Meta</span>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="w-6 h-0.5 bg-emerald-500" style={{ borderStyle: 'dashed' }} />
-        <span className="text-sm text-muted-foreground">Recebido Acumulado</span>
+      <div className="flex items-center gap-1.5">
+        <div className="w-5 h-0.5 bg-emerald-500 rounded" style={{ borderTop: '2px dashed #10b981', background: 'none' }} />
+        <span className="text-xs text-muted-foreground">Recebido</span>
       </div>
     </div>
   );
@@ -259,7 +265,7 @@ function CustomLegend({ payload }: any) {
 
 export default function RevenueGoals() {
   usePageTitle("Metas de Receita");
-  useSetPageInfo("Revenue Goals", "Acompanhamento de recebimentos do mês");
+  useSetPageInfo("Metas de Receita", "Acompanhamento de recebimentos do mês");
   
   const hoje = new Date();
   const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
@@ -359,15 +365,70 @@ export default function RevenueGoals() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-[140px]" />
-          ))}
+        <div className="space-y-4">
+          <Skeleton className="h-[100px]" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-[120px]" />
+            ))}
+          </div>
         </div>
       ) : data ? (
         <>
-          {/* KPIs Principais */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {/* Atingimento da Meta — Hero section */}
+          <Card className="overflow-hidden border-primary/20 transition-all duration-200 hover:shadow-md">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-primary/10 opacity-50" />
+            <CardContent className="relative p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold">Atingimento da Meta</h3>
+                    {atingimentoMeta < 50 && (
+                      <Badge variant="destructive" className="text-xs">Abaixo da meta</Badge>
+                    )}
+                    {atingimentoMeta >= 50 && atingimentoMeta < 100 && (
+                      <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 border-amber-300 dark:border-amber-700">Em progresso</Badge>
+                    )}
+                    {atingimentoMeta >= 100 && (
+                      <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-300 dark:border-emerald-700">Meta atingida</Badge>
+                    )}
+                  </div>
+                  <div className="flex items-end gap-3">
+                    <span className={`text-4xl font-bold ${atingimentoMeta >= 100 ? 'text-emerald-600' : atingimentoMeta >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {atingimentoMeta.toFixed(1)}%
+                    </span>
+                    <span className="text-muted-foreground pb-1">do objetivo mensal</span>
+                  </div>
+                  <Progress
+                    value={Math.min(atingimentoMeta, 100)}
+                    className="h-3 mt-4"
+                  />
+                </div>
+                <div className="lg:w-px lg:h-20 lg:bg-border" />
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Falta Receber</p>
+                    <p className="text-xl font-bold text-amber-600">
+                      {formatCurrency(data.resumo.totalPendente + data.resumo.totalInadimplente)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Gap para Meta</p>
+                    <p className={`text-xl font-bold ${data.resumo.totalRecebido >= data.resumo.totalPrevisto ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {formatCurrency(Math.abs(data.resumo.totalPrevisto - data.resumo.totalRecebido))}
+                      {data.resumo.totalRecebido >= data.resumo.totalPrevisto && (
+                        <span className="text-sm font-normal text-emerald-600 ml-2">acima</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* KPIs Principais — Row 1: 3 large cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KPICard
               title="Total a Receber"
               value={formatCurrency(data.resumo.totalPrevisto)}
@@ -381,6 +442,7 @@ export default function RevenueGoals() {
               subtitle={`${data.resumo.quantidadeRecebidas} parcelas`}
               icon={<CheckCircle className="w-5 h-5" />}
               color="success"
+              progress={data.resumo.totalPrevisto > 0 ? (data.resumo.totalRecebido / data.resumo.totalPrevisto) * 100 : 0}
             />
             <KPICard
               title="Pendente"
@@ -389,30 +451,37 @@ export default function RevenueGoals() {
               icon={<Clock className="w-5 h-5" />}
               color="warning"
             />
+          </div>
+
+          {/* KPIs Secundários — Row 2: 3 compact cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <KPICard
               title="Inadimplente"
               value={formatCurrency(data.resumo.totalInadimplente)}
-              subtitle={`${data.resumo.quantidadeInadimplentes} parcelas`}
-              icon={<AlertTriangle className="w-5 h-5" />}
+              subtitle={`${data.resumo.quantidadeInadimplentes} parcelas · ${formatPercent(data.resumo.percentualInadimplencia)}`}
+              icon={<AlertTriangle className="w-4 h-4" />}
               trend={data.resumo.percentualInadimplencia > 10 ? 'down' : 'up'}
-              trendValue={formatPercent(data.resumo.percentualInadimplencia)}
+              trendValue={data.resumo.percentualInadimplencia > 10 ? 'Acima de 10%' : 'Controlado'}
               color="danger"
+              compact
             />
             <KPICard
               title="Projeção Final"
               value={formatCurrency(projecaoFinal)}
               subtitle={`${diasRestantes} dias restantes`}
-              icon={<Zap className="w-5 h-5" />}
+              icon={<Zap className="w-4 h-4" />}
               trend={projecaoFinal >= data.resumo.totalPrevisto ? 'up' : 'down'}
               trendValue={projecaoFinal >= data.resumo.totalPrevisto ? 'Acima da meta' : 'Abaixo da meta'}
               color={projecaoFinal >= data.resumo.totalPrevisto ? 'success' : 'warning'}
+              compact
             />
             <KPICard
               title="Média Diária"
               value={formatCurrency(mediaDiariaRecebida)}
               subtitle="Por dia com recebimento"
-              icon={<BarChart3 className="w-5 h-5" />}
+              icon={<BarChart3 className="w-4 h-4" />}
               color="default"
+              compact
             />
           </div>
 
@@ -427,6 +496,12 @@ export default function RevenueGoals() {
               { label: "Meta Máxima", target: 6 },
             ];
 
+            const getStatusBadge = (pct: number, target: number) => {
+              if (pct > target) return { label: 'CRÍTICO', className: 'bg-red-500 text-white hover:bg-red-500' };
+              if (pct > target * 0.75) return { label: 'ATENÇÃO', className: 'bg-amber-500 text-white hover:bg-amber-500' };
+              return { label: 'OK', className: 'bg-emerald-500 text-white hover:bg-emerald-500' };
+            };
+
             return (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {metas.map(({ label, target }) => {
@@ -434,11 +509,12 @@ export default function RevenueGoals() {
                   const progressoPct = totalPrev > 0 ? Math.min((pctInad / target) * 100, 100) : 0;
                   const dentroMeta = pctInad <= target;
                   const excedente = totalInad - limiteReais;
+                  const statusBadge = getStatusBadge(pctInad, target);
 
                   return (
                     <Card
                       key={target}
-                      className={`relative overflow-hidden border ${
+                      className={`relative overflow-hidden border transition-all duration-200 hover:shadow-md ${
                         dentroMeta
                           ? "border-emerald-200 dark:border-emerald-800"
                           : "border-red-200 dark:border-red-800"
@@ -454,7 +530,12 @@ export default function RevenueGoals() {
                       <CardContent className="relative p-5">
                         <div className="flex items-start justify-between gap-3 mb-4">
                           <div>
-                            <p className="text-sm text-muted-foreground font-medium">{label}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-muted-foreground font-medium">{label}</p>
+                              <Badge className={`text-[10px] px-1.5 py-0 ${statusBadge.className}`}>
+                                {statusBadge.label}
+                              </Badge>
+                            </div>
                             <div className="flex items-baseline gap-2 mt-1">
                               <span className="text-3xl font-bold">{pctInad.toFixed(2)}%</span>
                               <span className="text-sm text-muted-foreground">/ {target}%</span>
@@ -577,7 +658,7 @@ export default function RevenueGoals() {
                       tickLine={false}
                       axisLine={{ stroke: 'hsl(var(--border))' }}
                     />
-                    <YAxis 
+                    <YAxis
                       yAxisId="bars"
                       tickFormatter={(value) => {
                         if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
@@ -587,8 +668,9 @@ export default function RevenueGoals() {
                       tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       tickLine={false}
                       axisLine={false}
+                      label={{ value: 'R$ Diário', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
                     />
-                    <YAxis 
+                    <YAxis
                       yAxisId="lines"
                       orientation="right"
                       tickFormatter={(value) => {
@@ -599,6 +681,7 @@ export default function RevenueGoals() {
                       tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       tickLine={false}
                       axisLine={false}
+                      label={{ value: 'R$ Acumulado', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
                     />
                     <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }} />
                     <Legend content={<CustomLegend />} />
@@ -655,70 +738,70 @@ export default function RevenueGoals() {
             </CardContent>
           </Card>
 
-          {/* Cards de Métricas Detalhadas */}
+          {/* Ticket Médio */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-emerald-200 dark:border-emerald-900 overflow-hidden">
+            <Card className="border-emerald-200 dark:border-emerald-900 overflow-hidden transition-all duration-200 hover:shadow-md">
               <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
-                    <DollarSign className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                    <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground font-medium">Ticket Médio Recebido</p>
-                    <p className="text-2xl font-bold mt-0.5">
-                      {data.resumo.quantidadeRecebidas > 0 
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">Ticket Médio Recebido</p>
+                    <p className="text-xl font-bold mt-0.5">
+                      {data.resumo.quantidadeRecebidas > 0
                         ? formatCurrency(data.resumo.totalRecebido / data.resumo.quantidadeRecebidas)
                         : 'R$ 0'
                       }
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       Base: {data.resumo.quantidadeRecebidas} parcelas
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-            
-            <Card className="border-amber-200 dark:border-amber-900 overflow-hidden">
+
+            <Card className="border-amber-200 dark:border-amber-900 overflow-hidden transition-all duration-200 hover:shadow-md">
               <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-xl">
-                    <Clock className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                    <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground font-medium">Ticket Médio Pendente</p>
-                    <p className="text-2xl font-bold mt-0.5">
-                      {data.resumo.quantidadePendentes > 0 
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">Ticket Médio Pendente</p>
+                    <p className="text-xl font-bold mt-0.5">
+                      {data.resumo.quantidadePendentes > 0
                         ? formatCurrency(data.resumo.totalPendente / data.resumo.quantidadePendentes)
                         : 'R$ 0'
                       }
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       Base: {data.resumo.quantidadePendentes} parcelas
                     </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
-            
-            <Card className="border-red-200 dark:border-red-900 overflow-hidden">
+
+            <Card className="border-red-200 dark:border-red-900 overflow-hidden transition-all duration-200 hover:shadow-md">
               <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
-              <CardContent className="p-5">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-xl">
-                    <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground font-medium">Ticket Médio Inadimplente</p>
-                    <p className="text-2xl font-bold mt-0.5">
-                      {data.resumo.quantidadeInadimplentes > 0 
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium">Ticket Médio Inadimplente</p>
+                    <p className="text-xl font-bold mt-0.5">
+                      {data.resumo.quantidadeInadimplentes > 0
                         ? formatCurrency(data.resumo.totalInadimplente / data.resumo.quantidadeInadimplentes)
                         : 'R$ 0'
                       }
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
                       Base: {data.resumo.quantidadeInadimplentes} parcelas
                     </p>
                   </div>
@@ -727,39 +810,6 @@ export default function RevenueGoals() {
             </Card>
           </div>
 
-          {/* Resumo de Atingimento */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                <div className="flex-1">
-                  <h3 className="font-semibold mb-2">Atingimento da Meta</h3>
-                  <div className="flex items-end gap-3">
-                    <span className="text-4xl font-bold">{atingimentoMeta.toFixed(1)}%</span>
-                    <span className="text-muted-foreground pb-1">do objetivo mensal</span>
-                  </div>
-                  <Progress value={Math.min(atingimentoMeta, 100)} className="h-3 mt-4" />
-                </div>
-                <div className="lg:w-px lg:h-20 lg:bg-border" />
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Falta Receber</p>
-                    <p className="text-xl font-bold text-amber-600">
-                      {formatCurrency(data.resumo.totalPendente + data.resumo.totalInadimplente)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Gap para Meta</p>
-                    <p className={`text-xl font-bold ${data.resumo.totalRecebido >= data.resumo.totalPrevisto ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {formatCurrency(Math.abs(data.resumo.totalPrevisto - data.resumo.totalRecebido))}
-                      {data.resumo.totalRecebido >= data.resumo.totalPrevisto && (
-                        <span className="text-sm font-normal text-emerald-600 ml-2">acima</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </>
       ) : (
         <Card className="p-12">
