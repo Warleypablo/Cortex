@@ -41,6 +41,7 @@ interface DREData {
     resultado_liquido: Record<string, number>;
   };
   empresas: string[];
+  mesesComDados: string[];
 }
 
 // ---------- Constants ----------
@@ -180,6 +181,12 @@ export default function DRE() {
     },
   });
 
+  // Set of months that have actual data (to distinguish zero from no-data)
+  const mesesComDados = useMemo(() => {
+    if (!data?.mesesComDados) return new Set<string>();
+    return new Set(data.mesesComDados);
+  }, [data]);
+
   // Compute receita bruta total per month + accumulated for AV% base
   const receitaBrutaTotal = useMemo(() => {
     if (!data) return emptyMonthsRecord();
@@ -257,25 +264,29 @@ export default function DRE() {
   function renderValueCell(
     value: number,
     key: string,
-    extraClass?: string
+    extraClass?: string,
+    monthKey?: string
   ) {
+    // If monthKey provided and that month has no data, show dash instead of R$ 0
+    const isEmptyMonth = monthKey && !mesesComDados.has(monthKey) && value === 0;
     return (
       <td
         key={key}
-        className={`px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap ${getValueClass(value)} ${extraClass ?? ""}`}
+        className={`px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap ${isEmptyMonth ? "text-gray-300 dark:text-zinc-600" : getValueClass(value)} ${extraClass ?? ""}`}
       >
-        {formatCurrencyNoDecimals(value)}
+        {isEmptyMonth ? "—" : formatCurrencyNoDecimals(value)}
       </td>
     );
   }
 
-  function renderAVCell(value: number, base: number, key: string) {
+  function renderAVCell(value: number, base: number, key: string, monthKey?: string) {
+    const isEmptyMonth = monthKey && !mesesComDados.has(monthKey) && value === 0;
     return (
       <td
         key={key}
-        className="px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap text-gray-500 dark:text-zinc-400"
+        className={`px-2 py-1.5 text-right text-xs tabular-nums whitespace-nowrap ${isEmptyMonth ? "text-gray-300 dark:text-zinc-600" : "text-gray-500 dark:text-zinc-400"}`}
       >
-        {computeAVPercent(value, base)}
+        {isEmptyMonth ? "—" : computeAVPercent(value, base)}
       </td>
     );
   }
@@ -305,11 +316,11 @@ export default function DRE() {
         </td>
         {MONTH_KEYS.map((mk) => (
           <Fragment key={`${keyPrefix}-${linha.categoria_id}-${mk}-wrap`}>
-            {renderValueCell(linha.valores[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-${mk}`)}
-            {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`)}
+            {renderValueCell(linha.valores[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-${mk}`, undefined, mk)}
+            {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`, mk)}
           </Fragment>
         ))}
-        {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`)}
+        {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`, undefined)}
         {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
       </tr>
     );
@@ -406,11 +417,11 @@ export default function DRE() {
           </td>
           {MONTH_KEYS.map((mk) => (
             <Fragment key={`sub-${section.key}-${mk}-wrap`}>
-              {renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium")}
-              {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`)}
+              {renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium", mk)}
+              {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
             </Fragment>
           ))}
-          {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium")}
+          {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium", undefined)}
           {showAV && renderAVCell(subtotalAccum, receitaBrutaTotalAcum, `sub-${section.key}-av-acum`)}
         </tr>
       </Fragment>
@@ -439,16 +450,18 @@ export default function DRE() {
             {renderValueCell(
               subtotal[mk] ?? 0,
               `derived-${section.subtotalKey}-${mk}`,
-              `font-bold ${section.textClass ?? ""}`
+              `font-bold ${section.textClass ?? ""}`,
+              mk
             )}
             {showAV &&
-              renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`)}
+              renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`, mk)}
           </Fragment>
         ))}
         {renderValueCell(
           acum,
           `derived-${section.subtotalKey}-acum`,
-          `font-bold ${section.textClass ?? ""}`
+          `font-bold ${section.textClass ?? ""}`,
+          undefined
         )}
         {showAV &&
           renderAVCell(acum, receitaBrutaTotalAcum, `derived-${section.subtotalKey}-av-acum`)}
