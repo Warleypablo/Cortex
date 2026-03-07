@@ -34,13 +34,17 @@ interface DREData {
   parentCategories: Record<string, string>;
   subtotais: {
     receita_bruta_operacional: Record<string, number>;
+    deducoes_receita_bruta: Record<string, number>;
+    receita_operacional_liquida: Record<string, number>;
     receitas_nao_operacionais: Record<string, number>;
-    receita_bruta_total: Record<string, number>;
+    receita_liquida_total: Record<string, number>;
     custos_operacionais: Record<string, number>;
     lucro_bruto: Record<string, number>;
     despesas_operacionais: Record<string, number>;
     resultado_operacional: Record<string, number>;
     despesas_nao_operacionais: Record<string, number>;
+    lair: Record<string, number>;
+    ir_csll: Record<string, number>;
     resultado_liquido: Record<string, number>;
   };
   empresas: string[];
@@ -70,21 +74,29 @@ interface DREDerived {
 const DRE_SECTIONS: (DREGroup | DREDerived)[] = [
   // 1. Receita Bruta Operacional
   { key: "03", grupoFilter: "03", label: "(+) RECEITA BRUTA OPERACIONAL", subtotalKey: "receita_bruta_operacional" },
-  // 2. Receitas Não Operacionais
+  // 2. Deduções da Receita Bruta
+  { key: "DD", grupoFilter: "DD", label: "(-) DEDUÇÕES DA RECEITA BRUTA", subtotalKey: "deducoes_receita_bruta" },
+  // 3. Receita Operacional Líquida (derived)
+  { label: "(=) RECEITA OPERACIONAL LÍQUIDA", subtotalKey: "receita_operacional_liquida", bgClass: "bg-blue-50 dark:bg-blue-950/30", borderClass: "border-t-2" },
+  // 4. Receitas Não Operacionais
   { key: "04", grupoFilter: "04", label: "(+) RECEITAS NÃO OPERACIONAIS", subtotalKey: "receitas_nao_operacionais" },
-  // 3. Receita Bruta Total (derived)
-  { label: "(=) RECEITA BRUTA TOTAL", subtotalKey: "receita_bruta_total", bgClass: "bg-blue-50 dark:bg-blue-950/30", borderClass: "border-t-2" },
-  // 4. Custos Operacionais
+  // 5. Receita Líquida Total (derived)
+  { label: "(=) RECEITA LÍQUIDA TOTAL", subtotalKey: "receita_liquida_total", bgClass: "bg-blue-100 dark:bg-blue-950/50", borderClass: "border-t-2" },
+  // 6. Custos Operacionais
   { key: "05", grupoFilter: "05", label: "(-) CUSTOS OPERACIONAIS", subtotalKey: "custos_operacionais" },
-  // 5. Lucro Bruto (derived)
+  // 7. Lucro Bruto (derived)
   { label: "(=) LUCRO BRUTO", subtotalKey: "lucro_bruto", bgClass: "bg-green-50 dark:bg-green-950/30", borderClass: "border-t-2" },
-  // 6. Despesas Operacionais
+  // 8. Despesas Operacionais
   { key: "06", grupoFilter: "06", label: "(-) DESPESAS OPERACIONAIS", subtotalKey: "despesas_operacionais" },
-  // 7. Resultado Operacional (derived)
-  { label: "(=) RESULTADO OPERACIONAL", subtotalKey: "resultado_operacional", bgClass: "bg-yellow-50 dark:bg-yellow-950/30", borderClass: "border-t-2" },
-  // 8. Despesas Não Operacionais
+  // 9. Resultado Operacional (derived)
+  { label: "(=) RESULTADO OPERACIONAL (EBIT)", subtotalKey: "resultado_operacional", bgClass: "bg-yellow-50 dark:bg-yellow-950/30", borderClass: "border-t-2" },
+  // 10. Despesas Não Operacionais
   { key: "07", grupoFilter: "07", label: "(-) DESPESAS NÃO OPERACIONAIS", subtotalKey: "despesas_nao_operacionais" },
-  // 9. Resultado Líquido (derived)
+  // 11. LAIR (derived)
+  { label: "(=) RESULTADO ANTES DO IR/CSLL (LAIR)", subtotalKey: "lair", bgClass: "bg-amber-50 dark:bg-amber-950/30", borderClass: "border-t-2" },
+  // 12. IR e Contribuição Social
+  { key: "08", grupoFilter: "08", label: "(-) IR E CONTRIBUIÇÃO SOCIAL", subtotalKey: "ir_csll" },
+  // 13. Resultado Líquido (derived)
   { label: "(=) RESULTADO LÍQUIDO", subtotalKey: "resultado_liquido", bgClass: "bg-emerald-50 dark:bg-emerald-950/30", borderClass: "border-t-4", textClass: "text-lg" },
 ];
 
@@ -128,12 +140,13 @@ function computeVariation(current: number, previous: number): { pct: number; lab
 const RESULT_KEYS: Set<string> = new Set([
   "lucro_bruto",
   "resultado_operacional",
+  "lair",
   "resultado_liquido",
 ]);
 
 // Keys for rows that get sparklines
 const SPARKLINE_KEYS: Set<string> = new Set([
-  "receita_bruta_total",
+  "receita_operacional_liquida",
   "lucro_bruto",
   "resultado_liquido",
 ]);
@@ -246,7 +259,7 @@ export default function DRE() {
   const [ano, setAno] = useState<number>(currentYear);
   const [empresa, setEmpresa] = useState<string>("todas");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(["03", "04", "05", "06", "07"])
+    new Set(["03", "DD", "04", "05", "06", "07", "08"])
   );
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [showAV, setShowAV] = useState<boolean>(false);
@@ -267,15 +280,15 @@ export default function DRE() {
     return new Set(data.mesesComDados);
   }, [data]);
 
-  // Compute receita bruta total per month + accumulated for AV% base
-  const receitaBrutaTotal = useMemo(() => {
+  // AV% base: Receita Líquida Total (padrão contábil)
+  const receitaLiquidaTotal = useMemo(() => {
     if (!data) return emptyMonthsRecord();
-    return data.subtotais.receita_bruta_total;
+    return data.subtotais.receita_liquida_total;
   }, [data]);
 
-  const receitaBrutaTotalAcum = useMemo(() => {
+  const receitaLiquidaTotalAcum = useMemo(() => {
     if (!data) return 0;
-    return computeAccumulated(data.subtotais.receita_bruta_total);
+    return computeAccumulated(data.subtotais.receita_liquida_total);
   }, [data]);
 
   // Group lines by parent_key (XX.YY) for grouped view
@@ -443,12 +456,12 @@ export default function DRE() {
           return (
             <Fragment key={`${keyPrefix}-${linha.categoria_id}-${mk}-wrap`}>
               {renderValueCell(linha.valores[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-${mk}`, undefined, mk, false, prevVal)}
-              {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`, mk)}
+              {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaLiquidaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`, mk)}
             </Fragment>
           );
         })}
         {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`, undefined, undefined, true)}
-        {showAV && renderAVCell(acum, receitaBrutaTotalAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
+        {showAV && renderAVCell(acum, receitaLiquidaTotalAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
         <td className="px-1 py-1" />
       </tr>
     );
@@ -550,12 +563,12 @@ export default function DRE() {
             return (
               <Fragment key={`sub-${section.key}-${mk}-wrap`}>
                 {renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium", mk, false, prevVal)}
-                {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
+                {showAV && renderAVCell(subtotal[mk] ?? 0, receitaLiquidaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
               </Fragment>
             );
           })}
           {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium", undefined, true)}
-          {showAV && renderAVCell(subtotalAccum, receitaBrutaTotalAcum, `sub-${section.key}-av-acum`)}
+          {showAV && renderAVCell(subtotalAccum, receitaLiquidaTotalAcum, `sub-${section.key}-av-acum`)}
           <td className="px-1 py-1" />
         </tr>
       </Fragment>
@@ -595,7 +608,7 @@ export default function DRE() {
                 isResultRow
               )}
               {showAV &&
-                renderAVCell(subtotal[mk] ?? 0, receitaBrutaTotal[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`, mk)}
+                renderAVCell(subtotal[mk] ?? 0, receitaLiquidaTotal[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`, mk)}
             </Fragment>
           );
         })}
@@ -607,7 +620,7 @@ export default function DRE() {
           true
         )}
         {showAV &&
-          renderAVCell(acum, receitaBrutaTotalAcum, `derived-${section.subtotalKey}-av-acum`)}
+          renderAVCell(acum, receitaLiquidaTotalAcum, `derived-${section.subtotalKey}-av-acum`)}
         {SPARKLINE_KEYS.has(section.subtotalKey) ? (
           <Sparkline valores={subtotal} mesesComDados={mesesComDados} />
         ) : (
@@ -749,6 +762,7 @@ export default function DRE() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-gray-900 dark:text-white">
             Demonstração do Resultado do Exercício — {ano}
+            <span className="text-xs font-normal text-gray-500 dark:text-zinc-400 ml-2">(Regime de Caixa)</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
