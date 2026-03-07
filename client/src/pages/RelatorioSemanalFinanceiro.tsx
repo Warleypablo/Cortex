@@ -33,6 +33,8 @@ import {
   PieChart as PieChartIcon,
   Printer,
   Wallet,
+  ArrowUpDown,
+  Eye,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -238,6 +240,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function RelatorioSemanalFinanceiro() {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [inadimSort, setInadimSort] = useState<{ key: 'valorTotal' | 'quantidadeParcelas' | 'diasAtrasoMax'; dir: 'asc' | 'desc' }>({ key: 'valorTotal', dir: 'desc' });
   const { toast } = useToast();
 
   // Calculate week boundaries
@@ -311,6 +314,19 @@ export default function RelatorioSemanalFinanceiro() {
   const fluxoDados = currentFluxoResponse?.dados ?? [];
   const prevFluxoDados = prevFluxoResponse?.dados ?? [];
   const inadimClientes = inadimClientesData?.clientes ?? [];
+
+  const sortedInadimClientes = useMemo(() => {
+    return [...inadimClientes].sort((a, b) => {
+      const mult = inadimSort.dir === 'asc' ? 1 : -1;
+      return (a[inadimSort.key] - b[inadimSort.key]) * mult;
+    });
+  }, [inadimClientes, inadimSort]);
+
+  const toggleInadimSort = (key: typeof inadimSort.key) => {
+    setInadimSort(prev =>
+      prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }
+    );
+  };
 
   // Compute weekly financial metrics
   const weekMetrics = useMemo(() => {
@@ -803,14 +819,29 @@ export default function RelatorioSemanalFinanceiro() {
                     <TableHead className="text-xs w-8">#</TableHead>
                     <TableHead className="text-xs">Cliente</TableHead>
                     <TableHead className="text-xs">CNPJ</TableHead>
-                    <TableHead className="text-xs text-right">Valor Total</TableHead>
-                    <TableHead className="text-xs text-center">Parcelas</TableHead>
-                    <TableHead className="text-xs text-center">Dias Atraso</TableHead>
+                    <TableHead
+                      className="text-xs text-right cursor-pointer hover:text-foreground select-none"
+                      onClick={() => toggleInadimSort('valorTotal')}
+                    >
+                      <span className="inline-flex items-center gap-1">Valor Total <ArrowUpDown className="h-3 w-3" /></span>
+                    </TableHead>
+                    <TableHead
+                      className="text-xs text-center cursor-pointer hover:text-foreground select-none"
+                      onClick={() => toggleInadimSort('quantidadeParcelas')}
+                    >
+                      <span className="inline-flex items-center gap-1">Parcelas <ArrowUpDown className="h-3 w-3" /></span>
+                    </TableHead>
+                    <TableHead
+                      className="text-xs text-center cursor-pointer hover:text-foreground select-none"
+                      onClick={() => toggleInadimSort('diasAtrasoMax')}
+                    >
+                      <span className="inline-flex items-center gap-1">Dias Atraso <ArrowUpDown className="h-3 w-3" /></span>
+                    </TableHead>
                     <TableHead className="text-xs">Responsável</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inadimClientes.map((c, i) => (
+                  {sortedInadimClientes.map((c, i) => (
                     <TableRow key={c.idCliente}>
                       <TableCell className="text-xs py-2 text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="text-xs py-2 font-medium">{c.nomeCliente}</TableCell>
