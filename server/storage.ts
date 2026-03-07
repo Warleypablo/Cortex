@@ -3324,12 +3324,29 @@ export class DbStorage implements IStorage {
       ORDER BY balance::numeric DESC
     `);
     
-    return (result.rows as any[]).map((row: any) => ({
+    const contas = (result.rows as any[]).map((row: any) => ({
       id: String(row.uuid || ''),
-      nome: row.nmbanco || 'Conta Desconhecida',
+      nome: (row.nmbanco || 'Conta Desconhecida').replace(/\s+/g, ' ').trim(),
       saldo: parseFloat(row.balance || '0'),
       empresa: row.empresa || '',
     }));
+
+    // Detect duplicate names and add suffix to differentiate
+    const nameCount = new Map<string, number>();
+    for (const c of contas) {
+      nameCount.set(c.nome, (nameCount.get(c.nome) || 0) + 1);
+    }
+    const nameIndex = new Map<string, number>();
+    for (const c of contas) {
+      if ((nameCount.get(c.nome) || 0) > 1) {
+        const idx = (nameIndex.get(c.nome) || 0) + 1;
+        nameIndex.set(c.nome, idx);
+        c.nome = c.empresa ? `${c.nome} (${c.empresa})` : `${c.nome} ${idx}`;
+      }
+    }
+
+    // Normalize similar names: "Itaú (Aplicações)" and "Itaú Aplicações" → keep as-is but normalize parens
+    return contas;
   }
 
   async getFluxoCaixaDiarioCompleto(dataInicio: string, dataFim: string): Promise<import("@shared/schema").FluxoCaixaDiarioCompletoResponse> {
