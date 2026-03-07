@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-03-07 | feat(juridico): add legal knowledge markdowns for AI assistant
+
+**O que foi feito:**
+- Criado `agents/legal-cobranca.md` com procedimentos de cobranca, escalonamento por dias de atraso, juros/multa, prescricao
+- Criado `agents/legal-contratos.md` com tipos de contrato, clausulas essenciais (SLA, NDA, PI, LGPD), checklist de analise
+- Criado `agents/legal-trabalhista.md` com modalidades CLT/PJ/estagio, tipos de rescisao, documentacao e prazos
+
+**Por que:**
+- Base de conhecimento necessaria para o assistente juridico com IA que sera integrado ao Cortex
+- Markdowns servem como contexto de sistema (system prompt) para orientar respostas juridicas
+
+**Arquivos alterados:**
+- `agents/legal-cobranca.md` - Novo arquivo: conhecimento sobre cobranca e inadimplencia empresarial
+- `agents/legal-contratos.md` - Novo arquivo: conhecimento sobre contratos empresariais
+- `agents/legal-trabalhista.md` - Novo arquivo: conhecimento sobre direito trabalhista brasileiro
+
+**Impacto arquitetural:** Nenhum. Arquivos de conhecimento (markdown) sem impacto em codigo.
+
+---
+
 ## 2026-03-07 | feat(dre): reclassifica deduções e adiciona receita líquida, LAIR, IR/CSLL no backend
 
 **O que foi feito:**
