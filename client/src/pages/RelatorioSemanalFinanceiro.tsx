@@ -3,6 +3,7 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip as TooltipUI, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -160,6 +161,7 @@ const KpiCard = ({
   delta,
   deltaFmt,
   invertColors,
+  deltaTooltip,
 }: {
   title: string;
   value: string;
@@ -169,6 +171,7 @@ const KpiCard = ({
   delta?: number;
   deltaFmt?: "number" | "currency" | "percent";
   invertColors?: boolean;
+  deltaTooltip?: string;
 }) => (
   <Card className="relative border-border/50 hover:border-border transition-all hover:shadow-lg">
     <CardContent className="p-4">
@@ -189,7 +192,22 @@ const KpiCard = ({
         )}
         {delta !== undefined && (
           <span className="shrink-0">
-            <VariationBadge value={delta} fmt={deltaFmt || "number"} invertColors={invertColors} />
+            {deltaTooltip ? (
+              <TooltipProvider delayDuration={200}>
+                <TooltipUI>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help">
+                      <VariationBadge value={delta} fmt={deltaFmt || "number"} invertColors={invertColors} />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    {deltaTooltip}
+                  </TooltipContent>
+                </TooltipUI>
+              </TooltipProvider>
+            ) : (
+              <VariationBadge value={delta} fmt={deltaFmt || "number"} invertColors={invertColors} />
+            )}
           </span>
         )}
       </div>
@@ -242,6 +260,7 @@ export default function RelatorioSemanalFinanceiro() {
     }, [weekOffset]);
 
   const weekLabel = `${format(weekStartDate, "dd/MM", { locale: ptBR })} - ${format(weekEndDate, "dd/MM/yyyy", { locale: ptBR })}`;
+  const prevWeekLabel = `${format(new Date(prevWeekStart + 'T00:00:00'), "dd/MM", { locale: ptBR })} - ${format(new Date(prevWeekEnd + 'T00:00:00'), "dd/MM", { locale: ptBR })}`;
   const weekNumber = getISOWeek(weekStartDate);
 
   // Fetch current week cash flow
@@ -608,6 +627,7 @@ export default function RelatorioSemanalFinanceiro() {
           delta={comparison?.entradasDelta}
           deltaFmt="currency"
           invertColors={true}
+          deltaTooltip={comparison ? `vs. semana anterior (${prevWeekLabel})` : undefined}
         />
         <KpiCard
           title="Total Saídas"
@@ -618,6 +638,7 @@ export default function RelatorioSemanalFinanceiro() {
           delta={comparison?.saidasDelta}
           deltaFmt="currency"
           invertColors={false}
+          deltaTooltip={comparison ? `vs. semana anterior (${prevWeekLabel})` : undefined}
         />
         <KpiCard
           title="Resultado da Semana"
@@ -628,6 +649,7 @@ export default function RelatorioSemanalFinanceiro() {
           delta={comparison?.resultadoDelta}
           deltaFmt="currency"
           invertColors={true}
+          deltaTooltip={comparison ? `vs. semana anterior (${prevWeekLabel})` : undefined}
         />
         <KpiCard
           title="Inadimplência Total"
@@ -638,6 +660,7 @@ export default function RelatorioSemanalFinanceiro() {
           delta={inadimComparison?.totalDelta}
           deltaFmt="currency"
           invertColors={false}
+          deltaTooltip={inadimComparison ? `vs. semana anterior (${prevWeekLabel})` : undefined}
         />
         <KpiCard
           title="Clientes Inadimplentes"
@@ -648,6 +671,7 @@ export default function RelatorioSemanalFinanceiro() {
           delta={inadimComparison?.clientesDelta}
           deltaFmt="number"
           invertColors={false}
+          deltaTooltip={inadimComparison ? `vs. semana anterior (${prevWeekLabel})` : undefined}
         />
       </div>
 
