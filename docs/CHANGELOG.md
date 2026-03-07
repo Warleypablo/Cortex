@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-03-06 | feat(metas): overhaul completo da página Metas de Receita
+
+**O que foi feito:**
+- [ALTA] Atingimento da Meta movido para hero section no topo com badges de status (Abaixo/Em progresso/Meta atingida)
+- [ALTA] KPI cards reorganizados: 3 grandes (Total a Receber, Recebido, Pendente) + 3 compactos (Inadimplente, Projeção, Média Diária)
+- [ALTA] Sistema de cores semântico padronizado: verde=recebido, amarelo=pendente, vermelho=inadimplente, azul=projeções
+- [MÉDIA] Badges CRÍTICO/ATENÇÃO/OK nos cards de inadimplência baseados em thresholds
+- [MÉDIA] Labels nos eixos Y do gráfico (R$ Diário / R$ Acumulado) e legenda separada por tipo
+- [BAIXA] Hover micro-interactions (shadow, scale) em todos os cards
+- [BAIXA] Renomeado "Revenue Goals" → "Metas de Receita" no nav e page info
+- Ticket médio: ícones menores (w-5), padding compacto, fonte ajustada
+
+**Arquivos alterados:**
+- `client/src/pages/RevenueGoals.tsx` - layout completo, KPICard compact prop, hero section, status badges, chart labels
+- `shared/nav-config.ts` - título e label de permissão renomeados
+
+**Impacto arquitetural:** Nenhum — apenas frontend, sem alteração de API
+
+---
+
 ## 2026-03-06 | feat(dfc): exportação CSV/Excel nos modos Diário e Mensal
 
 **O que foi feito:**
