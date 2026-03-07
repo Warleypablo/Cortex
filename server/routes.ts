@@ -4240,17 +4240,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/fluxo-caixa/contas-financeiras", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT COALESCE(nome_conta_financeira, 'Não informado') as nome
+        FROM "Conta Azul".caz_parcelas
+        WHERE nome_conta_financeira IS NOT NULL AND nome_conta_financeira != ''
+        ORDER BY nome
+      `);
+      res.json(result.rows.map((r: any) => r.nome as string));
+    } catch (error) {
+      console.error("[api] Error fetching contas financeiras:", error);
+      res.status(500).json({ error: "Failed to fetch contas financeiras" });
+    }
+  });
+
   app.get("/api/fluxo-caixa/diario-completo", async (req, res) => {
     try {
       const dataInicio = req.query.dataInicio as string;
       const dataFim = req.query.dataFim as string;
       const classificacao = req.query.classificacao as string | undefined;
+      const contaFinanceira = req.query.contaFinanceira as string | undefined;
 
       if (!dataInicio || !dataFim) {
         return res.status(400).json({ error: "dataInicio and dataFim are required" });
       }
 
       // Se tem filtro de classificação, calcula fluxo filtrado por clientes dessa classificação
+      // Sanitize contaFinanceira filter (escape single quotes for raw SQL)
+      const contasFinanceiras = contaFinanceira
+        ? contaFinanceira.split(',').map(c => c.trim()).filter(Boolean)
+        : [];
+      const contaFinanceiraFilter = contasFinanceiras.length > 0
+        ? `AND nome_conta_financeira IN (${contasFinanceiras.map(c => `'${c.replace(/'/g, "''")}'`).join(',')})`
+        : '';
+      const contaFinanceiraFilterP = contasFinanceiras.length > 0
+        ? `AND p.nome_conta_financeira IN (${contasFinanceiras.map(c => `'${c.replace(/'/g, "''")}'`).join(',')})`
+        : '';
+
       const validClassificacoes = ['em_dia', 'receoso', 'duvidoso'];
       const classificacoes = classificacao
         ? classificacao.split(',').filter(c => validClassificacoes.includes(c))
@@ -4298,6 +4325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             WHERE p.tipo_evento = 'RECEITA'
               AND p.status NOT IN ('PERDIDO')
               AND p.data_vencimento::date BETWEEN '${dataInicio}'::date AND '${dataFim}'::date
+              ${contaFinanceiraFilterP}
             GROUP BY p.data_vencimento::date
           ),
           despesas_todas AS (
@@ -4308,6 +4336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             WHERE tipo_evento = 'DESPESA'
               AND status NOT IN ('PERDIDO')
               AND data_vencimento::date BETWEEN '${dataInicio}'::date AND '${dataFim}'::date
+              ${contaFinanceiraFilter}
             GROUP BY data_vencimento::date
           )
           SELECT
@@ -4383,7 +4412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ hasSnapshot: false, snapshotDate: null, dados });
       }
 
-      const fluxo = await storage.getFluxoCaixaDiarioCompleto(dataInicio, dataFim);
+      const fluxo = await storage.getFluxoCaixaDiarioCompleto(dataInicio, dataFim, contasFinanceiras.length > 0 ? contasFinanceiras : undefined);
 
       // Reancora o saldo acumulado no saldo real de hoje (caz_bancos)
       const saldoBancos = await storage.getSaldoAtualBancos();
