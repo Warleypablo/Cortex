@@ -7,6 +7,8 @@ import {
   getStats,
   getConfiguracoes,
   updateConfiguracao,
+  getPipelineJuridico,
+  updatePipelineJuridico,
 } from "../services/turbozap";
 
 export function registerTurboZapRoutes(app: Express) {
@@ -113,6 +115,44 @@ export function registerTurboZapRoutes(app: Express) {
     } catch (error: any) {
       console.error("[turbozap] Error updating configuracao:", error);
       res.status(500).json({ message: error.message || "Erro ao atualizar configuração" });
+    }
+  });
+
+  // GET /api/turbozap/pipeline-juridico - Lista pipeline jurídico
+  app.get("/api/turbozap/pipeline-juridico", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+
+      const pipeline = await getPipelineJuridico();
+      res.json(pipeline);
+    } catch (error) {
+      console.error("[turbozap] Error fetching pipeline juridico:", error);
+      res.status(500).json({ message: "Erro ao buscar pipeline jurídico" });
+    }
+  });
+
+  // PUT /api/turbozap/pipeline-juridico/:id - Atualizar registro do pipeline
+  app.put("/api/turbozap/pipeline-juridico/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+
+      const user = req.user as any;
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
+
+      const { etapa, protesto_efetivado, negativacao_efetivada, observacoes } = req.body;
+
+      const updated = await updatePipelineJuridico(
+        id,
+        { etapa, protesto_efetivado, negativacao_efetivada, observacoes },
+        user?.email || user?.name || "sistema",
+      );
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[turbozap] Error updating pipeline juridico:", error);
+      res.status(500).json({ message: error.message || "Erro ao atualizar pipeline" });
     }
   });
 }
