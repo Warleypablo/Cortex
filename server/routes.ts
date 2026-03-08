@@ -29,6 +29,7 @@ import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
 import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
 import { registerJuridicoAssistenteRoutes } from "./routes/juridico-assistente";
+import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -15018,6 +15019,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Jurídico Assistente IA - registered from separate file
   registerJuridicoAssistenteRoutes(app);
+
+  // Jurídico Relatórios - registered from separate file
+  registerJuridicoRelatoriosRoutes(app);
 
   // ============================================
   // Sugestões API
