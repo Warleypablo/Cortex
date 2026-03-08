@@ -57,12 +57,21 @@ interface SquadResumo {
   quantidadeContratos: number;
 }
 
+interface DespesasMensais {
+  [mes: string]: {
+    salarios: number;
+    cxcs: number;
+    freelancers: number;
+  };
+}
+
 interface BulkResponse {
   ano: number;
   squad: string;
   squads: string[];
   meses: MonthlyData[];
   resumoPorSquad?: SquadResumo[];
+  despesasMensais?: DespesasMensais;
 }
 
 const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
@@ -201,6 +210,18 @@ export default function ContribuicaoSquad() {
   const totalReceitaBruta = useMemo(() => {
     return totalReceitas;
   }, [totalReceitas]);
+
+  // Total de despesas anuais (salários + CXCS + freelancers + impostos)
+  const totalDespesasAnual = useMemo(() => {
+    if (!bulkData?.despesasMensais) return totalReceitas * taxaDecimal;
+    let total = 0;
+    for (const col of hierarchicalData.monthColumns) {
+      const desp = bulkData.despesasMensais[col.mes];
+      const impostos = col.receitaTotal * taxaDecimal;
+      total += impostos + (desp?.salarios || 0) + (desp?.cxcs || 0) + (desp?.freelancers || 0);
+    }
+    return total;
+  }, [bulkData, hierarchicalData, taxaDecimal, totalReceitas]);
 
   // Ranking de squads
   const squadRanking = useMemo(() => {
@@ -348,7 +369,7 @@ export default function ContribuicaoSquad() {
                     <th className="text-left py-2 pr-4">#</th>
                     <th className="text-left py-2 pr-4">Squad</th>
                     <th className="text-right py-2 px-3">Receita Bruta</th>
-                    <th className="text-right py-2 px-3">Impostos ({taxaImposto}%)</th>
+                    <th className="text-right py-2 px-3">Despesas</th>
                     <th className="text-right py-2 px-3">Resultado Líquido</th>
                     <th className="text-right py-2 px-3">Contribuição</th>
                     <th className="text-center py-2 px-3 w-24">Tendência</th>
@@ -379,8 +400,8 @@ export default function ContribuicaoSquad() {
                   <tr className="border-t-2 font-bold">
                     <td className="py-2 pr-4" colSpan={2}>Total</td>
                     <td className="py-2 px-3 text-right">{formatCurrencyNoDecimals(totalReceitas)}</td>
-                    <td className="py-2 px-3 text-right text-purple-500">{formatCurrencyNoDecimals(totalReceitas * taxaDecimal)}</td>
-                    <td className="py-2 px-3 text-right">{formatCurrencyNoDecimals(totalReceitas * (1 - taxaDecimal))}</td>
+                    <td className="py-2 px-3 text-right text-red-500">{formatCurrencyNoDecimals(totalDespesasAnual)}</td>
+                    <td className="py-2 px-3 text-right">{formatCurrencyNoDecimals(totalReceitas - totalDespesasAnual)}</td>
                     <td className="py-2 px-3 text-right">100%</td>
                     <td></td>
                   </tr>
@@ -652,7 +673,7 @@ export default function ContribuicaoSquad() {
                     );
                   })}
 
-                  {/* DESPESAS - Seção expandível com Impostos */}
+                  {/* DESPESAS - Seção expandível com Impostos, Salários, CXCS, Freelancers */}
                   <div
                     className="grid border-b-2 border-red-500/50 bg-red-500/10 cursor-pointer hover:bg-red-500/15 transition-colors mt-2"
                     style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
@@ -668,28 +689,93 @@ export default function ContribuicaoSquad() {
                       <CirclePlus className="h-3.5 w-3.5 rotate-45" />
                       Despesas
                     </div>
-                    {hierarchicalData.monthColumns.map((col) => (
-                      <div key={col.mes} className="px-2 py-1.5 text-right text-sm font-bold text-red-500">
-                        {col.receitaTotal > 0 ? formatCurrencyNoDecimals(col.receitaTotal * taxaDecimal) : "-"}
-                      </div>
-                    ))}
+                    {hierarchicalData.monthColumns.map((col) => {
+                      const desp = bulkData?.despesasMensais?.[col.mes];
+                      const impostos = col.receitaTotal * taxaDecimal;
+                      const totalDesp = impostos + (desp?.salarios || 0) + (desp?.cxcs || 0) + (desp?.freelancers || 0);
+                      return (
+                        <div key={col.mes} className="px-2 py-1.5 text-right text-sm font-bold text-red-500">
+                          {totalDesp > 0 ? formatCurrencyNoDecimals(totalDesp) : "-"}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {expanded.has("DESPESAS") && (
-                    <div
-                      className="grid border-b border-border/50"
-                      style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
-                    >
-                      <div className="px-2 py-1 flex items-center gap-1.5 sticky left-0 z-10 bg-background pl-8">
-                        <DollarSign className="h-3 w-3 text-muted-foreground" />
-                        <span className="text-xs">Impostos ({taxaImposto}%)</span>
-                      </div>
-                      {hierarchicalData.monthColumns.map((col) => (
-                        <div key={col.mes} className="px-2 py-1 text-right text-xs">
-                          {col.receitaTotal > 0 ? formatCurrencyNoDecimals(col.receitaTotal * taxaDecimal) : "-"}
+                    <>
+                      {/* Impostos */}
+                      <div
+                        className="grid border-b border-border/50"
+                        style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                      >
+                        <div className="px-2 py-1 flex items-center gap-1.5 sticky left-0 z-10 bg-background pl-8">
+                          <DollarSign className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs">Impostos ({taxaImposto}%)</span>
                         </div>
-                      ))}
-                    </div>
+                        {hierarchicalData.monthColumns.map((col) => (
+                          <div key={col.mes} className="px-2 py-1 text-right text-xs">
+                            {col.receitaTotal > 0 ? formatCurrencyNoDecimals(col.receitaTotal * taxaDecimal) : "-"}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Salários */}
+                      <div
+                        className="grid border-b border-border/50"
+                        style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                      >
+                        <div className="px-2 py-1 flex items-center gap-1.5 sticky left-0 z-10 bg-background pl-8">
+                          <Users className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs">Salários</span>
+                        </div>
+                        {hierarchicalData.monthColumns.map((col) => {
+                          const val = bulkData?.despesasMensais?.[col.mes]?.salarios || 0;
+                          return (
+                            <div key={col.mes} className="px-2 py-1 text-right text-xs">
+                              {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* CXCS */}
+                      <div
+                        className="grid border-b border-border/50"
+                        style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                      >
+                        <div className="px-2 py-1 flex items-center gap-1.5 sticky left-0 z-10 bg-background pl-8">
+                          <Users className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs">CXCS (Média)</span>
+                        </div>
+                        {hierarchicalData.monthColumns.map((col) => {
+                          const val = bulkData?.despesasMensais?.[col.mes]?.cxcs || 0;
+                          return (
+                            <div key={col.mes} className="px-2 py-1 text-right text-xs">
+                              {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Freelancers */}
+                      <div
+                        className="grid border-b border-border/50"
+                        style={{ gridTemplateColumns: `220px repeat(${hierarchicalData.monthColumns.length}, 1fr)` }}
+                      >
+                        <div className="px-2 py-1 flex items-center gap-1.5 sticky left-0 z-10 bg-background pl-8">
+                          <Users className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs">Freelancers</span>
+                        </div>
+                        {hierarchicalData.monthColumns.map((col) => {
+                          const val = bulkData?.despesasMensais?.[col.mes]?.freelancers || 0;
+                          return (
+                            <div key={col.mes} className="px-2 py-1 text-right text-xs">
+                              {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
 
                   {/* RESULTADO LÍQUIDO = Receitas - Despesas */}
@@ -702,11 +788,20 @@ export default function ContribuicaoSquad() {
                       <TrendingUp className="h-3.5 w-3.5" />
                       Resultado
                     </div>
-                    {hierarchicalData.monthColumns.map((col) => (
-                      <div key={col.mes} className="px-2 py-1.5 text-right text-sm font-bold text-blue-500">
-                        {col.receitaTotal > 0 ? formatCurrencyNoDecimals(col.receitaTotal * (1 - taxaDecimal)) : "-"}
-                      </div>
-                    ))}
+                    {hierarchicalData.monthColumns.map((col) => {
+                      const desp = bulkData?.despesasMensais?.[col.mes];
+                      const impostos = col.receitaTotal * taxaDecimal;
+                      const totalDesp = impostos + (desp?.salarios || 0) + (desp?.cxcs || 0) + (desp?.freelancers || 0);
+                      const resultado = col.receitaTotal - totalDesp;
+                      return (
+                        <div key={col.mes} className={cn(
+                          "px-2 py-1.5 text-right text-sm font-bold",
+                          resultado >= 0 ? "text-blue-500" : "text-red-500"
+                        )}>
+                          {col.receitaTotal > 0 ? formatCurrencyNoDecimals(resultado) : "-"}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* CONTRIBUIÇÃO PERCENTUAL */}
