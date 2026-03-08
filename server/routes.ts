@@ -10287,6 +10287,124 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         });
       }
       
+      // ──── DESPESAS: Salários, CXCS, Freelancers ────────────────────────────
+      // Salários ativos do squad (rh_pessoal)
+      const salarioResult = await db.execute(sql`
+        WITH salarios_normalizados AS (
+          SELECT
+            rp.id,
+            rp.nome as colaborador_nome,
+            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
+            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
+            CASE
+              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
+              WHEN rp.salario::text LIKE '%,%' THEN
+                NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
+              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
+                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
+              ELSE
+                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
+            END as salario
+          FROM "Inhire".rh_pessoal rp
+        )
+        SELECT id, colaborador_nome, salario, squad
+        FROM salarios_normalizados
+        WHERE status_norm = 'ativo'
+          AND salario IS NOT NULL AND salario > 0
+          AND (
+            ${squadFilter}::text IS NULL
+            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squadFilter}
+            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter || ''}, '^[^a-zA-Z]+', '', 'g')
+            OR ${squadFilter || ''} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+          )
+        ORDER BY squad, colaborador_nome
+      `);
+
+      let salarioTotal = 0;
+      const salariosPorColab = new Map<number, { nome: string; salario: number }>();
+      for (const row of salarioResult.rows as any[]) {
+        const id = Number(row.id);
+        if (!salariosPorColab.has(id)) {
+          const sal = Number(row.salario) || 0;
+          salariosPorColab.set(id, { nome: row.colaborador_nome, salario: sal });
+          salarioTotal += sal;
+        }
+      }
+
+      // CXCS (média salarial dos CXCS ativos)
+      const cxcsResult = await db.execute(sql`
+        SELECT AVG(salario::numeric) as media_cxcs
+        FROM "Inhire".rh_pessoal
+        WHERE UPPER(TRIM(cargo)) = 'CXCS'
+          AND UPPER(TRIM(status)) = 'ATIVO'
+          AND salario IS NOT NULL AND salario::numeric > 0
+      `);
+      const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
+
+      // Freelancers agrupados por mês
+      const freelaResult = await db.execute(sql`
+        WITH best_match AS (
+          SELECT DISTINCT ON (LOWER(TRIM(fn.responsavel)))
+            LOWER(TRIM(fn.responsavel)) as responsavel_key,
+            rp.squad as rh_squad
+          FROM (SELECT DISTINCT responsavel FROM "Clickup".cup_freelas WHERE responsavel IS NOT NULL) fn
+          LEFT JOIN "Inhire".rh_pessoal rp ON (
+            LOWER(TRIM(fn.responsavel)) = LOWER(TRIM(rp.nome))
+            OR LOWER(TRIM(fn.responsavel)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2))
+            OR LOWER(TRIM(rp.nome)) LIKE LOWER(TRIM(fn.responsavel)) || '%'
+          )
+          ORDER BY LOWER(TRIM(fn.responsavel)),
+            CASE
+              WHEN rp.id IS NULL THEN 99
+              WHEN LOWER(TRIM(fn.responsavel)) = LOWER(TRIM(rp.nome)) THEN 1
+              WHEN LOWER(TRIM(fn.responsavel)) = LOWER(SPLIT_PART(TRIM(rp.nome), ' ', 1) || ' ' || SPLIT_PART(TRIM(rp.nome), ' ', 2)) THEN 2
+              ELSE 3
+            END,
+            rp.id NULLS LAST
+        )
+        SELECT
+          TO_CHAR(f.data_pagamento, 'YYYY-MM') as mes,
+          f.responsavel,
+          COALESCE(
+            f.valor_projeto::numeric,
+            NULLIF(REPLACE(REPLACE(REGEXP_REPLACE(f.custom_fields->>'Valor', '[^0-9,.]', '', 'g'), '.', ''), ',', '.'), '')::numeric,
+            0
+          ) as valor,
+          COALESCE(NULLIF(TRIM(bm.rh_squad), ''), 'Sem Squad') as squad
+        FROM "Clickup".cup_freelas f
+        LEFT JOIN best_match bm ON LOWER(TRIM(f.responsavel)) = bm.responsavel_key
+        WHERE f.data_pagamento >= ${dataInicio}::date
+          AND f.data_pagamento < (${dataFim}::date + interval '1 day')
+          AND (
+            ${squadFilter}::text IS NULL
+            OR COALESCE(NULLIF(TRIM(bm.rh_squad), ''), 'Sem Squad') = ${squadFilter}
+            OR COALESCE(NULLIF(TRIM(bm.rh_squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter || ''}, '^[^a-zA-Z]+', '', 'g')
+            OR ${squadFilter || ''} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(bm.rh_squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+          )
+        ORDER BY mes, valor DESC
+      `);
+
+      // Agrupar freelancers por mês
+      const freelaPorMes = new Map<string, number>();
+      let freelaTotal = 0;
+      for (const row of freelaResult.rows as any[]) {
+        const mes = row.mes as string;
+        const valor = Number(row.valor) || 0;
+        freelaPorMes.set(mes, (freelaPorMes.get(mes) || 0) + valor);
+        freelaTotal += valor;
+      }
+
+      // Montar objeto de despesas mensais
+      const despesasMensais: Record<string, { salarios: number; cxcs: number; freelancers: number }> = {};
+      for (let m = 0; m < 12; m++) {
+        const mesKey = `${ano}-${String(m + 1).padStart(2, '0')}`;
+        despesasMensais[mesKey] = {
+          salarios: salarioTotal,
+          cxcs: mediaCxcs,
+          freelancers: freelaPorMes.get(mesKey) || 0,
+        };
+      }
+
       // Agregar resumo por squad a partir dos dados brutos
       const squadSummaryMap = new Map<string, { total: number; porMes: number[]; contratos: Set<string> }>();
       for (const row of result.rows as any[]) {
@@ -10319,7 +10437,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         squad: squadFilter || 'todos',
         squads: Array.from(squadsSet).sort(),
         meses: monthlyData,
-        resumoPorSquad
+        resumoPorSquad,
+        despesasMensais
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
