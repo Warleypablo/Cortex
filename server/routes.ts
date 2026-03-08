@@ -10108,8 +10108,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           p.id as parcela_id,
           (p.valor_pago::numeric * COALESCE(cu.peso, 1)) as valor,
           p.data_quitacao,
-          p.link_nfse,
-          p.num_nfse,
           p.url_cobranca
         FROM "Conta Azul".caz_parcelas p
         LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
@@ -10201,8 +10199,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           id: row.parcela_id,
           valor,
           dataQuitacao: row.data_quitacao,
-          linkNfse: row.link_nfse,
-          numNfse: row.num_nfse,
+          linkNfse: null,
+          numNfse: null,
           urlCobranca: row.url_cobranca,
           clienteNome,
           servicoNome,
