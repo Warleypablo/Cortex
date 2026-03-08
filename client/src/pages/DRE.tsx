@@ -367,15 +367,16 @@ export default function DRE() {
     const isEmptyMonth = monthKey && !mesesComDados.has(monthKey) && value === 0;
     const accumBg = isAccum ? "bg-gray-50 dark:bg-zinc-800/50 font-semibold" : "";
 
-    // Variation tooltip
+    // Variation data
     const variation = (prevValue !== undefined && monthKey && !isEmptyMonth)
       ? computeVariation(value, prevValue)
       : null;
-    const prevMonthIdx = monthKey ? MONTH_KEYS.indexOf(monthKey) - 1 : -1;
+    const monthIdx = monthKey ? MONTH_KEYS.indexOf(monthKey) : -1;
+    const prevMonthIdx = monthIdx - 1;
+    const currentMonthName = monthIdx >= 0 ? MONTHS[monthIdx] : null;
     const prevMonthName = prevMonthIdx >= 0 ? MONTHS[prevMonthIdx] : null;
-    const tooltipText = variation && prevMonthName
-      ? `${variation.label} vs ${prevMonthName}`
-      : null;
+    const hasTooltip = variation && prevMonthName && currentMonthName && !isEmptyMonth;
+    const diff = prevValue !== undefined ? value - prevValue : 0;
 
     // Trend badge for result lines
     const badge = showBadge && variation && !isEmptyMonth ? (
@@ -402,12 +403,70 @@ export default function DRE() {
       </td>
     );
 
-    if (tooltipText && !isEmptyMonth) {
+    if (hasTooltip) {
+      const isPositive = diff > 0;
+      const isNegative = diff < 0;
+      const isNeutral = diff === 0;
+
       return (
         <Tooltip key={key}>
           <TooltipTrigger asChild>{cell}</TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">
-            {tooltipText}
+          <TooltipContent
+            side="top"
+            className="p-0 border-0 bg-transparent shadow-none"
+          >
+            <div className={`rounded-lg border px-3 py-2.5 min-w-[200px] shadow-lg ${
+              isPositive
+                ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/80 dark:border-emerald-800"
+                : isNegative
+                ? "bg-red-50 border-red-200 dark:bg-red-950/80 dark:border-red-800"
+                : "bg-gray-50 border-gray-200 dark:bg-zinc-800 dark:border-zinc-700"
+            }`}>
+              {/* Header: month comparison */}
+              <div className="text-[11px] font-semibold text-gray-500 dark:text-zinc-400 mb-1.5">
+                {currentMonthName} vs {prevMonthName}
+              </div>
+
+              {/* Previous month */}
+              <div className="flex justify-between items-center text-xs mb-0.5">
+                <span className="text-gray-500 dark:text-zinc-400">{prevMonthName}:</span>
+                <span className="font-medium text-gray-700 dark:text-zinc-300 ml-3 tabular-nums">
+                  {formatCurrencyNoDecimals(prevValue!)}
+                </span>
+              </div>
+
+              {/* Current month */}
+              <div className="flex justify-between items-center text-xs mb-1.5">
+                <span className="text-gray-500 dark:text-zinc-400">{currentMonthName}:</span>
+                <span className="font-medium text-gray-900 dark:text-white ml-3 tabular-nums">
+                  {formatCurrencyNoDecimals(value)}
+                </span>
+              </div>
+
+              {/* Divider */}
+              <div className={`border-t mb-1.5 ${
+                isPositive ? "border-emerald-200 dark:border-emerald-800" :
+                isNegative ? "border-red-200 dark:border-red-800" :
+                "border-gray-200 dark:border-zinc-700"
+              }`} />
+
+              {/* Variation line */}
+              <div className={`flex justify-between items-center text-xs font-bold ${
+                isPositive
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : isNegative
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-gray-500 dark:text-zinc-400"
+              }`}>
+                <span className="inline-flex items-center gap-1">
+                  {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : isNegative ? <TrendingDown className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
+                  {isNeutral ? "Sem variação" : variation.label}
+                </span>
+                <span className="tabular-nums">
+                  {isNeutral ? "—" : `${diff > 0 ? "+" : ""}${formatCurrencyNoDecimals(diff)}`}
+                </span>
+              </div>
+            </div>
           </TooltipContent>
         </Tooltip>
       );
