@@ -82,6 +82,7 @@ const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
 const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
+const RoadmapAuditoria = lazyWithRetry(() => import("@/pages/RoadmapAuditoria"));
 const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
 const ContribuicaoOperador = lazyWithRetry(() => import("@/pages/ContribuicaoOperador"));
 const ContribuicaoSquad = lazyWithRetry(() => import("@/pages/ContribuicaoSquad"));
@@ -288,6 +289,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/revenue-goals">{() => <ProtectedRoute path="/dashboard/revenue-goals" component={RevenueGoals} />}</Route>
       <Route path="/dashboard/inadimplencia">{() => <ProtectedRoute path="/dashboard/inadimplencia" component={DashboardInadimplencia} />}</Route>
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
+      <Route path="/dashboard/roadmap-auditoria">{() => <ProtectedRoute path="/dashboard/roadmap-auditoria" component={RoadmapAuditoria} />}</Route>
       <Route path="/dashboard/contribuicao-colaborador">{() => <ProtectedRoute path="/dashboard/contribuicao-colaborador" component={ContribuicaoColaborador} />}</Route>
       <Route path="/dashboard/contribuicao-operador">{() => <ProtectedRoute path="/dashboard/contribuicao-operador" component={ContribuicaoOperador} />}</Route>
       <Route path="/dashboard/contribuicao-squad">{() => <ProtectedRoute path="/dashboard/contribuicao-squad" component={ContribuicaoSquad} />}</Route>
