@@ -11,7 +11,7 @@ import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megapho
 import { cn } from "@/lib/utils";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, Line } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Line } from "recharts";
 
 type MetricType = 'manual' | 'formula';
 
@@ -231,31 +231,6 @@ export default function GrowthOrcadoRealizado() {
       return res.json();
     },
   });
-
-  interface RRSemanalItem {
-    semana: string;
-    rrMql: number;
-    rrNaoMql: number;
-    rrTotal: number;
-  }
-
-  const { data: rrSemanalData } = useQuery<RRSemanalItem[]>({
-    queryKey: ['/api/growth/orcado-realizado/rr-semanal', dateRange.startDate, dateRange.endDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/rr-semanal?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
-      if (!res.ok) throw new Error('Failed to fetch RR semanal');
-      return res.json();
-    },
-  });
-
-  const rrAcumuladoData = useMemo(() => {
-    if (!rrSemanalData || rrSemanalData.length === 0) return [];
-    let acumulado = 0;
-    return rrSemanalData.map(item => {
-      acumulado += item.rrTotal;
-      return { semana: item.semana, acumulado };
-    });
-  }, [rrSemanalData]);
 
   const mqlMetrics: Metric[] = useMemo(() => {
     const data = mqlData || {} as MQLMetrics;
@@ -1338,150 +1313,6 @@ export default function GrowthOrcadoRealizado() {
         </TabsContent>
       </Tabs>
 
-      {/* Gráficos de RR (Reunião Realizada) */}
-      {rrSemanalData && rrSemanalData.length > 0 && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
-          {/* Chart 1: RR por Semana */}
-          <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
-            <div className="h-1 bg-gradient-to-r from-violet-500 to-blue-500 rounded-t-lg" />
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <Phone className="h-4 w-4 text-violet-500" />
-                RR por Semana
-              </CardTitle>
-              <CardDescription className="text-gray-500 dark:text-zinc-400 text-xs">
-                Reuniões Realizadas por semana (MQL vs Não-MQL)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart data={rrSemanalData} barCategoryGap="15%">
-                  <defs>
-                    <linearGradient id="barRrMql" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={1}/>
-                      <stop offset="100%" stopColor="#6d28d9" stopOpacity={0.8}/>
-                    </linearGradient>
-                    <linearGradient id="barRrNaoMql" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={1}/>
-                      <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.8}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" vertical={false} />
-                  <XAxis
-                    dataKey="semana"
-                    stroke="#9ca3af"
-                    fontSize={10}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    interval={0}
-                    tick={{ fill: '#9ca3af' }}
-                  />
-                  <YAxis
-                    stroke="#9ca3af"
-                    fontSize={11}
-                    tick={{ fill: '#9ca3af' }}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                      border: '1px solid rgba(139, 92, 246, 0.3)',
-                      borderRadius: '12px',
-                      color: '#f1f5f9',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                    formatter={(value: number, name: string) => [
-                      value,
-                      name === 'rrMql' ? 'MQL' : 'Não-MQL'
-                    ]}
-                    labelFormatter={(label) => `Semana: ${label}`}
-                  />
-                  <Legend
-                    wrapperStyle={{ paddingTop: '10px' }}
-                    formatter={(value) => value === 'rrMql' ? 'MQL' : 'Não-MQL'}
-                  />
-                  <Bar
-                    dataKey="rrMql"
-                    fill="url(#barRrMql)"
-                    radius={[0, 0, 0, 0]}
-                    name="rrMql"
-                    stackId="stack"
-                  />
-                  <Bar
-                    dataKey="rrNaoMql"
-                    fill="url(#barRrNaoMql)"
-                    radius={[4, 4, 0, 0]}
-                    name="rrNaoMql"
-                    stackId="stack"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          {/* Chart 2: Evolução Acumulada de RR */}
-          <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
-            <div className="h-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-t-lg" />
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-500" />
-                Evolução de RR
-              </CardTitle>
-              <CardDescription className="text-gray-500 dark:text-zinc-400 text-xs">
-                Acumulado de Reuniões Realizadas no período
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={320}>
-                <AreaChart data={rrAcumuladoData}>
-                  <defs>
-                    <linearGradient id="areaRrAcumulado" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.4}/>
-                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.05}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" vertical={false} />
-                  <XAxis
-                    dataKey="semana"
-                    stroke="#9ca3af"
-                    fontSize={10}
-                    angle={-45}
-                    textAnchor="end"
-                    height={60}
-                    interval={0}
-                    tick={{ fill: '#9ca3af' }}
-                  />
-                  <YAxis
-                    stroke="#9ca3af"
-                    fontSize={11}
-                    tick={{ fill: '#9ca3af' }}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      borderRadius: '12px',
-                      color: '#f1f5f9',
-                      backdropFilter: 'blur(12px)'
-                    }}
-                    formatter={(value: number) => [value, 'RR Acumulado']}
-                    labelFormatter={(label) => `Semana: ${label}`}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="acumulado"
-                    stroke="#10b981"
-                    strokeWidth={2.5}
-                    fill="url(#areaRrAcumulado)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
