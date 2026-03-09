@@ -138,7 +138,7 @@ export default function SaudeBaseAtiva() {
     if (!data?.contratos) return [];
     return data.contratos.filter(c => {
       if (filterTipo === "recorrente" && c.mrr <= 0) return false;
-      if (filterTipo === "pontual" && c.valorp <= 0) return false;
+      if (filterTipo === "pontual" && c.mrr > 0) return false;
       if (filterSquad !== "todos" && c.squad !== filterSquad) return false;
       if (filterProduto !== "todos" && c.produto !== filterProduto) return false;
       if (filterPlano !== "todos" && c.plano !== filterPlano) return false;
