@@ -547,7 +547,7 @@ export default function DRE() {
 
     return (
       <Fragment key={`group-${section.key}`}>
-        {/* Level 1: Group header (e.g., "CUSTOS OPERACIONAIS") */}
+        {/* Level 1: Group header with subtotal values (e.g., "CUSTOS OPERACIONAIS") */}
         <tr
           className="bg-gray-100 dark:bg-zinc-800 cursor-pointer hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
           onClick={() => toggleGroup(section.key)}
@@ -562,14 +562,18 @@ export default function DRE() {
               {section.label}
             </span>
           </td>
-          {MONTH_KEYS.map((mk) => (
-            <Fragment key={`hdr-${section.key}-${mk}-wrap`}>
-              <td className="px-2 py-2" />
-              {showAV && <td className="px-2 py-2" />}
-            </Fragment>
-          ))}
-          <td className="px-2 py-2" />
-          {showAV && <td className="px-2 py-2" />}
+          {MONTH_KEYS.map((mk, idx) => {
+            const prevMk = idx > 0 ? MONTH_KEYS[idx - 1] : undefined;
+            const prevVal = prevMk ? (subtotal[prevMk] ?? 0) : undefined;
+            return (
+              <Fragment key={`hdr-${section.key}-${mk}-wrap`}>
+                {renderValueCell(subtotal[mk] ?? 0, `hdr-${section.key}-${mk}`, "font-bold text-sm", mk, false, prevVal)}
+                {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBruta[mk] ?? 0, `hdr-${section.key}-av-${mk}`, mk)}
+              </Fragment>
+            );
+          })}
+          {renderValueCell(subtotalAccum, `hdr-${section.key}-acum`, "font-bold text-sm", undefined, true)}
+          {showAV && renderAVCell(subtotalAccum, receitaBrutaAcum, `hdr-${section.key}-av-acum`)}
           <td className="px-1 py-1" />
         </tr>
 
@@ -664,25 +668,8 @@ export default function DRE() {
             })
         }
 
-        {/* Subtotal row (always visible) */}
-        <tr className="border-b border-gray-200 dark:border-zinc-700">
-          <td className="px-3 py-1.5 pl-5 text-xs font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-zinc-900 z-10 whitespace-nowrap border-r border-gray-200 dark:border-zinc-700">
-            Subtotal
-          </td>
-          {MONTH_KEYS.map((mk, idx) => {
-            const prevMk = idx > 0 ? MONTH_KEYS[idx - 1] : undefined;
-            const prevVal = prevMk ? (subtotal[prevMk] ?? 0) : undefined;
-            return (
-              <Fragment key={`sub-${section.key}-${mk}-wrap`}>
-                {renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium", mk, false, prevVal)}
-                {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBruta[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
-              </Fragment>
-            );
-          })}
-          {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium", undefined, true)}
-          {showAV && renderAVCell(subtotalAccum, receitaBrutaAcum, `sub-${section.key}-av-acum`)}
-          <td className="px-1 py-1" />
-        </tr>
+        {/* Border separator after group */}
+        <tr className="border-b border-gray-200 dark:border-zinc-700"><td colSpan={999} className="h-0" /></tr>
       </Fragment>
     );
   }
