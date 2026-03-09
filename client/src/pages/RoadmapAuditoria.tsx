@@ -67,6 +67,18 @@ export default function RoadmapAuditoria() {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [selectedItem, setSelectedItem] = useState<AuditoriaRoadmapItem | null>(null);
 
+  const monthOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 18; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const val = d.toISOString().slice(0, 7);
+      const label = d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+      opts.push({ value: val, label: label.charAt(0).toUpperCase() + label.slice(1) });
+    }
+    return opts;
+  }, []);
+
   const { data, isLoading } = useQuery<AuditoriaRoadmapItem[]>({
     queryKey: ["/api/auditoria/roadmap-clientes", month, threshold],
     queryFn: async () => {
@@ -186,7 +198,14 @@ export default function RoadmapAuditoria() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-muted-foreground">Mes:</label>
-          <Input type="month" value={month} onChange={e => setMonth(e.target.value)} className="w-40" />
+          <Select value={month} onValueChange={setMonth}>
+            <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {monthOptions.map(opt => (
+                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm font-medium text-muted-foreground">Tolerancia:</label>
