@@ -31,6 +31,7 @@ export const PERMISSION_KEYS = {
     MARGEM_CLIENTE: 'fin.margem_cliente',
     TURBOZAP: 'fin.turbozap',
     DRE: 'fin.dre',
+    NOTAS_FISCAIS: 'fin.notas_fiscais',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -199,6 +200,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/margem-cliente': PERMISSION_KEYS.FIN.MARGEM_CLIENTE,
   '/turbozap': PERMISSION_KEYS.FIN.TURBOZAP,
   '/dashboard/dre': PERMISSION_KEYS.FIN.DRE,
+  '/dashboard/notas-fiscais': PERMISSION_KEYS.FIN.NOTAS_FISCAIS,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
@@ -399,6 +401,7 @@ export const NAV_CONFIG = {
         { title: 'Margem por Cliente', url: '/dashboard/margem-cliente', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.FIN.MARGEM_CLIENTE },
         { title: 'Roadmap Auditoria', url: '/dashboard/roadmap-auditoria', icon: 'Route', permissionKey: PERMISSION_KEYS.FIN.ROADMAP_AUDITORIA },
         { title: 'TurboZap', url: '/turbozap', icon: 'Zap', permissionKey: PERMISSION_KEYS.FIN.TURBOZAP },
+        { title: 'Notas Fiscais', url: '/dashboard/notas-fiscais', icon: 'FileText', permissionKey: PERMISSION_KEYS.FIN.NOTAS_FISCAIS },
       ],
     },
     {
@@ -613,6 +616,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.FIN.INADIMPLENCIA]: 'Inadimplência',
   [PERMISSION_KEYS.FIN.AUDITORIA]: 'Auditoria de Sistemas',
   [PERMISSION_KEYS.FIN.ROADMAP_AUDITORIA]: 'Roadmap Auditoria',
+  [PERMISSION_KEYS.FIN.NOTAS_FISCAIS]: 'Notas Fiscais',
   [PERMISSION_KEYS.GESTAO.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
   [PERMISSION_KEYS.GESTAO.CHURN_PREDICAO]: 'Predição de Churn',
