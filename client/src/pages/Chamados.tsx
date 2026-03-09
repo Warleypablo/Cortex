@@ -78,6 +78,7 @@ const AREAS = [
   { value: "rh", label: "RH" },
   { value: "operacao", label: "Operação" },
   { value: "comercial", label: "Comercial" },
+  { value: "cortex", label: "Cortex" },
 ];
 
 const PRIORIDADES = [

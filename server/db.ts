@@ -2104,6 +2104,7 @@ export async function seedChamadoCategories(): Promise<void> {
       { fieldType: 'chamado_cat_rh', options: ['Férias', 'Benefícios', 'Documentos', 'Outros'] },
       { fieldType: 'chamado_cat_operacao', options: ['Sobre Cliente', 'Processo Interno', 'Outros'] },
       { fieldType: 'chamado_cat_comercial', options: ['Proposta', 'Contrato', 'Outros'] },
+      { fieldType: 'chamado_cat_cortex', options: ['Bug', 'Nova Feature', 'Melhoria', 'Relatório / Dashboard', 'Integração', 'Outros'] },
     ];
 
     for (const cat of seedCategories) {
