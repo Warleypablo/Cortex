@@ -1379,6 +1379,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // Growth - Orçado x Realizado - Valores distintos de fnl_ngc (funil)
+  app.get("/api/growth/orcado-realizado/funis", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT fnl_ngc
+        FROM "Bitrix".crm_deal
+        WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
+        ORDER BY fnl_ngc
+      `);
+      const funis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
+      res.json(funis);
+    } catch (error) {
+      console.error("[api] Error fetching funis:", error);
+      res.status(500).json({ error: "Failed to fetch funis" });
+    }
+  });
+
   // Growth - Orçado x Realizado - Métricas de Vendas MQL
   app.get("/api/growth/orcado-realizado/mql", async (req, res) => {
     try {
@@ -1391,7 +1408,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       const contagem = (req.query.contagem as string) || 'contrato';
       const categoryName = req.query.categoryName as string | undefined;
-      const categoryFilter = categoryName ? sql`AND d.category_name = ${categoryName}` : sql``;
+      const categoryMode = (req.query.categoryMode as string) || 'is';
+      const categoryFilter = categoryName
+        ? (categoryMode === 'isNot' ? sql`AND d.category_name != ${categoryName}` : sql`AND d.category_name = ${categoryName}`)
+        : sql``;
+
+      const funilNgc = req.query.funilNgc as string | undefined;
+      const funilFilter = funilNgc ? sql`AND d.fnl_ngc = ${funilNgc}` : sql``;
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
@@ -1451,6 +1474,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND d.data_fechamento <= ${endDate}::date
           AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
           ${categoryFilter}
+          ${funilFilter}
       `);
 
       const row = result.rows[0] as any;
@@ -1515,7 +1539,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       const contagem = (req.query.contagem as string) || 'contrato';
       const categoryName = req.query.categoryName as string | undefined;
-      const categoryFilter = categoryName ? sql`AND d.category_name = ${categoryName}` : sql``;
+      const categoryMode = (req.query.categoryMode as string) || 'is';
+      const categoryFilter = categoryName
+        ? (categoryMode === 'isNot' ? sql`AND d.category_name != ${categoryName}` : sql`AND d.category_name = ${categoryName}`)
+        : sql``;
+
+      const funilNgc = req.query.funilNgc as string | undefined;
+      const funilFilter = funilNgc ? sql`AND d.fnl_ngc = ${funilNgc}` : sql``;
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
@@ -1575,6 +1605,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND d.data_fechamento <= ${endDate}::date
           AND (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
           ${categoryFilter}
+          ${funilFilter}
       `);
 
       const row = result.rows[0] as any;
@@ -1624,6 +1655,50 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     } catch (error) {
       console.error("[api] Error fetching Não-MQL metrics:", error);
       res.status(500).json({ error: "Failed to fetch Não-MQL metrics" });
+    }
+  });
+
+  // Growth - Orçado x Realizado - RR (Reunião Realizada) por Semana
+  app.get("/api/growth/orcado-realizado/rr-semanal", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const result = await db.execute(sql`
+        SELECT
+          EXTRACT(ISOYEAR FROM d.data_fechamento::date)::int as ano,
+          EXTRACT(WEEK FROM d.data_fechamento::date)::int as semana_num,
+          TO_CHAR(MIN(d.data_fechamento::date), 'Mon') as mes_label,
+          COUNT(CASE WHEN (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
+            AND stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
+              'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as rr_mql,
+          COUNT(CASE WHEN (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
+            AND stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
+              'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as rr_nao_mql,
+          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
+              'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as rr_total
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_fechamento >= ${startDate}::date
+          AND d.data_fechamento <= ${endDate}::date
+        GROUP BY 1, 2
+        ORDER BY 1, 2
+      `);
+
+      const data = result.rows.map((row: any) => ({
+        semana: `S${row.semana_num} ${row.mes_label?.toLowerCase() || ''}`.trim(),
+        rrMql: parseInt(row.rr_mql) || 0,
+        rrNaoMql: parseInt(row.rr_nao_mql) || 0,
+        rrTotal: parseInt(row.rr_total) || 0,
+      }));
+
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching RR semanal:", error);
+      res.status(500).json({ error: "Failed to fetch RR semanal" });
     }
   });
 
