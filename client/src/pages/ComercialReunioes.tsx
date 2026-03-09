@@ -147,10 +147,9 @@ export default function ComercialReunioes() {
 
   const isLoading = rrLoading || chartLoading || rrPorSDRLoading;
 
-  const formatPercent = (val: number) => `${(val * 100).toFixed(1)}%`;
+  const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 
-  const getConversaoBadge = (conversao: number) => {
-    const pct = conversao * 100;
+  const getConversaoBadge = (pct: number) => {
     if (pct >= 30) return <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">{pct.toFixed(1)}%</Badge>;
     if (pct >= 15) return <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">{pct.toFixed(1)}%</Badge>;
     return <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">{pct.toFixed(1)}%</Badge>;
@@ -308,13 +307,13 @@ export default function ComercialReunioes() {
                   <BarChart data={sortedByConversao} layout="vertical" barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" className="dark:opacity-20" horizontal={false} />
                     <XAxis type="number" stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }}
-                      tickFormatter={(v) => `${(v * 100).toFixed(0)}%`} />
+                      tickFormatter={(v) => `${v.toFixed(0)}%`} />
                     <YAxis dataKey="sdr" type="category" stroke="#9ca3af" fontSize={11} tick={{ fill: '#9ca3af' }} width={120} />
                     <Tooltip contentStyle={tooltipStyle}
                       formatter={(value: number) => [formatPercent(value), 'Conversão']} />
                     <Bar dataKey="conversao" radius={[0, 4, 4, 0]}>
                       {sortedByConversao.map((entry, i) => {
-                        const pct = entry.conversao * 100;
+                        const pct = entry.conversao;
                         const color = pct >= 30 ? '#10b981' : pct >= 15 ? '#f59e0b' : '#ef4444';
                         return <Cell key={i} fill={color} />;
                       })}
@@ -419,7 +418,7 @@ export default function ComercialReunioes() {
                           {(() => {
                             const totalLeads = sortedChartReunioes.reduce((sum, s) => sum + s.leads, 0);
                             const totalRR = sortedChartReunioes.reduce((sum, s) => sum + s.reunioesRealizadas, 0);
-                            const avgConv = totalLeads > 0 ? totalRR / totalLeads : 0;
+                            const avgConv = totalLeads > 0 ? (totalRR / totalLeads) * 100 : 0;
                             return getConversaoBadge(avgConv);
                           })()}
                         </TableCell>
