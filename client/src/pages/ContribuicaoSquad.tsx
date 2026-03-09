@@ -223,17 +223,22 @@ export default function ContribuicaoSquad() {
     return total;
   }, [bulkData, hierarchicalData, taxaDecimal, totalReceitas]);
 
-  // Ranking de squads
+  // Ranking de squads - rateia despesas totais proporcionalmente à receita
   const squadRanking = useMemo(() => {
     if (!bulkData?.resumoPorSquad) return [];
     const totalGeral = bulkData.resumoPorSquad.reduce((s, sq) => s + sq.receitaTotal, 0);
-    return bulkData.resumoPorSquad.map((sq, idx) => ({
-      ...sq,
-      posicao: idx + 1,
-      contribuicaoPct: totalGeral > 0 ? (sq.receitaTotal / totalGeral) * 100 : 0,
-      resultadoLiquido: sq.receitaTotal * (1 - taxaDecimal),
-    }));
-  }, [bulkData, taxaDecimal]);
+    return bulkData.resumoPorSquad.map((sq, idx) => {
+      const proporcao = totalGeral > 0 ? sq.receitaTotal / totalGeral : 0;
+      const despesaRateada = totalDespesasAnual * proporcao;
+      return {
+        ...sq,
+        posicao: idx + 1,
+        contribuicaoPct: totalGeral > 0 ? proporcao * 100 : 0,
+        despesaRateada,
+        resultadoLiquido: sq.receitaTotal - despesaRateada,
+      };
+    });
+  }, [bulkData, totalDespesasAnual]);
 
   const formatMesLabel = (label: string) => {
     return label.charAt(0).toUpperCase() + label.slice(1);
@@ -381,7 +386,7 @@ export default function ContribuicaoSquad() {
                       <td className="py-2 pr-4 font-bold text-muted-foreground">{sq.posicao}º</td>
                       <td className="py-2 pr-4 font-medium">{sq.squad}</td>
                       <td className="py-2 px-3 text-right">{formatCurrencyNoDecimals(sq.receitaTotal)}</td>
-                      <td className="py-2 px-3 text-right text-purple-500">{formatCurrencyNoDecimals(sq.receitaTotal * taxaDecimal)}</td>
+                      <td className="py-2 px-3 text-right text-purple-500">{formatCurrencyNoDecimals(sq.despesaRateada)}</td>
                       <td className="py-2 px-3 text-right font-semibold">{formatCurrencyNoDecimals(sq.resultadoLiquido)}</td>
                       <td className="py-2 px-3 text-right font-bold">{sq.contribuicaoPct.toFixed(1)}%</td>
                       <td className="py-2 px-3">
