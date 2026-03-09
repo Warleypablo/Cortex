@@ -35,6 +35,15 @@ process.on('SIGINT', shutdownPool);
 export const db = drizzle(pool, { schema });
 export { pool, schema };
 
+export async function initializePgTrgmExtension(): Promise<void> {
+  try {
+    await db.execute(sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
+    console.log("[db] pg_trgm extension enabled");
+  } catch (error) {
+    console.error("[db] Error enabling pg_trgm extension:", error);
+  }
+}
+
 export async function initializeNotificationsTable(): Promise<void> {
   try {
     await db.execute(sql`
