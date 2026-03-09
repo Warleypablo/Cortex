@@ -1,9 +1,6 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useLocation } from "wouter";
-
-const JuridicoClientes = lazy(() => import("@/pages/JuridicoClientes"));
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +40,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
 import {
   BarChart,
   Bar,
@@ -51,11 +47,9 @@ import {
   YAxis,
   CartesianGrid,
   ResponsiveContainer,
-  ComposedChart,
-  Line,
   Tooltip as RechartsTooltip,
-  Legend,
   Cell,
+  LabelList,
 } from "recharts";
 import {
   AlertTriangle,
@@ -69,19 +63,15 @@ import {
   Eye,
   Receipt,
   Loader2,
-  X,
   AlertCircle,
   CreditCard,
   RotateCcw,
   ExternalLink,
-  FileText,
-  Download,
   MessageSquarePlus,
   CheckCircle2,
   Pause,
   XCircle,
-  Gavel,
-  Package,
+  BarChart3,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -204,20 +194,6 @@ interface ClienteNuncaPagou {
   responsavel: string | null;
 }
 
-interface ContratoCanceladoComCobranca {
-  cnpj: string;
-  nomeCliente: string;
-  statusContrato: string;
-  dataEncerramento: string | null;
-  valorEmAberto: number;
-  quantidadeParcelas: number;
-  parcelaMaisProxima: string;
-  vendedor: string | null;
-  squad: string | null;
-  responsavel: string | null;
-  produto: string | null;
-}
-
 interface InadimplenciaContexto {
   contexto: string | null;
   evidencias: string | null;
@@ -258,7 +234,6 @@ const TAB_TITLES: Record<string, { title: string; subtitle: string }> = {
   "visao-geral": { title: "Inadimplência - Visão Geral", subtitle: "Análise geral de inadimplência e métricas" },
   "clientes": { title: "Inadimplência - Clientes", subtitle: "Lista de clientes inadimplentes" },
   "empresas": { title: "Inadimplência - Por Empresa", subtitle: "Inadimplência agrupada por empresa" },
-  "detalhamento": { title: "Inadimplência - Detalhamento", subtitle: "Inadimplência por vendedor, squad e responsável" },
 };
 
 export default function DashboardInadimplencia() {
@@ -272,6 +247,10 @@ export default function DashboardInadimplencia() {
     setPageInfo(title, subtitle);
   }, [activeTab, setPageInfo]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [filterSquad, setFilterSquad] = useState("todos");
+  const [filterVendedor, setFilterVendedor] = useState("todos");
+  const [filterFaixa, setFilterFaixa] = useState("todos");
+  const [evolucaoMode, setEvolucaoMode] = useState<'valor' | 'parcelas'>('valor');
   const [ordenarPor, setOrdenarPor] = useState<"valor" | "diasAtraso" | "nome">("valor");
   const [clienteSelecionado, setClienteSelecionado] = useState<ClienteInadimplente | null>(null);
   const [busca, setBusca] = useState("");
@@ -355,15 +334,6 @@ export default function DashboardInadimplencia() {
   // Query para clientes que nunca pagaram
   const { data: clientesNuncaPagaramData, isLoading: isLoadingNuncaPagaram, isError: isErrorNuncaPagaram } = useQuery<{ clientes: ClienteNuncaPagou[] }>({
     queryKey: ['/api/inadimplencia/clientes-nunca-pagaram', resumoParams],
-  });
-
-  // Query para contratos cancelados com cobranças em aberto
-  const { data: canceladosComCobrancaData, isLoading: isLoadingCancelados, isError: isErrorCancelados } = useQuery<{ 
-    contratos: ContratoCanceladoComCobranca[];
-    totalValor: number;
-    totalContratos: number;
-  }>({
-    queryKey: ['/api/inadimplencia/cancelados-com-cobranca'],
   });
 
   // Query para drill-down - busca clientes filtrados por vendedor/squad/responsável
@@ -597,143 +567,65 @@ export default function DashboardInadimplencia() {
     }));
   }, [resumoData]);
 
+  // Compute KPI deltas from evolucaoMensal (last 2 months)
+  const kpiDeltas = useMemo(() => {
+    const evol = resumoData?.evolucaoMensal;
+    if (!evol || evol.length < 2) return { valor: undefined, clientes: undefined };
+    const current = evol[evol.length - 1];
+    const previous = evol[evol.length - 2];
+    const valorDiff = current.valor - previous.valor;
+    const valorPct = previous.valor > 0 ? Math.abs(valorDiff / previous.valor * 100) : 0;
+    const qtdDiff = current.quantidade - previous.quantidade;
+    return {
+      valor: {
+        value: `${valorPct.toFixed(1)}%`,
+        isPositive: valorDiff <= 0, // less overdue = positive
+      },
+      clientes: {
+        value: `${Math.abs(qtdDiff)} parcelas`,
+        isPositive: qtdDiff <= 0,
+      },
+    };
+  }, [resumoData]);
+
+  // Sort bar chart data by value descending
+  const sortedVendedores = useMemo(() => {
+    if (!vendedoresData?.vendedores) return [];
+    return [...vendedoresData.vendedores].sort((a, b) => b.valorTotal - a.valorTotal).slice(0, 8);
+  }, [vendedoresData]);
+
+  const sortedSquads = useMemo(() => {
+    if (!squadsData?.squads) return [];
+    return [...squadsData.squads].sort((a, b) => b.valorTotal - a.valorTotal).slice(0, 8);
+  }, [squadsData]);
+
+  const sortedResponsaveis = useMemo(() => {
+    if (!responsaveisDetData?.responsaveis) return [];
+    return [...responsaveisDetData.responsaveis].sort((a, b) => b.valorTotal - a.valorTotal).slice(0, 8);
+  }, [responsaveisDetData]);
+
+  // Smart name truncation: first name + last initial
+  const smartTruncate = (name: string, max: number = 18) => {
+    if (name.length <= max) return name;
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      const short = `${parts[0]} ${parts[parts.length - 1][0]}.`;
+      if (short.length <= max) return short;
+    }
+    return name.substring(0, max) + '…';
+  };
 
   const limparFiltros = () => {
     setDateRange(undefined);
     setBusca("");
     setStatusFiltro("todos");
     setResponsavelFiltro("todos");
+    setFilterSquad("todos");
+    setFilterVendedor("todos");
+    setFilterFaixa("todos");
   };
 
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  const [isDownloadingCobrancaPdf, setIsDownloadingCobrancaPdf] = useState(false);
-  const [isDownloadingCompleto, setIsDownloadingCompleto] = useState(false);
-  
-  const handleDownloadPdf = async (apenasAtivos: boolean = false) => {
-    try {
-      setIsDownloadingPdf(true);
-      const params = new URLSearchParams();
-      if (dataInicio) params.append('dataInicio', dataInicio);
-      if (dataFim) params.append('dataFim', dataFim);
-      if (apenasAtivos) params.append('apenasAtivos', 'true');
-      
-      const response = await fetch(`/api/inadimplencia/relatorio-pdf?${params.toString()}`);
-      if (!response.ok) throw new Error('Erro ao gerar relatório');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-inadimplencia-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast({
-        title: "PDF gerado com sucesso",
-        description: apenasAtivos ? "Relatório de clientes ativos baixado." : "Relatório completo baixado.",
-      });
-    } catch (error) {
-      console.error('Erro ao baixar PDF:', error);
-      toast({
-        title: "Erro ao gerar PDF",
-        description: "Não foi possível gerar o relatório. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDownloadingPdf(false);
-    }
-  };
-
-  const handleDownloadCobrancaPdf = async () => {
-    try {
-      setIsDownloadingCobrancaPdf(true);
-      const params = new URLSearchParams();
-      if (dataInicio) params.append('dataInicio', dataInicio);
-      if (dataFim) params.append('dataFim', dataFim);
-      
-      const response = await fetch(`/api/inadimplencia/relatorio-cobranca-pdf?${params.toString()}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          toast({
-            title: "Nenhum cliente encontrado",
-            description: "Não há clientes com ação 'Cobrar' no período selecionado.",
-          });
-          return;
-        }
-        if (response.status === 401 || response.status === 403) {
-          toast({
-            title: "Acesso negado",
-            description: "Você não tem permissão para acessar este relatório.",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw new Error('Erro ao gerar relatório');
-      }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-cobranca-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      toast({
-        title: "PDF gerado com sucesso",
-        description: "Relatório de cobrança (clientes a cobrar) baixado.",
-      });
-    } catch (error) {
-      console.error('Erro ao baixar PDF de cobrança:', error);
-      toast({
-        title: "Erro ao gerar PDF",
-        description: "Não foi possível gerar o relatório de cobrança. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDownloadingCobrancaPdf(false);
-    }
-  };
-
-  const handleDownloadRelatorioCompleto = async () => {
-    try {
-      setIsDownloadingCompleto(true);
-      const params = new URLSearchParams();
-      if (dataInicio) params.append('dataInicio', dataInicio);
-      if (dataFim) params.append('dataFim', dataFim);
-
-      const response = await fetch(`/api/inadimplencia/relatorio-completo-pdf?${params.toString()}`);
-      if (!response.ok) throw new Error('Erro ao gerar relatório');
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `relatorio-completo-inadimplencia-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      toast({
-        title: "PDF gerado com sucesso",
-        description: "Relatório completo de inadimplência baixado.",
-      });
-    } catch (error) {
-      console.error('Erro ao baixar PDF completo:', error);
-      toast({
-        title: "Erro ao gerar PDF",
-        description: "Não foi possível gerar o relatório completo. Tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDownloadingCompleto(false);
-    }
-  };
+  const hasActiveFilters = !!(dataInicio || dataFim || filterSquad !== "todos" || filterVendedor !== "todos" || filterFaixa !== "todos");
 
   const getDiasAtrasoColor = (dias: number) => {
     if (dias <= 30) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
@@ -758,6 +650,7 @@ export default function DashboardInadimplencia() {
     variant = "default",
     loading = false,
     testId,
+    delta,
   }: {
     title: string;
     value: string;
@@ -766,6 +659,7 @@ export default function DashboardInadimplencia() {
     variant?: "default" | "success" | "danger" | "warning" | "info";
     loading?: boolean;
     testId: string;
+    delta?: { value: string; isPositive: boolean };
   }) => {
     const variantStyles = {
       default: {
@@ -814,10 +708,19 @@ export default function DashboardInadimplencia() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-muted-foreground truncate">{title}</p>
-              <p className="text-lg font-bold text-foreground truncate" data-testid={`${testId}-value`}>{value}</p>
+              <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground truncate">{title}</p>
+              <p className="text-xl font-bold text-foreground truncate" data-testid={`${testId}-value`}>{value}</p>
               {subtitle && (
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{subtitle}</p>
+              )}
+              {delta && (
+                <span className={`inline-flex items-center gap-0.5 mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                  delta.isPositive
+                    ? "bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                    : "bg-red-100/80 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                }`}>
+                  {delta.isPositive ? "↓" : "↑"} {delta.value} vs mês ant.
+                </span>
               )}
             </div>
             <div className={`p-2.5 rounded-xl ${styles.icon} flex-shrink-0`}>
@@ -829,49 +732,105 @@ export default function DashboardInadimplencia() {
     );
   };
 
-  const renderFiltros = () => (
-    <Card className="mb-6 border-0 shadow-lg overflow-hidden" data-testid="card-filtros">
-      <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-red-50 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-red-950/30 p-5">
-        <div className="flex flex-col gap-5">
-          {/* Header */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/25">
-                <Filter className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Filtros de Período</h3>
-                <p className="text-xs text-muted-foreground">Selecione o período de análise da inadimplência</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {(dataInicio || dataFim) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={limparFiltros}
-                  className="h-9 px-4 border-amber-300 dark:border-amber-800 hover:bg-amber-100 hover:border-amber-400 hover:text-amber-700 dark:hover:bg-amber-950/50 dark:hover:border-amber-700 dark:hover:text-amber-400 transition-all"
-                  data-testid="button-limpar-filtros"
-                >
-                  <RotateCcw className="h-4 w-4 mr-1.5" />
-                  Limpar Filtros
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Date Range Picker */}
-          <div className="flex items-center gap-3">
-            <DateRangePicker
-              value={dateRange}
-              onChange={setDateRange}
-              placeholder="Selecione o período"
-              triggerClassName="h-10 bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-800/50 hover:border-amber-400"
-            />
-          </div>
+  // Custom rich tooltip for bar charts
+  const BarChartRichTooltip = ({ active, payload, totalInadimplente }: any) => {
+    if (!active || !payload?.length) return null;
+    const data = payload[0].payload;
+    const nameKey = data.vendedor || data.squad || data.responsavel || 'N/A';
+    const pctOfTotal = totalInadimplente > 0 ? (data.valorTotal / totalInadimplente * 100).toFixed(1) : '0';
+    return (
+      <div className="bg-background border border-border rounded-lg shadow-lg p-3 text-sm min-w-[180px]">
+        <p className="font-semibold text-foreground mb-1.5">{nameKey}</p>
+        <div className="space-y-1 text-muted-foreground">
+          <p>Valor: <span className="font-medium text-foreground">{formatCurrency(data.valorTotal)}</span></p>
+          <p>Parcelas: <span className="font-medium text-foreground">{data.quantidadeParcelas}</span></p>
+          <p>Clientes: <span className="font-medium text-foreground">{data.quantidadeClientes}</span></p>
+          <p>% do Total: <span className="font-medium text-foreground">{pctOfTotal}%</span></p>
         </div>
       </div>
-    </Card>
+    );
+  };
+
+  const renderFiltros = () => (
+    <div className="flex items-center gap-4 flex-wrap mb-4 p-3 rounded-lg bg-muted/40 dark:bg-muted/20 border border-border/50" data-testid="card-filtros">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground font-medium">Período:</span>
+        <DateRangePicker
+          value={dateRange}
+          onChange={setDateRange}
+          placeholder="Selecione o período"
+          triggerClassName="h-8 text-xs"
+        />
+      </div>
+
+      <div className="w-px h-6 bg-border hidden sm:block" />
+
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground font-medium">Squad:</span>
+        <Select value={filterSquad} onValueChange={setFilterSquad}>
+          <SelectTrigger className="h-8 w-[140px] text-xs">
+            <SelectValue placeholder="Todos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            {squadsData?.squads?.map((s) => (
+              <SelectItem key={s.squad} value={s.squad}>{s.squad}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="w-px h-6 bg-border hidden sm:block" />
+
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground font-medium">Vendedor:</span>
+        <Select value={filterVendedor} onValueChange={setFilterVendedor}>
+          <SelectTrigger className="h-8 w-[140px] text-xs">
+            <SelectValue placeholder="Todos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            {vendedoresData?.vendedores?.map((v) => (
+              <SelectItem key={v.vendedor} value={v.vendedor}>{v.vendedor}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="w-px h-6 bg-border hidden sm:block" />
+
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-muted-foreground font-medium">Faixa:</span>
+        <Select value={filterFaixa} onValueChange={setFilterFaixa}>
+          <SelectTrigger className="h-8 w-[130px] text-xs">
+            <SelectValue placeholder="Todas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todas</SelectItem>
+            <SelectItem value="ate30">Até 30 dias</SelectItem>
+            <SelectItem value="31a60">31-60 dias</SelectItem>
+            <SelectItem value="61a90">61-90 dias</SelectItem>
+            <SelectItem value="acima90">90+ dias</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {hasActiveFilters && (
+        <>
+          <div className="w-px h-6 bg-border hidden sm:block" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={limparFiltros}
+            className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            data-testid="button-limpar-filtros"
+          >
+            <RotateCcw className="h-3 w-3 mr-1" />
+            Limpar
+          </Button>
+        </>
+      )}
+    </div>
   );
 
   const renderVisaoGeral = () => (
@@ -885,6 +844,7 @@ export default function DashboardInadimplencia() {
           variant="danger"
           loading={isLoadingResumo}
           testId="kpi-total-inadimplente"
+          delta={kpiDeltas.valor}
         />
         <KPICard
           title="Clientes Inadimplentes"
@@ -894,6 +854,7 @@ export default function DashboardInadimplencia() {
           variant="warning"
           loading={isLoadingResumo}
           testId="kpi-clientes-inadimplentes"
+          delta={kpiDeltas.clientes}
         />
         <KPICard
           title="Ticket Médio"
@@ -938,7 +899,7 @@ export default function DashboardInadimplencia() {
         <KPICard
           title="Inadimplentes 1ª Parcela"
           value={String(metricasRecebimento?.clientesInadimPrimeiraParcela || 0)}
-          subtitle={`${formatPercent(metricasRecebimento?.percentualInadimPrimeiraParcela || 0)} • ${formatCurrency(metricasRecebimento?.valorInadimPrimeiraParcela || 0)}`}
+          subtitle={`${formatPercent(metricasRecebimento?.percentualInadimPrimeiraParcela || 0)} sobre ${metricasRecebimento?.totalClientesComParcelas || 0} clientes • ${formatCurrency(metricasRecebimento?.valorInadimPrimeiraParcela || 0)}`}
           icon={AlertTriangle}
           variant="danger"
           loading={isLoadingMetricas}
@@ -977,8 +938,9 @@ export default function DashboardInadimplencia() {
             ) : isErrorResumo ? (
               <ErrorDisplay message="Erro ao carregar dados do gráfico." />
             ) : faixasChartData.length === 0 ? (
-              <div className="h-[280px] flex items-center justify-center text-muted-foreground" data-testid="empty-chart-faixas">
-                Nenhum dado disponível
+              <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground gap-2" data-testid="empty-chart-faixas">
+                <BarChart3 className="h-8 w-8" />
+                <span className="text-sm">Sem dados de faixas para o período</span>
               </div>
             ) : (
               <div className="h-[280px]" data-testid="chart-distribuicao-faixas">
@@ -1025,12 +987,36 @@ export default function DashboardInadimplencia() {
 
         <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50" data-testid="card-evolucao-mensal">
           <CardHeader className="border-b border-slate-100 dark:border-slate-700/50 pb-4">
-            <CardTitle className="text-base flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-                <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                  <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                </div>
+                Evolução Mensal
+              </CardTitle>
+              <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5">
+                <button
+                  onClick={() => setEvolucaoMode('valor')}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                    evolucaoMode === 'valor'
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Valor
+                </button>
+                <button
+                  onClick={() => setEvolucaoMode('parcelas')}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                    evolucaoMode === 'parcelas'
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Parcelas
+                </button>
               </div>
-              Evolução Mensal da Inadimplência
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             {isLoadingResumo ? (
@@ -1040,40 +1026,38 @@ export default function DashboardInadimplencia() {
             ) : isErrorResumo ? (
               <ErrorDisplay message="Erro ao carregar dados do gráfico." />
             ) : !resumoData?.evolucaoMensal?.length ? (
-              <div className="h-[280px] flex items-center justify-center text-muted-foreground" data-testid="empty-chart-evolucao">
-                Nenhum dado disponível
+              <div className="h-[280px] flex flex-col items-center justify-center text-muted-foreground gap-2" data-testid="empty-chart-evolucao">
+                <BarChart3 className="h-8 w-8" />
+                <span className="text-sm">Sem dados de evolução para o período</span>
               </div>
             ) : (
               <div className="h-[280px]" data-testid="chart-evolucao-mensal">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={resumoData.evolucaoMensal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <BarChart data={resumoData.evolucaoMensal} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="mesLabel" tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="valor" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="quantidade" orientation="right" tick={{ fontSize: 11 }} />
+                    <YAxis
+                      tickFormatter={evolucaoMode === 'valor' ? formatCurrencyCompact : (v) => String(v)}
+                      tick={{ fontSize: 11 }}
+                    />
                     <RechartsTooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--background))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                       }}
-                      formatter={(value: number, name: string) => {
-                        if (name === "valor") return [formatCurrency(value), "Valor"];
-                        return [value, "Parcelas"];
-                      }}
+                      formatter={(value: number) => [
+                        evolucaoMode === 'valor' ? formatCurrency(value) : `${value} parcelas`,
+                        evolucaoMode === 'valor' ? "Valor" : "Parcelas",
+                      ]}
                     />
-                    <Legend />
-                    <Bar yAxisId="valor" dataKey="valor" fill="#ef4444" name="Valor" radius={[4, 4, 0, 0]} />
-                    <Line
-                      yAxisId="quantidade"
-                      type="monotone"
-                      dataKey="quantidade"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      name="Parcelas"
-                      dot={false}
+                    <Bar
+                      dataKey={evolucaoMode === 'valor' ? 'valor' : 'quantidade'}
+                      fill={evolucaoMode === 'valor' ? '#ef4444' : '#3b82f6'}
+                      radius={[4, 4, 0, 0]}
+                      name={evolucaoMode === 'valor' ? 'Valor' : 'Parcelas'}
                     />
-                  </ComposedChart>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -1100,17 +1084,18 @@ export default function DashboardInadimplencia() {
               </div>
             ) : isErrorVendedores ? (
               <ErrorDisplay message="Erro ao carregar dados." />
-            ) : !vendedoresData?.vendedores?.length ? (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
+            ) : !sortedVendedores.length ? (
+              <div className="h-[250px] flex flex-col items-center justify-center text-muted-foreground gap-2">
+                <BarChart3 className="h-6 w-6" />
+                <span className="text-xs">Sem dados de vendedores</span>
               </div>
             ) : (
               <div className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
-                    data={vendedoresData.vendedores.slice(0, 8)} 
-                    layout="vertical" 
-                    margin={{ left: 10, right: 30 }}
+                  <BarChart
+                    data={sortedVendedores}
+                    layout="vertical"
+                    margin={{ left: 10, right: 50 }}
                     style={{ cursor: 'pointer' }}
                     onClick={(data) => {
                       if (data?.activePayload?.[0]?.payload?.vendedor) {
@@ -1120,22 +1105,17 @@ export default function DashboardInadimplencia() {
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
-                    <YAxis 
-                      type="category" 
-                      dataKey="vendedor" 
-                      width={90} 
-                      tick={{ fontSize: 10 }} 
-                      tickFormatter={(v) => v.length > 12 ? v.substring(0, 12) + '...' : v}
+                    <YAxis
+                      type="category"
+                      dataKey="vendedor"
+                      width={120}
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(v) => smartTruncate(v)}
                     />
-                    <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                      formatter={(value: number) => [formatCurrency(value), "Valor"]}
-                    />
-                    <Bar dataKey="valorTotal" fill="#ef4444" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }} />
+                    <RechartsTooltip content={<BarChartRichTooltip totalInadimplente={resumoData?.totalInadimplente || 0} />} />
+                    <Bar dataKey="valorTotal" fill="#ef4444" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }}>
+                      <LabelList dataKey="valorTotal" position="right" formatter={formatCurrencyCompact} style={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1160,17 +1140,18 @@ export default function DashboardInadimplencia() {
               </div>
             ) : isErrorSquads ? (
               <ErrorDisplay message="Erro ao carregar dados." />
-            ) : !squadsData?.squads?.length ? (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
+            ) : !sortedSquads.length ? (
+              <div className="h-[250px] flex flex-col items-center justify-center text-muted-foreground gap-2">
+                <BarChart3 className="h-6 w-6" />
+                <span className="text-xs">Sem dados de squads</span>
               </div>
             ) : (
               <div className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
-                    data={squadsData.squads.slice(0, 8)} 
-                    layout="vertical" 
-                    margin={{ left: 10, right: 30 }}
+                  <BarChart
+                    data={sortedSquads}
+                    layout="vertical"
+                    margin={{ left: 10, right: 50 }}
                     style={{ cursor: 'pointer' }}
                     onClick={(data) => {
                       if (data?.activePayload?.[0]?.payload?.squad) {
@@ -1180,22 +1161,17 @@ export default function DashboardInadimplencia() {
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
-                    <YAxis 
-                      type="category" 
-                      dataKey="squad" 
-                      width={90} 
-                      tick={{ fontSize: 10 }} 
-                      tickFormatter={(v) => v.length > 12 ? v.substring(0, 12) + '...' : v}
+                    <YAxis
+                      type="category"
+                      dataKey="squad"
+                      width={120}
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(v) => smartTruncate(v)}
                     />
-                    <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                      formatter={(value: number) => [formatCurrency(value), "Valor"]}
-                    />
-                    <Bar dataKey="valorTotal" fill="#f59e0b" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }} />
+                    <RechartsTooltip content={<BarChartRichTooltip totalInadimplente={resumoData?.totalInadimplente || 0} />} />
+                    <Bar dataKey="valorTotal" fill="#f59e0b" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }}>
+                      <LabelList dataKey="valorTotal" position="right" formatter={formatCurrencyCompact} style={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1220,17 +1196,18 @@ export default function DashboardInadimplencia() {
               </div>
             ) : isErrorResponsaveisDet ? (
               <ErrorDisplay message="Erro ao carregar dados." />
-            ) : !responsaveisDetData?.responsaveis?.length ? (
-              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
+            ) : !sortedResponsaveis.length ? (
+              <div className="h-[250px] flex flex-col items-center justify-center text-muted-foreground gap-2">
+                <BarChart3 className="h-6 w-6" />
+                <span className="text-xs">Sem dados de responsáveis</span>
               </div>
             ) : (
               <div className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart 
-                    data={responsaveisDetData.responsaveis.slice(0, 8)} 
-                    layout="vertical" 
-                    margin={{ left: 10, right: 30 }}
+                  <BarChart
+                    data={sortedResponsaveis}
+                    layout="vertical"
+                    margin={{ left: 10, right: 50 }}
                     style={{ cursor: 'pointer' }}
                     onClick={(data) => {
                       if (data?.activePayload?.[0]?.payload?.responsavel) {
@@ -1240,22 +1217,17 @@ export default function DashboardInadimplencia() {
                   >
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
                     <XAxis type="number" tickFormatter={formatCurrencyCompact} tick={{ fontSize: 10 }} />
-                    <YAxis 
-                      type="category" 
-                      dataKey="responsavel" 
-                      width={90} 
-                      tick={{ fontSize: 10 }} 
-                      tickFormatter={(v) => v.length > 12 ? v.substring(0, 12) + '...' : v}
+                    <YAxis
+                      type="category"
+                      dataKey="responsavel"
+                      width={120}
+                      tick={{ fontSize: 10 }}
+                      tickFormatter={(v) => smartTruncate(v)}
                     />
-                    <RechartsTooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                      formatter={(value: number) => [formatCurrency(value), "Valor"]}
-                    />
-                    <Bar dataKey="valorTotal" fill="#3b82f6" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }} />
+                    <RechartsTooltip content={<BarChartRichTooltip totalInadimplente={resumoData?.totalInadimplente || 0} />} />
+                    <Bar dataKey="valorTotal" fill="#3b82f6" radius={[0, 4, 4, 0]} style={{ cursor: 'pointer' }}>
+                      <LabelList dataKey="valorTotal" position="right" formatter={formatCurrencyCompact} style={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -1875,13 +1847,18 @@ export default function DashboardInadimplencia() {
             <TrendingDown className="h-4 w-4 mr-2" />
             Visão Geral
           </TabsTrigger>
-          <TabsTrigger 
-            value="clientes" 
+          <TabsTrigger
+            value="clientes"
             className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md rounded-lg px-4 py-2.5 transition-all duration-200"
             data-testid="tab-clientes"
           >
             <Users className="h-4 w-4 mr-2" />
             Clientes ({clientesData?.clientes?.length || 0})
+            {(resumoData?.faixas?.acima90dias?.quantidade || 0) > 0 && (
+              <Badge variant="destructive" className="ml-1.5 text-[10px] px-1.5 py-0">
+                {resumoData?.faixas?.acima90dias?.quantidade}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
