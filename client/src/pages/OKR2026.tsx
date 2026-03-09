@@ -35,7 +35,7 @@ import {
   CreditCard, TrendingDown as TrendingDownIcon, MonitorPlay, Users, Heart, Building,
   LayoutGrid, List, Search, Loader2, Database, FileText, ListChecks, Calendar,
   ChevronRight, X, ExternalLink, Tag, Lightbulb, Zap, ShoppingCart, UserMinus, Wallet, Briefcase,
-  Percent
+  Percent, Settings, Save
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
@@ -3336,10 +3336,179 @@ const BP_DRILLDOWN_MAP: Record<string, { metric: string; title: string }> = {
   revenue_other: { metric: "revenue_other", title: "Outras Receitas — Detalhamento" },
 };
 
+interface BPTargetsResponse {
+  year: number;
+  months: string[];
+  metrics: { metric_key: string; title: string; unit: string; is_derived: boolean; months: Record<string, number> }[];
+}
+
+function BPEditMetasModal({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { toast } = useToast();
+  const [editedValues, setEditedValues] = useState<Record<string, Record<string, string>>>({});
+  const [saving, setSaving] = useState(false);
+
+  const { data, isLoading } = useQuery<BPTargetsResponse>({
+    queryKey: ["/api/okr2026/bp-targets"],
+    enabled: open,
+  });
+
+  const handleValueChange = (metricKey: string, month: string, value: string) => {
+    setEditedValues(prev => ({
+      ...prev,
+      [metricKey]: { ...prev[metricKey], [month]: value }
+    }));
+  };
+
+  const getDisplayValue = (metricKey: string, month: string, original: number) => {
+    return editedValues[metricKey]?.[month] ?? String(original);
+  };
+
+  const handleSave = async () => {
+    if (!data) return;
+    setSaving(true);
+    try {
+      const targets: { metric_key: string; month: string; target_value: number }[] = [];
+      for (const [metricKey, months] of Object.entries(editedValues)) {
+        for (const [month, value] of Object.entries(months)) {
+          const numValue = parseFloat(value);
+          if (!isNaN(numValue)) {
+            targets.push({ metric_key: metricKey, month, target_value: numValue });
+          }
+        }
+      }
+      if (targets.length === 0) {
+        toast({ title: "Nenhuma alteração para salvar" });
+        setSaving(false);
+        return;
+      }
+      await apiRequest("PUT", "/api/okr2026/bp-targets", { targets });
+      queryClient.invalidateQueries({ queryKey: ["/api/okr2026/bp-financeiro"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/okr2026/bp-targets"] });
+      toast({ title: "Metas atualizadas", description: `${targets.length} valores salvos com sucesso.` });
+      setEditedValues({});
+      onOpenChange(false);
+    } catch (err) {
+      toast({ title: "Erro ao salvar metas", description: "Tente novamente.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const getMonthLabel = (month: string) => {
+    const num = parseInt(month.split("-")[1]);
+    return ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"][num - 1] || month;
+  };
+
+  const formatInputValue = (value: number, unit: string) => {
+    if (unit === "PCT") return (value * 100).toFixed(2);
+    return String(Math.round(value));
+  };
+
+  const parseInputValue = (value: string, unit: string) => {
+    if (unit === "PCT") return String(parseFloat(value) / 100);
+    return value;
+  };
+
+  const editableMetrics = data?.metrics.filter(m => !m.is_derived) || [];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[95vw] max-h-[90vh] bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="text-gray-900 dark:text-white flex items-center gap-2">
+            <Settings className="w-5 h-5" />
+            Editar Metas — BP 2026
+          </DialogTitle>
+          <DialogDescription className="text-gray-500 dark:text-zinc-400">
+            Edite os valores de meta para cada métrica e mês. Métricas calculadas (derivadas) são atualizadas automaticamente.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex-1 overflow-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-white dark:bg-zinc-900">
+                <tr className="border-b border-gray-200 dark:border-zinc-700">
+                  <th className="text-left py-2 px-3 font-semibold text-gray-900 dark:text-white min-w-[200px] sticky left-0 bg-white dark:bg-zinc-900 z-20">
+                    Métrica
+                  </th>
+                  {data?.months.map(m => (
+                    <th key={m} className="text-center py-2 px-1 font-semibold text-xs text-gray-500 dark:text-zinc-400 uppercase min-w-[100px]">
+                      {getMonthLabel(m)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
+                {editableMetrics.map((metric) => (
+                  <tr key={metric.metric_key} className="hover:bg-gray-50 dark:hover:bg-zinc-800/50">
+                    <td className="py-2 px-3 font-medium text-gray-900 dark:text-white sticky left-0 bg-white dark:bg-zinc-900 group-hover:bg-gray-50 dark:group-hover:bg-zinc-800/50">
+                      <div className="flex items-center gap-1.5">
+                        <span>{metric.title}</span>
+                        <span className="text-[10px] text-gray-400 dark:text-zinc-500">
+                          {metric.unit === "PCT" ? "%" : metric.unit === "COUNT" ? "#" : "R$"}
+                        </span>
+                      </div>
+                    </td>
+                    {data?.months.map(month => {
+                      const original = metric.months[month] ?? 0;
+                      const displayVal = getDisplayValue(metric.metric_key, month, metric.unit === "PCT" ? original * 100 : original);
+                      const isEdited = editedValues[metric.metric_key]?.[month] !== undefined;
+                      return (
+                        <td key={month} className="py-1 px-1 text-center">
+                          <input
+                            type="number"
+                            step={metric.unit === "PCT" ? "0.01" : "1"}
+                            className={`w-full px-2 py-1.5 text-xs text-center rounded-md border transition-colors
+                              ${isEdited
+                                ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-semibold"
+                                : "border-gray-200 dark:border-zinc-700 bg-transparent text-gray-700 dark:text-zinc-300"
+                              }
+                              focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500`}
+                            value={displayVal}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              const stored = metric.unit === "PCT" ? String(parseFloat(raw) / 100) : raw;
+                              handleValueChange(metric.metric_key, month, stored);
+                            }}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-zinc-700">
+          <p className="text-xs text-gray-500 dark:text-zinc-400">
+            {Object.values(editedValues).reduce((acc, months) => acc + Object.keys(months).length, 0)} alterações pendentes
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => { setEditedValues({}); onOpenChange(false); }}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSave} disabled={saving || Object.keys(editedValues).length === 0}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+              Salvar Metas
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function BPFinanceiroTab() {
   const [displayMode, setDisplayMode] = useState<BPDisplayMode>("actual");
   const [drillDownMetric, setDrillDownMetric] = useState<{ metric: string; title: string; month?: string } | null>(null);
   const [formulaBreakdown, setFormulaBreakdown] = useState<{ metric: BPMetric; month: string } | null>(null);
+  const [editMetasOpen, setEditMetasOpen] = useState(false);
+  const { user } = useAuth();
 
   const { data, isLoading, error } = useQuery<BPFinanceiroResponse>({
     queryKey: ["/api/okr2026/bp-financeiro"],
@@ -3500,6 +3669,17 @@ function BPFinanceiroTab() {
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
+                {user?.role === "admin" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEditMetasOpen(true)}
+                    className="gap-1.5 text-xs"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    Editar Metas
+                  </Button>
+                )}
                 <div className="flex items-center gap-1.5 text-xs">
                   <div className="w-3 h-3 rounded-full bg-green-500 shadow-sm shadow-green-500/50" />
                   <span className="text-muted-foreground">No alvo</span>
@@ -3830,6 +4010,8 @@ function BPFinanceiroTab() {
           })()}
         </DialogContent>
       </Dialog>
+
+      <BPEditMetasModal open={editMetasOpen} onOpenChange={setEditMetasOpen} />
     </div>
   );
 }
