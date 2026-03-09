@@ -217,17 +217,26 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 11. Churn e Pausados no mês de dados
+        // Churn usa data_solicitacao_encerramento, Pausados usa data_pausa (campos distintos)
         db.execute(sql`
           SELECT
             COALESCE(SUM(CASE WHEN LOWER(status) IN ('encerrado', 'cancelado/inativo')
-              THEN COALESCE(valorr, '0')::numeric ELSE 0 END), 0) as churn_mrr,
-            COUNT(CASE WHEN LOWER(status) IN ('encerrado', 'cancelado/inativo') THEN 1 END)::int as churn_count,
+              AND data_solicitacao_encerramento >= ${dataStart}
+              AND data_solicitacao_encerramento < ${dataEnd}
+              THEN COALESCE(valorr::numeric, 0) ELSE 0 END), 0) as churn_mrr,
+            COUNT(CASE WHEN LOWER(status) IN ('encerrado', 'cancelado/inativo')
+              AND data_solicitacao_encerramento >= ${dataStart}
+              AND data_solicitacao_encerramento < ${dataEnd}
+              THEN 1 END)::int as churn_count,
             COALESCE(SUM(CASE WHEN LOWER(status) = 'pausado'
-              THEN COALESCE(valorr, '0')::numeric ELSE 0 END), 0) as pausados_mrr,
-            COUNT(CASE WHEN LOWER(status) = 'pausado' THEN 1 END)::int as pausados_count
+              AND data_pausa >= ${dataStart}
+              AND data_pausa < ${dataEnd}
+              THEN COALESCE(valorr::numeric, 0) ELSE 0 END), 0) as pausados_mrr,
+            COUNT(CASE WHEN LOWER(status) = 'pausado'
+              AND data_pausa >= ${dataStart}
+              AND data_pausa < ${dataEnd}
+              THEN 1 END)::int as pausados_count
           FROM "Clickup".cup_contratos
-          WHERE data_solicitacao_encerramento >= ${dataStart}
-            AND data_solicitacao_encerramento < ${dataEnd}
         `),
 
         // 12. Cross-sell (deals with source PARTNER in data month)
@@ -254,15 +263,20 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND tipo_evento = 'RECEITA'
         `),
 
-        // 14. Série mensal Receita x Churn (MRR do snapshot + churn do mês, ano inteiro até mesDados)
+        // 14. Série mensal Receita x Churn (últimos 12 meses até mesDados, cross-year)
         db.execute(sql`
-          WITH monthly_snapshots AS (
+          WITH date_range AS (
+            SELECT
+              (${dataStart}::date - INTERVAL '11 months')::date as range_start,
+              ${dataEnd}::date as range_end
+          ),
+          monthly_snapshots AS (
             SELECT
               TO_CHAR(data_snapshot, 'YYYY-MM') as month,
               MAX(data_snapshot) as last_snapshot
-            FROM "Clickup".cup_data_hist
-            WHERE EXTRACT(YEAR FROM data_snapshot) = ${anoDados}
-              AND EXTRACT(MONTH FROM data_snapshot) <= ${mesDados}
+            FROM "Clickup".cup_data_hist, date_range dr
+            WHERE data_snapshot >= dr.range_start
+              AND data_snapshot < dr.range_end
             GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
           ),
           mrr_mensal AS (
@@ -278,10 +292,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           churn_mensal AS (
             SELECT
               TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as month,
-              COALESCE(SUM(COALESCE(valorr, '0')::numeric), 0) as churn_brl
-            FROM "Clickup".cup_contratos
-            WHERE EXTRACT(YEAR FROM data_solicitacao_encerramento) = ${anoDados}
-              AND EXTRACT(MONTH FROM data_solicitacao_encerramento) <= ${mesDados}
+              COALESCE(SUM(COALESCE(valorr::numeric, 0)), 0) as churn_brl
+            FROM "Clickup".cup_contratos, date_range dr
+            WHERE data_solicitacao_encerramento >= dr.range_start
+              AND data_solicitacao_encerramento < dr.range_end
               AND LOWER(status) IN ('encerrado', 'cancelado/inativo')
             GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM')
           )
@@ -456,6 +470,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 24. OKR: inadimplencia_brl (parcelas vencidas não pagas no quarter)
+        // Usa dataEnd (1o dia do mês seguinte) como corte fixo para reprodutibilidade
         db.execute(sql`
           SELECT
             EXTRACT(MONTH FROM data_vencimento)::int as month,
@@ -463,7 +478,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           FROM "Conta Azul".caz_parcelas
           WHERE tipo_evento = 'RECEITA'
             AND status != 'QUITADO'
-            AND data_vencimento < CURRENT_DATE
+            AND data_vencimento < ${dataEnd}::date
             AND EXTRACT(YEAR FROM data_vencimento) = ${anoDados}
             AND EXTRACT(MONTH FROM data_vencimento) >= ${quarterStartMonth}
             AND EXTRACT(MONTH FROM data_vencimento) <= ${mesDados}
@@ -693,7 +708,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         const churn = churnBySquad[row.squad] || { brl: 0, count: 0 };
         const mrrAnt = mrrAnteriorBySquad[row.squad] || 0;
         const ticketMedio = contratos > 0 ? mrr / contratos : 0;
-        const churnPct = (mrr + churn.brl) > 0 ? (churn.brl / (mrr + churn.brl)) * 100 : 0;
+        // Churn % = churn do mês / MRR do mês anterior (base real)
+        const churnPct = mrrAnt > 0 ? (churn.brl / mrrAnt) * 100 : 0;
 
         return {
           squad: row.squad,
