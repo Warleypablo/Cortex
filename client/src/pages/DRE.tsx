@@ -25,6 +25,7 @@ interface DRELineItem {
   parent_nome: string;
   tipo: "receita" | "despesa";
   valores: Record<string, number>;
+  fornecedores?: { nome: string; valores: Record<string, number> }[];
 }
 
 interface DREData {
@@ -262,6 +263,7 @@ export default function DRE() {
     new Set(["03", "DD", "04", "05", "06", "07", "08"])
   );
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [expandedChildren, setExpandedChildren] = useState<Set<string>>(new Set());
   const [showAV, setShowAV] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"agrupada" | "expandida">("agrupada");
 
@@ -340,6 +342,15 @@ export default function DRE() {
       } else {
         next.add(key);
       }
+      return next;
+    });
+  };
+
+  const toggleChild = (key: string) => {
+    setExpandedChildren((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -597,14 +608,56 @@ export default function DRE() {
 
                   {/* Level 3: Child categories (e.g., "05.01.01 Lider de Squad") */}
                   {isParentOpen &&
-                    children.map((child) =>
-                      renderLineRow(
-                        child,
-                        "child",
-                        "pl-12 text-gray-500 dark:text-zinc-400",
-                        "bg-gray-50/50 dark:bg-zinc-900/50"
-                      )
-                    )
+                    children.map((child) => {
+                      const hasFornecedores = child.fornecedores && child.fornecedores.length > 0;
+                      const isChildOpen = expandedChildren.has(child.categoria_id);
+                      return (
+                        <Fragment key={`child-${child.categoria_id}`}>
+                          {renderLineRow(
+                            child,
+                            "child",
+                            "pl-12 text-gray-500 dark:text-zinc-400",
+                            "bg-gray-50/50 dark:bg-zinc-900/50",
+                            hasFornecedores ? {
+                              clickable: true,
+                              onClick: () => toggleChild(child.categoria_id),
+                              chevron: isChildOpen ? "expanded" : "collapsed",
+                            } : undefined
+                          )}
+                          {/* Level 4: Fornecedores (inline expansion) */}
+                          {isChildOpen && child.fornecedores?.map((forn) => {
+                            const fornAccum = computeAccumulated(forn.valores);
+                            return (
+                              <tr
+                                key={`forn-${child.categoria_id}-${forn.nome}`}
+                                className="hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors bg-gray-50/30 dark:bg-zinc-950/30"
+                              >
+                                <td className="px-3 py-1 pl-16 text-[11px] text-gray-400 dark:text-zinc-500 sticky left-0 z-10 whitespace-nowrap border-r border-gray-200 dark:border-zinc-700 bg-gray-50/30 dark:bg-zinc-950/30 italic">
+                                  {forn.nome}
+                                </td>
+                                {MONTH_KEYS.map((mk) => {
+                                  const val = forn.valores[mk] ?? 0;
+                                  const isEmptyMonth = !mesesComDados.has(mk) && val === 0;
+                                  return (
+                                    <Fragment key={`forn-${child.categoria_id}-${forn.nome}-${mk}-wrap`}>
+                                      <td className={`px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap ${isEmptyMonth ? "text-gray-300 dark:text-zinc-600" : getValueClass(val)}`}>
+                                        {isEmptyMonth ? "—" : formatCurrencyNoDecimals(val)}
+                                      </td>
+                                      {showAV && renderAVCell(val, receitaBruta[mk] ?? 0, `forn-${child.categoria_id}-${forn.nome}-av-${mk}`, mk)}
+                                    </Fragment>
+                                  );
+                                })}
+                                <td className={`px-2 py-1 text-right text-[11px] tabular-nums whitespace-nowrap font-semibold bg-gray-50 dark:bg-zinc-800/50 ${getValueClass(fornAccum)}`}>
+                                  {formatCurrencyNoDecimals(fornAccum)}
+                                </td>
+                                {showAV && renderAVCell(fornAccum, receitaBrutaAcum, `forn-${child.categoria_id}-${forn.nome}-av-acum`)}
+                                <td className="px-1 py-1" />
+                              </tr>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    })
                   }
                 </Fragment>
               );
