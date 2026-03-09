@@ -143,9 +143,7 @@ export default function GrowthOrcadoRealizado() {
   const [cardFilter, setCardFilter] = useState<'todos' | 'mql' | 'nao-mql'>('todos');
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
-  const [categoryFilter, setCategoryFilter] = useState<string>('todos');
-  const [categoryMode, setCategoryMode] = useState<'is' | 'isNot'>('is');
-  const [funilFilter, setFunilFilter] = useState<string>('todos');
+  const [selectedFunis, setSelectedFunis] = useState<string[]>([]);
   
   const months = [
     { value: "2026-01", label: "Janeiro 2026" },
@@ -164,15 +162,6 @@ export default function GrowthOrcadoRealizado() {
     };
   }, [selectedMonth]);
 
-  const { data: categories } = useQuery<string[]>({
-    queryKey: ['/api/growth/orcado-realizado/categories'],
-    queryFn: async () => {
-      const res = await fetch('/api/growth/orcado-realizado/categories');
-      if (!res.ok) throw new Error('Failed to fetch categories');
-      return res.json();
-    },
-  });
-
   const { data: funis } = useQuery<string[]>({
     queryKey: ['/api/growth/orcado-realizado/funis'],
     queryFn: async () => {
@@ -182,13 +171,12 @@ export default function GrowthOrcadoRealizado() {
     },
   });
 
-  const categoryParam = categoryFilter !== 'todos' ? `&categoryName=${encodeURIComponent(categoryFilter)}&categoryMode=${categoryMode}` : '';
-  const funilParam = funilFilter !== 'todos' ? `&funilNgc=${encodeURIComponent(funilFilter)}` : '';
+  const funilParam = selectedFunis.length > 0 ? `&funilNgc=${selectedFunis.map(f => encodeURIComponent(f)).join(',')}` : '';
 
   const { data: mqlData, isLoading: mqlLoading } = useQuery<MQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate, contagemFilter, categoryFilter, categoryMode, funilFilter],
+    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${categoryParam}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
       if (!res.ok) throw new Error('Failed to fetch MQL metrics');
       return res.json();
     },
@@ -215,9 +203,9 @@ export default function GrowthOrcadoRealizado() {
   }
 
   const { data: naoMqlData, isLoading: naoMqlLoading } = useQuery<NaoMQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate, contagemFilter, categoryFilter, categoryMode, funilFilter],
+    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${categoryParam}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
       if (!res.ok) throw new Error('Failed to fetch Não-MQL metrics');
       return res.json();
     },
@@ -816,48 +804,37 @@ export default function GrowthOrcadoRealizado() {
         <div className="h-5 w-px bg-border" />
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground font-medium mr-1">Funil:</span>
-          <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5">
-            {(['is', 'isNot'] as const).map((mode) => (
+          <div className="flex items-center gap-1 flex-wrap">
+            {funis?.map((f) => {
+              const isActive = selectedFunis.includes(f);
+              return (
+                <button
+                  key={f}
+                  onClick={() => {
+                    setSelectedFunis((prev) =>
+                      isActive ? prev.filter((v) => v !== f) : [...prev, f]
+                    );
+                  }}
+                  className={cn(
+                    "px-2.5 py-1 rounded-md text-xs font-medium transition-all border",
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+                  )}
+                >
+                  {f}
+                </button>
+              );
+            })}
+            {selectedFunis.length > 0 && (
               <button
-                key={mode}
-                onClick={() => setCategoryMode(mode)}
-                className={cn(
-                  "px-2 py-1 rounded text-xs font-medium transition-all",
-                  categoryMode === mode
-                    ? "bg-background shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
+                onClick={() => setSelectedFunis([])}
+                className="px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
-                {mode === 'is' ? 'é' : 'não é'}
+                Limpar
               </button>
-            ))}
+            )}
           </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="h-8 w-48 text-xs">
-              <SelectValue placeholder="Todas as categorias" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              {categories?.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="h-5 w-px bg-border" />
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground font-medium mr-1">Funil NGC:</span>
-          <Select value={funilFilter} onValueChange={setFunilFilter}>
-            <SelectTrigger className="h-8 w-48 text-xs">
-              <SelectValue placeholder="Todos os funis" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              {funis?.map((f) => (
-                <SelectItem key={f} value={f}>{f}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

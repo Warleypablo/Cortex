@@ -1407,14 +1407,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       const contagem = (req.query.contagem as string) || 'contrato';
-      const categoryName = req.query.categoryName as string | undefined;
-      const categoryMode = (req.query.categoryMode as string) || 'is';
-      const categoryFilter = categoryName
-        ? (categoryMode === 'isNot' ? sql`AND d.category_name != ${categoryName}` : sql`AND d.category_name = ${categoryName}`)
-        : sql``;
 
-      const funilNgc = req.query.funilNgc as string | undefined;
-      const funilFilter = funilNgc ? sql`AND d.fnl_ngc = ${funilNgc}` : sql``;
+      // Funil NGC filter (supports multiple comma-separated values)
+      const funilNgcRaw = req.query.funilNgc as string | undefined;
+      const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
+      const funilFilter = funilValues.length > 0
+        ? sql`AND d.fnl_ngc IN (${sql.join(funilValues.map(v => sql`${v}`), sql`, `)})`
+        : sql``;
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
@@ -1473,7 +1472,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
           AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
-          ${categoryFilter}
           ${funilFilter}
       `);
 
@@ -1538,14 +1536,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       const contagem = (req.query.contagem as string) || 'contrato';
-      const categoryName = req.query.categoryName as string | undefined;
-      const categoryMode = (req.query.categoryMode as string) || 'is';
-      const categoryFilter = categoryName
-        ? (categoryMode === 'isNot' ? sql`AND d.category_name != ${categoryName}` : sql`AND d.category_name = ${categoryName}`)
-        : sql``;
 
-      const funilNgc = req.query.funilNgc as string | undefined;
-      const funilFilter = funilNgc ? sql`AND d.fnl_ngc = ${funilNgc}` : sql``;
+      // Funil NGC filter (supports multiple comma-separated values)
+      const funilNgcRaw = req.query.funilNgc as string | undefined;
+      const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
+      const funilFilter = funilValues.length > 0
+        ? sql`AND d.fnl_ngc IN (${sql.join(funilValues.map(v => sql`${v}`), sql`, `)})`
+        : sql``;
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
@@ -1604,7 +1601,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
           AND (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
-          ${categoryFilter}
           ${funilFilter}
       `);
 
