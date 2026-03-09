@@ -245,7 +245,7 @@ export default function DashboardClosers() {
         trend,
       };
     })
-    .sort((a, b) => b.total - a.total || b.mrr - a.mrr || b.reunioes - a.reunioes)
+    .sort((a, b) => b.mrr - a.mrr || b.pontual - a.pontual || b.reunioes - a.reunioes)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
   })();
 
