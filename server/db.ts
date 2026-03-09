@@ -1696,6 +1696,36 @@ export async function initializeBpSnapshotsTable(): Promise<void> {
   }
 }
 
+export async function initializeNotasFiscaisTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.notas_fiscais (
+        id SERIAL PRIMARY KEY,
+        mes VARCHAR(20) NOT NULL,
+        mes_num INTEGER NOT NULL,
+        ano INTEGER NOT NULL DEFAULT 2026,
+        categoria VARCHAR(50) NOT NULL,
+        arquivo VARCHAR(500) NOT NULL,
+        prestador VARCHAR(255),
+        valor_brl NUMERIC(18,2),
+        moeda_original VARCHAR(5) DEFAULT 'BRL',
+        padrao_usado VARCHAR(100),
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDENTE',
+        cnpj_prestador VARCHAR(20),
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(ano, mes_num, categoria, arquivo)
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_notas_fiscais_ano_mes
+      ON cortex_core.notas_fiscais(ano, mes_num)
+    `);
+    console.log('[database] notas_fiscais table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing notas_fiscais table:', error);
+  }
+}
+
 export async function seedBpSnapshotJaneiro2026(): Promise<void> {
   try {
     const existing = await db.execute(sql`SELECT 1 FROM cortex_core.bp_snapshots WHERE mes_ano = '2026-01' LIMIT 1`);

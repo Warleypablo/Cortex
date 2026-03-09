@@ -21191,6 +21191,241 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
+  // ==================== NOTAS FISCAIS ====================
+
+  const multer = (await import("multer")).default;
+  const nfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+  // POST /api/notas-fiscais/upload — Upload and process PDF files
+  app.post("/api/notas-fiscais/upload", isAuthenticated, nfUpload.array("files", 50), async (req: any, res) => {
+    try {
+      const { extractTextFromPDF, extractValueFromText, extractPrestadorFromFilename } = await import("./services/nfExtractor");
+      const { mes, mes_num, categoria, ano } = req.body;
+      const files = req.files as Express.Multer.File[];
+      if (!files?.length) return res.status(400).json({ error: "No files uploaded" });
+
+      const results = [];
+      for (const file of files) {
+        const { text, status: pdfStatus } = await extractTextFromPDF(file.buffer);
+        let valor: number | null = null;
+        let moeda = "";
+        let padrao = "";
+        let status = pdfStatus;
+
+        if (pdfStatus === "OK") {
+          const extracted = extractValueFromText(text);
+          valor = extracted.valor;
+          moeda = extracted.moeda;
+          padrao = extracted.padrao;
+          if (valor === null) status = "VALOR NÃO ENCONTRADO";
+        }
+
+        const prestador = extractPrestadorFromFilename(file.originalname);
+
+        await db.execute(sql`
+          INSERT INTO cortex_core.notas_fiscais (mes, mes_num, ano, categoria, arquivo, prestador, valor_brl, moeda_original, padrao_usado, status)
+          VALUES (${mes}, ${parseInt(mes_num)}, ${parseInt(ano || "2026")}, ${categoria}, ${file.originalname}, ${prestador}, ${valor}, ${moeda}, ${padrao}, ${status})
+          ON CONFLICT (ano, mes_num, categoria, arquivo) DO UPDATE SET
+            valor_brl = EXCLUDED.valor_brl, moeda_original = EXCLUDED.moeda_original,
+            padrao_usado = EXCLUDED.padrao_usado, status = EXCLUDED.status, prestador = EXCLUDED.prestador,
+            created_at = NOW()
+        `);
+        results.push({ arquivo: file.originalname, valor_brl: valor, status, prestador });
+      }
+      res.json({ processed: results.length, results });
+    } catch (error: any) {
+      console.error("[api] Error uploading NFs:", error);
+      res.status(500).json({ error: "Failed to process uploaded files" });
+    }
+  });
+
+  // POST /api/notas-fiscais/scan-local — Scan local folder (admin only)
+  app.post("/api/notas-fiscais/scan-local", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { extractTextFromPDF, extractValueFromText, extractPrestadorFromFilename } = await import("./services/nfExtractor");
+      const fs = await import("fs/promises");
+      const path = await import("path");
+
+      const baseDir = path.default.join(process.cwd(), "attached_assets", "2026");
+      const monthDirs = (await fs.default.readdir(baseDir, { withFileTypes: true }))
+        .filter(d => d.isDirectory() && /^\d{2}\s*-\s*/.test(d.name))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      let totalProcessed = 0;
+      let totalErrors = 0;
+
+      for (const monthDir of monthDirs) {
+        const mesNum = parseInt(monthDir.name.substring(0, 2));
+        const monthPath = path.default.join(baseDir, monthDir.name);
+        const catDirs = (await fs.default.readdir(monthPath, { withFileTypes: true }))
+          .filter(d => d.isDirectory());
+
+        for (const catDir of catDirs) {
+          const catPath = path.default.join(monthPath, catDir.name);
+          const files = (await fs.default.readdir(catPath))
+            .filter(f => f.toLowerCase().endsWith(".pdf"));
+
+          for (const filename of files) {
+            const filePath = path.default.join(catPath, filename);
+            const buffer = await fs.default.readFile(filePath);
+            const { text, status: pdfStatus } = await extractTextFromPDF(buffer);
+
+            let valor: number | null = null;
+            let moeda = "";
+            let padrao = "";
+            let status = pdfStatus;
+
+            if (pdfStatus === "OK") {
+              const extracted = extractValueFromText(text);
+              valor = extracted.valor;
+              moeda = extracted.moeda;
+              padrao = extracted.padrao;
+              if (valor === null) status = "VALOR NÃO ENCONTRADO";
+            }
+
+            const prestador = extractPrestadorFromFilename(filename);
+
+            await db.execute(sql`
+              INSERT INTO cortex_core.notas_fiscais (mes, mes_num, ano, categoria, arquivo, prestador, valor_brl, moeda_original, padrao_usado, status)
+              VALUES (${monthDir.name}, ${mesNum}, 2026, ${catDir.name}, ${filename}, ${prestador}, ${valor}, ${moeda}, ${padrao}, ${status})
+              ON CONFLICT (ano, mes_num, categoria, arquivo) DO UPDATE SET
+                valor_brl = EXCLUDED.valor_brl, moeda_original = EXCLUDED.moeda_original,
+                padrao_usado = EXCLUDED.padrao_usado, status = EXCLUDED.status, prestador = EXCLUDED.prestador,
+                created_at = NOW()
+            `);
+
+            if (status === "OK") totalProcessed++;
+            else totalErrors++;
+          }
+        }
+      }
+
+      res.json({ success: true, totalProcessed, totalErrors, total: totalProcessed + totalErrors });
+    } catch (error: any) {
+      console.error("[api] Error scanning local NFs:", error);
+      res.status(500).json({ error: "Failed to scan local folder" });
+    }
+  });
+
+  // GET /api/notas-fiscais/dashboard — Aggregated data for dashboard
+  app.get("/api/notas-fiscais/dashboard", isAuthenticated, async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string) || 2026;
+
+      const [resumoMensal, resumoCategoria, topPrestadores, totais, erros] = await Promise.all([
+        db.execute(sql`
+          SELECT mes, mes_num, COUNT(*) as qtd, SUM(CASE WHEN status = 'OK' THEN valor_brl ELSE 0 END) as total,
+            SUM(CASE WHEN status = 'OK' THEN 1 ELSE 0 END) as ok_count,
+            SUM(CASE WHEN status != 'OK' THEN 1 ELSE 0 END) as erro_count
+          FROM cortex_core.notas_fiscais WHERE ano = ${ano}
+          GROUP BY mes, mes_num ORDER BY mes_num
+        `),
+        db.execute(sql`
+          SELECT categoria, COUNT(*) as qtd, SUM(CASE WHEN status = 'OK' THEN valor_brl ELSE 0 END) as total,
+            SUM(CASE WHEN status = 'OK' THEN 1 ELSE 0 END) as ok_count
+          FROM cortex_core.notas_fiscais WHERE ano = ${ano}
+          GROUP BY categoria ORDER BY total DESC
+        `),
+        db.execute(sql`
+          SELECT prestador, COUNT(*) as qtd, SUM(valor_brl) as total
+          FROM cortex_core.notas_fiscais WHERE ano = ${ano} AND status = 'OK'
+          GROUP BY prestador ORDER BY total DESC LIMIT 20
+        `),
+        db.execute(sql`
+          SELECT COUNT(*) as total_nfs,
+            SUM(CASE WHEN status = 'OK' THEN 1 ELSE 0 END) as total_ok,
+            SUM(CASE WHEN status != 'OK' THEN 1 ELSE 0 END) as total_erros,
+            COALESCE(SUM(CASE WHEN status = 'OK' THEN valor_brl ELSE 0 END), 0) as valor_total,
+            COALESCE(AVG(CASE WHEN status = 'OK' THEN valor_brl END), 0) as valor_medio
+          FROM cortex_core.notas_fiscais WHERE ano = ${ano}
+        `),
+        db.execute(sql`
+          SELECT id, mes, categoria, arquivo, status, prestador
+          FROM cortex_core.notas_fiscais WHERE ano = ${ano} AND status != 'OK'
+          ORDER BY mes_num, categoria, arquivo
+        `)
+      ]);
+
+      res.json({
+        resumoMensal: resumoMensal.rows,
+        resumoCategoria: resumoCategoria.rows,
+        topPrestadores: topPrestadores.rows,
+        totais: totais.rows[0],
+        erros: erros.rows
+      });
+    } catch (error: any) {
+      console.error("[api] Error fetching NF dashboard:", error);
+      res.status(500).json({ error: "Failed to fetch NF dashboard" });
+    }
+  });
+
+  // GET /api/notas-fiscais/detalhado — Full list with filters
+  app.get("/api/notas-fiscais/detalhado", isAuthenticated, async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string) || 2026;
+      const result = await db.execute(sql`
+        SELECT id, mes, mes_num, categoria, arquivo, prestador, valor_brl, moeda_original, padrao_usado, status, created_at
+        FROM cortex_core.notas_fiscais
+        WHERE ano = ${ano}
+        ORDER BY mes_num, categoria, arquivo
+      `);
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("[api] Error fetching NF detalhado:", error);
+      res.status(500).json({ error: "Failed to fetch NF details" });
+    }
+  });
+
+  // GET /api/notas-fiscais/conciliacao — Cross NFs with Conta Azul
+  app.get("/api/notas-fiscais/conciliacao", isAuthenticated, async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string) || 2026;
+
+      const nfByMonth = await db.execute(sql`
+        SELECT mes_num, SUM(CASE WHEN status = 'OK' THEN valor_brl ELSE 0 END) as nf_total
+        FROM cortex_core.notas_fiscais WHERE ano = ${ano}
+        GROUP BY mes_num ORDER BY mes_num
+      `);
+
+      const cazByMonth = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_vencimento::date) as mes_num,
+          SUM(COALESCE(valor_pago::numeric, valor_liquido::numeric, 0)) as caz_total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND EXTRACT(YEAR FROM data_vencimento::date) = ${ano}
+        GROUP BY EXTRACT(MONTH FROM data_vencimento::date)
+        ORDER BY mes_num
+      `);
+
+      const nfByCat = await db.execute(sql`
+        SELECT categoria, SUM(CASE WHEN status = 'OK' THEN valor_brl ELSE 0 END) as nf_total
+        FROM cortex_core.notas_fiscais WHERE ano = ${ano}
+        GROUP BY categoria ORDER BY nf_total DESC
+      `);
+
+      res.json({
+        nfByMonth: nfByMonth.rows,
+        cazByMonth: cazByMonth.rows,
+        nfByCategory: nfByCat.rows
+      });
+    } catch (error: any) {
+      console.error("[api] Error fetching NF conciliacao:", error);
+      res.status(500).json({ error: "Failed to fetch conciliation data" });
+    }
+  });
+
+  // DELETE /api/notas-fiscais/reset — Admin: clear all NFs for re-scan
+  app.delete("/api/notas-fiscais/reset", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string) || 2026;
+      await db.execute(sql`DELETE FROM cortex_core.notas_fiscais WHERE ano = ${ano}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[api] Error resetting NFs:", error);
+      res.status(500).json({ error: "Failed to reset NFs" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Commented out for Windows compatibility - WebSocket causes ENOTSUP error
