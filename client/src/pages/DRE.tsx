@@ -280,15 +280,15 @@ export default function DRE() {
     return new Set(data.mesesComDados);
   }, [data]);
 
-  // AV% base: Receita Líquida Total (padrão contábil)
-  const receitaLiquidaTotal = useMemo(() => {
+  // AV% base: Faturamento Bruto (Receita Bruta Operacional)
+  const receitaBruta = useMemo(() => {
     if (!data) return emptyMonthsRecord();
-    return data.subtotais.receita_liquida_total;
+    return data.subtotais.receita_bruta_operacional;
   }, [data]);
 
-  const receitaLiquidaTotalAcum = useMemo(() => {
+  const receitaBrutaAcum = useMemo(() => {
     if (!data) return 0;
-    return computeAccumulated(data.subtotais.receita_liquida_total);
+    return computeAccumulated(data.subtotais.receita_bruta_operacional);
   }, [data]);
 
   // Group lines by parent_key (XX.YY) for grouped view
@@ -515,12 +515,12 @@ export default function DRE() {
           return (
             <Fragment key={`${keyPrefix}-${linha.categoria_id}-${mk}-wrap`}>
               {renderValueCell(linha.valores[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-${mk}`, undefined, mk, false, prevVal)}
-              {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaLiquidaTotal[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`, mk)}
+              {showAV && renderAVCell(linha.valores[mk] ?? 0, receitaBruta[mk] ?? 0, `${keyPrefix}-${linha.categoria_id}-av-${mk}`, mk)}
             </Fragment>
           );
         })}
         {renderValueCell(acum, `${keyPrefix}-${linha.categoria_id}-acum`, undefined, undefined, true)}
-        {showAV && renderAVCell(acum, receitaLiquidaTotalAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
+        {showAV && renderAVCell(acum, receitaBrutaAcum, `${keyPrefix}-${linha.categoria_id}-av-acum`)}
         <td className="px-1 py-1" />
       </tr>
     );
@@ -622,12 +622,12 @@ export default function DRE() {
             return (
               <Fragment key={`sub-${section.key}-${mk}-wrap`}>
                 {renderValueCell(subtotal[mk] ?? 0, `sub-${section.key}-${mk}`, "font-medium", mk, false, prevVal)}
-                {showAV && renderAVCell(subtotal[mk] ?? 0, receitaLiquidaTotal[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
+                {showAV && renderAVCell(subtotal[mk] ?? 0, receitaBruta[mk] ?? 0, `sub-${section.key}-av-${mk}`, mk)}
               </Fragment>
             );
           })}
           {renderValueCell(subtotalAccum, `sub-${section.key}-acum`, "font-medium", undefined, true)}
-          {showAV && renderAVCell(subtotalAccum, receitaLiquidaTotalAcum, `sub-${section.key}-av-acum`)}
+          {showAV && renderAVCell(subtotalAccum, receitaBrutaAcum, `sub-${section.key}-av-acum`)}
           <td className="px-1 py-1" />
         </tr>
       </Fragment>
@@ -667,7 +667,7 @@ export default function DRE() {
                 isResultRow
               )}
               {showAV &&
-                renderAVCell(subtotal[mk] ?? 0, receitaLiquidaTotal[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`, mk)}
+                renderAVCell(subtotal[mk] ?? 0, receitaBruta[mk] ?? 0, `derived-${section.subtotalKey}-av-${mk}`, mk)}
             </Fragment>
           );
         })}
@@ -679,7 +679,7 @@ export default function DRE() {
           true
         )}
         {showAV &&
-          renderAVCell(acum, receitaLiquidaTotalAcum, `derived-${section.subtotalKey}-av-acum`)}
+          renderAVCell(acum, receitaBrutaAcum, `derived-${section.subtotalKey}-av-acum`)}
         {SPARKLINE_KEYS.has(section.subtotalKey) ? (
           <Sparkline valores={subtotal} mesesComDados={mesesComDados} />
         ) : (
