@@ -54,7 +54,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import RelatorioSemanalChurn from "./RelatorioSemanalChurn";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
+import { format, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   ResponsiveContainer, 
@@ -448,6 +448,14 @@ export default function ChurnDetalhamento() {
   const MRR_BASE_OVERRIDE = 1119046;
   const CHURN_MAX_TARGET = 102000;
   const BASE_REFERENCE_DATE = new Date(2026, 0, 1);
+
+  // BP 2026 - Metas mensais de churn MRR (planejado)
+  const BP_CHURN_MRR_TARGETS: Record<string, number> = {
+    "2026-01": 104117, "2026-02": 114096, "2026-03": 123177,
+    "2026-04": 133691, "2026-05": 143259, "2026-06": 151966,
+    "2026-07": 162589, "2026-08": 172256, "2026-09": 181053,
+    "2026-10": 191758, "2026-11": 201500, "2026-12": 210365,
+  };
   
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSquads, setFilterSquads] = useState<string[]>([]);
@@ -682,6 +690,33 @@ export default function ChurnDetalhamento() {
     const mrrPerdido = filteredMetricas.mrr_perdido;
     return mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
   }, [filteredMetricas.mrr_perdido]);
+
+  // Meta planejada pro-rateada até hoje (BP 2026)
+  const churnPlanejado = useMemo(() => {
+    const today = new Date();
+    const periodStart = dataInicio ? parseISO(dataInicio) : null;
+    const periodEnd = dataFim ? parseISO(dataFim) : null;
+    if (!periodStart || !periodEnd) return { mrrPlanejado: 0, taxaPlanejada: 0 };
+
+    // Pegar o mês de referência do filtro
+    const monthKey = format(periodStart, "yyyy-MM");
+    const targetMensal = BP_CHURN_MRR_TARGETS[monthKey] || 0;
+    if (targetMensal === 0) return { mrrPlanejado: 0, taxaPlanejada: 0 };
+
+    // Total de dias no mês
+    const totalDaysInMonth = getDaysInMonth(periodStart);
+
+    // Dias decorridos até hoje (ou até o fim do período se já passou)
+    const effectiveEnd = today < periodStart ? periodStart : today > periodEnd ? periodEnd : today;
+    const elapsedDays = differenceInCalendarDays(effectiveEnd, periodStart) + 1;
+    const safeDays = Math.max(0, Math.min(elapsedDays, totalDaysInMonth));
+
+    // Meta pro-rateada até hoje
+    const mrrPlanejado = (targetMensal / totalDaysInMonth) * safeDays;
+    const taxaPlanejada = MRR_BASE_OVERRIDE > 0 ? (mrrPlanejado / MRR_BASE_OVERRIDE) * 100 : 0;
+
+    return { mrrPlanejado, taxaPlanejada, targetMensal };
+  }, [dataInicio, dataFim]);
 
   const churnDailyInsights = useMemo(() => {
     const mrrBase = MRR_BASE_OVERRIDE;
@@ -1850,6 +1885,11 @@ export default function ChurnDetalhamento() {
                 <p className="text-xs text-muted-foreground mt-3 text-center">
                   Base: {format(BASE_REFERENCE_DATE, "MMMM/yyyy", { locale: ptBR })}
                 </p>
+                {churnPlanejado.taxaPlanejada > 0 && (
+                  <p className="text-[11px] text-muted-foreground text-center mt-1">
+                    Planejado até hoje: <span className="font-semibold">{churnPlanejado.taxaPlanejada.toFixed(2)}%</span>
+                  </p>
+                )}
                 <p className="text-[10px] text-muted-foreground text-center">
                   Status baseado na media diaria
                 </p>
@@ -1864,6 +1904,28 @@ export default function ChurnDetalhamento() {
                   </div>
                   <div className="text-2xl font-bold text-red-700 dark:text-red-300">{formatCurrency(filteredMetricas.mrr_perdido)}</div>
                   <div className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">{filteredMetricas.total_churned} contratos encerrados</div>
+                  {churnPlanejado.mrrPlanejado > 0 && (
+                    <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800/50">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-red-600/70 dark:text-red-400/70">Planejado até hoje</span>
+                        <span className="text-[11px] font-semibold text-red-600 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(churnPlanejado.mrrPlanejado)}</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-0.5">
+                        <span className="text-[11px] text-red-600/70 dark:text-red-400/70">Meta do mês</span>
+                        <span className="text-[11px] font-semibold text-red-600 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(churnPlanejado.targetMensal || 0)}</span>
+                      </div>
+                      {(() => {
+                        const diff = filteredMetricas.mrr_perdido - churnPlanejado.mrrPlanejado;
+                        const isOver = diff > 0;
+                        return (
+                          <div className={`flex items-center gap-1 mt-1 text-[11px] font-medium ${isOver ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {isOver ? <TrendingDown className="h-3 w-3" /> : <TrendingDown className="h-3 w-3 rotate-180" />}
+                            <span>{isOver ? '+' : ''}{formatCurrencyNoDecimals(diff)} {isOver ? 'acima' : 'abaixo'} do planejado</span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
                 </div>
                 
                 <div className="flex-1 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50 flex flex-col justify-center">
