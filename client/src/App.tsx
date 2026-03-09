@@ -130,6 +130,7 @@ const ProcessosInternos = lazyWithRetry(() => import("@/pages/ProcessosInternos"
 const ContratosModule = lazyWithRetry(() => import("@/pages/ContratosModule"));
 const MargemCliente = lazyWithRetry(() => import("@/pages/MargemCliente"));
 const AnaliseSquads = lazyWithRetry(() => import("@/pages/AnaliseSquads"));
+const SaudeBaseAtiva = lazyWithRetry(() => import("@/pages/SaudeBaseAtiva"));
 const AutoReport = lazyWithRetry(() => import("@/pages/AutoReport"));
 const Chamados = lazyWithRetry(() => import("@/pages/Chamados"));
 const PortalCliente = PortalClientePage;
@@ -278,6 +279,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>
       <Route path="/dashboard/contratos-detalhamento">{() => <ProtectedRoute path="/dashboard/contratos-detalhamento" component={ContratosDetalhamento} />}</Route>
       <Route path="/dashboard/analise-squads">{() => <ProtectedRoute path="/dashboard/analise-squads" component={AnaliseSquads} />}</Route>
+      <Route path="/dashboard/saude-base-ativa">{() => <ProtectedRoute path="/dashboard/saude-base-ativa" component={SaudeBaseAtiva} />}</Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       
       {/* Financeiro */}
