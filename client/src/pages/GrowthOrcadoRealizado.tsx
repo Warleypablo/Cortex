@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus, Calendar, Phone, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area, Line } from "recharts";
 
@@ -804,37 +805,14 @@ export default function GrowthOrcadoRealizado() {
         <div className="h-5 w-px bg-border" />
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground font-medium mr-1">Funil:</span>
-          <div className="flex items-center gap-1 flex-wrap">
-            {funis?.map((f) => {
-              const isActive = selectedFunis.includes(f);
-              return (
-                <button
-                  key={f}
-                  onClick={() => {
-                    setSelectedFunis((prev) =>
-                      isActive ? prev.filter((v) => v !== f) : [...prev, f]
-                    );
-                  }}
-                  className={cn(
-                    "px-2.5 py-1 rounded-md text-xs font-medium transition-all border",
-                    isActive
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                      : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
-                  )}
-                >
-                  {f}
-                </button>
-              );
-            })}
-            {selectedFunis.length > 0 && (
-              <button
-                onClick={() => setSelectedFunis([])}
-                className="px-2 py-1 rounded-md text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Limpar
-              </button>
-            )}
-          </div>
+          <MultiSelect
+            options={funis ?? []}
+            selected={selectedFunis}
+            onChange={setSelectedFunis}
+            placeholder="Todos os funis"
+            searchPlaceholder="Buscar funil..."
+            className="h-8 w-56 text-xs"
+          />
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
