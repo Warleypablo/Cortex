@@ -11,6 +11,12 @@ interface DRELineItem {
   parent_nome: string;      // e.g. "Mão de Obra Operacional"
   tipo: 'receita' | 'despesa';
   valores: Record<string, number>; // mes_01..mes_12 + acumulado
+  fornecedores?: DREFornecedor[];
+}
+
+interface DREFornecedor {
+  nome: string;
+  valores: Record<string, number>; // mes_01..mes_12 + acumulado
 }
 
 interface DREResponse {
@@ -151,6 +157,71 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
       const linhas = Array.from(categoriaMap.values()).sort((a, b) =>
         a.categoria_nome.localeCompare(b.categoria_nome)
       );
+
+      // Fetch supplier-level detail for expense categories
+      const fornecedorResult = await db.execute(sql`
+        WITH categorias_expandidas AS (
+          SELECT DISTINCT ON (p.id, REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g'))
+            p.id,
+            REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g') AS categoria_nome,
+            p.tipo_evento,
+            p.empresa,
+            EXTRACT(MONTH FROM p.data_quitacao::date)::int AS mes,
+            COALESCE(p.valor_bruto::numeric, 0) AS valor_bruto,
+            COALESCE(c.nome, c.empresa, 'Não identificado') AS fornecedor
+          FROM "Conta Azul".caz_parcelas p
+          LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = COALESCE(c.ids, c.id::text),
+               regexp_split_to_table(p.categoria_nome, ';') AS cat(categoria)
+          WHERE p.status = 'QUITADO'
+            AND EXTRACT(YEAR FROM p.data_quitacao::date) = ${ano}
+            ${empresaFilter}
+            AND p.categoria_nome IS NOT NULL
+            AND p.categoria_nome != ''
+            AND p.tipo_evento = 'DESPESA'
+        )
+        SELECT
+          categoria_nome,
+          fornecedor,
+          mes,
+          SUM(valor_bruto) AS total
+        FROM categorias_expandidas
+        GROUP BY categoria_nome, fornecedor, mes
+        ORDER BY categoria_nome, fornecedor, mes
+      `);
+
+      // Build fornecedor map: categoria_nome -> fornecedor_nome -> { valores }
+      const fornecedorMap = new Map<string, Map<string, Record<string, number>>>();
+      for (const row of fornecedorResult.rows) {
+        const catNome = (row.categoria_nome as string).trim();
+        const fornNome = (row.fornecedor as string);
+        const mes = parseInt(row.mes as string);
+        const total = parseFloat(row.total as string) || 0;
+
+        if (!fornecedorMap.has(catNome)) {
+          fornecedorMap.set(catNome, new Map());
+        }
+        const catMap = fornecedorMap.get(catNome)!;
+        if (!catMap.has(fornNome)) {
+          catMap.set(fornNome, emptyMonths());
+        }
+        const fornValores = catMap.get(fornNome)!;
+        const mesKey = `mes_${String(mes).padStart(2, '0')}`;
+        fornValores[mesKey] += total;
+        fornValores.acumulado += total;
+      }
+
+      // Attach fornecedores to linhas (only expenses)
+      for (const linha of linhas) {
+        const DESPESA_GRUPOS = new Set(['05', '06', '07', '08', 'DD']);
+        if (DESPESA_GRUPOS.has(linha.grupo)) {
+          const catFornecedores = fornecedorMap.get(linha.categoria_nome);
+          if (catFornecedores) {
+            linha.fornecedores = Array.from(catFornecedores.entries())
+              .map(([nome, valores]) => ({ nome, valores }))
+              .sort((a, b) => b.valores.acumulado - a.valores.acumulado);
+          }
+        }
+      }
 
       // Calculate subtotals
       const subtotais = {
