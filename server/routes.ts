@@ -11123,6 +11123,169 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   });
 
   // ========================================
+  // SAÚDE DA BASE ATIVA
+  // ========================================
+  app.get("/api/saude-base-ativa", async (req, res) => {
+    try {
+      // 1) Contratos ativos com LT calculado
+      const contratosResult = await db.execute(sql`
+        SELECT c.id_subtask, c.servico, c.status, c.valorr::numeric as mrr,
+          c.valorp::numeric as valorp, c.data_inicio, c.squad, c.produto, c.plano,
+          c.vendedor, c.responsavel, c.cs_responsavel,
+          cl.nome as nome_cliente, cl.cnpj, cl.cluster,
+          CASE WHEN c.data_inicio IS NOT NULL
+            THEN EXTRACT(EPOCH FROM (NOW() - c.data_inicio::timestamp)) / (86400 * 30.44)
+            ELSE 0 END as lt_meses
+        FROM "Clickup".cup_contratos c
+        LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
+        WHERE LOWER(c.status) IN ('ativo', 'onboarding', 'triagem')
+          AND c.valorr IS NOT NULL AND c.valorr::numeric > 0
+          AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+        ORDER BY lt_meses DESC
+      `);
+      const contratos = (contratosResult.rows as any[]).map(r => ({
+        id_subtask: r.id_subtask,
+        servico: r.servico,
+        status: r.status,
+        mrr: parseFloat(r.mrr) || 0,
+        valorp: parseFloat(r.valorp) || 0,
+        data_inicio: r.data_inicio,
+        squad: r.squad?.trim() || 'Sem Squad',
+        produto: r.produto?.trim() || 'Sem Produto',
+        plano: r.plano?.trim() || 'Sem Plano',
+        vendedor: r.vendedor,
+        responsavel: r.responsavel,
+        cs_responsavel: r.cs_responsavel,
+        nome_cliente: r.nome_cliente || 'Sem Nome',
+        cnpj: r.cnpj,
+        cluster: r.cluster?.trim() || 'Sem Cluster',
+        lt_meses: parseFloat(r.lt_meses) || 0,
+      }));
+
+      // 2) Evolução LT médio mensal (últimos 12 meses via cup_data_hist + mês atual)
+      const evolucaoResult = await db.execute(sql`
+        WITH monthly_snapshots AS (
+          SELECT DISTINCT ON (TO_CHAR(data_snapshot, 'YYYY-MM'))
+            TO_CHAR(data_snapshot, 'YYYY-MM') as mes,
+            data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= NOW() - INTERVAL '12 months'
+          ORDER BY TO_CHAR(data_snapshot, 'YYYY-MM'), data_snapshot DESC
+        ),
+        hist_lt AS (
+          SELECT ms.mes,
+            AVG(
+              CASE WHEN h.data_inicio IS NOT NULL
+                THEN EXTRACT(EPOCH FROM (ms.data_snapshot - h.data_inicio::timestamp)) / (86400 * 30.44)
+                ELSE 0 END
+            ) as lt_medio,
+            COUNT(*) as total_contratos,
+            AVG(h.valorr::numeric) as ticket_medio
+          FROM monthly_snapshots ms
+          JOIN "Clickup".cup_data_hist h ON h.data_snapshot = ms.data_snapshot
+          WHERE LOWER(h.status) IN ('ativo', 'onboarding', 'triagem')
+            AND h.valorr IS NOT NULL AND h.valorr::numeric > 0
+            AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+          GROUP BY ms.mes
+        )
+        SELECT mes, lt_medio, total_contratos, ticket_medio
+        FROM hist_lt
+        ORDER BY mes
+      `);
+      const evolucao = (evolucaoResult.rows as any[]).map(r => ({
+        mes: r.mes,
+        lt_medio: parseFloat(r.lt_medio) || 0,
+        total_contratos: parseInt(r.total_contratos) || 0,
+        ticket_medio: parseFloat(r.ticket_medio) || 0,
+      }));
+
+      // Add current month
+      const now = new Date();
+      const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const existeMesAtual = evolucao.some(e => e.mes === mesAtual);
+      if (!existeMesAtual && contratos.length > 0) {
+        const ltMedioAtual = contratos.reduce((sum, c) => sum + c.lt_meses, 0) / contratos.length;
+        const ticketMedioAtual = contratos.reduce((sum, c) => sum + c.mrr, 0) / contratos.length;
+        evolucao.push({
+          mes: mesAtual,
+          lt_medio: ltMedioAtual,
+          total_contratos: contratos.length,
+          ticket_medio: ticketMedioAtual,
+        });
+      }
+
+      // 3) Aggregate KPIs
+      const totalContratos = contratos.length;
+      const mrrTotal = contratos.reduce((sum, c) => sum + c.mrr, 0);
+      const ltMedio = totalContratos > 0 ? contratos.reduce((sum, c) => sum + c.lt_meses, 0) / totalContratos : 0;
+      const ticketMedio = totalContratos > 0 ? mrrTotal / totalContratos : 0;
+      const ltvEstimado = ticketMedio * ltMedio;
+
+      // 4) Distribution by LT ranges
+      const faixas = [
+        { label: '0-3m', min: 0, max: 3 },
+        { label: '3-6m', min: 3, max: 6 },
+        { label: '6-12m', min: 6, max: 12 },
+        { label: '12-24m', min: 12, max: 24 },
+        { label: '24m+', min: 24, max: Infinity },
+      ];
+      const distribuicaoLT = faixas.map(f => ({
+        faixa: f.label,
+        count: contratos.filter(c => c.lt_meses >= f.min && c.lt_meses < f.max).length,
+        mrr: contratos.filter(c => c.lt_meses >= f.min && c.lt_meses < f.max).reduce((s, c) => s + c.mrr, 0),
+      }));
+
+      // 5) Breakdowns
+      const groupBy = (key: 'squad' | 'produto' | 'plano' | 'cluster') => {
+        const map = new Map<string, { count: number; totalLT: number; mrr: number }>();
+        for (const c of contratos) {
+          const val = c[key];
+          const existing = map.get(val) || { count: 0, totalLT: 0, mrr: 0 };
+          existing.count++;
+          existing.totalLT += c.lt_meses;
+          existing.mrr += c.mrr;
+          map.set(val, existing);
+        }
+        return Array.from(map.entries())
+          .map(([name, data]) => ({
+            name,
+            lt_medio: data.count > 0 ? data.totalLT / data.count : 0,
+            contratos: data.count,
+            mrr: data.mrr,
+          }))
+          .sort((a, b) => b.lt_medio - a.lt_medio);
+      };
+
+      // 6) Available filter values
+      const uniqueValues = (key: 'squad' | 'produto' | 'plano' | 'cluster') => {
+        return Array.from(new Set(contratos.map(c => c[key]))).filter(Boolean).sort();
+      };
+
+      res.json({
+        contratos,
+        evolucao,
+        kpis: { ltMedio, ticketMedio, ltvEstimado, totalContratos, mrrTotal },
+        distribuicaoLT,
+        breakdowns: {
+          squad: groupBy('squad'),
+          produto: groupBy('produto'),
+          plano: groupBy('plano'),
+          cluster: groupBy('cluster'),
+        },
+        filtros: {
+          squads: uniqueValues('squad'),
+          produtos: uniqueValues('produto'),
+          planos: uniqueValues('plano'),
+          clusters: uniqueValues('cluster'),
+        },
+      });
+    } catch (error: any) {
+      console.error("[api] Error fetching saude base ativa:", error);
+      res.status(500).json({ error: "Failed to fetch saude base ativa data" });
+    }
+  });
+
+  // ========================================
   // GPTURBO CHAT API ENDPOINT (powered by OpenAI)
   // ========================================
   app.post("/api/cases/chat", async (req, res) => {

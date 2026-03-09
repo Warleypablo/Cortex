@@ -40,6 +40,7 @@ export const PERMISSION_KEYS = {
     EVOLUCAO_MENSAL: 'gestao.evolucao_mensal',
     CONTRATOS_DETALHAMENTO: 'gestao.contratos_detalhamento',
     ANALISE_SQUADS: 'gestao.analise_squads',
+    SAUDE_BASE: 'gestao.saude_base',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -203,6 +204,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/contratos-detalhamento': PERMISSION_KEYS.GESTAO.CONTRATOS_DETALHAMENTO,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
+  '/dashboard/saude-base-ativa': PERMISSION_KEYS.GESTAO.SAUDE_BASE,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   '/contratos': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   // Operação
@@ -407,6 +409,7 @@ export const NAV_CONFIG = {
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
         { title: 'Predição de Churn', url: '/dashboard/churn-predicao', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_PREDICAO },
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
+        { title: 'Saúde da Base', url: '/dashboard/saude-base-ativa', icon: 'HeartPulse', permissionKey: PERMISSION_KEYS.GESTAO.SAUDE_BASE },
       ],
     },
     {
@@ -613,6 +616,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
   [PERMISSION_KEYS.GESTAO.CONTRATOS_DETALHAMENTO]: 'Detalhamento Contratos',
   [PERMISSION_KEYS.GESTAO.ANALISE_SQUADS]: 'Análise de Squads',
+  [PERMISSION_KEYS.GESTAO.SAUDE_BASE]: 'Saúde da Base Ativa',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',
