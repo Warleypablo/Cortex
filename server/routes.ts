@@ -11446,10 +11446,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             )) as nome_normalizado
           FROM "Bitrix".crm_deal b
           WHERE LOWER(b.stage_name) = 'negócio ganho'
-            AND b.data_fechamento IS NOT NULL
-            AND b.data_fechamento >= ${startDate}::date
-            AND b.data_fechamento <= ${endDate}::date
-            AND COALESCE(b.valor_recorrente, 0) > 0
         ),
         clickup_clientes AS (
           SELECT
@@ -11483,11 +11479,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             COALESCE(SUM(cp.valor_bruto), 0) as valor_contaazul,
             COUNT(cp.id) as qtd_parcelas
           FROM "Conta Azul".caz_parcelas cp
-          JOIN "Conta Azul".caz_clientes cc ON cp.id_cliente = cc.ids
-          WHERE cp.tipo_evento = 'RECEIVE'
-            AND cp.data_vencimento >= ${startDate}::timestamp
-            AND cp.data_vencimento <= (${endDate}::timestamp + interval '1 day')
-            AND LOWER(cp.status) IN ('pago', 'pendente', 'vencido')
+          JOIN "Conta Azul".caz_clientes cc ON cp.id_cliente::text = cc.ids
+          WHERE cp.tipo_evento = 'RECEITA'
+            AND cp.data_vencimento >= ${startDate}::date
+            AND cp.data_vencimento <= ${endDate}::date
+            AND LOWER(cp.status) IN ('quitado', 'pendente', 'atrasado')
           GROUP BY REGEXP_REPLACE(COALESCE(cc.cnpj, ''), '[^0-9]', '', 'g'), cc.nome
         )
         SELECT
