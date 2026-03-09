@@ -6916,6 +6916,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       "DESENVOLVEDOR": {
         titulo: "DESENVOLVEDOR",
         escopo: "prestar à CONTRATANTE serviços técnicos especializados de desenvolvimento de software voltados a e-commerces na plataforma Shopify, abrangendo, de forma ampla e não exaustiva, a criação, customização, manutenção, correção, evolução e otimização de lojas virtuais, temas, funcionalidades, integrações, automações, APIs e aplicações relacionadas, bem como suporte técnico, ajustes de performance, segurança, conformidade técnica e boas práticas de desenvolvimento, de acordo com as demandas definidas pela CONTRATANTE, utilizando-se das tecnologias, recursos e padrões aplicáveis ao ecossistema Shopify, comprometendo-se a executar os serviços com diligência, qualidade técnica e observância às normas legais e contratuais vigentes"
+      },
+      "GESTOR DE COMUNIDADE": {
+        titulo: "GESTOR DE COMUNIDADE",
+        escopo: "planejar, criar e gerenciar estratégias de comunidade para fortalecer o relacionamento entre a marca e seu público, moderar e engajar comunidades em plataformas digitais como redes sociais, fóruns, grupos e canais de comunicação, desenvolver conteúdos e ações que estimulem a participação, interação e fidelização dos membros da comunidade, monitorar métricas de engajamento e crescimento da comunidade, gerando relatórios e insights para otimização contínua, identificar oportunidades de relacionamento e colaborar com as equipes de marketing, CX e conteúdo para alinhar as estratégias de comunidade aos objetivos do negócio, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
       }
     };
 
