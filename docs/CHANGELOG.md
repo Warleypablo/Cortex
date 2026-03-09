@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-03-09 | fix(contribuicao-squad): fix resultado liquido calculation to include all expenses
+
+**O que foi feito:**
+- Corrigido cálculo do Resultado Líquido no ranking de squads para incluir todas as despesas (impostos + salários + CXCS + freelancers) rateadas proporcionalmente à receita
+- Anteriormente só deduzia a taxa de imposto, resultando em margem artificialmente alta
+
+**Por que:**
+- O valor da margem estava muito baixo/errado - mostrava apenas dedução de imposto em vez de todas as despesas
+
+**Arquivos alterados:**
+- `client/src/pages/ContribuicaoSquad.tsx` - Corrigido squadRanking.resultadoLiquido e coluna de despesas na tabela
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-09 | refactor(inadimplencia): improve dashboard UX with compact filters, KPI deltas, and chart enhancements
 
 **O que foi feito:**
