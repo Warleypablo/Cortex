@@ -1757,4 +1757,55 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       res.status(500).json({ error: "Failed to fetch Ads metrics" });
     }
   });
+
+  // Comercial - RR (Reunião Realizada) por semana por SDR
+  app.get("/api/growth/comercial/rr-semanal-por-sdr", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const result = await db.execute(sql`
+        SELECT
+          EXTRACT(ISOYEAR FROM d.data_reuniao_realizada::date)::int AS ano,
+          EXTRACT(WEEK FROM d.data_reuniao_realizada::date)::int AS semana_num,
+          TO_CHAR(MIN(d.data_reuniao_realizada::date), 'Mon') AS mes_label,
+          u.nome AS sdr_name,
+          u.id AS sdr_id,
+          COUNT(CASE WHEN (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
+            AND d.stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
+              'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) AS rr_mql,
+          COUNT(CASE WHEN (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
+            AND d.stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
+              'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) AS rr_nao_mql,
+          COUNT(CASE WHEN d.stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
+              'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) AS rr_total
+        FROM "Bitrix".crm_deal d
+        INNER JOIN "Bitrix".crm_users u
+          ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+        WHERE d.data_reuniao_realizada IS NOT NULL
+          AND d.data_reuniao_realizada::date >= ${startDate}::date
+          AND d.data_reuniao_realizada::date <= ${endDate}::date
+        GROUP BY 1, 2, u.nome, u.id
+        ORDER BY 1, 2, u.nome
+      `);
+
+      const data = (result.rows as any[]).map((row: any) => ({
+        semana: `S${row.semana_num} ${row.mes_label}`,
+        sdrName: row.sdr_name,
+        sdrId: parseInt(row.sdr_id),
+        rrMql: parseInt(row.rr_mql) || 0,
+        rrNaoMql: parseInt(row.rr_nao_mql) || 0,
+        rrTotal: parseInt(row.rr_total) || 0,
+      }));
+
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching RR semanal por SDR:", error);
+      res.status(500).json({ error: "Failed to fetch RR semanal por SDR" });
+    }
+  });
 }

@@ -63,6 +63,7 @@ export const PERMISSION_KEYS = {
     DET_VENDAS: 'com.det_vendas',
     ANALISE_VENDAS: 'com.analise_vendas',
     APRESENTACAO: 'com.apresentacao',
+    REUNIOES: 'com.reunioes',
   },
   // Growth
   GROWTH: {
@@ -222,6 +223,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/comercial/detalhamento-vendas': PERMISSION_KEYS.COM.DET_VENDAS,
   '/dashboard/comercial/analise-vendas': PERMISSION_KEYS.COM.ANALISE_VENDAS,
   '/dashboard/comercial/apresentacao': PERMISSION_KEYS.COM.APRESENTACAO,
+  '/dashboard/comercial/reunioes': PERMISSION_KEYS.COM.REUNIOES,
   '/presentation': PERMISSION_KEYS.COM.APRESENTACAO,
   // Growth
   '/growth/visao-geral': PERMISSION_KEYS.GROWTH.VISAO_GERAL,
@@ -419,6 +421,7 @@ export const NAV_CONFIG = {
         { title: 'Detalhamento SDRs', url: '/dashboard/comercial/detalhamento-sdrs', icon: 'UserSearch', permissionKey: PERMISSION_KEYS.COM.DET_SDRS },
         { title: 'Detalhamento Vendas', url: '/dashboard/comercial/detalhamento-vendas', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.COM.DET_VENDAS },
         { title: 'Análise de Vendas', url: '/dashboard/comercial/analise-vendas', icon: 'LineChart', permissionKey: PERMISSION_KEYS.COM.ANALISE_VENDAS },
+        { title: 'Reuniões', url: '/dashboard/comercial/reunioes', icon: 'Phone', permissionKey: PERMISSION_KEYS.COM.REUNIOES },
       ],
     },
     {
@@ -626,6 +629,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.COM.DET_SDRS]: 'Detalhamento SDRs',
   [PERMISSION_KEYS.COM.DET_VENDAS]: 'Detalhamento Vendas',
   [PERMISSION_KEYS.COM.ANALISE_VENDAS]: 'Análise de Vendas',
+  [PERMISSION_KEYS.COM.REUNIOES]: 'Reuniões',
   [PERMISSION_KEYS.GROWTH.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.GROWTH.META_ADS]: 'Meta Ads',
   [PERMISSION_KEYS.GROWTH.PLATAFORMA]: 'Por Plataforma',
