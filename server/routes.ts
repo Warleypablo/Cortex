@@ -11139,7 +11139,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         FROM "Clickup".cup_contratos c
         LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
         WHERE LOWER(c.status) IN ('ativo', 'onboarding', 'triagem')
-          AND c.valorr IS NOT NULL AND c.valorr::numeric > 0
+          AND (COALESCE(c.valorr::numeric, 0) > 0 OR COALESCE(c.valorp::numeric, 0) > 0)
           AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
         ORDER BY lt_meses DESC
       `);
