@@ -41,6 +41,7 @@ export function registerChamadosRoutes(app: Express) {
           'Operação': 'operacao',
           'Operações': 'operacao',
           'Comercial': 'comercial',
+          'Cortex': 'cortex',
         };
         const mappedArea = deptAreaMap[dept] || dept.toLowerCase();
         conditions.push(`c.area = '${mappedArea.replace(/'/g, "''")}'`);
@@ -175,9 +176,16 @@ export function registerChamadosRoutes(app: Express) {
         squad = (squadResult.rows[0] as any)?.squad || null;
       } catch { /* ignore */ }
 
+      // Auto-assign Cortex chamados to Dev Admin (Warley Silva)
+      const isCortex = area === 'cortex';
+      const respId = isCortex ? 'dev-admin-001' : null;
+      const respNome = isCortex ? 'Dev Admin' : null;
+      const respEmail = isCortex ? 'warleyreserva4@gmail.com' : null;
+      const autoStatus = isCortex ? 'triagem' : 'aberto';
+
       const result = await db.execute(sql`
-        INSERT INTO cortex_core.chamados (titulo, descricao, area, categoria, prioridade, solicitante_id, solicitante_nome, solicitante_email, solicitante_squad, cliente_cnpj, cliente_nome)
-        VALUES (${titulo}, ${descricao}, ${area}, ${categoria || null}, ${prioridade || 'media'}, ${user.googleId || user.id}, ${user.name}, ${user.email}, ${squad}, ${cliente_cnpj || null}, ${cliente_nome || null})
+        INSERT INTO cortex_core.chamados (titulo, descricao, area, categoria, prioridade, solicitante_id, solicitante_nome, solicitante_email, solicitante_squad, cliente_cnpj, cliente_nome, responsavel_id, responsavel_nome, responsavel_email, status)
+        VALUES (${titulo}, ${descricao}, ${area}, ${categoria || null}, ${prioridade || 'media'}, ${user.googleId || user.id}, ${user.name}, ${user.email}, ${squad}, ${cliente_cnpj || null}, ${cliente_nome || null}, ${respId}, ${respNome}, ${respEmail}, ${autoStatus})
         RETURNING *
       `);
 
