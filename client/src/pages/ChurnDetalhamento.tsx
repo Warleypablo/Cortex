@@ -1900,28 +1900,28 @@ export default function ChurnDetalhamento() {
               {/* Coluna NRR & Cross-sell */}
               <div className="flex flex-col gap-3">
                 <div className={`flex-1 p-4 rounded-xl border flex flex-col justify-center ${
-                  (nrrData?.nrr_pct ?? 100) >= 100
+                  (nrrData?.nrr_pct ?? 0) <= 0
                     ? 'bg-green-50 dark:bg-green-950/30 border-green-100 dark:border-green-900/50'
                     : 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50'
                 }`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className={`text-xs font-medium uppercase ${
-                      (nrrData?.nrr_pct ?? 100) >= 100
+                      (nrrData?.nrr_pct ?? 0) <= 0
                         ? 'text-green-600 dark:text-green-400'
                         : 'text-red-600 dark:text-red-400'
                     }`}>NRR (Net Revenue Retention)</span>
                     <Percent className={`h-4 w-4 ${
-                      (nrrData?.nrr_pct ?? 100) >= 100
+                      (nrrData?.nrr_pct ?? 0) <= 0
                         ? 'text-green-500'
                         : 'text-red-500'
                     }`} />
                   </div>
                   <div className={`text-2xl font-bold ${
-                    (nrrData?.nrr_pct ?? 100) >= 100
+                    (nrrData?.nrr_pct ?? 0) <= 0
                       ? 'text-green-700 dark:text-green-300'
                       : 'text-red-700 dark:text-red-300'
                   }`}>{(nrrData?.nrr_pct ?? 0).toFixed(1)}%</div>
-                  <div className="text-xs text-muted-foreground mt-1">(MRR Início - Churn + Cross-sell) / MRR Início</div>
+                  <div className="text-xs text-muted-foreground mt-1">(Churn - Vendas) / MRR Base</div>
                 </div>
 
                 <div className="flex-1 p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-900/50 flex flex-col justify-center">
