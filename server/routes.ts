@@ -17667,8 +17667,80 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
+  // ==================== BP TARGETS CRUD ====================
+
+  app.get("/api/okr2026/bp-targets", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { BP_2026_TARGETS, BP_MONTHS } = await import("./okr2026/bp2026Targets");
+
+      // Load DB overrides
+      const dbResult = await db.execute(sql`
+        SELECT metric_key, month, target_value
+        FROM cortex_core.metric_targets_monthly
+        WHERE year = 2026
+        ORDER BY metric_key, month
+      `);
+      const dbTargets: Record<string, Record<string, number>> = {};
+      for (const row of dbResult.rows as any[]) {
+        const key = row.metric_key;
+        const monthKey = `2026-${String(row.month).padStart(2, "0")}`;
+        if (!dbTargets[key]) dbTargets[key] = {};
+        dbTargets[key][monthKey] = parseFloat(row.target_value);
+      }
+
+      // Merge: DB overrides TS fallback
+      const metrics = BP_2026_TARGETS.map(m => ({
+        metric_key: m.metric_key,
+        title: m.title,
+        unit: m.unit,
+        is_derived: m.is_derived,
+        months: BP_MONTHS.reduce((acc, month) => {
+          acc[month] = dbTargets[m.metric_key]?.[month] ?? m.months[month] ?? 0;
+          return acc;
+        }, {} as Record<string, number>)
+      }));
+
+      res.json({ year: 2026, months: BP_MONTHS, metrics });
+    } catch (error) {
+      console.error("[api] Error fetching BP targets:", error);
+      res.status(500).json({ error: "Failed to fetch BP targets" });
+    }
+  });
+
+  app.put("/api/okr2026/bp-targets", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { targets } = req.body as { targets: { metric_key: string; month: string; target_value: number }[] };
+      if (!Array.isArray(targets) || targets.length === 0) {
+        return res.status(400).json({ error: "targets array is required" });
+      }
+
+      let upserted = 0;
+      for (const t of targets) {
+        const monthNum = parseInt(t.month.split("-")[1]);
+        if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) continue;
+
+        // Delete + Insert because UNIQUE constraint includes NULLable dimension columns
+        await db.execute(sql`
+          DELETE FROM cortex_core.metric_targets_monthly
+          WHERE year = 2026 AND month = ${monthNum} AND metric_key = ${t.metric_key}
+            AND dimension_key IS NULL AND dimension_value IS NULL
+        `);
+        await db.execute(sql`
+          INSERT INTO cortex_core.metric_targets_monthly (year, month, metric_key, target_value, updated_at)
+          VALUES (2026, ${monthNum}, ${t.metric_key}, ${t.target_value}, NOW())
+        `);
+        upserted++;
+      }
+
+      res.json({ success: true, upserted });
+    } catch (error) {
+      console.error("[api] Error updating BP targets:", error);
+      res.status(500).json({ error: "Failed to update BP targets" });
+    }
+  });
+
   // ==================== BP SNAPSHOTS ====================
-  
+
   app.get("/api/okr2026/bp-snapshots", isAuthenticated, async (req, res) => {
     try {
       const result = await db.execute(sql`
