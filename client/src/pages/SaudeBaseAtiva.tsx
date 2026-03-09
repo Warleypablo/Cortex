@@ -15,21 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   HeartPulse,
   DollarSign,
   FileText,
   TrendingUp,
   Clock,
   Search,
-  ArrowUpDown,
   Users,
 } from "lucide-react";
 import {
@@ -130,8 +121,6 @@ export default function SaudeBaseAtiva() {
   const [filterPlano, setFilterPlano] = useState("todos");
   const [filterCluster, setFilterCluster] = useState("todos");
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortKey, setSortKey] = useState("lt_meses");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { data, isLoading } = useQuery<SaudeBaseResponse>({
     queryKey: ["/api/saude-base-ativa"],
@@ -250,33 +239,8 @@ export default function SaudeBaseAtiva() {
     };
   }, [activeItems]);
 
-  // Sorted table data (generic for both views)
-  const sortedData = useMemo(() => {
-    return [...activeItems].sort((a, b) => {
-      const aVal = (a as any)[sortKey];
-      const bVal = (b as any)[sortKey];
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return sortDir === "asc" ? aVal - bVal : bVal - aVal;
-      }
-      const aStr = String(aVal || "");
-      const bStr = String(bVal || "");
-      return sortDir === "asc" ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
-    });
-  }, [activeItems, sortKey, sortDir]);
-
-  const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key);
-      setSortDir("desc");
-    }
-  };
-
   const handleViewModeChange = (value: string) => {
     setViewMode(value as "contratos" | "clientes");
-    setSortKey("lt_meses");
-    setSortDir("desc");
   };
 
   const evolucaoChartData = useMemo(() => {
@@ -358,15 +322,6 @@ export default function SaudeBaseAtiva() {
       </Card>
     );
   };
-
-  const SortHeader = ({ label, field }: { label: string; field: string }) => (
-    <TableHead className="cursor-pointer select-none hover:text-gray-900 dark:hover:text-white" onClick={() => handleSort(field)}>
-      <div className="flex items-center gap-1">
-        {label}
-        <ArrowUpDown className={cn("w-3 h-3", sortKey === field ? "text-blue-500" : "opacity-40")} />
-      </div>
-    </TableHead>
-  );
 
   const distBarName = isClientView ? "Clientes" : "Contratos";
 
@@ -500,78 +455,6 @@ export default function SaudeBaseAtiva() {
         {renderBreakdownChart("LT Médio por Cluster", breakdowns.cluster)}
       </div>
 
-      {/* Detailed Table */}
-      <Card className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur border-gray-200 dark:border-zinc-700/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold text-gray-800 dark:text-zinc-200">
-            {isClientView ? `Clientes Ativos (${sortedData.length})` : `Contratos Ativos (${sortedData.length})`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-auto max-h-[500px]">
-            <Table>
-              <TableHeader className="sticky top-0 bg-white dark:bg-zinc-900 z-10">
-                <TableRow className="border-gray-200 dark:border-zinc-700">
-                  <SortHeader label="Cliente" field="nome_cliente" />
-                  {isClientView ? (
-                    <>
-                      <SortHeader label="Contratos" field="qtd_contratos" />
-                      <SortHeader label="Squad Principal" field="squad" />
-                      <SortHeader label="Cluster" field="cluster" />
-                      <SortHeader label="MRR Total" field="mrr" />
-                      <SortHeader label="LT (meses)" field="lt_meses" />
-                      <TableHead>LTV</TableHead>
-                      <SortHeader label="Desde" field="data_inicio" />
-                    </>
-                  ) : (
-                    <>
-                      <SortHeader label="Serviço" field="servico" />
-                      <SortHeader label="Squad" field="squad" />
-                      <SortHeader label="Produto" field="produto" />
-                      <SortHeader label="Plano" field="plano" />
-                      <SortHeader label="Cluster" field="cluster" />
-                      <SortHeader label="MRR" field="mrr" />
-                      <SortHeader label="LT (meses)" field="lt_meses" />
-                      <TableHead>LTV</TableHead>
-                      <SortHeader label="Data Início" field="data_inicio" />
-                    </>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isClientView
-                  ? (sortedData as ClienteAgregado[]).slice(0, 200).map((c) => (
-                      <TableRow key={c.cnpj || c.nome_cliente} className="border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/50">
-                        <TableCell className="font-medium text-gray-900 dark:text-white text-xs max-w-[180px] truncate">{c.nome_cliente}</TableCell>
-                        <TableCell className="text-xs text-center font-medium text-gray-900 dark:text-white">{c.qtd_contratos}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400">{c.squad}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400">{c.cluster}</TableCell>
-                        <TableCell className="text-xs font-medium text-gray-900 dark:text-white">{formatCurrencyNoDecimals(c.mrr)}</TableCell>
-                        <TableCell className="text-xs font-medium text-gray-900 dark:text-white">{c.lt_meses.toFixed(1)}</TableCell>
-                        <TableCell className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{formatCurrencyNoDecimals(c.mrr * c.lt_meses)}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400">{c.data_inicio ? new Date(c.data_inicio).toLocaleDateString("pt-BR") : "-"}</TableCell>
-                      </TableRow>
-                    ))
-                  : (sortedData as ContratoAtivo[]).slice(0, 200).map((c) => (
-                      <TableRow key={c.id_subtask} className="border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/50">
-                        <TableCell className="font-medium text-gray-900 dark:text-white text-xs max-w-[180px] truncate">{c.nome_cliente}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400 max-w-[150px] truncate">{c.servico}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400">{c.squad}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400">{c.produto}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400">{c.plano}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400">{c.cluster}</TableCell>
-                        <TableCell className="text-xs font-medium text-gray-900 dark:text-white">{formatCurrencyNoDecimals(c.mrr)}</TableCell>
-                        <TableCell className="text-xs font-medium text-gray-900 dark:text-white">{c.lt_meses.toFixed(1)}</TableCell>
-                        <TableCell className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{formatCurrencyNoDecimals(c.mrr * c.lt_meses)}</TableCell>
-                        <TableCell className="text-xs text-gray-600 dark:text-zinc-400">{c.data_inicio ? new Date(c.data_inicio).toLocaleDateString("pt-BR") : "-"}</TableCell>
-                      </TableRow>
-                    ))
-                }
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
