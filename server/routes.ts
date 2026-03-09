@@ -11138,7 +11138,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             ELSE 0 END as lt_meses
         FROM "Clickup".cup_contratos c
         LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
-        WHERE LOWER(c.status) IN ('ativo', 'onboarding', 'triagem')
+        WHERE c.status IS NOT NULL
           AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
         ORDER BY lt_meses DESC
       `);
