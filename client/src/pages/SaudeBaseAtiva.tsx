@@ -59,6 +59,7 @@ interface ClienteAgregado {
   nome_cliente: string;
   qtd_contratos: number;
   mrr: number;
+  valorp: number;
   lt_meses: number;
   cluster: string;
   squad: string;
@@ -116,6 +117,7 @@ export default function SaudeBaseAtiva() {
   };
 
   const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
+  const [filterTipo, setFilterTipo] = useState<"todos" | "recorrente" | "pontual">("todos");
   const [filterSquad, setFilterSquad] = useState("todos");
   const [filterProduto, setFilterProduto] = useState("todos");
   const [filterPlano, setFilterPlano] = useState("todos");
@@ -135,6 +137,8 @@ export default function SaudeBaseAtiva() {
   const filteredContratos = useMemo(() => {
     if (!data?.contratos) return [];
     return data.contratos.filter(c => {
+      if (filterTipo === "recorrente" && c.mrr <= 0) return false;
+      if (filterTipo === "pontual" && c.valorp <= 0) return false;
       if (filterSquad !== "todos" && c.squad !== filterSquad) return false;
       if (filterProduto !== "todos" && c.produto !== filterProduto) return false;
       if (filterPlano !== "todos" && c.plano !== filterPlano) return false;
@@ -142,7 +146,7 @@ export default function SaudeBaseAtiva() {
       if (searchTerm && !c.nome_cliente.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       return true;
     });
-  }, [data?.contratos, filterSquad, filterProduto, filterPlano, filterCluster, searchTerm]);
+  }, [data?.contratos, filterTipo, filterSquad, filterProduto, filterPlano, filterCluster, searchTerm]);
 
   // Aggregate by client (CNPJ) for client view
   const clientesAgregados = useMemo((): ClienteAgregado[] => {
@@ -158,6 +162,7 @@ export default function SaudeBaseAtiva() {
             nome_cliente: c.nome_cliente,
             qtd_contratos: 1,
             mrr: c.mrr,
+            valorp: c.valorp,
             lt_meses: c.lt_meses,
             cluster: c.cluster,
             squad: c.squad,
@@ -170,6 +175,7 @@ export default function SaudeBaseAtiva() {
       } else {
         existing.agg.qtd_contratos++;
         existing.agg.mrr += c.mrr;
+        existing.agg.valorp += c.valorp;
         if (c.lt_meses > existing.agg.lt_meses) {
           existing.agg.lt_meses = c.lt_meses;
           existing.agg.data_inicio = c.data_inicio;
@@ -336,6 +342,16 @@ export default function SaudeBaseAtiva() {
           <SelectContent>
             <SelectItem value="contratos">Por Contrato</SelectItem>
             <SelectItem value="clientes">Por Cliente</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterTipo} onValueChange={v => setFilterTipo(v as any)}>
+          <SelectTrigger className="w-[160px] bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="recorrente">Recorrente</SelectItem>
+            <SelectItem value="pontual">Pontual</SelectItem>
           </SelectContent>
         </Select>
         <div className="w-px h-8 bg-gray-200 dark:bg-zinc-700" />
