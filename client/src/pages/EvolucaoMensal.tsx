@@ -280,6 +280,7 @@ export default function EvolucaoMensal() {
             const previousValue = previousData ? (isMRR ? previousData.mrr : previousData.churn) : null;
             const change = previousValue ? entry.value - previousValue : 0;
             const changePercent = previousValue && previousValue !== 0 ? ((change / previousValue) * 100) : 0;
+            const churnRateDiff = !isMRR && currentData && previousData ? currentData.churnRate - previousData.churnRate : 0;
 
             return (
               <div key={index} className="mb-3 last:mb-0">
@@ -304,15 +305,19 @@ export default function EvolucaoMensal() {
                   {previousValue !== null && (
                     <div className={cn(
                       "text-xs flex items-center gap-1 mt-1",
-                      isMRR ? (change >= 0 ? "text-emerald-400" : "text-rose-400") : (change <= 0 ? "text-emerald-400" : "text-rose-400")
+                      isMRR ? (change >= 0 ? "text-emerald-400" : "text-rose-400") : (churnRateDiff <= 0 ? "text-emerald-400" : "text-rose-400")
                     )}>
                       {isMRR ? (
                         change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />
                       ) : (
-                        change <= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />
+                        churnRateDiff <= 0 ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />
                       )}
                       <span>
-                        {change >= 0 ? "+" : ""}{formatCurrencyNoDecimals(change)} ({changePercent >= 0 ? "+" : ""}{changePercent.toFixed(1)}%)
+                        {isMRR ? (
+                          <>{change >= 0 ? "+" : ""}{formatCurrencyNoDecimals(change)} ({changePercent >= 0 ? "+" : ""}{changePercent.toFixed(1)}%)</>
+                        ) : (
+                          <>{churnRateDiff >= 0 ? "+" : ""}{churnRateDiff.toFixed(1)}pp ({previousData?.churnRate.toFixed(1)}% → {currentData?.churnRate.toFixed(1)}%)</>
+                        )}
                       </span>
                     </div>
                   )}
