@@ -271,6 +271,77 @@ function mapNivelToNew(nivel: string | null): string {
   return nivel;
 }
 
+function CreateSquadDialog() {
+  const [open, setOpen] = useState(false);
+  const [nome, setNome] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const { toast } = useToast();
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/rh/squads", { nome, descricao: descricao || null });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/rh/squads"] });
+      toast({ title: "Squad criado", description: `Squad "${nome}" foi criado com sucesso.` });
+      setNome("");
+      setDescricao("");
+      setOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao criar squad", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <Plus className="w-4 h-4 mr-2" />
+          Criar Squad
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Criar novo Squad</DialogTitle>
+          <DialogDescription>Preencha os dados do novo squad.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="squad-nome">Nome *</Label>
+            <Input
+              id="squad-nome"
+              placeholder="Ex: 🚀 Nova Squad"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="squad-descricao">Descrição</Label>
+            <Input
+              id="squad-descricao"
+              placeholder="Descrição opcional"
+              value={descricao}
+              onChange={(e) => setDescricao(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button
+            onClick={() => createMutation.mutate()}
+            disabled={!nome.trim() || createMutation.isPending}
+          >
+            {createMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            Criar Squad
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function FilterDialog({
   filters,
   onApplyFilters,
@@ -2532,6 +2603,7 @@ export default function Colaboradores() {
                 niveis={niveis}
                 setores={gegFiltros?.setores || []}
               />
+              <CreateSquadDialog />
               <Link href="/colaboradores/analise">
                 <Button variant="outline" data-testid="button-analise-colaboradores">
                   <BarChart3 className="w-4 h-4 mr-2" />
