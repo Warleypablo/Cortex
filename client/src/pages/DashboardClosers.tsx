@@ -245,11 +245,11 @@ export default function DashboardClosers() {
         trend,
       };
     })
-    .sort((a, b) => b.mrr - a.mrr || b.pontual - a.pontual || b.reunioes - a.reunioes)
+    .sort((a, b) => b.total - a.total || b.mrr - a.mrr || b.reunioes - a.reunioes)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
   })();
 
-  const rankingPontual: RankingCloser[] = ranking
+  const rankingPontual: RankingCloser[] = [...ranking]
     .sort((a, b) => b.pontual - a.pontual)
     .map((c, idx) => ({ ...c, position: idx + 1 }));
 
