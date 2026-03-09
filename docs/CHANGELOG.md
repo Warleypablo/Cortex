@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-03-09 | refactor(inadimplencia): improve dashboard UX with compact filters, KPI deltas, and chart enhancements
+
+**O que foi feito:**
+- Removido ~200 linhas de dead code (imports, interfaces, queries, PDF handlers não utilizados)
+- Substituída barra de filtros com gradiente por filtros inline compactos (Período + Squad + Vendedor + Faixa)
+- Adicionados deltas de tendência nos KPI cards comparando mês atual vs anterior
+- Melhorada tipografia dos KPIs (text-xl, uppercase tracking-wider)
+- Substituído ComposedChart dual-axis por BarChart com toggle Valor/Parcelas
+- Gráficos de barras agora ordenados por valor decrescente, com labels mais largos (120px) e truncação inteligente de nomes
+- Adicionado LabelList nos gráficos de barras com valores compactos
+- Tooltips ricos customizados mostrando nome completo, valor, parcelas, clientes e % do total
+- Badge de urgência na tab Clientes mostrando contagem de 90+ dias
+- Empty states melhorados com ícones e textos descritivos
+
+**Por que:**
+- Melhorar a experiência do usuário na análise de inadimplência: mais técnica, mais bonita, mais intuitiva
+
+**Arquivos alterados:**
+- `client/src/pages/DashboardInadimplencia.tsx` - Refatoração completa da UX do dashboard
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-07 | feat(juridico): add legal knowledge markdowns for AI assistant
 
 **O que foi feito:**
