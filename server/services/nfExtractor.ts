@@ -3,8 +3,8 @@
  * Ported from attached_assets/2026/extrair_notas.py
  * Extracts monetary values from PDF invoice text using regex patterns.
  */
-import * as pdfParse from "pdf-parse";
-const pdf = (pdfParse as any).default || pdfParse;
+// @ts-ignore - pdf-parse v1 has no type declarations
+import pdf from "pdf-parse";
 
 const CAMBIO_USD_BRL = 6.0;
 
