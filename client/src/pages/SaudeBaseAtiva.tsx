@@ -118,6 +118,7 @@ export default function SaudeBaseAtiva() {
 
   const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
   const [filterTipo, setFilterTipo] = useState<"todos" | "recorrente" | "pontual">("todos");
+  const [filterStatus, setFilterStatus] = useState<"ativo" | "inativo" | "todos">("ativo");
   const [filterSquad, setFilterSquad] = useState("todos");
   const [filterProduto, setFilterProduto] = useState("todos");
   const [filterPlano, setFilterPlano] = useState("todos");
@@ -136,7 +137,11 @@ export default function SaudeBaseAtiva() {
   // Filter contracts client-side
   const filteredContratos = useMemo(() => {
     if (!data?.contratos) return [];
+    const ATIVOS = ['ativo', 'onboarding', 'triagem'];
     return data.contratos.filter(c => {
+      const statusLower = c.status?.toLowerCase() || '';
+      if (filterStatus === "ativo" && !ATIVOS.includes(statusLower)) return false;
+      if (filterStatus === "inativo" && ATIVOS.includes(statusLower)) return false;
       if (filterTipo === "recorrente" && c.mrr <= 0) return false;
       if (filterTipo === "pontual" && c.mrr > 0) return false;
       if (filterSquad !== "todos" && c.squad !== filterSquad) return false;
@@ -146,7 +151,7 @@ export default function SaudeBaseAtiva() {
       if (searchTerm && !c.nome_cliente.toLowerCase().includes(searchTerm.toLowerCase())) return false;
       return true;
     });
-  }, [data?.contratos, filterTipo, filterSquad, filterProduto, filterPlano, filterCluster, searchTerm]);
+  }, [data?.contratos, filterStatus, filterTipo, filterSquad, filterProduto, filterPlano, filterCluster, searchTerm]);
 
   // Aggregate by client (CNPJ) for client view
   const clientesAgregados = useMemo((): ClienteAgregado[] => {
@@ -352,6 +357,16 @@ export default function SaudeBaseAtiva() {
             <SelectItem value="todos">Todos</SelectItem>
             <SelectItem value="recorrente">Recorrente</SelectItem>
             <SelectItem value="pontual">Pontual</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={v => setFilterStatus(v as any)}>
+          <SelectTrigger className="w-[140px] bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ativo">Ativo</SelectItem>
+            <SelectItem value="inativo">Inativo</SelectItem>
+            <SelectItem value="todos">Todos</SelectItem>
           </SelectContent>
         </Select>
         <div className="w-px h-8 bg-gray-200 dark:bg-zinc-700" />
