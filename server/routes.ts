@@ -21240,7 +21240,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   });
 
   // POST /api/notas-fiscais/scan-local — Scan local folder (admin only)
-  app.post("/api/notas-fiscais/scan-local", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/notas-fiscais/scan-local", isAuthenticated, async (req, res) => {
     try {
       const { extractTextFromPDF, extractValueFromText, extractPrestadorFromFilename } = await import("./services/nfExtractor");
       const fs = await import("fs/promises");

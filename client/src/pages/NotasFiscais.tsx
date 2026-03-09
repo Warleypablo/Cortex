@@ -478,15 +478,28 @@ export default function NotasFiscais() {
     queryKey: ["/api/notas-fiscais/dashboard"],
   });
 
+  const [scanError, setScanError] = useState<string | null>(null);
+
   const scanMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/notas-fiscais/scan-local");
+      setScanError(null);
+      const res = await fetch("/api/notas-fiscais/scan-local", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text}`);
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/notas-fiscais/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notas-fiscais/detalhado"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notas-fiscais/conciliacao"] });
+    },
+    onError: (error: any) => {
+      setScanError(error.message || "Erro desconhecido no scan");
     },
   });
 
@@ -522,18 +535,18 @@ export default function NotasFiscais() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <UploadDialog />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={() => scanMutation.mutate()}
+            disabled={scanMutation.isPending}
+          >
+            {scanMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderSearch className="w-4 h-4" />}
+            {scanMutation.isPending ? "Processando..." : "Processar Pasta Local"}
+          </Button>
           {isAdmin && (
             <>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={() => scanMutation.mutate()}
-                disabled={scanMutation.isPending}
-              >
-                {scanMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderSearch className="w-4 h-4" />}
-                Processar Pasta Local
-              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -556,6 +569,11 @@ export default function NotasFiscais() {
       {scanMutation.isSuccess && (
         <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 text-sm text-emerald-700 dark:text-emerald-300">
           Scan concluído: {(scanMutation.data as any)?.totalProcessed || 0} processadas, {(scanMutation.data as any)?.totalErrors || 0} erros, {(scanMutation.data as any)?.total || 0} total
+        </div>
+      )}
+      {scanError && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+          Erro no scan: {scanError}
         </div>
       )}
 
