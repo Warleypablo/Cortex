@@ -5408,17 +5408,18 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
 
-      // 2) Churn por squad no mês selecionado
+      // 2) Churn por squad no mês selecionado (usa cup_churn curada)
       const churnResult = await db.execute(sql`
         SELECT
           COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
           COUNT(*) as churns,
-          COALESCE(SUM(valorr::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_contratos
+          COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
+        FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
-          AND valorr > 0
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND valor_r > 0
         GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
       `);
       const churnPorSquadRows = churnResult.rows as any[];
@@ -5461,17 +5462,18 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         ORDER BY mes, squad
       `);
 
-      // 4) Evolução Churn por squad (últimos 6 meses)
+      // 4) Evolução Churn por squad (últimos 6 meses, usa cup_churn curada)
       const evolucaoChurnResult = await db.execute(sql`
         SELECT
           TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
           COUNT(*) as churns,
-          COALESCE(SUM(valorr::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_contratos
+          COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
+        FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${evolucaoStartStr}::date
-          AND valorr > 0
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND valor_r > 0
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
         ORDER BY mes, squad
       `);
