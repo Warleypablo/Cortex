@@ -766,9 +766,10 @@ export async function getNrr(): Promise<{ nrr_pct: number; crosssell_mrr: number
       getGrossChurnMrr(),
       getMrrInicioMes(),
     ]);
-    // NRR% = (Churn - Vendas) / MRR_Início × 100
+    // NRR% = (Churn - Cross-sell) / MRR_Início × 100
+    // Apenas cross-sell entra no NRR (vendas de clientes novos não contam)
     const nrr_pct = mrrInicio > 0
-      ? ((grossChurn - breakdown.total) / mrrInicio) * 100
+      ? ((grossChurn - breakdown.crosssell) / mrrInicio) * 100
       : 0;
     return {
       nrr_pct,
@@ -820,9 +821,10 @@ export async function getNrrForPeriod(startDate: string, endDate: string): Promi
 
     const grossChurn = parseFloat((churnResult.rows[0] as any)?.gross_churn || "0");
     const mrrInicio = parseFloat((mrrResult.rows[0] as any)?.mrr || "0");
-    // NRR% = (Churn - Vendas) / MRR_Início × 100
+    // NRR% = (Churn - Cross-sell) / MRR_Início × 100
+    // Apenas cross-sell entra no NRR (vendas de clientes novos não contam)
     const nrr_pct = mrrInicio > 0
-      ? ((grossChurn - breakdown.total) / mrrInicio) * 100
+      ? ((grossChurn - breakdown.crosssell) / mrrInicio) * 100
       : 0;
 
     return {
