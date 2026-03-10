@@ -10,4 +10,4 @@ vite.config.ts.*
 nul
 credentials/
 *.key
-*.pem
+*.pem.superpowers/
