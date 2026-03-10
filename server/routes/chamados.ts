@@ -147,7 +147,68 @@ async function backfillObsidianTasks(): Promise<{ created: number; total: number
   }
 }
 
-// Periodic sync: every 5 minutes, backfill missing Obsidian tasks
+// Reverse sync: read Obsidian task files and update DB when status changed
+async function syncObsidianToDb(): Promise<number> {
+  if (!isObsidianAvailable()) return 0;
+  try {
+    const files = fs.readdirSync(OBSIDIAN_TASKS_DIR).filter(f => f.startsWith("TASK-") && f.endsWith(".md"));
+    let updated = 0;
+    for (const file of files) {
+      const match = file.match(/^TASK-(\d+)-/);
+      if (!match) continue;
+      const chamadoId = parseInt(match[1]);
+
+      const content = fs.readFileSync(path.join(OBSIDIAN_TASKS_DIR, file), "utf-8");
+      const statusMatch = content.match(/^status:\s*"([^"]+)"/m);
+      if (!statusMatch) continue;
+      const obsidianStatus = statusMatch[1];
+
+      // Map Obsidian status to DB status
+      const statusMap: Record<string, string> = {
+        concluido: "resolvido",
+        resolvido: "resolvido",
+        fechado: "fechado",
+        em_andamento: "em_andamento",
+        "em-andamento": "em_andamento",
+        triagem: "triagem",
+        aberto: "aberto",
+      };
+      const dbStatus = statusMap[obsidianStatus] || null;
+      if (!dbStatus) continue;
+
+      // Check if DB status differs
+      const result = await db.execute(sql`
+        SELECT status FROM cortex_core.chamados WHERE id = ${chamadoId} AND area = 'cortex'
+      `);
+      const row = result.rows[0] as any;
+      if (!row || row.status === dbStatus) continue;
+
+      // Update DB
+      const now = new Date();
+      if (dbStatus === "resolvido") {
+        await db.execute(sql`
+          UPDATE cortex_core.chamados
+          SET status = ${dbStatus}, atualizado_em = ${now}, resolvido_em = ${now}
+          WHERE id = ${chamadoId}
+        `);
+      } else {
+        await db.execute(sql`
+          UPDATE cortex_core.chamados
+          SET status = ${dbStatus}, atualizado_em = ${now}
+          WHERE id = ${chamadoId}
+        `);
+      }
+      console.log(`[obsidian→db] Chamado #${chamadoId} status: ${row.status} → ${dbStatus}`);
+      updated++;
+    }
+    return updated;
+  } catch (err) {
+    console.error("[obsidian→db] Sync error:", err);
+    return 0;
+  }
+}
+
+// Periodic sync: every 5 minutes, bidirectional sync (DB→Obsidian + Obsidian→DB)
 const OBSIDIAN_SYNC_INTERVAL = 5 * 60 * 1000;
 let obsidianSyncTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -159,25 +220,33 @@ function startObsidianPeriodicSync() {
   }
   obsidianSyncTimer = setInterval(async () => {
     const { created } = await backfillObsidianTasks();
-    if (created > 0) console.log(`[obsidian] Periodic sync: ${created} new task(s)`);
+    const updated = await syncObsidianToDb();
+    if (created > 0 || updated > 0) {
+      console.log(`[obsidian] Periodic sync: ${created} created, ${updated} status synced to DB`);
+    }
   }, OBSIDIAN_SYNC_INTERVAL);
-  console.log(`[obsidian] Periodic sync started (every ${OBSIDIAN_SYNC_INTERVAL / 1000}s)`);
+  console.log(`[obsidian] Periodic bidirectional sync started (every ${OBSIDIAN_SYNC_INTERVAL / 1000}s)`);
 }
 
 export function registerChamadosRoutes(app: Express) {
-  // Run migration for detalhes column, then backfill Obsidian tasks + start periodic sync
+  // Run migration, then bidirectional sync + start periodic
   db.execute(sql`ALTER TABLE cortex_core.chamados ADD COLUMN IF NOT EXISTS detalhes JSONB`)
-    .then(() => { console.log("[chamados] detalhes column ensured"); return backfillObsidianTasks(); })
-    .then(() => startObsidianPeriodicSync())
+    .then(async () => {
+      console.log("[chamados] detalhes column ensured");
+      await backfillObsidianTasks();
+      await syncObsidianToDb();
+      startObsidianPeriodicSync();
+    })
     .catch((err: any) => console.error("[chamados] migration error:", err));
 
-  // Manual Obsidian sync endpoint
+  // Manual Obsidian sync endpoint (bidirectional)
   app.post("/api/chamados/sync-obsidian", async (_req, res) => {
     if (!isObsidianAvailable()) {
       return res.status(400).json({ message: "Obsidian vault not available on this server" });
     }
-    const result = await backfillObsidianTasks();
-    res.json({ message: `Sync complete: ${result.created} task(s) created`, ...result });
+    const backfill = await backfillObsidianTasks();
+    const synced = await syncObsidianToDb();
+    res.json({ message: `Sync complete: ${backfill.created} created, ${synced} status synced to DB`, created: backfill.created, synced });
   });
 
   // ============================================
