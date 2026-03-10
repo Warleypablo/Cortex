@@ -66,8 +66,16 @@ export async function provisionClienteFromContrato(ctx: ProvisioningContext): Pr
 
     // 3. Upsert into cup_clientes
     const entidadeId = contrato.entidade_id;
+    if (!entidadeId) {
+      console.warn("[card-auto] No entidade_id for contrato:", ctx.contratoId);
+      return;
+    }
     const taskId = `cortex-ent-${entidadeId}`;
     const nome = contrato.nome;
+    if (!nome) {
+      console.warn("[card-auto] No nome found for entidade of contrato:", ctx.contratoId);
+      return;
+    }
 
     await db.execute(sql`
       INSERT INTO "Clickup".cup_clientes (cnpj, nome, status, responsavel, email, telefone, task_id, site)
@@ -119,7 +127,7 @@ export async function provisionClienteFromContrato(ctx: ProvisioningContext): Pr
         ${cnpj},
         'contrato_ativado',
         'Novo contrato ativado',
-        ${'Contrato #' + contrato.numero_contrato + ' ativado. CS: ' + (csResponsavel || 'Nao atribuido') + '. Servicos: ' + servicos.join(', ')},
+        ${`Contrato #${contrato.numero_contrato} ativado. CS: ${csResponsavel || 'Nao atribuido'}. Servicos: ${servicos.join(', ')}`},
         ${ctx.userId},
         ${ctx.userName},
         ${dadosExtras}
