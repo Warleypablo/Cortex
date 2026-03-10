@@ -2355,4 +2355,186 @@ export function registerComercialRoutes(app: Express) {
       res.status(500).json({ error: "Failed to fetch SDR photos" });
     }
   });
+
+  // ==================== COMERCIAL - FUNIL DE VENDAS ====================
+
+  const FUNNEL_STAGES = [
+    { key: "lead", names: ["Novo", "Lead", "Lead Novo", "Contato Inicial", "Contato inicial"], label: "Lead" },
+    { key: "qualificado", names: ["Qualificado", "Qualificação", "Qualificacao"], label: "Qualificado" },
+    { key: "reuniao", names: ["Reunião Agendada", "Reunião Realizada", "Reuniao Agendada", "Reuniao Realizada"], label: "Reunião" },
+    { key: "proposta", names: ["Proposta", "Proposta Enviada", "Apresentação", "Apresentacao"], label: "Proposta" },
+    { key: "negociacao", names: ["Negociação", "Em negociação", "Fechamento", "Negociacao", "Em negociacao"], label: "Negociação" },
+    { key: "ganho", names: ["Negócio Ganho", "Negocio Ganho", "Ganho"], label: "Ganho" },
+    { key: "perdido", names: ["Negócio Perdido", "Negócio perdido", "Negocio Perdido", "Perdido", "Descartado", "Descartado/sem fit"], label: "Perdido" },
+  ];
+
+  function getStageKey(stageName: string | null): string {
+    if (!stageName) return "outros";
+    for (const stage of FUNNEL_STAGES) {
+      if (stage.names.some(n => n.toLowerCase() === stageName.toLowerCase())) return stage.key;
+    }
+    return "outros";
+  }
+
+  // Filtros: listas de closers, SDRs e fontes
+  app.get("/api/comercial/funil/filtros", isAuthenticated, async (req, res) => {
+    try {
+      const [closersResult, sdrsResult, sourcesResult] = await Promise.all([
+        db.execute(sql`SELECT id, nome as name FROM "Bitrix".crm_closers ORDER BY nome`),
+        db.execute(sql`
+          SELECT DISTINCT u.id, u.nome as name
+          FROM "Bitrix".crm_users u
+          INNER JOIN "Bitrix".crm_deal d ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+          ORDER BY u.nome
+        `),
+        db.execute(sql`SELECT DISTINCT source FROM "Bitrix".crm_deal WHERE source IS NOT NULL AND source != '' ORDER BY source`),
+      ]);
+
+      res.json({
+        closers: closersResult.rows,
+        sdrs: sdrsResult.rows,
+        sources: (sourcesResult.rows as any[]).map(r => r.source),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching funil filtros:", error);
+      res.status(500).json({ error: "Failed to fetch filtros" });
+    }
+  });
+
+  // Etapas: metricas agregadas por etapa do funil
+  app.get("/api/comercial/funil/etapas", isAuthenticated, async (req, res) => {
+    try {
+      const { dataInicio, dataFim, closer, sdr, source } = req.query;
+
+      const conditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) conditions.push(sql`d.date_create >= ${dataInicio}`);
+      if (dataFim) conditions.push(sql`d.date_create <= ${dataFim}`);
+      if (closer) conditions.push(sql`d.closer = ${closer}`);
+      if (sdr) conditions.push(sql`d.sdr = ${sdr}`);
+      if (source) conditions.push(sql`d.source = ${source}`);
+
+      const whereClause = conditions.length > 0
+        ? sql`AND ${sql.join(conditions, sql` AND `)}`
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT
+          d.stage_name,
+          COUNT(*) as count,
+          COALESCE(SUM(COALESCE(d.valor_recorrente, 0) + COALESCE(d.valor_pontual, 0)), 0) as valor
+        FROM "Bitrix".crm_deal d
+        WHERE d.stage_name IS NOT NULL AND d.stage_name != ''
+          ${whereClause}
+        GROUP BY d.stage_name
+      `);
+
+      // Aggregate by funnel stage
+      const stageMap: Record<string, { count: number; valor: number }> = {};
+      for (const stage of FUNNEL_STAGES) {
+        stageMap[stage.key] = { count: 0, valor: 0 };
+      }
+      stageMap["outros"] = { count: 0, valor: 0 };
+
+      let totalDeals = 0;
+      let totalValor = 0;
+      let dealsGanhos = 0;
+
+      for (const row of result.rows as any[]) {
+        const key = getStageKey(row.stage_name);
+        if (!stageMap[key]) stageMap[key] = { count: 0, valor: 0 };
+        stageMap[key].count += parseInt(row.count);
+        stageMap[key].valor += parseFloat(row.valor);
+        totalDeals += parseInt(row.count);
+        totalValor += parseFloat(row.valor);
+        if (key === "ganho") dealsGanhos += parseInt(row.count);
+      }
+
+      const etapas = [...FUNNEL_STAGES, { key: "outros", names: [], label: "Outros" }]
+        .map(s => ({
+          key: s.key,
+          label: s.label,
+          count: stageMap[s.key]?.count || 0,
+          valor: stageMap[s.key]?.valor || 0,
+        }))
+        .filter(e => e.count > 0);
+
+      const taxaConversao = totalDeals > 0 ? (dealsGanhos / totalDeals) * 100 : 0;
+      const ticketMedio = dealsGanhos > 0 ? (stageMap["ganho"]?.valor || 0) / dealsGanhos : 0;
+
+      res.json({
+        etapas,
+        kpis: {
+          total_deals: totalDeals,
+          valor_pipeline: totalValor,
+          taxa_conversao: Math.round(taxaConversao * 10) / 10,
+          ticket_medio: Math.round(ticketMedio),
+        },
+      });
+    } catch (error) {
+      console.error("[api] Error fetching funil etapas:", error);
+      res.status(500).json({ error: "Failed to fetch etapas" });
+    }
+  });
+
+  // Deals: lista de deals filtrada por etapa
+  app.get("/api/comercial/funil/deals", isAuthenticated, async (req, res) => {
+    try {
+      const { dataInicio, dataFim, closer, sdr, source, stage, limit: lim, offset: off } = req.query;
+
+      const conditions: ReturnType<typeof sql>[] = [];
+      if (dataInicio) conditions.push(sql`d.date_create >= ${dataInicio}`);
+      if (dataFim) conditions.push(sql`d.date_create <= ${dataFim}`);
+      if (closer) conditions.push(sql`d.closer = ${closer}`);
+      if (sdr) conditions.push(sql`d.sdr = ${sdr}`);
+      if (source) conditions.push(sql`d.source = ${source}`);
+
+      // Filter by funnel stage key
+      if (stage && stage !== "all") {
+        const stageObj = FUNNEL_STAGES.find(s => s.key === stage);
+        if (stageObj) {
+          const stageNames = stageObj.names;
+          conditions.push(sql`d.stage_name = ANY(${stageNames})`);
+        }
+      }
+
+      const whereClause = conditions.length > 0
+        ? sql`AND ${sql.join(conditions, sql` AND `)}`
+        : sql``;
+
+      const limitVal = parseInt(String(lim)) || 50;
+      const offsetVal = parseInt(String(off)) || 0;
+
+      const result = await db.execute(sql`
+        SELECT
+          d.id,
+          d.title,
+          d.stage_name,
+          d.closer,
+          d.sdr,
+          d.source,
+          COALESCE(d.valor_recorrente, 0) as valor_recorrente,
+          COALESCE(d.valor_pontual, 0) as valor_pontual,
+          d.date_create,
+          d.data_fechamento,
+          c.nome as closer_name
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN "Bitrix".crm_closers c ON c.id::text = d.closer
+        WHERE d.stage_name IS NOT NULL AND d.stage_name != ''
+          ${whereClause}
+        ORDER BY d.date_create DESC
+        LIMIT ${limitVal} OFFSET ${offsetVal}
+      `);
+
+      // Add stage_key to each deal
+      const deals = (result.rows as any[]).map(r => ({
+        ...r,
+        stage_key: getStageKey(r.stage_name),
+      }));
+
+      res.json(deals);
+    } catch (error) {
+      console.error("[api] Error fetching funil deals:", error);
+      res.status(500).json({ error: "Failed to fetch deals" });
+    }
+  });
 }
