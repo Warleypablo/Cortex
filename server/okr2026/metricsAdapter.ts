@@ -2172,6 +2172,7 @@ export async function getMetricSeries(
         return await getActiveCustomersSeriesForRange(startDate, endDate);
       case "ebitda":
         return await getEbitdaSeriesForRange(startDate, endDate);
+      case "churn":
       case "gross_mrr_churn_brl":
       case "gross_churn_mrr":
         return await getChurnSeriesForRange(startDate, endDate);
