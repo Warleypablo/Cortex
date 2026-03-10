@@ -44,7 +44,6 @@ waitForPort = 5000
 [userenv.shared]
 CUSTOM_DOMAIN = "cortex.turbopartners.com.br"
 DB_SSL_REJECT_UNAUTHORIZED = "false"
-INTERNAL_API_TOKEN = "***REMOVED***"
 TURBODASH_API_URL = "https://app.turbodash.com.br"
 CENTRAL_TAB_NAME = "Automacao-Report"
 FORCE_REPORT_FOLDER_ID = "1O1VMxN7CL0GEWRtglmz862X85btgARTE"

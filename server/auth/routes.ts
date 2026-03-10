@@ -10,7 +10,7 @@ import { db } from "../db";
 import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos, arClientes, arMetricas, arCampanhas, arCanais, clientCredentials } from "../../shared/schema";
 import { eq, desc, sql, inArray, and, asc } from "drizzle-orm";
 
-// Senhas hasheadas para usuários externos (hash de "***REMOVED***")
+// Hashed passwords for external users
 const EXTERNAL_USER_PASSWORDS: Record<string, string> = {
   'ajame@icloud.com': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
   'warleyreserva4@gmail.com': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
@@ -19,6 +19,9 @@ const EXTERNAL_USER_PASSWORDS: Record<string, string> = {
 const router = Router();
 
 router.get("/auth/debug", (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).json({ message: "Not found" });
+  }
   const clientID = process.env.GOOGLE_CLIENT_ID;
   const customDomain = process.env.CUSTOM_DOMAIN;
   const replitDomains = process.env.REPLIT_DOMAINS;
@@ -40,12 +43,6 @@ router.get("/auth/google", (req, res, next) => {
     scope: ["profile", "email"],
     prompt: "select_account",
   })(req, res, next);
-});
-
-// Teste simples para verificar se a rota está acessível
-router.get("/auth/google/callback-test", (req, res) => {
-  console.log("✅ Callback test route accessed!");
-  res.json({ message: "Callback route is accessible", query: req.query });
 });
 
 router.get("/auth/google/callback",
@@ -106,11 +103,9 @@ router.post("/auth/logout", (req, res) => {
 
 // Dev login - apenas para ambiente de desenvolvimento
 router.post("/auth/dev-login", (req, res) => {
-  // Só funciona em desenvolvimento (quando não há domínio customizado em produção)
-  const isProduction = process.env.NODE_ENV === "production" && !process.env.REPLIT_DEV_DOMAIN;
-  
-  if (isProduction) {
-    return res.status(403).json({ message: "Dev login not available in production" });
+  const devLoginEnabled = process.env.ENABLE_DEV_LOGIN === "true";
+  if (process.env.NODE_ENV === "production" || !devLoginEnabled) {
+    return res.status(403).json({ message: "Dev login not available" });
   }
   
   const devUser: User = {
@@ -265,7 +260,10 @@ router.post("/auth/client-login", validateBody(clientLoginSchema), async (req, r
 
     if (!creds.length) {
       // Primeira vez: cria credenciais com senha padrão
-      const defaultPassword = process.env.CLIENT_DEFAULT_PASSWORD || '***REMOVED***';
+      const defaultPassword = process.env.CLIENT_DEFAULT_PASSWORD;
+      if (!defaultPassword) {
+        return res.status(500).json({ message: "CLIENT_DEFAULT_PASSWORD not configured" });
+      }
       const hash = bcrypt.hashSync(defaultPassword, 10);
       const [newCred] = await db
         .insert(clientCredentials)

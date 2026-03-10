@@ -683,37 +683,28 @@ export async function getHistorico(filters: {
   status?: string;
   busca?: string;
 }): Promise<EnvioRegistro[]> {
-  const conditions: string[] = ["1=1"];
+  const conditions: any[] = [sql`1=1`];
 
   if (filters.data_inicio) {
-    const val = filters.data_inicio.replace(/'/g, "''");
-    conditions.push(`e.criado_em >= '${val}'::date`);
+    conditions.push(sql`e.criado_em >= ${filters.data_inicio}::date`);
   }
   if (filters.data_fim) {
-    const val = filters.data_fim.replace(/'/g, "''");
-    conditions.push(`e.criado_em < ('${val}'::date + interval '1 day')`);
+    conditions.push(sql`e.criado_em < (${filters.data_fim}::date + interval '1 day')`);
   }
   if (filters.tipo_cobranca && filters.tipo_cobranca !== "todos") {
-    const val = filters.tipo_cobranca.replace(/'/g, "''");
-    conditions.push(`e.tipo_cobranca = '${val}'`);
+    conditions.push(sql`e.tipo_cobranca = ${filters.tipo_cobranca}`);
   }
   if (filters.status && filters.status !== "todos") {
-    const val = filters.status.replace(/'/g, "''");
-    conditions.push(`e.status = '${val}'`);
+    conditions.push(sql`e.status = ${filters.status}`);
   }
   if (filters.busca) {
-    const val = filters.busca.replace(/'/g, "''");
-    conditions.push(`(e.cliente_nome ILIKE '%${val}%' OR e.cnpj ILIKE '%${val}%' OR e.telefone ILIKE '%${val}%')`);
+    const searchTerm = `%${filters.busca}%`;
+    conditions.push(sql`(e.cliente_nome ILIKE ${searchTerm} OR e.cnpj ILIKE ${searchTerm} OR e.telefone ILIKE ${searchTerm})`);
   }
 
-  const whereClause = conditions.join(" AND ");
+  const whereClause = sql.join(conditions, sql` AND `);
   const result = await db.execute(
-    sql.raw(`
-      SELECT * FROM cortex_core.turbozap_envios e
-      WHERE ${whereClause}
-      ORDER BY e.criado_em DESC
-      LIMIT 500
-    `),
+    sql`SELECT * FROM cortex_core.turbozap_envios e WHERE ${whereClause} ORDER BY e.criado_em DESC LIMIT 500`,
   );
   return result.rows as EnvioRegistro[];
 }
@@ -806,30 +797,24 @@ export async function updatePipelineJuridico(
   updates: { etapa?: string; protesto_efetivado?: boolean; negativacao_efetivada?: boolean; observacoes?: string },
   atualizadoPor: string,
 ): Promise<PipelineJuridico> {
-  const setClauses: string[] = ["atualizado_em = NOW()"];
-  const safeUser = atualizadoPor.replace(/'/g, "''");
-  setClauses.push(`atualizado_por = '${safeUser}'`);
+  const setClauses: any[] = [sql`atualizado_em = NOW()`, sql`atualizado_por = ${atualizadoPor}`];
 
   if (updates.etapa !== undefined) {
-    setClauses.push(`etapa = '${updates.etapa.replace(/'/g, "''")}'`);
+    setClauses.push(sql`etapa = ${updates.etapa}`);
   }
   if (updates.protesto_efetivado !== undefined) {
-    setClauses.push(`protesto_efetivado = ${updates.protesto_efetivado}`);
+    setClauses.push(sql`protesto_efetivado = ${updates.protesto_efetivado}`);
   }
   if (updates.negativacao_efetivada !== undefined) {
-    setClauses.push(`negativacao_efetivada = ${updates.negativacao_efetivada}`);
+    setClauses.push(sql`negativacao_efetivada = ${updates.negativacao_efetivada}`);
   }
   if (updates.observacoes !== undefined) {
-    setClauses.push(`observacoes = '${updates.observacoes.replace(/'/g, "''")}'`);
+    setClauses.push(sql`observacoes = ${updates.observacoes}`);
   }
 
+  const setClause = sql.join(setClauses, sql`, `);
   const result = await db.execute(
-    sql.raw(`
-      UPDATE cortex_core.turbozap_pipeline_juridico
-      SET ${setClauses.join(", ")}
-      WHERE id = ${id}
-      RETURNING *
-    `),
+    sql`UPDATE cortex_core.turbozap_pipeline_juridico SET ${setClause} WHERE id = ${id} RETURNING *`,
   );
 
   if (result.rows.length === 0) {
