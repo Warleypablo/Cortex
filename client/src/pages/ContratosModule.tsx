@@ -1,4 +1,5 @@
 import { useState, useMemo, useDeferredValue, useCallback, memo } from "react";
+import { EntregaveisChecklist } from "@/components/EntregaveisChecklist";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -2211,6 +2212,11 @@ function ContratosTab() {
                     </p>
                   </Card>
                 )}
+
+                {/* Entregaveis section */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-zinc-700">
+                  <EntregaveisChecklist contratoId={contratoDetail.id} />
+                </div>
               </div>
             </>
           )}
