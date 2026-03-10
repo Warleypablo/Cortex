@@ -16,7 +16,7 @@ import {
 } from "recharts";
 import {
   FileText, Upload, FolderSearch, AlertTriangle, CheckCircle2,
-  DollarSign, Hash, TrendingUp, Loader2, RotateCcw
+  DollarSign, Hash, TrendingUp, Loader2, RotateCcw, Download
 } from "lucide-react";
 
 const MONTHS = [
@@ -293,6 +293,41 @@ function VisaoGeralTab({ data }: { data: any }) {
   );
 }
 
+// ---- Export to Excel (CSV) ----
+
+function exportToExcel(rows: any[], filterMes: string, filterCat: string, filterStatus: string) {
+  const filtered = rows.filter((r: any) => {
+    if (filterMes && String(r.mes_num) !== filterMes) return false;
+    if (filterCat && r.categoria !== filterCat) return false;
+    if (filterStatus && r.status !== filterStatus) return false;
+    return true;
+  });
+
+  const headers = ["Mês", "Categoria", "Prestador", "CNPJ", "Arquivo", "Valor (BRL)", "Moeda Original", "Padrão Usado", "Status"];
+  const csvRows = filtered.map((r: any) => [
+    r.mes || "",
+    r.categoria || "",
+    r.prestador || "",
+    r.cnpj || "",
+    r.arquivo || "",
+    r.valor_brl ? Number(r.valor_brl).toFixed(2).replace(".", ",") : "",
+    r.moeda_original || "",
+    r.padrao_usado || "",
+    r.status || "",
+  ]);
+
+  const BOM = "\uFEFF";
+  const csv = BOM + [headers, ...csvRows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `notas-fiscais-2026.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ---- Detalhado Tab ----
 
 function DetalhadoTab({ filterMes, filterCat, filterStatus }: { filterMes: string; filterCat: string; filterStatus: string }) {
@@ -478,6 +513,10 @@ export default function NotasFiscais() {
     queryKey: ["/api/notas-fiscais/dashboard"],
   });
 
+  const { data: detalhadoRows = [] } = useQuery<any[]>({
+    queryKey: ["/api/notas-fiscais/detalhado"],
+  });
+
   const [scanError, setScanError] = useState<string | null>(null);
 
   const scanMutation = useMutation({
@@ -646,6 +685,22 @@ export default function NotasFiscais() {
                     Limpar filtros
                   </Button>
                 )}
+                <div className="ml-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => exportToExcel(
+                      detalhadoRows,
+                      filterMes === "all" ? "" : filterMes,
+                      filterCat === "all" ? "" : filterCat,
+                      filterStatus === "all" ? "" : filterStatus
+                    )}
+                    disabled={detalhadoRows.length === 0}
+                  >
+                    <Download className="w-4 h-4" /> Exportar Excel
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
