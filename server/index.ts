@@ -35,6 +35,10 @@ function createSessionStore() {
   return undefined;
 }
 
+if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error('SESSION_SECRET environment variable is required in production');
+}
+
 app.use(
   session({
     store: createSessionStore(),
@@ -199,8 +203,10 @@ app.use((req, res, next) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    throw err;
+    console.error(`[error-handler] ${status} - ${message}`, err.stack || err);
+    if (!res.headersSent) {
+      res.status(status).json({ message });
+    }
   });
 
   // importantly only setup vite in development and after
@@ -227,3 +233,12 @@ app.use((req, res, next) => {
     logOAuthSetupInstructions();
   });
 })();
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[unhandledRejection]', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+  process.exit(1);
+});
