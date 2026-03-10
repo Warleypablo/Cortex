@@ -60,8 +60,19 @@ Localizados em `agents/`:
 | Agente | Arquivo | Quando usar |
 |--------|---------|-------------|
 | DB Specialist | `agents/db-specialist.md` | Queries SQL, novas tabelas, relacionamentos, migracoes |
+| Obsidian Sync | `agents/obsidian-sync-SKILL.md` | Invocado automaticamente pelo git-autopush para sincronizar progresso no vault |
 
 Documentacao completa do banco: `DATABASE.md`
+
+---
+
+## ⚠️ Regra Obrigatória: Consultar Agentes
+
+**ANTES** de iniciar qualquer alteração, **SEMPRE** consultar os arquivos em `agents/` para verificar se existe um agente especializado relevante para a tarefa. Ler o agente correspondente e seguir suas instruções/contexto antes de codificar.
+
+## ⚠️ Regra Obrigatória: Git Auto-Push
+
+**APÓS** toda alteração de código (edição, criação ou exclusão de arquivo), **SEMPRE** executar o workflow descrito em `agents/git-autopush-SKILL.md`: stage, commit (Conventional Commits) e push automaticamente. Nunca pular esse passo.
 
 ---
 
