@@ -1094,7 +1094,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const cprr = rr > 0 ? investimento / rr : null;
         const percRrCliente = rr > 0 ? Math.round((vendas / rr) * 100) : null;
         const cacUnico = vendas > 0 ? investimento / vendas : null;
-        
+        const valorTotal = deal.valorTotal || 0;
+        const roas = investimento > 0 ? valorTotal / investimento : null;
+        const conversionRate = leads > 0 ? parseFloat(((vendas / leads) * 100).toFixed(1)) : null;
+
         return {
           investimento: Math.round(investimento),
           impressions,
@@ -1116,7 +1119,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           cprr: cprr ? parseFloat(cprr.toFixed(2)) : null,
           clientesUnicos: vendas,
           percRrCliente,
-          cacUnico: cacUnico ? Math.round(cacUnico) : null
+          cacUnico: cacUnico ? Math.round(cacUnico) : null,
+          roas: roas ? parseFloat(roas.toFixed(2)) : null,
+          conversionRate
         };
       };
       
@@ -1175,7 +1180,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         if (ads.length === 0 && status !== 'Todos') continue;
         
         // Agregar métricas dos anúncios
-        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0;
+        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0, aggValor = 0;
         for (const ad of ads) {
           aggInvest += ad.investimento || 0;
           aggImpr += ad.impressions || 0;
@@ -1184,9 +1189,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           aggRm += ad.ra || 0;
           aggRr += ad.rr || 0;
           aggVendas += ad.clientesUnicos || 0;
+          // Buscar valorTotal do deal original para ROAS
+          const adId = ad.id.replace('ad_', '');
+          const adDeal = dealsMap.get(adId);
+          if (adDeal) aggValor += adDeal.valorTotal || 0;
         }
-        
-        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: 0 };
+
+        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: aggValor };
         const metrics = calcMetrics(aggInvest, aggImpr, 0, 0, aggImpr > 0 ? null : null, null, deal);
         
         // Recalcular CTR e CPM com valores agregados
@@ -1226,7 +1235,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         if (adsets.length === 0 && status !== 'Todos') continue;
         
         // Agregar métricas dos adsets
-        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0;
+        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0, aggValor = 0;
         for (const adset of adsets) {
           aggInvest += adset.investimento || 0;
           aggImpr += adset.impressions || 0;
@@ -1235,9 +1244,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           aggRm += adset.ra || 0;
           aggRr += adset.rr || 0;
           aggVendas += adset.clientesUnicos || 0;
+          // ROAS propagado: investimento * roas = valorTotal do adset
+          if (adset.roas) aggValor += adset.investimento * adset.roas;
         }
-        
-        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: 0 };
+
+        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: aggValor };
         const metrics = calcMetrics(aggInvest, aggImpr, 0, 0, null, null, deal);
         
         // Recalcular CTR e CPM com valores agregados
@@ -1273,7 +1284,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Meta Ads
       const metaCampaigns = campaignsByPlatform.get('meta') || [];
       if (metaCampaigns.length > 0) {
-        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0;
+        let aggInvest = 0, aggImpr = 0, aggLeads = 0, aggMqls = 0, aggRm = 0, aggRr = 0, aggVendas = 0, aggValor = 0;
         for (const camp of metaCampaigns) {
           aggInvest += camp.investimento || 0;
           aggImpr += camp.impressions || 0;
@@ -1282,9 +1293,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           aggRm += camp.ra || 0;
           aggRr += camp.rr || 0;
           aggVendas += camp.clientesUnicos || 0;
+          if (camp.roas) aggValor += camp.investimento * camp.roas;
         }
-        
-        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: 0 };
+
+        const deal = { leads: aggLeads, mqls: aggMqls, rm: aggRm, rr: aggRr, vendas: aggVendas, valorTotal: aggValor };
         const metrics = calcMetrics(aggInvest, aggImpr, 0, 0, null, null, deal);
         metrics.ctr = aggImpr > 0 && metaCampaigns.length > 0 ? parseFloat((metaCampaigns.reduce((sum, c) => sum + (c.ctr || 0), 0) / metaCampaigns.length).toFixed(2)) : null;
         metrics.cpm = aggInvest > 0 && aggImpr > 0 ? Math.round((aggInvest / aggImpr) * 1000) : null;
@@ -1312,7 +1324,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null,
         ra: 0, percRa: null, cpra: null, percRaMql: null, percRrMql: null,
         rr: 0, percRr: null, cprr: null,
-        clientesUnicos: 0, percRrCliente: null, cacUnico: null
+        clientesUnicos: 0, percRrCliente: null, cacUnico: null, roas: null, conversionRate: null
       });
       
       // LinkedIn Ads - placeholder
@@ -1327,7 +1339,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null,
         ra: 0, percRa: null, cpra: null, percRaMql: null, percRrMql: null,
         rr: 0, percRr: null, cprr: null,
-        clientesUnicos: 0, percRrCliente: null, cacUnico: null
+        clientesUnicos: 0, percRrCliente: null, cacUnico: null, roas: null, conversionRate: null
       });
       
       // TikTok Ads - placeholder
@@ -1342,7 +1354,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         leads: 0, cpl: null, mql: 0, percMql: null, cpmql: null,
         ra: 0, percRa: null, cpra: null, percRaMql: null, percRrMql: null,
         rr: 0, percRr: null, cprr: null,
-        clientesUnicos: 0, percRrCliente: null, cacUnico: null
+        clientesUnicos: 0, percRrCliente: null, cacUnico: null, roas: null, conversionRate: null
       });
       
       // Montar lista flat de todos os nodes
