@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus, Calendar, Phone, ShoppingCart } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus, Calendar, Phone, ShoppingCart, Pencil, Save, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
@@ -128,6 +128,54 @@ const DEFAULT_ORCADO_ADS = {
   visualizacaoPagina: 7306,
 };
 
+// Mapeamento de metric.id → segmento/chave no banco de budgets
+const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
+  // MQL
+  mql_ra_perc: { segment: 'mql', key: 'percReuniaoAgendada' },
+  mql_ra_num: { segment: 'mql', key: 'reunioesAgendadas' },
+  mql_rr_num: { segment: 'mql', key: 'reunioesRealizadas' },
+  mql_noshow: { segment: 'mql', key: 'percNoShow' },
+  mql_taxa_vendas: { segment: 'mql', key: 'taxaVendas' },
+  mql_novos_clientes: { segment: 'mql', key: 'novosClientes' },
+  mql_tx_recorrente: { segment: 'mql', key: 'txContratosRecorrentes' },
+  mql_tx_implantacao: { segment: 'mql', key: 'txContratosImplantacao' },
+  mql_contratos_acel: { segment: 'mql', key: 'contratosAceleracao' },
+  mql_ticket_acel: { segment: 'mql', key: 'ticketMedioAceleracao' },
+  mql_fat_acel: { segment: 'mql', key: 'faturamentoAceleracao' },
+  mql_contratos_impl: { segment: 'mql', key: 'contratosImplantacao' },
+  mql_ticket_impl: { segment: 'mql', key: 'ticketMedioImplantacao' },
+  mql_fat_impl: { segment: 'mql', key: 'faturamentoImplantacao' },
+  // Não-MQL
+  nmql_ra_perc: { segment: 'nao_mql', key: 'percReuniaoAgendada' },
+  nmql_ra_num: { segment: 'nao_mql', key: 'reunioesAgendadas' },
+  nmql_rr_num: { segment: 'nao_mql', key: 'reunioesRealizadas' },
+  nmql_noshow: { segment: 'nao_mql', key: 'percNoShow' },
+  nmql_taxa_vendas: { segment: 'nao_mql', key: 'taxaVendas' },
+  nmql_novos_clientes: { segment: 'nao_mql', key: 'novosClientes' },
+  nmql_tx_recorrente: { segment: 'nao_mql', key: 'txContratosRecorrentes' },
+  nmql_tx_implantacao: { segment: 'nao_mql', key: 'txContratosImplantacao' },
+  nmql_contratos_acel: { segment: 'nao_mql', key: 'contratosAceleracao' },
+  nmql_ticket_acel: { segment: 'nao_mql', key: 'ticketMedioAceleracao' },
+  nmql_fat_acel: { segment: 'nao_mql', key: 'faturamentoAceleracao' },
+  nmql_contratos_impl: { segment: 'nao_mql', key: 'contratosImplantacao' },
+  nmql_ticket_impl: { segment: 'nao_mql', key: 'ticketMedioImplantacao' },
+  nmql_fat_impl: { segment: 'nao_mql', key: 'faturamentoImplantacao' },
+  // Ads
+  investimento: { segment: 'ads', key: 'investimento' },
+  cpm: { segment: 'ads', key: 'cpm' },
+  impressoes: { segment: 'ads', key: 'impressoes' },
+  ctr: { segment: 'ads', key: 'ctr' },
+  cliques_saida: { segment: 'ads', key: 'cliquesSaida' },
+  visualizacao_pagina: { segment: 'ads', key: 'visualizacaoPagina' },
+  cps: { segment: 'ads', key: 'cps' },
+};
+
+const PERCENT_METRICS = new Set([
+  'mql_ra_perc', 'mql_noshow', 'mql_taxa_vendas', 'mql_tx_recorrente', 'mql_tx_implantacao',
+  'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas', 'nmql_tx_recorrente', 'nmql_tx_implantacao',
+  'ctr',
+]);
+
 export default function GrowthOrcadoRealizado() {
   usePageTitle("Orçado x Realizado");
   useSetPageInfo("Orçado x Realizado", "Controle de Métricas de Marketing e Vendas");
@@ -137,7 +185,11 @@ export default function GrowthOrcadoRealizado() {
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
   const [selectedFunis, setSelectedFunis] = useState<string[]>([]);
-  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState<Record<string, number>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const queryClient = useQueryClient();
+
   const months = [
     { value: "2026-01", label: "Janeiro 2026" },
     { value: "2026-02", label: "Fevereiro 2026" },
@@ -186,6 +238,72 @@ export default function GrowthOrcadoRealizado() {
     ticketMedioAceleracao: 4000,
     ticketMedioImplantacao: 8500,
   }), [ORCADO_MQL, ORCADO_NAO_MQL]);
+
+  const startEditing = () => {
+    const values: Record<string, number> = {};
+    for (const [metricId, { segment, key }] of Object.entries(METRIC_BUDGET_MAP)) {
+      const source = segment === 'mql' ? ORCADO_MQL : segment === 'nao_mql' ? ORCADO_NAO_MQL : ORCADO_ADS;
+      const raw = (source as any)[key] ?? 0;
+      values[metricId] = PERCENT_METRICS.has(metricId) ? raw * 100 : raw;
+    }
+    setEditValues(values);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditValues({});
+  };
+
+  const saveEdits = async () => {
+    setIsSaving(true);
+    try {
+      const segments: Record<string, Record<string, number>> = {};
+      for (const [metricId, value] of Object.entries(editValues)) {
+        const mapping = METRIC_BUDGET_MAP[metricId];
+        if (!mapping) continue;
+        if (!segments[mapping.segment]) segments[mapping.segment] = {};
+        segments[mapping.segment][mapping.key] = PERCENT_METRICS.has(metricId) ? value / 100 : value;
+      }
+      await Promise.all(
+        Object.entries(segments).map(([segmento, metricas]) =>
+          fetch('/api/growth/orcado-realizado/budgets', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mes: selectedMonth, segmento, metricas }),
+          })
+        )
+      );
+      queryClient.invalidateQueries({ queryKey: ['/api/growth/orcado-realizado/budgets'] });
+      setIsEditing(false);
+      setEditValues({});
+    } catch (error) {
+      console.error('Failed to save budgets:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderOrcadoCell = (metric: Metric) => {
+    if (isEditing && METRIC_BUDGET_MAP[metric.id]) {
+      return (
+        <div className="flex items-center justify-end gap-1">
+          <input
+            type="number"
+            step={PERCENT_METRICS.has(metric.id) ? '0.01' : metric.format === 'currency' ? '0.01' : '1'}
+            value={editValues[metric.id] ?? ''}
+            onChange={(e) => setEditValues(prev => ({
+              ...prev,
+              [metric.id]: parseFloat(e.target.value) || 0,
+            }))}
+            className="w-28 px-2 py-1 text-right text-sm border rounded bg-background text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary"
+          />
+          {PERCENT_METRICS.has(metric.id) && <span className="text-xs text-muted-foreground">%</span>}
+        </div>
+      );
+    }
+    return formatValue(metric.orcado, metric.format);
+  };
 
   const { data: funis } = useQuery<string[]>({
     queryKey: ['/api/growth/orcado-realizado/funis'],
@@ -769,18 +887,48 @@ export default function GrowthOrcadoRealizado() {
           </div>
         </div>
         
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-48" data-testid="select-month">
-            <SelectValue placeholder="Selecione o mês" />
-          </SelectTrigger>
-          <SelectContent>
-            {months.map((month) => (
-              <SelectItem key={month.value} value={month.value}>
-                {month.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-3">
+          {isEditing ? (
+            <>
+              <button
+                onClick={saveEdits}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salvar
+              </button>
+              <button
+                onClick={cancelEditing}
+                disabled={isSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50 transition-colors"
+              >
+                <X className="w-4 h-4" />
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={startEditing}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              Editar Metas
+            </button>
+          )}
+          <Select value={selectedMonth} onValueChange={(v) => { setSelectedMonth(v); if (isEditing) cancelEditing(); }}>
+            <SelectTrigger className="w-48" data-testid="select-month">
+              <SelectValue placeholder="Selecione o mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((month) => (
+                <SelectItem key={month.value} value={month.value}>
+                  {month.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Filtros + Cards de Resumo */}
@@ -1037,7 +1185,7 @@ export default function GrowthOrcadoRealizado() {
                             {metric.name}
                           </TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">
-                            {formatValue(metric.orcado, metric.format)}
+                            {renderOrcadoCell(metric)}
                           </TableCell>
                           <TableCell className="text-right text-sm font-medium">
                             {formatValue(metric.realizado, metric.format)}
@@ -1309,7 +1457,7 @@ export default function GrowthOrcadoRealizado() {
                             {metric.name}
                           </TableCell>
                           <TableCell className="text-right text-sm text-muted-foreground">
-                            {formatValue(metric.orcado, metric.format)}
+                            {renderOrcadoCell(metric)}
                           </TableCell>
                           <TableCell className="text-right text-sm font-medium">
                             {formatValue(metric.realizado, metric.format)}
