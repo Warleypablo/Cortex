@@ -3,6 +3,7 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { validateBody } from "../middleware/validate";
 import { createChamadoSchema, updateChamadoSchema } from "../middleware/schemas";
+import { storage } from "../storage";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -299,11 +300,17 @@ export function registerChamadosRoutes(app: Express) {
 
       const detalhesJson = detalhes ? JSON.stringify(detalhes) : null;
 
-      const result = await db.execute(sql`
-        INSERT INTO cortex_core.chamados (titulo, descricao, area, categoria, prioridade, solicitante_id, solicitante_nome, solicitante_email, solicitante_squad, cliente_cnpj, cliente_nome, responsavel_id, responsavel_nome, responsavel_email, status, detalhes)
-        VALUES (${titulo}, ${descricao}, ${area}, ${categoria || null}, ${prioridade || 'media'}, ${user.googleId || user.id}, ${user.name}, ${user.email}, ${squad}, ${cliente_cnpj || null}, ${cliente_nome || null}, ${respId}, ${respNome}, ${respEmail}, ${autoStatus}, ${detalhesJson}::jsonb)
-        RETURNING *
-      `);
+      const result = detalhesJson
+        ? await db.execute(sql`
+            INSERT INTO cortex_core.chamados (titulo, descricao, area, categoria, prioridade, solicitante_id, solicitante_nome, solicitante_email, solicitante_squad, cliente_cnpj, cliente_nome, responsavel_id, responsavel_nome, responsavel_email, status, detalhes)
+            VALUES (${titulo}, ${descricao}, ${area}, ${categoria || null}, ${prioridade || 'media'}, ${user.googleId || user.id}, ${user.name}, ${user.email}, ${squad}, ${cliente_cnpj || null}, ${cliente_nome || null}, ${respId}, ${respNome}, ${respEmail}, ${autoStatus}, ${detalhesJson}::jsonb)
+            RETURNING *
+          `)
+        : await db.execute(sql`
+            INSERT INTO cortex_core.chamados (titulo, descricao, area, categoria, prioridade, solicitante_id, solicitante_nome, solicitante_email, solicitante_squad, cliente_cnpj, cliente_nome, responsavel_id, responsavel_nome, responsavel_email, status)
+            VALUES (${titulo}, ${descricao}, ${area}, ${categoria || null}, ${prioridade || 'media'}, ${user.googleId || user.id}, ${user.name}, ${user.email}, ${squad}, ${cliente_cnpj || null}, ${cliente_nome || null}, ${respId}, ${respNome}, ${respEmail}, ${autoStatus})
+            RETURNING *
+          `);
 
       const chamado = result.rows[0] as any;
 
@@ -356,6 +363,25 @@ export function registerChamadosRoutes(app: Express) {
       // Sync Obsidian task status for Cortex chamados
       if (status && chamado.area === 'cortex') {
         updateObsidianTaskStatus(id, status);
+      }
+
+      // Notify solicitante when chamado is resolved
+      if (status === 'resolvido' && chamado.solicitante_email) {
+        try {
+          await storage.createNotification({
+            type: 'chamado_resolvido',
+            title: `Chamado resolvido: ${chamado.titulo}`,
+            message: `Seu chamado #${chamado.id} "${chamado.titulo}" foi marcado como resolvido por ${user.name}.`,
+            entityId: String(chamado.id),
+            entityType: 'chamado',
+            priority: 'medium',
+            read: false,
+            dismissed: false,
+            uniqueKey: `chamado-resolvido-${chamado.id}`,
+          });
+        } catch (err) {
+          console.error("[chamados] Error creating notification:", err);
+        }
       }
 
       res.json(chamado);
