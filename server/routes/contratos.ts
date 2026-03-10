@@ -1365,6 +1365,11 @@ Exemplos:
           userId: user?.id || 'system',
           userName: user?.name || 'Sistema',
         }); // fire-and-forget: no await
+
+        // Auto-generate entregaveis from contract scope
+        import("../services/entregaveisGenerator").then(mod => {
+          mod.generateEntregaveisFromContrato({ contratoId: parseInt(id) });
+        }).catch(err => console.error("[entregaveis] Dynamic import failed:", err));
       }
 
       res.json({ message: "Contrato atualizado com sucesso" });
