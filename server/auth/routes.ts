@@ -691,7 +691,7 @@ router.get("/api/portal-cliente/resumo", async (req, res) => {
         urlCobranca: cazParcelas.urlCobranca,
       })
       .from(cazParcelas)
-      .where(sql`${cazParcelas.idCliente} = ANY(${sql.raw(`ARRAY[${safeIdList.map(id => `'${id}'`).join(',')}]::uuid[]`)})`)
+      .where(sql`${cazParcelas.idCliente} = ANY(${safeIdList}::uuid[])`)
       .orderBy(desc(cazParcelas.dataVencimento))
       .limit(50);
 
@@ -840,7 +840,7 @@ router.get("/api/portal-cliente/performance", async (req, res) => {
       arClienteRow = await db
         .select()
         .from(arClientes)
-        .where(sql`${normSql(arClientes.nome)} = ${normSql(sql.raw(`'${nomeClickup.replace(/'/g, "''")}'`))}`)
+        .where(sql`${normSql(arClientes.nome)} = ${normSql(sql`${nomeClickup}`)}`)
         .limit(1);
       matchType = 'normalized';
     }
