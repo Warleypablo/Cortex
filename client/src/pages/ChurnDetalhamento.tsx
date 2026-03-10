@@ -445,16 +445,30 @@ export default function ChurnDetalhamento() {
   usePageTitle("Detalhamento de Churn");
   useSetPageInfo("Detalhamento de Churn", "Análise detalhada de contratos encerrados");
 
-  const MRR_BASE_OVERRIDE = 1119046;
-  const CHURN_MAX_TARGET = 102000;
   const BASE_REFERENCE_DATE = new Date(2026, 0, 1);
 
-  // BP 2026 - Metas mensais de churn MRR (planejado)
+  // BP 2026 - MRR planejado por mês (para calcular taxa de churn)
+  const BP_MRR_TARGETS: Record<string, number> = {
+    "2026-01": 1156850, "2026-02": 1267734, "2026-03": 1368637,
+    "2026-04": 1485460, "2026-05": 1591769, "2026-06": 1688510,
+    "2026-07": 1806544, "2026-08": 1913955, "2026-09": 2011699,
+    "2026-10": 2130646, "2026-11": 2238888, "2026-12": 2337388,
+  };
+
+  // BP 2026 - Metas mensais de churn MRR (planejado estático)
   const BP_CHURN_MRR_TARGETS: Record<string, number> = {
     "2026-01": 104117, "2026-02": 114096, "2026-03": 123177,
     "2026-04": 133691, "2026-05": 143259, "2026-06": 151966,
     "2026-07": 162589, "2026-08": 172256, "2026-09": 181053,
     "2026-10": 191758, "2026-11": 201500, "2026-12": 210365,
+  };
+
+  // Taxa de churn planejada por mês (%) = churn_bp / mrr_bp
+  const getChurnRateBP = (monthKey: string): number => {
+    const mrrBP = BP_MRR_TARGETS[monthKey];
+    const churnBP = BP_CHURN_MRR_TARGETS[monthKey];
+    if (!mrrBP || !churnBP) return 0;
+    return churnBP / mrrBP;
   };
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -685,13 +699,16 @@ export default function ChurnDetalhamento() {
       .sort((a, b) => b.mrr_perdido - a.mrr_perdido); // Ordenar por valor (R$) ao invés de percentual
   }, [filteredContratos, data?.metricas?.churn_por_squad]);
 
+  // MRR base dinâmico: usa MRR real do período quando disponível
+  const mrrBaseReal = data?.metricas?.mrr_ativo_ref ?? 0;
+
   const filteredTaxaChurn = useMemo(() => {
-    const mrrBase = MRR_BASE_OVERRIDE;
+    const mrrBase = mrrBaseReal;
     const mrrPerdido = filteredMetricas.mrr_perdido;
     return mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
-  }, [filteredMetricas.mrr_perdido]);
+  }, [filteredMetricas.mrr_perdido, mrrBaseReal]);
 
-  // Meta planejada pro-rateada até hoje (BP 2026)
+  // Meta planejada pro-rateada até hoje (BP 2026) — DINÂMICA baseada no MRR real
   const churnPlanejado = useMemo(() => {
     const today = new Date();
     const periodStart = dataInicio ? parseISO(dataInicio) : null;
@@ -700,7 +717,9 @@ export default function ChurnDetalhamento() {
 
     // Pegar o mês de referência do filtro
     const monthKey = format(periodStart, "yyyy-MM");
-    const targetMensal = BP_CHURN_MRR_TARGETS[monthKey] || 0;
+    const churnRate = getChurnRateBP(monthKey);
+    // Meta dinâmica: taxa do BP × MRR real
+    const targetMensal = mrrBaseReal > 0 ? mrrBaseReal * churnRate : (BP_CHURN_MRR_TARGETS[monthKey] || 0);
     if (targetMensal === 0) return { mrrPlanejado: 0, taxaPlanejada: 0 };
 
     // Total de dias no mês
@@ -713,14 +732,16 @@ export default function ChurnDetalhamento() {
 
     // Meta pro-rateada até hoje
     const mrrPlanejado = (targetMensal / totalDaysInMonth) * safeDays;
-    const taxaPlanejada = MRR_BASE_OVERRIDE > 0 ? (mrrPlanejado / MRR_BASE_OVERRIDE) * 100 : 0;
+    const taxaPlanejada = mrrBaseReal > 0 ? (mrrPlanejado / mrrBaseReal) * 100 : 0;
 
     return { mrrPlanejado, taxaPlanejada, targetMensal };
-  }, [dataInicio, dataFim]);
+  }, [dataInicio, dataFim, mrrBaseReal]);
 
   const churnDailyInsights = useMemo(() => {
-    const mrrBase = MRR_BASE_OVERRIDE;
-    const churnTarget = CHURN_MAX_TARGET;
+    const mrrBase = mrrBaseReal;
+    const monthKey = dataInicio ? format(parseISO(dataInicio), "yyyy-MM") : "";
+    const churnRate = getChurnRateBP(monthKey);
+    const churnTarget = mrrBase > 0 ? mrrBase * churnRate : 0;
     const churnTargetPct = mrrBase > 0 ? (churnTarget / mrrBase) * 100 : 0;
     const churnSpent = filteredMetricas.mrr_perdido || 0;
 
@@ -1954,8 +1975,8 @@ export default function ChurnDetalhamento() {
                     <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">MRR Base Referência</span>
                     <Target className="h-4 w-4 text-blue-500" />
                   </div>
-                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(MRR_BASE_OVERRIDE)}</div>
-                  <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base para cálculo do churn</div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(mrrBaseReal)}</div>
+                  <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">MRR ativo real do período</div>
                 </div>
               </div>
 

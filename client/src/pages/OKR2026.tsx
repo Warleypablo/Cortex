@@ -2102,9 +2102,26 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
   const currentTargets = getCurrentTargets();
   const mrrTarget = currentTargets.mrr;
   const vendasMrrTarget = currentTargets.vendasMrr;
-  const inadTarget = currentTargets.inadimplencia;
-  const churnTarget = currentTargets.churn;
   const cashGenTarget = currentTargets.geracaoCaixa;
+
+  // MRR real do mês selecionado (série para meses passados, realtime para mês atual)
+  const mrrRealForMonth = viewMode === "month"
+    ? (isSelectedMonthCurrent || isSelectedMonthFuture
+        ? metrics.mrr_ativo
+        : getValueFromSeries(series.mrr || metrics.mrr_serie, selectedMonth) ?? metrics.mrr_ativo)
+    : metrics.mrr_ativo;
+
+  // Churn e inadimplência dinâmicos: taxa do BP aplicada sobre MRR real
+  // Taxa BP = meta_bp / mrr_planejado_bp → aplicar sobre MRR real
+  const churnRateBP = viewMode === "month"
+    ? (monthlyTargets[selectedMonth].mrr > 0 ? monthlyTargets[selectedMonth].churn / monthlyTargets[selectedMonth].mrr : 0)
+    : (quarterlyTargets[selectedQuarter].mrr > 0 ? quarterlyTargets[selectedQuarter].churn / quarterlyTargets[selectedQuarter].mrr : 0);
+  const inadRateBP = viewMode === "month"
+    ? (monthlyTargets[selectedMonth].mrr > 0 ? monthlyTargets[selectedMonth].inadimplencia / monthlyTargets[selectedMonth].mrr : 0)
+    : (quarterlyTargets[selectedQuarter].mrr > 0 ? quarterlyTargets[selectedQuarter].inadimplencia / quarterlyTargets[selectedQuarter].mrr : 0);
+
+  const churnTarget = mrrRealForMonth * churnRateBP;
+  const inadTarget = mrrRealForMonth * inadRateBP;
 
   // Valores atuais
   const inadRealtime = metrics.inadimplencia_brl ?? (metrics.inadimplencia_percentual ? (metrics.mrr_ativo ?? 0) * (metrics.inadimplencia_percentual / 100) : 0);
