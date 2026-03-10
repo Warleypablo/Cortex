@@ -1955,4 +1955,135 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       res.status(500).json({ error: "Failed to fetch RR semanal por SDR" });
     }
   });
+
+  // Google Ads - Keyword Performance
+  app.get("/api/growth/keyword-performance", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '2025-01-01';
+      const endDate = req.query.endDate as string || new Date().toISOString().split('T')[0];
+      const matchType = req.query.matchType as string || 'Todos';
+      const status = req.query.status as string || 'Todos';
+      const search = req.query.search as string || '';
+      const sortBy = req.query.sortBy as string || 'cost';
+      const sortDir = req.query.sortDir as string || 'desc';
+
+      // Validate dates
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+
+      const result = await db.execute(sql`
+        WITH keyword_metrics AS (
+          SELECT
+            k.keyword_key,
+            k.text as keyword_text,
+            k.match_type,
+            k.status,
+            k.quality_score as current_quality_score,
+            k.negative,
+            ag.name as ad_group_name,
+            c.name as campaign_name,
+            c.status as campaign_status,
+            COALESCE(SUM(m.impressions), 0)::bigint as impressions,
+            COALESCE(SUM(m.clicks), 0)::bigint as clicks,
+            COALESCE(SUM(m.cost_micros), 0)::bigint as cost_micros,
+            COALESCE(SUM(m.conversions), 0)::numeric as conversions,
+            COALESCE(SUM(m.conversion_value), 0)::numeric as conversion_value,
+            MAX(m.quality_score) as max_quality_score
+          FROM google_ads.keywords k
+          JOIN google_ads.ad_groups ag ON k.ad_group_key = ag.ad_group_key
+          JOIN google_ads.campaigns c ON ag.campaign_key = c.campaign_key
+          LEFT JOIN google_ads.keyword_daily_metrics m
+            ON k.keyword_key = m.keyword_key
+            AND m.report_date >= ${startDate}::date
+            AND m.report_date <= ${endDate}::date
+          WHERE k.negative = false
+          GROUP BY k.keyword_key, k.text, k.match_type, k.status, k.quality_score, k.negative,
+                   ag.name, c.name, c.status
+        )
+        SELECT
+          keyword_key,
+          keyword_text,
+          match_type,
+          status,
+          current_quality_score,
+          ad_group_name,
+          campaign_name,
+          campaign_status,
+          impressions,
+          clicks,
+          cost_micros,
+          conversions,
+          conversion_value,
+          max_quality_score,
+          CASE WHEN impressions > 0 THEN (clicks::numeric / impressions::numeric * 100) ELSE 0 END as ctr,
+          CASE WHEN clicks > 0 THEN (cost_micros::numeric / clicks::numeric / 1000000.0) ELSE 0 END as avg_cpc,
+          CASE WHEN cost_micros > 0 THEN (conversion_value::numeric / (cost_micros::numeric / 1000000.0)) ELSE 0 END as roas
+        FROM keyword_metrics
+        ORDER BY cost_micros DESC
+      `);
+
+      let data = (result.rows as any[]).map((row: any) => ({
+        keywordKey: row.keyword_key,
+        keyword: row.keyword_text,
+        matchType: row.match_type,
+        status: row.status,
+        qualityScore: row.current_quality_score || row.max_quality_score || null,
+        adGroup: row.ad_group_name,
+        campaign: row.campaign_name,
+        campaignStatus: row.campaign_status,
+        impressions: parseInt(row.impressions) || 0,
+        clicks: parseInt(row.clicks) || 0,
+        cost: (parseInt(row.cost_micros) || 0) / 1000000,
+        conversions: parseFloat(row.conversions) || 0,
+        conversionValue: parseFloat(row.conversion_value) || 0,
+        ctr: parseFloat(row.ctr) || 0,
+        avgCpc: parseFloat(row.avg_cpc) || 0,
+        roas: parseFloat(row.roas) || 0,
+      }));
+
+      // Apply filters
+      if (matchType !== 'Todos') {
+        data = data.filter(d => d.matchType === matchType);
+      }
+      if (status !== 'Todos') {
+        data = data.filter(d => d.status === status);
+      }
+      if (search) {
+        const s = search.toLowerCase();
+        data = data.filter(d => d.keyword.toLowerCase().includes(s) || d.campaign.toLowerCase().includes(s));
+      }
+
+      // Sort
+      const dir = sortDir === 'asc' ? 1 : -1;
+      const sortKey = sortBy as keyof typeof data[0];
+      data.sort((a, b) => {
+        const va = a[sortKey] ?? 0;
+        const vb = b[sortKey] ?? 0;
+        return va > vb ? dir : va < vb ? -dir : 0;
+      });
+
+      // Summary totals
+      const totals = data.reduce((acc, d) => ({
+        impressions: acc.impressions + d.impressions,
+        clicks: acc.clicks + d.clicks,
+        cost: acc.cost + d.cost,
+        conversions: acc.conversions + d.conversions,
+        conversionValue: acc.conversionValue + d.conversionValue,
+      }), { impressions: 0, clicks: 0, cost: 0, conversions: 0, conversionValue: 0 });
+
+      const summary = {
+        totalKeywords: data.length,
+        ...totals,
+        ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions * 100) : 0,
+        avgCpc: totals.clicks > 0 ? (totals.cost / totals.clicks) : 0,
+        roas: totals.cost > 0 ? (totals.conversionValue / totals.cost) : 0,
+      };
+
+      res.json({ keywords: data, summary });
+    } catch (error) {
+      console.error("[api] Error fetching keyword performance:", error);
+      res.status(500).json({ error: "Failed to fetch keyword performance" });
+    }
+  });
 }
