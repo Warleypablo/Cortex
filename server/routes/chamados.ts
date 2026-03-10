@@ -115,10 +115,31 @@ function updateObsidianTaskStatus(chamadoId: number, newStatus: string) {
   }
 }
 
+async function backfillObsidianTasks() {
+  try {
+    const result = await db.execute(sql`
+      SELECT * FROM cortex_core.chamados WHERE area = 'cortex' ORDER BY id ASC
+    `);
+    let created = 0;
+    for (const row of result.rows as any[]) {
+      const slug = slugify(row.titulo || "sem-titulo");
+      const filename = `TASK-${row.id}-${slug}.md`;
+      const filepath = path.join(OBSIDIAN_TASKS_DIR, filename);
+      if (!fs.existsSync(filepath)) {
+        writeObsidianTask(row);
+        created++;
+      }
+    }
+    if (created > 0) console.log(`[obsidian] Backfill: ${created} task(s) created`);
+  } catch (err) {
+    console.error("[obsidian] Backfill error:", err);
+  }
+}
+
 export function registerChamadosRoutes(app: Express) {
-  // Run migration for detalhes column
+  // Run migration for detalhes column, then backfill Obsidian tasks
   db.execute(sql`ALTER TABLE cortex_core.chamados ADD COLUMN IF NOT EXISTS detalhes JSONB`)
-    .then(() => console.log("[chamados] detalhes column ensured"))
+    .then(() => { console.log("[chamados] detalhes column ensured"); return backfillObsidianTasks(); })
     .catch((err: any) => console.error("[chamados] migration error:", err));
 
   // ============================================
