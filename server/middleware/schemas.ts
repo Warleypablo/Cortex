@@ -79,8 +79,8 @@ export const createChamadoSchema = z.object({
   descricao: z.string().max(10000).optional().default(''),
   area: z.string().min(1).max(100),
   prioridade: z.enum(['baixa', 'media', 'alta', 'urgente']).default('media'),
-  cliente_nome: z.string().max(500).optional(),
-  cliente_cnpj: z.string().max(50).optional(),
+  cliente_nome: z.string().max(500).nullable().optional(),
+  cliente_cnpj: z.string().max(50).nullable().optional(),
   detalhes: z.record(z.string(), z.any()).optional(),
 }).passthrough();
 
