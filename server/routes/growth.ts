@@ -1362,6 +1362,57 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // Growth - Orçado x Realizado - Budgets CRUD
+  app.get("/api/growth/orcado-realizado/budgets", async (req, res) => {
+    try {
+      const mes = req.query.mes as string;
+      if (!mes) return res.status(400).json({ error: "mes is required (YYYY-MM)" });
+      const result = await db.execute(sql`
+        SELECT segmento, metricas FROM meta_ads.growth_budgets WHERE mes = ${mes}
+      `);
+      const budgets: Record<string, any> = {};
+      for (const row of result.rows as any[]) {
+        budgets[row.segmento] = row.metricas;
+      }
+      res.json(budgets);
+    } catch (error) {
+      console.error("[api] Error fetching budgets:", error);
+      res.status(500).json({ error: "Failed to fetch budgets" });
+    }
+  });
+
+  app.put("/api/growth/orcado-realizado/budgets", async (req, res) => {
+    try {
+      const { mes, segmento, metricas } = req.body;
+      if (!mes || !segmento || !metricas) {
+        return res.status(400).json({ error: "mes, segmento, and metricas are required" });
+      }
+      await db.execute(sql`
+        INSERT INTO meta_ads.growth_budgets (mes, segmento, metricas)
+        VALUES (${mes}, ${segmento}, ${JSON.stringify(metricas)}::jsonb)
+        ON CONFLICT (mes, segmento) DO UPDATE SET
+          metricas = ${JSON.stringify(metricas)}::jsonb,
+          updated_at = NOW()
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error updating budget:", error);
+      res.status(500).json({ error: "Failed to update budget" });
+    }
+  });
+
+  app.get("/api/growth/orcado-realizado/budgets/months", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT mes FROM meta_ads.growth_budgets ORDER BY mes DESC
+      `);
+      res.json((result.rows as any[]).map((r: any) => r.mes));
+    } catch (error) {
+      console.error("[api] Error fetching budget months:", error);
+      res.status(500).json({ error: "Failed to fetch budget months" });
+    }
+  });
+
   // Growth - Orçado x Realizado - Categorias distintas de crm_deal
   app.get("/api/growth/orcado-realizado/categories", async (req, res) => {
     try {
