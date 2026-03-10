@@ -18,7 +18,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, LayoutGrid, List, Clock, AlertCircle, CheckCircle2, Timer,
-  MessageSquare, Send, Trash2, User, ArrowRight, RotateCcw, ChevronsUpDown, Check, Building2,
+  MessageSquare, Send, Trash2, User, ArrowRight, RotateCcw, ChevronsUpDown, Check, Building2, CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -78,7 +78,12 @@ const AREAS = [
   { value: "rh", label: "RH" },
   { value: "operacao", label: "Operação" },
   { value: "comercial", label: "Comercial" },
+  { value: "growth", label: "Growth" },
   { value: "cortex", label: "Cortex" },
+];
+
+const GROWTH_CATEGORIES = [
+  "Design", "Criativo", "Copy", "Broadcast", "Sugestão de Conteúdo", "Gravação",
 ];
 
 const PRIORIDADES = [
@@ -486,15 +491,19 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
   const [clienteNome, setClienteNome] = useState("");
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
   const [detalhes, setDetalhes] = useState<Record<string, string>>({});
+  const [deadline, setDeadline] = useState("");
 
   const isCortex = area === "cortex";
+  const isGrowth = area === "growth";
   const cortexFields = isCortex ? (CORTEX_CATEGORY_FIELDS[categoria] || []) : [];
 
   const { data: categoriasData } = useQuery<{ fieldType: string; options: { id: number; value: string; label: string }[] }>({
     queryKey: [`/api/system-fields/chamado_cat_${area}`],
-    enabled: !!area,
+    enabled: !!area && !isGrowth,
   });
-  const categorias = categoriasData?.options ?? [];
+  const categorias = isGrowth
+    ? GROWTH_CATEGORIES.map((c, i) => ({ id: i, value: c, label: c }))
+    : (categoriasData?.options ?? []);
 
   const { data: clientes = [] } = useQuery<{ nome: string; cnpj: string }[]>({
     queryKey: ["/api/chamados/clientes"],
@@ -511,11 +520,14 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      const growthDetalhes = isGrowth ? { ...detalhes, deadline: deadline || undefined } : undefined;
       const res = await apiRequest("POST", "/api/chamados", {
         titulo, descricao, area, categoria: categoria || null, prioridade,
         cliente_cnpj: area === "financeiro" ? (clienteCnpj || null) : null,
         cliente_nome: area === "financeiro" ? (clienteNome || null) : null,
-        detalhes: isCortex && Object.keys(detalhes).length > 0 ? detalhes : undefined,
+        detalhes: isCortex && Object.keys(detalhes).length > 0
+          ? detalhes
+          : isGrowth ? growthDetalhes : undefined,
       });
       return res.json();
     },
@@ -540,6 +552,7 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
     setClienteCnpj("");
     setClienteNome("");
     setDetalhes({});
+    setDeadline("");
   }
 
   return (
@@ -693,6 +706,22 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
               </Popover>
             </div>
           )}
+          {/* Growth: Deadline field */}
+          {isGrowth && (
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">
+                <CalendarDays className="w-3 h-3 inline mr-1" />
+                Deadline de entrega <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+                className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+              />
+            </div>
+          )}
           <div>
             <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">Prioridade</label>
             <Select value={prioridade} onValueChange={setPrioridade}>
@@ -712,7 +741,7 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             onClick={() => createMutation.mutate()}
-            disabled={!titulo || !descricao || !area || cortexFieldsMissing || createMutation.isPending}
+            disabled={!titulo || !descricao || !area || cortexFieldsMissing || (isGrowth && (!categoria || !deadline)) || createMutation.isPending}
           >
             {createMutation.isPending ? "Criando..." : "Criar Chamado"}
           </Button>
