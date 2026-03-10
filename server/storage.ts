@@ -3365,7 +3365,7 @@ export class DbStorage implements IStorage {
     }
     
     const contaFilter = contasFinanceiras && contasFinanceiras.length > 0
-      ? sql.raw(`AND nome_conta_financeira IN (${contasFinanceiras.map(c => `'${c.replace(/'/g, "''")}'`).join(',')})`)
+      ? sql`AND nome_conta_financeira IN (${sql.join(contasFinanceiras.map(c => sql`${c}`), sql`, `)})`
       : sql``;
 
     const result = await db.execute(sql`
@@ -9702,8 +9702,7 @@ export class DbStorage implements IStorage {
   async getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>> {
     if (!clienteIds.length) return {};
     
-    const escapedIds = clienteIds.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
-    const result = await db.execute(sql.raw(`SELECT * FROM cortex_core.inadimplencia_contextos WHERE cliente_id IN (${escapedIds})`));
+    const result = await db.execute(sql`SELECT * FROM cortex_core.inadimplencia_contextos WHERE cliente_id = ANY(${clienteIds})`);
     
     const contextos: Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null }> = {};
     for (const row of result.rows as any[]) {
@@ -9728,8 +9727,7 @@ export class DbStorage implements IStorage {
   }
 
   async getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null } | null> {
-    const escapedId = clienteId.replace(/'/g, "''");
-    const result = await db.execute(sql.raw(`SELECT * FROM cortex_core.inadimplencia_contextos WHERE cliente_id = '${escapedId}'`));
+    const result = await db.execute(sql`SELECT * FROM cortex_core.inadimplencia_contextos WHERE cliente_id = ${clienteId}`);
     
     if (!result.rows.length) return null;
     const row = result.rows[0] as any;
@@ -9752,17 +9750,9 @@ export class DbStorage implements IStorage {
   }
 
   async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
-    const escapedClienteId = data.clienteId.replace(/'/g, "''");
-    const escapedContexto = (data.contexto || '').replace(/'/g, "''");
-    const escapedEvidencias = (data.evidencias || '').replace(/'/g, "''");
-    const escapedAcao = (data.acao || '').replace(/'/g, "''");
-    const escapedStatusFinanceiro = (data.statusFinanceiro || '').replace(/'/g, "''");
-    const escapedDetalheFinanceiro = (data.detalheFinanceiro || '').replace(/'/g, "''");
-    const escapedAtualizadoPor = data.atualizadoPor.replace(/'/g, "''");
-    
-    const result = await db.execute(sql.raw(`
+    const result = await db.execute(sql`
       INSERT INTO cortex_core.inadimplencia_contextos (cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em)
-      VALUES ('${escapedClienteId}', '${escapedContexto}', '${escapedEvidencias}', NULLIF('${escapedAcao}', ''), NULLIF('${escapedStatusFinanceiro}', ''), NULLIF('${escapedDetalheFinanceiro}', ''), '${escapedAtualizadoPor}', NOW())
+      VALUES (${data.clienteId}, ${data.contexto || ''}, ${data.evidencias || ''}, NULLIF(${data.acao || ''}, ''), NULLIF(${data.statusFinanceiro || ''}, ''), NULLIF(${data.detalheFinanceiro || ''}, ''), ${data.atualizadoPor}, NOW())
       ON CONFLICT (cliente_id) DO UPDATE SET
         contexto = EXCLUDED.contexto,
         evidencias = EXCLUDED.evidencias,
@@ -9772,7 +9762,7 @@ export class DbStorage implements IStorage {
         atualizado_por = EXCLUDED.atualizado_por,
         atualizado_em = NOW()
       RETURNING cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em
-    `));
+    `);
     
     const row = result.rows[0] as any;
     return {
@@ -9787,61 +9777,42 @@ export class DbStorage implements IStorage {
   }
 
   async upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; tipoInadimplencia?: string; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; tipoInadimplencia: string | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }> {
-    const escapedClienteId = data.clienteId.replace(/'/g, "''");
-    const escapedContexto = (data.contextoJuridico || '').replace(/'/g, "''");
-    const escapedProcedimento = (data.procedimentoJuridico || '').replace(/'/g, "''");
-    const escapedStatus = (data.statusJuridico || '').replace(/'/g, "''");
-    const escapedTipoInadimplencia = (data.tipoInadimplencia || '').replace(/'/g, "''");
-    const escapedAtualizadoPor = data.atualizadoPor.replace(/'/g, "''");
-    const valorAcordadoSql = data.valorAcordado != null ? data.valorAcordado.toString() : 'NULL';
-    
+    const valorAcordado = data.valorAcordado != null ? data.valorAcordado : null;
+
     // Primeiro tenta atualizar se já existe
-    let result = await db.execute(sql.raw(`
+    let result = await db.execute(sql`
       UPDATE cortex_core.inadimplencia_contextos SET
-        contexto_juridico = NULLIF('${escapedContexto}', ''),
-        procedimento_juridico = NULLIF('${escapedProcedimento}', ''),
-        status_juridico = NULLIF('${escapedStatus}', ''),
-        valor_acordado = ${valorAcordadoSql},
-        tipo_inadimplencia = NULLIF('${escapedTipoInadimplencia}', ''),
-        atualizado_juridico_por = '${escapedAtualizadoPor}',
+        contexto_juridico = NULLIF(${data.contextoJuridico || ''}, ''),
+        procedimento_juridico = NULLIF(${data.procedimentoJuridico || ''}, ''),
+        status_juridico = NULLIF(${data.statusJuridico || ''}, ''),
+        valor_acordado = ${valorAcordado},
+        tipo_inadimplencia = NULLIF(${data.tipoInadimplencia || ''}, ''),
+        atualizado_juridico_por = ${data.atualizadoPor},
         atualizado_juridico_em = NOW()
-      WHERE cliente_id = '${escapedClienteId}'
+      WHERE cliente_id = ${data.clienteId}
       RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, tipo_inadimplencia, atualizado_juridico_por, atualizado_juridico_em
-    `));
-    
+    `);
+
     // Se não existe, insere um novo registro com valores padrão para campos obrigatórios
     if (!result.rows.length) {
       console.log(`[storage] Cliente ${data.clienteId} não existe em cortex_core.inadimplencia_contextos, criando registro...`);
-      result = await db.execute(sql.raw(`
+      result = await db.execute(sql`
         INSERT INTO cortex_core.inadimplencia_contextos (
-          cliente_id, 
-          contexto,
-          evidencias,
-          acao,
-          contexto_juridico, 
-          procedimento_juridico, 
-          status_juridico, 
-          valor_acordado, 
-          tipo_inadimplencia,
-          atualizado_juridico_por, 
-          atualizado_juridico_em,
-          atualizado_por,
-          atualizado_em
+          cliente_id, contexto, evidencias, acao,
+          contexto_juridico, procedimento_juridico, status_juridico,
+          valor_acordado, tipo_inadimplencia,
+          atualizado_juridico_por, atualizado_juridico_em,
+          atualizado_por, atualizado_em
         )
         VALUES (
-          '${escapedClienteId}',
-          '',
-          '',
-          'Análise Jurídica',
-          NULLIF('${escapedContexto}', ''),
-          NULLIF('${escapedProcedimento}', ''),
-          NULLIF('${escapedStatus}', ''),
-          ${valorAcordadoSql},
-          NULLIF('${escapedTipoInadimplencia}', ''),
-          '${escapedAtualizadoPor}',
-          NOW(),
-          '${escapedAtualizadoPor}',
-          NOW()
+          ${data.clienteId}, '', '', 'Análise Jurídica',
+          NULLIF(${data.contextoJuridico || ''}, ''),
+          NULLIF(${data.procedimentoJuridico || ''}, ''),
+          NULLIF(${data.statusJuridico || ''}, ''),
+          ${valorAcordado},
+          NULLIF(${data.tipoInadimplencia || ''}, ''),
+          ${data.atualizadoPor}, NOW(),
+          ${data.atualizadoPor}, NOW()
         )
         ON CONFLICT (cliente_id) DO UPDATE SET
           contexto_juridico = EXCLUDED.contexto_juridico,
@@ -9852,7 +9823,7 @@ export class DbStorage implements IStorage {
           atualizado_juridico_por = EXCLUDED.atualizado_juridico_por,
           atualizado_juridico_em = EXCLUDED.atualizado_juridico_em
         RETURNING contexto_juridico, procedimento_juridico, status_juridico, valor_acordado, tipo_inadimplencia, atualizado_juridico_por, atualizado_juridico_em
-      `));
+      `);
     }
     
     const row = result.rows[0] as any;
@@ -9871,14 +9842,14 @@ export class DbStorage implements IStorage {
     try {
       // Query sem valor_acordado para compatibilidade com produção
       // Filtrar apenas registros manuais antigos que não deveriam aparecer (com "Registro manual" no contexto)
-      const result = await db.execute(sql.raw(`
-        SELECT cliente_id FROM cortex_core.inadimplencia_contextos 
-        WHERE (contexto_juridico IS NOT NULL 
-           OR procedimento_juridico IS NOT NULL 
+      const result = await db.execute(sql`
+        SELECT cliente_id FROM cortex_core.inadimplencia_contextos
+        WHERE (contexto_juridico IS NOT NULL
+           OR procedimento_juridico IS NOT NULL
            OR status_juridico IS NOT NULL)
           AND (contexto_juridico IS NULL OR contexto_juridico NOT ILIKE '%Registro manual%')
           AND cliente_id NOT LIKE 'erro_%'
-      `));
+      `);
       return (result.rows as any[]).map(r => r.cliente_id);
     } catch (error) {
       console.warn('[storage] getClientesComContextoJuridico error (colunas podem não existir):', error);
@@ -9901,21 +9872,21 @@ export class DbStorage implements IStorage {
 
   // Metric Formatting Rules - DbStorage implementations
   async getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]> {
-    const rulesetsResult = await db.execute(sql.raw(`
+    const rulesetsResult = await db.execute(sql`
       SELECT id, metric_key, display_label, default_color, updated_at, updated_by
       FROM metric_rulesets
       ORDER BY display_label
-    `));
-    
+    `);
+
     const rulesets: import("@shared/schema").MetricRulesetWithThresholds[] = [];
-    
+
     for (const row of rulesetsResult.rows as any[]) {
-      const thresholdsResult = await db.execute(sql.raw(`
+      const thresholdsResult = await db.execute(sql`
         SELECT id, ruleset_id, min_value, max_value, color, label, sort_order
         FROM metric_thresholds
         WHERE ruleset_id = ${row.id}
         ORDER BY sort_order
-      `));
+      `);
       
       rulesets.push({
         id: row.id,
@@ -9940,23 +9911,22 @@ export class DbStorage implements IStorage {
   }
 
   async getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null> {
-    const escapedKey = metricKey.replace(/'/g, "''");
-    const rulesetResult = await db.execute(sql.raw(`
+    const rulesetResult = await db.execute(sql`
       SELECT id, metric_key, display_label, default_color, updated_at, updated_by
       FROM metric_rulesets
-      WHERE metric_key = '${escapedKey}'
-    `));
-    
+      WHERE metric_key = ${metricKey}
+    `);
+
     if (!rulesetResult.rows.length) return null;
-    
+
     const row = rulesetResult.rows[0] as any;
-    
-    const thresholdsResult = await db.execute(sql.raw(`
+
+    const thresholdsResult = await db.execute(sql`
       SELECT id, ruleset_id, min_value, max_value, color, label, sort_order
       FROM metric_thresholds
       WHERE ruleset_id = ${row.id}
       ORDER BY sort_order
-    `));
+    `);
     
     return {
       id: row.id,
@@ -9978,21 +9948,16 @@ export class DbStorage implements IStorage {
   }
 
   async upsertMetricRuleset(data: import("@shared/schema").InsertMetricRuleset): Promise<import("@shared/schema").MetricRuleset> {
-    const escapedKey = data.metricKey.replace(/'/g, "''");
-    const escapedLabel = data.displayLabel.replace(/'/g, "''");
-    const escapedColor = (data.defaultColor || 'default').replace(/'/g, "''");
-    const escapedUpdatedBy = (data.updatedBy || '').replace(/'/g, "''");
-    
-    const result = await db.execute(sql.raw(`
+    const result = await db.execute(sql`
       INSERT INTO metric_rulesets (metric_key, display_label, default_color, updated_by, updated_at)
-      VALUES ('${escapedKey}', '${escapedLabel}', '${escapedColor}', NULLIF('${escapedUpdatedBy}', ''), NOW())
+      VALUES (${data.metricKey}, ${data.displayLabel}, ${data.defaultColor || 'default'}, NULLIF(${data.updatedBy || ''}, ''), NOW())
       ON CONFLICT (metric_key) DO UPDATE SET
         display_label = EXCLUDED.display_label,
         default_color = EXCLUDED.default_color,
         updated_by = EXCLUDED.updated_by,
         updated_at = NOW()
       RETURNING id, metric_key, display_label, default_color, updated_at, updated_by
-    `));
+    `);
     
     const row = result.rows[0] as any;
     return {
@@ -10006,34 +9971,26 @@ export class DbStorage implements IStorage {
   }
 
   async deleteMetricRuleset(metricKey: string): Promise<void> {
-    const escapedKey = metricKey.replace(/'/g, "''");
-    
-    // First get the ruleset id
-    const rulesetResult = await db.execute(sql.raw(`
-      SELECT id FROM metric_rulesets WHERE metric_key = '${escapedKey}'
-    `));
-    
+    const rulesetResult = await db.execute(sql`
+      SELECT id FROM metric_rulesets WHERE metric_key = ${metricKey}
+    `);
+
     if (rulesetResult.rows.length > 0) {
       const rulesetId = (rulesetResult.rows[0] as any).id;
-      // Delete thresholds first
-      await db.execute(sql.raw(`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`));
-      // Then delete ruleset
-      await db.execute(sql.raw(`DELETE FROM metric_rulesets WHERE id = ${rulesetId}`));
+      await db.execute(sql`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`);
+      await db.execute(sql`DELETE FROM metric_rulesets WHERE id = ${rulesetId}`);
     }
   }
 
   async createMetricThreshold(data: import("@shared/schema").InsertMetricThreshold): Promise<import("@shared/schema").MetricThreshold> {
-    const minVal = data.minValue !== null && data.minValue !== undefined ? data.minValue : 'NULL';
-    const maxVal = data.maxValue !== null && data.maxValue !== undefined ? data.maxValue : 'NULL';
-    const escapedColor = data.color.replace(/'/g, "''");
-    const escapedLabel = (data.label || '').replace(/'/g, "''");
-    const sortOrder = data.sortOrder || 0;
-    
-    const result = await db.execute(sql.raw(`
+    const minVal = data.minValue !== null && data.minValue !== undefined ? data.minValue : null;
+    const maxVal = data.maxValue !== null && data.maxValue !== undefined ? data.maxValue : null;
+
+    const result = await db.execute(sql`
       INSERT INTO metric_thresholds (ruleset_id, min_value, max_value, color, label, sort_order)
-      VALUES (${data.rulesetId}, ${minVal}, ${maxVal}, '${escapedColor}', NULLIF('${escapedLabel}', ''), ${sortOrder})
+      VALUES (${data.rulesetId}, ${minVal}, ${maxVal}, ${data.color}, NULLIF(${data.label || ''}, ''), ${data.sortOrder || 0})
       RETURNING id, ruleset_id, min_value, max_value, color, label, sort_order
-    `));
+    `);
     
     const row = result.rows[0] as any;
     return {
@@ -10048,30 +10005,30 @@ export class DbStorage implements IStorage {
   }
 
   async updateMetricThreshold(id: number, data: Partial<import("@shared/schema").InsertMetricThreshold>): Promise<import("@shared/schema").MetricThreshold> {
-    const updates: string[] = [];
-    
+    const setClauses: ReturnType<typeof sql>[] = [];
+
     if (data.minValue !== undefined) {
-      updates.push(`min_value = ${data.minValue !== null ? data.minValue : 'NULL'}`);
+      setClauses.push(sql`min_value = ${data.minValue !== null ? data.minValue : null}`);
     }
     if (data.maxValue !== undefined) {
-      updates.push(`max_value = ${data.maxValue !== null ? data.maxValue : 'NULL'}`);
+      setClauses.push(sql`max_value = ${data.maxValue !== null ? data.maxValue : null}`);
     }
     if (data.color !== undefined) {
-      updates.push(`color = '${data.color.replace(/'/g, "''")}'`);
+      setClauses.push(sql`color = ${data.color}`);
     }
     if (data.label !== undefined) {
-      updates.push(`label = NULLIF('${(data.label || '').replace(/'/g, "''")}', '')`);
+      setClauses.push(sql`label = NULLIF(${data.label || ''}, '')`);
     }
     if (data.sortOrder !== undefined) {
-      updates.push(`sort_order = ${data.sortOrder}`);
+      setClauses.push(sql`sort_order = ${data.sortOrder}`);
     }
-    
-    const result = await db.execute(sql.raw(`
+
+    const result = await db.execute(sql`
       UPDATE metric_thresholds
-      SET ${updates.join(', ')}
+      SET ${sql.join(setClauses, sql`, `)}
       WHERE id = ${id}
       RETURNING id, ruleset_id, min_value, max_value, color, label, sort_order
-    `));
+    `);
     
     const row = result.rows[0] as any;
     return {
@@ -10086,15 +10043,15 @@ export class DbStorage implements IStorage {
   }
 
   async deleteMetricThreshold(id: number): Promise<void> {
-    await db.execute(sql.raw(`DELETE FROM metric_thresholds WHERE id = ${id}`));
+    await db.execute(sql`DELETE FROM metric_thresholds WHERE id = ${id}`);
   }
 
   async deleteMetricThresholdsByRuleset(rulesetId: number): Promise<void> {
-    await db.execute(sql.raw(`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`));
+    await db.execute(sql`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`);
   }
 
   async searchAllEntities(query: string): Promise<import("@shared/schema").SearchResult[]> {
-    const searchTerm = `%${query.replace(/'/g, "''")}%`;
+    const searchTerm = `%${query}%`;
     const results: import("@shared/schema").SearchResult[] = [];
 
     // Search clientes - exclude names that match colaboradores to avoid duplicates
