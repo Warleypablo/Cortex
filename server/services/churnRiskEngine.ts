@@ -425,21 +425,25 @@ export async function getRiskScores(filters?: {
   produto?: string;
   limit?: number;
 }): Promise<ChurnRiskResult[]> {
-  let query = `
+  const conditions: ReturnType<typeof sql>[] = [];
+
+  if (filters?.squad) conditions.push(sql`squad = ${filters.squad}`);
+  if (filters?.tier) conditions.push(sql`tier = ${filters.tier}`);
+  if (filters?.produto) conditions.push(sql`produto = ${filters.produto}`);
+
+  const whereClause = conditions.length > 0
+    ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+    : sql``;
+
+  const limitVal = filters?.limit ? Math.min(Math.max(parseInt(String(filters.limit)) || 1000, 1), 10000) : 1000;
+
+  const result = await db.execute(sql`
     SELECT contrato_id, cliente_nome, cnpj, score, tier, fatores, mrr::numeric, squad, produto, cs_responsavel, calculated_at
     FROM cortex_core.churn_risk_scores
-    WHERE 1=1
-  `;
-
-  if (filters?.squad) query += ` AND squad = '${filters.squad.replace(/'/g, "''")}'`;
-  if (filters?.tier) query += ` AND tier = '${filters.tier.replace(/'/g, "''")}'`;
-  if (filters?.produto) query += ` AND produto = '${filters.produto.replace(/'/g, "''")}'`;
-
-  query += ' ORDER BY score DESC';
-
-  if (filters?.limit) query += ` LIMIT ${parseInt(String(filters.limit))}`;
-
-  const result = await db.execute(sql.raw(query));
+    ${whereClause}
+    ORDER BY score DESC
+    LIMIT ${limitVal}
+  `);
 
   return (result.rows as any[]).map(row => ({
     contratoId: row.contrato_id,

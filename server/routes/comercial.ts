@@ -18,13 +18,14 @@ export function registerComercialRoutes(app: Express) {
       const hasEmail = cols.includes('email');
       const hasActive = cols.includes('active');
 
-      const selectParts = ['id', 'nome as name'];
-      if (hasEmail) selectParts.push('email');
-      if (hasActive) selectParts.push('active');
+      // Build SELECT columns dynamically (all values are hardcoded, not user input)
+      const selectColumns = [sql`id`, sql`nome as name`];
+      if (hasEmail) selectColumns.push(sql`email`);
+      if (hasActive) selectColumns.push(sql`active`);
 
-      const result = await db.execute(sql.raw(`
-        SELECT ${selectParts.join(', ')} FROM "Bitrix".crm_closers ORDER BY nome
-      `));
+      const result = await db.execute(sql`
+        SELECT ${sql.join(selectColumns, sql`, `)} FROM "Bitrix".crm_closers ORDER BY nome
+      `);
 
       // Ensure all rows have email and active fields
       const rows = (result.rows as any[]).map(r => ({
@@ -1876,7 +1877,7 @@ export function registerComercialRoutes(app: Express) {
         FROM "Bitrix".crm_deal d
         LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
-        ORDER BY ${sql.raw(orderColumn)} ${sql.raw(orderDirection)}
+        ORDER BY ${sql.raw(orderColumn)} ${sql.raw(orderDirection)} -- safe: whitelist-derived values (lines 1850-1855)
         LIMIT 500
       `);
 
@@ -2067,6 +2068,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
       }
 
+      // safe: utmColumn is whitelist-derived, not user input
       const utmColumn = utmType === 'medium' ? 'utm_medium' :
                         utmType === 'campaign' ? 'utm_campaign' :
                         utmType === 'term' ? 'utm_term' :
