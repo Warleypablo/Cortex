@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-03-10 | refactor(routes): modularize routes.ts - Phase 3 refactoring
+
+**O que foi feito:**
+- Extraídos 7 módulos de rotas de `routes.ts` (21k linhas → 11k linhas, **-47%**)
+- Módulos criados: `inadimplencia.ts`, `geg.ts`, `comercial.ts`, `okr2026.ts`, `juridico.ts`, `clientes.ts`, `colaboradores.ts`
+- Total de ~177 rotas extraídas para arquivos dedicados
+- Adicionada validação Zod (middleware) em 9 endpoints críticos (auth, chamados, inadimplência, user management)
+- Configurados Vitest (24 tests), ESLint + Prettier
+
+**Arquivos criados:**
+- `server/routes/inadimplencia.ts` (1310 linhas, 18 rotas)
+- `server/routes/geg.ts` (958 linhas, 30 rotas)
+- `server/routes/comercial.ts` (2356 linhas, 41 rotas)
+- `server/routes/okr2026.ts` (1784 linhas, 30 rotas)
+- `server/routes/juridico.ts` (1760 linhas, 17 rotas)
+- `server/routes/clientes.ts` (976 linhas, 26 rotas)
+- `server/routes/colaboradores.ts` (964 linhas, 15 rotas)
+- `server/middleware/validate.ts`, `server/middleware/schemas.ts`
+
+**Impacto arquitetural:** Manutenibilidade significativamente melhorada - cada domínio em arquivo dedicado
+
+---
+
 ## 2026-03-09 | fix(security): hardening Phase 1 - endpoints, SQL injection, rate limiting
 
 **O que foi feito:**
