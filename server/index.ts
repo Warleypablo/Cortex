@@ -10,6 +10,7 @@ import { pool as dbPool } from "./db";
 import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
+import rateLimit from "express-rate-limit";
 import path from "path";
 const app = express();
 
@@ -20,6 +21,26 @@ app.use(express.static(path.resolve(import.meta.dirname, "..", "client", "public
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Rate limiting - proteção contra abuso
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 200, // 200 requests por minuto por IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many requests, please try again later." },
+});
+app.use("/api", apiLimiter);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 20, // 20 tentativas de login por 15 min
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: "Too many login attempts, please try again later." },
+});
+app.use("/api/auth/login", authLimiter);
+app.use("/auth/google", authLimiter);
 
 function createSessionStore() {
   // Reuse the main database pool for sessions to avoid exhausting connection slots
