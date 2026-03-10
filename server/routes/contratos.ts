@@ -3585,4 +3585,142 @@ Responda APENAS com o texto revisado das observações, sem explicações adicio
       res.status(500).json({ error: "Erro ao revisar observações", details: error.message });
     }
   });
+
+  // ============================================================================
+  // ENTREGAVEIS - CRUD
+  // ============================================================================
+
+  // Dashboard: progress per contrato (MUST come before :id routes)
+  app.get("/api/contratos/entregaveis/dashboard", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          e.contrato_id,
+          c.numero_contrato,
+          ent.nome as cliente_nome,
+          COUNT(*) FILTER (WHERE e.id NOT IN (SELECT DISTINCT parent_id FROM staging.entregaveis WHERE parent_id IS NOT NULL)) as total_folhas,
+          COUNT(*) FILTER (WHERE e.status = 'concluido' AND e.id NOT IN (SELECT DISTINCT parent_id FROM staging.entregaveis WHERE parent_id IS NOT NULL)) as concluidas,
+          COUNT(*) FILTER (WHERE e.prazo < CURRENT_DATE AND e.status NOT IN ('concluido') AND e.prazo IS NOT NULL) as atrasadas
+        FROM staging.entregaveis e
+        JOIN staging.contratos c ON c.id = e.contrato_id
+        LEFT JOIN staging.entidades ent ON ent.id = c.entidade_id
+        GROUP BY e.contrato_id, c.numero_contrato, ent.nome
+        ORDER BY atrasadas DESC, concluidas ASC
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching entregaveis dashboard:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard" });
+    }
+  });
+
+  // List entregaveis as flat list (frontend builds tree)
+  app.get("/api/contratos/:id/entregaveis", isAuthenticated, async (req, res) => {
+    try {
+      const contratoId = parseInt(req.params.id);
+      const result = await db.execute(sql`
+        WITH RECURSIVE tree AS (
+          SELECT *, 0 as depth FROM staging.entregaveis
+          WHERE contrato_id = ${contratoId} AND parent_id IS NULL
+          UNION ALL
+          SELECT e.*, t.depth + 1
+          FROM staging.entregaveis e
+          JOIN tree t ON e.parent_id = t.id
+        )
+        SELECT * FROM tree ORDER BY depth, ordem
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching entregaveis:", error);
+      res.status(500).json({ error: "Failed to fetch entregaveis" });
+    }
+  });
+
+  // Create entregavel manually
+  app.post("/api/contratos/:id/entregaveis", isAuthenticated, async (req, res) => {
+    try {
+      const contratoId = parseInt(req.params.id);
+      const { titulo, descricao, parent_id, prioridade, prazo, responsavel } = req.body;
+
+      if (!titulo) return res.status(400).json({ error: "Titulo obrigatorio" });
+
+      // Calculate nivel from parent
+      let nivel = 0;
+      if (parent_id) {
+        const parentResult = await db.execute(sql`SELECT nivel FROM staging.entregaveis WHERE id = ${parent_id}`);
+        if (parentResult.rows.length > 0) nivel = (parentResult.rows[0] as any).nivel + 1;
+      }
+
+      const result = await db.execute(sql`
+        INSERT INTO staging.entregaveis (contrato_id, parent_id, titulo, descricao, prioridade, prazo, responsavel, nivel)
+        VALUES (${contratoId}, ${parent_id || null}, ${titulo}, ${descricao || null}, ${prioridade || 'media'}, ${prazo || null}, ${responsavel || null}, ${nivel})
+        RETURNING *
+      `);
+
+      res.status(201).json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error creating entregavel:", error);
+      res.status(500).json({ error: "Failed to create entregavel" });
+    }
+  });
+
+  // Update entregavel
+  app.patch("/api/contratos/entregaveis/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { titulo, descricao, status, responsavel, prazo, prioridade, ordem } = req.body;
+
+      const result = await db.execute(sql`
+        UPDATE staging.entregaveis SET
+          titulo = COALESCE(${titulo || null}, titulo),
+          descricao = COALESCE(${descricao !== undefined ? descricao : null}, descricao),
+          status = COALESCE(${status || null}, status),
+          responsavel = COALESCE(${responsavel !== undefined ? responsavel : null}, responsavel),
+          prazo = COALESCE(${prazo || null}, prazo),
+          prioridade = COALESCE(${prioridade || null}, prioridade),
+          ordem = COALESCE(${ordem !== undefined ? ordem : null}, ordem),
+          data_conclusao = ${status === 'concluido' ? sql`CURRENT_DATE` : sql`data_conclusao`},
+          atualizado_em = CURRENT_TIMESTAMP
+        WHERE id = ${id}
+        RETURNING *
+      `);
+
+      if (result.rows.length === 0) return res.status(404).json({ error: "Entregavel nao encontrado" });
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error("[api] Error updating entregavel:", error);
+      res.status(500).json({ error: "Failed to update entregavel" });
+    }
+  });
+
+  // Delete entregavel (cascades to children)
+  app.delete("/api/contratos/entregaveis/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await db.execute(sql`DELETE FROM staging.entregaveis WHERE id = ${id}`);
+      res.json({ message: "Entregavel excluido" });
+    } catch (error) {
+      console.error("[api] Error deleting entregavel:", error);
+      res.status(500).json({ error: "Failed to delete entregavel" });
+    }
+  });
+
+  // Regenerate entregaveis via AI (deletes existing, generates new)
+  app.post("/api/contratos/:id/gerar-entregaveis", isAuthenticated, async (req, res) => {
+    try {
+      const contratoId = parseInt(req.params.id);
+      await db.execute(sql`DELETE FROM staging.entregaveis WHERE contrato_id = ${contratoId}`);
+
+      const { generateEntregaveisFromContrato } = await import("../services/entregaveisGenerator");
+      await generateEntregaveisFromContrato({ contratoId });
+
+      const result = await db.execute(sql`
+        SELECT * FROM staging.entregaveis WHERE contrato_id = ${contratoId} ORDER BY nivel, ordem
+      `);
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error generating entregaveis:", error);
+      res.status(500).json({ error: "Failed to generate entregaveis" });
+    }
+  });
 }
