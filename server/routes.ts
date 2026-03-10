@@ -39,6 +39,7 @@ import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
+import { registerFavoritesRoutes } from "./routes/favorites";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -6890,6 +6891,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Colaboradores Module - registered from separate file
   registerColaboradoresRoutes(app, db, storage);
+
+  // Favorites Module - registered from separate file
+  registerFavoritesRoutes(app);
 
   // ============================================
   // Sugestões API

@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { 
-  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound, 
-  Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, 
-  Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch, 
-  LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen, 
+  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound,
+  Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase,
+  Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
+  LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
-  ChevronRight, ChevronDown, Presentation, Activity, Palette, Sliders, Lightbulb, Megaphone, Ticket
+  ChevronRight, ChevronDown, Presentation, Activity, Palette, Sliders, Lightbulb, Megaphone, Ticket,
+  Star
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/Logo_(15)_1766960214260.png";
@@ -25,7 +26,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { NAV_CONFIG, permissionsToRoutes } from "@shared/nav-config";
 import { cn } from "@/lib/utils";
 
@@ -67,6 +68,29 @@ export function AppSidebar() {
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/me"],
+  });
+
+  const qc = useQueryClient();
+
+  const { data: favorites = [] } = useQuery<{ url: string; title: string; icon: string }[]>({
+    queryKey: ["/api/favorites"],
+  });
+  const favoriteUrls = new Set(favorites.map((f) => f.url));
+
+  const addFavorite = useMutation({
+    mutationFn: async (fav: { url: string; title: string; icon: string }) => {
+      const res = await apiRequest("POST", "/api/favorites", fav);
+      return res.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/favorites"] }),
+  });
+
+  const removeFavorite = useMutation({
+    mutationFn: async (url: string) => {
+      const res = await apiRequest("DELETE", "/api/favorites", { url });
+      return res.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/favorites"] }),
   });
 
   const PUBLIC_SIDEBAR_ROUTES = ['/rh/nps/responder'];
@@ -158,25 +182,49 @@ export function AppSidebar() {
       );
     }
     
+    const isFav = favoriteUrls.has(item.url);
+
     return (
-      <Link
-        key={item.url}
-        href={isLocked ? "#" : item.url}
-        onClick={isLocked ? (e) => e.preventDefault() : handleItemClick}
-        className={cn(
-          "flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-all",
-          isActive 
-            ? "bg-primary/20 text-sidebar-foreground border-l-2 border-primary ml-0 pl-[10px]" 
-            : isLocked
-              ? "text-sidebar-foreground/40 cursor-not-allowed"
-              : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      <div key={item.url} className="group/navitem relative flex items-center">
+        <Link
+          href={isLocked ? "#" : item.url}
+          onClick={isLocked ? (e) => e.preventDefault() : handleItemClick}
+          className={cn(
+            "flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-all flex-1 min-w-0",
+            isActive
+              ? "bg-primary/20 text-sidebar-foreground border-l-2 border-primary ml-0 pl-[10px]"
+              : isLocked
+                ? "text-sidebar-foreground/40 cursor-not-allowed"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          )}
+          data-testid={`nav-item-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+        >
+          <ItemIcon className="h-4 w-4 flex-shrink-0" />
+          <span className="truncate flex-1">{item.title}</span>
+          {isLocked && <Lock className="h-3.5 w-3.5 text-sidebar-foreground/40 flex-shrink-0" />}
+        </Link>
+        {!isLocked && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (isFav) {
+                removeFavorite.mutate(item.url);
+              } else {
+                addFavorite.mutate({ url: item.url, title: item.title, icon: item.icon });
+              }
+            }}
+            className={cn(
+              "absolute right-1 flex items-center justify-center h-6 w-6 rounded-md transition-all",
+              isFav
+                ? "text-yellow-500 opacity-100"
+                : "text-sidebar-foreground/40 opacity-0 group-hover/navitem:opacity-100 hover:text-yellow-500"
+            )}
+          >
+            <Star className={cn("h-3.5 w-3.5", isFav && "fill-yellow-500")} />
+          </button>
         )}
-        data-testid={`nav-item-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-      >
-        <ItemIcon className="h-4 w-4 flex-shrink-0" />
-        <span className="truncate flex-1">{item.title}</span>
-        {isLocked && <Lock className="h-3.5 w-3.5 text-sidebar-foreground/40 flex-shrink-0" />}
-      </Link>
+      </div>
     );
   };
 
@@ -249,6 +297,52 @@ export function AppSidebar() {
       <SidebarContent className="bg-sidebar">
         <ScrollArea className="flex-1 px-2 py-2">
           <nav className="flex flex-col gap-1">
+            {/* Favoritos - Topo */}
+            {favorites.length > 0 && !isCollapsed && (
+              <>
+                <div className="flex items-center gap-2 px-3 py-2 mb-1">
+                  <div className="flex items-center justify-center h-6 w-6 rounded-md bg-yellow-500/20">
+                    <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
+                  </div>
+                  <span className="text-xs font-bold text-yellow-600 dark:text-yellow-500 uppercase tracking-wider">
+                    Favoritos
+                  </span>
+                </div>
+                {favorites.map((fav) => {
+                  const FavIcon = getIcon(fav.icon);
+                  const isActive = location === fav.url || location.startsWith(fav.url + "/");
+                  return (
+                    <div key={`fav-${fav.url}`} className="group/navitem relative flex items-center">
+                      <Link
+                        href={fav.url}
+                        onClick={handleItemClick}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-all flex-1 min-w-0",
+                          isActive
+                            ? "bg-primary/20 text-sidebar-foreground border-l-2 border-primary ml-0 pl-[10px]"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                        )}
+                      >
+                        <FavIcon className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate flex-1">{fav.title}</span>
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          removeFavorite.mutate(fav.url);
+                        }}
+                        className="absolute right-1 flex items-center justify-center h-6 w-6 rounded-md text-yellow-500 opacity-0 group-hover/navitem:opacity-100 hover:text-yellow-600 transition-all"
+                      >
+                        <Star className="h-3.5 w-3.5 fill-yellow-500" />
+                      </button>
+                    </div>
+                  );
+                })}
+                <Separator className="my-2 bg-sidebar-border" />
+              </>
+            )}
+
             {/* Setores - Primeiro */}
             {!isCollapsed && (
               <div className="flex items-center gap-2 px-3 py-2 mb-1">
