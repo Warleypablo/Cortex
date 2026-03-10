@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus, Calendar, Phone, ShoppingCart, Pencil, Save, X } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, LineChart, Loader2, Wallet, UserCheck, Receipt, ArrowUpRight, ArrowDownRight, Minus, Calendar, Phone, ShoppingCart, Pencil, Save, X, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
@@ -188,6 +188,8 @@ export default function GrowthOrcadoRealizado() {
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [showCopyFrom, setShowCopyFrom] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
   const queryClient = useQueryClient();
 
   const months = [
@@ -281,6 +283,28 @@ export default function GrowthOrcadoRealizado() {
       console.error('Failed to save budgets:', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const copyBudgets = async (mesOrigem: string) => {
+    setIsCopying(true);
+    try {
+      const res = await fetch('/api/growth/orcado-realizado/budgets/copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mesOrigem, mesDestino: selectedMonth }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error('Copy failed:', err);
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/growth/orcado-realizado/budgets'] });
+      setShowCopyFrom(false);
+    } catch (error) {
+      console.error('Failed to copy budgets:', error);
+    } finally {
+      setIsCopying(false);
     }
   };
 
@@ -908,13 +932,40 @@ export default function GrowthOrcadoRealizado() {
               </button>
             </>
           ) : (
-            <button
-              onClick={startEditing}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted transition-colors"
-            >
-              <Pencil className="w-4 h-4" />
-              Editar Metas
-            </button>
+            <>
+              <button
+                onClick={startEditing}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                Editar Metas
+              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowCopyFrom(!showCopyFrom)}
+                  disabled={isCopying}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted disabled:opacity-50 transition-colors"
+                >
+                  {isCopying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+                  Copiar Metas
+                </button>
+                {showCopyFrom && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-popover border rounded-lg shadow-lg p-2 min-w-[200px]">
+                    <p className="text-xs text-muted-foreground px-2 pb-2">Copiar metas de:</p>
+                    {months.filter(m => m.value !== selectedMonth).map((month) => (
+                      <button
+                        key={month.value}
+                        onClick={() => copyBudgets(month.value)}
+                        disabled={isCopying}
+                        className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors disabled:opacity-50"
+                      >
+                        {month.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
           <Select value={selectedMonth} onValueChange={(v) => { setSelectedMonth(v); if (isEditing) cancelEditing(); }}>
             <SelectTrigger className="w-48" data-testid="select-month">
