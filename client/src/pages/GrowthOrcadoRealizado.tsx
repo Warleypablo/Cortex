@@ -82,8 +82,8 @@ function calcPercentual(orcado: number | null, realizado: number | null): number
   return (realizado / orcado) * 100;
 }
 
-// Valores orçados (budget) - por enquanto fixos, depois podem vir de uma tabela
-const ORCADO_MQL = {
+// Valores orçados default (fallback quando não há dados no banco)
+const DEFAULT_ORCADO_MQL = {
   percReuniaoAgendada: 0.30,
   reunioesAgendadas: 69,
   reunioesRealizadas: 65,
@@ -100,7 +100,7 @@ const ORCADO_MQL = {
   faturamentoImplantacao: 71147,
 };
 
-const ORCADO_NAO_MQL = {
+const DEFAULT_ORCADO_NAO_MQL = {
   percReuniaoAgendada: 0.14,
   reunioesAgendadas: 152,
   reunioesRealizadas: 144,
@@ -117,23 +117,15 @@ const ORCADO_NAO_MQL = {
   faturamentoImplantacao: 131217.12,
 };
 
-const ORCADO_TOTAL = {
-  percRA: 0.2317,
-  reunioesAgendadas: ORCADO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.reunioesAgendadas,
-  reunioesRealizadas: ORCADO_MQL.reunioesRealizadas + ORCADO_NAO_MQL.reunioesRealizadas,
-  percNoShow: 0.05,
-  percConversaoRRV: 0.28,
-  novosClientes: ORCADO_MQL.novosClientes + ORCADO_NAO_MQL.novosClientes,
-  contratosAceleracao: ORCADO_MQL.contratosAceleracao + ORCADO_NAO_MQL.contratosAceleracao,
-  contratosImplantacao: ORCADO_MQL.contratosImplantacao + ORCADO_NAO_MQL.contratosImplantacao,
-  faturamentoAceleracao: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao,
-  faturamentoImplantacao: ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
-  faturamentoTotal: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
-  taxaConversaoFunil: 0.0561,
-  taxaConversaoMQL: 0.0812,
-  ticketMedioGeral: 4192.07,
-  ticketMedioAceleracao: 4000,
-  ticketMedioImplantacao: 8500,
+const DEFAULT_ORCADO_ADS = {
+  investimento: 95500,
+  impressoes: 955000,
+  ctr: 0.009,
+  cps: 13.07,
+  cliques: 89843,
+  cliquesSaida: 8595,
+  cpm: 100,
+  visualizacaoPagina: 7306,
 };
 
 export default function GrowthOrcadoRealizado() {
@@ -162,6 +154,38 @@ export default function GrowthOrcadoRealizado() {
       endDate: format(endOfMonth(monthDate), 'yyyy-MM-dd'),
     };
   }, [selectedMonth]);
+
+  // Fetch budgets from DB (falls back to defaults)
+  const { data: budgetsData } = useQuery<Record<string, any>>({
+    queryKey: ['/api/growth/orcado-realizado/budgets', selectedMonth],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/budgets?mes=${selectedMonth}`);
+      if (!res.ok) return {};
+      return res.json();
+    },
+  });
+
+  const ORCADO_MQL = useMemo(() => ({ ...DEFAULT_ORCADO_MQL, ...(budgetsData?.mql || {}) }), [budgetsData]);
+  const ORCADO_NAO_MQL = useMemo(() => ({ ...DEFAULT_ORCADO_NAO_MQL, ...(budgetsData?.nao_mql || {}) }), [budgetsData]);
+  const ORCADO_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_ADS, ...(budgetsData?.ads || {}) }), [budgetsData]);
+  const ORCADO_TOTAL = useMemo(() => ({
+    percRA: 0.2317,
+    reunioesAgendadas: ORCADO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.reunioesAgendadas,
+    reunioesRealizadas: ORCADO_MQL.reunioesRealizadas + ORCADO_NAO_MQL.reunioesRealizadas,
+    percNoShow: 0.05,
+    percConversaoRRV: 0.28,
+    novosClientes: ORCADO_MQL.novosClientes + ORCADO_NAO_MQL.novosClientes,
+    contratosAceleracao: ORCADO_MQL.contratosAceleracao + ORCADO_NAO_MQL.contratosAceleracao,
+    contratosImplantacao: ORCADO_MQL.contratosImplantacao + ORCADO_NAO_MQL.contratosImplantacao,
+    faturamentoAceleracao: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao,
+    faturamentoImplantacao: ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
+    faturamentoTotal: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
+    taxaConversaoFunil: 0.0561,
+    taxaConversaoMQL: 0.0812,
+    ticketMedioGeral: 4192.07,
+    ticketMedioAceleracao: 4000,
+    ticketMedioImplantacao: 8500,
+  }), [ORCADO_MQL, ORCADO_NAO_MQL]);
 
   const { data: funis } = useQuery<string[]>({
     queryKey: ['/api/growth/orcado-realizado/funis'],
@@ -368,21 +392,21 @@ export default function GrowthOrcadoRealizado() {
         emoji: '🔧' 
       },
     ];
-  }, [mqlData]);
+  }, [mqlData, ORCADO_MQL]);
 
   // Métricas de Marketing Ads (usando dados reais da API)
   const adsMetrics: Metric[] = useMemo(() => {
     const data = adsData || {} as AdsMetrics;
     return [
-      { id: 'investimento', name: 'Investimento', type: 'manual', orcado: 95500, realizado: data.investimento ?? 0, percentual: calcPercentual(95500, data.investimento), format: 'currency' },
-      { id: 'cpm', name: 'CPM', type: 'formula', orcado: 100, realizado: data.cpm ?? null, percentual: calcPercentual(100, data.cpm), format: 'currency' },
-      { id: 'impressoes', name: 'Impressões', type: 'formula', orcado: 955000, realizado: data.impressoes ?? 0, percentual: calcPercentual(955000, data.impressoes), format: 'number' },
-      { id: 'ctr', name: 'CTR', type: 'manual', orcado: 0.009, realizado: data.ctr ?? null, percentual: calcPercentual(0.009, data.ctr), format: 'percent' },
-      { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: 8595, realizado: data.cliquesSaida ?? 0, percentual: calcPercentual(8595, data.cliquesSaida), format: 'number' },
-      { id: 'visualizacao_pagina', name: 'Visualização de Página', type: 'formula', orcado: 7306, realizado: data.visualizacaoPagina ?? null, percentual: calcPercentual(7306, data.visualizacaoPagina), format: 'number' },
-      { id: 'cps', name: 'CPS', type: 'formula', orcado: 13.07, realizado: data.cps ?? null, percentual: calcPercentual(13.07, data.cps), format: 'currency' },
+      { id: 'investimento', name: 'Investimento', type: 'manual', orcado: ORCADO_ADS.investimento, realizado: data.investimento ?? 0, percentual: calcPercentual(ORCADO_ADS.investimento, data.investimento), format: 'currency' },
+      { id: 'cpm', name: 'CPM', type: 'formula', orcado: ORCADO_ADS.cpm, realizado: data.cpm ?? null, percentual: calcPercentual(ORCADO_ADS.cpm, data.cpm), format: 'currency' },
+      { id: 'impressoes', name: 'Impressões', type: 'formula', orcado: ORCADO_ADS.impressoes, realizado: data.impressoes ?? 0, percentual: calcPercentual(ORCADO_ADS.impressoes, data.impressoes), format: 'number' },
+      { id: 'ctr', name: 'CTR', type: 'manual', orcado: ORCADO_ADS.ctr, realizado: data.ctr ?? null, percentual: calcPercentual(ORCADO_ADS.ctr, data.ctr), format: 'percent' },
+      { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: ORCADO_ADS.cliquesSaida, realizado: data.cliquesSaida ?? 0, percentual: calcPercentual(ORCADO_ADS.cliquesSaida, data.cliquesSaida), format: 'number' },
+      { id: 'visualizacao_pagina', name: 'Visualização de Página', type: 'formula', orcado: ORCADO_ADS.visualizacaoPagina, realizado: data.visualizacaoPagina ?? null, percentual: calcPercentual(ORCADO_ADS.visualizacaoPagina, data.visualizacaoPagina), format: 'number' },
+      { id: 'cps', name: 'CPS', type: 'formula', orcado: ORCADO_ADS.cps, realizado: data.cps ?? null, percentual: calcPercentual(ORCADO_ADS.cps, data.cps), format: 'currency' },
     ];
-  }, [adsData]);
+  }, [adsData, ORCADO_ADS]);
 
   const marketingSections: MetricSection[] = [
     {
@@ -528,7 +552,7 @@ export default function GrowthOrcadoRealizado() {
         emoji: '🔧' 
       },
     ];
-  }, [naoMqlData]);
+  }, [naoMqlData, ORCADO_NAO_MQL]);
 
   const totalMetrics: Metric[] = useMemo(() => {
     const mql = mqlData || {} as MQLMetrics;
@@ -574,8 +598,7 @@ export default function GrowthOrcadoRealizado() {
       ? totalNovosClientes / totalLeads
       : null;
 
-    const investimentoOrcado = 95500;
-    const cacAdsOrcado = investimentoOrcado / ORCADO_TOTAL.novosClientes;
+    const cacAdsOrcado = ORCADO_TOTAL.novosClientes > 0 ? ORCADO_ADS.investimento / ORCADO_TOTAL.novosClientes : 0;
     const cacAdsReal = totalNovosClientes > 0
       ? (ads.investimento ?? 0) / totalNovosClientes
       : null;
@@ -599,7 +622,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'total_ticket_acel', name: 'Ticket Médio Aceleração', type: 'formula', orcado: ORCADO_TOTAL.ticketMedioAceleracao, realizado: ticketMedioAceleracao, percentual: calcPercentual(ORCADO_TOTAL.ticketMedioAceleracao, ticketMedioAceleracao), format: 'currency' },
       { id: 'total_ticket_impl', name: 'Ticket Médio Implantação', type: 'formula', orcado: ORCADO_TOTAL.ticketMedioImplantacao, realizado: ticketMedioImplantacao, percentual: calcPercentual(ORCADO_TOTAL.ticketMedioImplantacao, ticketMedioImplantacao), format: 'currency' },
     ];
-  }, [mqlData, naoMqlData, adsData]);
+  }, [mqlData, naoMqlData, adsData, ORCADO_MQL, ORCADO_NAO_MQL, ORCADO_ADS, ORCADO_TOTAL]);
   
   const totalSection: MetricSection = {
     title: 'Total',
@@ -669,15 +692,17 @@ export default function GrowthOrcadoRealizado() {
 
   // Calcular métricas dos cards de resumo (reativas ao filtro)
   const investimentoRealizado = adsData?.investimento ?? 0;
-  const investimentoOrcado = 95500;
-  const investimentoPerc = (investimentoRealizado / investimentoOrcado) * 100;
+  const investimentoOrcado = ORCADO_ADS.investimento;
+  const investimentoPerc = investimentoOrcado > 0 ? (investimentoRealizado / investimentoOrcado) * 100 : 0;
 
   const mqlsRealizado = cardFilter === 'nao-mql'
     ? (naoMqlData?.totalNaoMqls ?? 0)
     : cardFilter === 'mql'
     ? (mqlData?.totalMqls ?? 0)
     : (mqlData?.totalMqls ?? 0) + (naoMqlData?.totalNaoMqls ?? 0);
-  const mqlsOrcado = cardFilter === 'nao-mql' ? 1085 : cardFilter === 'mql' ? 229 : 229 + 1085;
+  const mqlsOrcadoMql = ORCADO_MQL.reunioesAgendadas + ORCADO_MQL.novosClientes; // ~229 MQLs
+  const mqlsOrcadoNaoMql = ORCADO_NAO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.novosClientes; // ~1085 leads
+  const mqlsOrcado = cardFilter === 'nao-mql' ? mqlsOrcadoNaoMql : cardFilter === 'mql' ? mqlsOrcadoMql : mqlsOrcadoMql + mqlsOrcadoNaoMql;
   const mqlsPerc = mqlsOrcado > 0 ? (mqlsRealizado / mqlsOrcado) * 100 : 0;
   const mqlsLabel = cardFilter === 'nao-mql' ? 'Leads Não-MQL' : cardFilter === 'mql' ? 'MQLs' : 'Leads Totais';
 
