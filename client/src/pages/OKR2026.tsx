@@ -2120,8 +2120,30 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
     ? (monthlyTargets[selectedMonth].mrr > 0 ? monthlyTargets[selectedMonth].inadimplencia / monthlyTargets[selectedMonth].mrr : 0)
     : (quarterlyTargets[selectedQuarter].mrr > 0 ? quarterlyTargets[selectedQuarter].inadimplencia / quarterlyTargets[selectedQuarter].mrr : 0);
 
-  const churnTarget = mrrRealForMonth * churnRateBP;
+  const churnBaseTarget = mrrRealForMonth * churnRateBP;
   const inadTarget = mrrRealForMonth * inadRateBP;
+
+  // Churn acumulativo: excesso de meses anteriores reduz a meta do mês atual
+  // Se em janeiro o churn real excedeu a meta, o excesso é descontado da meta de fevereiro
+  const churnExcessFromPreviousMonths = (() => {
+    if (viewMode !== "month") return 0;
+    const selectedIdx = MONTHS.findIndex(m => m.key === selectedMonth);
+    if (selectedIdx <= 0) return 0; // janeiro não tem meses anteriores
+    let totalExcess = 0;
+    for (let i = 0; i < selectedIdx; i++) {
+      const mk = MONTHS[i].key;
+      const mrrReal = getValueFromSeries(series.mrr || metrics.mrr_serie, mk) ?? monthlyTargets[mk].mrr;
+      const rate = monthlyTargets[mk].mrr > 0 ? monthlyTargets[mk].churn / monthlyTargets[mk].mrr : 0;
+      const targetForMonth = mrrReal * rate;
+      const realForMonth = getValueFromSeries(series.churn, mk);
+      if (realForMonth !== null && realForMonth > targetForMonth) {
+        totalExcess += realForMonth - targetForMonth;
+      }
+    }
+    return totalExcess;
+  })();
+
+  const churnTarget = Math.max(0, churnBaseTarget - churnExcessFromPreviousMonths);
 
   // Valores atuais
   const inadRealtime = metrics.inadimplencia_brl ?? (metrics.inadimplencia_percentual ? (metrics.mrr_ativo ?? 0) * (metrics.inadimplencia_percentual / 100) : 0);

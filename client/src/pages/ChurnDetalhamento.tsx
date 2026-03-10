@@ -501,6 +501,38 @@ export default function ChurnDetalhamento() {
   const [expandedOpTheme, setExpandedOpTheme] = useState<string | null>(null);
   const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
 
+  // Buscar série de churn do ano para calcular excesso acumulado de meses anteriores
+  const currentMonthKey = dataInicio ? format(parseISO(dataInicio), "yyyy-MM") : "";
+  const { data: churnSeriesData } = useQuery<{ series: { date: string; value: number }[] }>({
+    queryKey: ["/api/okr2026/metric-series", "churn", "2026-01", currentMonthKey],
+    queryFn: async () => {
+      const res = await fetch(`/api/okr2026/metric-series?metricKey=churn&start=2026-01&end=${currentMonthKey}`);
+      if (!res.ok) throw new Error("Failed to fetch churn series");
+      return res.json();
+    },
+    enabled: !!currentMonthKey && currentMonthKey > "2026-01",
+  });
+
+  // Calcular excesso acumulado de churn de meses anteriores ao mês selecionado
+  const churnExcessFromPreviousMonths = useMemo(() => {
+    if (!churnSeriesData?.series || !currentMonthKey || currentMonthKey <= "2026-01") return 0;
+    let totalExcess = 0;
+    for (const entry of churnSeriesData.series) {
+      if (entry.date >= currentMonthKey) continue; // ignorar mês atual e futuros
+      const mrrBP = BP_MRR_TARGETS[entry.date];
+      const churnBP = BP_CHURN_MRR_TARGETS[entry.date];
+      if (!mrrBP || !churnBP) continue;
+      const rate = churnBP / mrrBP;
+      // Para o target dinâmico do mês anterior, usamos o BP estático como aproximação
+      // (o MRR real daquele mês não está disponível aqui)
+      const targetForMonth = mrrBP * rate; // = churnBP
+      if (entry.value > targetForMonth) {
+        totalExcess += entry.value - targetForMonth;
+      }
+    }
+    return totalExcess;
+  }, [churnSeriesData, currentMonthKey]);
+
   const { data: nrrData } = useQuery<{ nrr_pct: number; crosssell_mrr: number; crosssell_pontual: number; vendas_mrr_novo: number; vendas_mrr_total: number; gross_churn_mrr: number; mrr_inicio: number }>({
     queryKey: ["/api/analytics/nrr", dataInicio, dataFim],
     queryFn: async () => {
@@ -718,9 +750,10 @@ export default function ChurnDetalhamento() {
     // Pegar o mês de referência do filtro
     const monthKey = format(periodStart, "yyyy-MM");
     const churnRate = getChurnRateBP(monthKey);
-    // Meta dinâmica: taxa do BP × MRR real
-    const targetMensal = mrrBaseReal > 0 ? mrrBaseReal * churnRate : (BP_CHURN_MRR_TARGETS[monthKey] || 0);
-    if (targetMensal === 0) return { mrrPlanejado: 0, taxaPlanejada: 0 };
+    // Meta dinâmica: taxa do BP × MRR real, descontando excesso acumulado de meses anteriores
+    const targetBase = mrrBaseReal > 0 ? mrrBaseReal * churnRate : (BP_CHURN_MRR_TARGETS[monthKey] || 0);
+    const targetMensal = Math.max(0, targetBase - churnExcessFromPreviousMonths);
+    if (targetBase === 0) return { mrrPlanejado: 0, taxaPlanejada: 0 };
 
     // Total de dias no mês
     const totalDaysInMonth = getDaysInMonth(periodStart);
@@ -735,13 +768,14 @@ export default function ChurnDetalhamento() {
     const taxaPlanejada = mrrBaseReal > 0 ? (mrrPlanejado / mrrBaseReal) * 100 : 0;
 
     return { mrrPlanejado, taxaPlanejada, targetMensal };
-  }, [dataInicio, dataFim, mrrBaseReal]);
+  }, [dataInicio, dataFim, mrrBaseReal, churnExcessFromPreviousMonths]);
 
   const churnDailyInsights = useMemo(() => {
     const mrrBase = mrrBaseReal;
     const monthKey = dataInicio ? format(parseISO(dataInicio), "yyyy-MM") : "";
     const churnRate = getChurnRateBP(monthKey);
-    const churnTarget = mrrBase > 0 ? mrrBase * churnRate : 0;
+    const churnTargetBase = mrrBase > 0 ? mrrBase * churnRate : 0;
+    const churnTarget = Math.max(0, churnTargetBase - churnExcessFromPreviousMonths);
     const churnTargetPct = mrrBase > 0 ? (churnTarget / mrrBase) * 100 : 0;
     const churnSpent = filteredMetricas.mrr_perdido || 0;
 
@@ -798,7 +832,7 @@ export default function ChurnDetalhamento() {
       pacePct,
       status,
     };
-  }, [filteredMetricas.mrr_perdido, dataInicio, dataFim]);
+  }, [filteredMetricas.mrr_perdido, dataInicio, dataFim, mrrBaseReal, churnExcessFromPreviousMonths]);
 
   const dailyStatusConfig = {
     on_track: {
