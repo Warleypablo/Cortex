@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-03-09 | fix(security): hardening Phase 1 - endpoints, SQL injection, rate limiting
+
+**O que foi feito:**
+- Removidos 10 endpoints `/debug-*` não protegidos (~360 linhas) que estavam antes do middleware `isAuthenticated`
+- Substituídos ~30 `sql.raw()` com interpolação de input de usuário por queries parametrizadas (Drizzle `sql` template)
+- Adicionado `express-rate-limit`: 200 req/min geral em `/api`, 20 req/15min em login/OAuth
+- Validação fail-fast de `SESSION_SECRET` em produção
+- Corrigido error handler que fazia re-throw após responder (crash com ERR_HTTP_HEADERS_SENT)
+- Adicionados `process.on('unhandledRejection')` e `process.on('uncaughtException')` handlers
+- Adicionados `credentials/`, `*.key`, `*.pem` ao `.gitignore`
+
+**Arquivos alterados:**
+- `server/routes.ts` - Remoção de debug endpoints
+- `server/storage.ts` - Parametrização de queries (inadimplência, métricas, busca)
+- `server/auth/routes.ts` - Parametrização de UUID array e name matching
+- `server/routes/chamados.ts` - Parametrização de list/update
+- `server/routes/juridico-assistente.ts` - Parametrização de LIMIT
+- `server/index.ts` - Rate limiting, SESSION_SECRET, error handler, process guards
+- `.gitignore` - Secrets patterns
+
+**Impacto arquitetural:** Segurança reforçada em múltiplas camadas
+
+---
+
 ## 2026-03-09 | fix(contribuicao-squad): fix resultado liquido calculation to include all expenses
 
 **O que foi feito:**
