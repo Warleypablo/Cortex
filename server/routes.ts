@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { insertColaboradorSchema, insertPatrimonioSchema, updateContratoSchema } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
+import { validateBody } from "./middleware/validate";
+import { createUserSchema, updatePermissionsSchema, updateRoleSchema, upsertInadimplenciaContextoSchema, upsertContextoJuridicoSchema } from "./middleware/schemas";
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
@@ -398,13 +400,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users/:userId/permissions", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/users/:userId/permissions", isAuthenticated, isAdmin, validateBody(updatePermissionsSchema), async (req, res) => {
     try {
       const { userId } = req.params;
       const { allowedRoutes } = req.body;
-
-      if (!Array.isArray(allowedRoutes)) {
-        return res.status(400).json({ error: "allowedRoutes must be an array" });
       }
 
       const updatedUser = await updateUserPermissions(userId, allowedRoutes);
@@ -420,14 +419,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/users/:userId/role", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/users/:userId/role", isAuthenticated, isAdmin, validateBody(updateRoleSchema), async (req, res) => {
     try {
       const { userId } = req.params;
       const { role } = req.body;
-
-      if (role !== 'admin' && role !== 'user') {
-        return res.status(400).json({ error: "Role must be 'admin' or 'user'" });
-      }
 
       const updatedUser = await updateUserRole(userId, role);
       
@@ -442,17 +437,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/users", isAuthenticated, isAdmin, async (req, res) => {
+  app.post("/api/auth/users", isAuthenticated, isAdmin, validateBody(createUserSchema), async (req, res) => {
     try {
       const { name, email, role, allowedRoutes } = req.body;
-
-      if (!name || typeof name !== 'string') {
-        return res.status(400).json({ error: "Nome é obrigatório" });
-      }
-
-      if (!email || typeof email !== 'string') {
-        return res.status(400).json({ error: "Email é obrigatório" });
-      }
 
       const normalizedEmail = email.toLowerCase().trim();
       const validDomains = ['@turbopartners.com.br', '@gmail.com'];
@@ -5770,7 +5757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contextos de inadimplência - PUT upsert
-  app.put("/api/inadimplencia/contexto/:clienteId", async (req, res) => {
+  app.put("/api/inadimplencia/contexto/:clienteId", validateBody(upsertInadimplenciaContextoSchema), async (req, res) => {
     try {
       const { clienteId } = req.params;
       const { contexto, evidencias, acao, statusFinanceiro, detalheFinanceiro } = req.body;
@@ -6035,7 +6022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/juridico/clientes/:clienteId/contexto", async (req, res) => {
+  app.put("/api/juridico/clientes/:clienteId/contexto", validateBody(upsertContextoJuridicoSchema), async (req, res) => {
     try {
       const { clienteId } = req.params;
       const { contextoJuridico, procedimentoJuridico, statusJuridico, valorAcordado, tipoInadimplencia } = req.body;

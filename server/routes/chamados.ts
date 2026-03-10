@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import { validateBody } from "../middleware/validate";
+import { createChamadoSchema, updateChamadoSchema } from "../middleware/schemas";
 
 export function registerChamadosRoutes(app: Express) {
   // ============================================
@@ -151,7 +153,7 @@ export function registerChamadosRoutes(app: Express) {
   });
 
   // POST /api/chamados - Create
-  app.post("/api/chamados", async (req, res) => {
+  app.post("/api/chamados", validateBody(createChamadoSchema), async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
       const user = req.user as any;
@@ -194,7 +196,7 @@ export function registerChamadosRoutes(app: Express) {
   });
 
   // PATCH /api/chamados/:id - Update status, responsavel, prioridade
-  app.patch("/api/chamados/:id", async (req, res) => {
+  app.patch("/api/chamados/:id", validateBody(updateChamadoSchema), async (req, res) => {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
       const user = req.user as any;
