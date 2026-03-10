@@ -2033,18 +2033,18 @@ function DashboardTab({ data, onTabChange }: { data: SummaryResponse; onTabChang
   const getValueFromSeries = (seriesData: { month: string; value: number }[] | undefined, monthKey: MonthKey): number | null => {
     if (!seriesData || seriesData.length === 0) return null;
     const monthLabels: Record<MonthKey, string[]> = {
-      jan: ["jan", "janeiro", "01"],
-      fev: ["fev", "fevereiro", "02"],
-      mar: ["mar", "março", "marco", "03"],
-      abr: ["abr", "abril", "04"],
-      mai: ["mai", "maio", "05"],
-      jun: ["jun", "junho", "06"],
-      jul: ["jul", "julho", "07"],
-      ago: ["ago", "agosto", "08"],
-      set: ["set", "setembro", "09"],
-      out: ["out", "outubro", "10"],
-      nov: ["nov", "novembro", "11"],
-      dez: ["dez", "dezembro", "12"],
+      jan: ["jan", "janeiro", "-01"],
+      fev: ["fev", "fevereiro", "-02"],
+      mar: ["mar", "março", "marco", "-03"],
+      abr: ["abr", "abril", "-04"],
+      mai: ["mai", "maio", "-05"],
+      jun: ["jun", "junho", "-06"],
+      jul: ["jul", "julho", "-07"],
+      ago: ["ago", "agosto", "-08"],
+      set: ["set", "setembro", "-09"],
+      out: ["out", "outubro", "-10"],
+      nov: ["nov", "novembro", "-11"],
+      dez: ["dez", "dezembro", "-12"],
     };
     const possibleLabels = monthLabels[monthKey];
     const entry = seriesData.find(s => 
