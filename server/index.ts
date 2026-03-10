@@ -12,6 +12,13 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import { initTurbodashTable } from "./services/turbodash";
 import rateLimit from "express-rate-limit";
 import path from "path";
+
+function requireEnv(name: string): string {
+  const val = process.env[name];
+  if (!val) throw new Error(`Environment variable ${name} is required`);
+  return val;
+}
+
 const app = express();
 
 app.set("trust proxy", 1);
@@ -56,14 +63,10 @@ function createSessionStore() {
   return undefined;
 }
 
-if (!process.env.SESSION_SECRET && process.env.NODE_ENV === 'production') {
-  throw new Error('SESSION_SECRET environment variable is required in production');
-}
-
 app.use(
   session({
     store: createSessionStore(),
-    secret: process.env.SESSION_SECRET || "development-secret-change-in-production",
+    secret: requireEnv("SESSION_SECRET"),
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -211,12 +214,12 @@ app.use((req, res, next) => {
       const { syncMetaAds } = await import("./services/metaAdsSync");
       const { Pool } = await import("pg");
       const pool = new Pool({
-        host: process.env.DATABASE_HOST || "***REMOVED***",
+        host: requireEnv("DATABASE_HOST"),
         port: 5432,
         database: "dados_turbo",
         user: "postgres",
-        password: process.env.DATABASE_PASSWORD || "***REMOVED***",
-        ssl: false,
+        password: requireEnv("DATABASE_PASSWORD"),
+        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
       });
       const result = await syncMetaAds(pool, { since: undefined, until: undefined });
       await pool.end();
@@ -250,12 +253,12 @@ app.use((req, res, next) => {
       const { syncGoogleAdsKeywords } = await import("./services/googleAdsSync");
       const { Pool } = await import("pg");
       const pool = new Pool({
-        host: process.env.DATABASE_HOST || "***REMOVED***",
+        host: requireEnv("DATABASE_HOST"),
         port: 5432,
         database: "dados_turbo",
         user: "postgres",
-        password: process.env.DATABASE_PASSWORD || "***REMOVED***",
-        ssl: false,
+        password: requireEnv("DATABASE_PASSWORD"),
+        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
       });
       const result = await syncGoogleAdsKeywords(pool);
       await pool.end();
