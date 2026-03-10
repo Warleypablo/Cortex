@@ -9097,7 +9097,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateFilter = sql`c.data_solicitacao_encerramento >= ${startDate}::date AND c.data_solicitacao_encerramento <= ${endDate}::date`;
       } else if (meses !== "all") {
         const mesesNum = parseInt(meses) || 12;
-        dateFilter = sql`c.data_solicitacao_encerramento >= (NOW() - INTERVAL '${sql.raw(String(mesesNum))} months')::date`;
+        dateFilter = sql`c.data_solicitacao_encerramento >= (NOW() - make_interval(months => ${mesesNum}))::date`;
       }
 
       // Query principal em cup_churn - sem necessidade de JOIN com cup_clientes

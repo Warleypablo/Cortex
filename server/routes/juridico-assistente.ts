@@ -331,7 +331,7 @@ async function executeTool(
           FROM "Conta Azul".caz_parcelas
           WHERE ${whereClause}
           ORDER BY data_vencimento DESC
-          LIMIT ${sql.raw(String(limite))}
+          LIMIT ${limite}
         `);
 
         return JSON.stringify({
