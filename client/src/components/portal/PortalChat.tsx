@@ -31,7 +31,8 @@ interface ChatData {
 type SystemMsg =
   | { _type: "encerramento"; atendimentoId: number; encerradoPor: string }
   | { _type: "avaliacao_request"; atendimentoId: number }
-  | { _type: "avaliacao_respondida"; atendimentoId: number; nota: number };
+  | { _type: "avaliacao_respondida"; atendimentoId: number; nota: number }
+  | { _type: "cancelamento" };
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
