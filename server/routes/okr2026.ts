@@ -325,12 +325,19 @@ export function registerOKR2026Routes(app: Express) {
 
       const { getQuarterSummary, getMetricSeries } = await import("../okr2026/metricsAdapter");
 
+      const year = new Date().getFullYear();
+      const [churnSeriesRaw, geracaoCaixaSeries] = await Promise.all([
+        getMetricSeries("churn", `${year}-01-01`, `${year}-12-31`),
+        getMetricSeries("geracao_caixa_margem", `${year}-01-01`, `${year}-12-31`),
+      ]);
+      // Map { date: "2026-01", value } → { month: "2026-01", value } for frontend compatibility
+      const churnSeries = churnSeriesRaw.map(p => ({ month: p.date, value: p.value }));
       const series = {
         mrr: metrics.mrr_serie || [],
         ebitda: [],
-        churn: [],
+        churn: churnSeries,
         inadimplencia: metrics.inadimplencia_serie || [],
-        geracao_caixa_margem: await getMetricSeries("geracao_caixa_margem", `${new Date().getFullYear()}-01-01`, `${new Date().getFullYear()}-12-31`)
+        geracao_caixa_margem: geracaoCaixaSeries,
       };
 
       const quarterSummary = await getQuarterSummary(new Date().getFullYear());
