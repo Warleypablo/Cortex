@@ -7,13 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, ShoppingCart, BarChart3, Rocket, Percent, Trophy, CircleDollarSign, ChevronDown, ChevronRight, Loader2, Info } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Percent, Trophy, CircleDollarSign, ChevronDown, ChevronRight, Loader2, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { format, subDays, subMonths, eachDayOfInterval, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
+import { format, subDays, subMonths, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter, startOfYear, endOfYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { formatCurrency, formatDecimal, formatPercent } from "@/lib/utils";
 
 interface KPICardProps {
@@ -98,113 +98,6 @@ const channelColors: Record<string, string> = {
   'Outros': '#6B7280',
 };
 
-const mockDailyData = eachDayOfInterval({
-  start: new Date(2025, 9, 1),
-  end: new Date(2025, 10, 30),
-}).map(date => ({
-  date: format(date, 'dd/MM'),
-  Facebook: Math.floor(Math.random() * 150) + 80,
-  Google: Math.floor(Math.random() * 120) + 60,
-  Orgânico: Math.floor(Math.random() * 60) + 20,
-  Institucional: Math.floor(Math.random() * 40) + 10,
-  LinkedIn: Math.floor(Math.random() * 20) + 5,
-  Outros: Math.floor(Math.random() * 15) + 5,
-  cpmql: Math.floor(Math.random() * 200) + 250,
-  FacebookLeads: Math.floor(Math.random() * 300) + 160,
-  GoogleLeads: Math.floor(Math.random() * 240) + 120,
-  OrgânicoLeads: Math.floor(Math.random() * 120) + 40,
-  InstitucionalLeads: Math.floor(Math.random() * 80) + 20,
-  LinkedInLeads: Math.floor(Math.random() * 40) + 10,
-  OutrosLeads: Math.floor(Math.random() * 30) + 10,
-  cpl: Math.floor(Math.random() * 100) + 120,
-}));
-
-const mockChannelPerformance = [
-  { 
-    canal: 'Facebook', 
-    leads: 8117, 
-    cpmql: 310, 
-    leadMql: 76, 
-    mql: 6129, 
-    mqlRm: 35, 
-    rm: 2115, 
-    mqlRr: 16, 
-    rr: 972, 
-    txRrVenda: 35, 
-    mqlVenda: 6, 
-    vendas: 341, 
-    cac: 6017, 
-    valorVendas: 4836479, 
-    tm: 14183 
-  },
-  { 
-    canal: 'Google', 
-    leads: 8209, 
-    cpmql: 580, 
-    leadMql: 60, 
-    mql: 4913, 
-    mqlRm: 43, 
-    rm: 2130, 
-    mqlRr: 22, 
-    rr: 1087, 
-    txRrVenda: 34, 
-    mqlVenda: 7, 
-    vendas: 368, 
-    cac: 7741, 
-    valorVendas: 5248351, 
-    tm: 14262 
-  },
-  { 
-    canal: 'Orgânico', 
-    leads: 2848, 
-    cpmql: null, 
-    leadMql: 56, 
-    mql: 1609, 
-    mqlRm: 52, 
-    rm: 841, 
-    mqlRr: 31, 
-    rr: 492, 
-    txRrVenda: 38, 
-    mqlVenda: 12, 
-    vendas: 187, 
-    cac: null, 
-    valorVendas: 2749642, 
-    tm: 14704 
-  },
-  { 
-    canal: 'Institucional', 
-    leads: 1488, 
-    cpmql: null, 
-    leadMql: 41, 
-    mql: 606, 
-    mqlRm: 59, 
-    rm: 357, 
-    mqlRr: 40, 
-    rr: 241, 
-    txRrVenda: 29, 
-    mqlVenda: 12, 
-    vendas: 70, 
-    cac: null, 
-    valorVendas: 892742, 
-    tm: 12753 
-  },
-];
-
-const mockTotals = {
-  leads: 21617,
-  cpmql: 339,
-  leadMql: 65,
-  mql: 14013,
-  mqlRm: 41,
-  rm: 5781,
-  mqlRr: 21,
-  rr: 2946,
-  txRrVenda: 35,
-  vendas: 1024,
-  cac: null,
-  valorVendas: 14509270,
-  tm: 14169,
-};
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat("pt-BR").format(value);
@@ -366,7 +259,6 @@ export default function GrowthVisaoGeral() {
   });
   const [canal, setCanal] = useState("Todos");
   const [tipoContrato, setTipoContrato] = useState("Todos");
-  const [estrategia, setEstrategia] = useState("Todos");
   const [chartView, setChartView] = useState<'mql' | 'leads'>('mql');
   const [investimentoSource, setInvestimentoSource] = useState("todos");
   const [expandedCanal, setExpandedCanal] = useState<string | null>(null);
@@ -497,47 +389,34 @@ export default function GrowthVisaoGeral() {
     tm: number;
   };
 
-  // Use real data from API, fall back to mock if needed
+  // Use real data from API
   const sparklineData = useMemo(() => {
     const realData = visaoGeralData?.mqlPorCanal || [];
-    
-    if (realData.length > 0) {
-      // Gerar sparklines baseados em dados diários reais se disponíveis
-      const mqlDiario = visaoGeralData?.mqlDiario || [];
-      
-      return realData.map((ch: ChannelData) => {
-        // Extrair sparkline dos dados diários para este canal
-        const sparkline = mqlDiario.map((day: { data: string; canais: Record<string, { leads: number; mqls: number }> }) => {
-          const canalData = day.canais[ch.canal];
-          return canalData?.mqls || 0;
-        });
-        
-        // Se não houver dados diários suficientes, gerar baseado no total
-        const finalSparkline = sparkline.length >= 5 
-          ? sparkline 
-          : Array.from({ length: 30 }, () => Math.floor((ch.mqls / 30) * (0.5 + Math.random())));
-        
-        return {
-          ...ch,
-          cpmql: null as number | null, // Será calculado abaixo
-          cac: null as number | null,
-          sparkline: finalSparkline,
-        };
+    const mqlDiario = visaoGeralData?.mqlDiario || [];
+
+    return realData.map((ch: ChannelData) => {
+      const sparkline = mqlDiario.map((day: { data: string; canais: Record<string, { leads: number; mqls: number }> }) => {
+        const canalData = day.canais[ch.canal];
+        return canalData?.mqls || 0;
       });
-    }
-    
-    // Fallback para mock se não houver dados reais
-    return mockChannelPerformance.map((ch) => ({
-      ...ch,
-      sparkline: Array.from({ length: 30 }, () => Math.floor(Math.random() * 100) + 50),
-    }));
+
+      // Se não houver dados diários suficientes, usar array vazio
+      const finalSparkline = sparkline.length >= 5
+        ? sparkline
+        : sparkline.length > 0 ? sparkline : [0];
+
+      return {
+        ...ch,
+        cpmql: null as number | null,
+        cac: null as number | null,
+        sparkline: finalSparkline,
+      };
+    });
   }, [visaoGeralData?.mqlPorCanal, visaoGeralData?.mqlDiario]);
   
-  // Calculate real totals from data
+  // Calculate totals from real data
   const calculatedTotals = useMemo(() => {
     const data = visaoGeralData?.mqlPorCanal || [];
-    if (data.length === 0) return mockTotals;
-    
     const leads = data.reduce((sum: number, c: ChannelData) => sum + c.leads, 0);
     const mqls = data.reduce((sum: number, c: ChannelData) => sum + c.mqls, 0);
     const rm = data.reduce((sum: number, c: ChannelData) => sum + c.rm, 0);
@@ -598,21 +477,6 @@ export default function GrowthVisaoGeral() {
                 <SelectItem value="Todos">Todos</SelectItem>
                 <SelectItem value="Recorrente">Recorrente</SelectItem>
                 <SelectItem value="Pontual">Pontual</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Estratégia:</span>
-            <Select value={estrategia} onValueChange={setEstrategia}>
-              <SelectTrigger className="w-[120px]" data-testid="select-estrategia">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todos</SelectItem>
-                <SelectItem value="Conversão">Conversão</SelectItem>
-                <SelectItem value="Awareness">Awareness</SelectItem>
-                <SelectItem value="Retargeting">Retargeting</SelectItem>
               </SelectContent>
             </Select>
           </div>

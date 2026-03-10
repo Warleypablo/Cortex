@@ -252,7 +252,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                     COALESCE(SUM(impressions::numeric), 0) as impressions,
                     COALESCE(SUM(clicks::numeric), 0) as clicks
                   FROM google_ads.campaign_daily_metrics
-                  WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+                  WHERE ${sql.raw(dateColumn)} >= ${startDate}::date AND ${sql.raw(dateColumn)} <= ${endDate}::date
                   GROUP BY campaign_id, campaign_name
                 `);
                 googleData = googleResult.rows as any[];
