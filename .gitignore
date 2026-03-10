@@ -10,4 +10,7 @@ vite.config.ts.*
 nul
 credentials/
 *.key
-*.pem.superpowers/
+*.pem
+.superpowers/
+contracts.db/
+attached_assets/*.csv

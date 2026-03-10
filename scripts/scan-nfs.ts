@@ -5,14 +5,22 @@
 import path from "path";
 import fs from "fs/promises";
 import { Pool } from "pg";
+import { config } from 'dotenv';
+config({ path: '.env' });
+
+function requireEnv(name: string): string {
+  const val = process.env[name];
+  if (!val) throw new Error(`Environment variable ${name} is required. Check your .env file.`);
+  return val;
+}
 
 const pool = new Pool({
-  host: "***REMOVED***",
+  host: requireEnv("DATABASE_HOST"),
   port: 5432,
-  database: "dados_turbo",
-  user: "postgres",
-  password: "***REMOVED***",
-  ssl: false,
+  database: process.env.DATABASE_NAME || "dados_turbo",
+  user: process.env.DATABASE_USER || "postgres",
+  password: requireEnv("DATABASE_PASSWORD"),
+  ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
 });
 
 async function main() {
