@@ -75,6 +75,7 @@ export const PERMISSION_KEYS = {
     CRIATIVOS: 'growth.criativos',
     ORCADO_REALIZADO: 'growth.orcado_realizado',
     KEYWORD_PERFORMANCE: 'growth.keyword_performance',
+    FUNIL_CONVERSAO: 'growth.funil_conversao',
   },
   // G&G (Pessoas)
   GG: {
@@ -238,6 +239,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/auto-report': PERMISSION_KEYS.REPORTS.AUTO_REPORT,
   '/growth/orcado-realizado': PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO,
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
+  '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
   '/dashboard/recrutamento': PERMISSION_KEYS.GG.RECRUTAMENTO,
@@ -442,6 +444,7 @@ export const NAV_CONFIG = {
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
         { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Keywords', url: '/growth/keyword-performance', icon: 'Search', permissionKey: PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE },
+        { title: 'Funil de Conversão', url: '/growth/funil-conversao', icon: 'Filter', permissionKey: PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO },
       ],
     },
     {
@@ -646,6 +649,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GROWTH.PLATAFORMA]: 'Por Plataforma',
   [PERMISSION_KEYS.GROWTH.CRIATIVOS]: 'Criativos',
   [PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE]: 'Keywords Performance',
+  [PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO]: 'Funil de Conversão',
   [PERMISSION_KEYS.GG.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.GG.RECRUTAMENTO]: 'Recrutamento',
   [PERMISSION_KEYS.GG.ONBOARDING]: 'Onboarding',
