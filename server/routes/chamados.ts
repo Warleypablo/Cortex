@@ -115,7 +115,16 @@ function updateObsidianTaskStatus(chamadoId: number, newStatus: string) {
   }
 }
 
-async function backfillObsidianTasks() {
+function isObsidianAvailable(): boolean {
+  try {
+    return fs.existsSync(OBSIDIAN_TASKS_DIR);
+  } catch { return false; }
+}
+
+async function backfillObsidianTasks(): Promise<{ created: number; total: number }> {
+  if (!isObsidianAvailable()) {
+    return { created: 0, total: 0 };
+  }
   try {
     const result = await db.execute(sql`
       SELECT * FROM cortex_core.chamados WHERE area = 'cortex' ORDER BY id ASC
@@ -131,16 +140,45 @@ async function backfillObsidianTasks() {
       }
     }
     if (created > 0) console.log(`[obsidian] Backfill: ${created} task(s) created`);
+    return { created, total: result.rows.length };
   } catch (err) {
     console.error("[obsidian] Backfill error:", err);
+    return { created: 0, total: 0 };
   }
 }
 
+// Periodic sync: every 5 minutes, backfill missing Obsidian tasks
+const OBSIDIAN_SYNC_INTERVAL = 5 * 60 * 1000;
+let obsidianSyncTimer: ReturnType<typeof setInterval> | null = null;
+
+function startObsidianPeriodicSync() {
+  if (obsidianSyncTimer) return;
+  if (!isObsidianAvailable()) {
+    console.log("[obsidian] Vault not found locally, periodic sync disabled");
+    return;
+  }
+  obsidianSyncTimer = setInterval(async () => {
+    const { created } = await backfillObsidianTasks();
+    if (created > 0) console.log(`[obsidian] Periodic sync: ${created} new task(s)`);
+  }, OBSIDIAN_SYNC_INTERVAL);
+  console.log(`[obsidian] Periodic sync started (every ${OBSIDIAN_SYNC_INTERVAL / 1000}s)`);
+}
+
 export function registerChamadosRoutes(app: Express) {
-  // Run migration for detalhes column, then backfill Obsidian tasks
+  // Run migration for detalhes column, then backfill Obsidian tasks + start periodic sync
   db.execute(sql`ALTER TABLE cortex_core.chamados ADD COLUMN IF NOT EXISTS detalhes JSONB`)
     .then(() => { console.log("[chamados] detalhes column ensured"); return backfillObsidianTasks(); })
+    .then(() => startObsidianPeriodicSync())
     .catch((err: any) => console.error("[chamados] migration error:", err));
+
+  // Manual Obsidian sync endpoint
+  app.post("/api/chamados/sync-obsidian", async (_req, res) => {
+    if (!isObsidianAvailable()) {
+      return res.status(400).json({ message: "Obsidian vault not available on this server" });
+    }
+    const result = await backfillObsidianTasks();
+    res.json({ message: `Sync complete: ${result.created} task(s) created`, ...result });
+  });
 
   // ============================================
   // Chamados CRUD
