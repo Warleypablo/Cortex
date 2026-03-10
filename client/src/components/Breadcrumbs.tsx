@@ -53,6 +53,7 @@ const routeNameMap: Record<string, string> = {
   "criativos": "Criativos",
   "performance-plataformas": "Performance Plataformas",
   "keyword-performance": "Keywords Performance",
+  "funil-conversao": "Funil de Conversão",
   "cases": "Cases",
   "chat": "Chat",
   "juridico": "Jurídico",

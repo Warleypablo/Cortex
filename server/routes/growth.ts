@@ -1956,6 +1956,168 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // Growth - Funil de Conversão (Meta + Google Ads → Bitrix CRM)
+  app.get("/api/growth/funil-conversao", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '2025-01-01';
+      const endDate = req.query.endDate as string || new Date().toISOString().split('T')[0];
+      const plataforma = req.query.plataforma as string || 'Todos'; // Todos, Meta, Google
+      const campaign = req.query.campaign as string || '';
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format" });
+      }
+
+      // 1. Ads data: impressions + clicks
+      let metaImpressions = 0, metaClicks = 0, metaSpend = 0;
+      let googleImpressions = 0, googleClicks = 0, googleSpend = 0;
+
+      if (plataforma === 'Todos' || plataforma === 'Meta') {
+        const metaResult = await db.execute(sql`
+          SELECT
+            COALESCE(SUM(impressions), 0)::bigint as impressions,
+            COALESCE(SUM(clicks), 0)::bigint as clicks,
+            COALESCE(SUM(spend), 0)::numeric as spend
+          FROM meta_ads.meta_insights_daily
+          WHERE date_start >= ${startDate}::date AND date_stop <= ${endDate}::date
+            AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+        `);
+        const mr = metaResult.rows[0] as any;
+        metaImpressions = parseInt(mr.impressions) || 0;
+        metaClicks = parseInt(mr.clicks) || 0;
+        metaSpend = parseFloat(mr.spend) || 0;
+      }
+
+      if (plataforma === 'Todos' || plataforma === 'Google') {
+        try {
+          const googleResult = await db.execute(sql`
+            SELECT
+              COALESCE(SUM(impressions), 0)::bigint as impressions,
+              COALESCE(SUM(clicks), 0)::bigint as clicks,
+              COALESCE(SUM(cost_micros), 0)::bigint as cost_micros
+            FROM google_ads.campaign_daily_metrics
+            WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+          `);
+          const gr = googleResult.rows[0] as any;
+          googleImpressions = parseInt(gr.impressions) || 0;
+          googleClicks = parseInt(gr.clicks) || 0;
+          googleSpend = (parseInt(gr.cost_micros) || 0) / 1000000;
+        } catch (e) {
+          // Google Ads schema may not exist
+        }
+      }
+
+      const totalImpressions = metaImpressions + googleImpressions;
+      const totalClicks = metaClicks + googleClicks;
+      const totalSpend = metaSpend + googleSpend;
+
+      // 2. CRM funnel data from Bitrix
+      const utmFilter = plataforma === 'Meta'
+        ? sql`AND (LOWER(utm_source) IN ('facebook', 'fb', 'meta', 'instagram', 'ig'))`
+        : plataforma === 'Google'
+        ? sql`AND (LOWER(utm_source) IN ('google', 'gads', 'google_ads', 'adwords'))`
+        : sql``;
+
+      const campaignFilter = campaign
+        ? sql`AND utm_campaign ILIKE ${'%' + campaign + '%'}`
+        : sql``;
+
+      const crmResult = await db.execute(sql`
+        SELECT
+          COUNT(*) as leads,
+          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado', 'Reunião Agendada',
+                                        'Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho')
+                   AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho')
+                   AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho'
+                   THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_vendas
+        FROM "Bitrix".crm_deal
+        WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+          ${utmFilter}
+          ${campaignFilter}
+      `);
+
+      const cr = crmResult.rows[0] as any;
+      const leads = parseInt(cr.leads) || 0;
+      const mqls = parseInt(cr.mqls) || 0;
+      const rm = parseInt(cr.rm) || 0;
+      const rr = parseInt(cr.rr) || 0;
+      const vendas = parseInt(cr.vendas) || 0;
+      const valorVendas = parseFloat(cr.valor_vendas) || 0;
+
+      // 3. Build funnel stages
+      const stages = [
+        { key: 'impressions', label: 'Impressões', value: totalImpressions, color: '#6366f1' },
+        { key: 'clicks', label: 'Cliques', value: totalClicks, color: '#8b5cf6' },
+        { key: 'leads', label: 'Leads', value: leads, color: '#a855f7' },
+        { key: 'mqls', label: 'MQL', value: mqls, color: '#d946ef' },
+        { key: 'rm', label: 'Reunião Marcada', value: rm, color: '#ec4899' },
+        { key: 'rr', label: 'Reunião Realizada', value: rr, color: '#f43f5e' },
+        { key: 'vendas', label: 'Venda', value: vendas, color: '#10b981' },
+      ];
+
+      // Conversion rates between stages
+      const rates = stages.slice(1).map((stage, i) => ({
+        from: stages[i].key,
+        to: stage.key,
+        rate: stages[i].value > 0 ? (stage.value / stages[i].value * 100) : 0,
+      }));
+
+      // 4. Monthly trend
+      const trendResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(created_at, 'YYYY-MM') as month,
+          COUNT(*) as leads,
+          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado', 'Reunião Agendada',
+                                        'Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho')
+                   AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho')
+                   AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas
+        FROM "Bitrix".crm_deal
+        WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+          ${utmFilter}
+          ${campaignFilter}
+        GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+        ORDER BY 1
+      `);
+
+      const trend = (trendResult.rows as any[]).map(row => ({
+        month: row.month,
+        leads: parseInt(row.leads) || 0,
+        mqls: parseInt(row.mqls) || 0,
+        rm: parseInt(row.rm) || 0,
+        rr: parseInt(row.rr) || 0,
+        vendas: parseInt(row.vendas) || 0,
+      }));
+
+      res.json({
+        stages,
+        rates,
+        trend,
+        summary: {
+          totalSpend: totalSpend,
+          cpl: leads > 0 ? totalSpend / leads : 0,
+          cpmql: mqls > 0 ? totalSpend / mqls : 0,
+          cac: vendas > 0 ? totalSpend / vendas : 0,
+          roas: totalSpend > 0 ? valorVendas / totalSpend : 0,
+          valorVendas,
+        },
+        platforms: {
+          meta: { impressions: metaImpressions, clicks: metaClicks, spend: metaSpend },
+          google: { impressions: googleImpressions, clicks: googleClicks, spend: googleSpend },
+        },
+      });
+    } catch (error) {
+      console.error("[api] Error fetching funil-conversao:", error);
+      res.status(500).json({ error: "Failed to fetch funil de conversão" });
+    }
+  });
+
   // Google Ads - Keyword Performance
   app.get("/api/growth/keyword-performance", async (req, res) => {
     try {
