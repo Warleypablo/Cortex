@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-03-10 | feat(chamados): integrate Cortex chamados with Obsidian Tasks
+
+**O que foi feito:**
+- Adicionado campo `detalhes` JSONB ao schema de chamados para dados estruturados por categoria
+- Criada funcao `writeObsidianTask` que gera arquivo .md no vault Obsidian para chamados Cortex
+- Criada funcao `updateObsidianTaskStatus` que sincroniza status no frontmatter do Obsidian
+- Adicionados campos dinamicos no formulario por categoria (Bug, Nova Feature, Melhoria, Relatorio/Dashboard, Integracao, Outros)
+- Criado `Tasks/_overview.md` no Obsidian com queries Dataview
+
+**Por que:**
+- Permitir que chamados abertos na area Cortex alimentem automaticamente tasks no Obsidian vault para gestao de desenvolvimento
+
+**Arquivos alterados:**
+- `server/middleware/schemas.ts` - Adicionado campo `detalhes` ao createChamadoSchema
+- `server/routes/chamados.ts` - Salvar detalhes JSONB, writeObsidianTask no POST, updateObsidianTaskStatus no PATCH
+- `client/src/pages/Chamados.tsx` - Campos dinamicos por categoria quando area=cortex
+
+**Impacto arquitetural:** Integracao file-system entre backend e Obsidian vault local via fs.writeFileSync. Sem dependencia externa.
+
+---
+
 ## 2026-03-10 | fix(security): hardening Phase 2 - SQL injection deep fixes
 
 **O que foi feito:**
