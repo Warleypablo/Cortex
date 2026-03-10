@@ -697,6 +697,128 @@ router.get("/api/portal-cliente/resumo", async (req, res) => {
   }
 });
 
+// ── GET /api/portal-cliente/dashboard ────────────────────────────────────────
+router.get("/api/portal-cliente/dashboard", async (req, res) => {
+  const clientData = (req.session as any).clientData;
+  if (!clientData) return res.status(401).json({ message: "Não autenticado como cliente" });
+
+  try {
+    // 1. Buscar IDs do cliente (mesma lógica de /resumo)
+    const clientRows = await db
+      .select({ ids: cazClientes.ids })
+      .from(cazClientes)
+      .where(eq(cazClientes.id, clientData.id))
+      .limit(1);
+
+    const ids = clientRows[0]?.ids;
+    let faturas: any[] = [];
+
+    if (ids) {
+      const trimmed = ids.trim();
+      let idList: string[];
+      if (trimmed.startsWith("[")) {
+        idList = (JSON.parse(trimmed) as (string | number)[]).map(String);
+      } else {
+        idList = trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const safeIdList = idList.filter((id) => UUID_REGEX.test(id));
+
+      if (safeIdList.length > 0) {
+        faturas = await db
+          .select({
+            id: cazParcelas.id,
+            status: cazParcelas.status,
+            valorBruto: cazParcelas.valorBruto,
+            descricao: cazParcelas.descricao,
+            dataVencimento: sql<string>`to_char(${cazParcelas.dataVencimento}, 'YYYY-MM-DD')`,
+            dataQuitacao: sql<string>`to_char(${cazParcelas.dataQuitacao}, 'YYYY-MM-DD')`,
+            categoriaNome: cazParcelas.categoriaNome,
+            urlCobranca: cazParcelas.urlCobranca,
+          })
+          .from(cazParcelas)
+          .where(sql`${cazParcelas.idCliente} = ANY(${safeIdList}::uuid[])`)
+          .orderBy(desc(cazParcelas.dataVencimento))
+          .limit(50);
+      }
+    }
+
+    // 2. Calcular KPIs de faturas
+    const atrasadas = faturas.filter((f) =>
+      ["ATRASADO", "VENCIDO"].includes((f.status ?? "").toUpperCase())
+    );
+    const pendentes = faturas.filter((f) => {
+      const s = (f.status ?? "").toUpperCase();
+      return !["RECEBIDO", "PAGO", "QUITADO", "ATRASADO", "VENCIDO"].includes(s);
+    });
+    const proximaFatura = pendentes.sort((a: any, b: any) =>
+      (a.dataVencimento ?? "").localeCompare(b.dataVencimento ?? "")
+    )[0];
+
+    // 3. Buscar serviços ativos (mesma query de /servicos)
+    const servicosResult = await db
+      .select({ status: cupContratos.status })
+      .from(cazClientes)
+      .innerJoin(cupClientes, eq(cazClientes.cnpj, cupClientes.cnpj))
+      .innerJoin(cupContratos, eq(cupClientes.taskId, cupContratos.idTask))
+      .where(eq(cazClientes.id, clientData.id));
+
+    const servicosAtivos = servicosResult.filter((s) => {
+      const st = (s.status ?? "").toLowerCase();
+      return st.includes("ativo") || st.includes("anda") || st.includes("progr");
+    }).length;
+
+    // 4. Mensagens não lidas
+    const naoLidas = await db
+      .select({ id: chatMensagens.id })
+      .from(chatMensagens)
+      .where(
+        and(
+          eq(chatMensagens.clientId, clientData.id),
+          eq(chatMensagens.remetenteTipo, "colaborador"),
+          eq(chatMensagens.lida, false)
+        )
+      );
+    const mensagensNaoLidas = naoLidas.length;
+
+    // 5. Alertas automáticos
+    const alertas: Array<{ tipo: string; mensagem: string }> = [];
+    if (atrasadas.length > 0) {
+      const totalAtrasado = atrasadas.reduce(
+        (sum, f) => sum + parseFloat(f.valorBruto ?? "0"), 0
+      );
+      alertas.push({
+        tipo: "atrasado",
+        mensagem: `Você tem ${atrasadas.length} fatura${atrasadas.length > 1 ? "s" : ""} atrasada${atrasadas.length > 1 ? "s" : ""} (R$ ${totalAtrasado.toFixed(2).replace(".", ",")})`,
+      });
+    }
+    if (mensagensNaoLidas > 0) {
+      alertas.push({
+        tipo: "mensagem",
+        mensagem: `Você tem ${mensagensNaoLidas} mensagen${mensagensNaoLidas > 1 ? "s" : ""} não lida${mensagensNaoLidas > 1 ? "s" : ""}`,
+      });
+    }
+
+    res.json({
+      proximoVencimento: proximaFatura
+        ? { valor: parseFloat(proximaFatura.valorBruto ?? "0"), data: proximaFatura.dataVencimento }
+        : null,
+      faturasAtrasadas: {
+        count: atrasadas.length,
+        total: atrasadas.reduce((sum, f) => sum + parseFloat(f.valorBruto ?? "0"), 0),
+      },
+      servicosAtivos,
+      mensagensNaoLidas,
+      ultimasFaturas: faturas.slice(0, 3),
+      alertas,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar dashboard do cliente:", error);
+    return res.status(500).json({ message: "Erro ao buscar dados do dashboard" });
+  }
+});
+
 // ── GET /api/portal-cliente/chat ─────────────────────────────────────────────
 router.get("/api/portal-cliente/chat", async (req, res) => {
   const clientData = (req.session as any).clientData;
