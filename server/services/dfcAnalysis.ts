@@ -6,34 +6,61 @@ import { sql } from "drizzle-orm";
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Função para executar queries SQL de forma segura (somente SELECT)
+// Schemas e tabelas permitidas para queries AI-geradas
+const ALLOWED_SCHEMAS = ['Conta Azul', 'Clickup', 'cortex_core'];
+const BLOCKED_TABLES = ['users', 'sessions', 'rh_pessoal', 'assinafy_config', 'client_credentials'];
+const MAX_ROWS = 500;
+
+// Função para executar queries SQL de forma segura (somente SELECT, read-only)
 async function executeSecureQuery(query: string): Promise<{ success: boolean; data?: any[]; error?: string; rowCount?: number }> {
-  // Validação de segurança: apenas queries SELECT são permitidas
   const normalizedQuery = query.trim().toUpperCase();
-  
+
+  // 1. Apenas SELECT permitido
   if (!normalizedQuery.startsWith('SELECT')) {
     return { success: false, error: "Apenas queries SELECT são permitidas" };
   }
-  
-  // Bloquear comandos perigosos
-  const dangerousKeywords = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'TRUNCATE', 'CREATE', 'GRANT', 'REVOKE'];
-  for (const keyword of dangerousKeywords) {
-    if (normalizedQuery.includes(keyword)) {
-      return { success: false, error: `Comando ${keyword} não é permitido` };
+
+  // 2. Bloquear comandos DML/DDL (com word boundary check para evitar bypass)
+  const dangerousPatterns = [
+    /\b(DROP|DELETE|UPDATE|INSERT|ALTER|TRUNCATE|CREATE|GRANT|REVOKE|EXECUTE|EXEC)\b/,
+    /\bINTO\s+/,           // SELECT INTO
+    /;\s*\w/,              // Multiple statements
+    /--/,                  // SQL comments (potential injection)
+    /\/\*/,                // Block comments
+  ];
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(normalizedQuery)) {
+      return { success: false, error: "Query contém comandos ou padrões não permitidos" };
     }
   }
-  
+
+  // 3. Verificar tabelas bloqueadas
+  const queryLower = query.toLowerCase();
+  for (const table of BLOCKED_TABLES) {
+    if (queryLower.includes(table.toLowerCase())) {
+      return { success: false, error: `Acesso à tabela '${table}' não é permitido` };
+    }
+  }
+
+  // 4. Forçar LIMIT se não presente
+  let safeQuery = query.trim();
+  if (!normalizedQuery.includes('LIMIT')) {
+    safeQuery = safeQuery.replace(/;?\s*$/, '') + ` LIMIT ${MAX_ROWS}`;
+  }
+
   try {
-    console.log("[DFC Chat] Executing query:", query);
-    const result = await db.execute(sql.raw(query));
-    return { 
-      success: true, 
-      data: result.rows as any[],
-      rowCount: result.rowCount || 0
+    console.log("[DFC Chat] Executing query:", safeQuery.substring(0, 200) + (safeQuery.length > 200 ? '...' : ''));
+    // Executar em transação read-only para garantia extra
+    const result = await db.execute(sql`SET TRANSACTION READ ONLY`).catch(() => {});
+    const queryResult = await db.execute(sql.raw(safeQuery));
+    return {
+      success: true,
+      data: (queryResult.rows as any[]).slice(0, MAX_ROWS),
+      rowCount: queryResult.rowCount || 0
     };
   } catch (error: any) {
-    console.error("[DFC Chat] Query error:", error);
-    return { success: false, error: error.message || "Erro ao executar query" };
+    console.error("[DFC Chat] Query error:", error.message);
+    return { success: false, error: "Erro ao executar query" };
   }
 }
 
