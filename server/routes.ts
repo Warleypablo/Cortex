@@ -6440,6 +6440,29 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
+  // Meta Ads Sync endpoint
+  app.post("/api/meta-ads/sync", async (req, res) => {
+    try {
+      const { since, until } = req.body || {};
+      const { syncMetaAds } = await import("./services/metaAdsSync");
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        host: process.env.DATABASE_HOST || "***REMOVED***",
+        port: 5432,
+        database: "dados_turbo",
+        user: "postgres",
+        password: process.env.DATABASE_PASSWORD || "***REMOVED***",
+        ssl: false,
+      });
+      const result = await syncMetaAds(pool, { since, until });
+      await pool.end();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[api] Error syncing Meta Ads:", error);
+      res.status(500).json({ error: error.message || "Failed to sync Meta Ads" });
+    }
+  });
+
   // Recruitment Analytics API Routes (Power BI style G&G Dashboard)
   app.get("/api/recrutamento/kpis", async (req, res) => {
     try {
