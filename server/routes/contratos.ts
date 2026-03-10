@@ -337,6 +337,29 @@ async function ensureContratosTablesExist() {
       )
     `);
 
+    // Entregaveis - tasks de entrega hierarquicas
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.entregaveis (
+        id SERIAL PRIMARY KEY,
+        contrato_id INTEGER REFERENCES staging.contratos(id) ON DELETE CASCADE,
+        contrato_item_id INTEGER REFERENCES staging.contratos_itens(id),
+        parent_id INTEGER REFERENCES staging.entregaveis(id) ON DELETE CASCADE,
+        titulo VARCHAR(255) NOT NULL,
+        descricao TEXT,
+        status VARCHAR(30) DEFAULT 'pendente',
+        responsavel VARCHAR(255),
+        prazo DATE,
+        data_conclusao DATE,
+        prioridade VARCHAR(20) DEFAULT 'media',
+        ordem INTEGER DEFAULT 0,
+        nivel INTEGER DEFAULT 0,
+        criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_entregaveis_contrato ON staging.entregaveis(contrato_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_entregaveis_parent ON staging.entregaveis(parent_id)`);
+
     // Aditivos de contratos
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS staging.aditivos (
