@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-03-10 | fix(security): hardening Phase 2 - SQL injection deep fixes
+
+**O que foi feito:**
+- **churnRiskEngine.ts**: Substituída concatenação de string com `sql.raw()` por queries parametrizadas usando `sql` template + `sql.join()` para filtros dinâmicos
+- **dfcAnalysis.ts**: Hardened `executeSecureQuery()` - regex-based pattern blocking, table blacklist, forced LIMIT 500, transação read-only, log truncado
+- **juridico.ts**: Substituído escape manual de SQL (IN clause com `replace(/'/g, "''")`) por `ANY()` parametrizado
+- **comercial.ts**: Substituída query inteira em `sql.raw()` por `sql.join()` para colunas dinâmicas do SELECT
+
+**110 sql.raw() restantes** são todos server-computed (datas de `new Date().toISOString()`, nomes de tabela hardcoded, scripts de migração) - nenhum com interpolação de input de usuário.
+
+**Impacto arquitetural:** Eliminadas todas as vulnerabilidades de SQL injection com input de usuário
+
+---
+
 ## 2026-03-10 | refactor(routes): modularize routes.ts - Phase 3 refactoring
 
 **O que foi feito:**
