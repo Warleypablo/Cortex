@@ -119,7 +119,11 @@ After a successful push, add an entry to `docs/CHANGELOG.md` documenting what wa
 - Do NOT include the changelog file itself in the list of altered files
 - After writing the entry, stage, commit (`docs(changelog): update changelog`), and push
 
-### Step 6 — Confirm to the user
+### Step 6 — Sync Obsidian vault
+
+Execute the workflow described in `agents/obsidian-sync-SKILL.md` to update the Obsidian vault with the progress made in this commit. This step is mandatory — never skip it.
+
+### Step 7 — Confirm to the user
 
 After everything completes, show a brief confirmation:
 
@@ -127,6 +131,7 @@ After everything completes, show a brief confirmation:
 ✅ Committed and pushed to `<branch>`:
    <commit message subject line>
 📋 Changelog updated
+📓 Obsidian synced
 ```
 
 If anything fails, show the error clearly and suggest a fix.
