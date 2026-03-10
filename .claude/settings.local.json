@@ -13,7 +13,6 @@
       "Bash(curl:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(node -e \"const { Pool } = require\\(''pg''\\); const pool = new Pool\\({ host: ''***REMOVED***'', port: 5432, database: ''dados_turbo'', user: ''postgres'', password: ''***REMOVED***'', ssl: false }\\); pool.query\\(''SELECT COUNT\\(DISTINCT c.id\\) as total FROM cup_clientes c INNER JOIN cup_contratos ct ON c.task_id = ct.id_task WHERE ct.status IN \\(\\\\''ativo\\\\'', \\\\''onboarding\\\\'', \\\\''triagem\\\\''\\)''\\).then\\(r => console.log\\(''Count with c.id:'', r.rows[0]\\)\\).catch\\(e => console.error\\(''Error:'', e.message\\)\\).finally\\(\\(\\) => pool.end\\(\\)\\);\")",
       "Bash(timeout:*)",
       "Bash(ping:*)",
       "Bash(git pull:*)",
@@ -25,7 +24,6 @@
       "Bash(npm config:*)",
       "Bash(export NODE_ENV=development)",
       "Bash(pkill:*)",
-      "Bash(psql \"postgresql://postgres:***REMOVED***@***REMOVED***:5432/dados_turbo\" -c \"DELETE FROM session;\")",
       "Bash(node clearSessions.js:*)",
       "Bash(del clearSessions.js)",
       "Bash(git add:*)",
@@ -33,7 +31,9 @@
       "Bash(git push)",
       "Bash(git commit:*)",
       "Bash(git fetch:*)",
-      "Bash(git update-index:*)"
+      "Bash(git update-index:*)",
+      "Bash(grep -r \"cup_churn\" /Users/mac0267/Cortex --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.sql\" 2>/dev/null | grep -v node_modules)",
+      "Bash(grep -l \"cup_churn\\\\|CREATE TABLE.*churn\" /Users/mac0267/Cortex/scripts/*.sql 2>/dev/null)"
     ]
   }
 }
