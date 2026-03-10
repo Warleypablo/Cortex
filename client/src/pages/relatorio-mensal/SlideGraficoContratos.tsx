@@ -105,6 +105,25 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Pipeline Breakdown */}
+      {dados.pipelineBreakdown && dados.pipelineBreakdown.length > 0 && (
+        <div className="mt-4 bg-zinc-900/40 border border-zinc-800 rounded-2xl p-4 shrink-0">
+          <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold mb-3">Por Pipeline</p>
+          <div className="grid grid-cols-3 gap-3">
+            {dados.pipelineBreakdown.map((p) => (
+              <div key={p.pipeline} className="bg-zinc-800/40 rounded-xl px-4 py-3">
+                <p className="text-sm font-bold text-white mb-1">{p.pipeline}</p>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-zinc-400">{p.contratos} contratos</span>
+                  <span className="text-emerald-400 font-bold">{formatBRL(p.receitaRecorrente)} R</span>
+                  <span className="text-purple-400 font-bold">{formatBRL(p.receitaPontual)} P</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

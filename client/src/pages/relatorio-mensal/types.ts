@@ -46,6 +46,20 @@ export interface CloserRanking {
   negociosGanhos: number;
 }
 
+export interface PipelineBreakdown {
+  pipeline: string;
+  contratos: number;
+  receitaRecorrente: number;
+  receitaPontual: number;
+}
+
+export interface Indicacoes {
+  indicacoesRecebidas: number;
+  contratosFechados: number;
+  valorRecorrente: number;
+  valorPontual: number;
+}
+
 export interface ContratosMes {
   numContratos: number;
   contratosRecorrente: number;
@@ -54,6 +68,7 @@ export interface ContratosMes {
   receitaPontual: number;
   tmRecorrente: number;
   tmPontual: number;
+  pipelineBreakdown: PipelineBreakdown[];
 }
 
 export interface TurboMetrics {
@@ -75,6 +90,10 @@ export interface TurboMetrics {
   faturamentoPago: number;
   churnMetaMensal: number;
   receitaChurnSeries: ReceitaChurnMes[];
+  retencoesSolicitacoesCount: number;
+  retencoesSolicitacoesValor: number;
+  retencoesCount: number;
+  retencoesValor: number;
 }
 
 export interface ReceitaChurnMes {
@@ -147,4 +166,5 @@ export interface RelatorioMensalData {
   rankingSquads: SquadRanking[];
   squadDetails: SquadDetail[];
   techData: TechSlideData;
+  indicacoes: Indicacoes;
 }
