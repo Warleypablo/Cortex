@@ -97,11 +97,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dotColor: st
   aberto: { label: "Aberto", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300", dotColor: "bg-blue-500" },
   triagem: { label: "Triagem", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300", dotColor: "bg-purple-500" },
   em_andamento: { label: "Em Andamento", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300", dotColor: "bg-amber-500" },
+  review: { label: "Review", color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300", dotColor: "bg-indigo-500" },
   resolvido: { label: "Resolvido", color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300", dotColor: "bg-green-500" },
   fechado: { label: "Fechado", color: "bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-zinc-400", dotColor: "bg-gray-400" },
 };
 
-const KANBAN_COLUMNS = ["aberto", "triagem", "em_andamento", "resolvido"];
+const KANBAN_COLUMNS = ["aberto", "triagem", "em_andamento", "review", "resolvido"];
 
 function getPrioridadeConfig(p: string) {
   return PRIORIDADES.find((pr) => pr.value === p) || PRIORIDADES[1];
