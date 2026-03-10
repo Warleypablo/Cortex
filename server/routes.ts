@@ -411,7 +411,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const { allowedRoutes } = req.body;
-      }
 
       const updatedUser = await updateUserPermissions(userId, allowedRoutes);
       
