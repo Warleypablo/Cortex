@@ -219,27 +219,29 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
         `),
 
-        // 11. Churn e Pausados no mês de dados
-        // Churn usa data_solicitacao_encerramento, Pausados usa data_pausa (campos distintos)
+        // 11. Churn (cup_churn curada) e Pausados (cup_contratos) no mês de dados
         db.execute(sql`
-          SELECT
-            COALESCE(SUM(CASE WHEN LOWER(status) IN ('encerrado', 'cancelado/inativo')
+          WITH churn_data AS (
+            SELECT
+              COALESCE(SUM(valor_r), 0)::numeric as churn_mrr,
+              COUNT(*)::int as churn_count
+            FROM "Clickup".cup_churn
+            WHERE data_solicitacao_encerramento IS NOT NULL
               AND data_solicitacao_encerramento >= ${dataStart}
               AND data_solicitacao_encerramento < ${dataEnd}
-              THEN COALESCE(valorr::numeric, 0) ELSE 0 END), 0) as churn_mrr,
-            COUNT(CASE WHEN LOWER(status) IN ('encerrado', 'cancelado/inativo')
-              AND data_solicitacao_encerramento >= ${dataStart}
-              AND data_solicitacao_encerramento < ${dataEnd}
-              THEN 1 END)::int as churn_count,
-            COALESCE(SUM(CASE WHEN LOWER(status) = 'pausado'
+              AND COALESCE(abonar_churn, '') != 'Sim'
+          ),
+          pausados_data AS (
+            SELECT
+              COALESCE(SUM(COALESCE(valorr::numeric, 0)), 0) as pausados_mrr,
+              COUNT(*)::int as pausados_count
+            FROM "Clickup".cup_contratos
+            WHERE LOWER(status) = 'pausado'
               AND data_pausa >= ${dataStart}
               AND data_pausa < ${dataEnd}
-              THEN COALESCE(valorr::numeric, 0) ELSE 0 END), 0) as pausados_mrr,
-            COUNT(CASE WHEN LOWER(status) = 'pausado'
-              AND data_pausa >= ${dataStart}
-              AND data_pausa < ${dataEnd}
-              THEN 1 END)::int as pausados_count
-          FROM "Clickup".cup_contratos
+          )
+          SELECT c.churn_mrr, c.churn_count, p.pausados_mrr, p.pausados_count
+          FROM churn_data c, pausados_data p
         `),
 
         // 12. Cross-sell (deals with source PARTNER in data month)
@@ -336,11 +338,12 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           churn_mensal AS (
             SELECT
               TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as month,
-              COALESCE(SUM(COALESCE(valorr::numeric, 0)), 0) as churn_brl
-            FROM "Clickup".cup_contratos, date_range dr
-            WHERE data_solicitacao_encerramento >= dr.range_start
+              COALESCE(SUM(valor_r), 0) as churn_brl
+            FROM "Clickup".cup_churn, date_range dr
+            WHERE data_solicitacao_encerramento IS NOT NULL
+              AND data_solicitacao_encerramento >= dr.range_start
               AND data_solicitacao_encerramento < dr.range_end
-              AND LOWER(status) IN ('encerrado', 'cancelado/inativo')
+              AND COALESCE(abonar_churn, '') != 'Sim'
             GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM')
           )
           SELECT
@@ -375,16 +378,17 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY mrr DESC
         `),
 
-        // 16. Churn por squad no mês de dados
+        // 16. Churn por squad no mês de dados (usa cup_churn - tabela curada)
         db.execute(sql`
           SELECT
             squad,
-            COALESCE(SUM(COALESCE(valorr, '0')::numeric), 0) as churn_brl,
+            COALESCE(SUM(valor_r), 0)::numeric as churn_brl,
             COUNT(*)::int as churn_count
-          FROM "Clickup".cup_contratos
-          WHERE data_solicitacao_encerramento >= ${dataStart}
+          FROM "Clickup".cup_churn
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
-            AND LOWER(status) IN ('encerrado', 'cancelado/inativo')
+            AND COALESCE(abonar_churn, '') != 'Sim'
             AND squad IS NOT NULL
             AND TRIM(squad) != ''
           GROUP BY squad
@@ -483,16 +487,17 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           GROUP BY EXTRACT(MONTH FROM data_vencimento)
         `),
 
-        // 22. OKR: churn_brl por mês no quarter
+        // 22. OKR: churn_brl por mês no quarter (usa cup_churn curada)
         db.execute(sql`
           SELECT
             EXTRACT(MONTH FROM data_solicitacao_encerramento)::int as month,
-            COALESCE(SUM(COALESCE(valorr, '0')::numeric), 0) as valor
-          FROM "Clickup".cup_contratos
-          WHERE EXTRACT(YEAR FROM data_solicitacao_encerramento) = ${anoDados}
+            COALESCE(SUM(valor_r), 0)::numeric as valor
+          FROM "Clickup".cup_churn
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND EXTRACT(YEAR FROM data_solicitacao_encerramento) = ${anoDados}
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) >= ${quarterStartMonth}
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) <= ${mesDados}
-            AND LOWER(status) IN ('encerrado', 'cancelado/inativo')
+            AND COALESCE(abonar_churn, '') != 'Sim'
           GROUP BY EXTRACT(MONTH FROM data_solicitacao_encerramento)
         `),
 
