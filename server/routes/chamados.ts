@@ -3,8 +3,123 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { validateBody } from "../middleware/validate";
 import { createChamadoSchema, updateChamadoSchema } from "../middleware/schemas";
+import * as fs from "fs";
+import * as path from "path";
+
+// ============================================
+// Obsidian Task Writer
+// ============================================
+const OBSIDIAN_TASKS_DIR = "/Users/mac0267/Documents/Obsidian Vault/Córtex 2.0/Tasks";
+
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+function renderDetalhes(categoria: string | null, detalhes: Record<string, any> | null): string {
+  if (!detalhes || Object.keys(detalhes).length === 0) return "_Nenhum detalhe adicional._";
+
+  const lines: string[] = [];
+  for (const [key, value] of Object.entries(detalhes)) {
+    if (value !== null && value !== undefined && value !== "") {
+      const label = key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      if (typeof value === "string" && value.includes("\n")) {
+        lines.push(`### ${label}\n${value}`);
+      } else {
+        lines.push(`- **${label}:** ${value}`);
+      }
+    }
+  }
+  return lines.join("\n\n");
+}
+
+function writeObsidianTask(chamado: Record<string, any>) {
+  try {
+    fs.mkdirSync(OBSIDIAN_TASKS_DIR, { recursive: true });
+
+    const id = chamado.id;
+    const slug = slugify(chamado.titulo || "sem-titulo");
+    const filename = `TASK-${id}-${slug}.md`;
+    const filepath = path.join(OBSIDIAN_TASKS_DIR, filename);
+
+    const hoje = new Date().toISOString().split("T")[0];
+    const detalhes = typeof chamado.detalhes === "string"
+      ? JSON.parse(chamado.detalhes)
+      : chamado.detalhes || {};
+
+    const content = `---
+tipo: task
+origem: chamados
+chamado_id: ${id}
+categoria: "${chamado.categoria || "geral"}"
+prioridade: "${chamado.prioridade || "media"}"
+status: "${chamado.status || "aberto"}"
+solicitante: "${chamado.solicitante_nome || ""}"
+criado: ${hoje}
+atualizado: ${hoje}
+---
+# [${chamado.categoria || "Geral"}] ${chamado.titulo}
+
+## Informacoes
+- **Solicitante:** ${chamado.solicitante_nome || "N/A"} (${chamado.solicitante_email || "N/A"})
+- **Squad:** ${chamado.solicitante_squad || "N/A"}
+- **Prioridade:** ${chamado.prioridade || "media"}
+- **Categoria:** ${chamado.categoria || "N/A"}
+
+## Detalhes
+${renderDetalhes(chamado.categoria, detalhes)}
+
+## Descricao Original
+${chamado.descricao || "_Sem descricao._"}
+
+## Tasks
+- [ ] Triagem e analise
+- [ ] Implementacao
+- [ ] Testes
+- [ ] Deploy
+`;
+
+    fs.writeFileSync(filepath, content, "utf-8");
+    console.log(`[obsidian] Task file written: ${filename}`);
+    return filepath;
+  } catch (err) {
+    console.error("[obsidian] Error writing task file:", err);
+    return null;
+  }
+}
+
+function updateObsidianTaskStatus(chamadoId: number, newStatus: string) {
+  try {
+    if (!fs.existsSync(OBSIDIAN_TASKS_DIR)) return;
+
+    const files = fs.readdirSync(OBSIDIAN_TASKS_DIR);
+    const taskFile = files.find((f) => f.startsWith(`TASK-${chamadoId}-`));
+    if (!taskFile) return;
+
+    const filepath = path.join(OBSIDIAN_TASKS_DIR, taskFile);
+    let content = fs.readFileSync(filepath, "utf-8");
+
+    content = content.replace(/^status: ".*"$/m, `status: "${newStatus}"`);
+    const hoje = new Date().toISOString().split("T")[0];
+    content = content.replace(/^atualizado: .*$/m, `atualizado: ${hoje}`);
+
+    fs.writeFileSync(filepath, content, "utf-8");
+    console.log(`[obsidian] Task status updated: ${taskFile} -> ${newStatus}`);
+  } catch (err) {
+    console.error("[obsidian] Error updating task status:", err);
+  }
+}
 
 export function registerChamadosRoutes(app: Express) {
+  // Run migration for detalhes column
+  db.execute(sql`ALTER TABLE cortex_core.chamados ADD COLUMN IF NOT EXISTS detalhes JSONB`)
+    .then(() => console.log("[chamados] detalhes column ensured"))
+    .catch((err: any) => console.error("[chamados] migration error:", err));
+
   // ============================================
   // Chamados CRUD
   // ============================================
@@ -157,7 +272,7 @@ export function registerChamadosRoutes(app: Express) {
     try {
       if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
       const user = req.user as any;
-      const { titulo, descricao, area, categoria, prioridade, cliente_cnpj, cliente_nome } = req.body;
+      const { titulo, descricao, area, categoria, prioridade, cliente_cnpj, cliente_nome, detalhes } = req.body;
 
       if (!titulo || !descricao || !area) {
         return res.status(400).json({ message: "Título, descrição e área são obrigatórios" });
@@ -182,13 +297,22 @@ export function registerChamadosRoutes(app: Express) {
       const respEmail = isCortex ? 'warleyreserva4@gmail.com' : null;
       const autoStatus = isCortex ? 'triagem' : 'aberto';
 
+      const detalhesJson = detalhes ? JSON.stringify(detalhes) : null;
+
       const result = await db.execute(sql`
-        INSERT INTO cortex_core.chamados (titulo, descricao, area, categoria, prioridade, solicitante_id, solicitante_nome, solicitante_email, solicitante_squad, cliente_cnpj, cliente_nome, responsavel_id, responsavel_nome, responsavel_email, status)
-        VALUES (${titulo}, ${descricao}, ${area}, ${categoria || null}, ${prioridade || 'media'}, ${user.googleId || user.id}, ${user.name}, ${user.email}, ${squad}, ${cliente_cnpj || null}, ${cliente_nome || null}, ${respId}, ${respNome}, ${respEmail}, ${autoStatus})
+        INSERT INTO cortex_core.chamados (titulo, descricao, area, categoria, prioridade, solicitante_id, solicitante_nome, solicitante_email, solicitante_squad, cliente_cnpj, cliente_nome, responsavel_id, responsavel_nome, responsavel_email, status, detalhes)
+        VALUES (${titulo}, ${descricao}, ${area}, ${categoria || null}, ${prioridade || 'media'}, ${user.googleId || user.id}, ${user.name}, ${user.email}, ${squad}, ${cliente_cnpj || null}, ${cliente_nome || null}, ${respId}, ${respNome}, ${respEmail}, ${autoStatus}, ${detalhesJson}::jsonb)
         RETURNING *
       `);
 
-      res.status(201).json(result.rows[0]);
+      const chamado = result.rows[0] as any;
+
+      // Write Obsidian task file for Cortex chamados
+      if (isCortex) {
+        writeObsidianTask(chamado);
+      }
+
+      res.status(201).json(chamado);
     } catch (error) {
       console.error("[chamados] Error creating:", error);
       res.status(500).json({ message: "Erro ao criar chamado" });
@@ -226,7 +350,15 @@ export function registerChamadosRoutes(app: Express) {
       `);
 
       if (result.rows.length === 0) return res.status(404).json({ message: "Chamado não encontrado" });
-      res.json(result.rows[0]);
+
+      const chamado = result.rows[0] as any;
+
+      // Sync Obsidian task status for Cortex chamados
+      if (status && chamado.area === 'cortex') {
+        updateObsidianTaskStatus(id, status);
+      }
+
+      res.json(chamado);
     } catch (error) {
       console.error("[chamados] Error updating:", error);
       res.status(500).json({ message: "Erro ao atualizar chamado" });

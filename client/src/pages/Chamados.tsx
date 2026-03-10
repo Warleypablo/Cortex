@@ -428,6 +428,51 @@ function ListView({ chamados, onSelect }: { chamados: Chamado[]; onSelect: (c: C
 }
 
 // ============================================
+// Cortex Category Fields Config
+// ============================================
+interface CortexField {
+  key: string;
+  label: string;
+  type: "input" | "textarea" | "select";
+  required: boolean;
+  placeholder?: string;
+  options?: string[];
+}
+
+const CORTEX_CATEGORY_FIELDS: Record<string, CortexField[]> = {
+  Bug: [
+    { key: "pagina_url", label: "Pagina/URL afetada", type: "input", required: true, placeholder: "Ex: /financeiro/inadimplencia" },
+    { key: "passos_reproduzir", label: "Passos para reproduzir", type: "textarea", required: true, placeholder: "1. Acessar a pagina...\n2. Clicar em...\n3. Observar que..." },
+    { key: "comportamento_esperado", label: "Comportamento esperado", type: "textarea", required: true, placeholder: "O que deveria acontecer?" },
+    { key: "comportamento_atual", label: "Comportamento atual", type: "textarea", required: true, placeholder: "O que esta acontecendo de errado?" },
+  ],
+  "Nova Feature": [
+    { key: "user_story", label: "Objetivo / User Story", type: "textarea", required: true, placeholder: "Como [perfil], quero [acao], para [beneficio]" },
+    { key: "criterios_aceite", label: "Criterios de aceite", type: "textarea", required: true, placeholder: "- [ ] Criterio 1\n- [ ] Criterio 2" },
+    { key: "paginas_componentes", label: "Paginas/componentes afetados", type: "input", required: false, placeholder: "Ex: Dashboard, Sidebar" },
+  ],
+  Melhoria: [
+    { key: "comportamento_atual", label: "Comportamento atual", type: "textarea", required: true, placeholder: "Como funciona hoje?" },
+    { key: "melhoria_desejada", label: "Melhoria desejada", type: "textarea", required: true, placeholder: "Como deveria funcionar?" },
+    { key: "paginas_componentes", label: "Paginas/componentes afetados", type: "input", required: false, placeholder: "Ex: Tabela de clientes" },
+  ],
+  "Relatorio / Dashboard": [
+    { key: "fonte_dados", label: "Fonte de dados", type: "input", required: true, placeholder: "Tabela ou API (ex: caz_parcelas)" },
+    { key: "metricas_campos", label: "Metricas/campos necessarios", type: "textarea", required: true, placeholder: "Quais dados precisam aparecer?" },
+    { key: "tipo_visualizacao", label: "Tipo de visualizacao", type: "select", required: true, options: ["Tabela", "Grafico de barras", "Grafico de linha", "Card KPI", "Outro"] },
+  ],
+  "Integracao": [
+    { key: "sistema_externo", label: "Sistema externo", type: "input", required: true, placeholder: "Ex: Conta Azul, ClickUp" },
+    { key: "tipo_integracao", label: "Tipo", type: "select", required: true, options: ["API REST", "Webhook", "Banco de dados", "Arquivo/CSV"] },
+    { key: "direcao", label: "Direcao", type: "select", required: true, options: ["Entrada", "Saida", "Bidirecional"] },
+    { key: "detalhes_integracao", label: "Detalhes da integracao", type: "textarea", required: true, placeholder: "Descreva o fluxo de dados desejado" },
+  ],
+  Outros: [
+    { key: "detalhes_adicionais", label: "Detalhes adicionais", type: "textarea", required: true, placeholder: "Descreva com o maximo de detalhes possivel" },
+  ],
+};
+
+// ============================================
 // Create Dialog
 // ============================================
 function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -440,6 +485,10 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
   const [clienteCnpj, setClienteCnpj] = useState("");
   const [clienteNome, setClienteNome] = useState("");
   const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
+  const [detalhes, setDetalhes] = useState<Record<string, string>>({});
+
+  const isCortex = area === "cortex";
+  const cortexFields = isCortex ? (CORTEX_CATEGORY_FIELDS[categoria] || []) : [];
 
   const { data: categoriasData } = useQuery<{ fieldType: string; options: { id: number; value: string; label: string }[] }>({
     queryKey: [`/api/system-fields/chamado_cat_${area}`],
@@ -452,12 +501,21 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
     enabled: area === "financeiro",
   });
 
+  function updateDetalhe(key: string, value: string) {
+    setDetalhes((prev) => ({ ...prev, [key]: value }));
+  }
+
+  const cortexFieldsMissing = isCortex && categoria
+    ? cortexFields.filter((f) => f.required && !detalhes[f.key]?.trim()).length > 0
+    : false;
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/chamados", {
         titulo, descricao, area, categoria: categoria || null, prioridade,
         cliente_cnpj: area === "financeiro" ? (clienteCnpj || null) : null,
         cliente_nome: area === "financeiro" ? (clienteNome || null) : null,
+        detalhes: isCortex && Object.keys(detalhes).length > 0 ? detalhes : undefined,
       });
       return res.json();
     },
@@ -481,38 +539,40 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
     setPrioridade("media");
     setClienteCnpj("");
     setClienteNome("");
+    setDetalhes({});
   }
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-[520px] bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800" onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-[560px] max-h-[90vh] bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="text-gray-900 dark:text-white">Novo Chamado</DialogTitle>
         </DialogHeader>
+        <ScrollArea className="max-h-[65vh] pr-3">
         <div className="space-y-4 py-2">
           <div>
-            <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">Título</label>
+            <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">Titulo</label>
             <Input
               value={titulo}
               onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Resumo da solicitação"
+              placeholder="Resumo da solicitacao"
               className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">Descrição</label>
+            <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">Descricao</label>
             <Textarea
               value={descricao}
               onChange={(e) => setDescricao(e.target.value)}
-              placeholder="Descreva em detalhes a sua solicitação..."
-              rows={4}
+              placeholder="Descreva em detalhes a sua solicitacao..."
+              rows={3}
               className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">Área</label>
-              <Select value={area} onValueChange={(v) => { setArea(v); setCategoria(""); setClienteCnpj(""); setClienteNome(""); }}>
+              <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">Area</label>
+              <Select value={area} onValueChange={(v) => { setArea(v); setCategoria(""); setClienteCnpj(""); setClienteNome(""); setDetalhes({}); }}>
                 <SelectTrigger className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -525,9 +585,9 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
             </div>
             <div>
               <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">Categoria</label>
-              <Select value={categoria} onValueChange={setCategoria} disabled={!area || categorias.length === 0}>
+              <Select value={categoria} onValueChange={(v) => { setCategoria(v); setDetalhes({}); }} disabled={!area || categorias.length === 0}>
                 <SelectTrigger className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
-                  <SelectValue placeholder={area ? "Selecione" : "Selecione área"} />
+                  <SelectValue placeholder={area ? "Selecione" : "Selecione area"} />
                 </SelectTrigger>
                 <SelectContent>
                   {categorias.map((c) => (
@@ -537,6 +597,52 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
               </Select>
             </div>
           </div>
+
+          {/* Cortex: Dynamic category fields */}
+          {isCortex && categoria && cortexFields.length > 0 && (
+            <div className="space-y-3 p-3 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20">
+              <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">
+                Detalhes - {categoria}
+              </p>
+              {cortexFields.map((field) => (
+                <div key={field.key}>
+                  <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">
+                    {field.label} {field.required && <span className="text-red-500">*</span>}
+                  </label>
+                  {field.type === "input" && (
+                    <Input
+                      value={detalhes[field.key] || ""}
+                      onChange={(e) => updateDetalhe(field.key, e.target.value)}
+                      placeholder={field.placeholder}
+                      className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+                    />
+                  )}
+                  {field.type === "textarea" && (
+                    <Textarea
+                      value={detalhes[field.key] || ""}
+                      onChange={(e) => updateDetalhe(field.key, e.target.value)}
+                      placeholder={field.placeholder}
+                      rows={3}
+                      className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+                    />
+                  )}
+                  {field.type === "select" && field.options && (
+                    <Select value={detalhes[field.key] || ""} onValueChange={(v) => updateDetalhe(field.key, v)}>
+                      <SelectTrigger className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {field.options.map((opt) => (
+                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {area === "financeiro" && (
             <div>
               <label className="text-xs font-medium text-gray-600 dark:text-zinc-400 mb-1 block">
@@ -601,11 +707,12 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
             </Select>
           </div>
         </div>
+        </ScrollArea>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             onClick={() => createMutation.mutate()}
-            disabled={!titulo || !descricao || !area || createMutation.isPending}
+            disabled={!titulo || !descricao || !area || cortexFieldsMissing || createMutation.isPending}
           >
             {createMutation.isPending ? "Criando..." : "Criar Chamado"}
           </Button>
