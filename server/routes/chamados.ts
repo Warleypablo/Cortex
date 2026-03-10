@@ -178,7 +178,8 @@ async function syncObsidianToDb(): Promise<number> {
 
       // Check if DB status differs
       const result = await db.execute(sql`
-        SELECT status FROM cortex_core.chamados WHERE id = ${chamadoId} AND area = 'cortex'
+        SELECT status, titulo, solicitante_nome, solicitante_email
+        FROM cortex_core.chamados WHERE id = ${chamadoId} AND area = 'cortex'
       `);
       const row = result.rows[0] as any;
       if (!row || row.status === dbStatus) continue;
@@ -191,6 +192,22 @@ async function syncObsidianToDb(): Promise<number> {
           SET status = ${dbStatus}, atualizado_em = ${now}, resolvido_em = ${now}
           WHERE id = ${chamadoId}
         `);
+        // Notify solicitante
+        try {
+          await storage.createNotification({
+            type: 'chamado_resolvido',
+            title: `Chamado resolvido: ${row.titulo}`,
+            message: `Seu chamado #${chamadoId} "${row.titulo}" foi resolvido.`,
+            entityId: String(chamadoId),
+            entityType: 'chamado',
+            priority: 'medium',
+            read: false,
+            dismissed: false,
+            uniqueKey: `chamado-resolvido-${chamadoId}`,
+          });
+        } catch (err) {
+          console.error("[obsidian→db] Error creating notification:", err);
+        }
       } else {
         await db.execute(sql`
           UPDATE cortex_core.chamados
@@ -228,11 +245,86 @@ function startObsidianPeriodicSync() {
   console.log(`[obsidian] Periodic bidirectional sync started (every ${OBSIDIAN_SYNC_INTERVAL / 1000}s)`);
 }
 
+// ============================================
+// ClickUp Integration (Growth tasks)
+// ============================================
+const CLICKUP_API_KEY = process.env.CLICKUP_API_KEY;
+const CLICKUP_GROWTH_LIST_ID = process.env.CLICKUP_GROWTH_LIST_ID || "199117634";
+
+const CLICKUP_PRIORITY_MAP: Record<string, number> = {
+  urgente: 1,
+  alta: 2,
+  media: 3,
+  baixa: 4,
+};
+
+async function createClickUpTask(chamado: Record<string, any>): Promise<string | null> {
+  if (!CLICKUP_API_KEY) {
+    console.warn("[clickup] API key not configured, skipping sync");
+    return null;
+  }
+
+  try {
+    const detalhes = typeof chamado.detalhes === "string"
+      ? JSON.parse(chamado.detalhes)
+      : chamado.detalhes || {};
+
+    const deadlineStr = detalhes.deadline;
+    const deadlineMs = deadlineStr ? new Date(deadlineStr).getTime() : undefined;
+
+    const description = [
+      chamado.descricao,
+      "",
+      `**Solicitante:** ${chamado.solicitante_nome} (${chamado.solicitante_email})`,
+      chamado.solicitante_squad ? `**Squad:** ${chamado.solicitante_squad}` : null,
+      `**Categoria:** ${chamado.categoria || "N/A"}`,
+      `**Prioridade:** ${chamado.prioridade}`,
+      deadlineStr ? `**Deadline:** ${deadlineStr}` : null,
+      "",
+      `_Criado via Cortex (chamado #${chamado.id})_`,
+    ].filter(Boolean).join("\n");
+
+    const body: Record<string, any> = {
+      name: chamado.titulo,
+      description,
+      priority: CLICKUP_PRIORITY_MAP[chamado.prioridade] ?? 3,
+      tags: [chamado.categoria || "growth"].map((t: string) => t.toLowerCase()),
+    };
+    if (deadlineMs) body.due_date = deadlineMs;
+
+    const response = await fetch(
+      `https://api.clickup.com/api/v2/list/${CLICKUP_GROWTH_LIST_ID}/task`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: CLICKUP_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("[clickup] Error creating task:", response.status, err);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log(`[clickup] Task created: ${data.id} — ${data.url}`);
+    return data.id;
+  } catch (error) {
+    console.error("[clickup] Error:", error);
+    return null;
+  }
+}
+
 export function registerChamadosRoutes(app: Express) {
   // Run migration, then bidirectional sync + start periodic
   db.execute(sql`ALTER TABLE cortex_core.chamados ADD COLUMN IF NOT EXISTS detalhes JSONB`)
+    .then(() => db.execute(sql`ALTER TABLE cortex_core.chamados ADD COLUMN IF NOT EXISTS clickup_task_id TEXT`))
     .then(async () => {
-      console.log("[chamados] detalhes column ensured");
+      console.log("[chamados] columns ensured (detalhes, clickup_task_id)");
       await backfillObsidianTasks();
       await syncObsidianToDb();
       startObsidianPeriodicSync();
@@ -285,6 +377,8 @@ export function registerChamadosRoutes(app: Express) {
           'Operação': 'operacao',
           'Operações': 'operacao',
           'Comercial': 'comercial',
+          'Growth': 'growth',
+          'Marketing': 'growth',
           'Cortex': 'cortex',
         };
         const mappedArea = deptAreaMap[dept] || dept.toLowerCase();
@@ -445,6 +539,15 @@ export function registerChamadosRoutes(app: Express) {
       // Write Obsidian task file for Cortex chamados
       if (isCortex) {
         writeObsidianTask(chamado);
+      }
+
+      // Sync Growth chamados to ClickUp
+      if (area === 'growth') {
+        const clickupId = await createClickUpTask(chamado);
+        if (clickupId) {
+          await db.execute(sql`UPDATE cortex_core.chamados SET clickup_task_id = ${clickupId} WHERE id = ${chamado.id}`);
+          chamado.clickup_task_id = clickupId;
+        }
       }
 
       res.status(201).json(chamado);
