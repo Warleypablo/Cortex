@@ -167,6 +167,7 @@ async function syncObsidianToDb(): Promise<number> {
       const statusMap: Record<string, string> = {
         concluido: "resolvido",
         resolvido: "resolvido",
+        review: "review",
         fechado: "fechado",
         em_andamento: "em_andamento",
         "em-andamento": "em_andamento",
@@ -572,7 +573,7 @@ export function registerChamadosRoutes(app: Express) {
         setClauses.push(sql`status = ${status}`);
         if (status === 'resolvido') setClauses.push(sql`resolvido_em = NOW()`);
         if (status === 'fechado') setClauses.push(sql`fechado_em = NOW()`);
-        if (status === 'em_andamento') {
+        if (status === 'em_andamento' || status === 'review') {
           setClauses.push(sql`resolvido_em = NULL`);
           setClauses.push(sql`fechado_em = NULL`);
         }
