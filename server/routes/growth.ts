@@ -243,17 +243,18 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                                  columns.includes('segments_date') ? 'segments_date' : null;
               
               if (dateColumn && columns.includes('cost_micros')) {
-                // Query com dados já validados (dateRegex garante formato seguro)
+                // JOIN with campaigns table to get campaign_id and name
                 const googleResult = await db.execute(sql`
-                  SELECT 
-                    campaign_id,
-                    campaign_name,
-                    COALESCE(SUM(cost_micros::numeric) / 1000000.0, 0) as investimento,
-                    COALESCE(SUM(impressions::numeric), 0) as impressions,
-                    COALESCE(SUM(clicks::numeric), 0) as clicks
-                  FROM google_ads.campaign_daily_metrics
-                  WHERE ${sql.raw(dateColumn)} >= ${startDate}::date AND ${sql.raw(dateColumn)} <= ${endDate}::date
-                  GROUP BY campaign_id, campaign_name
+                  SELECT
+                    c.campaign_id,
+                    c.name as campaign_name,
+                    COALESCE(SUM(m.cost_micros::numeric) / 1000000.0, 0) as investimento,
+                    COALESCE(SUM(m.impressions::numeric), 0) as impressions,
+                    COALESCE(SUM(m.clicks::numeric), 0) as clicks
+                  FROM google_ads.campaign_daily_metrics m
+                  JOIN google_ads.campaigns c ON m.campaign_key = c.campaign_key
+                  WHERE m.${sql.raw(dateColumn)} >= ${startDate}::date AND m.${sql.raw(dateColumn)} <= ${endDate}::date
+                  GROUP BY c.campaign_id, c.name
                 `);
                 googleData = googleResult.rows as any[];
               }
