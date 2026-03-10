@@ -202,7 +202,46 @@ app.use((req, res, next) => {
   
   // Executar snapshot na inicialização
   setTimeout(() => createDailySnapshot(), 5000);
-  
+
+  // Meta Ads auto-sync a cada 6 horas
+  const META_SYNC_INTERVAL = 6 * 60 * 60 * 1000; // 6h
+  const runMetaSync = async () => {
+    try {
+      console.log("[meta-sync-job] Starting scheduled Meta Ads sync...");
+      const { syncMetaAds } = await import("./services/metaAdsSync");
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        host: process.env.DATABASE_HOST || "***REMOVED***",
+        port: 5432,
+        database: "dados_turbo",
+        user: "postgres",
+        password: process.env.DATABASE_PASSWORD || "***REMOVED***",
+        ssl: false,
+      });
+      const result = await syncMetaAds(pool, { since: undefined, until: undefined });
+      await pool.end();
+      // Store last sync result globally
+      (globalThis as any).__metaSyncStatus = {
+        lastSync: new Date().toISOString(),
+        result,
+        status: result.errors.length === 0 ? "success" : "partial",
+      };
+      console.log(`[meta-sync-job] Sync complete: ${result.campaigns} campaigns, ${result.ads} ads, ${result.insights} insights`);
+    } catch (err: any) {
+      console.error("[meta-sync-job] Sync failed:", err.message);
+      (globalThis as any).__metaSyncStatus = {
+        lastSync: new Date().toISOString(),
+        result: null,
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  // First sync 30s after startup, then every 6 hours
+  setTimeout(() => runMetaSync(), 30000);
+  setInterval(() => runMetaSync(), META_SYNC_INTERVAL);
+  console.log(`[meta-sync-job] Scheduled every ${META_SYNC_INTERVAL / 3600000}h`);
+
   // Agendar snapshot diário às 00:05
   const scheduleNextSnapshot = () => {
     const now = new Date();
