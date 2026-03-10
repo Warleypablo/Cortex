@@ -8134,8 +8134,16 @@ export class DbStorage implements IStorage {
   }
 
   async getTechAllProjetos(tipo: 'abertos' | 'fechados', responsavel?: string, tipoP?: string): Promise<TechProjetoDetalhe[]> {
+    const alphanumericPattern = /^[a-zA-ZÀ-ú0-9\s\-_.\/]+$/;
+    if (responsavel && !alphanumericPattern.test(responsavel)) {
+      throw new Error('Invalid responsavel filter');
+    }
+    if (tipoP && !alphanumericPattern.test(tipoP)) {
+      throw new Error('Invalid tipo filter');
+    }
+
     const table = tipo === 'abertos' ? '"Clickup".cup_projetos_tech' : '"Clickup".cup_projetos_tech_fechados';
-    
+
     let whereConditions: string[] = [];
     if (responsavel) {
       whereConditions.push(`responsavel = '${responsavel.replace(/'/g, "''")}'`);
@@ -8903,6 +8911,20 @@ export class DbStorage implements IStorage {
       orderByClause = 'COALESCE(cliente_info.nome_clickup, caz.nome_caz) ASC';
     }
     
+    const alphanumericPattern = /^[a-zA-ZÀ-ú0-9\s\-_.\/]+$/;
+    if (filtroVendedor && !alphanumericPattern.test(filtroVendedor)) {
+      throw new Error('Invalid vendedor filter');
+    }
+    if (filtroSquad && !alphanumericPattern.test(filtroSquad)) {
+      throw new Error('Invalid squad filter');
+    }
+    if (filtroResponsavel && !alphanumericPattern.test(filtroResponsavel)) {
+      throw new Error('Invalid responsavel filter');
+    }
+    if (filtroProduto && !alphanumericPattern.test(filtroProduto)) {
+      throw new Error('Invalid produto filter');
+    }
+
     let filtroWhere = '';
     if (filtroVendedor) {
       const vendedorSafe = filtroVendedor.replace(/'/g, "''");

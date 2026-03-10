@@ -20,12 +20,17 @@ async function importAssinafy() {
     console.log('[assinafy] Table created');
 
     // Insert data
+    const accountId = process.env.ASSINAFY_ACCOUNT_ID;
+    const apiKey = process.env.ASSINAFY_API_KEY;
+    if (!accountId || !apiKey) {
+      throw new Error('ASSINAFY_ACCOUNT_ID and ASSINAFY_API_KEY environment variables are required');
+    }
     await db.execute(sql`
       INSERT INTO cortex_core.assinafy_config (id, account_id, api_key, api_url, webhook_url, webhook_secret, ativo, data_cadastro, data_atualizacao)
       VALUES (
         1,
-        '***REMOVED***',
-        '***REMOVED***',
+        ${accountId},
+        ${apiKey},
         'https://api.assinafy.com.br/v1',
         'https://contratos.turbopartners.com.br/api/assinafy_webhook.php',
         NULL,
