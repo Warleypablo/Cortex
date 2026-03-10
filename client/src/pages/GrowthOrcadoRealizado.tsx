@@ -126,6 +126,11 @@ const DEFAULT_ORCADO_ADS = {
   cliquesSaida: 8595,
   cpm: 100,
   visualizacaoPagina: 7306,
+  leads: 0,
+  mqls: 0,
+  cpl: 0,
+  cpmql: 0,
+  percMqls: 0,
 };
 
 // Mapeamento de metric.id → segmento/chave no banco de budgets
@@ -168,12 +173,17 @@ const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   cliques_saida: { segment: 'ads', key: 'cliquesSaida' },
   visualizacao_pagina: { segment: 'ads', key: 'visualizacaoPagina' },
   cps: { segment: 'ads', key: 'cps' },
+  leads: { segment: 'ads', key: 'leads' },
+  mqls: { segment: 'ads', key: 'mqls' },
+  cpl: { segment: 'ads', key: 'cpl' },
+  cpmql: { segment: 'ads', key: 'cpmql' },
+  perc_mqls: { segment: 'ads', key: 'percMqls' },
 };
 
 const PERCENT_METRICS = new Set([
   'mql_ra_perc', 'mql_noshow', 'mql_taxa_vendas', 'mql_tx_recorrente', 'mql_tx_implantacao',
   'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas', 'nmql_tx_recorrente', 'nmql_tx_implantacao',
-  'ctr',
+  'ctr', 'perc_mqls',
 ]);
 
 export default function GrowthOrcadoRealizado() {
@@ -387,12 +397,17 @@ export default function GrowthOrcadoRealizado() {
     ctr: number;
     cps: number;
     visualizacaoPagina: number | null;
+    leads: number;
+    mqls: number;
+    cpl: number;
+    cpmql: number;
+    percMqls: number;
   }
 
   const { data: adsData, isLoading: adsLoading } = useQuery<AdsMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/ads', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/growth/orcado-realizado/ads', dateRange.startDate, dateRange.endDate, selectedFunis],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${funilParam}`);
       if (!res.ok) throw new Error('Failed to fetch Ads metrics');
       return res.json();
     },
@@ -547,6 +562,11 @@ export default function GrowthOrcadoRealizado() {
       { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: ORCADO_ADS.cliquesSaida, realizado: data.cliquesSaida ?? 0, percentual: calcPercentual(ORCADO_ADS.cliquesSaida, data.cliquesSaida), format: 'number' },
       { id: 'visualizacao_pagina', name: 'Visualização de Página', type: 'formula', orcado: ORCADO_ADS.visualizacaoPagina, realizado: data.visualizacaoPagina ?? null, percentual: calcPercentual(ORCADO_ADS.visualizacaoPagina, data.visualizacaoPagina), format: 'number' },
       { id: 'cps', name: 'CPS', type: 'formula', orcado: ORCADO_ADS.cps, realizado: data.cps ?? null, percentual: calcPercentual(ORCADO_ADS.cps, data.cps), format: 'currency' },
+      { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
+      { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },
+      { id: 'cpl', name: 'CPL', type: 'formula', orcado: ORCADO_ADS.cpl, realizado: data.cpl ?? null, percentual: calcPercentual(ORCADO_ADS.cpl, data.cpl), format: 'currency' },
+      { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: ORCADO_ADS.cpmql, realizado: data.cpmql ?? null, percentual: calcPercentual(ORCADO_ADS.cpmql, data.cpmql), format: 'currency' },
+      { id: 'perc_mqls', name: '% MQLs', type: 'formula', orcado: ORCADO_ADS.percMqls, realizado: data.percMqls ?? null, percentual: calcPercentual(ORCADO_ADS.percMqls, data.percMqls), format: 'percent' },
     ];
   }, [adsData, ORCADO_ADS]);
 
