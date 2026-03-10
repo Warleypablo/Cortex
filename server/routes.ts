@@ -6495,6 +6495,55 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
+  // Google Ads Keywords Sync endpoint
+  app.post("/api/google-ads/sync-keywords", async (req, res) => {
+    try {
+      const { since, until } = req.body || {};
+      const { syncGoogleAdsKeywords } = await import("./services/googleAdsSync");
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        host: process.env.DATABASE_HOST || "***REMOVED***",
+        port: 5432,
+        database: "dados_turbo",
+        user: "postgres",
+        password: process.env.DATABASE_PASSWORD || "***REMOVED***",
+        ssl: false,
+      });
+      const result = await syncGoogleAdsKeywords(pool, { since, until });
+      await pool.end();
+      (globalThis as any).__googleAdsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        result,
+        status: result.errors.length === 0 ? "success" : "partial",
+      };
+      res.json(result);
+    } catch (error: any) {
+      console.error("[api] Error syncing Google Ads keywords:", error);
+      res.status(500).json({ error: error.message || "Failed to sync Google Ads keywords" });
+    }
+  });
+
+  // Google Ads Sync status
+  app.get("/api/google-ads/sync-status", async (_req, res) => {
+    try {
+      const syncStatus = (globalThis as any).__googleAdsSyncStatus || null;
+      const lastKeyword = await db.execute(sql`
+        SELECT MAX(updated_at) as last_update FROM google_ads.keywords
+      `);
+      const lastUpdate = (lastKeyword.rows[0] as any)?.last_update || null;
+      res.json({
+        scheduler: { interval: "12h", active: true },
+        lastSync: syncStatus?.lastSync || null,
+        lastSyncStatus: syncStatus?.status || "unknown",
+        lastSyncResult: syncStatus?.result || null,
+        lastKeywordUpdate: lastUpdate,
+      });
+    } catch (error: any) {
+      console.error("[api] Error fetching Google Ads sync status:", error);
+      res.status(500).json({ error: "Failed to fetch sync status" });
+    }
+  });
+
   // Recruitment Analytics API Routes (Power BI style G&G Dashboard)
   app.get("/api/recrutamento/kpis", async (req, res) => {
     try {

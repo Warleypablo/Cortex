@@ -242,6 +242,44 @@ app.use((req, res, next) => {
   setInterval(() => runMetaSync(), META_SYNC_INTERVAL);
   console.log(`[meta-sync-job] Scheduled every ${META_SYNC_INTERVAL / 3600000}h`);
 
+  // Google Ads keywords sync a cada 12 horas
+  const GOOGLE_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
+  const runGoogleAdsSync = async () => {
+    try {
+      console.log("[google-ads-sync-job] Starting scheduled Google Ads keywords sync...");
+      const { syncGoogleAdsKeywords } = await import("./services/googleAdsSync");
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        host: process.env.DATABASE_HOST || "***REMOVED***",
+        port: 5432,
+        database: "dados_turbo",
+        user: "postgres",
+        password: process.env.DATABASE_PASSWORD || "***REMOVED***",
+        ssl: false,
+      });
+      const result = await syncGoogleAdsKeywords(pool);
+      await pool.end();
+      (globalThis as any).__googleAdsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        result,
+        status: result.errors.length === 0 ? "success" : "partial",
+      };
+      console.log(`[google-ads-sync-job] Sync complete: ${result.keywords} keywords, ${result.keywordMetrics} metric rows`);
+    } catch (err: any) {
+      console.error("[google-ads-sync-job] Sync failed:", err.message);
+      (globalThis as any).__googleAdsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        result: null,
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  // First sync 60s after startup, then every 12 hours
+  setTimeout(() => runGoogleAdsSync(), 60000);
+  setInterval(() => runGoogleAdsSync(), GOOGLE_ADS_SYNC_INTERVAL);
+  console.log(`[google-ads-sync-job] Scheduled every ${GOOGLE_ADS_SYNC_INTERVAL / 3600000}h`);
+
   // Agendar snapshot diário às 00:05
   const scheduleNextSnapshot = () => {
     const now = new Date();
