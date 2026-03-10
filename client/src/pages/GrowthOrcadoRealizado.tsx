@@ -826,6 +826,7 @@ export default function GrowthOrcadoRealizado() {
 
   // Métricas amarelas para a aba Consolidado (filtradas por seção)
   const YELLOW_METRIC_IDS = new Set([
+    'leads', 'mqls', 'cpl', 'cpmql', 'perc_mqls',
     'mql_noshow', 'mql_ticket_acel', 'mql_ticket_impl',
     'nmql_noshow', 'nmql_ticket_acel', 'nmql_ticket_impl',
     'total_cac_ads', 'total_ticket_acel', 'total_ticket_impl',
