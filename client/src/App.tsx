@@ -104,6 +104,7 @@ const Criativos = lazyWithRetry(() => import("@/pages/Criativos"));
 const GrowthOrcadoRealizado = lazyWithRetry(() => import("@/pages/GrowthOrcadoRealizado"));
 const GrowthVisaoGeral = lazyWithRetry(() => import("@/pages/GrowthVisaoGeral"));
 const PerformancePlataformas = lazyWithRetry(() => import("@/pages/PerformancePlataformas"));
+const KeywordPerformance = lazyWithRetry(() => import("@/pages/KeywordPerformance"));
 const RevenueGoals = lazyWithRetry(() => import("@/pages/RevenueGoals"));
 const CasesChat = lazyWithRetry(() => import("@/pages/CasesChat"));
 const JuridicoClientes = lazyWithRetry(() => import("@/pages/JuridicoClientes"));
@@ -334,6 +335,7 @@ function ProtectedRouter() {
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
       <Route path="/growth/criativos">{() => <ProtectedRoute path="/growth/criativos" component={Criativos} />}</Route>
       <Route path="/growth/performance-plataformas">{() => <ProtectedRoute path="/growth/performance-plataformas" component={PerformancePlataformas} />}</Route>
+      <Route path="/growth/keyword-performance">{() => <ProtectedRoute path="/growth/keyword-performance" component={KeywordPerformance} />}</Route>
       <Route path="/growth/orcado-realizado">{() => <ProtectedRoute path="/growth/orcado-realizado" component={GrowthOrcadoRealizado} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
       
