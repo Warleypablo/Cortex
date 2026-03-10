@@ -177,16 +177,15 @@ export function registerJuridicoRoutes(app: Express) {
       // Buscar nomes reais dos clientes históricos
       const nomesClientesHistoricos: Record<string, { nome: string; empresa: string }> = {};
       if (idsHistoricoNaoInadimplentes.length > 0) {
-        const escapedIds = idsHistoricoNaoInadimplentes.map(id => `'${id.replace(/'/g, "''")}'`).join(', ');
-        const nomesResult = await db.execute(sql.raw(`
+        const nomesResult = await db.execute(sql`
           SELECT DISTINCT ON (TRIM(ids::text))
             TRIM(ids::text) as id_cliente,
             nome,
             COALESCE(empresa, '') as empresa
           FROM "Conta Azul".caz_clientes
-          WHERE ids IS NOT NULL AND TRIM(ids::text) IN (${escapedIds})
+          WHERE ids IS NOT NULL AND TRIM(ids::text) = ANY(${idsHistoricoNaoInadimplentes})
           ORDER BY TRIM(ids::text)
-        `));
+        `);
         for (const row of nomesResult.rows as any[]) {
           nomesClientesHistoricos[row.id_cliente] = { nome: row.nome || '', empresa: row.empresa || '' };
         }
