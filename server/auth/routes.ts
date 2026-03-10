@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import type { User } from "./userDb";
 import { getCallbackURL } from "./config";
 import { isExternalEmailAllowed, createExternalUser, EXTERNAL_USER_ROUTES } from "./userDb";
+import { validateBody } from "../middleware/validate";
+import { externalLoginSchema, clientLoginSchema } from "../middleware/schemas";
 import { db } from "../db";
 import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos, arClientes, arMetricas, arCampanhas, arCanais, clientCredentials } from "../../shared/schema";
 import { eq, desc, sql, inArray, and, asc } from "drizzle-orm";
@@ -163,17 +165,8 @@ router.get("/api/user/profile", (req, res) => {
 });
 
 // Login externo para investidores (sem Google OAuth, com senha)
-router.post("/auth/external-login", async (req, res) => {
+router.post("/auth/external-login", validateBody(externalLoginSchema), async (req, res) => {
   const { email, password } = req.body;
-  
-  if (!email || typeof email !== 'string') {
-    return res.status(400).json({ message: "Email é obrigatório" });
-  }
-  
-  if (!password || typeof password !== 'string') {
-    return res.status(400).json({ message: "Senha é obrigatória" });
-  }
-  
   const normalizedEmail = email.toLowerCase().trim();
   
   // Verifica se o email está na lista de externos permitidos
@@ -236,16 +229,8 @@ function formatCnpj(cnpj: string): string {
   return `${c.slice(0,2)}.${c.slice(2,5)}.${c.slice(5,8)}/${c.slice(8,12)}-${c.slice(12,14)}`;
 }
 
-router.post("/auth/client-login", async (req, res) => {
+router.post("/auth/client-login", validateBody(clientLoginSchema), async (req, res) => {
   const { cnpj, password } = req.body;
-
-  if (!cnpj || typeof cnpj !== 'string') {
-    return res.status(400).json({ message: "CNPJ é obrigatório" });
-  }
-
-  if (!password || typeof password !== 'string') {
-    return res.status(400).json({ message: "Senha é obrigatória" });
-  }
 
   const raw = cleanCnpj(cnpj);
   if (raw.length !== 14 || !/^\d{14}$/.test(raw)) {
