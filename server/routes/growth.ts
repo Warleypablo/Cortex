@@ -1413,6 +1413,37 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  app.post("/api/growth/orcado-realizado/budgets/copy", async (req, res) => {
+    try {
+      const { mesOrigem, mesDestino } = req.body;
+      if (!mesOrigem || !mesDestino) {
+        return res.status(400).json({ error: "mesOrigem and mesDestino are required (YYYY-MM)" });
+      }
+      if (mesOrigem === mesDestino) {
+        return res.status(400).json({ error: "mesOrigem and mesDestino must be different" });
+      }
+      const source = await db.execute(sql`
+        SELECT segmento, metricas FROM meta_ads.growth_budgets WHERE mes = ${mesOrigem}
+      `);
+      if ((source.rows as any[]).length === 0) {
+        return res.status(404).json({ error: `No budgets found for ${mesOrigem}` });
+      }
+      for (const row of source.rows as any[]) {
+        await db.execute(sql`
+          INSERT INTO meta_ads.growth_budgets (mes, segmento, metricas)
+          VALUES (${mesDestino}, ${row.segmento}, ${JSON.stringify(row.metricas)}::jsonb)
+          ON CONFLICT (mes, segmento) DO UPDATE SET
+            metricas = ${JSON.stringify(row.metricas)}::jsonb,
+            updated_at = NOW()
+        `);
+      }
+      res.json({ copied: (source.rows as any[]).length, from: mesOrigem, to: mesDestino });
+    } catch (error) {
+      console.error("[api] Error copying budgets:", error);
+      res.status(500).json({ error: "Failed to copy budgets" });
+    }
+  });
+
   // Growth - Orçado x Realizado - Categorias distintas de crm_deal
   app.get("/api/growth/orcado-realizado/categories", async (req, res) => {
     try {
