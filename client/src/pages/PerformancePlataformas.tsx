@@ -48,6 +48,8 @@ interface PerformanceNode {
   clientesUnicos: number;
   percRrCliente: number | null;
   cacUnico: number | null;
+  roas: number | null;
+  conversionRate: number | null;
 }
 
 
@@ -226,6 +228,8 @@ export default function PerformancePlataformas() {
         <td className="p-2 text-right">{formatNumber(node.clientesUnicos)}</td>
         <td className="p-2 text-right">{formatPercent(node.percRrCliente)}</td>
         <td className={`p-2 text-right ${getCellClassName('cacUnico', node.cacUnico)}`}>{formatCurrency(node.cacUnico)}</td>
+        <td className="p-2 text-right font-medium">{node.roas !== null ? `${node.roas.toFixed(2)}x` : '-'}</td>
+        <td className="p-2 text-right">{formatPercent(node.conversionRate)}</td>
       </tr>
     );
   };
@@ -354,6 +358,8 @@ export default function PerformancePlataformas() {
                     <th className="p-2 text-right min-w-[80px]">Clientes</th>
                     <th className="p-2 text-right min-w-[70px]">%RR/Cli</th>
                     <th className="p-2 text-right min-w-[80px]">CAC</th>
+                    <th className="p-2 text-right min-w-[70px]">ROAS</th>
+                    <th className="p-2 text-right min-w-[70px]">Conv%</th>
                   </tr>
                 </thead>
                 <tbody>
