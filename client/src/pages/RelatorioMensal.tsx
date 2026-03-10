@@ -165,7 +165,7 @@ export default function RelatorioMensal() {
       case 10: return <SlideRankingSquads ranking={data.rankingSquads} />;
       case 11: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
       case 12: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 13: return <SlideIndicacoes />;
+      case 13: return <SlideIndicacoes dados={data.indicacoes} mesLabel={data.mesDadosLabel} />;
       default: return null;
     }
   };

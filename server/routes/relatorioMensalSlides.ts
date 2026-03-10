@@ -49,6 +49,9 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         turboChurnResult,
         turboCxcsResult,
         turboFaturamentoResult,
+        turboRetencoesResult,
+        indicacoesResult,
+        pipelineBreakdownResult,
         receitaChurnResult,
         rankingSquadsResult,
         churnSquadsResult,
@@ -261,6 +264,47 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           WHERE data_vencimento >= ${dataStart}
             AND data_vencimento < ${dataEnd}
             AND tipo_evento = 'RECEITA'
+        `),
+
+        // 13b. Retenções CXCS (solicitações + retidos no mês de dados)
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int as solicitacoes_count,
+            COALESCE(SUM(valor_r), 0)::numeric as solicitacoes_valor,
+            COUNT(CASE WHEN reteve = 'Sim' THEN 1 END)::int as retencoes_count,
+            COALESCE(SUM(CASE WHEN reteve = 'Sim' THEN valor_r ELSE 0 END), 0)::numeric as retencoes_valor
+          FROM "Clickup".cup_churn
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= ${dataStart}
+            AND data_solicitacao_encerramento < ${dataEnd}
+        `),
+
+        // 13c. Indicações (source = RECOMMENDATION no mês de dados)
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int as indicacoes_recebidas,
+            COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)::int as contratos_fechados,
+            COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente::numeric ELSE 0 END), 0) as valor_recorrente,
+            COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual::numeric ELSE 0 END), 0) as valor_pontual
+          FROM "Bitrix".crm_deal
+          WHERE source = 'RECOMMENDATION'
+            AND data_fechamento >= ${dataStart}
+            AND data_fechamento < ${dataEnd}
+        `),
+
+        // 13d. Pipeline breakdown (Inbound/Outbound/Geral)
+        db.execute(sql`
+          SELECT
+            COALESCE(d.category_name, 'Outros') as pipeline,
+            COUNT(*)::int as contratos,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as receita_recorrente,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as receita_pontual
+          FROM "Bitrix".crm_deal d
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.data_fechamento >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}
+            AND d.data_fechamento < ${`${ano}-${String(mes).padStart(2, '0')}-01`}
+          GROUP BY d.category_name
+          ORDER BY receita_recorrente DESC
         `),
 
         // 14. Série mensal Receita x Churn (últimos 12 meses até mesDados, cross-year)
@@ -637,6 +681,23 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       const turboCxcs = (turboCxcsResult.rows as any[])[0] || {};
       const turboFat = (turboFaturamentoResult.rows as any[])[0] || {};
 
+      const turboRetencoes = (turboRetencoesResult.rows as any[])[0] || {};
+      const indicacoesRow = (indicacoesResult.rows as any[])[0] || {};
+
+      const pipelineBreakdown = (pipelineBreakdownResult.rows as any[]).map((row: any) => ({
+        pipeline: row.pipeline,
+        contratos: parseInt(row.contratos) || 0,
+        receitaRecorrente: parseFloat(row.receita_recorrente) || 0,
+        receitaPontual: parseFloat(row.receita_pontual) || 0,
+      }));
+
+      const indicacoes = {
+        indicacoesRecebidas: parseInt(indicacoesRow.indicacoes_recebidas) || 0,
+        contratosFechados: parseInt(indicacoesRow.contratos_fechados) || 0,
+        valorRecorrente: parseFloat(indicacoesRow.valor_recorrente) || 0,
+        valorPontual: parseFloat(indicacoesRow.valor_pontual) || 0,
+      };
+
       const mrrAdicionado = totalRecorrente; // from deals won this month
       const churnTarget = krs.find(kr => kr.metricKey === "churn_brl");
       const churnMetaMensal = churnTarget ? (churnTarget.targets[quarter] || 0) / 3 : 0;
@@ -675,6 +736,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         faturamentoPago: parseFloat(turboFat.faturamento_pago) || 0,
         churnMetaMensal,
         receitaChurnSeries,
+        retencoesSolicitacoesCount: parseInt(turboRetencoes.solicitacoes_count) || 0,
+        retencoesSolicitacoesValor: parseFloat(turboRetencoes.solicitacoes_valor) || 0,
+        retencoesCount: parseInt(turboRetencoes.retencoes_count) || 0,
+        retencoesValor: parseFloat(turboRetencoes.retencoes_valor) || 0,
       };
 
       // Build ranking squads
@@ -804,11 +869,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           receitaPontual: totalPontual,
           tmRecorrente: totalContratosRec > 0 ? totalRecorrente / totalContratosRec : 0,
           tmPontual: totalContratosPont > 0 ? totalPontual / totalContratosPont : 0,
+          pipelineBreakdown,
         },
         turboMetrics,
         rankingSquads,
         squadDetails,
         techData,
+        indicacoes,
       });
 
     } catch (error: any) {
