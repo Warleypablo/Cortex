@@ -1785,43 +1785,92 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     try {
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
-      
+
       if (!startDate || !endDate) {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
+      // Parse funilNgc filter
+      const funilNgcRaw = req.query.funilNgc as string | undefined;
+      const funilValues = funilNgcRaw
+        ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
+        : [];
+
+      // Build campaign filter (JOIN + WHERE) when funil is selected
+      const campaignJoin = funilValues.length > 0
+        ? sql`JOIN meta_ads.meta_campaigns mc ON mid.campaign_id = mc.campaign_id`
+        : sql``;
+
+      const campaignFilter = funilValues.length > 0
+        ? sql`AND (${sql.join(
+            funilValues.map(v => sql`mc.campaign_name ILIKE ${'%[' + v + ']%'}`),
+            sql` OR `
+          )})`
+        : sql``;
+
       // Query para buscar métricas de Meta Ads para Turbo Partners
       const result = await db.execute(sql`
         SELECT
-          COALESCE(SUM(spend), 0) as investimento,
-          COALESCE(SUM(impressions), 0) as impressoes,
-          COALESCE(SUM(clicks), 0) as cliques,
-          COALESCE(SUM(inline_link_clicks), 0) as cliques_saida,
-          CASE WHEN SUM(impressions) > 0 
-            THEN (SUM(spend)::numeric / SUM(impressions)::numeric * 1000)
-            ELSE 0 
+          COALESCE(SUM(mid.spend), 0) as investimento,
+          COALESCE(SUM(mid.impressions), 0) as impressoes,
+          COALESCE(SUM(mid.clicks), 0) as cliques,
+          COALESCE(SUM(mid.inline_link_clicks), 0) as cliques_saida,
+          CASE WHEN SUM(mid.impressions) > 0
+            THEN (SUM(mid.spend)::numeric / SUM(mid.impressions)::numeric * 1000)
+            ELSE 0
           END as cpm,
-          CASE WHEN SUM(impressions) > 0 
-            THEN (SUM(clicks)::numeric / SUM(impressions)::numeric)
-            ELSE 0 
+          CASE WHEN SUM(mid.impressions) > 0
+            THEN (SUM(mid.clicks)::numeric / SUM(mid.impressions)::numeric)
+            ELSE 0
           END as ctr
-        FROM meta_ads.meta_insights_daily
-        WHERE date_start >= ${startDate}::date 
-          AND date_start <= ${endDate}::date
-          AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+        FROM meta_ads.meta_insights_daily mid
+        ${campaignJoin}
+        WHERE mid.date_start >= ${startDate}::date
+          AND mid.date_start <= ${endDate}::date
+          AND mid.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+          ${campaignFilter}
       `);
 
       const row = result.rows[0] as any;
-      
+
       const investimento = parseFloat(row.investimento) || 0;
       const impressoes = parseInt(row.impressoes) || 0;
       const cliques = parseInt(row.cliques) || 0;
       const cliquesSaida = parseInt(row.cliques_saida) || 0;
       const cpm = parseFloat(row.cpm) || 0;
       const ctr = parseFloat(row.ctr) || 0;
-      
+
       // CPS = Custo por Clique de Saída
       const cps = cliquesSaida > 0 ? investimento / cliquesSaida : 0;
+
+      // Query Leads e MQLs do Bitrix (tráfego pago)
+      const funilFilter = funilValues.length > 0
+        ? sql`AND d.fnl_ngc IN (${sql.join(funilValues.map(v => sql`${v}`), sql`, `)})`
+        : sql``;
+
+      const leadsResult = await db.execute(sql`
+        SELECT
+          COUNT(*) as total_leads,
+          COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as total_mqls
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_criacao >= ${startDate}::date
+          AND d.data_criacao <= ${endDate}::date
+          AND (
+            LOWER(d.utm_source) LIKE '%facebook%' OR LOWER(d.utm_source) LIKE '%fb%'
+            OR LOWER(d.utm_source) LIKE '%meta%' OR LOWER(d.utm_source) = 'ig'
+            OR LOWER(d.utm_source) LIKE '%instagram%'
+            OR LOWER(d.utm_source) LIKE '%google%' OR LOWER(d.utm_source) LIKE '%adwords%'
+            OR LOWER(d.utm_source) = 'gads'
+          )
+          ${funilFilter}
+      `);
+
+      const leadsRow = leadsResult.rows[0] as any;
+      const leads = parseInt(leadsRow.total_leads) || 0;
+      const mqls = parseInt(leadsRow.total_mqls) || 0;
+      const cpl = leads > 0 ? investimento / leads : 0;
+      const cpmql = mqls > 0 ? investimento / mqls : 0;
+      const percMqls = leads > 0 ? (mqls / leads) : 0;
 
       res.json({
         investimento,
@@ -1831,8 +1880,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cpm,
         ctr,
         cps,
-        // Placeholders para métricas que dependem do site (GA4 ou outra fonte)
         visualizacaoPagina: null,
+        leads,
+        mqls,
+        cpl,
+        cpmql,
+        percMqls,
       });
     } catch (error) {
       console.error("[api] Error fetching Ads metrics:", error);
