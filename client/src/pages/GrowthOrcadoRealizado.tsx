@@ -190,7 +190,8 @@ export default function GrowthOrcadoRealizado() {
   usePageTitle("Orçado x Realizado");
   useSetPageInfo("Orçado x Realizado", "Controle de Métricas de Marketing e Vendas");
   
-  const [selectedMonth, setSelectedMonth] = useState("2026-01");
+  const currentMonth = format(new Date(), 'yyyy-MM');
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [cardFilter, setCardFilter] = useState<'todos' | 'mql' | 'nao-mql'>('todos');
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
@@ -202,14 +203,36 @@ export default function GrowthOrcadoRealizado() {
   const [isCopying, setIsCopying] = useState(false);
   const queryClient = useQueryClient();
 
-  const months = [
-    { value: "2026-01", label: "Janeiro 2026" },
-    { value: "2026-02", label: "Fevereiro 2026" },
-    { value: "2026-03", label: "Março 2026" },
-    { value: "2025-12", label: "Dezembro 2025" },
-    { value: "2025-11", label: "Novembro 2025" },
-    { value: "2025-10", label: "Outubro 2025" },
-  ];
+  // Fetch dynamic months from API
+  const { data: dynamicMonths } = useQuery<string[]>({
+    queryKey: ['/api/growth/orcado-realizado/budgets/months'],
+    queryFn: async () => {
+      const res = await fetch('/api/growth/orcado-realizado/budgets/months', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    }
+  });
+
+  const months = useMemo(() => {
+    const monthNames: Record<string, string> = {
+      '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março', '04': 'Abril',
+      '05': 'Maio', '06': 'Junho', '07': 'Julho', '08': 'Agosto',
+      '09': 'Setembro', '10': 'Outubro', '11': 'Novembro', '12': 'Dezembro',
+    };
+
+    // Always include current month
+    const allMonths = new Set<string>([currentMonth]);
+    if (dynamicMonths) {
+      dynamicMonths.forEach(m => allMonths.add(m));
+    }
+
+    return Array.from(allMonths)
+      .sort((a, b) => b.localeCompare(a))
+      .map(m => {
+        const [year, month] = m.split('-');
+        return { value: m, label: `${monthNames[month] || month} ${year}` };
+      });
+  }, [dynamicMonths, currentMonth]);
 
   const dateRange = useMemo(() => {
     const monthDate = parse(selectedMonth, 'yyyy-MM', new Date());
