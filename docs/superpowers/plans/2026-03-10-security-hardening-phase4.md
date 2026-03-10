@@ -35,11 +35,11 @@ function requireEnv(name: string): string {
 Replace:
 ```typescript
 const pool = new Pool({
-  host: process.env.DATABASE_HOST || "***REMOVED***",
+  host: process.env.DATABASE_HOST || "[REDACTED_HOST]",
   port: 5432,
   database: "dados_turbo",
   user: "postgres",
-  password: process.env.DATABASE_PASSWORD || "***REMOVED***",
+  password: process.env.DATABASE_PASSWORD || "[REDACTED_PASSWORD]",
   ssl: false,
 });
 ```
@@ -117,11 +117,11 @@ git commit -m "fix(security): remove hardcoded DB credentials from routes.ts syn
 Replace:
 ```typescript
 const pool = new Pool({
-  host: "***REMOVED***",
+  host: "[REDACTED_HOST]",
   port: 5432,
   database: "dados_turbo",
   user: "postgres",
-  password: "***REMOVED***",
+  password: "[REDACTED_PASSWORD]",
   ssl: false,
 });
 ```
@@ -264,7 +264,7 @@ git commit -m "fix(security): remove 60+ plaintext passwords from courses seed d
 
 Replace:
 ```typescript
-// Senhas hasheadas para usuários externos (hash de "***REMOVED***")
+// Senhas hasheadas para usuários externos (hash de "[REDACTED]")
 ```
 
 With:
@@ -276,7 +276,7 @@ With:
 
 Replace:
 ```typescript
-const defaultPassword = process.env.CLIENT_DEFAULT_PASSWORD || '***REMOVED***';
+const defaultPassword = process.env.CLIENT_DEFAULT_PASSWORD || '[REDACTED]';
 ```
 
 With:
@@ -303,7 +303,7 @@ git commit -m "fix(security): remove plaintext password comment and require CLIE
 
 - [ ] **Step 1: Remove the INTERNAL_API_TOKEN line from .replit**
 
-Remove line 47: `INTERNAL_API_TOKEN = "***REMOVED***"`
+Remove line 47: `INTERNAL_API_TOKEN = "[REDACTED]"`
 
 The token should only be set via environment variable in the deployment platform, not in tracked config files.
 
@@ -724,4 +724,4 @@ After all tasks are complete:
    - CLIENT_DEFAULT_PASSWORD
    - SESSION_SECRET
 2. **Rewrite git history** using `git filter-repo` or BFG Repo Cleaner to remove secrets from all previous commits
-3. **Restrict DB network access** - verify firewall rules on `***REMOVED***:5432`
+3. **Restrict DB network access** - verify firewall rules on `[REDACTED_HOST]:5432`
