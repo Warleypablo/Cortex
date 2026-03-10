@@ -6459,10 +6459,39 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       });
       const result = await syncMetaAds(pool, { since, until });
       await pool.end();
+      // Update global sync status
+      (globalThis as any).__metaSyncStatus = {
+        lastSync: new Date().toISOString(),
+        result,
+        status: result.errors.length === 0 ? "success" : "partial",
+      };
       res.json(result);
     } catch (error: any) {
       console.error("[api] Error syncing Meta Ads:", error);
       res.status(500).json({ error: error.message || "Failed to sync Meta Ads" });
+    }
+  });
+
+  // Meta Ads Sync status (freshness indicator)
+  app.get("/api/meta-ads/sync-status", async (req, res) => {
+    try {
+      const syncStatus = (globalThis as any).__metaSyncStatus || null;
+      // Also get last insight date from DB as fallback
+      const lastInsight = await db.execute(sql`
+        SELECT MAX(data_importacao) as last_import
+        FROM meta_ads.meta_insights_daily
+      `);
+      const lastImport = (lastInsight.rows[0] as any)?.last_import || null;
+      res.json({
+        scheduler: { interval: "6h", active: true },
+        lastSync: syncStatus?.lastSync || null,
+        lastSyncStatus: syncStatus?.status || "unknown",
+        lastSyncResult: syncStatus?.result || null,
+        lastImportDb: lastImport,
+      });
+    } catch (error: any) {
+      console.error("[api] Error fetching sync status:", error);
+      res.status(500).json({ error: "Failed to fetch sync status" });
     }
   });
 
