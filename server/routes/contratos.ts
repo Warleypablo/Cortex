@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/middleware";
+import { provisionClienteFromContrato } from "../services/clienteProvisioning";
 import PDFDocument from "pdfkit";
 import FormData from "form-data";
 import OpenAI from "openai";
@@ -1276,7 +1277,13 @@ Exemplos:
     try {
       const { id } = req.params;
       const data = req.body;
-      
+
+      // Read current status before update (for provisioning trigger)
+      const currentResult = await db.execute(sql`
+        SELECT status FROM staging.contratos WHERE id = ${parseInt(id)}
+      `);
+      const oldStatus = currentResult.rows.length > 0 ? (currentResult.rows[0] as any).status : null;
+
       await db.execute(sql`
         UPDATE staging.contratos SET
           numero_contrato = ${data.numero_contrato},
@@ -1326,6 +1333,17 @@ Exemplos:
         }
       }
       
+      // Auto-provision client card when status changes to "ativo"
+      const newStatus = data.status || 'rascunho';
+      if (oldStatus !== 'ativo' && newStatus === 'ativo') {
+        const user = req.user as any;
+        provisionClienteFromContrato({
+          contratoId: parseInt(id),
+          userId: user?.id || 'system',
+          userName: user?.name || 'Sistema',
+        }); // fire-and-forget: no await
+      }
+
       res.json({ message: "Contrato atualizado com sucesso" });
     } catch (error: any) {
       console.error("Error updating contrato:", error);
