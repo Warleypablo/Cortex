@@ -60,6 +60,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         techKpisAdicionadosResult,
         techEntregasPorTipoResult,
         techEmAbertoResult,
+        techPipelineResult,
         okrFaturamentoResult,
         okrChurnResult,
         okrTechResult,
@@ -474,6 +475,16 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY valor DESC
         `),
 
+        // 20b. Pipeline Tech - projetos em aberto por status
+        db.execute(sql`
+          SELECT
+            COALESCE(TRIM(status_projeto), 'Sem Status') as status,
+            COUNT(*)::int as quantidade
+          FROM "Clickup".cup_projetos_tech
+          GROUP BY TRIM(status_projeto)
+          ORDER BY quantidade DESC
+        `),
+
         // 21. OKR: faturamento_legado (caz_parcelas por mês no quarter)
         db.execute(sql`
           SELECT
@@ -848,12 +859,31 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         valor: parseFloat(row.valor) || 0,
       }));
 
+      // Pipeline status order (natural flow)
+      const PIPELINE_ORDER = [
+        'não iniciado', 'kickoff', 'pronto p/ design', 'design', 'design review',
+        'pronto p/ dev', 'dev', 'dev review', 'pronto para lançar', 'bloqueado',
+      ];
+      const pipelineRaw = (techPipelineResult.rows as any[]).map((row: any) => ({
+        status: row.status,
+        quantidade: parseInt(row.quantidade) || 0,
+      }));
+      // Sort by pipeline order, unknown statuses at the end
+      const techPipeline = pipelineRaw
+        .filter((p: any) => p.status !== 'pausado')
+        .sort((a: any, b: any) => {
+          const ia = PIPELINE_ORDER.indexOf(a.status);
+          const ib = PIPELINE_ORDER.indexOf(b.status);
+          return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+        });
+
       const techData = {
         kpis: techKpis,
         mesLabel: mesDadosLabel,
         entregasPorTipo: techEntregasPorTipo,
         receitaPorTipo: techReceitaPorTipo,
         emAbertoPorTipo: techEmAbertoPorTipo,
+        pipeline: techPipeline,
       };
 
       res.json({
