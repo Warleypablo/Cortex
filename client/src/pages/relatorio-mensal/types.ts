@@ -143,12 +143,18 @@ export interface TechEmAberto {
   valor: number;
 }
 
+export interface TechPipelineItem {
+  status: string;
+  quantidade: number;
+}
+
 export interface TechSlideData {
   kpis: TechKpis;
   mesLabel: string;
   entregasPorTipo: TechTipoMes[];
   receitaPorTipo: TechTipoMes[];
   emAbertoPorTipo: TechEmAberto[];
+  pipeline: TechPipelineItem[];
 }
 
 export interface RelatorioMensalData {
