@@ -1416,10 +1416,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
   app.get("/api/growth/orcado-realizado/budgets/months", async (req, res) => {
     try {
+      // Generate last 12 months
+      const now = new Date();
+      const generatedMonths = new Set<string>();
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        generatedMonths.add(format(d, 'yyyy-MM'));
+      }
+
+      // Also include any months that have saved budgets
       const result = await db.execute(sql`
         SELECT DISTINCT mes FROM meta_ads.growth_budgets ORDER BY mes DESC
       `);
-      res.json((result.rows as any[]).map((r: any) => r.mes));
+      for (const r of result.rows as any[]) {
+        generatedMonths.add(r.mes);
+      }
+
+      const sorted = Array.from(generatedMonths).sort((a, b) => b.localeCompare(a));
+      res.json(sorted);
     } catch (error) {
       console.error("[api] Error fetching budget months:", error);
       res.status(500).json({ error: "Failed to fetch budget months" });
