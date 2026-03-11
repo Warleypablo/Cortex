@@ -366,37 +366,13 @@ export default function BpProdutos() {
                 })}
               </tr>
               {/* Δ m/m */}
-              <tr className="border-b-0">
+              <tr className="border-b border-gray-200 dark:border-zinc-700">
                 {MONTHS.map((m) => {
                   const v = hasReal(m) ? getVarPct(m, "total") : null;
                   return (
-                    <td key={m} className={`${cellBase} pt-0.5 pb-1 ${colHighlight(m)}`}>
+                    <td key={m} className={`${cellBase} pt-0.5 pb-3 ${colHighlight(m)}`}>
                       {v !== null ? (
                         <span className={`text-[10px] ${varColor(v)}`}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</span>
-                      ) : <span className="text-[10px] text-gray-300 dark:text-zinc-700">—</span>}
-                    </td>
-                  );
-                })}
-              </tr>
-              {/* Churn Total */}
-              <tr className="border-b border-gray-200 dark:border-zinc-700">
-                <td className={`${stickyBase} bg-gray-50 dark:bg-zinc-800/40 pl-14 pr-4 pb-3 pt-0 text-[10px] text-gray-400 dark:text-zinc-500 whitespace-nowrap`}>
-                  Churn
-                </td>
-                {MONTHS.map((m) => {
-                  const rate = getChurnRate(m, "total");
-                  const tc = getTotalChurn(m);
-                  return (
-                    <td key={m} className={`${cellBase} pb-3 pt-0 ${colHighlight(m)}`}>
-                      {rate !== null ? (
-                        <div className="flex flex-col items-center">
-                          <span className={`text-[10px] font-medium ${rate <= 9 ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-                            {rate.toFixed(1)}%
-                          </span>
-                          <span className="text-[9px] text-gray-400 dark:text-zinc-600">
-                            {tc.churns} · {fmtK(tc.mrrPerdido)}
-                          </span>
-                        </div>
                       ) : <span className="text-[10px] text-gray-300 dark:text-zinc-700">—</span>}
                     </td>
                   );
@@ -503,7 +479,7 @@ export default function BpProdutos() {
                     )}
                     {/* Expandido: Contratos */}
                     {isExp && (
-                      <tr className="border-b-0">
+                      <tr className={segBorder}>
                         {subRowLabel("Contratos", subBg)}
                         {MONTHS.map((m) => {
                           const bpC = BP_TARGETS[seg]?.[m]?.contratos || 0;
@@ -518,33 +494,6 @@ export default function BpProdutos() {
                                 </>
                               ) : (
                                 <span className="text-gray-300 dark:text-zinc-600">{bpC}</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    )}
-                    {/* Expandido: Churn */}
-                    {isExp && (
-                      <tr className={segBorder}>
-                        {subRowLabel("Churn", subBg)}
-                        {MONTHS.map((m) => {
-                          const bpChurn = BP_TARGETS[seg]?.[m]?.churn || 0;
-                          const rate = getChurnRate(m, seg);
-                          const c = getChurn(m, seg);
-                          return (
-                            <td key={m} className={`${cellBase} py-1.5 text-[11px] ${colHighlight(m)}`}>
-                              {rate !== null ? (
-                                <div className="flex flex-col items-center">
-                                  <span className={rate <= bpChurn * 100 ? "text-emerald-500 dark:text-emerald-400 font-medium" : "text-red-500 dark:text-red-400 font-medium"}>
-                                    {rate.toFixed(1)}%
-                                  </span>
-                                  <span className="text-[9px] text-gray-400 dark:text-zinc-600">
-                                    {c?.churns || 0} · {fmtK(c?.mrrPerdido || 0)}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className="text-gray-300 dark:text-zinc-600">{(bpChurn * 100).toFixed(0)}%</span>
                               )}
                             </td>
                           );
@@ -607,6 +556,94 @@ export default function BpProdutos() {
                       return (
                         <td key={m} className={`px-1.5 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/40 dark:bg-blue-950/15" : ""}`}>
                           {pct !== null ? <span className={`font-medium ${pctColor(pct)}`}>{pct.toFixed(0)}%</span> : <span className="text-gray-300 dark:text-zinc-700">-</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Churn por Produto */}
+      <div className="mt-5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 dark:border-zinc-800">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Churn por Produto</h2>
+          <p className="text-[10px] text-gray-500 dark:text-zinc-500 mt-0.5">Taxa de churn mensal por segmento (meta BP: 9%)</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse min-w-[800px]">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-zinc-700">
+                <th className="px-5 py-2.5 text-left text-[10px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider w-40" />
+                {MONTHS.map((m) => (
+                  <th key={m} className={`px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${isCurrent(m) ? "text-blue-600 dark:text-blue-400" : isFuture(m) ? "text-gray-300 dark:text-zinc-600" : "text-gray-500 dark:text-zinc-400"}`}>
+                    {MONTH_LABELS[m].split("/")[0]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-zinc-800/50">
+              {/* Total */}
+              <tr className="bg-gray-50/50 dark:bg-zinc-800/20">
+                <td className="px-5 py-2 text-[11px] font-semibold text-gray-700 dark:text-zinc-300">Total</td>
+                {MONTHS.map((m) => {
+                  const rate = getChurnRate(m, "total");
+                  const tc = getTotalChurn(m);
+                  const future = isFuture(m);
+                  return (
+                    <td key={m} className={`px-1.5 py-2 text-center tabular-nums ${isCurrent(m) ? "bg-blue-50/40 dark:bg-blue-950/15" : ""}`}>
+                      {rate !== null ? (
+                        <div className="flex flex-col items-center">
+                          <span className={`text-[11px] font-semibold ${rate <= 9 ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                            {rate.toFixed(1)}%
+                          </span>
+                          <span className="text-[9px] text-gray-400 dark:text-zinc-600">
+                            {tc.churns} · {fmtK(tc.mrrPerdido)}
+                          </span>
+                        </div>
+                      ) : future ? (
+                        <span className="text-[10px] text-gray-300 dark:text-zinc-600">9%</span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-zinc-700">-</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+              {/* Segmentos */}
+              {SEGMENTS.map((seg) => {
+                const colors = SEG_COLORS[seg];
+                return (
+                  <tr key={seg}>
+                    <td className="px-5 py-2 text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+                        <span className={`${colors.text} font-medium`}>{seg}</span>
+                      </div>
+                    </td>
+                    {MONTHS.map((m) => {
+                      const rate = getChurnRate(m, seg);
+                      const c = getChurn(m, seg);
+                      const future = isFuture(m);
+                      return (
+                        <td key={m} className={`px-1.5 py-2 text-center tabular-nums ${isCurrent(m) ? "bg-blue-50/40 dark:bg-blue-950/15" : ""}`}>
+                          {rate !== null ? (
+                            <div className="flex flex-col items-center">
+                              <span className={`text-[11px] font-medium ${rate <= 9 ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                                {rate.toFixed(1)}%
+                              </span>
+                              <span className="text-[9px] text-gray-400 dark:text-zinc-600">
+                                {c?.churns || 0} · {fmtK(c?.mrrPerdido || 0)}
+                              </span>
+                            </div>
+                          ) : future ? (
+                            <span className="text-[10px] text-gray-300 dark:text-zinc-600">9%</span>
+                          ) : (
+                            <span className="text-gray-300 dark:text-zinc-700">-</span>
+                          )}
                         </td>
                       );
                     })}
