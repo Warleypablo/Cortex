@@ -1896,8 +1896,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COUNT(*) as total_leads,
           COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as total_mqls
         FROM "Bitrix".crm_deal d
-        WHERE d.data_criacao >= ${startDate}::date
-          AND d.data_criacao <= ${endDate}::date
+        WHERE d.created_at >= ${startDate}::date
+          AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
           AND (
             LOWER(d.utm_source) LIKE '%facebook%' OR LOWER(d.utm_source) LIKE '%fb%'
             OR LOWER(d.utm_source) LIKE '%meta%' OR LOWER(d.utm_source) = 'ig'
