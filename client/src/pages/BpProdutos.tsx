@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ============================================
-// BP Targets (hardcoded from business plan)
+// BP Targets
 // ============================================
 const MONTHS = [
   "2025-12", "2026-01", "2026-02", "2026-03",
@@ -14,10 +15,10 @@ const MONTHS = [
 ];
 
 const MONTH_LABELS: Record<string, string> = {
-  "2025-12": "Dez", "2026-01": "Jan", "2026-02": "Fev", "2026-03": "Mar",
-  "2026-04": "Abr", "2026-05": "Mai", "2026-06": "Jun",
-  "2026-07": "Jul", "2026-08": "Ago", "2026-09": "Set",
-  "2026-10": "Out", "2026-11": "Nov", "2026-12": "Dez",
+  "2025-12": "Dez/25", "2026-01": "Jan/26", "2026-02": "Fev/26", "2026-03": "Mar/26",
+  "2026-04": "Abr/26", "2026-05": "Mai/26", "2026-06": "Jun/26",
+  "2026-07": "Jul/26", "2026-08": "Ago/26", "2026-09": "Set/26",
+  "2026-10": "Out/26", "2026-11": "Nov/26", "2026-12": "Dez/26",
 };
 
 type SegmentName = "Performance" | "Creators" | "Social" | "Gestão de Comunidade" | "Others";
@@ -121,21 +122,30 @@ const BP_MRR_TOTAL: Record<string, number> = {
 // ============================================
 // Helpers
 // ============================================
-function fmtK(value: number): string {
-  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-  return value.toFixed(0);
-}
-
 function fmtCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(value);
 }
 
+function fmtK(value: number): string {
+  if (Math.abs(value) >= 1000000) return `R$ ${(value / 1000000).toFixed(2)}M`;
+  if (Math.abs(value) >= 1000) return `R$ ${(value / 1000).toFixed(1)}k`;
+  return `R$ ${value.toFixed(0)}`;
+}
+
+function fmtNum(value: number): string {
+  return new Intl.NumberFormat("pt-BR").format(Math.round(value));
+}
+
 function pctClass(pct: number): string {
   if (pct >= 100) return "text-emerald-600 dark:text-emerald-400";
   if (pct >= 80) return "text-amber-600 dark:text-amber-400";
+  return "text-red-500 dark:text-red-400";
+}
+
+function nominalClass(diff: number): string {
+  if (diff >= 0) return "text-emerald-600 dark:text-emerald-400";
   return "text-red-500 dark:text-red-400";
 }
 
@@ -157,6 +167,7 @@ export default function BpProdutos() {
   const { data, isLoading } = useQuery<ApiData>({
     queryKey: ["/api/bp-produtos/mrr-mensal"],
   });
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   if (isLoading) {
@@ -170,6 +181,7 @@ export default function BpProdutos() {
   const realizado = data || {};
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const activeMonth = selectedMonth || currentMonth;
 
   function getReal(month: string, segment: SegmentName) {
     return realizado[month]?.[segment] || null;
@@ -190,77 +202,121 @@ export default function BpProdutos() {
     setExpanded((p) => ({ ...p, [seg]: !p[seg] }));
   }
 
-  // Célula simples: mostra valor realizado OU target (futuro)
-  function Cell({ orcado, real, format = "currency" }: { orcado: number; real: number | null; format?: "currency" | "number" }) {
-    const fmt = format === "currency" ? (v: number) => `R$ ${fmtK(v)}` : (v: number) => v.toFixed(0);
-    const isFuture = real === null;
+  // Build rows for the detail table
+  type MetricRow = {
+    label: string;
+    segment?: SegmentName;
+    isHeader?: boolean;
+    isSegmentHeader?: boolean;
+    indent?: boolean;
+    values: { orcado: number; real: number | null; format: "currency" | "number" }[];
+  };
 
-    if (isFuture) {
-      return (
-        <td className="px-1.5 py-1.5 text-right text-[11px] text-gray-300 dark:text-zinc-700 whitespace-nowrap tabular-nums">
-          {fmt(orcado)}
-        </td>
-      );
-    }
+  const rows: MetricRow[] = [];
 
-    const pct = orcado > 0 ? (real / orcado) * 100 : 0;
+  // MRR Total
+  rows.push({
+    label: "MRR Ativo Total",
+    isHeader: true,
+    values: MONTHS.map((m) => ({
+      orcado: BP_MRR_TOTAL[m] || 0,
+      real: hasReal(m) ? getTotalReal(m).mrr : null,
+      format: "currency" as const,
+    })),
+  });
 
-    return (
-      <td className="px-1.5 py-1.5 text-right text-[11px] whitespace-nowrap tabular-nums">
-        <span className="text-gray-900 dark:text-white font-medium">{fmt(real)}</span>
-        <span className={`ml-1 text-[10px] ${pctClass(pct)}`}>{pct.toFixed(0)}%</span>
-      </td>
-    );
+  // Per segment
+  for (const seg of SEGMENTS) {
+    // Segment header (MRR)
+    rows.push({
+      label: seg,
+      segment: seg,
+      isSegmentHeader: true,
+      values: MONTHS.map((m) => ({
+        orcado: BP_TARGETS[seg]?.[m]?.mrr || 0,
+        real: hasReal(m) ? (getReal(m, seg)?.mrr || 0) : null,
+        format: "currency" as const,
+      })),
+    });
+    // AOV
+    rows.push({
+      label: "AOV",
+      segment: seg,
+      indent: true,
+      values: MONTHS.map((m) => {
+        const bp = BP_TARGETS[seg]?.[m]?.aov || 0;
+        const real = getReal(m, seg);
+        const has = hasReal(m);
+        const realAov = has && real && real.contratos > 0 ? real.mrr / real.contratos : (has ? 0 : null);
+        return { orcado: bp, real: realAov, format: "currency" as const };
+      }),
+    });
+    // Contratos
+    rows.push({
+      label: "Contratos",
+      segment: seg,
+      indent: true,
+      values: MONTHS.map((m) => ({
+        orcado: BP_TARGETS[seg]?.[m]?.contratos || 0,
+        real: hasReal(m) ? (getReal(m, seg)?.contratos || 0) : null,
+        format: "number" as const,
+      })),
+    });
   }
+
+  // Find month index
+  const monthIdx = MONTHS.indexOf(activeMonth);
+  const activeRow = monthIdx >= 0 ? monthIdx : MONTHS.indexOf(currentMonth);
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-full">
       {/* Header */}
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">BP Produtos 2026</h1>
           <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">MRR ativo por produto vs Business Plan</p>
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-gray-400 dark:text-zinc-600">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> &ge;100%</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> 80-99%</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> &lt;80%</span>
-        </div>
+        <Select value={activeMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-36 bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MONTHS.map((m) => (
+              <SelectItem key={m} value={m}>{MONTH_LABELS[m]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* KPI Cards - MRR Total + por segmento */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-        {/* Total */}
-        <Card className="bg-gray-900 dark:bg-white border-0 col-span-1">
+        <Card className="bg-gray-900 dark:bg-white border-0">
           <CardContent className="p-3">
             <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">MRR Total</p>
             <p className="text-base font-bold text-white dark:text-gray-900 mt-0.5">
-              {fmtCurrency(getTotalReal(currentMonth).mrr)}
+              {fmtCurrency(getTotalReal(activeMonth).mrr)}
             </p>
             {(() => {
-              const bp = BP_MRR_TOTAL[currentMonth] || 0;
-              const real = getTotalReal(currentMonth).mrr;
+              const bp = BP_MRR_TOTAL[activeMonth] || 0;
+              const real = getTotalReal(activeMonth).mrr;
               const pct = bp > 0 ? (real / bp) * 100 : 0;
               return (
                 <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
                   <span className={pct >= 100 ? "text-emerald-400" : pct >= 80 ? "text-amber-400" : "text-red-400"}>
                     {pct.toFixed(0)}%
-                  </span> de {fmtCurrency(bp)}
+                  </span>{" "}de {fmtCurrency(bp)}
                 </p>
               );
             })()}
           </CardContent>
         </Card>
-
-        {/* Per segment */}
         {SEGMENTS.map((seg) => {
-          const bp = BP_TARGETS[seg]?.[currentMonth];
-          const real = getReal(currentMonth, seg);
+          const bp = BP_TARGETS[seg]?.[activeMonth];
+          const real = getReal(activeMonth, seg);
           const mrrReal = real?.mrr || 0;
           const mrrBp = bp?.mrr || 0;
           const pct = mrrBp > 0 ? (mrrReal / mrrBp * 100) : 0;
           const colors = SEGMENT_COLORS[seg];
-
           return (
             <Card key={seg} className={`border-0 ${colors.bg}`}>
               <CardContent className="p-3">
@@ -268,7 +324,7 @@ export default function BpProdutos() {
                   <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
                   <p className={`text-[10px] font-medium ${colors.text} uppercase tracking-wider truncate`}>{seg}</p>
                 </div>
-                <p className="text-base font-bold text-gray-900 dark:text-white mt-0.5">R$ {fmtK(mrrReal)}</p>
+                <p className="text-base font-bold text-gray-900 dark:text-white mt-0.5">{fmtCurrency(mrrReal)}</p>
                 <span className={`inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${pctBadgeBg(pct)}`}>
                   {pct.toFixed(0)}%
                 </span>
@@ -278,108 +334,203 @@ export default function BpProdutos() {
         })}
       </div>
 
-      {/* Tabela */}
+      {/* Tabela detalhada - 4 colunas: Orçado | Realizado | Nominal | % */}
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+            Detalhamento - {MONTH_LABELS[activeMonth]}
+          </h2>
+        </div>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[900px]">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-zinc-700 bg-gray-50/50 dark:bg-zinc-800/30">
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider w-56">
+                  Métrica
+                </th>
+                <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider w-32">
+                  Orçado
+                </th>
+                <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider w-32">
+                  Realizado
+                </th>
+                <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider w-32">
+                  Nominal
+                </th>
+                <th className="px-3 py-2.5 text-right text-[11px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider w-24">
+                  %
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
+              {rows.map((row, i) => {
+                const v = row.values[activeRow];
+                if (!v) return null;
+
+                const orcado = v.orcado;
+                const real = v.real;
+                const hasData = real !== null;
+                const diff = hasData ? real - orcado : null;
+                const pct = hasData && orcado > 0 ? (real / orcado) * 100 : null;
+                const fmt = v.format === "currency" ? fmtCurrency : fmtNum;
+
+                // Skip indent rows if segment is collapsed
+                if (row.indent && row.segment && !(expanded[row.segment] ?? false)) return null;
+
+                const isSegHeader = row.isSegmentHeader;
+                const colors = row.segment ? SEGMENT_COLORS[row.segment] : null;
+
+                return (
+                  <tr
+                    key={i}
+                    className={`
+                      ${row.isHeader ? "bg-gray-50 dark:bg-zinc-800/40 font-semibold" : ""}
+                      ${isSegHeader ? "cursor-pointer hover:bg-gray-50/70 dark:hover:bg-zinc-800/20" : ""}
+                      ${row.indent ? "bg-gray-50/30 dark:bg-zinc-800/10" : ""}
+                    `}
+                    onClick={isSegHeader && row.segment ? () => toggleSegment(row.segment!) : undefined}
+                  >
+                    {/* Label */}
+                    <td className={`px-4 py-2.5 text-sm ${row.isHeader ? "text-gray-900 dark:text-white font-bold" : ""}`}>
+                      {isSegHeader && colors ? (
+                        <div className="flex items-center gap-2">
+                          {expanded[row.segment!]
+                            ? <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                            : <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
+                          }
+                          <div className={`w-2.5 h-2.5 rounded-full ${colors.dot}`} />
+                          <span className={`font-semibold ${colors.text}`}>{row.label}</span>
+                        </div>
+                      ) : row.indent ? (
+                        <span className="pl-9 text-xs text-gray-500 dark:text-zinc-500">{row.label}</span>
+                      ) : (
+                        <span>{row.label}</span>
+                      )}
+                    </td>
+
+                    {/* Orçado */}
+                    <td className="px-3 py-2.5 text-right text-sm text-gray-500 dark:text-zinc-400 tabular-nums">
+                      {fmt(orcado)}
+                    </td>
+
+                    {/* Realizado */}
+                    <td className="px-3 py-2.5 text-right text-sm font-medium text-gray-900 dark:text-white tabular-nums">
+                      {hasData ? fmt(real) : <span className="text-gray-300 dark:text-zinc-700">-</span>}
+                    </td>
+
+                    {/* Nominal (diferença) */}
+                    <td className={`px-3 py-2.5 text-right text-sm tabular-nums ${diff !== null ? nominalClass(diff) : ""}`}>
+                      {diff !== null ? (
+                        <span>{diff >= 0 ? "+" : ""}{v.format === "currency" ? fmtCurrency(diff) : fmtNum(diff)}</span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-zinc-700">-</span>
+                      )}
+                    </td>
+
+                    {/* % atingimento */}
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {pct !== null ? (
+                        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full ${pctBadgeBg(pct)}`}>
+                          {pct.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-zinc-700 text-sm">-</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Mini timeline - todos os meses */}
+      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800 overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Evolução MRR Total vs BP</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse min-w-[800px]">
             <thead>
               <tr className="border-b border-gray-200 dark:border-zinc-700">
-                <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 dark:text-zinc-500 uppercase tracking-wider sticky left-0 bg-white dark:bg-zinc-900 z-10 w-44">
-                  Produto
-                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 dark:text-zinc-500 uppercase tracking-wider w-28" />
                 {MONTHS.map((m) => (
                   <th
                     key={m}
-                    className={`px-1.5 py-2 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${
-                      m === currentMonth
+                    className={`px-1 py-2 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors ${
+                      m === activeMonth
                         ? "text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/20"
-                        : m < currentMonth && hasReal(m)
+                        : hasReal(m)
                         ? "text-gray-600 dark:text-zinc-400"
                         : "text-gray-300 dark:text-zinc-700"
                     }`}
+                    onClick={() => setSelectedMonth(m)}
                   >
-                    {MONTH_LABELS[m]}
+                    {MONTH_LABELS[m].split("/")[0]}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
-              {/* MRR Total row */}
-              <tr className="bg-gray-50 dark:bg-zinc-800/40">
-                <td className="px-3 py-2 text-xs font-bold text-gray-900 dark:text-white sticky left-0 bg-gray-50 dark:bg-zinc-800/40 z-10">
-                  MRR Ativo Total
-                </td>
+            <tbody className="divide-y divide-gray-50 dark:divide-zinc-800/50">
+              {/* Total MRR */}
+              <tr className="bg-gray-50/50 dark:bg-zinc-800/20">
+                <td className="px-3 py-1.5 text-[11px] font-semibold text-gray-700 dark:text-zinc-300">MRR Total</td>
                 {MONTHS.map((m) => {
                   const bp = BP_MRR_TOTAL[m] || 0;
                   const t = getTotalReal(m);
-                  return <Cell key={m} orcado={bp} real={hasReal(m) ? t.mrr : null} />;
+                  const has = hasReal(m);
+                  const pct = has && bp > 0 ? (t.mrr / bp) * 100 : null;
+                  return (
+                    <td
+                      key={m}
+                      className={`px-1 py-1.5 text-center text-[10px] tabular-nums cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/20 ${
+                        m === activeMonth ? "bg-blue-50/60 dark:bg-blue-950/20" : ""
+                      }`}
+                      onClick={() => setSelectedMonth(m)}
+                    >
+                      {pct !== null ? (
+                        <span className={`font-semibold ${pctClass(pct)}`}>{pct.toFixed(0)}%</span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-zinc-700">-</span>
+                      )}
+                    </td>
+                  );
                 })}
               </tr>
-
-              {/* Per segment - collapsible */}
+              {/* Per segment */}
               {SEGMENTS.map((seg) => {
                 const colors = SEGMENT_COLORS[seg];
-                const isOpen = expanded[seg] ?? false;
-
                 return (
-                  <React.Fragment key={seg}>
-                    {/* Segment MRR row (clickable) */}
-                    <tr
-                      className="cursor-pointer hover:bg-gray-50/70 dark:hover:bg-zinc-800/20 transition-colors"
-                      onClick={() => toggleSegment(seg)}
-                    >
-                      <td className="px-3 py-2 text-xs sticky left-0 bg-white dark:bg-zinc-900 z-10">
-                        <div className="flex items-center gap-2">
-                          {isOpen
-                            ? <ChevronDown className="w-3 h-3 text-gray-400" />
-                            : <ChevronRight className="w-3 h-3 text-gray-400" />
-                          }
-                          <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                          <span className={`font-semibold ${colors.text}`}>{seg}</span>
-                        </div>
-                      </td>
-                      {MONTHS.map((m) => {
-                        const bp = BP_TARGETS[seg]?.[m]?.mrr || 0;
-                        const real = getReal(m, seg);
-                        return <Cell key={m} orcado={bp} real={hasReal(m) ? (real?.mrr || 0) : null} />;
-                      })}
-                    </tr>
-
-                    {/* Expanded detail rows */}
-                    {isOpen && (
-                      <>
-                        {/* AOV */}
-                        <tr className="bg-gray-50/40 dark:bg-zinc-800/10">
-                          <td className="px-3 py-1 text-[11px] text-gray-400 dark:text-zinc-500 pl-10 sticky left-0 bg-gray-50/40 dark:bg-zinc-900 z-10">AOV</td>
-                          {MONTHS.map((m) => {
-                            const bp = BP_TARGETS[seg]?.[m]?.aov || 0;
-                            const real = getReal(m, seg);
-                            const has = hasReal(m);
-                            const realAov = has && real && real.contratos > 0 ? real.mrr / real.contratos : null;
-                            return <Cell key={m} orcado={bp} real={has ? (realAov ?? 0) : null} />;
-                          })}
-                        </tr>
-                        {/* Contratos */}
-                        <tr className="bg-gray-50/40 dark:bg-zinc-800/10">
-                          <td className="px-3 py-1 text-[11px] text-gray-400 dark:text-zinc-500 pl-10 sticky left-0 bg-gray-50/40 dark:bg-zinc-900 z-10">Contratos</td>
-                          {MONTHS.map((m) => {
-                            const bp = BP_TARGETS[seg]?.[m]?.contratos || 0;
-                            const real = getReal(m, seg);
-                            return <Cell key={m} orcado={bp} real={hasReal(m) ? (real?.contratos || 0) : null} format="number" />;
-                          })}
-                        </tr>
-                        {/* Churn BP */}
-                        <tr className="bg-gray-50/40 dark:bg-zinc-800/10">
-                          <td className="px-3 py-1 text-[11px] text-gray-400 dark:text-zinc-500 pl-10 sticky left-0 bg-gray-50/40 dark:bg-zinc-900 z-10">Churn (BP)</td>
-                          {MONTHS.map((m) => (
-                            <td key={m} className="px-1.5 py-1 text-right text-[11px] text-gray-300 dark:text-zinc-700 whitespace-nowrap tabular-nums">
-                              9%
-                            </td>
-                          ))}
-                        </tr>
-                      </>
-                    )}
-                  </React.Fragment>
+                  <tr key={seg}>
+                    <td className="px-3 py-1.5 text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+                        <span className={`${colors.text} font-medium`}>{seg}</span>
+                      </div>
+                    </td>
+                    {MONTHS.map((m) => {
+                      const bp = BP_TARGETS[seg]?.[m]?.mrr || 0;
+                      const real = getReal(m, seg);
+                      const has = hasReal(m);
+                      const pct = has && bp > 0 ? ((real?.mrr || 0) / bp) * 100 : null;
+                      return (
+                        <td
+                          key={m}
+                          className={`px-1 py-1.5 text-center text-[10px] tabular-nums cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/20 ${
+                            m === activeMonth ? "bg-blue-50/60 dark:bg-blue-950/20" : ""
+                          }`}
+                          onClick={() => setSelectedMonth(m)}
+                        >
+                          {pct !== null ? (
+                            <span className={`font-medium ${pctClass(pct)}`}>{pct.toFixed(0)}%</span>
+                          ) : (
+                            <span className="text-gray-300 dark:text-zinc-700">-</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 );
               })}
             </tbody>
