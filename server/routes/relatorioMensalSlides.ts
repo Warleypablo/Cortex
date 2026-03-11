@@ -42,6 +42,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         actualsResult,
         rankingResult,
         closerPhotosResult,
+        rankingSdrResult,
+        sdrPhotosResult,
         graficoResult,
         quarterSalesResult,
         turboMrrResult,
@@ -162,6 +164,31 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           FROM "Bitrix".crm_closers c
           LEFT JOIN cortex_core.auth_users a ON LOWER(TRIM(c.email)) = LOWER(TRIM(a.email))
           WHERE c.email IS NOT NULL AND a.picture IS NOT NULL
+        `),
+
+        // 6b. Ranking SDRs (deals won in the data month, grouped by SDR)
+        db.execute(sql`
+          SELECT
+            u.nome as name,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as mrr_gerado,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as pontual_gerado,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric + COALESCE(SUM(d.valor_pontual), 0)::numeric as total_gerado,
+            COUNT(*)::int as negocios_ganhos
+          FROM "Bitrix".crm_deal d
+          JOIN "Bitrix".crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.data_fechamento >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}
+            AND d.data_fechamento < ${`${ano}-${String(mes).padStart(2, '0')}-01`}
+          GROUP BY u.nome
+          ORDER BY mrr_gerado DESC
+        `),
+
+        // 6c. SDR photos
+        db.execute(sql`
+          SELECT u.nome as name, a.picture
+          FROM "Bitrix".crm_users u
+          LEFT JOIN cortex_core.auth_users a ON LOWER(TRIM(u.email)) = LOWER(TRIM(a.email))
+          WHERE u.email IS NOT NULL AND a.picture IS NOT NULL
         `),
 
         // 7. Contracts data for the data month only
@@ -684,6 +711,22 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       // Top pontual (sorted by pontual)
       const topPontual = [...rankingClosers].sort((a, b) => b.pontualObtido - a.pontualObtido)[0] || null;
 
+      // Build SDR photo map
+      const sdrPhotoMap: Record<string, string> = {};
+      (sdrPhotosResult.rows as any[]).forEach((row: any) => {
+        if (row.picture && row.name) sdrPhotoMap[row.name] = row.picture;
+      });
+
+      // Build SDR ranking with photos
+      const rankingSDRs = (rankingSdrResult.rows as any[]).map((row: any) => ({
+        name: row.name,
+        fotoUrl: sdrPhotoMap[row.name] || null,
+        mrrGerado: parseFloat(row.mrr_gerado) || 0,
+        pontualGerado: parseFloat(row.pontual_gerado) || 0,
+        totalGerado: parseFloat(row.total_gerado) || 0,
+        negociosGanhos: parseInt(row.negocios_ganhos) || 0,
+      }));
+
       // Build contracts data (single month)
       const contratosRow = (graficoResult.rows as any[])[0] || {};
       const totalRecorrente = parseFloat(contratosRow.receita_recorrente) || 0;
@@ -898,6 +941,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         okrObjectives,
         rankingClosers,
         topPontual,
+        rankingSDRs,
         contratosMes: {
           numContratos,
           contratosRecorrente: totalContratosRec,
