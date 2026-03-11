@@ -13,6 +13,7 @@ const CF = {
   VALOR_P: "a0797492-cc59-41ab-9df6-f8d9952afec1",
   LANCAMENTO_PREVISTO: "bfc1bf1c-57cf-4cfe-ac0c-c8d167b96f4c",
   DATA_KICKOFF: "de5c78c9-5d62-4f45-8eba-69b15126a784",
+  DATA_ENTREGUE: "f20ce1d5-3e09-40f5-84a9-34b24139501a",
   FIGMA: "08cc9fd7-afe8-4f84-894b-393ccbcc93d3",
   TEMPO_TOTAL: "2a8272dd-990f-4833-936e-c7be47e3ac8b",
 };
@@ -69,6 +70,7 @@ function parseTaskRow(t: ClickUpTask) {
     prioridade: t.priority?.priority || null,
     data_vencimento: msToDate(t.due_date),
     lancamento: cfs[CF.LANCAMENTO_PREVISTO]?.value ? msToDate(cfs[CF.LANCAMENTO_PREVISTO].value) : null,
+    data_entregue: cfs[CF.DATA_ENTREGUE]?.value ? msToDate(cfs[CF.DATA_ENTREGUE].value) : null,
     tempo_total: cfs[CF.TEMPO_TOTAL]?.value != null ? parseFloat(cfs[CF.TEMPO_TOTAL].value) || null : null,
     responsavel: assigneeNames || null,
     fase_projeto: cfs[CF.FASE_PROJETO] ? getDropdownValue(cfs[CF.FASE_PROJETO]) : null,
@@ -286,7 +288,7 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
             INSERT INTO "Clickup".cup_projetos_tech
             (clickup_task_id, task_name, status_projeto, prioridade, data_vencimento,
              lancamento, tempo_total, responsavel, fase_projeto, tipo, tipo_projeto,
-             figma, valor_p, data_inicial, data_criada)
+             figma, valor_p, data_inicial, data_criada, data_entregue)
             VALUES (
               ${row.clickup_task_id}, ${row.task_name}, ${row.status_projeto}, ${row.prioridade},
               ${row.data_vencimento ? sql.raw(`'${row.data_vencimento}'::date`) : sql`NULL`},
@@ -294,7 +296,8 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
               ${row.tempo_total}, ${row.responsavel}, ${row.fase_projeto}, ${row.tipo},
               ${row.tipo_projeto}, ${row.figma}, ${row.valor_p},
               ${row.data_inicial ? sql.raw(`'${row.data_inicial}'::date`) : sql`NULL`},
-              ${row.data_criada ? sql.raw(`'${row.data_criada}'::date`) : sql`NULL`}
+              ${row.data_criada ? sql.raw(`'${row.data_criada}'::date`) : sql`NULL`},
+              ${row.data_entregue ? sql.raw(`'${row.data_entregue}'::date`) : sql`NULL`}
             )
           `);
         }
@@ -304,7 +307,7 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
             INSERT INTO "Clickup".cup_projetos_tech_fechados
             (clickup_task_id, task_name, status_projeto, prioridade, data_vencimento,
              lancamento, tempo_total, responsavel, fase_projeto, tipo, tipo_projeto,
-             figma, valor_p, data_inicial, data_criada)
+             figma, valor_p, data_inicial, data_criada, data_entregue)
             VALUES (
               ${row.clickup_task_id}, ${row.task_name}, ${row.status_projeto}, ${row.prioridade},
               ${row.data_vencimento ? sql.raw(`'${row.data_vencimento}'::date`) : sql`NULL`},
@@ -312,7 +315,8 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
               ${row.tempo_total}, ${row.responsavel}, ${row.fase_projeto}, ${row.tipo},
               ${row.tipo_projeto}, ${row.figma}, ${row.valor_p},
               ${row.data_inicial ? sql.raw(`'${row.data_inicial}'::date`) : sql`NULL`},
-              ${row.data_criada ? sql.raw(`'${row.data_criada}'::date`) : sql`NULL`}
+              ${row.data_criada ? sql.raw(`'${row.data_criada}'::date`) : sql`NULL`},
+              ${row.data_entregue ? sql.raw(`'${row.data_entregue}'::date`) : sql`NULL`}
             )
           `);
         }
