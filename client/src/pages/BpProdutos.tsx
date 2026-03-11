@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 
 // ============================================
 // BP Targets
@@ -23,12 +22,12 @@ const MONTH_LABELS: Record<string, string> = {
 type SegmentName = "Performance" | "Creators" | "Social" | "Gestão de Comunidade" | "Others";
 const SEGMENTS: SegmentName[] = ["Performance", "Creators", "Social", "Gestão de Comunidade", "Others"];
 
-const SEGMENT_COLORS: Record<SegmentName, { dot: string; bg: string; text: string }> = {
-  "Performance": { dot: "bg-blue-500", bg: "bg-blue-50 dark:bg-blue-950/20", text: "text-blue-700 dark:text-blue-400" },
-  "Creators": { dot: "bg-purple-500", bg: "bg-purple-50 dark:bg-purple-950/20", text: "text-purple-700 dark:text-purple-400" },
-  "Social": { dot: "bg-pink-500", bg: "bg-pink-50 dark:bg-pink-950/20", text: "text-pink-700 dark:text-pink-400" },
-  "Gestão de Comunidade": { dot: "bg-amber-500", bg: "bg-amber-50 dark:bg-amber-950/20", text: "text-amber-700 dark:text-amber-400" },
-  "Others": { dot: "bg-gray-400", bg: "bg-gray-50 dark:bg-zinc-800/30", text: "text-gray-600 dark:text-zinc-400" },
+const SEG_COLORS: Record<SegmentName, { dot: string; text: string }> = {
+  "Performance": { dot: "bg-blue-500", text: "text-blue-600 dark:text-blue-400" },
+  "Creators": { dot: "bg-purple-500", text: "text-purple-600 dark:text-purple-400" },
+  "Social": { dot: "bg-pink-500", text: "text-pink-600 dark:text-pink-400" },
+  "Gestão de Comunidade": { dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
+  "Others": { dot: "bg-gray-400", text: "text-gray-500 dark:text-zinc-400" },
 };
 
 interface BpTarget { mrr: number; aov: number; contratos: number; churn: number; }
@@ -121,39 +120,24 @@ const BP_MRR_TOTAL: Record<string, number> = {
 // ============================================
 // Helpers
 // ============================================
-function fmtCurrency(value: number): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0,
-  }).format(value);
-}
-
 function fmtK(value: number): string {
   if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
   if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return value.toFixed(0);
 }
 
-function pctClass(pct: number): string {
-  if (pct >= 100) return "text-emerald-600 dark:text-emerald-400";
-  if (pct >= 80) return "text-amber-600 dark:text-amber-400";
+function pctColor(pct: number): string {
+  if (pct >= 100) return "text-emerald-500 dark:text-emerald-400";
+  if (pct >= 80) return "text-amber-500 dark:text-amber-400";
   return "text-red-500 dark:text-red-400";
 }
 
-function pctBadgeBg(pct: number): string {
-  if (pct >= 100) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400";
-  if (pct >= 80) return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400";
-  return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400";
-}
-
-function varClass(v: number): string {
-  if (v > 0) return "text-emerald-600 dark:text-emerald-400";
+function varColor(v: number): string {
+  if (v > 0) return "text-emerald-500 dark:text-emerald-400";
   if (v < 0) return "text-red-500 dark:text-red-400";
   return "text-gray-400 dark:text-zinc-500";
 }
 
-// ============================================
-// Types
-// ============================================
 type ApiData = Record<string, Record<string, { mrr: number; contratos: number }>>;
 
 // ============================================
@@ -192,123 +176,69 @@ export default function BpProdutos() {
 
   function hasReal(month: string) { return !!realizado[month]; }
 
-  function toggleSegment(seg: string) {
-    setExpanded((p) => ({ ...p, [seg]: !p[seg] }));
-  }
-
-  // Variation vs previous month (%)
   function getVarPct(month: string, segment: SegmentName | "total"): number | null {
     const idx = MONTHS.indexOf(month);
     if (idx <= 0) return null;
-    const prevMonth = MONTHS[idx - 1];
-    if (!hasReal(month) || !hasReal(prevMonth)) return null;
-    const currMrr = segment === "total" ? getTotalReal(month).mrr : (getReal(month, segment)?.mrr || 0);
-    const prevMrr = segment === "total" ? getTotalReal(prevMonth).mrr : (getReal(prevMonth, segment)?.mrr || 0);
-    if (prevMrr === 0) return null;
-    return ((currMrr - prevMrr) / prevMrr) * 100;
+    const prev = MONTHS[idx - 1];
+    if (!hasReal(month) || !hasReal(prev)) return null;
+    const curr = segment === "total" ? getTotalReal(month).mrr : (getReal(month, segment)?.mrr || 0);
+    const prevV = segment === "total" ? getTotalReal(prev).mrr : (getReal(prev, segment)?.mrr || 0);
+    if (prevV === 0) return null;
+    return ((curr - prevV) / prevV) * 100;
   }
 
   const isFuture = (m: string) => m > currentMonth;
   const isCurrent = (m: string) => m === currentMonth;
 
-  // Cell background for current month column
-  const colBg = (m: string) =>
-    isCurrent(m) ? "bg-blue-50/60 dark:bg-blue-950/20" : "";
+  // Renders the indicators line: % atingimento + variação m/m
+  function indicators(pct: number | null, v: number | null) {
+    if (pct === null && v === null) return null;
+    return (
+      <div className="flex items-center justify-center gap-1.5 mt-1">
+        {pct !== null && (
+          <span className={`text-[10px] font-medium tabular-nums ${pctColor(pct)}`}>
+            {pct.toFixed(0)}%
+          </span>
+        )}
+        {v !== null && (
+          <span className={`text-[10px] tabular-nums ${varColor(v)}`}>
+            {v >= 0 ? "↑" : "↓"}{Math.abs(v).toFixed(1)}%
+          </span>
+        )}
+      </div>
+    );
+  }
 
-  // Sticky left cell bg
-  const stickyBg = (extra?: string) =>
-    `sticky left-0 z-10 ${extra || "bg-white dark:bg-zinc-900"} border-r border-gray-100 dark:border-zinc-800`;
+  const stickyBase = "sticky left-0 z-10 border-r border-gray-100 dark:border-zinc-800";
 
   return (
-    <div className="p-4 md:p-6 space-y-5 max-w-full">
+    <div className="p-4 md:p-6 max-w-full">
       {/* Header */}
-      <div>
+      <div className="mb-5">
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">BP Produtos 2026</h1>
         <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">
-          Evolução MRR ativo por produto vs Business Plan
+          Evolução MRR por segmento vs Business Plan
         </p>
       </div>
 
-      {/* KPI Cards - mês atual */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-        <Card className="bg-gray-900 dark:bg-white border-0">
-          <CardContent className="p-3">
-            <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-              MRR Total ({MONTH_LABELS[currentMonth]})
-            </p>
-            <p className="text-base font-bold text-white dark:text-gray-900 mt-0.5">
-              {fmtCurrency(getTotalReal(currentMonth).mrr)}
-            </p>
-            {(() => {
-              const bp = BP_MRR_TOTAL[currentMonth] || 0;
-              const real = getTotalReal(currentMonth).mrr;
-              const pct = bp > 0 ? (real / bp) * 100 : 0;
-              const v = getVarPct(currentMonth, "total");
-              return (
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-[10px] ${pct >= 100 ? "text-emerald-400" : pct >= 80 ? "text-amber-400" : "text-red-400"}`}>
-                    {pct.toFixed(0)}% BP
-                  </span>
-                  {v !== null && (
-                    <span className={`text-[10px] ${v >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                      {v >= 0 ? "↑" : "↓"}{Math.abs(v).toFixed(1)}% m/m
-                    </span>
-                  )}
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
-        {SEGMENTS.map((seg) => {
-          const bp = BP_TARGETS[seg]?.[currentMonth];
-          const real = getReal(currentMonth, seg);
-          const mrrReal = real?.mrr || 0;
-          const mrrBp = bp?.mrr || 0;
-          const pct = mrrBp > 0 ? (mrrReal / mrrBp * 100) : 0;
-          const v = getVarPct(currentMonth, seg);
-          const colors = SEGMENT_COLORS[seg];
-          return (
-            <Card key={seg} className={`border-0 ${colors.bg}`}>
-              <CardContent className="p-3">
-                <div className="flex items-center gap-1.5">
-                  <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                  <p className={`text-[10px] font-medium ${colors.text} uppercase tracking-wider truncate`}>{seg}</p>
-                </div>
-                <p className="text-base font-bold text-gray-900 dark:text-white mt-0.5">{fmtCurrency(mrrReal)}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${pctBadgeBg(pct)}`}>
-                    {pct.toFixed(0)}%
-                  </span>
-                  {v !== null && (
-                    <span className={`text-[10px] font-medium ${varClass(v)}`}>
-                      {v >= 0 ? "↑" : "↓"}{Math.abs(v).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Tabela geral - todos os meses */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800 overflow-hidden">
+      {/* Tabela principal */}
+      <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse min-w-[1100px]">
             <thead>
               <tr className="border-b border-gray-200 dark:border-zinc-700">
-                <th className={`${stickyBg("bg-white dark:bg-zinc-900")} px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 dark:text-zinc-400 uppercase tracking-wider w-44`}>
+                <th className={`${stickyBase} bg-white dark:bg-zinc-900 px-5 py-3 text-left text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider w-48`}>
                   Segmento
                 </th>
                 {MONTHS.map((m) => (
                   <th
                     key={m}
-                    className={`px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap min-w-[80px] ${
+                    className={`px-2 py-3 text-center text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap min-w-[82px] ${
                       isCurrent(m)
-                        ? "text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/20"
+                        ? "text-blue-600 dark:text-blue-400"
                         : isFuture(m)
                         ? "text-gray-300 dark:text-zinc-600"
-                        : "text-gray-600 dark:text-zinc-400"
+                        : "text-gray-500 dark:text-zinc-400"
                     }`}
                   >
                     {MONTH_LABELS[m]}
@@ -318,8 +248,8 @@ export default function BpProdutos() {
             </thead>
             <tbody>
               {/* ─── MRR Total ─── */}
-              <tr className="border-b border-gray-200 dark:border-zinc-700 bg-gray-50/70 dark:bg-zinc-800/30">
-                <td className={`${stickyBg("bg-gray-50 dark:bg-zinc-800/50")} px-4 py-3 text-sm font-bold text-gray-900 dark:text-white`}>
+              <tr className="border-b border-gray-200 dark:border-zinc-700">
+                <td className={`${stickyBase} bg-gray-50 dark:bg-zinc-800/40 px-5 py-4 text-sm font-bold text-gray-900 dark:text-white`}>
                   MRR Total
                 </td>
                 {MONTHS.map((m) => {
@@ -329,31 +259,18 @@ export default function BpProdutos() {
                   const pct = has && bp > 0 ? (mrr / bp) * 100 : null;
                   const v = has ? getVarPct(m, "total") : null;
                   return (
-                    <td key={m} className={`px-1.5 py-2 text-center ${colBg(m)}`}>
-                      {has ? (
-                        <div className="space-y-0.5">
-                          <div className="text-xs font-bold text-gray-900 dark:text-white tabular-nums">
-                            {fmtK(mrr)}
-                          </div>
-                          <div className="flex items-center justify-center gap-1 flex-wrap">
-                            {pct !== null && (
-                              <span className={`text-[9px] font-semibold px-1 py-px rounded ${pctBadgeBg(pct)}`}>
-                                {pct.toFixed(0)}%
-                              </span>
-                            )}
-                            {v !== null && (
-                              <span className={`text-[9px] font-medium ${varClass(v)}`}>
-                                {v >= 0 ? "↑" : "↓"}{Math.abs(v).toFixed(1)}%
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-0.5">
-                          <div className="text-xs text-gray-300 dark:text-zinc-600 tabular-nums italic">{fmtK(bp)}</div>
-                          <div className="text-[9px] text-gray-300 dark:text-zinc-700">meta</div>
-                        </div>
-                      )}
+                    <td
+                      key={m}
+                      className={`px-2 py-3 text-center ${
+                        isCurrent(m) ? "bg-blue-50/50 dark:bg-blue-950/15" : ""
+                      }`}
+                    >
+                      <div className="text-sm font-bold text-gray-900 dark:text-white tabular-nums">
+                        {has ? fmtK(mrr) : (
+                          <span className="text-gray-300 dark:text-zinc-600 font-normal">{fmtK(bp)}</span>
+                        )}
+                      </div>
+                      {has && indicators(pct, v)}
                     </td>
                   );
                 })}
@@ -361,82 +278,65 @@ export default function BpProdutos() {
 
               {/* ─── Segmentos ─── */}
               {SEGMENTS.map((seg) => {
-                const colors = SEGMENT_COLORS[seg];
+                const colors = SEG_COLORS[seg];
                 const isExp = expanded[seg] ?? false;
                 return (
                   <React.Fragment key={seg}>
-                    {/* Linha principal do segmento */}
                     <tr
-                      className="border-b border-gray-100 dark:border-zinc-800 cursor-pointer hover:bg-gray-50/50 dark:hover:bg-zinc-800/20 transition-colors"
-                      onClick={() => toggleSegment(seg)}
+                      className="border-b border-gray-100 dark:border-zinc-800/60 cursor-pointer hover:bg-gray-50/60 dark:hover:bg-zinc-800/20 transition-colors"
+                      onClick={() => setExpanded((p) => ({ ...p, [seg]: !p[seg] }))}
                     >
-                      <td className={`${stickyBg()} px-4 py-2.5`}>
-                        <div className="flex items-center gap-2">
+                      <td className={`${stickyBase} bg-white dark:bg-zinc-900 px-5 py-4`}>
+                        <div className="flex items-center gap-2.5">
                           {isExp
-                            ? <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                            : <ChevronRight className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />}
+                            ? <ChevronDown className="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500 flex-shrink-0" />
+                            : <ChevronRight className="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500 flex-shrink-0" />}
                           <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${colors.dot}`} />
-                          <span className={`text-sm font-semibold ${colors.text} truncate`}>{seg}</span>
+                          <span className={`text-sm font-semibold ${colors.text}`}>{seg}</span>
                         </div>
                       </td>
                       {MONTHS.map((m) => {
                         const bp = BP_TARGETS[seg]?.[m]?.mrr || 0;
                         const has = hasReal(m);
-                        const real = getReal(m, seg);
-                        const mrr = real?.mrr || 0;
+                        const mrr = getReal(m, seg)?.mrr || 0;
                         const pct = has && bp > 0 ? (mrr / bp) * 100 : null;
                         const v = has ? getVarPct(m, seg) : null;
                         return (
-                          <td key={m} className={`px-1.5 py-2 text-center ${colBg(m)}`}>
-                            {has ? (
-                              <div className="space-y-0.5">
-                                <div className="text-xs font-medium text-gray-900 dark:text-white tabular-nums">
-                                  {fmtK(mrr)}
-                                </div>
-                                <div className="flex items-center justify-center gap-1 flex-wrap">
-                                  {pct !== null && (
-                                    <span className={`text-[9px] font-semibold px-1 py-px rounded ${pctBadgeBg(pct)}`}>
-                                      {pct.toFixed(0)}%
-                                    </span>
-                                  )}
-                                  {v !== null && (
-                                    <span className={`text-[9px] font-medium ${varClass(v)}`}>
-                                      {v >= 0 ? "↑" : "↓"}{Math.abs(v).toFixed(1)}%
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-xs text-gray-300 dark:text-zinc-600 tabular-nums italic">
-                                {fmtK(bp)}
-                              </div>
-                            )}
+                          <td
+                            key={m}
+                            className={`px-2 py-3 text-center ${
+                              isCurrent(m) ? "bg-blue-50/50 dark:bg-blue-950/15" : ""
+                            }`}
+                          >
+                            <div className="text-[13px] font-medium text-gray-900 dark:text-white tabular-nums">
+                              {has ? fmtK(mrr) : (
+                                <span className="text-gray-300 dark:text-zinc-600 font-normal">{fmtK(bp)}</span>
+                              )}
+                            </div>
+                            {has && indicators(pct, v)}
                           </td>
                         );
                       })}
                     </tr>
 
-                    {/* Expandido: Orçado (BP) */}
+                    {/* Expandido: Orçado */}
                     {isExp && (
-                      <tr className="border-b border-gray-50 dark:border-zinc-800/50 bg-gray-50/30 dark:bg-zinc-800/10">
-                        <td className={`${stickyBg("bg-gray-50/50 dark:bg-zinc-800/20")} pl-11 pr-4 py-1.5 text-[11px] text-gray-500 dark:text-zinc-500`}>
+                      <tr className="border-b border-gray-50 dark:border-zinc-800/30">
+                        <td className={`${stickyBase} bg-gray-50/40 dark:bg-zinc-800/15 pl-14 pr-4 py-2 text-[11px] text-gray-400 dark:text-zinc-500`}>
                           Orçado (BP)
                         </td>
-                        {MONTHS.map((m) => {
-                          const bp = BP_TARGETS[seg]?.[m]?.mrr || 0;
-                          return (
-                            <td key={m} className={`px-1.5 py-1.5 text-center text-[11px] text-gray-500 dark:text-zinc-500 tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
-                              {fmtK(bp)}
-                            </td>
-                          );
-                        })}
+                        {MONTHS.map((m) => (
+                          <td key={m} className={`px-2 py-2 text-center text-[11px] text-gray-400 dark:text-zinc-500 tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
+                            {fmtK(BP_TARGETS[seg]?.[m]?.mrr || 0)}
+                          </td>
+                        ))}
                       </tr>
                     )}
 
                     {/* Expandido: AOV */}
                     {isExp && (
-                      <tr className="border-b border-gray-50 dark:border-zinc-800/50 bg-gray-50/30 dark:bg-zinc-800/10">
-                        <td className={`${stickyBg("bg-gray-50/50 dark:bg-zinc-800/20")} pl-11 pr-4 py-1.5 text-[11px] text-gray-500 dark:text-zinc-500`}>
+                      <tr className="border-b border-gray-50 dark:border-zinc-800/30">
+                        <td className={`${stickyBase} bg-gray-50/40 dark:bg-zinc-800/15 pl-14 pr-4 py-2 text-[11px] text-gray-400 dark:text-zinc-500`}>
                           AOV
                         </td>
                         {MONTHS.map((m) => {
@@ -445,14 +345,14 @@ export default function BpProdutos() {
                           const real = getReal(m, seg);
                           const aov = has && real && real.contratos > 0 ? real.mrr / real.contratos : null;
                           return (
-                            <td key={m} className={`px-1.5 py-1.5 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
+                            <td key={m} className={`px-2 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
                               {aov !== null ? (
-                                <div>
+                                <>
                                   <span className="text-gray-900 dark:text-white font-medium">{fmtK(aov)}</span>
-                                  <div className="text-gray-400 dark:text-zinc-600 text-[9px]">BP: {fmtK(bpAov)}</div>
-                                </div>
+                                  <span className="text-gray-300 dark:text-zinc-600 ml-1">/ {fmtK(bpAov)}</span>
+                                </>
                               ) : (
-                                <span className="text-gray-300 dark:text-zinc-600 italic">{fmtK(bpAov)}</span>
+                                <span className="text-gray-300 dark:text-zinc-600">{fmtK(bpAov)}</span>
                               )}
                             </td>
                           );
@@ -462,24 +362,23 @@ export default function BpProdutos() {
 
                     {/* Expandido: Contratos */}
                     {isExp && (
-                      <tr className="border-b border-gray-100 dark:border-zinc-800 bg-gray-50/30 dark:bg-zinc-800/10">
-                        <td className={`${stickyBg("bg-gray-50/50 dark:bg-zinc-800/20")} pl-11 pr-4 py-1.5 text-[11px] text-gray-500 dark:text-zinc-500`}>
+                      <tr className="border-b border-gray-100 dark:border-zinc-800/60">
+                        <td className={`${stickyBase} bg-gray-50/40 dark:bg-zinc-800/15 pl-14 pr-4 py-2 text-[11px] text-gray-400 dark:text-zinc-500`}>
                           Contratos
                         </td>
                         {MONTHS.map((m) => {
-                          const bpCttos = BP_TARGETS[seg]?.[m]?.contratos || 0;
+                          const bpC = BP_TARGETS[seg]?.[m]?.contratos || 0;
                           const has = hasReal(m);
-                          const real = getReal(m, seg);
-                          const cttos = has ? (real?.contratos || 0) : null;
+                          const cttos = has ? (getReal(m, seg)?.contratos || 0) : null;
                           return (
-                            <td key={m} className={`px-1.5 py-1.5 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
+                            <td key={m} className={`px-2 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
                               {cttos !== null ? (
-                                <div>
+                                <>
                                   <span className="text-gray-900 dark:text-white font-medium">{cttos}</span>
-                                  <div className="text-gray-400 dark:text-zinc-600 text-[9px]">BP: {bpCttos}</div>
-                                </div>
+                                  <span className="text-gray-300 dark:text-zinc-600 ml-1">/ {bpC}</span>
+                                </>
                               ) : (
-                                <span className="text-gray-300 dark:text-zinc-600 italic">{bpCttos}</span>
+                                <span className="text-gray-300 dark:text-zinc-600">{bpC}</span>
                               )}
                             </td>
                           );
@@ -492,7 +391,7 @@ export default function BpProdutos() {
             </tbody>
           </table>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
