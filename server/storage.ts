@@ -9538,14 +9538,13 @@ export class DbStorage implements IStorage {
     
     const resumoResult = await db.execute(sql.raw(`
       SELECT
-        COALESCE(SUM(valor_liquido::numeric), 0) as total_previsto,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) <= 0
           THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0
         END), 0) as total_recebido,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0
+          THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as total_pendente,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date
@@ -9563,23 +9562,22 @@ export class DbStorage implements IStorage {
     `));
 
     const resumoRow = resumoResult.rows[0] as any;
-    const totalPrevisto = parseFloat(resumoRow?.total_previsto || '0');
     const totalRecebido = parseFloat(resumoRow?.total_recebido || '0');
     const totalPendente = parseFloat(resumoRow?.total_pendente || '0');
     const totalInadimplente = parseFloat(resumoRow?.total_inadimplente || '0');
+    const totalPrevisto = totalRecebido + totalPendente + totalInadimplente;
     
     const porDiaResult = await db.execute(sql.raw(`
       SELECT
         EXTRACT(DAY FROM data_vencimento) as dia,
         TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_completa,
-        COALESCE(SUM(valor_liquido::numeric), 0) as previsto,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) <= 0
           THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0
         END), 0) as recebido,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date
-          THEN COALESCE(valor_liquido::numeric, 0) ELSE 0
+          THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as pendente,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date
@@ -9611,10 +9609,10 @@ export class DbStorage implements IStorage {
       const diaNum = parseInt(row.dia);
       const idx = diaNum - 1;
       if (idx >= 0 && idx < diasDoMes.length) {
-        diasDoMes[idx].previsto = parseFloat(row.previsto || '0');
         diasDoMes[idx].recebido = parseFloat(row.recebido || '0');
         diasDoMes[idx].pendente = parseFloat(row.pendente || '0');
         diasDoMes[idx].inadimplente = parseFloat(row.inadimplente || '0');
+        diasDoMes[idx].previsto = diasDoMes[idx].recebido + diasDoMes[idx].pendente + diasDoMes[idx].inadimplente;
       }
     }
     
