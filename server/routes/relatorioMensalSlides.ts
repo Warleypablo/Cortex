@@ -419,17 +419,18 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 18. Tech KPIs - Entregues no mês de dados (ambas tabelas)
+        // Usa COALESCE(data_entregue, lancamento) para priorizar data real de entrega
         db.execute(sql`
           SELECT
             COUNT(*)::int as entregues,
             COALESCE(SUM(valor_p), 0)::numeric as valor_entregues,
-            COALESCE(AVG(lancamento - data_criada), 0)::numeric as tempo_medio
+            COALESCE(AVG(COALESCE(data_entregue, lancamento) - data_criada), 0)::numeric as tempo_medio
           FROM (
-            SELECT lancamento, valor_p, data_criada FROM "Clickup".cup_projetos_tech_fechados
+            SELECT data_entregue, lancamento, valor_p, data_criada FROM "Clickup".cup_projetos_tech_fechados
             UNION ALL
-            SELECT lancamento, valor_p, data_criada FROM "Clickup".cup_projetos_tech
+            SELECT data_entregue, lancamento, valor_p, data_criada FROM "Clickup".cup_projetos_tech
           ) combined
-          WHERE TO_CHAR(lancamento, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`}
+          WHERE TO_CHAR(COALESCE(data_entregue, lancamento), 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`}
         `),
 
         // 18b. Tech KPIs - Adicionados no mês de dados (ambas tabelas)
@@ -446,21 +447,22 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 19. Projetos por tipo/mês - últimos 12 meses (ambas tabelas)
+        // Usa COALESCE(data_entregue, lancamento) para priorizar data real de entrega
         db.execute(sql`
           SELECT
-            TO_CHAR(lancamento, 'YYYY-MM') as month,
+            TO_CHAR(COALESCE(data_entregue, lancamento), 'YYYY-MM') as month,
             COALESCE(TRIM(tipo), 'Outros') as tipo,
             COUNT(*)::int as entregas,
             COALESCE(SUM(valor_p), 0)::numeric as receita
           FROM (
-            SELECT lancamento, tipo, valor_p FROM "Clickup".cup_projetos_tech_fechados
+            SELECT data_entregue, lancamento, tipo, valor_p FROM "Clickup".cup_projetos_tech_fechados
             UNION ALL
-            SELECT lancamento, tipo, valor_p FROM "Clickup".cup_projetos_tech
+            SELECT data_entregue, lancamento, tipo, valor_p FROM "Clickup".cup_projetos_tech
           ) combined
-          WHERE lancamento IS NOT NULL
-            AND lancamento >= (${dataEnd}::date - INTERVAL '12 months')
-            AND lancamento < ${dataEnd}::date
-          GROUP BY TO_CHAR(lancamento, 'YYYY-MM'), TRIM(tipo)
+          WHERE COALESCE(data_entregue, lancamento) IS NOT NULL
+            AND COALESCE(data_entregue, lancamento) >= (${dataEnd}::date - INTERVAL '12 months')
+            AND COALESCE(data_entregue, lancamento) < ${dataEnd}::date
+          GROUP BY TO_CHAR(COALESCE(data_entregue, lancamento), 'YYYY-MM'), TRIM(tipo)
           ORDER BY month, tipo
         `),
 
