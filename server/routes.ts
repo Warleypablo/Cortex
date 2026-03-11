@@ -5812,6 +5812,114 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
+  // Top MRR por Area (Comunicacao vs Performance)
+  app.get("/api/analise-squads/top-mrr-area", async (req, res) => {
+    try {
+      const mesAno = req.query.mesAno as string;
+      if (!mesAno || !/^\d{4}-\d{2}$/.test(mesAno)) {
+        return res.status(400).json({ error: "Invalid mesAno parameter. Expected format: YYYY-MM" });
+      }
+
+      const [ano, mes] = mesAno.split('-').map(Number);
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+      const agora = new Date();
+      const isMesAtual = ano === agora.getFullYear() && mes === (agora.getMonth() + 1);
+
+      // Squads da area Comunicacao
+      const COMUNICACAO_SQUADS = ['Makers', 'Pulse'];
+
+      let clientesRows: any[];
+
+      if (isMesAtual) {
+        const result = await db.execute(sql`
+          SELECT
+            COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') as squad,
+            cl.nome as cliente_nome,
+            COALESCE(SUM(c.valorr::numeric), 0) as mrr,
+            COUNT(DISTINCT c.id_subtask) as contratos,
+            MAX(c.responsavel) as responsavel
+          FROM "Clickup".cup_contratos c
+          LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
+          WHERE c.status IN ('ativo', 'onboarding', 'triagem')
+            AND c.valorr IS NOT NULL AND c.valorr > 0
+          GROUP BY COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad'), cl.nome
+          ORDER BY mrr DESC
+        `);
+        clientesRows = result.rows as any[];
+      } else {
+        // Snapshot historico
+        const snapshotResult = await db.execute(sql`
+          SELECT MAX(data_snapshot) as ds
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= ${inicioMes}::timestamp
+            AND data_snapshot <= ${fimMes}::timestamp
+        `);
+        const dataSnapshot = (snapshotResult.rows[0] as any)?.ds;
+
+        if (dataSnapshot) {
+          const result = await db.execute(sql`
+            SELECT
+              COALESCE(NULLIF(TRIM(h.squad), ''), 'Sem Squad') as squad,
+              cl.nome as cliente_nome,
+              COALESCE(SUM(h.valorr::numeric), 0) as mrr,
+              COUNT(DISTINCT h.id_subtask) as contratos,
+              MAX(h.responsavel) as responsavel
+            FROM "Clickup".cup_data_hist h
+            LEFT JOIN "Clickup".cup_clientes cl ON h.id_task = cl.task_id
+            WHERE h.data_snapshot = ${dataSnapshot}::timestamp
+              AND h.status IN ('ativo', 'onboarding', 'triagem')
+              AND h.valorr IS NOT NULL AND h.valorr > 0
+            GROUP BY COALESCE(NULLIF(TRIM(h.squad), ''), 'Sem Squad'), cl.nome
+            ORDER BY mrr DESC
+          `);
+          clientesRows = result.rows as any[];
+        } else {
+          clientesRows = [];
+        }
+      }
+
+      // Separar em areas
+      const comunicacao: any[] = [];
+      const performance: any[] = [];
+
+      for (const row of clientesRows) {
+        const squad = (row.squad || '').trim();
+        const cliente = {
+          nome: row.cliente_nome || 'Sem Nome',
+          squad,
+          mrr: parseFloat(row.mrr) || 0,
+          contratos: parseInt(row.contratos) || 0,
+          responsavel: row.responsavel || '',
+        };
+        if (COMUNICACAO_SQUADS.includes(squad)) {
+          comunicacao.push(cliente);
+        } else {
+          performance.push(cliente);
+        }
+      }
+
+      const buildArea = (clientes: any[]) => {
+        const mrr = clientes.reduce((s: number, c: any) => s + c.mrr, 0);
+        const contratos = clientes.reduce((s: number, c: any) => s + c.contratos, 0);
+        return {
+          mrr,
+          contratos,
+          ticketMedio: contratos > 0 ? mrr / contratos : 0,
+          clientes,
+        };
+      };
+
+      res.json({
+        comunicacao: buildArea(comunicacao),
+        performance: buildArea(performance),
+      });
+    } catch (error) {
+      console.error("Erro ao buscar top MRR por area:", error);
+      res.status(500).json({ error: "Erro interno" });
+    }
+  });
+
   // ========================================
   // SAÚDE DA BASE ATIVA
   // ========================================
@@ -6461,11 +6569,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const { syncMetaAds } = await import("./services/metaAdsSync");
       const { Pool } = await import("pg");
       const pool = new Pool({
-        host: requireEnv("DATABASE_HOST"),
-        port: 5432,
-        database: "dados_turbo",
-        user: "postgres",
-        password: requireEnv("DATABASE_PASSWORD"),
+        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'dados_turbo',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
         ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
       });
       const result = await syncMetaAds(pool, { since, until });
@@ -6513,11 +6621,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const { syncGoogleAdsKeywords } = await import("./services/googleAdsSync");
       const { Pool } = await import("pg");
       const pool = new Pool({
-        host: requireEnv("DATABASE_HOST"),
-        port: 5432,
-        database: "dados_turbo",
-        user: "postgres",
-        password: requireEnv("DATABASE_PASSWORD"),
+        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'dados_turbo',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
         ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
       });
       const result = await syncGoogleAdsKeywords(pool, { since, until });
