@@ -419,6 +419,84 @@ export default function BpProdutos() {
           </table>
         </div>
       </div>
+
+      {/* Resumo: % atingimento por segmento */}
+      <div className="mt-5 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg overflow-hidden">
+        <div className="px-5 py-3 border-b border-gray-100 dark:border-zinc-800">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Resumo — % Atingimento BP</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse min-w-[800px]">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-zinc-700">
+                <th className="px-5 py-2.5 text-left text-[10px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider w-40" />
+                {MONTHS.map((m) => (
+                  <th
+                    key={m}
+                    className={`px-1.5 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${
+                      isCurrent(m)
+                        ? "text-blue-600 dark:text-blue-400"
+                        : isFuture(m)
+                        ? "text-gray-300 dark:text-zinc-600"
+                        : "text-gray-500 dark:text-zinc-400"
+                    }`}
+                  >
+                    {MONTH_LABELS[m].split("/")[0]}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50 dark:divide-zinc-800/50">
+              {/* Total */}
+              <tr className="bg-gray-50/50 dark:bg-zinc-800/20">
+                <td className="px-5 py-2 text-[11px] font-semibold text-gray-700 dark:text-zinc-300">MRR Total</td>
+                {MONTHS.map((m) => {
+                  const bp = BP_MRR_TOTAL[m] || 0;
+                  const has = hasReal(m);
+                  const pct = has && bp > 0 ? (getTotalReal(m).mrr / bp) * 100 : null;
+                  return (
+                    <td key={m} className={`px-1.5 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/40 dark:bg-blue-950/15" : ""}`}>
+                      {pct !== null ? (
+                        <span className={`font-semibold ${pctColor(pct)}`}>{pct.toFixed(0)}%</span>
+                      ) : (
+                        <span className="text-gray-300 dark:text-zinc-700">-</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+              {/* Segmentos */}
+              {SEGMENTS.map((seg) => {
+                const colors = SEG_COLORS[seg];
+                return (
+                  <tr key={seg}>
+                    <td className="px-5 py-2 text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+                        <span className={`${colors.text} font-medium`}>{seg}</span>
+                      </div>
+                    </td>
+                    {MONTHS.map((m) => {
+                      const bp = BP_TARGETS[seg]?.[m]?.mrr || 0;
+                      const has = hasReal(m);
+                      const pct = has && bp > 0 ? ((getReal(m, seg)?.mrr || 0) / bp) * 100 : null;
+                      return (
+                        <td key={m} className={`px-1.5 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/40 dark:bg-blue-950/15" : ""}`}>
+                          {pct !== null ? (
+                            <span className={`font-medium ${pctColor(pct)}`}>{pct.toFixed(0)}%</span>
+                          ) : (
+                            <span className="text-gray-300 dark:text-zinc-700">-</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
