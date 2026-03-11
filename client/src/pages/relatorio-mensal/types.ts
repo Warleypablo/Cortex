@@ -46,6 +46,15 @@ export interface CloserRanking {
   negociosGanhos: number;
 }
 
+export interface SdrRanking {
+  name: string;
+  fotoUrl: string | null;
+  mrrGerado: number;
+  pontualGerado: number;
+  totalGerado: number;
+  negociosGanhos: number;
+}
+
 export interface PipelineBreakdown {
   pipeline: string;
   contratos: number;
@@ -167,6 +176,7 @@ export interface RelatorioMensalData {
   okrObjectives: ObjectiveSlide[];
   rankingClosers: CloserRanking[];
   topPontual: CloserRanking | null;
+  rankingSDRs: SdrRanking[];
   contratosMes: ContratosMes;
   turboMetrics: TurboMetrics;
   rankingSquads: SquadRanking[];
