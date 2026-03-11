@@ -4,6 +4,7 @@ import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useTheme } from "@/components/ThemeProvider";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import TopMrrPorArea from "@/components/squads/TopMrrPorArea";
 import { formatCurrencyNoDecimals, formatPercent, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -605,6 +606,9 @@ export default function AnaliseSquads() {
           )}
         </CardContent>
       </Card>
+
+      {/* Top MRR por Área */}
+      <TopMrrPorArea mesAno={mesAno} />
     </div>
   );
 }
