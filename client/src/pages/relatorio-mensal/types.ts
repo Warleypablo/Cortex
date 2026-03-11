@@ -55,6 +55,12 @@ export interface SdrRanking {
   negociosGanhos: number;
 }
 
+export interface TopReunioes {
+  name: string;
+  fotoUrl: string | null;
+  reunioes: number;
+}
+
 export interface PipelineBreakdown {
   pipeline: string;
   contratos: number;
@@ -177,6 +183,7 @@ export interface RelatorioMensalData {
   rankingClosers: CloserRanking[];
   topPontual: CloserRanking | null;
   rankingSDRs: SdrRanking[];
+  topReunioes: TopReunioes | null;
   contratosMes: ContratosMes;
   turboMetrics: TurboMetrics;
   rankingSquads: SquadRanking[];
