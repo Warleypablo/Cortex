@@ -21,8 +21,25 @@ const TIPO_COLORS: Record<string, string> = {
   "Outros": "#71717a",
 };
 
+const STATUS_COLORS: Record<string, string> = {
+  "não iniciado": "#6b7280",
+  "kickoff": "#a855f7",
+  "pronto p/ design": "#c084fc",
+  "design": "#ec4899",
+  "design review": "#f472b6",
+  "pronto p/ dev": "#f59e0b",
+  "dev": "#3b82f6",
+  "dev review": "#60a5fa",
+  "pronto para lançar": "#22c55e",
+  "bloqueado": "#ef4444",
+};
+
 function getColor(tipo: string): string {
   return TIPO_COLORS[tipo] || "#71717a";
+}
+
+function getStatusColor(status: string): string {
+  return STATUS_COLORS[status] || "#71717a";
 }
 
 function fmtBRL(v: number): string {
@@ -59,6 +76,10 @@ function ChartTooltipContent({ active, payload, label, isCurrency }: any) {
   );
 }
 
+function capitalizeStatus(s: string): string {
+  return s.replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export default function SlideAreaTech({ techData, mesLabel }: Props) {
   if (!techData) {
     return (
@@ -68,7 +89,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
     );
   }
 
-  const { kpis, entregasPorTipo, receitaPorTipo, emAbertoPorTipo, mesLabel: techMesLabel } = techData;
+  const { kpis, entregasPorTipo, receitaPorTipo, emAbertoPorTipo, pipeline, mesLabel: techMesLabel } = techData;
   const displayLabel = techMesLabel || mesLabel;
 
   // Get all tipo keys from data (excluding month/label)
@@ -78,6 +99,8 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
 
   const totalAberto = emAbertoPorTipo.reduce((s, t) => s + t.quantidade, 0);
   const totalAbertoValor = emAbertoPorTipo.reduce((s, t) => s + t.valor, 0);
+  const totalPipeline = (pipeline || []).reduce((s, p) => s + p.quantidade, 0);
+  const maxPipeline = Math.max(...(pipeline || []).map(p => p.quantidade), 1);
 
   return (
     <div className="w-full h-full flex flex-col bg-zinc-950 text-white" style={{ padding: "24px 32px" }}>
@@ -155,63 +178,40 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
         </Card>
       </div>
 
-      {/* Bottom row: Pie em aberto (col-span-2) + Stacked Bar receita (col-span-5) */}
+      {/* Bottom row: Pipeline (col-span-3) + Receita (col-span-4) */}
       <div className="flex-1 grid grid-cols-7 gap-3 min-h-0">
-        {/* Pie Chart: Projetos em Aberto */}
-        <Card className="col-span-2 flex flex-col">
-          <p className="text-sm font-bold text-zinc-300 mb-1">Projetos em Aberto</p>
-          <div className="flex-1 min-h-0 relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={emAbertoPorTipo}
-                  dataKey="quantidade"
-                  nameKey="tipo"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="55%"
-                  outerRadius="85%"
-                  strokeWidth={1}
-                  stroke="#18181b"
-                >
-                  {emAbertoPorTipo.map((entry) => (
-                    <Cell key={entry.tipo} fill={getColor(entry.tipo)} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null;
-                    const d = payload[0].payload;
-                    return (
-                      <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs">
-                        <p className="font-bold text-white">{d.tipo}</p>
-                        <p className="text-zinc-300">{d.quantidade} projetos</p>
-                        <p className="text-zinc-400">{fmtBRL(d.valor)}</p>
-                      </div>
-                    );
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            {/* Center label */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <p className="text-2xl font-black">{totalAberto}</p>
-              <p className="text-[9px] text-zinc-500">{fmtBRL(totalAbertoValor)}</p>
-            </div>
+        {/* Pipeline por Status */}
+        <Card className="col-span-3 flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-bold text-zinc-300">Pipeline Tech</p>
+            <span className="text-xs text-zinc-500">{totalPipeline} projetos</span>
           </div>
-          {/* Legend */}
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-            {emAbertoPorTipo.map((t) => (
-              <div key={t.tipo} className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getColor(t.tipo) }} />
-                <span className="text-[8px] text-zinc-400">{t.tipo} ({t.quantidade})</span>
+          <div className="flex-1 min-h-0 flex flex-col justify-center gap-1.5 overflow-y-auto">
+            {(pipeline || []).map((item) => (
+              <div key={item.status} className="flex items-center gap-2">
+                <span className="text-[9px] text-zinc-400 w-[100px] text-right truncate shrink-0">
+                  {capitalizeStatus(item.status)}
+                </span>
+                <div className="flex-1 h-5 bg-zinc-800/50 rounded overflow-hidden relative">
+                  <div
+                    className="h-full rounded transition-all"
+                    style={{
+                      width: `${(item.quantidade / maxPipeline) * 100}%`,
+                      backgroundColor: getStatusColor(item.status),
+                      minWidth: item.quantidade > 0 ? '8px' : '0px',
+                    }}
+                  />
+                  <span className="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-white drop-shadow">
+                    {item.quantidade}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
         </Card>
 
         {/* Stacked Bar: Receita Tech */}
-        <Card className="col-span-5 flex flex-col">
+        <Card className="col-span-4 flex flex-col">
           <p className="text-sm font-bold text-zinc-300 mb-1">Receita Tech</p>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
