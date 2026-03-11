@@ -44,6 +44,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         closerPhotosResult,
         rankingSdrResult,
         sdrPhotosResult,
+        sdrReunioesResult,
         graficoResult,
         quarterSalesResult,
         turboMrrResult,
@@ -189,6 +190,21 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           FROM "Bitrix".crm_users u
           LEFT JOIN cortex_core.auth_users a ON LOWER(TRIM(u.email)) = LOWER(TRIM(a.email))
           WHERE u.email IS NOT NULL AND a.picture IS NOT NULL
+        `),
+
+        // 6d. SDR reuniões (meetings held in the data month, grouped by SDR)
+        db.execute(sql`
+          SELECT
+            u.nome as name,
+            COUNT(*)::int as reunioes
+          FROM "Bitrix".crm_deal d
+          JOIN "Bitrix".crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+          WHERE d.data_reuniao_realizada IS NOT NULL
+            AND d.data_reuniao_realizada >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}
+            AND d.data_reuniao_realizada < ${`${ano}-${String(mes).padStart(2, '0')}-01`}
+          GROUP BY u.nome
+          ORDER BY reunioes DESC
+          LIMIT 1
         `),
 
         // 7. Contracts data for the data month only
@@ -727,6 +743,14 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         negociosGanhos: parseInt(row.negocios_ganhos) || 0,
       }));
 
+      // Top SDR by meetings
+      const topReunioesRow = (sdrReunioesResult.rows as any[])[0];
+      const topReunioes = topReunioesRow ? {
+        name: topReunioesRow.name,
+        fotoUrl: sdrPhotoMap[topReunioesRow.name] || null,
+        reunioes: parseInt(topReunioesRow.reunioes) || 0,
+      } : null;
+
       // Build contracts data (single month)
       const contratosRow = (graficoResult.rows as any[])[0] || {};
       const totalRecorrente = parseFloat(contratosRow.receita_recorrente) || 0;
@@ -942,6 +966,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         rankingClosers,
         topPontual,
         rankingSDRs,
+        topReunioes,
         contratosMes: {
           numContratos,
           contratosRecorrente: totalContratosRec,
