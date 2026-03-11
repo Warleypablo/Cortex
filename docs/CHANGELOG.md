@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-03-11 | fix(growth): show last 12 months in orcado-realizado month selector
+
+**O que foi feito:**
+- Endpoint de meses agora gera últimos 12 meses automaticamente, além dos meses com budgets salvos
+
+**Por que:**
+- Fevereiro sumiu do seletor porque não tinha budget salvo na tabela `growth_budgets`
+
+**Arquivos alterados:**
+- `server/routes/growth.ts` - Gerar últimos 12 meses no endpoint `/budgets/months`
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-11 | fix(growth): correct crm_deal column name from data_criacao to created_at
 
 **O que foi feito:**
