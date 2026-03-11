@@ -2579,20 +2579,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ============== MARGEM POR CLIENTE ==============
-  
-  app.get("/api/financeiro/margem-clientes", async (req, res) => {
-    try {
-      const dataInicio = req.query.dataInicio as string | undefined;
-      const dataFim = req.query.dataFim as string | undefined;
-      const data = await storage.getMargemPorCliente(dataInicio, dataFim);
-      res.json(data);
-    } catch (error) {
-      console.error("[api] Error fetching margem por cliente:", error);
-      res.status(500).json({ error: "Failed to fetch margem por cliente" });
-    }
-  });
-
   app.get("/api/analytics/cohort-retention", async (req, res) => {
     try {
       const filters: { squad?: string; servicos?: string[]; mesInicio?: string; mesFim?: string } = {};
