@@ -1,5 +1,102 @@
 import type { Express } from "express";
 import type { IStorage } from "../storage";
+import { sql } from "drizzle-orm";
+
+const CLICKUP_API_KEY = process.env.CLICKUP_API_KEY;
+const CLICKUP_TECH_LIST_ID = "217091334";
+
+// Custom field IDs for Projetos Tech list
+const CF = {
+  TIPO: "8cd467cb-6451-4933-b9e7-a61bf169987a",
+  TIPO_PROJETO: "727d5d3e-7f40-4c64-8a76-9a703554efb6",
+  FASE_PROJETO: "5d46b251-aa0a-417f-9dd8-8dc11ff7b5eb",
+  VALOR_P: "a0797492-cc59-41ab-9df6-f8d9952afec1",
+  LANCAMENTO_PREVISTO: "bfc1bf1c-57cf-4cfe-ac0c-c8d167b96f4c",
+  DATA_KICKOFF: "de5c78c9-5d62-4f45-8eba-69b15126a784",
+  FIGMA: "08cc9fd7-afe8-4f84-894b-393ccbcc93d3",
+  TEMPO_TOTAL: "2a8272dd-990f-4833-936e-c7be47e3ac8b",
+};
+
+interface ClickUpTask {
+  id: string;
+  name: string;
+  status: { status: string; type: string };
+  priority?: { priority: string } | null;
+  due_date?: string | null;
+  start_date?: string | null;
+  date_created?: string;
+  custom_fields?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    value: any;
+    type_config?: { options?: Array<{ orderindex: number; name: string }> };
+  }>;
+  assignees?: Array<{ username: string }>;
+}
+
+function msToDate(ms: string | number | null | undefined): string | null {
+  if (!ms) return null;
+  const d = new Date(Number(ms));
+  return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
+}
+
+function getDropdownValue(cf: any): string | null {
+  if (cf.value == null) return null;
+  const opts = cf.type_config?.options || [];
+  for (const opt of opts) {
+    if (String(opt.orderindex) === String(cf.value)) return opt.name;
+  }
+  return null;
+}
+
+function parseCurrency(val: any): number | null {
+  if (val == null) return null;
+  const n = parseFloat(val);
+  return isNaN(n) ? null : n;
+}
+
+function parseTaskRow(t: ClickUpTask) {
+  const cfs: Record<string, any> = {};
+  for (const cf of t.custom_fields || []) {
+    cfs[cf.id] = cf;
+  }
+  const assigneeNames = (t.assignees || []).map((a: any) => a.username).join("; ");
+  return {
+    clickup_task_id: t.id,
+    task_name: t.name,
+    status_projeto: t.status?.status || null,
+    prioridade: t.priority?.priority || null,
+    data_vencimento: msToDate(t.due_date),
+    lancamento: cfs[CF.LANCAMENTO_PREVISTO]?.value ? msToDate(cfs[CF.LANCAMENTO_PREVISTO].value) : null,
+    tempo_total: cfs[CF.TEMPO_TOTAL]?.value != null ? parseFloat(cfs[CF.TEMPO_TOTAL].value) || null : null,
+    responsavel: assigneeNames || null,
+    fase_projeto: cfs[CF.FASE_PROJETO] ? getDropdownValue(cfs[CF.FASE_PROJETO]) : null,
+    tipo: cfs[CF.TIPO] ? getDropdownValue(cfs[CF.TIPO]) : null,
+    tipo_projeto: cfs[CF.TIPO_PROJETO] ? getDropdownValue(cfs[CF.TIPO_PROJETO]) : null,
+    figma: cfs[CF.FIGMA]?.value || null,
+    valor_p: cfs[CF.VALOR_P] ? parseCurrency(cfs[CF.VALOR_P].value) : null,
+    data_inicial: msToDate(t.start_date),
+    data_criada: msToDate(t.date_created),
+  };
+}
+
+async function fetchAllClickUpTasks(listId: string): Promise<ClickUpTask[]> {
+  const allTasks: ClickUpTask[] = [];
+  let page = 0;
+  while (true) {
+    const res = await fetch(
+      `https://api.clickup.com/api/v2/list/${listId}/task?page=${page}&include_closed=true&subtasks=false`,
+      { headers: { Authorization: CLICKUP_API_KEY || "" } }
+    );
+    if (!res.ok) throw new Error(`ClickUp API error: ${res.status} ${res.statusText}`);
+    const data = await res.json();
+    allTasks.push(...(data.tasks || []));
+    if (data.last_page) break;
+    page++;
+  }
+  return allTasks;
+}
 
 export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
   // Tech Dashboard API routes
@@ -157,6 +254,80 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
     } catch (error) {
       console.error("[api] Error fetching tech receita mensal:", error);
       res.status(500).json({ error: "Failed to fetch tech receita mensal" });
+    }
+  });
+
+  // Sync ClickUp → cup_projetos_tech / cup_projetos_tech_fechados
+  app.post("/api/tech/sync-clickup", async (req, res) => {
+    try {
+      if (!CLICKUP_API_KEY) {
+        return res.status(500).json({ error: "CLICKUP_API_KEY not configured" });
+      }
+
+      console.log("[tech-sync] Starting ClickUp sync...");
+      const tasks = await fetchAllClickUpTasks(CLICKUP_TECH_LIST_ID);
+      console.log(`[tech-sync] Fetched ${tasks.length} tasks from ClickUp`);
+
+      // Closed status types in ClickUp
+      const closedTypes = new Set(["closed", "done"]);
+      const openTasks = tasks.filter(t => !closedTypes.has(t.status?.type));
+      const closedTasks = tasks.filter(t => closedTypes.has(t.status?.type));
+
+      const openRows = openTasks.map(parseTaskRow);
+      const closedRows = closedTasks.map(parseTaskRow);
+
+      // Truncate and insert in a transaction
+      await db.transaction(async (tx: any) => {
+        await tx.execute(sql`DELETE FROM "Clickup".cup_projetos_tech`);
+        await tx.execute(sql`DELETE FROM "Clickup".cup_projetos_tech_fechados`);
+
+        for (const row of openRows) {
+          await tx.execute(sql`
+            INSERT INTO "Clickup".cup_projetos_tech
+            (clickup_task_id, task_name, status_projeto, prioridade, data_vencimento,
+             lancamento, tempo_total, responsavel, fase_projeto, tipo, tipo_projeto,
+             figma, valor_p, data_inicial, data_criada)
+            VALUES (
+              ${row.clickup_task_id}, ${row.task_name}, ${row.status_projeto}, ${row.prioridade},
+              ${row.data_vencimento ? sql.raw(`'${row.data_vencimento}'::date`) : sql`NULL`},
+              ${row.lancamento ? sql.raw(`'${row.lancamento}'::date`) : sql`NULL`},
+              ${row.tempo_total}, ${row.responsavel}, ${row.fase_projeto}, ${row.tipo},
+              ${row.tipo_projeto}, ${row.figma}, ${row.valor_p},
+              ${row.data_inicial ? sql.raw(`'${row.data_inicial}'::date`) : sql`NULL`},
+              ${row.data_criada ? sql.raw(`'${row.data_criada}'::date`) : sql`NULL`}
+            )
+          `);
+        }
+
+        for (const row of closedRows) {
+          await tx.execute(sql`
+            INSERT INTO "Clickup".cup_projetos_tech_fechados
+            (clickup_task_id, task_name, status_projeto, prioridade, data_vencimento,
+             lancamento, tempo_total, responsavel, fase_projeto, tipo, tipo_projeto,
+             figma, valor_p, data_inicial, data_criada)
+            VALUES (
+              ${row.clickup_task_id}, ${row.task_name}, ${row.status_projeto}, ${row.prioridade},
+              ${row.data_vencimento ? sql.raw(`'${row.data_vencimento}'::date`) : sql`NULL`},
+              ${row.lancamento ? sql.raw(`'${row.lancamento}'::date`) : sql`NULL`},
+              ${row.tempo_total}, ${row.responsavel}, ${row.fase_projeto}, ${row.tipo},
+              ${row.tipo_projeto}, ${row.figma}, ${row.valor_p},
+              ${row.data_inicial ? sql.raw(`'${row.data_inicial}'::date`) : sql`NULL`},
+              ${row.data_criada ? sql.raw(`'${row.data_criada}'::date`) : sql`NULL`}
+            )
+          `);
+        }
+      });
+
+      console.log(`[tech-sync] Done: ${openRows.length} open, ${closedRows.length} closed`);
+      res.json({
+        success: true,
+        total: tasks.length,
+        open: openRows.length,
+        closed: closedRows.length,
+      });
+    } catch (error: any) {
+      console.error("[tech-sync] Error:", error?.message || error);
+      res.status(500).json({ error: "Failed to sync ClickUp data", details: error?.message });
     }
   });
 }
