@@ -443,38 +443,45 @@ interface CortexField {
   required: boolean;
   placeholder?: string;
   options?: string[];
+  minLength?: number;
 }
 
 const CORTEX_CATEGORY_FIELDS: Record<string, CortexField[]> = {
   Bug: [
     { key: "pagina_url", label: "Pagina/URL afetada", type: "input", required: true, placeholder: "Ex: /financeiro/inadimplencia" },
-    { key: "passos_reproduzir", label: "Passos para reproduzir", type: "textarea", required: true, placeholder: "1. Acessar a pagina...\n2. Clicar em...\n3. Observar que..." },
-    { key: "comportamento_esperado", label: "Comportamento esperado", type: "textarea", required: true, placeholder: "O que deveria acontecer?" },
-    { key: "comportamento_atual", label: "Comportamento atual", type: "textarea", required: true, placeholder: "O que esta acontecendo de errado?" },
+    { key: "passos_reproduzir", label: "Passos para reproduzir", type: "textarea", required: true, minLength: 30, placeholder: "1. Acessei a pagina X\n2. Cliquei no botao Y\n3. Vi o erro Z" },
+    { key: "comportamento_esperado", label: "Comportamento esperado", type: "textarea", required: true, minLength: 20, placeholder: "Deveria mostrar a lista de clientes filtrada" },
+    { key: "comportamento_atual", label: "Comportamento atual", type: "textarea", required: true, minLength: 20, placeholder: "Aparece uma tela em branco / erro 500 / dados errados" },
+    { key: "exemplo_concreto", label: "Exemplo concreto", type: "textarea", required: true, minLength: 50, placeholder: "Ex: Ao filtrar por 'Janeiro/2026' na pagina de inadimplencia, o cliente 'Empresa X' aparece como inadimplente mas ja pagou dia 05/01" },
   ],
   "Nova Feature": [
-    { key: "user_story", label: "Objetivo / User Story", type: "textarea", required: true, placeholder: "Como [perfil], quero [acao], para [beneficio]" },
-    { key: "criterios_aceite", label: "Criterios de aceite", type: "textarea", required: true, placeholder: "- [ ] Criterio 1\n- [ ] Criterio 2" },
+    { key: "user_story", label: "Objetivo / User Story", type: "textarea", required: true, minLength: 30, placeholder: "Como [perfil], quero [acao], para [beneficio]" },
+    { key: "criterios_aceite", label: "Criterios de aceite", type: "textarea", required: true, minLength: 30, placeholder: "- [ ] Criterio 1\n- [ ] Criterio 2" },
+    { key: "exemplo_uso", label: "Exemplo concreto de uso", type: "textarea", required: true, minLength: 50, placeholder: "Ex: O gerente de operacoes precisa ver quantos clientes entraram em churn no mes, filtrado por responsavel, para discutir na reuniao semanal" },
     { key: "paginas_componentes", label: "Paginas/componentes afetados", type: "input", required: false, placeholder: "Ex: Dashboard, Sidebar" },
   ],
   Melhoria: [
-    { key: "comportamento_atual", label: "Comportamento atual", type: "textarea", required: true, placeholder: "Como funciona hoje?" },
-    { key: "melhoria_desejada", label: "Melhoria desejada", type: "textarea", required: true, placeholder: "Como deveria funcionar?" },
+    { key: "comportamento_atual", label: "Comportamento atual", type: "textarea", required: true, minLength: 30, placeholder: "Hoje a tabela mostra todos os clientes sem filtro de periodo" },
+    { key: "melhoria_desejada", label: "Melhoria desejada", type: "textarea", required: true, minLength: 30, placeholder: "Quero poder filtrar por mes e ver so os do periodo selecionado" },
+    { key: "exemplo_concreto", label: "Exemplo concreto", type: "textarea", required: true, minLength: 50, placeholder: "Ex: Na reuniao de segunda, precisei exportar os dados para Excel porque nao consegui filtrar por squad na propria tela" },
     { key: "paginas_componentes", label: "Paginas/componentes afetados", type: "input", required: false, placeholder: "Ex: Tabela de clientes" },
   ],
   "Relatorio / Dashboard": [
     { key: "fonte_dados", label: "Fonte de dados", type: "input", required: true, placeholder: "Tabela ou API (ex: caz_parcelas)" },
-    { key: "metricas_campos", label: "Metricas/campos necessarios", type: "textarea", required: true, placeholder: "Quais dados precisam aparecer?" },
+    { key: "metricas_campos", label: "Metricas/campos necessarios", type: "textarea", required: true, minLength: 30, placeholder: "Quais dados precisam aparecer?" },
     { key: "tipo_visualizacao", label: "Tipo de visualizacao", type: "select", required: true, options: ["Tabela", "Grafico de barras", "Grafico de linha", "Card KPI", "Outro"] },
+    { key: "exemplo_uso", label: "Exemplo concreto de uso", type: "textarea", required: true, minLength: 50, placeholder: "Ex: Na reuniao mensal, o financeiro precisa ver receita recorrente vs pontual mes a mes, comparando com o orcado" },
   ],
   "Integracao": [
     { key: "sistema_externo", label: "Sistema externo", type: "input", required: true, placeholder: "Ex: Conta Azul, ClickUp" },
     { key: "tipo_integracao", label: "Tipo", type: "select", required: true, options: ["API REST", "Webhook", "Banco de dados", "Arquivo/CSV"] },
     { key: "direcao", label: "Direcao", type: "select", required: true, options: ["Entrada", "Saida", "Bidirecional"] },
-    { key: "detalhes_integracao", label: "Detalhes da integracao", type: "textarea", required: true, placeholder: "Descreva o fluxo de dados desejado" },
+    { key: "detalhes_integracao", label: "Detalhes da integracao", type: "textarea", required: true, minLength: 40, placeholder: "Descreva o fluxo de dados desejado" },
+    { key: "exemplo_caso_uso", label: "Exemplo concreto de uso", type: "textarea", required: true, minLength: 50, placeholder: "Ex: Quando um deal e fechado no CRM, os dados do contrato devem ser criados automaticamente no ClickUp com as informacoes de valor e prazo" },
   ],
   Outros: [
-    { key: "detalhes_adicionais", label: "Detalhes adicionais", type: "textarea", required: true, placeholder: "Descreva com o maximo de detalhes possivel" },
+    { key: "detalhes_adicionais", label: "Detalhes adicionais", type: "textarea", required: true, minLength: 30, placeholder: "Descreva com o maximo de detalhes possivel" },
+    { key: "exemplo_concreto", label: "Exemplo concreto", type: "textarea", required: true, minLength: 50, placeholder: "De um exemplo concreto da situacao ou necessidade" },
   ],
 };
 
@@ -516,7 +523,13 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
   }
 
   const cortexFieldsMissing = isCortex && categoria
-    ? cortexFields.filter((f) => f.required && !detalhes[f.key]?.trim()).length > 0
+    ? cortexFields.filter((f) => {
+        if (!f.required) return false;
+        const val = detalhes[f.key]?.trim() || "";
+        if (!val) return true;
+        if (f.minLength && val.length < f.minLength) return true;
+        return false;
+      }).length > 0
     : false;
 
   const createMutation = useMutation({
@@ -632,13 +645,24 @@ function CreateChamadoDialog({ open, onClose }: { open: boolean; onClose: () => 
                     />
                   )}
                   {field.type === "textarea" && (
-                    <Textarea
-                      value={detalhes[field.key] || ""}
-                      onChange={(e) => updateDetalhe(field.key, e.target.value)}
-                      placeholder={field.placeholder}
-                      rows={3}
-                      className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
-                    />
+                    <>
+                      <Textarea
+                        value={detalhes[field.key] || ""}
+                        onChange={(e) => updateDetalhe(field.key, e.target.value)}
+                        placeholder={field.placeholder}
+                        rows={3}
+                        className={`bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 ${
+                          field.minLength && detalhes[field.key]?.trim() && detalhes[field.key].trim().length < field.minLength
+                            ? "border-amber-400 dark:border-amber-600"
+                            : ""
+                        }`}
+                      />
+                      {field.minLength && detalhes[field.key]?.trim() && detalhes[field.key].trim().length < field.minLength && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                          Minimo {field.minLength} caracteres (faltam {field.minLength - detalhes[field.key].trim().length})
+                        </p>
+                      )}
+                    </>
                   )}
                   {field.type === "select" && field.options && (
                     <Select value={detalhes[field.key] || ""} onValueChange={(v) => updateDetalhe(field.key, v)}>
