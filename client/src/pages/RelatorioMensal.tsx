@@ -146,31 +146,31 @@ export default function RelatorioMensal() {
   }, [data, currentSlide, selectedMonth]);
 
   const slideNames = [
-    "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
+    "Capa", "Novos & Aniversários", "Aniv. Empresa",
     "KRs", "Capa Commerce", "Commerce", "Capa Comercial", "Ranking Closers",
     "Contratos", "Turbo Metrics", "Ranking Squads", "Squad Details",
-    "Capa Tech", "Area Tech", "Indicações"
+    "Capa Tech", "Area Tech", "Indicações", "Q&A"
   ];
 
   const renderSlide = () => {
     if (!data) return null;
     switch (currentSlide) {
       case 0: return <SlideCapa mesLabel={data.mesLabel} />;
-      case 1: return <SlideQRCode />;
-      case 2: return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
-      case 3: return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
-      case 4: return <SlideKRs objectives={data.okrObjectives} />;
-      case 5: return <SlideCapaCommerce />;
-      case 6: return <SlideTurboCommerce ano={ano} mes={mes} />;
-      case 7: return <SlideCapaComercial />;
-      case 8: return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
-      case 9: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
-      case 10: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 11: return <SlideRankingSquads ranking={data.rankingSquads} />;
-      case 12: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
-      case 13: return <SlideCapaTech />;
-      case 14: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 15: return <SlideIndicacoes dados={data.indicacoes} mesLabel={data.mesDadosLabel} />;
+      case 1: return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
+      case 2: return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
+      case 3: return <SlideKRs objectives={data.okrObjectives} />;
+      case 4: return <SlideCapaCommerce />;
+      case 5: return <SlideTurboCommerce ano={ano} mes={mes} />;
+      case 6: return <SlideCapaComercial />;
+      case 7: return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
+      case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
+      case 9: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 10: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 11: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
+      case 12: return <SlideCapaTech />;
+      case 13: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 14: return <SlideIndicacoes dados={data.indicacoes} mesLabel={data.mesDadosLabel} />;
+      case 15: return <SlideQRCode />;
       default: return null;
     }
   };
