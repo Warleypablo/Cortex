@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-03-11 | fix(growth): include Google Ads data in orcado-realizado investment metric
+
+**O que foi feito:**
+- Endpoint `/api/growth/orcado-realizado/ads` agora consulta Google Ads além de Meta Ads
+- Investimento, impressões e cliques são combinados de ambas as fontes
+- CPM e CTR recalculados a partir dos totais combinados
+
+**Por que:**
+- O card "Investimento" na aba Orçado x Realizado mostrava R$ 0,00 porque o endpoint só consultava Meta Ads, ignorando gastos no Google Ads
+
+**Arquivos alterados:**
+- `server/routes/growth.ts` - Adicionada query Google Ads ao endpoint orcado-realizado/ads e combinação dos totais
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-10 | feat(chamados): integrate Cortex chamados with Obsidian Tasks
 
 **O que foi feito:**
