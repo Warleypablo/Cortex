@@ -119,6 +119,7 @@ const Acessos = lazyWithRetry(() => import("@/pages/Acessos"));
 const Conhecimentos = lazyWithRetry(() => import("@/pages/Conhecimentos"));
 const Beneficios = lazyWithRetry(() => import("@/pages/Beneficios"));
 const OKR2026 = lazyWithRetry(() => import("@/pages/OKR2026"));
+const BpProdutos = lazyWithRetry(() => import("@/pages/BpProdutos"));
 const AdminNotificationRules = lazyWithRetry(() => import("@/pages/AdminNotificationRules"));
 const AdminDesignSystem = lazyWithRetry(() => import("@/pages/AdminDesignSystem"));
 const Calendario = lazyWithRetry(() => import("@/pages/Calendario"));
@@ -354,7 +355,8 @@ function ProtectedRouter() {
       
       {/* OKR 2026 */}
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
-      
+      <Route path="/bp-produtos">{() => <ProtectedRoute path="/bp-produtos" component={BpProdutos} />}</Route>
+
       {/* Calendário */}
       <Route path="/calendario">{() => <ProtectedRoute path="/calendario" component={Calendario} />}</Route>
       

@@ -40,6 +40,7 @@ import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
+import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -7093,6 +7094,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Favorites Module - registered from separate file
   registerFavoritesRoutes(app);
+
+  // BP Produtos Module
+  registerBpProdutosRoutes(app);
 
   // ============================================
   // Sugestões API
