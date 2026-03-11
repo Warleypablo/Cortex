@@ -13,6 +13,7 @@ import SlideCapaCommerce from "./relatorio-mensal/SlideCapaCommerce";
 import SlideCapaComercial from "./relatorio-mensal/SlideCapaComercial";
 import SlideCapaTech from "./relatorio-mensal/SlideCapaTech";
 import SlideRankingClosers from "./relatorio-mensal/SlideRankingClosers";
+import SlideRankingSDRs from "./relatorio-mensal/SlideRankingSDRs";
 import SlideGraficoContratos from "./relatorio-mensal/SlideGraficoContratos";
 import SlideIndicacoes from "./relatorio-mensal/SlideIndicacoes";
 import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
@@ -20,7 +21,7 @@ import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
 import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
 
-const TOTAL_SLIDES = 17;
+const TOTAL_SLIDES = 18;
 
 const MESES_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -148,7 +149,7 @@ export default function RelatorioMensal() {
   const slideNames = [
     "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
     "KRs", "Capa Commerce", "Commerce", "Capa Comercial", "Ranking Closers",
-    "Contratos", "Turbo Metrics", "Ranking Squads", "Squad Details",
+    "Ranking SDRs", "Contratos", "Turbo Metrics", "Ranking Squads", "Squad Details",
     "Capa Tech", "Area Tech", "Indicações", "Q&A"
   ];
 
@@ -164,14 +165,15 @@ export default function RelatorioMensal() {
       case 6: return <SlideTurboCommerce ano={ano} mes={mes} />;
       case 7: return <SlideCapaComercial />;
       case 8: return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
-      case 9: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
-      case 10: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 11: return <SlideRankingSquads ranking={data.rankingSquads} />;
-      case 12: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
-      case 13: return <SlideCapaTech />;
-      case 14: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 15: return <SlideIndicacoes dados={data.indicacoes} mesLabel={data.mesDadosLabel} />;
-      case 16: return <SlideQRCode />;
+      case 9: return <SlideRankingSDRs ranking={data.rankingSDRs} />;
+      case 10: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
+      case 11: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 12: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
+      case 14: return <SlideCapaTech />;
+      case 15: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 16: return <SlideIndicacoes dados={data.indicacoes} mesLabel={data.mesDadosLabel} />;
+      case 17: return <SlideQRCode />;
       default: return null;
     }
   };
