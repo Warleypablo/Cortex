@@ -9559,8 +9559,9 @@ export class DbStorage implements IStorage {
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= '${primeiroDia}'
         AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
+        AND status NOT IN ('RENEGOCIADO', 'PERDIDO')
     `));
-    
+
     const resumoRow = resumoResult.rows[0] as any;
     const totalPrevisto = parseFloat(resumoRow?.total_previsto || '0');
     const totalRecebido = parseFloat(resumoRow?.total_recebido || '0');
@@ -9588,6 +9589,7 @@ export class DbStorage implements IStorage {
       WHERE tipo_evento = 'RECEITA'
         AND data_vencimento >= '${primeiroDia}'
         AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
+        AND status NOT IN ('RENEGOCIADO', 'PERDIDO')
       GROUP BY EXTRACT(DAY FROM data_vencimento), TO_CHAR(data_vencimento, 'YYYY-MM-DD')
       ORDER BY dia
     `));
