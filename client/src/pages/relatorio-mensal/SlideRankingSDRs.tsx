@@ -1,8 +1,9 @@
-import { Trophy, Crown } from "lucide-react";
-import type { SdrRanking } from "./types";
+import { Trophy, Crown, CalendarCheck } from "lucide-react";
+import type { SdrRanking, TopReunioes } from "./types";
 
 interface Props {
   ranking: SdrRanking[];
+  topReunioes: TopReunioes | null;
 }
 
 function formatBRL(v: number): string {
@@ -35,9 +36,8 @@ const COLORS = [
   { ring: "#f97316", grad: "from-orange-500/25 to-orange-800/15", text: "text-orange-400" },
 ];
 
-export default function SlideRankingSDRs({ ranking }: Props) {
+export default function SlideRankingSDRs({ ranking, topReunioes }: Props) {
   const top3 = ranking.slice(0, 3);
-  const rest = ranking.slice(3);
 
   // Display: 2nd | 1st | 3rd
   const display = top3.length >= 3
@@ -98,23 +98,26 @@ export default function SlideRankingSDRs({ ranking }: Props) {
           })}
         </div>
 
-        {/* Remaining SDRs list */}
-        {rest.length > 0 && (
+        {/* Top Reuniões */}
+        {topReunioes && (
           <div className="flex items-center shrink-0" style={{ width: 240 }}>
-            <div className="w-full bg-gradient-to-b from-zinc-800/40 to-zinc-900/20 border border-zinc-700/40 rounded-2xl flex flex-col"
-              style={{ padding: "24px 20px" }}>
-              <p className="text-sm font-bold text-zinc-400 uppercase tracking-widest mb-4 text-center">Demais SDRs</p>
-              <div className="flex flex-col gap-3">
-                {rest.map((sdr, i) => (
-                  <div key={sdr.name} className="flex items-center gap-3">
-                    <span className="text-zinc-500 font-bold text-sm w-6 text-right">{i + 4}o</span>
-                    <Foto nome={sdr.name} url={sdr.fotoUrl} px={36} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{firstName(sdr.name)}</p>
-                      <p className="text-xs text-zinc-500">{formatBRL(sdr.mrrGerado)} · {sdr.negociosGanhos} neg.</p>
-                    </div>
-                  </div>
-                ))}
+            <div className="w-full bg-gradient-to-b from-emerald-500/15 to-emerald-900/5 border border-emerald-500/30 rounded-2xl flex flex-col items-center text-center"
+              style={{ padding: "32px 24px" }}>
+              <div className="flex items-center gap-2 mb-5">
+                <CalendarCheck className="h-5 w-5 text-emerald-400" />
+                <span className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Top Reunioes</span>
+              </div>
+
+              <div className="rounded-full mb-4"
+                style={{ padding: 4, border: "4px solid #10b981" }}>
+                <Foto nome={topReunioes.name} url={topReunioes.fotoUrl} px={120} />
+              </div>
+
+              <p className="text-xl font-bold">{firstName(topReunioes.name)}</p>
+
+              <div className="bg-emerald-500/15 rounded-xl px-6 py-3 mt-4">
+                <p className="text-3xl font-bold text-emerald-400">{topReunioes.reunioes}</p>
+                <p className="text-sm text-zinc-400 mt-1">reunioes realizadas</p>
               </div>
             </div>
           </div>
