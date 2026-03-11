@@ -83,7 +83,6 @@ const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
 const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
-const RoadmapAuditoria = lazyWithRetry(() => import("@/pages/RoadmapAuditoria"));
 const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
 const ContribuicaoOperador = lazyWithRetry(() => import("@/pages/ContribuicaoOperador"));
 const ContribuicaoSquad = lazyWithRetry(() => import("@/pages/ContribuicaoSquad"));
@@ -134,7 +133,6 @@ const AdminOverrides = lazyWithRetry(() => import("@/pages/AdminOverrides"));
 const Sugestoes = lazyWithRetry(() => import("@/pages/Sugestoes"));
 const ProcessosInternos = lazyWithRetry(() => import("@/pages/ProcessosInternos"));
 const ContratosModule = lazyWithRetry(() => import("@/pages/ContratosModule"));
-const MargemCliente = lazyWithRetry(() => import("@/pages/MargemCliente"));
 const AnaliseSquads = lazyWithRetry(() => import("@/pages/AnaliseSquads"));
 const SaudeBaseAtiva = lazyWithRetry(() => import("@/pages/SaudeBaseAtiva"));
 const AutoReport = lazyWithRetry(() => import("@/pages/AutoReport"));
@@ -294,11 +292,9 @@ function ProtectedRouter() {
       <Route path="/dashboard/revenue-goals">{() => <ProtectedRoute path="/dashboard/revenue-goals" component={RevenueGoals} />}</Route>
       <Route path="/dashboard/inadimplencia">{() => <ProtectedRoute path="/dashboard/inadimplencia" component={DashboardInadimplencia} />}</Route>
       <Route path="/dashboard/auditoria-sistemas">{() => <ProtectedRoute path="/dashboard/auditoria-sistemas" component={AuditoriaSistemas} />}</Route>
-      <Route path="/dashboard/roadmap-auditoria">{() => <ProtectedRoute path="/dashboard/roadmap-auditoria" component={RoadmapAuditoria} />}</Route>
       <Route path="/dashboard/contribuicao-colaborador">{() => <ProtectedRoute path="/dashboard/contribuicao-colaborador" component={ContribuicaoColaborador} />}</Route>
       <Route path="/dashboard/contribuicao-operador">{() => <ProtectedRoute path="/dashboard/contribuicao-operador" component={ContribuicaoOperador} />}</Route>
       <Route path="/dashboard/contribuicao-squad">{() => <ProtectedRoute path="/dashboard/contribuicao-squad" component={ContribuicaoSquad} />}</Route>
-      <Route path="/dashboard/margem-cliente">{() => <ProtectedRoute path="/dashboard/margem-cliente" component={MargemCliente} />}</Route>
       <Route path="/dashboard/dre">{() => <ProtectedRoute path="/dashboard/dre" component={DRE} />}</Route>
       <Route path="/dashboard/notas-fiscais">{() => <ProtectedRoute path="/dashboard/notas-fiscais" component={NotasFiscais} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
