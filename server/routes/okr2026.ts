@@ -673,7 +673,7 @@ export function registerOKR2026Routes(app: Express) {
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as cac FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND (categoria_nome LIKE '05.04.02%' OR categoria_nome LIKE '06.04%' OR categoria_nome LIKE '06.06%' OR categoria_nome LIKE '06.07.02%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as capex FROM "Conta Azul".caz_parcelas WHERE status = 'QUITADO' AND categoria_nome LIKE '06.11.01%' AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
               db.execute(sql.raw(`SELECT COALESCE(SUM(COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)), 0) as ir_csll FROM "Conta Azul".caz_parcelas WHERE status IN ('QUITADO','RECEBIDO_PARCIAL') AND (categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01%') AND data_quitacao::date >= '${mStart}'::date AND data_quitacao::date <= '${mEnd}'::date`)),
-              db.execute(sql.raw(`SELECT COALESCE(SUM(valorr::numeric), 0) as churn FROM "Clickup".cup_contratos WHERE data_solicitacao_encerramento >= '${mStart}' AND data_solicitacao_encerramento <= '${mEnd}'`)),
+              db.execute(sql.raw(`SELECT COALESCE(SUM(valor_r), 0) as churn FROM "Clickup".cup_churn WHERE data_solicitacao_encerramento IS NOT NULL AND data_solicitacao_encerramento >= '${mStart}' AND data_solicitacao_encerramento <= '${mEnd}' AND COALESCE(abonar_churn, '') != 'Sim' AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou') AND valor_r > 0`)),
               db.execute(sql.raw(`SELECT COUNT(*) as total FROM "Inhire".rh_pessoal WHERE admissao IS NOT NULL AND admissao::date <= '${mEnd}'::date AND (demissao IS NULL OR demissao::date > '${mEnd}'::date)`)),
               db.execute(sql.raw(`SELECT COUNT(DISTINCT id_task) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${mEnd}'::date AND status IN ('ativo', 'triagem', 'onboarding')`)),
               db.execute(sql.raw(`SELECT COUNT(DISTINCT id_subtask) as total FROM "Clickup".cup_data_hist WHERE data_snapshot::date = '${mEnd}'::date AND status IN ('ativo', 'triagem', 'onboarding')`)),
@@ -805,10 +805,14 @@ export function registerOKR2026Routes(app: Express) {
           actualsByMetric["bad_debt"][currentMonthKey] = inadimplencia;
 
           const churnResult = await db.execute(sql`
-            SELECT COALESCE(SUM(valorr::numeric), 0) as churn
-            FROM "Clickup".cup_contratos
-            WHERE data_solicitacao_encerramento >= ${startOfMonth.toISOString().split("T")[0]}
+            SELECT COALESCE(SUM(valor_r), 0) as churn
+            FROM "Clickup".cup_churn
+            WHERE data_solicitacao_encerramento IS NOT NULL
+              AND data_solicitacao_encerramento >= ${startOfMonth.toISOString().split("T")[0]}
               AND data_solicitacao_encerramento < ${today.toISOString().split("T")[0]}
+              AND COALESCE(abonar_churn, '') != 'Sim'
+              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+              AND valor_r > 0
           `);
           const churnMrr = parseFloat((churnResult.rows[0] as any)?.churn || "0");
           if (!actualsByMetric["churn_mrr_month"]) actualsByMetric["churn_mrr_month"] = {};
