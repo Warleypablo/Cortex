@@ -152,6 +152,7 @@ function varColor(v: number): string {
 }
 
 type ApiData = Record<string, Record<string, { mrr: number; contratos: number }>>;
+type ChurnData = Record<string, Record<string, { churns: number; mrrPerdido: number }>>;
 
 // ============================================
 // Component
@@ -160,9 +161,12 @@ export default function BpProdutos() {
   const { data, isLoading } = useQuery<ApiData>({
     queryKey: ["/api/bp-produtos/mrr-mensal"],
   });
+  const { data: churnData, isLoading: churnLoading } = useQuery<ChurnData>({
+    queryKey: ["/api/bp-produtos/churn-mensal"],
+  });
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  if (isLoading) {
+  if (isLoading || churnLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
         <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -171,6 +175,7 @@ export default function BpProdutos() {
   }
 
   const realizado = data || {};
+  const churn = churnData || {};
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
@@ -188,6 +193,34 @@ export default function BpProdutos() {
   }
 
   function hasReal(month: string) { return !!realizado[month]; }
+
+  function getChurn(month: string, segment: SegmentName) {
+    return churn[month]?.[segment] || null;
+  }
+
+  function getTotalChurn(month: string) {
+    let churns = 0, mrrPerdido = 0;
+    for (const seg of SEGMENTS) {
+      const c = getChurn(month, seg);
+      if (c) { churns += c.churns; mrrPerdido += c.mrrPerdido; }
+    }
+    return { churns, mrrPerdido };
+  }
+
+  function getChurnRate(month: string, segment: SegmentName | "total"): number | null {
+    const idx = MONTHS.indexOf(month);
+    if (idx <= 0) return null;
+    const prev = MONTHS[idx - 1];
+    if (!hasReal(prev)) return null;
+    const prevContratos = segment === "total"
+      ? getTotalReal(prev).contratos
+      : (getReal(prev, segment)?.contratos || 0);
+    if (prevContratos === 0) return null;
+    const churns = segment === "total"
+      ? getTotalChurn(month).churns
+      : (getChurn(month, segment)?.churns || 0);
+    return (churns / prevContratos) * 100;
+  }
 
   function getVarPct(month: string, segment: SegmentName | "total"): number | null {
     const idx = MONTHS.indexOf(month);
@@ -333,13 +366,37 @@ export default function BpProdutos() {
                 })}
               </tr>
               {/* Δ m/m */}
-              <tr className="border-b border-gray-200 dark:border-zinc-700">
+              <tr className="border-b-0">
                 {MONTHS.map((m) => {
                   const v = hasReal(m) ? getVarPct(m, "total") : null;
                   return (
-                    <td key={m} className={`${cellBase} pt-0.5 pb-3 ${colHighlight(m)}`}>
+                    <td key={m} className={`${cellBase} pt-0.5 pb-1 ${colHighlight(m)}`}>
                       {v !== null ? (
                         <span className={`text-[10px] ${varColor(v)}`}>{v >= 0 ? "+" : ""}{v.toFixed(1)}%</span>
+                      ) : <span className="text-[10px] text-gray-300 dark:text-zinc-700">—</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+              {/* Churn Total */}
+              <tr className="border-b border-gray-200 dark:border-zinc-700">
+                <td className={`${stickyBase} bg-gray-50 dark:bg-zinc-800/40 pl-14 pr-4 pb-3 pt-0 text-[10px] text-gray-400 dark:text-zinc-500 whitespace-nowrap`}>
+                  Churn
+                </td>
+                {MONTHS.map((m) => {
+                  const rate = getChurnRate(m, "total");
+                  const tc = getTotalChurn(m);
+                  return (
+                    <td key={m} className={`${cellBase} pb-3 pt-0 ${colHighlight(m)}`}>
+                      {rate !== null ? (
+                        <div className="flex flex-col items-center">
+                          <span className={`text-[10px] font-medium ${rate <= 9 ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                            {rate.toFixed(1)}%
+                          </span>
+                          <span className="text-[9px] text-gray-400 dark:text-zinc-600">
+                            {tc.churns} · {fmtK(tc.mrrPerdido)}
+                          </span>
+                        </div>
                       ) : <span className="text-[10px] text-gray-300 dark:text-zinc-700">—</span>}
                     </td>
                   );
@@ -446,7 +503,7 @@ export default function BpProdutos() {
                     )}
                     {/* Expandido: Contratos */}
                     {isExp && (
-                      <tr className={segBorder}>
+                      <tr className="border-b-0">
                         {subRowLabel("Contratos", subBg)}
                         {MONTHS.map((m) => {
                           const bpC = BP_TARGETS[seg]?.[m]?.contratos || 0;
@@ -461,6 +518,33 @@ export default function BpProdutos() {
                                 </>
                               ) : (
                                 <span className="text-gray-300 dark:text-zinc-600">{bpC}</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    )}
+                    {/* Expandido: Churn */}
+                    {isExp && (
+                      <tr className={segBorder}>
+                        {subRowLabel("Churn", subBg)}
+                        {MONTHS.map((m) => {
+                          const bpChurn = BP_TARGETS[seg]?.[m]?.churn || 0;
+                          const rate = getChurnRate(m, seg);
+                          const c = getChurn(m, seg);
+                          return (
+                            <td key={m} className={`${cellBase} py-1.5 text-[11px] ${colHighlight(m)}`}>
+                              {rate !== null ? (
+                                <div className="flex flex-col items-center">
+                                  <span className={rate <= bpChurn * 100 ? "text-emerald-500 dark:text-emerald-400 font-medium" : "text-red-500 dark:text-red-400 font-medium"}>
+                                    {rate.toFixed(1)}%
+                                  </span>
+                                  <span className="text-[9px] text-gray-400 dark:text-zinc-600">
+                                    {c?.churns || 0} · {fmtK(c?.mrrPerdido || 0)}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-gray-300 dark:text-zinc-600">{(bpChurn * 100).toFixed(0)}%</span>
                               )}
                             </td>
                           );
