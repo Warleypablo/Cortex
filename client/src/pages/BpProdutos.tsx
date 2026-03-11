@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 // ============================================
 // BP Targets
@@ -120,6 +121,18 @@ const BP_MRR_TOTAL: Record<string, number> = {
 // ============================================
 // Helpers
 // ============================================
+function fmtCurrency(value: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function pctBadgeBg(pct: number): string {
+  if (pct >= 100) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400";
+  if (pct >= 80) return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400";
+  return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400";
+}
+
 function fmtK(value: number): string {
   if (Math.abs(value) >= 1000000) return `${(value / 1000000).toFixed(2)}M`;
   if (Math.abs(value) >= 1000) return `${(value / 1000).toFixed(1)}k`;
@@ -212,6 +225,50 @@ export default function BpProdutos() {
         <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">
           Evolução MRR por segmento vs Business Plan
         </p>
+      </div>
+
+      {/* KPI Cards - mês atual */}
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-5">
+        <Card className="bg-gray-900 dark:bg-white border-0">
+          <CardContent className="p-3">
+            <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">MRR Total</p>
+            <p className="text-lg font-bold text-white dark:text-gray-900 mt-0.5">{fmtCurrency(getTotalReal(currentMonth).mrr)}</p>
+            {(() => {
+              const bp = BP_MRR_TOTAL[currentMonth] || 0;
+              const pct = bp > 0 ? (getTotalReal(currentMonth).mrr / bp) * 100 : 0;
+              return (
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                  <span className={pct >= 100 ? "text-emerald-400" : pct >= 80 ? "text-amber-400" : "text-red-400"}>
+                    {pct.toFixed(0)}%
+                  </span>
+                  {" "}de {fmtCurrency(bp)}
+                </p>
+              );
+            })()}
+          </CardContent>
+        </Card>
+        {SEGMENTS.map((seg) => {
+          const bp = BP_TARGETS[seg]?.[currentMonth];
+          const real = getReal(currentMonth, seg);
+          const mrrReal = real?.mrr || 0;
+          const mrrBp = bp?.mrr || 0;
+          const pct = mrrBp > 0 ? (mrrReal / mrrBp * 100) : 0;
+          const colors = SEG_COLORS[seg];
+          return (
+            <Card key={seg} className="bg-gray-800/50 dark:bg-zinc-800/50 border-0">
+              <CardContent className="p-3">
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                  <p className={`text-[10px] font-medium ${colors.text} uppercase tracking-wider truncate`}>{seg}</p>
+                </div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">{fmtCurrency(mrrReal)}</p>
+                <span className={`inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${pctBadgeBg(pct)}`}>
+                  {pct.toFixed(0)}%
+                </span>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Tabela principal */}
