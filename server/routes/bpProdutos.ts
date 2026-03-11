@@ -3,15 +3,18 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 
 // Mapeamento de produto (coluna DB) -> segmento BP
-const PRODUCT_SEGMENT_SQL = `
-  CASE
-    WHEN h.produto = 'Performance' THEN 'Performance'
-    WHEN h.produto IN ('Creators', 'Creators - Recorrente') THEN 'Creators'
-    WHEN h.produto = 'Social Media' THEN 'Social'
-    WHEN h.produto = 'Gestão de Comunidade' THEN 'Gestão de Comunidade'
-    ELSE 'Others'
-  END
-`;
+// COALESCE com fallback_produto para meses com produto NULL (ex: Janeiro/2026)
+function segmentCase(produtoCol: string): string {
+  return `
+    CASE
+      WHEN ${produtoCol} = 'Performance' THEN 'Performance'
+      WHEN ${produtoCol} IN ('Creators', 'Creators - Recorrente') THEN 'Creators'
+      WHEN ${produtoCol} = 'Social Media' THEN 'Social'
+      WHEN ${produtoCol} = 'Gestão de Comunidade' THEN 'Gestão de Comunidade'
+      ELSE 'Others'
+    END
+  `;
+}
 
 export function registerBpProdutosRoutes(app: Express) {
 
@@ -28,14 +31,25 @@ export function registerBpProdutosRoutes(app: Express) {
           WHERE data_snapshot >= '2025-11-01'
           GROUP BY 1
         ),
+        -- Fallback: para contratos com produto NULL, busca o produto
+        -- do snapshot mais recente onde o mesmo id_subtask tinha produto preenchido
+        produto_fallback AS (
+          SELECT DISTINCT ON (id_subtask)
+            id_subtask,
+            produto as fallback_produto
+          FROM "Clickup".cup_data_hist
+          WHERE produto IS NOT NULL AND produto != ''
+          ORDER BY id_subtask, data_snapshot DESC
+        ),
         hist_data AS (
           SELECT
             ls.mes,
-            ${sql.raw(PRODUCT_SEGMENT_SQL)} as segmento,
+            ${sql.raw(segmentCase("COALESCE(NULLIF(h.produto, ''), pf.fallback_produto)"))} as segmento,
             COALESCE(SUM(h.valorr::numeric), 0) as mrr,
             COUNT(DISTINCT h.id_subtask) as contratos
           FROM last_snapshots ls
           JOIN "Clickup".cup_data_hist h ON h.data_snapshot = ls.last_snap
+          LEFT JOIN produto_fallback pf ON pf.id_subtask = h.id_subtask
           WHERE h.valorr IS NOT NULL AND h.valorr::numeric > 0
             AND h.status IN ('ativo', 'onboarding', 'triagem')
           GROUP BY 1, 2
@@ -43,13 +57,7 @@ export function registerBpProdutosRoutes(app: Express) {
         current_data AS (
           SELECT
             TO_CHAR(NOW(), 'YYYY-MM') as mes,
-            CASE
-              WHEN c.produto = 'Performance' THEN 'Performance'
-              WHEN c.produto IN ('Creators', 'Creators - Recorrente') THEN 'Creators'
-              WHEN c.produto = 'Social Media' THEN 'Social'
-              WHEN c.produto = 'Gestão de Comunidade' THEN 'Gestão de Comunidade'
-              ELSE 'Others'
-            END as segmento,
+            ${sql.raw(segmentCase("c.produto"))} as segmento,
             COALESCE(SUM(c.valorr::numeric), 0) as mrr,
             COUNT(DISTINCT c.id_subtask) as contratos
           FROM "Clickup".cup_contratos c

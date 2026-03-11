@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 
 // ============================================
 // BP Targets (hardcoded from business plan)
@@ -14,38 +14,24 @@ const MONTHS = [
 ];
 
 const MONTH_LABELS: Record<string, string> = {
-  "2025-12": "Dez/25",
-  "2026-01": "Jan/26", "2026-02": "Fev/26", "2026-03": "Mar/26",
-  "2026-04": "Abr/26", "2026-05": "Mai/26", "2026-06": "Jun/26",
-  "2026-07": "Jul/26", "2026-08": "Ago/26", "2026-09": "Set/26",
-  "2026-10": "Out/26", "2026-11": "Nov/26", "2026-12": "Dez/26",
-};
-
-const TRIMESTRE_LABELS: Record<string, string> = {
-  "2025-12": "Bookado",
-  "2026-01": "1 Tri", "2026-02": "1 Tri", "2026-03": "1 Tri",
-  "2026-04": "2 Tri", "2026-05": "2 Tri", "2026-06": "2 Tri",
-  "2026-07": "3 Tri", "2026-08": "3 Tri", "2026-09": "3 Tri",
-  "2026-10": "4 Tri", "2026-11": "4 Tri", "2026-12": "4 Tri",
+  "2025-12": "Dez", "2026-01": "Jan", "2026-02": "Fev", "2026-03": "Mar",
+  "2026-04": "Abr", "2026-05": "Mai", "2026-06": "Jun",
+  "2026-07": "Jul", "2026-08": "Ago", "2026-09": "Set",
+  "2026-10": "Out", "2026-11": "Nov", "2026-12": "Dez",
 };
 
 type SegmentName = "Performance" | "Creators" | "Social" | "Gestão de Comunidade" | "Others";
 const SEGMENTS: SegmentName[] = ["Performance", "Creators", "Social", "Gestão de Comunidade", "Others"];
 
-const SEGMENT_COLORS: Record<SegmentName, string> = {
-  "Performance": "bg-blue-500",
-  "Creators": "bg-purple-500",
-  "Social": "bg-pink-500",
-  "Gestão de Comunidade": "bg-amber-500",
-  "Others": "bg-gray-500",
+const SEGMENT_COLORS: Record<SegmentName, { dot: string; bg: string; text: string }> = {
+  "Performance": { dot: "bg-blue-500", bg: "bg-blue-50 dark:bg-blue-950/20", text: "text-blue-700 dark:text-blue-400" },
+  "Creators": { dot: "bg-purple-500", bg: "bg-purple-50 dark:bg-purple-950/20", text: "text-purple-700 dark:text-purple-400" },
+  "Social": { dot: "bg-pink-500", bg: "bg-pink-50 dark:bg-pink-950/20", text: "text-pink-700 dark:text-pink-400" },
+  "Gestão de Comunidade": { dot: "bg-amber-500", bg: "bg-amber-50 dark:bg-amber-950/20", text: "text-amber-700 dark:text-amber-400" },
+  "Others": { dot: "bg-gray-400", bg: "bg-gray-50 dark:bg-zinc-800/30", text: "text-gray-600 dark:text-zinc-400" },
 };
 
-interface BpTarget {
-  mrr: number;
-  aov: number;
-  contratos: number;
-  churn: number;
-}
+interface BpTarget { mrr: number; aov: number; contratos: number; churn: number; }
 
 const BP_TARGETS: Record<SegmentName, Record<string, BpTarget>> = {
   "Performance": {
@@ -125,7 +111,6 @@ const BP_TARGETS: Record<SegmentName, Record<string, BpTarget>> = {
   },
 };
 
-// MRR Ativo total (soma dos segmentos)
 const BP_MRR_TOTAL: Record<string, number> = {
   "2025-12": 1035000, "2026-01": 1156850, "2026-02": 1267734, "2026-03": 1368637,
   "2026-04": 1485460, "2026-05": 1591769, "2026-06": 1688510,
@@ -133,45 +118,31 @@ const BP_MRR_TOTAL: Record<string, number> = {
   "2026-10": 2130646, "2026-11": 2238888, "2026-12": 2337388,
 };
 
-// Churn total
-const BP_CHURN_TOTAL: Record<string, number> = {
-  "2025-12": 93150, "2026-01": 104117, "2026-02": 114096, "2026-03": 123177,
-  "2026-04": 133691, "2026-05": 143259, "2026-06": 151966,
-  "2026-07": 162589, "2026-08": 172256, "2026-09": 181053,
-  "2026-10": 191758, "2026-11": 201500, "2026-12": 210365,
-};
-
 // ============================================
 // Helpers
 // ============================================
-function formatCurrency(value: number): string {
+function fmtK(value: number): string {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+  return value.toFixed(0);
+}
+
+function fmtCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(value);
 }
 
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("pt-BR").format(Math.round(value));
+function pctClass(pct: number): string {
+  if (pct >= 100) return "text-emerald-600 dark:text-emerald-400";
+  if (pct >= 80) return "text-amber-600 dark:text-amber-400";
+  return "text-red-500 dark:text-red-400";
 }
 
-function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(0)}%`;
-}
-
-function atingimentoColor(orcado: number, realizado: number): string {
-  if (!orcado) return "";
-  const pct = realizado / orcado;
-  if (pct >= 1) return "text-emerald-600 dark:text-emerald-400";
-  if (pct >= 0.8) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
-}
-
-function atingimentoBg(orcado: number, realizado: number): string {
-  if (!orcado) return "";
-  const pct = realizado / orcado;
-  if (pct >= 1) return "bg-emerald-50 dark:bg-emerald-950/30";
-  if (pct >= 0.8) return "bg-amber-50 dark:bg-amber-950/30";
-  return "bg-red-50 dark:bg-red-950/30";
+function pctBadgeBg(pct: number): string {
+  if (pct >= 100) return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400";
+  if (pct >= 80) return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400";
+  return "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400";
 }
 
 // ============================================
@@ -186,6 +157,7 @@ export default function BpProdutos() {
   const { data, isLoading } = useQuery<ApiData>({
     queryKey: ["/api/bp-produtos/mrr-mensal"],
   });
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   if (isLoading) {
     return (
@@ -196,8 +168,6 @@ export default function BpProdutos() {
   }
 
   const realizado = data || {};
-
-  // Calcula o mês atual (YYYY-MM)
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
@@ -214,220 +184,208 @@ export default function BpProdutos() {
     return { mrr, contratos };
   }
 
-  // Verifica se o mês tem dados realizados
-  function hasRealizado(month: string) {
-    return !!realizado[month];
+  function hasReal(month: string) { return !!realizado[month]; }
+
+  function toggleSegment(seg: string) {
+    setExpanded((p) => ({ ...p, [seg]: !p[seg] }));
   }
 
-  // Renderiza uma célula orçado/realizado
-  function renderCell(orcado: number, real: number | null, format: "currency" | "number" | "percent") {
+  // Célula simples: mostra valor realizado OU target (futuro)
+  function Cell({ orcado, real, format = "currency" }: { orcado: number; real: number | null; format?: "currency" | "number" }) {
+    const fmt = format === "currency" ? (v: number) => `R$ ${fmtK(v)}` : (v: number) => v.toFixed(0);
     const isFuture = real === null;
-    const formatter = format === "currency" ? formatCurrency : format === "number" ? formatNumber : formatPercent;
 
     if (isFuture) {
       return (
-        <td className="px-2 py-1.5 text-right text-xs text-gray-400 dark:text-zinc-600 whitespace-nowrap">
-          {formatter(orcado)}
+        <td className="px-1.5 py-1.5 text-right text-[11px] text-gray-300 dark:text-zinc-700 whitespace-nowrap tabular-nums">
+          {fmt(orcado)}
         </td>
       );
     }
 
-    const pct = orcado > 0 ? ((real / orcado) * 100).toFixed(0) : "-";
+    const pct = orcado > 0 ? (real / orcado) * 100 : 0;
 
     return (
-      <td className={`px-2 py-1.5 text-right text-xs whitespace-nowrap ${atingimentoBg(orcado, real)}`}>
-        <div className="font-medium text-gray-900 dark:text-white">{formatter(real)}</div>
-        <div className={`text-[10px] ${atingimentoColor(orcado, real)}`}>
-          {formatter(orcado)} ({pct}%)
-        </div>
+      <td className="px-1.5 py-1.5 text-right text-[11px] whitespace-nowrap tabular-nums">
+        <span className="text-gray-900 dark:text-white font-medium">{fmt(real)}</span>
+        <span className={`ml-1 text-[10px] ${pctClass(pct)}`}>{pct.toFixed(0)}%</span>
       </td>
     );
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-full overflow-x-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">BP Produtos</h1>
-        <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
-          MRR ativo por produto vs Business Plan 2026
-        </p>
+    <div className="p-4 md:p-6 space-y-5 max-w-full">
+      {/* Header */}
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">BP Produtos 2026</h1>
+          <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">MRR ativo por produto vs Business Plan</p>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-gray-400 dark:text-zinc-600">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> &ge;100%</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500" /> 80-99%</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> &lt;80%</span>
+        </div>
       </div>
 
-      {/* KPI Cards - MRR Total do mês atual */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      {/* KPI Cards - MRR Total + por segmento */}
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+        {/* Total */}
+        <Card className="bg-gray-900 dark:bg-white border-0 col-span-1">
+          <CardContent className="p-3">
+            <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider">MRR Total</p>
+            <p className="text-base font-bold text-white dark:text-gray-900 mt-0.5">
+              {fmtCurrency(getTotalReal(currentMonth).mrr)}
+            </p>
+            {(() => {
+              const bp = BP_MRR_TOTAL[currentMonth] || 0;
+              const real = getTotalReal(currentMonth).mrr;
+              const pct = bp > 0 ? (real / bp) * 100 : 0;
+              return (
+                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                  <span className={pct >= 100 ? "text-emerald-400" : pct >= 80 ? "text-amber-400" : "text-red-400"}>
+                    {pct.toFixed(0)}%
+                  </span> de {fmtCurrency(bp)}
+                </p>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
+        {/* Per segment */}
         {SEGMENTS.map((seg) => {
           const bp = BP_TARGETS[seg]?.[currentMonth];
           const real = getReal(currentMonth, seg);
           const mrrReal = real?.mrr || 0;
           const mrrBp = bp?.mrr || 0;
           const pct = mrrBp > 0 ? (mrrReal / mrrBp * 100) : 0;
+          const colors = SEGMENT_COLORS[seg];
 
           return (
-            <Card key={seg} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+            <Card key={seg} className={`border-0 ${colors.bg}`}>
               <CardContent className="p-3">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className={`w-2.5 h-2.5 rounded-full ${SEGMENT_COLORS[seg]}`} />
-                  <span className="text-xs font-medium text-gray-500 dark:text-zinc-400 truncate">{seg}</span>
+                <div className="flex items-center gap-1.5">
+                  <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                  <p className={`text-[10px] font-medium ${colors.text} uppercase tracking-wider truncate`}>{seg}</p>
                 </div>
-                <div className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrency(mrrReal)}</div>
-                <div className={`text-xs ${atingimentoColor(mrrBp, mrrReal)}`}>
-                  {pct.toFixed(0)}% do BP ({formatCurrency(mrrBp)})
-                </div>
+                <p className="text-base font-bold text-gray-900 dark:text-white mt-0.5">R$ {fmtK(mrrReal)}</p>
+                <span className={`inline-block mt-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${pctBadgeBg(pct)}`}>
+                  {pct.toFixed(0)}%
+                </span>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      {/* Tabela completa */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base text-gray-900 dark:text-white">MRR por Produto - Orçado vs Realizado</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse min-w-[1200px]">
-              <thead>
-                {/* Trimestre header */}
-                <tr className="border-b border-gray-100 dark:border-zinc-800">
-                  <th className="px-3 py-1.5 text-left text-[10px] font-medium text-gray-400 dark:text-zinc-500 sticky left-0 bg-white dark:bg-zinc-900 z-10 w-48" />
-                  {MONTHS.map((m, i) => {
-                    const label = TRIMESTRE_LABELS[m];
-                    const prev = i > 0 ? TRIMESTRE_LABELS[MONTHS[i - 1]] : "";
-                    const showLabel = label !== prev;
-                    return (
-                      <th key={m} className="px-2 py-1 text-center text-[10px] font-medium text-gray-400 dark:text-zinc-500">
-                        {showLabel ? label : ""}
-                      </th>
-                    );
-                  })}
-                </tr>
-                {/* Month header */}
-                <tr className="border-b border-gray-200 dark:border-zinc-700">
-                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-zinc-300 sticky left-0 bg-white dark:bg-zinc-900 z-10 w-48">
-                    Métrica
+      {/* Tabela */}
+      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse min-w-[900px]">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-zinc-700">
+                <th className="px-3 py-2 text-left text-[10px] font-semibold text-gray-500 dark:text-zinc-500 uppercase tracking-wider sticky left-0 bg-white dark:bg-zinc-900 z-10 w-44">
+                  Produto
+                </th>
+                {MONTHS.map((m) => (
+                  <th
+                    key={m}
+                    className={`px-1.5 py-2 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${
+                      m === currentMonth
+                        ? "text-blue-600 dark:text-blue-400 bg-blue-50/60 dark:bg-blue-950/20"
+                        : m < currentMonth && hasReal(m)
+                        ? "text-gray-600 dark:text-zinc-400"
+                        : "text-gray-300 dark:text-zinc-700"
+                    }`}
+                  >
+                    {MONTH_LABELS[m]}
                   </th>
-                  {MONTHS.map((m) => (
-                    <th
-                      key={m}
-                      className={`px-2 py-2 text-center text-xs font-semibold whitespace-nowrap ${
-                        m === currentMonth
-                          ? "text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20"
-                          : "text-gray-700 dark:text-zinc-300"
-                      }`}
-                    >
-                      {MONTH_LABELS[m]}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {/* MRR Total */}
-                <tr className="bg-gray-50 dark:bg-zinc-800/50 border-b border-gray-200 dark:border-zinc-700 font-semibold">
-                  <td className="px-3 py-2 text-xs text-gray-900 dark:text-white sticky left-0 bg-gray-50 dark:bg-zinc-800/50 z-10">
-                    MRR Ativo Total
-                  </td>
-                  {MONTHS.map((m) => {
-                    const bp = BP_MRR_TOTAL[m] || 0;
-                    const t = getTotalReal(m);
-                    const has = hasRealizado(m);
-                    return renderCell(bp, has ? t.mrr : null, "currency");
-                  })}
-                </tr>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">
+              {/* MRR Total row */}
+              <tr className="bg-gray-50 dark:bg-zinc-800/40">
+                <td className="px-3 py-2 text-xs font-bold text-gray-900 dark:text-white sticky left-0 bg-gray-50 dark:bg-zinc-800/40 z-10">
+                  MRR Ativo Total
+                </td>
+                {MONTHS.map((m) => {
+                  const bp = BP_MRR_TOTAL[m] || 0;
+                  const t = getTotalReal(m);
+                  return <Cell key={m} orcado={bp} real={hasReal(m) ? t.mrr : null} />;
+                })}
+              </tr>
 
-                {/* Per segment */}
-                {SEGMENTS.map((seg) => (
-                  <>
-                    {/* Separator */}
-                    <tr key={`${seg}-sep`} className="border-b border-gray-100 dark:border-zinc-800">
-                      <td colSpan={MONTHS.length + 1} className="px-3 py-1.5 sticky left-0 bg-white dark:bg-zinc-900 z-10">
+              {/* Per segment - collapsible */}
+              {SEGMENTS.map((seg) => {
+                const colors = SEGMENT_COLORS[seg];
+                const isOpen = expanded[seg] ?? false;
+
+                return (
+                  <React.Fragment key={seg}>
+                    {/* Segment MRR row (clickable) */}
+                    <tr
+                      className="cursor-pointer hover:bg-gray-50/70 dark:hover:bg-zinc-800/20 transition-colors"
+                      onClick={() => toggleSegment(seg)}
+                    >
+                      <td className="px-3 py-2 text-xs sticky left-0 bg-white dark:bg-zinc-900 z-10">
                         <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${SEGMENT_COLORS[seg]}`} />
-                          <span className="text-xs font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wider">{seg}</span>
+                          {isOpen
+                            ? <ChevronDown className="w-3 h-3 text-gray-400" />
+                            : <ChevronRight className="w-3 h-3 text-gray-400" />
+                          }
+                          <div className={`w-2 h-2 rounded-full ${colors.dot}`} />
+                          <span className={`font-semibold ${colors.text}`}>{seg}</span>
                         </div>
                       </td>
-                    </tr>
-
-                    {/* MRR */}
-                    <tr key={`${seg}-mrr`} className="border-b border-gray-50 dark:border-zinc-800/50 hover:bg-gray-50/50 dark:hover:bg-zinc-800/30">
-                      <td className="px-3 py-1.5 text-xs text-gray-600 dark:text-zinc-400 pl-7 sticky left-0 bg-white dark:bg-zinc-900 z-10">MRR</td>
                       {MONTHS.map((m) => {
                         const bp = BP_TARGETS[seg]?.[m]?.mrr || 0;
                         const real = getReal(m, seg);
-                        const has = hasRealizado(m);
-                        return <React.Fragment key={m}>{renderCell(bp, has ? (real?.mrr || 0) : null, "currency")}</React.Fragment>;
+                        return <Cell key={m} orcado={bp} real={hasReal(m) ? (real?.mrr || 0) : null} />;
                       })}
                     </tr>
 
-                    {/* AOV */}
-                    <tr key={`${seg}-aov`} className="border-b border-gray-50 dark:border-zinc-800/50 hover:bg-gray-50/50 dark:hover:bg-zinc-800/30">
-                      <td className="px-3 py-1.5 text-xs text-gray-600 dark:text-zinc-400 pl-7 sticky left-0 bg-white dark:bg-zinc-900 z-10">AOV</td>
-                      {MONTHS.map((m) => {
-                        const bp = BP_TARGETS[seg]?.[m]?.aov || 0;
-                        const real = getReal(m, seg);
-                        const has = hasRealizado(m);
-                        const realAov = has && real ? (real.contratos > 0 ? real.mrr / real.contratos : 0) : null;
-                        return <React.Fragment key={m}>{renderCell(bp, realAov, "currency")}</React.Fragment>;
-                      })}
-                    </tr>
-
-                    {/* Contratos */}
-                    <tr key={`${seg}-contratos`} className="border-b border-gray-50 dark:border-zinc-800/50 hover:bg-gray-50/50 dark:hover:bg-zinc-800/30">
-                      <td className="px-3 py-1.5 text-xs text-gray-600 dark:text-zinc-400 pl-7 sticky left-0 bg-white dark:bg-zinc-900 z-10">Contratos</td>
-                      {MONTHS.map((m) => {
-                        const bp = BP_TARGETS[seg]?.[m]?.contratos || 0;
-                        const real = getReal(m, seg);
-                        const has = hasRealizado(m);
-                        return <React.Fragment key={m}>{renderCell(bp, has ? (real?.contratos || 0) : null, "number")}</React.Fragment>;
-                      })}
-                    </tr>
-
-                    {/* Churn % */}
-                    <tr key={`${seg}-churn`} className="border-b border-gray-100 dark:border-zinc-800 hover:bg-gray-50/50 dark:hover:bg-zinc-800/30">
-                      <td className="px-3 py-1.5 text-xs text-gray-600 dark:text-zinc-400 pl-7 sticky left-0 bg-white dark:bg-zinc-900 z-10">Churn %</td>
-                      {MONTHS.map((m) => {
-                        const bp = BP_TARGETS[seg]?.[m]?.churn || 0;
-                        return (
-                          <td key={m} className="px-2 py-1.5 text-right text-xs text-gray-400 dark:text-zinc-500 whitespace-nowrap">
-                            {formatPercent(bp)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  </>
-                ))}
-
-                {/* Churn Total */}
-                <tr className="bg-red-50/50 dark:bg-red-950/10 border-t border-gray-200 dark:border-zinc-700">
-                  <td className="px-3 py-2 text-xs font-semibold text-red-700 dark:text-red-400 sticky left-0 bg-red-50/50 dark:bg-red-950/10 z-10">
-                    Churn Total (BP)
-                  </td>
-                  {MONTHS.map((m) => (
-                    <td key={m} className="px-2 py-1.5 text-right text-xs text-red-600 dark:text-red-400 whitespace-nowrap">
-                      {formatCurrency(BP_CHURN_TOTAL[m] || 0)}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
+                    {/* Expanded detail rows */}
+                    {isOpen && (
+                      <>
+                        {/* AOV */}
+                        <tr className="bg-gray-50/40 dark:bg-zinc-800/10">
+                          <td className="px-3 py-1 text-[11px] text-gray-400 dark:text-zinc-500 pl-10 sticky left-0 bg-gray-50/40 dark:bg-zinc-900 z-10">AOV</td>
+                          {MONTHS.map((m) => {
+                            const bp = BP_TARGETS[seg]?.[m]?.aov || 0;
+                            const real = getReal(m, seg);
+                            const has = hasReal(m);
+                            const realAov = has && real && real.contratos > 0 ? real.mrr / real.contratos : null;
+                            return <Cell key={m} orcado={bp} real={has ? (realAov ?? 0) : null} />;
+                          })}
+                        </tr>
+                        {/* Contratos */}
+                        <tr className="bg-gray-50/40 dark:bg-zinc-800/10">
+                          <td className="px-3 py-1 text-[11px] text-gray-400 dark:text-zinc-500 pl-10 sticky left-0 bg-gray-50/40 dark:bg-zinc-900 z-10">Contratos</td>
+                          {MONTHS.map((m) => {
+                            const bp = BP_TARGETS[seg]?.[m]?.contratos || 0;
+                            const real = getReal(m, seg);
+                            return <Cell key={m} orcado={bp} real={hasReal(m) ? (real?.contratos || 0) : null} format="number" />;
+                          })}
+                        </tr>
+                        {/* Churn BP */}
+                        <tr className="bg-gray-50/40 dark:bg-zinc-800/10">
+                          <td className="px-3 py-1 text-[11px] text-gray-400 dark:text-zinc-500 pl-10 sticky left-0 bg-gray-50/40 dark:bg-zinc-900 z-10">Churn (BP)</td>
+                          {MONTHS.map((m) => (
+                            <td key={m} className="px-1.5 py-1 text-right text-[11px] text-gray-300 dark:text-zinc-700 whitespace-nowrap tabular-nums">
+                              9%
+                            </td>
+                          ))}
+                        </tr>
+                      </>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </Card>
-
-      {/* Legenda */}
-      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-zinc-400">
-        <span>Legenda:</span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-emerald-100 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-700" /> &ge; 100%
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-amber-100 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700" /> 80-99%
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-3 h-3 rounded bg-red-100 dark:bg-red-950/50 border border-red-300 dark:border-red-700" /> &lt; 80%
-        </span>
-        <span className="ml-4 text-gray-400 dark:text-zinc-600">Meses futuros mostram apenas o target do BP</span>
-      </div>
     </div>
   );
 }
