@@ -10,6 +10,7 @@ const CF = {
   FASE_PROJETO: "5d46b251-aa0a-417f-9dd8-8dc11ff7b5eb",
   VALOR_P: "a0797492-cc59-41ab-9df6-f8d9952afec1",
   LANCAMENTO_PREVISTO: "bfc1bf1c-57cf-4cfe-ac0c-c8d167b96f4c",
+  DATA_ENTREGUE: "f20ce1d5-3e09-40f5-84a9-34b24139501a",
   FIGMA: "08cc9fd7-afe8-4f84-894b-393ccbcc93d3",
   TEMPO_TOTAL: "2a8272dd-990f-4833-936e-c7be47e3ac8b",
 };
@@ -40,6 +41,7 @@ function parseTask(t: any) {
     priority: t.priority?.priority || null,
     due: msToDate(t.due_date),
     lancamento: cfs[CF.LANCAMENTO_PREVISTO]?.value ? msToDate(cfs[CF.LANCAMENTO_PREVISTO].value) : null,
+    dataEntregue: cfs[CF.DATA_ENTREGUE]?.value ? msToDate(cfs[CF.DATA_ENTREGUE].value) : null,
     tempo: cfs[CF.TEMPO_TOTAL]?.value != null ? parseFloat(cfs[CF.TEMPO_TOTAL].value) || null : null,
     responsavel: assignees || null,
     fase: cfs[CF.FASE_PROJETO] ? getDropdown(cfs[CF.FASE_PROJETO]) : null,
@@ -98,14 +100,14 @@ async function main() {
       INSERT INTO "Clickup".${table}
       (clickup_task_id, task_name, status_projeto, prioridade, data_vencimento,
        lancamento, tempo_total, responsavel, fase_projeto, tipo, tipo_projeto,
-       figma, valor_p, data_inicial, data_criada)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       figma, valor_p, data_inicial, data_criada, data_entregue)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
     `;
 
     for (const r of open) {
       await client.query(insertSQL("cup_projetos_tech"), [
         r.id, r.name, r.status, r.priority, r.due, r.lancamento, r.tempo,
-        r.responsavel, r.fase, r.tipo, r.tipoProjeto, r.figma, r.valorP, r.start, r.created,
+        r.responsavel, r.fase, r.tipo, r.tipoProjeto, r.figma, r.valorP, r.start, r.created, r.dataEntregue,
       ]);
     }
     console.log(`[sync] Inserted ${open.length} open projects`);
@@ -113,7 +115,7 @@ async function main() {
     for (const r of closed) {
       await client.query(insertSQL("cup_projetos_tech_fechados"), [
         r.id, r.name, r.status, r.priority, r.due, r.lancamento, r.tempo,
-        r.responsavel, r.fase, r.tipo, r.tipoProjeto, r.figma, r.valorP, r.start, r.created,
+        r.responsavel, r.fase, r.tipo, r.tipoProjeto, r.figma, r.valorP, r.start, r.created, r.dataEntregue,
       ]);
     }
     console.log(`[sync] Inserted ${closed.length} closed projects`);
