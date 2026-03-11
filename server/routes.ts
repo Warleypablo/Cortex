@@ -31,6 +31,7 @@ import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
 import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
 import { registerJuridicoAssistenteRoutes } from "./routes/juridico-assistente";
+import { registerIaHubRoutes } from "./routes/ia-hub";
 import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
 import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
 import { registerGEGRoutes } from "./routes/geg";
@@ -6883,6 +6884,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Jurídico Assistente IA - registered from separate file
   registerJuridicoAssistenteRoutes(app);
+
+  // IA Hub - Multi-model AI chat
+  registerIaHubRoutes(app);
 
   // Jurídico Relatórios - registered from separate file
   registerJuridicoRelatoriosRoutes(app);
