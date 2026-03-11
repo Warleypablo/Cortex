@@ -49,7 +49,7 @@ export const BP_2026_TARGETS: MetricDefinition[] = [
   },
   {
     metric_key: "revenue_one_time",
-    title: "Receita Pontual",
+    title: "Vendas Pontuais",
     unit: "BRL",
     period_type: "month_sum",
     direction: "up",
