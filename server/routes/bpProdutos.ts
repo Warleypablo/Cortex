@@ -16,6 +16,19 @@ function segmentCase(produtoCol: string): string {
   `;
 }
 
+// Mapeamento de produto cup_churn (multi-produto separado por ;) -> segmento BP
+function churnSegmentCase(produtoCol: string): string {
+  return `
+    CASE
+      WHEN ${produtoCol} ILIKE '%Performance%' THEN 'Performance'
+      WHEN ${produtoCol} ILIKE '%Creator%' THEN 'Creators'
+      WHEN ${produtoCol} ILIKE '%Social%' THEN 'Social'
+      WHEN ${produtoCol} ILIKE '%Gestão de comunidade%' OR ${produtoCol} ILIKE '%Gestão de Comunidade%' THEN 'Gestão de Comunidade'
+      ELSE 'Others'
+    END
+  `;
+}
+
 export function registerBpProdutosRoutes(app: Express) {
 
   // GET /api/bp-produtos/mrr-mensal
@@ -94,6 +107,39 @@ export function registerBpProdutosRoutes(app: Express) {
     } catch (error) {
       console.error("[api] Error fetching BP produtos MRR:", error);
       res.status(500).json({ error: "Failed to fetch BP produtos MRR" });
+    }
+  });
+
+  // GET /api/bp-produtos/churn-mensal
+  // Retorna churn realizado por segmento BP por mês
+  app.get("/api/bp-produtos/churn-mensal", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          TO_CHAR(ultimo_dia_operacao, 'YYYY-MM') as mes,
+          ${sql.raw(churnSegmentCase("produto"))} as segmento,
+          COUNT(*)::int as churns,
+          COALESCE(SUM(valor_r), 0)::numeric as mrr_perdido
+        FROM "Clickup".cup_churn
+        WHERE status IN ('cancelado/inativo', 'em cancelamento')
+          AND ultimo_dia_operacao >= '2025-11-01'
+        GROUP BY 1, 2
+        ORDER BY 1, 2
+      `);
+
+      const byMonth: Record<string, Record<string, { churns: number; mrrPerdido: number }>> = {};
+      for (const row of result.rows as any[]) {
+        if (!byMonth[row.mes]) byMonth[row.mes] = {};
+        byMonth[row.mes][row.segmento] = {
+          churns: parseInt(row.churns) || 0,
+          mrrPerdido: parseFloat(row.mrr_perdido) || 0,
+        };
+      }
+
+      res.json(byMonth);
+    } catch (error) {
+      console.error("[api] Error fetching BP produtos churn:", error);
+      res.status(500).json({ error: "Failed to fetch BP produtos churn" });
     }
   });
 }
