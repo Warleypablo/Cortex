@@ -28,17 +28,17 @@ import { motion, AnimatePresence } from "framer-motion";
 interface Conversa {
   id: number;
   titulo: string;
-  criado_em: string;
-  atualizado_em: string;
+  criadoEm: string;
+  atualizadoEm: string;
 }
 
 interface Mensagem {
   id: number;
-  conversa_id: number;
+  conversaId: number;
   role: "user" | "assistant";
   conteudo: string;
   modelo: string | null;
-  criado_em: string;
+  criadoEm: string;
 }
 
 interface ModelOption {
@@ -212,11 +212,11 @@ export default function CasesChat() {
     ...mensagens,
     ...optimisticMessages.map((m, i) => ({
       id: -(i + 1),
-      conversa_id: activeConversaId || 0,
+      conversaId: activeConversaId || 0,
       role: m.role as "user" | "assistant",
       conteudo: m.conteudo,
       modelo: m.modelo,
-      criado_em: new Date().toISOString(),
+      criadoEm: new Date().toISOString(),
     })),
   ];
 
@@ -368,7 +368,7 @@ export default function CasesChat() {
                       {conversa.titulo || "Nova conversa"}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-zinc-500">
-                      {formatDate(conversa.atualizado_em || conversa.criado_em)}
+                      {formatDate(conversa.atualizadoEm || conversa.criadoEm)}
                     </p>
                   </div>
                   <button
@@ -454,7 +454,7 @@ export default function CasesChat() {
                             msg.role === "user" ? "text-indigo-200" : "text-gray-400 dark:text-zinc-500"
                           }`}
                         >
-                          {formatTime(msg.criado_em)}
+                          {formatTime(msg.criadoEm)}
                         </p>
                       </div>
                     </div>
