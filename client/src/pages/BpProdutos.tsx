@@ -176,40 +176,45 @@ export default function BpProdutos() {
 
   function hasReal(month: string) { return !!realizado[month]; }
 
-  function getVarPct(month: string, segment: SegmentName | "total"): number | null {
-    const idx = MONTHS.indexOf(month);
-    if (idx <= 0) return null;
-    const prev = MONTHS[idx - 1];
-    if (!hasReal(month) || !hasReal(prev)) return null;
-    const curr = segment === "total" ? getTotalReal(month).mrr : (getReal(month, segment)?.mrr || 0);
-    const prevV = segment === "total" ? getTotalReal(prev).mrr : (getReal(prev, segment)?.mrr || 0);
-    if (prevV === 0) return null;
-    return ((curr - prevV) / prevV) * 100;
+  // Variation % between two months
+  function calcVar(currMrr: number, prevMrr: number): number | null {
+    if (prevMrr === 0) return null;
+    return ((currMrr - prevMrr) / prevMrr) * 100;
   }
 
   const isFuture = (m: string) => m > currentMonth;
   const isCurrent = (m: string) => m === currentMonth;
 
-  // Renders the indicators line: % atingimento + variação m/m
-  function indicators(pct: number | null, v: number | null) {
-    if (pct === null && v === null) return null;
+  const stickyBase = "sticky left-0 z-10 border-r border-gray-100 dark:border-zinc-800";
+  const varColBg = "bg-gray-50/40 dark:bg-zinc-800/15";
+  const varColBorder = "border-l border-gray-100/60 dark:border-zinc-800/40";
+
+  // Render a Δ variation cell
+  function varCell(prevMonth: string, currMonth: string, segment: SegmentName | "total", key: string) {
+    const hasPrev = hasReal(prevMonth);
+    const hasCurr = hasReal(currMonth);
+    if (!hasPrev || !hasCurr) {
+      return <td key={key} className={`px-1 py-3 text-center ${varColBg} ${varColBorder}`} />;
+    }
+    const prevMrr = segment === "total" ? getTotalReal(prevMonth).mrr : (getReal(prevMonth, segment)?.mrr || 0);
+    const currMrr = segment === "total" ? getTotalReal(currMonth).mrr : (getReal(currMonth, segment)?.mrr || 0);
+    const v = calcVar(currMrr, prevMrr);
+    if (v === null) {
+      return <td key={key} className={`px-1 py-3 text-center ${varColBg} ${varColBorder}`} />;
+    }
     return (
-      <div className="flex items-center justify-center gap-1.5 mt-1">
-        {pct !== null && (
-          <span className={`text-[10px] font-medium tabular-nums ${pctColor(pct)}`}>
-            {pct.toFixed(0)}%
-          </span>
-        )}
-        {v !== null && (
-          <span className={`text-[10px] tabular-nums ${varColor(v)}`}>
-            {v >= 0 ? "↑" : "↓"}{Math.abs(v).toFixed(1)}%
-          </span>
-        )}
-      </div>
+      <td key={key} className={`px-1 py-3 text-center ${varColBg} ${varColBorder}`}>
+        <span className={`text-[10px] font-medium tabular-nums ${varColor(v)}`}>
+          {v >= 0 ? "+" : ""}{v.toFixed(1)}%
+        </span>
+      </td>
     );
   }
 
-  const stickyBase = "sticky left-0 z-10 border-r border-gray-100 dark:border-zinc-800";
+  // Empty Δ cell for expanded rows
+  function emptyVarCell(key: string) {
+    return <td key={key} className={`px-1 py-2 ${varColBg} ${varColBorder}`} />;
+  }
 
   return (
     <div className="p-4 md:p-6 max-w-full">
@@ -224,26 +229,38 @@ export default function BpProdutos() {
       {/* Tabela principal */}
       <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[1100px]">
+          <table className="w-full border-collapse">
             <thead>
               <tr className="border-b border-gray-200 dark:border-zinc-700">
-                <th className={`${stickyBase} bg-white dark:bg-zinc-900 px-5 py-3 text-left text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider w-48`}>
+                <th className={`${stickyBase} bg-white dark:bg-zinc-900 px-5 py-3 text-left text-[11px] font-semibold text-gray-400 dark:text-zinc-500 uppercase tracking-wider min-w-[180px]`}>
                   Segmento
                 </th>
-                {MONTHS.map((m) => (
-                  <th
-                    key={m}
-                    className={`px-2 py-3 text-center text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap min-w-[82px] ${
-                      isCurrent(m)
-                        ? "text-blue-600 dark:text-blue-400"
-                        : isFuture(m)
-                        ? "text-gray-300 dark:text-zinc-600"
-                        : "text-gray-500 dark:text-zinc-400"
-                    }`}
-                  >
-                    {MONTH_LABELS[m]}
-                  </th>
-                ))}
+                {MONTHS.flatMap((m, i) => {
+                  const cells: React.ReactNode[] = [];
+                  // Δ header before each month (except first)
+                  if (i > 0) {
+                    cells.push(
+                      <th key={`dh-${m}`} className={`px-1 py-3 text-center text-[9px] font-medium text-gray-300 dark:text-zinc-600 uppercase ${varColBg} ${varColBorder} w-[44px]`}>
+                        Δ
+                      </th>
+                    );
+                  }
+                  cells.push(
+                    <th
+                      key={m}
+                      className={`px-2 py-3 text-center text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap min-w-[76px] ${
+                        isCurrent(m)
+                          ? "text-blue-600 dark:text-blue-400"
+                          : isFuture(m)
+                          ? "text-gray-300 dark:text-zinc-600"
+                          : "text-gray-500 dark:text-zinc-400"
+                      }`}
+                    >
+                      {MONTH_LABELS[m]}
+                    </th>
+                  );
+                  return cells;
+                })}
               </tr>
             </thead>
             <tbody>
@@ -252,27 +269,26 @@ export default function BpProdutos() {
                 <td className={`${stickyBase} bg-gray-50 dark:bg-zinc-800/40 px-5 py-4 text-sm font-bold text-gray-900 dark:text-white`}>
                   MRR Total
                 </td>
-                {MONTHS.map((m) => {
+                {MONTHS.flatMap((m, i) => {
+                  const cells: React.ReactNode[] = [];
+                  if (i > 0) cells.push(varCell(MONTHS[i - 1], m, "total", `vt-${m}`));
                   const bp = BP_MRR_TOTAL[m] || 0;
                   const has = hasReal(m);
                   const mrr = has ? getTotalReal(m).mrr : 0;
                   const pct = has && bp > 0 ? (mrr / bp) * 100 : null;
-                  const v = has ? getVarPct(m, "total") : null;
-                  return (
-                    <td
-                      key={m}
-                      className={`px-2 py-3 text-center ${
-                        isCurrent(m) ? "bg-blue-50/50 dark:bg-blue-950/15" : ""
-                      }`}
-                    >
+                  cells.push(
+                    <td key={m} className={`px-2 py-3 text-center ${isCurrent(m) ? "bg-blue-50/50 dark:bg-blue-950/15" : ""}`}>
                       <div className="text-sm font-bold text-gray-900 dark:text-white tabular-nums">
-                        {has ? fmtK(mrr) : (
-                          <span className="text-gray-300 dark:text-zinc-600 font-normal">{fmtK(bp)}</span>
-                        )}
+                        {has ? fmtK(mrr) : <span className="text-gray-300 dark:text-zinc-600 font-normal">{fmtK(bp)}</span>}
                       </div>
-                      {has && indicators(pct, v)}
+                      {pct !== null && (
+                        <div className={`text-[10px] font-medium tabular-nums mt-0.5 ${pctColor(pct)}`}>
+                          {pct.toFixed(0)}%
+                        </div>
+                      )}
                     </td>
                   );
+                  return cells;
                 })}
               </tr>
 
@@ -282,6 +298,7 @@ export default function BpProdutos() {
                 const isExp = expanded[seg] ?? false;
                 return (
                   <React.Fragment key={seg}>
+                    {/* Linha MRR do segmento */}
                     <tr
                       className="border-b border-gray-100 dark:border-zinc-800/60 cursor-pointer hover:bg-gray-50/60 dark:hover:bg-zinc-800/20 transition-colors"
                       onClick={() => setExpanded((p) => ({ ...p, [seg]: !p[seg] }))}
@@ -295,27 +312,26 @@ export default function BpProdutos() {
                           <span className={`text-sm font-semibold ${colors.text}`}>{seg}</span>
                         </div>
                       </td>
-                      {MONTHS.map((m) => {
+                      {MONTHS.flatMap((m, i) => {
+                        const cells: React.ReactNode[] = [];
+                        if (i > 0) cells.push(varCell(MONTHS[i - 1], m, seg, `v-${seg}-${m}`));
                         const bp = BP_TARGETS[seg]?.[m]?.mrr || 0;
                         const has = hasReal(m);
                         const mrr = getReal(m, seg)?.mrr || 0;
                         const pct = has && bp > 0 ? (mrr / bp) * 100 : null;
-                        const v = has ? getVarPct(m, seg) : null;
-                        return (
-                          <td
-                            key={m}
-                            className={`px-2 py-3 text-center ${
-                              isCurrent(m) ? "bg-blue-50/50 dark:bg-blue-950/15" : ""
-                            }`}
-                          >
+                        cells.push(
+                          <td key={`${seg}-${m}`} className={`px-2 py-3 text-center ${isCurrent(m) ? "bg-blue-50/50 dark:bg-blue-950/15" : ""}`}>
                             <div className="text-[13px] font-medium text-gray-900 dark:text-white tabular-nums">
-                              {has ? fmtK(mrr) : (
-                                <span className="text-gray-300 dark:text-zinc-600 font-normal">{fmtK(bp)}</span>
-                              )}
+                              {has ? fmtK(mrr) : <span className="text-gray-300 dark:text-zinc-600 font-normal">{fmtK(bp)}</span>}
                             </div>
-                            {has && indicators(pct, v)}
+                            {pct !== null && (
+                              <div className={`text-[10px] font-medium tabular-nums mt-0.5 ${pctColor(pct)}`}>
+                                {pct.toFixed(0)}%
+                              </div>
+                            )}
                           </td>
                         );
+                        return cells;
                       })}
                     </tr>
 
@@ -325,11 +341,16 @@ export default function BpProdutos() {
                         <td className={`${stickyBase} bg-gray-50/40 dark:bg-zinc-800/15 pl-14 pr-4 py-2 text-[11px] text-gray-400 dark:text-zinc-500`}>
                           Orçado (BP)
                         </td>
-                        {MONTHS.map((m) => (
-                          <td key={m} className={`px-2 py-2 text-center text-[11px] text-gray-400 dark:text-zinc-500 tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
-                            {fmtK(BP_TARGETS[seg]?.[m]?.mrr || 0)}
-                          </td>
-                        ))}
+                        {MONTHS.flatMap((m, i) => {
+                          const cells: React.ReactNode[] = [];
+                          if (i > 0) cells.push(emptyVarCell(`vo-${seg}-${m}`));
+                          cells.push(
+                            <td key={`o-${seg}-${m}`} className={`px-2 py-2 text-center text-[11px] text-gray-400 dark:text-zinc-500 tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
+                              {fmtK(BP_TARGETS[seg]?.[m]?.mrr || 0)}
+                            </td>
+                          );
+                          return cells;
+                        })}
                       </tr>
                     )}
 
@@ -339,13 +360,15 @@ export default function BpProdutos() {
                         <td className={`${stickyBase} bg-gray-50/40 dark:bg-zinc-800/15 pl-14 pr-4 py-2 text-[11px] text-gray-400 dark:text-zinc-500`}>
                           AOV
                         </td>
-                        {MONTHS.map((m) => {
+                        {MONTHS.flatMap((m, i) => {
+                          const cells: React.ReactNode[] = [];
+                          if (i > 0) cells.push(emptyVarCell(`va-${seg}-${m}`));
                           const bpAov = BP_TARGETS[seg]?.[m]?.aov || 0;
                           const has = hasReal(m);
                           const real = getReal(m, seg);
                           const aov = has && real && real.contratos > 0 ? real.mrr / real.contratos : null;
-                          return (
-                            <td key={m} className={`px-2 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
+                          cells.push(
+                            <td key={`a-${seg}-${m}`} className={`px-2 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
                               {aov !== null ? (
                                 <>
                                   <span className="text-gray-900 dark:text-white font-medium">{fmtK(aov)}</span>
@@ -356,6 +379,7 @@ export default function BpProdutos() {
                               )}
                             </td>
                           );
+                          return cells;
                         })}
                       </tr>
                     )}
@@ -366,12 +390,14 @@ export default function BpProdutos() {
                         <td className={`${stickyBase} bg-gray-50/40 dark:bg-zinc-800/15 pl-14 pr-4 py-2 text-[11px] text-gray-400 dark:text-zinc-500`}>
                           Contratos
                         </td>
-                        {MONTHS.map((m) => {
+                        {MONTHS.flatMap((m, i) => {
+                          const cells: React.ReactNode[] = [];
+                          if (i > 0) cells.push(emptyVarCell(`vc-${seg}-${m}`));
                           const bpC = BP_TARGETS[seg]?.[m]?.contratos || 0;
                           const has = hasReal(m);
                           const cttos = has ? (getReal(m, seg)?.contratos || 0) : null;
-                          return (
-                            <td key={m} className={`px-2 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
+                          cells.push(
+                            <td key={`c-${seg}-${m}`} className={`px-2 py-2 text-center text-[11px] tabular-nums ${isCurrent(m) ? "bg-blue-50/30 dark:bg-blue-950/10" : ""}`}>
                               {cttos !== null ? (
                                 <>
                                   <span className="text-gray-900 dark:text-white font-medium">{cttos}</span>
@@ -382,6 +408,7 @@ export default function BpProdutos() {
                               )}
                             </td>
                           );
+                          return cells;
                         })}
                       </tr>
                     )}
