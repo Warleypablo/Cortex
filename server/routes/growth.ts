@@ -1821,21 +1821,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           )})`
         : sql``;
 
-      // Query para buscar métricas de Meta Ads para Turbo Partners
-      const result = await db.execute(sql`
+      // Query Meta Ads
+      const metaResult = await db.execute(sql`
         SELECT
           COALESCE(SUM(mid.spend), 0) as investimento,
           COALESCE(SUM(mid.impressions), 0) as impressoes,
           COALESCE(SUM(mid.clicks), 0) as cliques,
-          COALESCE(SUM(mid.inline_link_clicks), 0) as cliques_saida,
-          CASE WHEN SUM(mid.impressions) > 0
-            THEN (SUM(mid.spend)::numeric / SUM(mid.impressions)::numeric * 1000)
-            ELSE 0
-          END as cpm,
-          CASE WHEN SUM(mid.impressions) > 0
-            THEN (SUM(mid.clicks)::numeric / SUM(mid.impressions)::numeric)
-            ELSE 0
-          END as ctr
+          COALESCE(SUM(mid.inline_link_clicks), 0) as cliques_saida
         FROM meta_ads.meta_insights_daily mid
         ${campaignJoin}
         WHERE mid.date_start >= ${startDate}::date
@@ -1844,14 +1836,52 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${campaignFilter}
       `);
 
-      const row = result.rows[0] as any;
+      const metaRow = metaResult.rows[0] as any;
+      const metaInvestimento = parseFloat(metaRow.investimento) || 0;
+      const metaImpressoes = parseInt(metaRow.impressoes) || 0;
+      const metaCliques = parseInt(metaRow.cliques) || 0;
+      const cliquesSaida = parseInt(metaRow.cliques_saida) || 0;
 
-      const investimento = parseFloat(row.investimento) || 0;
-      const impressoes = parseInt(row.impressoes) || 0;
-      const cliques = parseInt(row.cliques) || 0;
-      const cliquesSaida = parseInt(row.cliques_saida) || 0;
-      const cpm = parseFloat(row.cpm) || 0;
-      const ctr = parseFloat(row.ctr) || 0;
+      // Query Google Ads
+      let googleInvestimento = 0;
+      let googleImpressoes = 0;
+      let googleCliques = 0;
+      try {
+        const columnsResult = await db.execute(sql`
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+          ORDER BY ordinal_position
+        `);
+        const columns = columnsResult.rows.map((r: any) => r.column_name);
+        const dateColumn = columns.includes('report_date') ? 'report_date' :
+                           columns.includes('metric_date') ? 'metric_date' :
+                           columns.includes('date') ? 'date' :
+                           columns.includes('segments_date') ? 'segments_date' : null;
+
+        if (dateColumn && columns.includes('cost_micros')) {
+          const googleResult = await db.execute(sql.raw(`
+            SELECT
+              COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
+              COALESCE(SUM(impressions), 0) as impressoes,
+              COALESCE(SUM(clicks), 0) as cliques
+            FROM google_ads.campaign_daily_metrics
+            WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+          `));
+          const gRow = googleResult.rows[0] as any;
+          googleInvestimento = parseFloat(gRow.investimento) || 0;
+          googleImpressoes = parseInt(gRow.impressoes) || 0;
+          googleCliques = parseInt(gRow.cliques) || 0;
+        }
+      } catch (googleError) {
+        console.log("[api] Google Ads query error in orcado-realizado/ads (may not have data):", googleError);
+      }
+
+      // Combine Meta + Google
+      const investimento = metaInvestimento + googleInvestimento;
+      const impressoes = metaImpressoes + googleImpressoes;
+      const cliques = metaCliques + googleCliques;
+      const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
+      const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
 
       // CPS = Custo por Clique de Saída
       const cps = cliquesSaida > 0 ? investimento / cliquesSaida : 0;
