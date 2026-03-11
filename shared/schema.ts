@@ -1486,6 +1486,29 @@ export const juridicoChatMensagens = cortexCoreSchema.table("juridico_chat_mensa
 
 export type JuridicoChatMensagem = typeof juridicoChatMensagens.$inferSelect;
 
+// IA Hub - Conversas multi-modelo
+export const iaHubConversas = cortexCoreSchema.table("ia_hub_conversas", {
+  id: serial("id").primaryKey(),
+  usuarioId: varchar("usuario_id", { length: 100 }).notNull(),
+  titulo: varchar("titulo", { length: 200 }),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type IaHubConversa = typeof iaHubConversas.$inferSelect;
+
+// IA Hub - Mensagens com modelo usado
+export const iaHubMensagens = cortexCoreSchema.table("ia_hub_mensagens", {
+  id: serial("id").primaryKey(),
+  conversaId: integer("conversa_id").notNull(),
+  role: varchar("role", { length: 20 }).notNull(),
+  conteudo: text("conteudo").notNull(),
+  modelo: varchar("modelo", { length: 100 }),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type IaHubMensagem = typeof iaHubMensagens.$inferSelect;
+
 // Tabela para comunicações/avisos internos sobre clientes
 export const clienteComunicacoes = pgTable("cliente_comunicacoes", {
   id: serial("id").primaryKey(),
