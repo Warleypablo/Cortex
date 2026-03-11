@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-03-11 | fix(growth): correct crm_deal column name from data_criacao to created_at
+
+**O que foi feito:**
+- Corrigido nome da coluna `d.data_criacao` para `d.created_at` na query de leads do endpoint orcado-realizado/ads
+- Adicionado `INTERVAL '1 day'` para consistência com demais queries
+
+**Por que:**
+- A coluna `data_criacao` não existe na tabela `crm_deal`, causando erro 500 — o endpoint inteiro falhava
+
+**Arquivos alterados:**
+- `server/routes/growth.ts` - Corrigido nome da coluna na query de leads do Bitrix
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-11 | fix(growth): include Google Ads data in orcado-realizado investment metric
 
 **O que foi feito:**
