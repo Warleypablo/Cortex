@@ -226,8 +226,8 @@ export default function RelatorioMensal() {
       case 14: return <SlideCapaTech />;
       case 15: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
       case 16: return <SlideCapaNovoEscritorio />;
-      case 17: return <SlideNovaSede imageSrc={novaSedeEtapa1} titulo="Nova Sede Gazeta — 1ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída Takeat - 15/03) • Até 71 posições" />;
-      case 18: return <SlideNovaSede imageSrc={novaSedeEtapa2} titulo="Nova Sede Gazeta — 2ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída AEP - 01/05) • 98 posições" />;
+      case 17: return <SlideNovaSede imageSrc={novaSedeEtapa2} titulo="Nova Sede Gazeta — 2ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída AEP - 01/05) • 98 posições" />;
+      case 18: return <SlideNovaSede imageSrc={novaSedeEtapa1} titulo="Nova Sede Gazeta — 1ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída Takeat - 15/03) • Até 71 posições" />;
       case 19: return <SlideEncerramento />;
       case 20: return <SlideFraseEncerramento />;
       case 21: return <SlideQRCode />;
