@@ -890,6 +890,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           clientes,
           churnPct: Math.round(churnPct * 10) / 10,
           churnBrl: churn.brl,
+          mrrBase: mrrAnt,
           evolucaoMrr: mrr - mrrAnt,
         };
       });
