@@ -94,6 +94,12 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
   const { kpis, entregasPorTipo, receitaPorTipo, emAbertoPorTipo, mesLabel: techMesLabel } = techData;
   const displayLabel = techMesLabel || mesLabel;
 
+  // Filtrar apenas meses com dados (soma dos valores numéricos > 0)
+  const hasData = (row: Record<string, any>) =>
+    Object.entries(row).some(([k, v]) => k !== "month" && k !== "label" && typeof v === "number" && v > 0);
+  const entregasFiltered = entregasPorTipo.filter(hasData);
+  const receitaFiltered = receitaPorTipo.filter(hasData);
+
   const tipos = entregasPorTipo.length > 0
     ? Object.keys(entregasPorTipo[0]).filter(k => k !== "month" && k !== "label")
     : [];
@@ -163,7 +169,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
           </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={entregasPorTipo} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={entregasFiltered} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a40" />
                 <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
                 <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} allowDecimals={false} width={30} />
@@ -241,7 +247,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
           </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={receitaPorTipo} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={receitaFiltered} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a40" />
                 <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
                 <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} tickFormatter={fmtK} width={45} />
