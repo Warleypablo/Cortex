@@ -80,7 +80,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
       {/* Top row: 5 compact cards */}
       <div className="grid grid-cols-5 gap-3 mb-3 shrink-0">
         {/* Faturamento */}
-        <SecondaryCard className="p-3">
+        <SecondaryCard className="p-3 flex flex-col justify-center">
           <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1.5">Faturamento Mes</p>
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
@@ -105,7 +105,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
         </SecondaryCard>
 
         {/* Base */}
-        <SecondaryCard className="p-3">
+        <SecondaryCard className="p-3 flex flex-col justify-center">
           <div className="flex items-center gap-1.5 mb-2">
             <Users className="h-3.5 w-3.5 text-blue-400" />
             <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Base</p>
@@ -117,13 +117,13 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
             </div>
             <div>
               <p className="text-[10px] text-zinc-500">Contratos</p>
-              <p className="text-xl font-black">{metrics.contratosTotais}</p>
+              <p className="text-xl font-black">{metrics.contratosAtivos}</p>
             </div>
           </div>
         </SecondaryCard>
 
         {/* MRR Add / Cancel / Pausado */}
-        <SecondaryCard className="p-3">
+        <SecondaryCard className="p-3 flex flex-col justify-center">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
@@ -157,7 +157,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
         </SecondaryCard>
 
         {/* CXCS */}
-        <SecondaryCard className="p-3">
+        <SecondaryCard className="p-3 flex flex-col justify-center">
           <div className="flex items-center gap-1.5 mb-1.5">
             <Handshake className="h-3.5 w-3.5 text-purple-400" />
             <p className="text-[10px] text-purple-400 font-bold uppercase tracking-wide">CXCS</p>
