@@ -21,12 +21,13 @@ import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
 import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
 import SlideNovaSede from "./relatorio-mensal/SlideNovaSede";
+import SlideCapaNovoEscritorio from "./relatorio-mensal/SlideCapaNovoEscritorio";
 import SlideEncerramento from "./relatorio-mensal/SlideEncerramento";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
 import novaSedeEtapa1 from "@assets/nova-sede-etapa-1.jpeg";
 import novaSedeEtapa2 from "@assets/nova-sede-etapa-2.jpeg";
 
-const TOTAL_SLIDES = 21;
+const TOTAL_SLIDES = 22;
 
 const MESES_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -155,7 +156,7 @@ export default function RelatorioMensal() {
     "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
     "KRs", "Capa Comercial", "Ranking Closers",
     "Ranking SDRs", "Contratos", "Capa Commerce", "Commerce", "Turbo Metrics", "Ranking Squads", "Squad Details",
-    "Capa Tech", "Area Tech", "Sede Gazeta 1ª Etapa", "Sede Gazeta 2ª Etapa",
+    "Capa Tech", "Area Tech", "Capa Novo Escritório", "Sede Gazeta 1ª Etapa", "Sede Gazeta 2ª Etapa",
     "Vamos com Turbo!", "Frase", "Q&A"
   ];
 
@@ -178,11 +179,12 @@ export default function RelatorioMensal() {
       case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
       case 14: return <SlideCapaTech />;
       case 15: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 16: return <SlideNovaSede imageSrc={novaSedeEtapa1} titulo="Nova Sede Gazeta — 1ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída Takeat - 15/03) • Até 71 posições" />;
-      case 17: return <SlideNovaSede imageSrc={novaSedeEtapa2} titulo="Nova Sede Gazeta — 2ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída AEP - 01/05) • 98 posições" />;
-      case 18: return <SlideEncerramento />;
-      case 19: return <SlideFraseEncerramento />;
-      case 20: return <SlideQRCode />;
+      case 16: return <SlideCapaNovoEscritorio />;
+      case 17: return <SlideNovaSede imageSrc={novaSedeEtapa1} titulo="Nova Sede Gazeta — 1ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída Takeat - 15/03) • Até 71 posições" />;
+      case 18: return <SlideNovaSede imageSrc={novaSedeEtapa2} titulo="Nova Sede Gazeta — 2ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída AEP - 01/05) • 98 posições" />;
+      case 19: return <SlideEncerramento />;
+      case 20: return <SlideFraseEncerramento />;
+      case 21: return <SlideQRCode />;
       default: return null;
     }
   };
