@@ -428,9 +428,9 @@ export default function GrowthOrcadoRealizado() {
   }
 
   const { data: adsData, isLoading: adsLoading } = useQuery<AdsMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/ads', dateRange.startDate, dateRange.endDate, selectedFunis],
+    queryKey: ['/api/growth/orcado-realizado/ads', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
       if (!res.ok) throw new Error('Failed to fetch Ads metrics');
       return res.json();
     },
