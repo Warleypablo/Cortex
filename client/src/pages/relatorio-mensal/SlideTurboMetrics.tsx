@@ -42,8 +42,8 @@ function ChartTooltipContent({ active, payload, label }: any) {
 }
 
 export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
-  const faturamentoPontual = metrics.faturamentoTotal > metrics.mrrAtivo
-    ? metrics.faturamentoTotal - metrics.mrrAtivo : 0;
+  const faturamentoPontual = metrics.faturamentoPontual;
+  const faturamentoTotal = metrics.mrrAtivo + faturamentoPontual;
   const faturamentoVariavel = 0;
   const crosssellTotal = metrics.crosssellMrr + metrics.crosssellPontual;
   const retencaoPct = metrics.retencoesSolicitacoesCount > 0
@@ -100,7 +100,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
             </div>
           </div>
           <div className="mt-1.5 bg-cyan-500/10 rounded px-2 py-0.5 inline-block">
-            <span className="text-xs font-bold text-cyan-400">Total: {fmtBRL(metrics.faturamentoTotal)}</span>
+            <span className="text-xs font-bold text-cyan-400">Total: {fmtBRL(faturamentoTotal)}</span>
           </div>
         </SecondaryCard>
 
