@@ -64,7 +64,7 @@ function getBarColor(pct: number): string {
 }
 
 export default function Capacity() {
-  useSetPageInfo({ title: "Capacity", area: "gestao" });
+  useSetPageInfo("Capacity", "Gestão de capacidade por operador e produto");
   usePageTitle("Capacity");
 
   const queryClient = useQueryClient();
