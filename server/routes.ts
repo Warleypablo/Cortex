@@ -39,6 +39,7 @@ import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerJuridicoRoutes } from "./routes/juridico";
+import { registerCreatorsRoutes } from "./routes/creators";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
@@ -6912,6 +6913,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Jurídico Module - registered from separate file
   registerJuridicoRoutes(app);
+
+  // Creators (Freelancers) Module - registered from separate file
+  registerCreatorsRoutes(app);
 
   // Clientes Module - registered from separate file
   registerClientesRoutes(app);
