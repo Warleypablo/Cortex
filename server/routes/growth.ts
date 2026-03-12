@@ -1537,17 +1537,20 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN d.company_id END)")
+        ? sql.raw("(COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN d.company_id END) + COUNT(*) FILTER (WHERE stage_name = 'Negócio Ganho' AND (d.company_id IS NULL OR d.company_id::text = '')))")
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)");
       const countAcel = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN d.company_id END)")
+        ? sql.raw("(COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN d.company_id END) + COUNT(*) FILTER (WHERE stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 AND (d.company_id IS NULL OR d.company_id::text = '')))")
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END)");
       const countImpl = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END)")
+        ? sql.raw("(COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END) + COUNT(*) FILTER (WHERE stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 AND (d.company_id IS NULL OR d.company_id::text = '')))")
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
       const mqlCondition = sql`(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
-      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
+      // cliente: empresas distintas + deals sem empresa (cada um conta como 1 cliente)
+      const countExpr = contagem === 'cliente'
+        ? sql`(COUNT(DISTINCT d.company_id) + COUNT(*) FILTER (WHERE d.company_id IS NULL OR d.company_id::text = ''))`
+        : sql`COUNT(*)`;
 
       // Stages que indicam que o deal chegou em Reunião Agendada ou além
       const STAGES_RM_PLUS = [
@@ -1693,19 +1696,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
+      // SQL fragments: contrato = conta cada deal; cliente = empresas distintas + deals sem empresa
       const countNovos = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN d.company_id END)")
+        ? sql.raw("(COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN d.company_id END) + COUNT(*) FILTER (WHERE stage_name = 'Negócio Ganho' AND (d.company_id IS NULL OR d.company_id::text = '')))")
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)");
       const countAcel = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN d.company_id END)")
+        ? sql.raw("(COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN d.company_id END) + COUNT(*) FILTER (WHERE stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 AND (d.company_id IS NULL OR d.company_id::text = '')))")
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END)");
       const countImpl = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END)")
+        ? sql.raw("(COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END) + COUNT(*) FILTER (WHERE stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 AND (d.company_id IS NULL OR d.company_id::text = '')))")
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
       const naoMqlCondition = sql`(d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')`;
-      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
+      // cliente: empresas distintas + deals sem empresa (cada um conta como 1 cliente)
+      const countExpr = contagem === 'cliente'
+        ? sql`(COUNT(DISTINCT d.company_id) + COUNT(*) FILTER (WHERE d.company_id IS NULL OR d.company_id::text = ''))`
+        : sql`COUNT(*)`;
 
       // Stages que indicam que o deal chegou em Reunião Agendada ou além
       const STAGES_RM_PLUS = [
@@ -1976,9 +1982,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
+      // cliente: empresas distintas + deals sem empresa (cada um conta como 1 cliente)
+      const countExpr = contagem === 'cliente'
+        ? sql`(COUNT(DISTINCT d.company_id) + COUNT(*) FILTER (WHERE d.company_id IS NULL OR d.company_id::text = ''))`
+        : sql`COUNT(*)`;
       const countMqlExpr = contagem === 'cliente'
-        ? sql`COUNT(DISTINCT CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN d.company_id END)`
+        ? sql`(COUNT(DISTINCT CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN d.company_id END) + COUNT(*) FILTER (WHERE (d.company_id IS NULL OR d.company_id::text = '') AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')))`
         : sql`COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END)`;
 
       const leadsResult = await db.execute(sql`
