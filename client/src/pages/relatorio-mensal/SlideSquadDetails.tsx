@@ -123,7 +123,7 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
                     <span className="font-bold" style={{ color: churnColor }}>
                       {sq.churnPct.toFixed(1).replace(".", ",")}%
                     </span>
-                    <span className="text-zinc-500">({fmtBRL(sq.churnBrl)})</span>
+                    <span className="text-zinc-500">({fmtBRL(sq.churnBrl)} / {fmtBRL(sq.mrrBase)})</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
