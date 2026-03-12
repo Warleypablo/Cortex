@@ -50,8 +50,10 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
 
   if (squads.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-zinc-950 text-white">
-        <p className="text-zinc-500">Sem dados de squads para este período</p>
+      <div className="w-full h-full flex items-center justify-center text-white relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+        <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+        <p className="relative z-10 text-zinc-500">Sem dados de squads para este período</p>
       </div>
     );
   }
@@ -59,14 +61,16 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
   const cols = squads.length <= 4 ? 2 : 3;
 
   return (
-    <div className="w-full h-full flex flex-col bg-zinc-950 text-white" style={{ padding: "28px 36px" }}>
+    <div className="w-full h-full flex flex-col text-white relative overflow-hidden" style={{ padding: "28px 36px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
       {/* Header */}
-      <div className="shrink-0 mb-4">
+      <div className="relative z-10 shrink-0 mb-4">
         <h2 className="text-2xl font-bold">Detalhes por Squad — {mesLabel}</h2>
       </div>
 
       {/* Grid of cards */}
-      <div className={`flex-1 grid gap-4 min-h-0 ${cols === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+      <div className={`relative z-10 flex-1 grid gap-4 min-h-0 ${cols === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
         {squads.map((sq) => {
           const { emoji, name } = parseSquadName(sq.squad);
           const color = getColor(name);
