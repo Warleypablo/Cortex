@@ -30,10 +30,12 @@ export default function SlideIndicacoes({ dados, mesLabel }: Props) {
 
   if (!hasData) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 text-white p-12">
-        <Gift className="h-16 w-16 text-emerald-500 mb-6" />
-        <h2 className="text-3xl font-bold mb-2">Indique e Ganhe — {mesLabel}</h2>
-        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-12 text-center max-w-lg">
+      <div className="w-full h-full flex flex-col items-center justify-center text-white p-12 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+        <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+        <Gift className="relative z-10 h-16 w-16 text-emerald-500 mb-6" />
+        <h2 className="relative z-10 text-3xl font-bold mb-2">Indique e Ganhe — {mesLabel}</h2>
+        <div className="relative z-10 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-12 text-center max-w-lg">
           <p className="text-zinc-500 text-base">Nenhuma indicacao registrada neste mes.</p>
         </div>
       </div>
@@ -41,7 +43,10 @@ export default function SlideIndicacoes({ dados, mesLabel }: Props) {
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-zinc-950 text-white p-10">
+    <div className="w-full h-full flex flex-col text-white p-10 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="relative z-10 flex-1 flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 mb-8">
         <Gift className="h-7 w-7 text-emerald-400" />
@@ -83,6 +88,7 @@ export default function SlideIndicacoes({ dados, mesLabel }: Props) {
             <p className="text-2xl font-bold text-purple-400">{formatBRL(dados.valorPontual)}</p>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -29,7 +29,10 @@ function Avatar({ nome, fotoUrl }: { nome: string; fotoUrl: string | null }) {
 
 export default function SlideNovosAniversariantes({ novos, aniversariantes, mesLabel }: Props) {
   return (
-    <div className="w-full h-full flex flex-col bg-zinc-950 text-white p-10 overflow-hidden">
+    <div className="w-full h-full flex flex-col text-white p-10 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="relative z-10 flex-1 flex flex-col">
       {/* Novos Colaboradores */}
       <div className="flex-1 min-h-0">
         <div className="flex items-center gap-3 mb-4">
@@ -81,6 +84,7 @@ export default function SlideNovosAniversariantes({ novos, aniversariantes, mesL
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
