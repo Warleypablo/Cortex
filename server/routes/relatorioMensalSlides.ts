@@ -302,15 +302,15 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND d.data_fechamento < ${dataEnd}
         `),
 
-        // 13. Faturamento do mês (Conta Azul)
+        // 13. Faturamento pontual do mês (cup_contratos — data_entrega no mês)
         db.execute(sql`
           SELECT
-            COALESCE(SUM(valor_bruto::numeric), 0) as faturamento_total,
-            COALESCE(SUM(CASE WHEN status = 'QUITADO' THEN valor_bruto::numeric ELSE 0 END), 0) as faturamento_pago
-          FROM "Conta Azul".caz_parcelas
-          WHERE data_vencimento >= ${dataStart}
-            AND data_vencimento < ${dataEnd}
-            AND tipo_evento = 'RECEITA'
+            COALESCE(SUM(valorp::numeric), 0) as faturamento_pontual
+          FROM "Clickup".cup_contratos
+          WHERE data_entrega >= ${dataStart}
+            AND data_entrega < ${dataEnd}
+            AND valorp IS NOT NULL
+            AND valorp::numeric > 0
         `),
 
         // 13b. Retenções CXCS (solicitações + retidos no mês de dados)
@@ -838,8 +838,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         crosssellMrr: parseFloat(turboCxcs.crosssell_mrr) || 0,
         crosssellPontual: parseFloat(turboCxcs.crosssell_pontual) || 0,
         cxcsSolicitacoes: parseInt(turboCxcs.solicitacoes) || 0,
-        faturamentoTotal: parseFloat(turboFat.faturamento_total) || 0,
-        faturamentoPago: parseFloat(turboFat.faturamento_pago) || 0,
+        faturamentoPontual: parseFloat(turboFat.faturamento_pontual) || 0,
         churnMetaMensal,
         receitaChurnSeries,
         retencoesSolicitacoesCount: parseInt(turboRetencoes.solicitacoes_count) || 0,
