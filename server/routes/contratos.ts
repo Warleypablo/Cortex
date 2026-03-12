@@ -3175,6 +3175,41 @@ Exemplos:
       `);
       
       if (contratoResult.rows.length === 0) {
+        // Tentar buscar em contratos_creators (freelancers)
+        const creatorContratoResult = await db.execute(sql`
+          SELECT id, status, assinafy_status FROM cortex_core.contratos_creators
+          WHERE assinafy_document_id = ${documentId}
+        `);
+
+        if (creatorContratoResult.rows.length > 0) {
+          const cc = creatorContratoResult.rows[0] as any;
+          const isAssinadoCC = status === 'signed' || status === 'completed' || status === 'certificated'
+            || eventType === 'document.signed' || eventType === 'assignment.signed'
+            || eventType === 'document.completed' || eventType === 'document.certificated';
+          const isRecusadoCC = status === 'declined'
+            || eventType === 'document.declined' || eventType === 'assignment.declined';
+
+          if (isAssinadoCC) {
+            await db.execute(sql`
+              UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), atualizado_em = NOW()
+              WHERE id = ${cc.id}
+            `);
+          } else if (isRecusadoCC) {
+            await db.execute(sql`
+              UPDATE cortex_core.contratos_creators SET status = 'recusado', assinafy_status = 'declined', atualizado_em = NOW()
+              WHERE id = ${cc.id}
+            `);
+          } else if (status && status !== cc.assinafy_status) {
+            await db.execute(sql`
+              UPDATE cortex_core.contratos_creators SET assinafy_status = ${status}, atualizado_em = NOW()
+              WHERE id = ${cc.id}
+            `);
+          }
+
+          console.log(`[assinafy-webhook] Contrato creator ${cc.id} atualizado`);
+          return res.status(200).json({ received: true, contratoCreatorId: cc.id });
+        }
+
         console.warn(`[assinafy-webhook] Contrato não encontrado para document_id: ${documentId}`);
         return res.status(200).json({ received: true, warning: 'contract not found' });
       }
