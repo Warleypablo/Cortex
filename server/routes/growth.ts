@@ -1546,38 +1546,58 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END)")
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
-      // Query para buscar métricas de vendas MQL do Bitrix
-      // MQL = leads onde mql = '1' ou 'true'
-      // Usando data_fechamento como referência de data para negócios ganhos
-      const result = await db.execute(sql`
+      const mqlCondition = sql`(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+
+      // Stages que indicam que o deal chegou em Reunião Agendada ou além
+      const STAGES_RM_PLUS = [
+        'Reunião agendada', 'Reunião marcada', 'RM - Reunião Marcada', 'Agendamento direto',
+        'Reunião realizada', 'RR - Reunião Realizada',
+        'Confecção de proposta', 'Em negociação', 'Aguardado os dados',
+        'Aguardando assinatura', 'Subir/Ajustar Cobrança',
+        'Proposta Enviada', 'Negócio Ganho', 'Negócio perdido',
+        'Fortemente interessado', 'Descartado'
+      ];
+      const stagesRmPlus = sql`LOWER(d.stage_name) IN (${sql.join(STAGES_RM_PLUS.map(s => sql`${s.toLowerCase()}`), sql`, `)})`;
+
+      // 1. Total MQLs = leads criados no período
+      const totalResult = await db.execute(sql`
+        SELECT COUNT(*) as total_mqls
+        FROM "Bitrix".crm_deal d
+        WHERE d.created_at >= ${startDate}::date
+          AND d.created_at < (${endDate}::date + INTERVAL '1 day')
+          AND ${mqlCondition}
+          ${funilFilter}
+      `);
+
+      // 2. Reuniões Agendadas = data_fechamento no período + stage >= RM
+      const raResult = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_agendadas_mql
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_fechamento >= ${startDate}::date
+          AND d.data_fechamento <= ${endDate}::date
+          AND ${mqlCondition}
+          AND ${stagesRmPlus}
+          ${funilFilter}
+      `);
+
+      // 3. Reuniões Realizadas = data_reuniao_realizada no período
+      const rrResult = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_realizadas_mql
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_reuniao_realizada >= ${startDate}::date
+          AND d.data_reuniao_realizada < (${endDate}::date + INTERVAL '1 day')
+          AND ${mqlCondition}
+          ${funilFilter}
+      `);
+
+      // 4. Novos Clientes + Faturamento = data_fechamento no período + Negócio Ganho
+      const vendasResult = await db.execute(sql`
         SELECT
-          -- Total MQLs com data_fechamento no período
-          COUNT(*) as total_mqls,
-
-          -- Reuniões Agendadas MQL (deals que passaram por RM ou stages superiores)
-          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada',
-            'Reunião Realizada', 'RR - Reunião Realizada', 'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_agendadas_mql,
-
-          -- Reuniões Realizadas MQL (deals que passaram por RR ou stages superiores)
-          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
-            'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_realizadas_mql,
-
-          -- Novos Clientes MQL (Negócio Ganho)
           ${countNovos} as novos_clientes_mql,
-
-          -- Contratos Aceleração (valor_recorrente > 0 e Negócio Ganho)
           ${countAcel} as contratos_aceleracao_mql,
-
-          -- Contratos Implantação (valor_pontual > 0 e Negócio Ganho)
           ${countImpl} as contratos_implantacao_mql,
-
-          -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao_mql,
-
-          -- Faturamento Implantação (soma valor_pontual dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_mql,
-
-          -- Faturamento via Tráfego (utm_source = facebook/google)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' AND (
             LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%'
             OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%'
@@ -1591,22 +1611,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM "Bitrix".crm_deal d
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
-          AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
+          AND ${mqlCondition}
           ${funilFilter}
       `);
 
-      const row = result.rows[0] as any;
-      
-      const totalMqls = parseInt(row.total_mqls) || 0;
-      const reunioesAgendadas = parseInt(row.reunioes_agendadas_mql) || 0;
-      const reunioesRealizadas = parseInt(row.reunioes_realizadas_mql) || 0;
-      const novosClientes = parseInt(row.novos_clientes_mql) || 0;
-      const contratosAceleracao = parseInt(row.contratos_aceleracao_mql) || 0;
-      const contratosImplantacao = parseInt(row.contratos_implantacao_mql) || 0;
-      const faturamentoAceleracao = parseFloat(row.faturamento_aceleracao_mql) || 0;
-      const faturamentoImplantacao = parseFloat(row.faturamento_implantacao_mql) || 0;
-      const faturamentoAceleracaoTrafego = parseFloat(row.faturamento_aceleracao_trafego) || 0;
-      const faturamentoImplantacaoTrafego = parseFloat(row.faturamento_implantacao_trafego) || 0;
+      const totalMqls = parseInt((totalResult.rows[0] as any).total_mqls) || 0;
+      const reunioesAgendadas = parseInt((raResult.rows[0] as any).reunioes_agendadas_mql) || 0;
+      const reunioesRealizadas = parseInt((rrResult.rows[0] as any).reunioes_realizadas_mql) || 0;
+      const vRow = vendasResult.rows[0] as any;
+      const novosClientes = parseInt(vRow.novos_clientes_mql) || 0;
+      const contratosAceleracao = parseInt(vRow.contratos_aceleracao_mql) || 0;
+      const contratosImplantacao = parseInt(vRow.contratos_implantacao_mql) || 0;
+      const faturamentoAceleracao = parseFloat(vRow.faturamento_aceleracao_mql) || 0;
+      const faturamentoImplantacao = parseFloat(vRow.faturamento_implantacao_mql) || 0;
+      const faturamentoAceleracaoTrafego = parseFloat(vRow.faturamento_aceleracao_trafego) || 0;
+      const faturamentoImplantacaoTrafego = parseFloat(vRow.faturamento_implantacao_trafego) || 0;
 
       // Calcular taxas
       const percReuniaoAgendada = totalMqls > 0 ? reunioesAgendadas / totalMqls : 0;
@@ -1684,38 +1703,58 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END)")
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
-      // Query para buscar métricas de vendas Não-MQL do Bitrix
-      // Não-MQL = leads onde mql != '1' e mql != 'true' (ou mql é null)
-      // Usando data_fechamento como referência de data para negócios ganhos
-      const result = await db.execute(sql`
+      const naoMqlCondition = sql`(d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')`;
+
+      // Stages que indicam que o deal chegou em Reunião Agendada ou além
+      const STAGES_RM_PLUS = [
+        'Reunião agendada', 'Reunião marcada', 'RM - Reunião Marcada', 'Agendamento direto',
+        'Reunião realizada', 'RR - Reunião Realizada',
+        'Confecção de proposta', 'Em negociação', 'Aguardado os dados',
+        'Aguardando assinatura', 'Subir/Ajustar Cobrança',
+        'Proposta Enviada', 'Negócio Ganho', 'Negócio perdido',
+        'Fortemente interessado', 'Descartado'
+      ];
+      const stagesRmPlus = sql`LOWER(d.stage_name) IN (${sql.join(STAGES_RM_PLUS.map(s => sql`${s.toLowerCase()}`), sql`, `)})`;
+
+      // 1. Total Não-MQLs = leads criados no período
+      const totalResult = await db.execute(sql`
+        SELECT COUNT(*) as total_nao_mqls
+        FROM "Bitrix".crm_deal d
+        WHERE d.created_at >= ${startDate}::date
+          AND d.created_at < (${endDate}::date + INTERVAL '1 day')
+          AND ${naoMqlCondition}
+          ${funilFilter}
+      `);
+
+      // 2. Reuniões Agendadas = data_fechamento no período + stage >= RM
+      const raResult = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_agendadas
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_fechamento >= ${startDate}::date
+          AND d.data_fechamento <= ${endDate}::date
+          AND ${naoMqlCondition}
+          AND ${stagesRmPlus}
+          ${funilFilter}
+      `);
+
+      // 3. Reuniões Realizadas = data_reuniao_realizada no período
+      const rrResult = await db.execute(sql`
+        SELECT COUNT(*) as reunioes_realizadas
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_reuniao_realizada >= ${startDate}::date
+          AND d.data_reuniao_realizada < (${endDate}::date + INTERVAL '1 day')
+          AND ${naoMqlCondition}
+          ${funilFilter}
+      `);
+
+      // 4. Novos Clientes + Faturamento = data_fechamento no período + Negócio Ganho
+      const vendasResult = await db.execute(sql`
         SELECT
-          -- Total Não-MQLs com data_fechamento no período
-          COUNT(*) as total_nao_mqls,
-
-          -- Reuniões Agendadas Não-MQL (deals que passaram por RM ou stages superiores)
-          COUNT(CASE WHEN stage_name IN ('Reunião Marcada', 'RM - Reunião Marcada', 'Reunião Agendada',
-            'Reunião Realizada', 'RR - Reunião Realizada', 'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_agendadas,
-
-          -- Reuniões Realizadas Não-MQL (deals que passaram por RR ou stages superiores)
-          COUNT(CASE WHEN stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
-            'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) as reunioes_realizadas,
-
-          -- Novos Clientes Não-MQL (Negócio Ganho)
           ${countNovos} as novos_clientes,
-
-          -- Contratos Aceleração (valor_recorrente > 0 e Negócio Ganho)
           ${countAcel} as contratos_aceleracao,
-
-          -- Contratos Implantação (valor_pontual > 0 e Negócio Ganho)
           ${countImpl} as contratos_implantacao,
-
-          -- Faturamento Aceleração (soma valor_recorrente dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_recorrente ELSE 0 END), 0) as faturamento_aceleracao,
-
-          -- Faturamento Implantação (soma valor_pontual dos ganhos)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao,
-
-          -- Faturamento via Tráfego (utm_source = facebook/google)
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' AND (
             LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%'
             OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%'
@@ -1729,22 +1768,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM "Bitrix".crm_deal d
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
-          AND (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
+          AND ${naoMqlCondition}
           ${funilFilter}
       `);
 
-      const row = result.rows[0] as any;
-      
-      const totalNaoMqls = parseInt(row.total_nao_mqls) || 0;
-      const reunioesAgendadas = parseInt(row.reunioes_agendadas) || 0;
-      const reunioesRealizadas = parseInt(row.reunioes_realizadas) || 0;
-      const novosClientes = parseInt(row.novos_clientes) || 0;
-      const contratosAceleracao = parseInt(row.contratos_aceleracao) || 0;
-      const contratosImplantacao = parseInt(row.contratos_implantacao) || 0;
-      const faturamentoAceleracao = parseFloat(row.faturamento_aceleracao) || 0;
-      const faturamentoImplantacao = parseFloat(row.faturamento_implantacao) || 0;
-      const faturamentoAceleracaoTrafego = parseFloat(row.faturamento_aceleracao_trafego) || 0;
-      const faturamentoImplantacaoTrafego = parseFloat(row.faturamento_implantacao_trafego) || 0;
+      const totalNaoMqls = parseInt((totalResult.rows[0] as any).total_nao_mqls) || 0;
+      const reunioesAgendadas = parseInt((raResult.rows[0] as any).reunioes_agendadas) || 0;
+      const reunioesRealizadas = parseInt((rrResult.rows[0] as any).reunioes_realizadas) || 0;
+      const vRow = vendasResult.rows[0] as any;
+      const novosClientes = parseInt(vRow.novos_clientes) || 0;
+      const contratosAceleracao = parseInt(vRow.contratos_aceleracao) || 0;
+      const contratosImplantacao = parseInt(vRow.contratos_implantacao) || 0;
+      const faturamentoAceleracao = parseFloat(vRow.faturamento_aceleracao) || 0;
+      const faturamentoImplantacao = parseFloat(vRow.faturamento_implantacao) || 0;
+      const faturamentoAceleracaoTrafego = parseFloat(vRow.faturamento_aceleracao_trafego) || 0;
+      const faturamentoImplantacaoTrafego = parseFloat(vRow.faturamento_implantacao_trafego) || 0;
 
       // Calcular taxas
       const percReuniaoAgendada = totalNaoMqls > 0 ? reunioesAgendadas / totalNaoMqls : 0;
