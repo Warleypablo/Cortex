@@ -137,6 +137,7 @@ const AnaliseSquads = lazyWithRetry(() => import("@/pages/AnaliseSquads"));
 const SaudeBaseAtiva = lazyWithRetry(() => import("@/pages/SaudeBaseAtiva"));
 const AutoReport = lazyWithRetry(() => import("@/pages/AutoReport"));
 const Chamados = lazyWithRetry(() => import("@/pages/Chamados"));
+const Capacity = lazyWithRetry(() => import("@/pages/Capacity"));
 const PortalCliente = PortalClientePage;
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
@@ -352,6 +353,7 @@ function ProtectedRouter() {
       {/* OKR 2026 */}
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
       <Route path="/bp-produtos">{() => <ProtectedRoute path="/bp-produtos" component={BpProdutos} />}</Route>
+      <Route path="/capacity">{() => <ProtectedRoute path="/capacity" component={Capacity} />}</Route>
 
       {/* Calendário */}
       <Route path="/calendario">{() => <ProtectedRoute path="/calendario" component={Calendario} />}</Route>
