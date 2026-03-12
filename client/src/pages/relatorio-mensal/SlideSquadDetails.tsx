@@ -70,7 +70,7 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
         {squads.map((sq) => {
           const { emoji, name } = parseSquadName(sq.squad);
           const color = getColor(name);
-          const churnColor = sq.churnPct > 15 ? "#ef4444" : sq.churnPct > 10 ? "#f59e0b" : "#22c55e";
+          const churnColor = sq.churnPct > 8 ? "#ef4444" : "#22c55e";
           const evolColor = sq.evolucaoMrr >= 0 ? "#22c55e" : "#ef4444";
           const evolSign = sq.evolucaoMrr >= 0 ? "+" : "";
 
