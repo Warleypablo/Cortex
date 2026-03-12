@@ -72,15 +72,17 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
   });
 
   return (
-    <div className="w-full h-full flex flex-col bg-zinc-950 text-white" style={{ padding: "24px 32px" }}>
+    <div className="w-full h-full flex flex-col text-white relative overflow-hidden" style={{ padding: "24px 32px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
       {/* Header */}
-      <div className="flex items-center gap-3 mb-3 shrink-0">
+      <div className="relative z-10 flex items-center gap-3 mb-3 shrink-0">
         <Activity className="h-6 w-6 text-cyan-400" />
         <h2 className="text-xl font-bold">Turbo Commerce — {mesLabel}</h2>
       </div>
 
       {/* Top row: 5 compact cards */}
-      <div className="grid grid-cols-5 gap-3 mb-3 shrink-0">
+      <div className="relative z-10 grid grid-cols-5 gap-3 mb-3 shrink-0">
         {/* Faturamento */}
         <Card>
           <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1.5">Faturamento Mês</p>
@@ -200,7 +202,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
       </div>
 
       {/* Bottom: Chart + MRR/Churn info */}
-      <div className="flex-1 grid grid-cols-7 gap-3 min-h-0">
+      <div className="relative z-10 flex-1 grid grid-cols-7 gap-3 min-h-0">
         {/* Chart: Receita x Churn */}
         <Card className="col-span-5 flex flex-col">
           <p className="text-sm font-bold text-zinc-300 mb-2">Receita x Churn</p>

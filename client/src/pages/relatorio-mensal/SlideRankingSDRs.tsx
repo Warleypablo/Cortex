@@ -52,23 +52,27 @@ export default function SlideRankingSDRs({ ranking, topReunioes }: Props) {
 
   if (ranking.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-zinc-950 text-white">
-        <p className="text-zinc-500">Sem dados de SDRs para este periodo</p>
+      <div className="w-full h-full flex items-center justify-center text-white relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+        <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+        <p className="relative z-10 text-zinc-500">Sem dados de SDRs para este periodo</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full bg-zinc-950 text-white flex flex-col" style={{ padding: "32px 40px" }}>
+    <div className="w-full h-full text-white flex flex-col relative overflow-hidden" style={{ padding: "32px 40px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
       {/* Title */}
-      <div className="flex items-center gap-3 shrink-0" style={{ marginBottom: 24 }}>
+      <div className="relative z-10 flex items-center gap-3 shrink-0" style={{ marginBottom: 24 }}>
         <Trophy className="h-7 w-7 text-emerald-400" />
         <h2 className="text-2xl font-bold">Ranking SDRs</h2>
         <span className="text-sm text-zinc-500 ml-2">por MRR gerado</span>
       </div>
 
       {/* Content */}
-      <div className="flex-1 flex items-stretch gap-8 min-h-0">
+      <div className="relative z-10 flex-1 flex items-stretch gap-8 min-h-0">
         {/* Podium */}
         <div className="flex-1 flex items-center justify-center" style={{ gap: 24 }}>
           {display.map(({ c, r }) => {
