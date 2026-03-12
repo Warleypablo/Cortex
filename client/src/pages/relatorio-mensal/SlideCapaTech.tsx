@@ -3,10 +3,9 @@ import { Monitor } from "lucide-react";
 
 export default function SlideCapaTech() {
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 text-white p-12 relative overflow-hidden">
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-[-10%] left-[50%] translate-x-[-50%] w-[800px] h-[400px] rounded-full bg-gradient-to-b from-blue-500 to-cyan-600" />
-      </div>
+    <div className="w-full h-full flex flex-col items-center justify-center text-white p-12 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
 
       <div className="relative z-10 flex flex-col items-center gap-6">
         <img src={turboLogo} alt="Turbo Partners" className="h-12 object-contain opacity-60" />
