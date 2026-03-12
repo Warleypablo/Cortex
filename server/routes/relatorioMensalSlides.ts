@@ -923,12 +923,11 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
 
       const tiposList = Array.from(allTipos);
 
-      // Build 12-month arrays (last 12 months ending at mesDados)
+      // Build month arrays (jan do ano até mesDados)
       const tech12Months: { key: string; label: string }[] = [];
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date(anoDados, mesDados - 1 - i, 1);
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const label = MESES_SHORT[d.getMonth()];
+      for (let m = 1; m <= mesDados; m++) {
+        const key = `${anoDados}-${String(m).padStart(2, '0')}`;
+        const label = MESES_SHORT[m - 1];
         tech12Months.push({ key, label });
       }
 
