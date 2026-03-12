@@ -7,7 +7,87 @@ const MESES_PT = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
+async function initCustomSlidesTable(db: any) {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cortex_core.relatorio_slides_custom (
+      id SERIAL PRIMARY KEY,
+      mes_ano VARCHAR(7) NOT NULL,
+      posicao INTEGER NOT NULL DEFAULT 0,
+      ordem INTEGER NOT NULL DEFAULT 0,
+      titulo TEXT,
+      subtitulo TEXT,
+      image_url TEXT,
+      criado_em TIMESTAMP DEFAULT NOW(),
+      atualizado_em TIMESTAMP DEFAULT NOW()
+    )
+  `);
+}
+
 export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
+
+  // Initialize custom slides table
+  initCustomSlidesTable(db).catch((err: any) =>
+    console.error("[custom-slides] Failed to init table:", err?.message)
+  );
+
+  // --- Custom Slides CRUD ---
+
+  app.get("/api/reports/mensal/custom-slides", async (req, res) => {
+    try {
+      const mes = req.query.mes as string;
+      if (!mes || !/^\d{4}-\d{2}$/.test(mes)) {
+        return res.status(400).json({ error: "Parâmetro 'mes' inválido. Use formato YYYY-MM." });
+      }
+      const result = await db.execute(sql`
+        SELECT * FROM cortex_core.relatorio_slides_custom
+        WHERE mes_ano = ${mes}
+        ORDER BY posicao ASC, ordem ASC
+      `);
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("[custom-slides] GET error:", error?.message);
+      res.status(500).json({ error: "Erro ao buscar custom slides" });
+    }
+  });
+
+  app.post("/api/reports/mensal/custom-slides", async (req, res) => {
+    try {
+      const { mes_ano, posicao, titulo, subtitulo, image_url } = req.body;
+      if (!mes_ano || !/^\d{4}-\d{2}$/.test(mes_ano)) {
+        return res.status(400).json({ error: "Campo 'mes_ano' inválido." });
+      }
+      // Auto-increment ordem for same position
+      const maxOrdem = await db.execute(sql`
+        SELECT COALESCE(MAX(ordem), -1) + 1 as next_ordem
+        FROM cortex_core.relatorio_slides_custom
+        WHERE mes_ano = ${mes_ano} AND posicao = ${posicao ?? 0}
+      `);
+      const ordem = maxOrdem.rows[0]?.next_ordem ?? 0;
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.relatorio_slides_custom (mes_ano, posicao, ordem, titulo, subtitulo, image_url)
+        VALUES (${mes_ano}, ${posicao ?? 0}, ${ordem}, ${titulo ?? null}, ${subtitulo ?? null}, ${image_url ?? null})
+        RETURNING *
+      `);
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      console.error("[custom-slides] POST error:", error?.message);
+      res.status(500).json({ error: "Erro ao criar custom slide" });
+    }
+  });
+
+  app.delete("/api/reports/mensal/custom-slides/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+      await db.execute(sql`
+        DELETE FROM cortex_core.relatorio_slides_custom WHERE id = ${id}
+      `);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[custom-slides] DELETE error:", error?.message);
+      res.status(500).json({ error: "Erro ao deletar custom slide" });
+    }
+  });
 
   app.get("/api/reports/mensal", async (req, res) => {
     try {
