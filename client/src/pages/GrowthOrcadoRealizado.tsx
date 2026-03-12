@@ -881,16 +881,11 @@ export default function GrowthOrcadoRealizado() {
   const investimentoOrcado = ORCADO_ADS.investimento;
   const investimentoPerc = investimentoOrcado > 0 ? (investimentoRealizado / investimentoOrcado) * 100 : 0;
 
-  const mqlsRealizado = cardFilter === 'nao-mql'
-    ? (naoMqlData?.totalNaoMqls ?? 0)
-    : cardFilter === 'mql'
-    ? (mqlData?.totalMqls ?? 0)
-    : (mqlData?.totalMqls ?? 0) + (naoMqlData?.totalNaoMqls ?? 0);
-  const mqlsOrcadoMql = ORCADO_MQL.reunioesAgendadas + ORCADO_MQL.novosClientes; // ~229 MQLs
-  const mqlsOrcadoNaoMql = ORCADO_NAO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.novosClientes; // ~1085 leads
-  const mqlsOrcado = cardFilter === 'nao-mql' ? mqlsOrcadoNaoMql : cardFilter === 'mql' ? mqlsOrcadoMql : mqlsOrcadoMql + mqlsOrcadoNaoMql;
+  // Leads do card = leads de tráfego pago (Ads endpoint)
+  const mqlsRealizado = adsData?.leads ?? 0;
+  const mqlsOrcado = ORCADO_ADS.leads;
   const mqlsPerc = mqlsOrcado > 0 ? (mqlsRealizado / mqlsOrcado) * 100 : 0;
-  const mqlsLabel = cardFilter === 'nao-mql' ? 'Leads Não-MQL' : cardFilter === 'mql' ? 'MQLs' : 'Leads Totais';
+  const mqlsLabel = 'Leads Totais';
 
   // Helper para somar valores de MQL e/ou Não-MQL conforme cardFilter
   const sumByCardFilter = (mqlVal: number, naoMqlVal: number) => {
