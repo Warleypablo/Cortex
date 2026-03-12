@@ -1498,6 +1498,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ORDER BY fnl_ngc
       `);
       const funis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
+      // Add "(Vazio)" option for deals with no funnel assigned
+      funis.unshift("(Vazio)");
       res.json(funis);
     } catch (error) {
       console.error("[api] Error fetching funis:", error);
@@ -1510,19 +1512,28 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     try {
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
-      
+
       if (!startDate || !endDate) {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
       const contagem = (req.query.contagem as string) || 'contrato';
 
-      // Funil NGC filter (supports multiple comma-separated values)
+      // Funil NGC filter (supports multiple comma-separated values + "(Vazio)" for NULL/empty)
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
-      const funilFilter = funilValues.length > 0
-        ? sql`AND d.fnl_ngc IN (${sql.join(funilValues.map(v => sql`${v}`), sql`, `)})`
-        : sql``;
+      const hasVazio = funilValues.includes('(Vazio)');
+      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
+      let funilFilter = sql``;
+      if (funilValues.length > 0) {
+        if (hasVazio && realFunilValues.length > 0) {
+          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+        } else if (hasVazio) {
+          funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+        } else {
+          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+        }
+      }
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
@@ -1639,19 +1650,28 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     try {
       const startDate = req.query.startDate as string;
       const endDate = req.query.endDate as string;
-      
+
       if (!startDate || !endDate) {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
       const contagem = (req.query.contagem as string) || 'contrato';
 
-      // Funil NGC filter (supports multiple comma-separated values)
+      // Funil NGC filter (supports multiple comma-separated values + "(Vazio)" for NULL/empty)
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
-      const funilFilter = funilValues.length > 0
-        ? sql`AND d.fnl_ngc IN (${sql.join(funilValues.map(v => sql`${v}`), sql`, `)})`
-        : sql``;
+      const hasVazio = funilValues.includes('(Vazio)');
+      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
+      let funilFilter = sql``;
+      if (funilValues.length > 0) {
+        if (hasVazio && realFunilValues.length > 0) {
+          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+        } else if (hasVazio) {
+          funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+        } else {
+          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+        }
+      }
 
       // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
       const countNovos = contagem === 'cliente'
@@ -1817,20 +1837,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
-      // Parse funilNgc filter
+      // Parse funilNgc filter (supports "(Vazio)" for NULL/empty)
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw
         ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
         : [];
+      const hasVazio = funilValues.includes('(Vazio)');
+      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
 
       // Build campaign filter (JOIN + WHERE) when funil is selected
-      const campaignJoin = funilValues.length > 0
+      // Note: "(Vazio)" doesn't apply to campaign name filtering, only real values
+      const campaignJoin = realFunilValues.length > 0
         ? sql`JOIN meta_ads.meta_campaigns mc ON mid.campaign_id = mc.campaign_id`
         : sql``;
 
-      const campaignFilter = funilValues.length > 0
+      const campaignFilter = realFunilValues.length > 0
         ? sql`AND (${sql.join(
-            funilValues.map(v => sql`mc.campaign_name ILIKE ${'%[' + v + ']%'}`),
+            realFunilValues.map(v => sql`mc.campaign_name ILIKE ${'%[' + v + ']%'}`),
             sql` OR `
           )})`
         : sql``;
@@ -1901,9 +1924,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cps = cliquesSaida > 0 ? investimento / cliquesSaida : 0;
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
-      const funilFilter = funilValues.length > 0
-        ? sql`AND d.fnl_ngc IN (${sql.join(funilValues.map(v => sql`${v}`), sql`, `)})`
-        : sql``;
+      let funilFilter = sql``;
+      if (funilValues.length > 0) {
+        if (hasVazio && realFunilValues.length > 0) {
+          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+        } else if (hasVazio) {
+          funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+        } else {
+          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+        }
+      }
 
       const leadsResult = await db.execute(sql`
         SELECT
