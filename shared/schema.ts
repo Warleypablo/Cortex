@@ -2976,3 +2976,23 @@ export const clientCredentials = cortexCoreSchema.table("client_credentials", {
 
 export type ClientCredential = typeof clientCredentials.$inferSelect;
 export type InsertClientCredential = typeof clientCredentials.$inferInsert;
+
+// ── Capacity Operador ────────────────────────────────────────────────────────
+export const capacityOperadorSchema = z.object({
+  id: z.number().optional(),
+  operador: z.string().min(1),
+  produto: z.string().min(1),
+  squad: z.string().min(1),
+  max_contratos: z.number().int().positive(),
+});
+
+export const upsertCapacitySchema = capacityOperadorSchema.omit({ id: true });
+
+export type CapacityOperador = z.infer<typeof capacityOperadorSchema>;
+export type UpsertCapacity = z.infer<typeof upsertCapacitySchema>;
+
+export type CapacityComUtilizacao = CapacityOperador & {
+  contratos_atuais: number;
+  vagas_livres: number;
+  utilizacao_pct: number;
+};
