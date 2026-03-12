@@ -153,8 +153,8 @@ export default function RelatorioMensal() {
 
   const slideNames = [
     "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
-    "KRs", "Capa Commerce", "Commerce", "Capa Comercial", "Ranking Closers",
-    "Ranking SDRs", "Contratos", "Turbo Metrics", "Ranking Squads", "Squad Details",
+    "KRs", "Capa Comercial", "Ranking Closers",
+    "Ranking SDRs", "Contratos", "Capa Commerce", "Commerce", "Turbo Metrics", "Ranking Squads", "Squad Details",
     "Capa Tech", "Area Tech", "Indicações", "Sede Gazeta 1ª Etapa", "Sede Gazeta 2ª Etapa",
     "Vamos com Turbo!", "Frase", "Q&A"
   ];
@@ -167,12 +167,12 @@ export default function RelatorioMensal() {
       case 2: return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
       case 3: return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
       case 4: return <SlideKRs objectives={data.okrObjectives} />;
-      case 5: return <SlideCapaCommerce />;
-      case 6: return <SlideTurboCommerce ano={ano} mes={mes} />;
-      case 7: return <SlideCapaComercial />;
-      case 8: return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
-      case 9: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
-      case 10: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
+      case 5: return <SlideCapaComercial />;
+      case 6: return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
+      case 7: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
+      case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
+      case 9: return <SlideCapaCommerce />;
+      case 10: return <SlideTurboCommerce ano={ano} mes={mes} />;
       case 11: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
       case 12: return <SlideRankingSquads ranking={data.rankingSquads} />;
       case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
