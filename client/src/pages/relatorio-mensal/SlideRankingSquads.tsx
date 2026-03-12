@@ -1,4 +1,5 @@
 import type { SquadRanking } from "./types";
+import SlideLayout from "./SlideLayout";
 
 interface Props {
   ranking: SquadRanking[];
@@ -30,7 +31,7 @@ const SQUAD_COLORS: Record<string, string> = {
   "Turbo Interno": "#94a3b8",
   "Solar+":     "#facc15",
   "Tribo":      "#fb923c",
-  "Comunicação":"#64748b",
+  "Comunicacao":"#64748b",
 };
 
 const DEFAULT_COLOR = "#71717a";
@@ -38,7 +39,7 @@ const DEFAULT_COLOR = "#71717a";
 /** Extract emoji prefix and base name from squad name like "🪖 Selva" */
 function parseSquadName(raw: string): { emoji: string; name: string } {
   const trimmed = raw.trim();
-  // Find first ASCII letter position — everything before it is the emoji
+  // Find first ASCII letter position - everything before it is the emoji
   const idx = trimmed.search(/[A-Za-z]/);
   if (idx > 0) {
     return { emoji: trimmed.slice(0, idx).trim(), name: trimmed.slice(idx).trim() };
@@ -64,11 +65,11 @@ export default function SlideRankingSquads({ ranking }: Props) {
 
   if (top.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-white relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
-        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-        <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
-        <p className="relative z-10 text-zinc-500">Sem dados de squads para este período</p>
-      </div>
+      <SlideLayout section="commerce">
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-zinc-500">Sem dados de squads para este periodo</p>
+        </div>
+      </SlideLayout>
     );
   }
 
@@ -84,14 +85,9 @@ export default function SlideRankingSquads({ ranking }: Props) {
   const emojiSize: Record<number, number> = { 1: 42, 2: 34, 3: 32, 4: 28, 5: 26 };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center text-white relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
-      {/* Background glow effects */}
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-
+    <SlideLayout section="commerce" className="items-center justify-center">
       {/* Title */}
-      <div className="relative z-10 mb-6">
+      <div className="mb-6">
         <h2 className="text-4xl font-black tracking-tight">
           <span className="text-amber-400 italic">Ranking</span>{" "}
           <span className="text-white">Squads</span>
@@ -99,7 +95,7 @@ export default function SlideRankingSquads({ ranking }: Props) {
       </div>
 
       {/* Podium */}
-      <div className="relative z-10 flex items-end justify-center" style={{ gap: 14 }}>
+      <div className="flex items-end justify-center" style={{ gap: 14 }}>
         {podiumOrder.map((squad) => {
           const { emoji, name } = parseSquadName(squad.squad);
           const color = getSquadColor(name);
@@ -155,6 +151,6 @@ export default function SlideRankingSquads({ ranking }: Props) {
           );
         })}
       </div>
-    </div>
+    </SlideLayout>
   );
 }
