@@ -64,8 +64,10 @@ export default function SlideRankingSquads({ ranking }: Props) {
 
   if (top.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-zinc-950 text-white">
-        <p className="text-zinc-500">Sem dados de squads para este período</p>
+      <div className="w-full h-full flex items-center justify-center text-white relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+        <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+        <p className="relative z-10 text-zinc-500">Sem dados de squads para este período</p>
       </div>
     );
   }
@@ -82,9 +84,10 @@ export default function SlideRankingSquads({ ranking }: Props) {
   const emojiSize: Record<number, number> = { 1: 42, 2: 34, 3: 32, 4: 28, 5: 26 };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center bg-zinc-950 text-white relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/40 via-zinc-950 to-purple-950/30" />
+    <div className="w-full h-full flex flex-col items-center justify-center text-white relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
+      {/* Background glow effects */}
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
 
       {/* Title */}
       <div className="relative z-10 mb-6">
