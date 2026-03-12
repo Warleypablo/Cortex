@@ -6,7 +6,7 @@ import {
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
   ChevronRight, ChevronDown, Presentation, Activity, Palette, Sliders, Lightbulb, Megaphone, Ticket,
-  Star
+  Star, Gauge
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogoLight from "@assets/Logo_(15)_1766960214260.png";
@@ -46,8 +46,8 @@ const ICONS: Record<string, any> = {
   Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor,
   Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
-  CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Activity, Palette, 
-  Sliders, Bell, Lightbulb, Megaphone, Ticket,
+  CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Activity, Palette,
+  Sliders, Bell, Lightbulb, Megaphone, Ticket, Gauge,
 };
 
 const getIcon = (iconName: string) => ICONS[iconName] || FileText;
