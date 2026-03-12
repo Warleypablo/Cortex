@@ -209,6 +209,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
   '/dashboard/saude-base-ativa': PERMISSION_KEYS.GESTAO.SAUDE_BASE,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
+  '/capacity': PERMISSION_KEYS.GESTAO.CAPACITY,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   '/contratos': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   // Operação
@@ -417,6 +418,7 @@ export const NAV_CONFIG = {
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
         { title: 'Saúde da Base', url: '/dashboard/saude-base-ativa', icon: 'HeartPulse', permissionKey: PERMISSION_KEYS.GESTAO.SAUDE_BASE },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
+        { title: 'Capacity', url: '/capacity', icon: 'Gauge', permissionKey: PERMISSION_KEYS.GESTAO.CAPACITY },
       ],
     },
     {
