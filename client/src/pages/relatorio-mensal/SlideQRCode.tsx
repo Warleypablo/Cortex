@@ -6,12 +6,13 @@ export default function SlideQRCode() {
     <div className="w-full h-full flex flex-col items-center justify-center text-white p-12 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
       <img src={turboLogo} alt="Turbo Partners" className="relative z-10 h-10 object-contain mb-8 opacity-60" />
 
       <h2 className="relative z-10 text-2xl font-bold mb-2">Q&A</h2>
       <p className="relative z-10 text-zinc-400 mb-8">Escaneie o QR Code para enviar sua pergunta</p>
 
-      <div className="relative z-10 w-64 h-64 bg-white rounded-2xl flex items-center justify-center p-4">
+      <div className="relative z-10 w-64 h-64 bg-white/95 backdrop-blur-xl rounded-2xl flex items-center justify-center p-4 shadow-[0_0_40px_rgba(139,92,246,0.2)]">
         <img src={qrCode} alt="QR Code" className="w-full h-full object-contain" />
       </div>
     </div>

@@ -14,7 +14,7 @@ function formatBRL(v: number): string {
 
 function StatCard({ icon: Icon, label, value, accent }: { icon: any; label: string; value: string; accent?: string }) {
   return (
-    <div className="flex items-center gap-4 bg-zinc-800/50 rounded-xl px-5 py-4">
+    <div className="flex items-center gap-4 bg-white/[0.04] border border-white/[0.06] rounded-xl px-5 py-4">
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${accent ? accent.replace("text-", "bg-").replace("400", "500/15") : "bg-zinc-700/30"}`}>
         <Icon className={`h-5 w-5 ${accent || "text-zinc-400"}`} />
       </div>
@@ -35,15 +35,21 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
     <div className="w-full h-full flex flex-col text-white p-10 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
       <div className="relative z-10 flex-1 flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-8">
-        <BarChart3 className="h-7 w-7 text-cyan-400" />
-        <h2 className="text-2xl font-bold">Contratos Fechados — {mesLabel}</h2>
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="bg-white/10 backdrop-blur p-2 rounded-lg">
+            <BarChart3 className="h-5 w-5 text-cyan-400" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">Contratos Fechados — {mesLabel}</h2>
+        </div>
+        <div className="h-px bg-gradient-to-r from-cyan-500/40 to-transparent" />
       </div>
 
       {/* Top row: Total summary with progress bar */}
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6 mb-6">
+      <div className="bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] shadow-lg shadow-black/20 rounded-2xl p-6 mb-6">
         <div className="flex items-end justify-between mb-5">
           <div>
             <p className="text-sm text-zinc-500 mb-1">Total de Contratos</p>
@@ -83,7 +89,7 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
       {/* Bottom: Two sections */}
       <div className="grid grid-cols-2 gap-6 flex-1 min-h-0">
         {/* Recorrente */}
-        <div className="bg-zinc-900/40 border border-emerald-500/20 rounded-2xl p-5 flex flex-col">
+        <div className="bg-white/[0.03] backdrop-blur-xl border border-emerald-500/15 rounded-2xl p-5 flex flex-col">
           <div className="flex items-center gap-2 mb-4">
             <TrendingUp className="h-5 w-5 text-emerald-400" />
             <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Recorrente (MRR)</h3>
@@ -96,7 +102,7 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
         </div>
 
         {/* Pontual */}
-        <div className="bg-zinc-900/40 border border-purple-500/20 rounded-2xl p-5 flex flex-col">
+        <div className="bg-white/[0.03] backdrop-blur-xl border border-purple-500/15 rounded-2xl p-5 flex flex-col">
           <div className="flex items-center gap-2 mb-4">
             <Zap className="h-5 w-5 text-purple-400" />
             <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wider">Pontual</h3>
