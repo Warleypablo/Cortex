@@ -33,7 +33,7 @@ export default function SlideLayout({
 
   return (
     <div
-      className={`w-full h-full flex flex-col text-white relative overflow-hidden ${className}`}
+      className="w-full h-full flex flex-col text-white relative overflow-hidden"
       style={{
         padding,
         background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)",
@@ -85,7 +85,7 @@ export default function SlideLayout({
       />
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col flex-1 min-h-0">
+      <div className={`relative z-10 flex flex-col flex-1 min-h-0 ${className}`}>
         {children}
       </div>
 
