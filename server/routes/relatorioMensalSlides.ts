@@ -241,7 +241,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           )
           SELECT
             COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_ativo,
-            COALESCE(AVG(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as ticket_medio,
+            COALESCE(AVG(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as ticket_medio_contrato,
             COUNT(*)::int as contratos_ativos,
             COUNT(DISTINCT h.id_task)::int as clientes_ativos
           FROM "Clickup".cup_data_hist h
@@ -825,7 +825,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
 
       const turboMetrics = {
         mrrAtivo: parseFloat(turboMrr.mrr_ativo) || 0,
-        ticketMedio: parseFloat(turboMrr.ticket_medio) || 0,
+        ticketMedioContrato: parseFloat(turboMrr.ticket_medio_contrato) || 0,
+        ticketMedioCliente: (parseInt(turboMrr.clientes_ativos) || 0) > 0
+          ? (parseFloat(turboMrr.mrr_ativo) || 0) / (parseInt(turboMrr.clientes_ativos) || 1)
+          : 0,
         clientesAtivos: parseInt(turboMrr.clientes_ativos) || 0,
         contratosAtivos: parseInt(turboMrr.contratos_ativos) || 0,
         clientesTotais: parseInt(turboClientes.clientes_totais) || 0,

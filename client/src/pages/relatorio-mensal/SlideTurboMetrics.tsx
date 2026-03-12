@@ -150,10 +150,21 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
         </SecondaryCard>
 
         {/* Ticket Medio */}
-        <SecondaryCard className="p-3 flex flex-col items-center justify-center text-center">
-          <CreditCard className="h-4 w-4 text-zinc-400 mb-1" />
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Ticket Medio</p>
-          <p className="text-2xl font-black">{fmtBRL(metrics.ticketMedio)}</p>
+        <SecondaryCard className="p-3 flex flex-col justify-center">
+          <div className="flex items-center gap-1.5 mb-2">
+            <CreditCard className="h-3.5 w-3.5 text-zinc-400" />
+            <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Ticket Medio</p>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-400">Contrato:</span>
+              <span className="text-xs font-bold">{fmtBRL(metrics.ticketMedioContrato)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-400">Cliente:</span>
+              <span className="text-xs font-bold">{fmtBRL(metrics.ticketMedioCliente)}</span>
+            </div>
+          </div>
         </SecondaryCard>
 
         {/* CXCS */}

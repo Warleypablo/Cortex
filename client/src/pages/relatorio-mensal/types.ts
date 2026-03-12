@@ -88,7 +88,8 @@ export interface ContratosMes {
 
 export interface TurboMetrics {
   mrrAtivo: number;
-  ticketMedio: number;
+  ticketMedioContrato: number;
+  ticketMedioCliente: number;
   clientesAtivos: number;
   contratosAtivos: number;
   clientesTotais: number;
