@@ -41,6 +41,7 @@ export const PERMISSION_KEYS = {
     ANALISE_SQUADS: 'gestao.analise_squads',
     SAUDE_BASE: 'gestao.saude_base',
     BP_PRODUTOS: 'gestao.bp_produtos',
+    CAPACITY: 'gestao.capacity',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
