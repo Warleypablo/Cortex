@@ -110,6 +110,7 @@ const CasesChat = lazyWithRetry(() => import("@/pages/CasesChat"));
 const JuridicoClientes = lazyWithRetry(() => import("@/pages/JuridicoClientes"));
 const ProcessosJuridico = lazyWithRetry(() => import("@/pages/ProcessosJuridico"));
 const ContratosColaboradores = lazyWithRetry(() => import("@/pages/ContratosColaboradores"));
+const Creators = lazyWithRetry(() => import("@/pages/Creators"));
 const AssistenteJuridico = lazyWithRetry(() => import("@/pages/AssistenteJuridico"));
 const RelatoriosJuridico = lazyWithRetry(() => import("@/pages/RelatoriosJuridico"));
 const InvestorsReport = lazyWithRetry(() => import("@/pages/InvestorsReport"));
@@ -345,6 +346,7 @@ function ProtectedRouter() {
       <Route path="/juridico/contratos-colaborador">{() => <ProtectedRoute path="/juridico/contratos-colaborador" component={ContratosColaboradores} />}</Route>
       <Route path="/juridico/assistente">{() => <ProtectedRoute path="/juridico/assistente" component={AssistenteJuridico} />}</Route>
       <Route path="/juridico/relatorios">{() => <ProtectedRoute path="/juridico/relatorios" component={RelatoriosJuridico} />}</Route>
+      <Route path="/juridico/creators">{() => <ProtectedRoute path="/juridico/creators" component={Creators} />}</Route>
       
       {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
