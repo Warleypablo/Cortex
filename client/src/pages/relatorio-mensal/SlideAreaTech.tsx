@@ -82,6 +82,20 @@ function BarLabel({ x, y, width, height, value, fill }: any) {
   );
 }
 
+function makeStackTopLabel(data: Record<string, any>[], tiposList: string[], isCurrency: boolean) {
+  return ({ x, y, width, index }: any) => {
+    if (index == null || !data[index]) return null;
+    const row = data[index];
+    const total = tiposList.reduce((s, t) => s + ((row[t] as number) || 0), 0);
+    if (!total) return null;
+    return (
+      <text x={x + width / 2} y={y - 6} fill="white" textAnchor="middle" fontSize={12} fontWeight="bold">
+        {isCurrency ? fmtK(total) : total}
+      </text>
+    );
+  };
+}
+
 export default function SlideAreaTech({ techData, mesLabel }: Props) {
   if (!techData) {
     return (
@@ -105,12 +119,6 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
     : [];
 
   const totalAbertoValor = emAbertoPorTipo.reduce((s, t) => s + t.valor, 0);
-
-  // Totais dos gráficos de barras
-  const sumBar = (data: Record<string, any>[]) =>
-    data.reduce((s, row) => s + tipos.reduce((a, t) => a + ((row[t] as number) || 0), 0), 0);
-  const totalEntregas = sumBar(entregasFiltered);
-  const totalReceita = sumBar(receitaFiltered);
 
   const pieData = emAbertoPorTipo.filter(t => t.quantidade > 0);
 
@@ -163,7 +171,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
         {/* Stacked Bar: N Projetos Entregues */}
         <div className="border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm p-3 flex flex-col">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <p className="text-sm font-bold text-zinc-200">N° Projetos Entregues <span className="text-emerald-400 ml-1">{totalEntregas}</span></p>
+            <p className="text-sm font-bold text-zinc-200">N° Projetos Entregues</p>
             <div className="flex items-center gap-2 flex-wrap">
               {tipos.map(tipo => (
                 <div key={tipo} className="flex items-center gap-1">
@@ -175,7 +183,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
           </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={entregasFiltered} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={entregasFiltered} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a40" />
                 <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
                 <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} allowDecimals={false} width={30} />
@@ -188,7 +196,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
                     stackId="a"
                     fill={getColor(tipo)}
                     radius={i === tipos.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
-                    label={<BarLabel />}
+                    label={i === tipos.length - 1 ? makeStackTopLabel(entregasFiltered, tipos, false) : <BarLabel />}
                   />
                 ))}
               </BarChart>
@@ -241,7 +249,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
         {/* Stacked Bar: Receita Tech */}
         <div className="border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm p-3 flex flex-col">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <p className="text-sm font-bold text-zinc-200">Receita Tech <span className="text-emerald-400 ml-1">{fmtBRL(totalReceita)}</span></p>
+            <p className="text-sm font-bold text-zinc-200">Receita Tech</p>
             <div className="flex items-center gap-2 flex-wrap">
               {tipos.map(tipo => (
                 <div key={tipo} className="flex items-center gap-1">
@@ -253,7 +261,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
           </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={receitaFiltered} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={receitaFiltered} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a40" />
                 <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
                 <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} tickFormatter={fmtK} width={45} />
@@ -266,7 +274,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
                     stackId="a"
                     fill={getColor(tipo)}
                     radius={i === tipos.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
-                    label={<BarLabel />}
+                    label={i === tipos.length - 1 ? makeStackTopLabel(receitaFiltered, tipos, true) : <BarLabel />}
                   />
                 ))}
               </BarChart>
