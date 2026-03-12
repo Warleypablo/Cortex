@@ -155,7 +155,7 @@ export default function RelatorioMensal() {
   const slideNames = [
     "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
     "KRs", "Capa Comercial", "Ranking Closers",
-    "Ranking SDRs", "Contratos", "Capa Commerce", "Commerce", "Turbo Metrics", "Ranking Squads", "Squad Details",
+    "Ranking SDRs", "Contratos", "Capa Commerce", "Turbo Metrics", "Commerce", "Ranking Squads", "Squad Details",
     "Capa Tech", "Area Tech", "Capa Novo Escritório", "Sede Gazeta 1ª Etapa", "Sede Gazeta 2ª Etapa",
     "Vamos com Turbo!", "Frase", "Q&A"
   ];
@@ -173,8 +173,8 @@ export default function RelatorioMensal() {
       case 7: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
       case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
       case 9: return <SlideCapaCommerce />;
-      case 10: return <SlideTurboCommerce ano={ano} mes={mes} okrObjectives={data.okrObjectives} mrrAtivo={data.turboMetrics.mrrAtivo} />;
-      case 11: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 10: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 11: return <SlideTurboCommerce ano={ano} mes={mes} okrObjectives={data.okrObjectives} mrrAtivo={data.turboMetrics.mrrAtivo} />;
       case 12: return <SlideRankingSquads ranking={data.rankingSquads} />;
       case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
       case 14: return <SlideCapaTech />;
