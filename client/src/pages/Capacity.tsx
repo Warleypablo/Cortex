@@ -89,14 +89,12 @@ export default function Capacity() {
   });
 
   const { data: produtos } = useQuery<string[]>({
-    queryKey: ["/api/contratos/produtos-distintos"],
+    queryKey: ["/api/capacity/produtos"],
   });
 
-  const { data: evolucaoData } = useQuery<{ operadores: string[] }>({
-    queryKey: ["/api/evolucao-mensal"],
+  const { data: operadores } = useQuery<string[]>({
+    queryKey: ["/api/capacity/operadores"],
   });
-
-  const operadores = evolucaoData?.operadores || [];
 
   // Mutations
   const upsertMutation = useMutation({
@@ -390,7 +388,7 @@ export default function Capacity() {
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {operadores.map((op) => (
+                      {(operadores || []).map((op) => (
                         <SelectItem key={op} value={op}>{op}</SelectItem>
                       ))}
                     </SelectContent>
