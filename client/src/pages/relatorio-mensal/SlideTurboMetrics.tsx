@@ -50,11 +50,14 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
     ? ((metrics.retencoesCount / metrics.retencoesSolicitacoesCount) * 100).toFixed(1)
     : "0.0";
 
-  // Build chart data: fill all 12 months, empty for months without data
+  // Extract year from mesLabel (e.g. "Fevereiro 2026" -> 2026)
+  const reportYear = parseInt(mesLabel.split(" ").pop() || "0");
+
+  // Build chart data: only months from the report year
   const chartData = MESES_ALL.map((label, i) => {
     const found = metrics.receitaChurnSeries?.find(s => {
-      const m = parseInt(s.month.split("-")[1]);
-      return m === i + 1;
+      const [y, m] = s.month.split("-").map(Number);
+      return y === reportYear && m === i + 1;
     });
     return {
       label,
