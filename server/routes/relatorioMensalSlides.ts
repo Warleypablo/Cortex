@@ -59,6 +59,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         rankingSquadsResult,
         churnSquadsResult,
         mrrAnteriorSquadsResult,
+        mrrAnteriorTotalResult,
         techKpisEntreguesResult,
         techKpisAdicionadosResult,
         techEntregasPorTipoResult,
@@ -461,6 +462,25 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           GROUP BY h.squad
         `),
 
+        // 17b. MRR total do mês anterior (para meta de churn = 8% do MRR ativo)
+        db.execute(sql`
+          WITH ultimo_snapshot_ant AS (
+            SELECT MAX(data_snapshot) as snap
+            FROM "Clickup".cup_data_hist
+            WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${
+              mesDados === 1
+                ? `${anoDados - 1}-12`
+                : `${anoDados}-${String(mesDados - 1).padStart(2, '0')}`
+            }
+          )
+          SELECT
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_total
+          FROM "Clickup".cup_data_hist h
+          JOIN ultimo_snapshot_ant us ON h.data_snapshot = us.snap
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND h.valorr IS NOT NULL
+        `),
+
         // 18. Tech KPIs - Entregues no mês de dados (ambas tabelas)
         // Usa COALESCE(data_entregue, lancamento) para priorizar data real de entrega
         db.execute(sql`
@@ -784,8 +804,9 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       };
 
       const mrrAdicionado = totalRecorrente; // from deals won this month
-      const churnTarget = krs.find(kr => kr.metricKey === "churn_brl");
-      const churnMetaMensal = churnTarget ? (churnTarget.targets[quarter] || 0) / 3 : 0;
+      // Meta de churn máximo mensal = 8% do MRR ativo do último dia do mês anterior
+      const mrrMesAnteriorTotal = parseFloat((mrrAnteriorTotalResult.rows as any[])[0]?.mrr_total) || 0;
+      const churnMetaMensal = mrrMesAnteriorTotal * 0.08;
 
       // Build receita x churn series
       const MESES_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
