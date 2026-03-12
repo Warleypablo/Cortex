@@ -1547,6 +1547,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
       const mqlCondition = sql`(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
 
       // Stages que indicam que o deal chegou em Reunião Agendada ou além
       const STAGES_RM_PLUS = [
@@ -1561,7 +1562,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // 1. Total MQLs = leads criados no período
       const totalResult = await db.execute(sql`
-        SELECT COUNT(*) as total_mqls
+        SELECT ${countExpr} as total_mqls
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at < (${endDate}::date + INTERVAL '1 day')
@@ -1571,7 +1572,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // 2. Reuniões Agendadas = data_fechamento no período + stage >= RM
       const raResult = await db.execute(sql`
-        SELECT COUNT(*) as reunioes_agendadas_mql
+        SELECT ${countExpr} as reunioes_agendadas_mql
         FROM "Bitrix".crm_deal d
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
@@ -1582,7 +1583,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // 3. Reuniões Realizadas = data_reuniao_realizada no período
       const rrResult = await db.execute(sql`
-        SELECT COUNT(*) as reunioes_realizadas_mql
+        SELECT ${countExpr} as reunioes_realizadas_mql
         FROM "Bitrix".crm_deal d
         WHERE d.data_reuniao_realizada >= ${startDate}::date
           AND d.data_reuniao_realizada < (${endDate}::date + INTERVAL '1 day')
@@ -1704,6 +1705,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
       const naoMqlCondition = sql`(d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')`;
+      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
 
       // Stages que indicam que o deal chegou em Reunião Agendada ou além
       const STAGES_RM_PLUS = [
@@ -1718,7 +1720,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // 1. Total Não-MQLs = leads criados no período
       const totalResult = await db.execute(sql`
-        SELECT COUNT(*) as total_nao_mqls
+        SELECT ${countExpr} as total_nao_mqls
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at < (${endDate}::date + INTERVAL '1 day')
@@ -1728,7 +1730,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // 2. Reuniões Agendadas = data_fechamento no período + stage >= RM
       const raResult = await db.execute(sql`
-        SELECT COUNT(*) as reunioes_agendadas
+        SELECT ${countExpr} as reunioes_agendadas
         FROM "Bitrix".crm_deal d
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
@@ -1739,7 +1741,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // 3. Reuniões Realizadas = data_reuniao_realizada no período
       const rrResult = await db.execute(sql`
-        SELECT COUNT(*) as reunioes_realizadas
+        SELECT ${countExpr} as reunioes_realizadas
         FROM "Bitrix".crm_deal d
         WHERE d.data_reuniao_realizada >= ${startDate}::date
           AND d.data_reuniao_realizada < (${endDate}::date + INTERVAL '1 day')
@@ -1962,6 +1964,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cps = cliquesSaida > 0 ? investimento / cliquesSaida : 0;
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
+      const contagem = (req.query.contagem as string) || 'contrato';
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
@@ -1973,10 +1976,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
+      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
+      const countMqlExpr = contagem === 'cliente'
+        ? sql`COUNT(DISTINCT CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN d.company_id END)`
+        : sql`COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END)`;
+
       const leadsResult = await db.execute(sql`
         SELECT
-          COUNT(*) as total_leads,
-          COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as total_mqls
+          ${countExpr} as total_leads,
+          ${countMqlExpr} as total_mqls
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
