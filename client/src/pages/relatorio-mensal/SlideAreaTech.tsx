@@ -106,6 +106,12 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
 
   const totalAbertoValor = emAbertoPorTipo.reduce((s, t) => s + t.valor, 0);
 
+  // Totais dos gráficos de barras
+  const sumBar = (data: Record<string, any>[]) =>
+    data.reduce((s, row) => s + tipos.reduce((a, t) => a + ((row[t] as number) || 0), 0), 0);
+  const totalEntregas = sumBar(entregasFiltered);
+  const totalReceita = sumBar(receitaFiltered);
+
   const pieData = emAbertoPorTipo.filter(t => t.quantidade > 0);
 
   return (
@@ -157,7 +163,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
         {/* Stacked Bar: N Projetos Entregues */}
         <div className="border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm p-3 flex flex-col">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <p className="text-sm font-bold text-zinc-200">N° Projetos Entregues</p>
+            <p className="text-sm font-bold text-zinc-200">N° Projetos Entregues <span className="text-emerald-400 ml-1">{totalEntregas}</span></p>
             <div className="flex items-center gap-2 flex-wrap">
               {tipos.map(tipo => (
                 <div key={tipo} className="flex items-center gap-1">
@@ -235,7 +241,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
         {/* Stacked Bar: Receita Tech */}
         <div className="border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm p-3 flex flex-col">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <p className="text-sm font-bold text-zinc-200">Receita Tech</p>
+            <p className="text-sm font-bold text-zinc-200">Receita Tech <span className="text-emerald-400 ml-1">{fmtBRL(totalReceita)}</span></p>
             <div className="flex items-center gap-2 flex-wrap">
               {tipos.map(tipo => (
                 <div key={tipo} className="flex items-center gap-1">
