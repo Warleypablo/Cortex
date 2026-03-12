@@ -1,8 +1,10 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 import type { TechSlideData } from "./types";
+import SlideLayout from "./SlideLayout";
+import { ChartCard, SecondaryCard } from "./SlideComponents";
 
 interface Props {
   techData: TechSlideData;
@@ -16,9 +18,9 @@ const TIPO_COLORS: Record<string, string> = {
   "Ecommerce": "#22c55e",
   "Site": "#3b82f6",
   "CRO": "#eab308",
-  "Sustentação": "#8b5cf6",
-  "Alteração": "#6366f1",
-  "Integração": "#71717a",
+  "Sustentacao": "#8b5cf6",
+  "Alteracao": "#6366f1",
+  "Integracao": "#71717a",
   "Outros": "#71717a",
 };
 
@@ -65,7 +67,7 @@ function renderPieLabel({ cx, cy, midAngle, innerRadius, outerRadius, value }: a
   );
 }
 
-function BarLabel({ x, y, width, height, value, fill }: any) {
+function BarLabel({ x, y, width, height, value }: any) {
   if (!value || height < 14) return null;
   return (
     <text
@@ -99,16 +101,18 @@ function makeStackTopLabel(data: Record<string, any>[], tiposList: string[], isC
 export default function SlideAreaTech({ techData, mesLabel }: Props) {
   if (!techData) {
     return (
-      <div className="w-full h-full flex items-center justify-center bg-zinc-950 text-zinc-500">
-        Carregando dados Tech...
-      </div>
+      <SlideLayout section="tech">
+        <div className="flex-1 flex items-center justify-center text-zinc-500">
+          Carregando dados Tech...
+        </div>
+      </SlideLayout>
     );
   }
 
   const { kpis, entregasPorTipo, receitaPorTipo, emAbertoPorTipo, mesLabel: techMesLabel } = techData;
   const displayLabel = techMesLabel || mesLabel;
 
-  // Filtrar apenas meses com dados (soma dos valores numéricos > 0)
+  // Filtrar apenas meses com dados (soma dos valores numericos > 0)
   const hasData = (row: Record<string, any>) =>
     Object.entries(row).some(([k, v]) => k !== "month" && k !== "label" && typeof v === "number" && v > 0);
   const entregasFiltered = entregasPorTipo.filter(hasData);
@@ -123,57 +127,47 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
   const pieData = emAbertoPorTipo.filter(t => t.quantidade > 0);
 
   return (
-    <div
-      className="w-full h-full flex flex-col text-white relative overflow-hidden"
-      style={{
-        padding: "28px 36px",
-        background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)",
-      }}
-    >
-      {/* Glow effects */}
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+    <SlideLayout section="tech" padding="28px 36px">
       {/* Title */}
-      <div className="relative z-10 shrink-0 mb-5">
+      <div className="shrink-0 mb-5">
         <h2 className="text-4xl font-black text-center tracking-tight" style={{ fontFamily: "serif" }}>
-          Área Tech
+          Area Tech
         </h2>
         <div className="h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent mt-3" />
       </div>
 
       {/* Top row */}
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 mb-4 relative z-10">
+      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 mb-4">
         {/* KPI cards */}
         <div className="flex gap-3">
           {/* Projetos Entregues */}
-          <div className="flex-1 border border-white/[0.08] rounded-xl bg-white/[0.04] backdrop-blur-xl shadow-lg shadow-black/20 flex flex-col items-center justify-center p-3">
+          <SecondaryCard className="flex-1 flex flex-col items-center justify-center p-3">
             <p className="text-xs text-zinc-300 text-center mb-2">Projetos<br />entregues</p>
             <p className="text-4xl font-black mb-3">{kpis.entregues}</p>
             <span className="text-xs text-emerald-400 border border-emerald-500/30 rounded-lg px-3 py-1">
               Valor: {fmtBRL(kpis.valorEntregues)}
             </span>
-          </div>
+          </SecondaryCard>
 
           {/* Tempo Medio */}
-          <div className="flex-1 border border-white/[0.08] rounded-xl bg-white/[0.04] backdrop-blur-xl shadow-lg shadow-black/20 flex flex-col items-center justify-center p-3">
-            <p className="text-xs text-zinc-300 text-center mb-2">Tempo médio<br />por projeto</p>
+          <SecondaryCard className="flex-1 flex flex-col items-center justify-center p-3">
+            <p className="text-xs text-zinc-300 text-center mb-2">Tempo medio<br />por projeto</p>
             <p className="text-4xl font-black mb-3">{kpis.tempoMedio}</p>
             <span className="text-xs text-zinc-500 invisible px-3 py-1">—</span>
-          </div>
+          </SecondaryCard>
 
           {/* Adicionados */}
-          <div className="flex-1 border border-white/[0.08] rounded-xl bg-white/[0.04] backdrop-blur-xl shadow-lg shadow-black/20 flex flex-col items-center justify-center p-3">
+          <SecondaryCard className="flex-1 flex flex-col items-center justify-center p-3">
             <p className="text-xs text-zinc-300 text-center mb-2">Adicionados em<br />{displayLabel}</p>
             <p className="text-4xl font-black mb-3">{kpis.adicionados}</p>
             <span className="text-xs text-cyan-400 border border-cyan-500/30 rounded-lg px-3 py-1">
               {fmtBRL(kpis.valorAdicionados)}
             </span>
-          </div>
+          </SecondaryCard>
         </div>
 
         {/* Stacked Bar: N Projetos Entregues */}
-        <div className="border border-white/[0.08] rounded-xl bg-white/[0.04] backdrop-blur-xl shadow-lg shadow-black/20 p-3 flex flex-col">
+        <ChartCard className="">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <p className="text-sm font-bold text-zinc-200">N° Projetos Entregues</p>
             <div className="flex items-center gap-2 flex-wrap">
@@ -206,13 +200,13 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartCard>
       </div>
 
       {/* Bottom row */}
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 relative z-10">
+      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
         {/* Pie: Projetos em Aberto */}
-        <div className="border border-white/[0.08] rounded-xl bg-white/[0.04] backdrop-blur-xl shadow-lg shadow-black/20 p-3 flex flex-col">
+        <ChartCard className="">
           <p className="text-sm font-bold text-zinc-200 text-center mb-1">Projetos em Aberto</p>
           <div className="flex-1 min-h-0 flex items-center">
             <div className="w-1/2 h-full">
@@ -248,10 +242,10 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
           <p className="text-xs text-cyan-400 text-center mt-1 shrink-0">
             {fmtBRL(totalAbertoValor)} em projetos abertos
           </p>
-        </div>
+        </ChartCard>
 
         {/* Stacked Bar: Receita Tech */}
-        <div className="border border-white/[0.08] rounded-xl bg-white/[0.04] backdrop-blur-xl shadow-lg shadow-black/20 p-3 flex flex-col">
+        <ChartCard className="">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <p className="text-sm font-bold text-zinc-200">Receita Tech</p>
             <div className="flex items-center gap-2 flex-wrap">
@@ -284,8 +278,8 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </ChartCard>
       </div>
-    </div>
+    </SlideLayout>
   );
 }

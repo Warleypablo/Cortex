@@ -1,5 +1,7 @@
 import { Trophy, Crown, Zap } from "lucide-react";
 import type { CloserRanking } from "./types";
+import SlideLayout from "./SlideLayout";
+import { SlideHeader } from "./SlideComponents";
 
 interface Props {
   ranking: CloserRanking[];
@@ -51,32 +53,25 @@ export default function SlideRankingClosers({ ranking, topPontual }: Props) {
 
   if (ranking.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-white relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
-        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-        <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
-        <p className="relative z-10 text-zinc-500">Sem dados de vendas para este período</p>
-      </div>
+      <SlideLayout section="comercial">
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-zinc-500">Sem dados de vendas para este periodo</p>
+        </div>
+      </SlideLayout>
     );
   }
 
   return (
-    <div className="w-full h-full text-white flex flex-col relative overflow-hidden" style={{ padding: "32px 40px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-      {/* Title */}
-      <div className="relative z-10 shrink-0" style={{ marginBottom: 24 }}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="bg-white/10 backdrop-blur p-2 rounded-lg">
-            <Trophy className="h-5 w-5 text-amber-400" />
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight">Ranking Closers</h2>
-        </div>
-        <div className="h-px bg-gradient-to-r from-amber-500/40 to-transparent" />
-      </div>
+    <SlideLayout section="comercial">
+      <SlideHeader
+        icon={Trophy}
+        iconColor="text-amber-400"
+        title="Ranking Closers"
+        gradientColor="#f59e0b"
+      />
 
       {/* Content: fills remaining space */}
-      <div className="relative z-10 flex-1 flex items-stretch gap-8 min-h-0">
+      <div className="flex-1 flex items-stretch gap-8 min-h-0">
         {/* Podium */}
         <div className="flex-1 flex items-center justify-center" style={{ gap: 24 }}>
           {display.map(({ c, r }) => {
@@ -98,7 +93,7 @@ export default function SlideRankingClosers({ ranking, topPontual }: Props) {
                 {/* Info */}
                 <p className={`font-bold text-center ${isFirst ? "text-xl" : "text-base"}`}>{firstName(c.name)}</p>
                 <p className={`font-bold mt-1 ${isFirst ? "text-3xl" : "text-2xl"} ${col.text}`}>{formatBRL(c.mrrObtido)}</p>
-                <p className="text-sm text-zinc-500 mt-0.5 mb-4">{c.negociosGanhos} negócios</p>
+                <p className="text-sm text-zinc-500 mt-0.5 mb-4">{c.negociosGanhos} negocios</p>
 
                 {/* Podium block - stretches to bottom */}
                 <div className={`w-full rounded-t-2xl bg-gradient-to-b ${col.grad} flex items-center justify-center flex-1`}
@@ -113,7 +108,7 @@ export default function SlideRankingClosers({ ranking, topPontual }: Props) {
         {/* Top Pontual */}
         {topPontual && (
           <div className="flex items-center shrink-0" style={{ width: 240 }}>
-            <div className="w-full bg-white/[0.03] backdrop-blur-xl border border-purple-500/15 rounded-2xl flex flex-col items-center text-center shadow-lg shadow-black/20"
+            <div className="w-full bg-white/[0.03] border border-purple-500/15 rounded-2xl flex flex-col items-center text-center shadow-lg shadow-black/20"
               style={{ padding: "32px 24px" }}>
               <div className="flex items-center gap-2 mb-5">
                 <Zap className="h-5 w-5 text-purple-400" />
@@ -126,7 +121,7 @@ export default function SlideRankingClosers({ ranking, topPontual }: Props) {
               </div>
 
               <p className="text-xl font-bold">{firstName(topPontual.name)}</p>
-              <p className="text-sm text-zinc-500 mt-1 mb-4">{topPontual.negociosGanhos} negócios</p>
+              <p className="text-sm text-zinc-500 mt-1 mb-4">{topPontual.negociosGanhos} negocios</p>
 
               <div className="bg-white/[0.04] border border-purple-500/20 rounded-xl px-6 py-3">
                 <p className="text-3xl font-bold text-purple-400">{formatBRL(topPontual.pontualObtido)}</p>
@@ -135,6 +130,6 @@ export default function SlideRankingClosers({ ranking, topPontual }: Props) {
           </div>
         )}
       </div>
-    </div>
+    </SlideLayout>
   );
 }

@@ -1,4 +1,7 @@
+import { LayoutGrid } from "lucide-react";
 import type { SquadDetail } from "./types";
+import SlideLayout from "./SlideLayout";
+import { SlideHeader } from "./SlideComponents";
 
 interface Props {
   details: SquadDetail[];
@@ -50,29 +53,27 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
 
   if (squads.length === 0) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-white relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
-        <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-        <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
-        <p className="relative z-10 text-zinc-500">Sem dados de squads para este período</p>
-      </div>
+      <SlideLayout section="commerce">
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-zinc-500">Sem dados de squads para este periodo</p>
+        </div>
+      </SlideLayout>
     );
   }
 
   const cols = squads.length <= 4 ? 2 : 3;
 
   return (
-    <div className="w-full h-full flex flex-col text-white relative overflow-hidden" style={{ padding: "28px 36px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-      {/* Header */}
-      <div className="relative z-10 shrink-0 mb-4">
-        <h2 className="text-2xl font-bold tracking-tight mb-3">Detalhes por Squad — {mesLabel}</h2>
-        <div className="h-px bg-gradient-to-r from-purple-500/40 to-transparent" />
-      </div>
+    <SlideLayout section="commerce" padding="28px 36px">
+      <SlideHeader
+        icon={LayoutGrid}
+        iconColor="text-purple-400"
+        title={`Detalhes por Squad — ${mesLabel}`}
+        gradientColor="#a855f7"
+      />
 
       {/* Grid of cards */}
-      <div className={`relative z-10 flex-1 grid gap-4 min-h-0 ${cols === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+      <div className={`flex-1 grid gap-4 min-h-0 ${cols === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
         {squads.map((sq) => {
           const { emoji, name } = parseSquadName(sq.squad);
           const color = getColor(name);
@@ -83,7 +84,7 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
           return (
             <div
               key={sq.squad}
-              className="rounded-xl flex flex-col backdrop-blur-xl shadow-lg shadow-black/20"
+              className="rounded-xl flex flex-col shadow-lg shadow-black/20"
               style={{
                 background: "rgba(255, 255, 255, 0.04)",
                 border: `1px solid ${color}25`,
@@ -115,7 +116,7 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
-                    <span className="text-zinc-400">Ticket Médio MRR:</span>
+                    <span className="text-zinc-400">Ticket Medio MRR:</span>
                     <span className="font-bold">{fmtBRL(sq.ticketMedio)}</span>
                   </li>
                   <li className="flex items-center gap-2">
@@ -133,7 +134,7 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
-                    <span className="text-zinc-400">Evolução MRR:</span>
+                    <span className="text-zinc-400">Evolucao MRR:</span>
                     <span className="font-bold" style={{ color: evolColor }}>
                       R$ {evolSign}{Math.round(sq.evolucaoMrr).toLocaleString("pt-BR")}
                     </span>
@@ -144,6 +145,6 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
           );
         })}
       </div>
-    </div>
+    </SlideLayout>
   );
 }
