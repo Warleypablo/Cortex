@@ -76,6 +76,7 @@ import {
 interface ChurnContract {
   id: string;
   cliente_nome: string;
+  contrato_nome?: string;
   cnpj: string;
   produto: string;
   squad: string;
@@ -1167,14 +1168,13 @@ export default function ChurnDetalhamento() {
       .slice(-12);
   }, [filteredContratos]);
 
-  // Top clientes perdidos (maior impacto financeiro)
+  // Clientes perdidos (maior impacto financeiro) — todos, sem limite
   const topClientesPerdidos = useMemo(() => {
     if (filteredContratos.length === 0) return [];
 
     const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
     return churnContratos
-      .sort((a, b) => b.valorr - a.valorr)
-      .slice(0, 10);
+      .sort((a, b) => b.valorr - a.valorr);
   }, [filteredContratos]);
 
   // Feature 1: Churn DNA Tags helper
@@ -2362,18 +2362,19 @@ export default function ChurnDetalhamento() {
                 <TrendingDown className="h-5 w-5 text-white" />
               </div>
               <div>
-                <CardTitle className="text-base">Top 10 Clientes Perdidos</CardTitle>
+                <CardTitle className="text-base">Clientes Perdidos ({topClientesPerdidos.length})</CardTitle>
                 <CardDescription>Maior impacto financeiro no período</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 bg-card z-10">
                   <TableRow>
                     <TableHead className="w-[50px]">#</TableHead>
                     <TableHead>Cliente</TableHead>
+                    <TableHead>Contrato</TableHead>
                     <TableHead>Produto</TableHead>
                     <TableHead>Squad</TableHead>
                     <TableHead className="text-right">MRR</TableHead>
@@ -2398,9 +2399,9 @@ export default function ChurnDetalhamento() {
                               Abonado
                             </Badge>
                           )}
-                          {c.cnpj && <p className="text-xs text-muted-foreground">{c.cnpj}</p>}
                         </div>
                       </TableCell>
+                      <TableCell className="text-sm">{c.contrato_nome || c.cliente_nome}</TableCell>
                       <TableCell className="text-sm">{c.produto}</TableCell>
                       <TableCell className="text-sm">{c.squad}</TableCell>
                       <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
