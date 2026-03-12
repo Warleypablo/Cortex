@@ -1,7 +1,6 @@
-import { Monitor, Package, Clock, PlusCircle } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from "recharts";
 import type { TechSlideData } from "./types";
 
@@ -11,40 +10,25 @@ interface Props {
 }
 
 const TIPO_COLORS: Record<string, string> = {
-  "Landing Page": "#3b82f6",
+  "LP Shopify": "#f97316",
+  "Landing Page": "#ec4899",
   "E-Commerce Standard": "#22c55e",
-  "Site": "#f59e0b",
-  "CRO": "#ec4899",
-  "LP Shopify": "#8b5cf6",
+  "Ecommerce": "#22c55e",
+  "Site": "#3b82f6",
+  "CRO": "#eab308",
+  "Sustentação": "#8b5cf6",
   "Alteração": "#6366f1",
   "Integração": "#71717a",
   "Outros": "#71717a",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  "não iniciado": "#6b7280",
-  "kickoff": "#a855f7",
-  "pronto p/ design": "#c084fc",
-  "design": "#ec4899",
-  "design review": "#f472b6",
-  "pronto p/ dev": "#f59e0b",
-  "dev": "#3b82f6",
-  "dev review": "#60a5fa",
-  "pronto para lançar": "#22c55e",
-  "bloqueado": "#ef4444",
 };
 
 function getColor(tipo: string): string {
   return TIPO_COLORS[tipo] || "#71717a";
 }
 
-function getStatusColor(status: string): string {
-  return STATUS_COLORS[status] || "#71717a";
-}
-
 function fmtBRL(v: number): string {
   if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
-  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(1).replace(".", ",")}k`;
+  if (v >= 1_000) return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
@@ -52,14 +36,6 @@ function fmtK(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${Math.round(v / 1_000)}k`;
   return `${Math.round(v)}`;
-}
-
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 ${className}`}>
-      {children}
-    </div>
-  );
 }
 
 function ChartTooltipContent({ active, payload, label, isCurrency }: any) {
@@ -76,8 +52,34 @@ function ChartTooltipContent({ active, payload, label, isCurrency }: any) {
   );
 }
 
-function capitalizeStatus(s: string): string {
-  return s.replace(/\b\w/g, c => c.toUpperCase());
+const RADIAN = Math.PI / 180;
+function renderPieLabel({ cx, cy, midAngle, innerRadius, outerRadius, value }: any) {
+  if (!value) return null;
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  return (
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={14} fontWeight="bold">
+      {value}
+    </text>
+  );
+}
+
+function BarLabel({ x, y, width, height, value, fill }: any) {
+  if (!value || height < 14) return null;
+  return (
+    <text
+      x={x + width / 2}
+      y={y + height / 2}
+      fill="white"
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={10}
+      fontWeight="bold"
+    >
+      {typeof value === "number" && value >= 1000 ? fmtK(value) : value}
+    </text>
+  );
 }
 
 export default function SlideAreaTech({ techData, mesLabel }: Props) {
@@ -89,78 +91,79 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
     );
   }
 
-  const { kpis, entregasPorTipo, receitaPorTipo, emAbertoPorTipo, pipeline, mesLabel: techMesLabel } = techData;
+  const { kpis, entregasPorTipo, receitaPorTipo, emAbertoPorTipo, mesLabel: techMesLabel } = techData;
   const displayLabel = techMesLabel || mesLabel;
 
-  // Get all tipo keys from data (excluding month/label)
   const tipos = entregasPorTipo.length > 0
     ? Object.keys(entregasPorTipo[0]).filter(k => k !== "month" && k !== "label")
     : [];
 
-  const totalAberto = emAbertoPorTipo.reduce((s, t) => s + t.quantidade, 0);
   const totalAbertoValor = emAbertoPorTipo.reduce((s, t) => s + t.valor, 0);
-  const totalPipeline = (pipeline || []).reduce((s, p) => s + p.quantidade, 0);
-  const maxPipeline = Math.max(...(pipeline || []).map(p => p.quantidade), 1);
+
+  const pieData = emAbertoPorTipo.filter(t => t.quantidade > 0);
 
   return (
-    <div className="w-full h-full flex flex-col bg-zinc-950 text-white" style={{ padding: "24px 32px" }}>
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-3 shrink-0">
-        <Monitor className="h-6 w-6 text-blue-400" />
-        <h2 className="text-xl font-bold">Area Tech — {displayLabel}</h2>
-      </div>
+    <div
+      className="w-full h-full flex flex-col text-white"
+      style={{
+        padding: "28px 36px",
+        background: "linear-gradient(135deg, #0c0a1a 0%, #1a1030 40%, #0f0d1f 100%)",
+      }}
+    >
+      {/* Title */}
+      <h2 className="text-4xl font-black text-center mb-5 shrink-0 tracking-tight" style={{ fontFamily: "serif" }}>
+        Área Tech
+      </h2>
 
-      {/* Top row: KPI cards (col-span-2) + Stacked Bar entregas (col-span-5) */}
-      <div className="flex-1 grid grid-cols-7 gap-3 min-h-0 mb-3">
-        {/* KPI Cards */}
-        <div className="col-span-2 flex flex-col gap-2">
-          <Card className="flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Package className="h-3.5 w-3.5 text-emerald-400" />
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Projetos Entregues</p>
-            </div>
-            <p className="text-3xl font-black text-emerald-400">{kpis.entregues}</p>
-            <p className="text-[10px] text-zinc-500 mt-0.5">{fmtBRL(kpis.valorEntregues)}</p>
-          </Card>
+      {/* Top row */}
+      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 mb-4">
+        {/* KPI cards */}
+        <div className="flex gap-3">
+          {/* Projetos Entregues */}
+          <div className="flex-1 border border-zinc-600/50 rounded-xl flex flex-col items-center justify-center p-3">
+            <p className="text-xs text-zinc-300 text-center mb-2">Projetos<br />entregues</p>
+            <p className="text-4xl font-black mb-3">{kpis.entregues}</p>
+            <span className="text-xs text-emerald-400 border border-emerald-500/30 rounded-lg px-3 py-1">
+              Valor: {fmtBRL(kpis.valorEntregues)}
+            </span>
+          </div>
 
-          <Card className="flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Clock className="h-3.5 w-3.5 text-amber-400" />
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Tempo Medio</p>
-            </div>
-            <p className="text-3xl font-black text-amber-400">{kpis.tempoMedio}<span className="text-base font-medium text-zinc-400 ml-1">dias</span></p>
-          </Card>
+          {/* Tempo Medio */}
+          <div className="flex-1 border border-zinc-600/50 rounded-xl flex flex-col items-center justify-center p-3">
+            <p className="text-xs text-zinc-300 text-center mb-2">Tempo médio<br />por projeto</p>
+            <p className="text-4xl font-black mb-3">{kpis.tempoMedio}</p>
+            <span className="text-xs text-zinc-500 invisible px-3 py-1">—</span>
+          </div>
 
-          <Card className="flex-1 flex flex-col justify-center">
-            <div className="flex items-center gap-1.5 mb-1">
-              <PlusCircle className="h-3.5 w-3.5 text-blue-400" />
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Adicionados</p>
-            </div>
-            <p className="text-3xl font-black text-blue-400">{kpis.adicionados}</p>
-            <p className="text-[10px] text-zinc-500 mt-0.5">{fmtBRL(kpis.valorAdicionados)}</p>
-          </Card>
+          {/* Adicionados */}
+          <div className="flex-1 border border-zinc-600/50 rounded-xl flex flex-col items-center justify-center p-3">
+            <p className="text-xs text-zinc-300 text-center mb-2">Adicionados em<br />{displayLabel}</p>
+            <p className="text-4xl font-black mb-3">{kpis.adicionados}</p>
+            <span className="text-xs text-cyan-400 border border-cyan-500/30 rounded-lg px-3 py-1">
+              {fmtBRL(kpis.valorAdicionados)}
+            </span>
+          </div>
         </div>
 
         {/* Stacked Bar: N Projetos Entregues */}
-        <Card className="col-span-5 flex flex-col">
-          <p className="text-sm font-bold text-zinc-300 mb-1">N° Projetos Entregues</p>
+        <div className="border border-zinc-600/50 rounded-xl p-3 flex flex-col">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
+            <p className="text-sm font-bold text-zinc-200">N° Projetos Entregues</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {tipos.map(tipo => (
+                <div key={tipo} className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getColor(tipo) }} />
+                  <span className="text-[9px] text-zinc-400">{tipo}</span>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={entregasPorTipo} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: "#a1a1aa", fontSize: 10 }}
-                  axisLine={{ stroke: "#3f3f46" }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: "#a1a1aa", fontSize: 10 }}
-                  axisLine={{ stroke: "#3f3f46" }}
-                  tickLine={false}
-                  allowDecimals={false}
-                  width={30}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a40" />
+                <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
+                <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} allowDecimals={false} width={30} />
                 <Tooltip content={<ChartTooltipContent isCurrency={false} />} />
                 {tipos.map((tipo, i) => (
                   <Bar
@@ -170,66 +173,75 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
                     stackId="a"
                     fill={getColor(tipo)}
                     radius={i === tipos.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                    label={<BarLabel />}
                   />
                 ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Card>
+        </div>
       </div>
 
-      {/* Bottom row: Pipeline (col-span-3) + Receita (col-span-4) */}
-      <div className="flex-1 grid grid-cols-7 gap-3 min-h-0">
-        {/* Pipeline por Status */}
-        <Card className="col-span-3 flex flex-col">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm font-bold text-zinc-300">Pipeline Tech</p>
-            <span className="text-xs text-zinc-500">{totalPipeline} projetos</span>
-          </div>
-          <div className="flex-1 min-h-0 flex flex-col justify-center gap-1.5 overflow-y-auto">
-            {(pipeline || []).map((item) => (
-              <div key={item.status} className="flex items-center gap-2">
-                <span className="text-[9px] text-zinc-400 w-[100px] text-right truncate shrink-0">
-                  {capitalizeStatus(item.status)}
-                </span>
-                <div className="flex-1 h-5 bg-zinc-800/50 rounded overflow-hidden relative">
-                  <div
-                    className="h-full rounded transition-all"
-                    style={{
-                      width: `${(item.quantidade / maxPipeline) * 100}%`,
-                      backgroundColor: getStatusColor(item.status),
-                      minWidth: item.quantidade > 0 ? '8px' : '0px',
-                    }}
-                  />
-                  <span className="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-white drop-shadow">
-                    {item.quantidade}
-                  </span>
+      {/* Bottom row */}
+      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
+        {/* Pie: Projetos em Aberto */}
+        <div className="border border-zinc-600/50 rounded-xl p-3 flex flex-col">
+          <p className="text-sm font-bold text-zinc-200 text-center mb-1">Projetos em Aberto</p>
+          <div className="flex-1 min-h-0 flex items-center">
+            <div className="w-1/2 h-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="quantidade"
+                    nameKey="tipo"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius="85%"
+                    label={renderPieLabel}
+                    labelLine={false}
+                    stroke="none"
+                  >
+                    {pieData.map((entry) => (
+                      <Cell key={entry.tipo} fill={getColor(entry.tipo)} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="w-1/2 flex flex-col gap-2 pl-4">
+              {pieData.map((entry) => (
+                <div key={entry.tipo} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getColor(entry.tipo) }} />
+                  <span className="text-xs text-zinc-300">{entry.tipo}</span>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </Card>
+          <p className="text-xs text-cyan-400 text-center mt-1 shrink-0">
+            {fmtBRL(totalAbertoValor)} em projetos abertos
+          </p>
+        </div>
 
         {/* Stacked Bar: Receita Tech */}
-        <Card className="col-span-4 flex flex-col">
-          <p className="text-sm font-bold text-zinc-300 mb-1">Receita Tech</p>
+        <div className="border border-zinc-600/50 rounded-xl p-3 flex flex-col">
+          <div className="flex items-center gap-3 mb-1 flex-wrap">
+            <p className="text-sm font-bold text-zinc-200">Receita Tech</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {tipos.map(tipo => (
+                <div key={tipo} className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getColor(tipo) }} />
+                  <span className="text-[9px] text-zinc-400">{tipo}</span>
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={receitaPorTipo} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: "#a1a1aa", fontSize: 10 }}
-                  axisLine={{ stroke: "#3f3f46" }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: "#a1a1aa", fontSize: 10 }}
-                  axisLine={{ stroke: "#3f3f46" }}
-                  tickLine={false}
-                  tickFormatter={fmtK}
-                  width={45}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a40" />
+                <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
+                <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} tickFormatter={fmtK} width={45} />
                 <Tooltip content={<ChartTooltipContent isCurrency={true} />} />
                 {tipos.map((tipo, i) => (
                   <Bar
@@ -239,12 +251,13 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
                     stackId="a"
                     fill={getColor(tipo)}
                     radius={i === tipos.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                    label={<BarLabel />}
                   />
                 ))}
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
