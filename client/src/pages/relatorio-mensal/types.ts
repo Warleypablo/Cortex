@@ -127,6 +127,7 @@ export interface SquadDetail {
   clientes: number;
   churnPct: number;
   churnBrl: number;
+  mrrBase: number;
   evolucaoMrr: number;
 }
 
