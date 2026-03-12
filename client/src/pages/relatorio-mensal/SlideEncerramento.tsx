@@ -1,4 +1,4 @@
-import teamPhoto from "@assets/image.png";
+import teamPhoto from "@assets/IMG_1925 1.png";
 import SlideLayout from "./SlideLayout";
 
 export default function SlideEncerramento() {
