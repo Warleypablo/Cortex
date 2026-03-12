@@ -10,6 +10,7 @@ export default function SlideCapa({ mesLabel }: Props) {
       {/* Background glow effects */}
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
 
       <div className="relative z-10 flex flex-col items-center gap-8 max-w-3xl text-center">
         <img src={turboLogo} alt="Turbo Partners" className="h-16 object-contain" />
@@ -19,7 +20,7 @@ export default function SlideCapa({ mesLabel }: Props) {
           <p className="text-xl text-zinc-400">{mesLabel}</p>
         </div>
 
-        <div className="mt-8 px-8 py-6 rounded-2xl bg-zinc-900/60 border border-zinc-800">
+        <div className="mt-8 px-8 py-6 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] shadow-lg shadow-black/20">
           <p className="text-lg leading-relaxed text-zinc-300 italic">
             "Você sonha grande, é inconformado e por isso melhora todos os dias,
             pensando como dono, fazendo o que tem que ser feito, você terá o que merece"
