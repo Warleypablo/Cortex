@@ -1,6 +1,8 @@
 import { Activity, Users, TrendingUp, TrendingDown, Pause, CreditCard, Target, Handshake } from "lucide-react";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { TurboMetrics } from "./types";
+import SlideLayout from "./SlideLayout";
+import { SlideHeader, ChartCard, SecondaryCard } from "./SlideComponents";
 
 interface Props {
   metrics: TurboMetrics;
@@ -25,14 +27,6 @@ function fmtK(v: number): string {
   return `${Math.round(v)}`;
 }
 
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] shadow-lg shadow-black/20 rounded-xl p-3 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
 function ChartTooltipContent({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -50,7 +44,7 @@ function ChartTooltipContent({ active, payload, label }: any) {
 export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
   const faturamentoPontual = metrics.faturamentoTotal > metrics.mrrAtivo
     ? metrics.faturamentoTotal - metrics.mrrAtivo : 0;
-  const faturamentoVariavel = 0; // Variável tracked separately when applicable
+  const faturamentoVariavel = 0;
   const crosssellTotal = metrics.crosssellMrr + metrics.crosssellPontual;
   const retencaoPct = metrics.retencoesSolicitacoesCount > 0
     ? ((metrics.retencoesCount / metrics.retencoesSolicitacoesCount) * 100).toFixed(1)
@@ -72,26 +66,19 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
   });
 
   return (
-    <div className="w-full h-full flex flex-col text-white relative overflow-hidden" style={{ padding: "24px 32px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
-      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-      {/* Header */}
-      <div className="relative z-10 shrink-0 mb-3">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="bg-white/10 backdrop-blur p-1.5 rounded-lg">
-            <Activity className="h-4 w-4 text-cyan-400" />
-          </div>
-          <h2 className="text-xl font-bold tracking-tight">Turbo Commerce — {mesLabel}</h2>
-        </div>
-        <div className="h-px bg-gradient-to-r from-cyan-500/40 to-transparent" />
-      </div>
+    <SlideLayout section="commerce" padding="24px 32px">
+      <SlideHeader
+        icon={Activity}
+        iconColor="text-cyan-400"
+        title={`Turbo Commerce — ${mesLabel}`}
+        gradientColor="#06b6d4"
+      />
 
       {/* Top row: 5 compact cards */}
-      <div className="relative z-10 grid grid-cols-5 gap-3 mb-3 shrink-0">
+      <div className="grid grid-cols-5 gap-3 mb-3 shrink-0">
         {/* Faturamento */}
-        <Card>
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1.5">Faturamento Mês</p>
+        <SecondaryCard className="p-3">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1.5">Faturamento Mes</p>
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -100,7 +87,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="text-[10px] text-zinc-400">Variável:</span>
+              <span className="text-[10px] text-zinc-400">Variavel:</span>
               <span className="text-xs font-bold text-amber-400">{fmtBRL(faturamentoVariavel)}</span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -112,10 +99,10 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
           <div className="mt-1.5 bg-cyan-500/10 rounded px-2 py-0.5 inline-block">
             <span className="text-xs font-bold text-cyan-400">Total: {fmtBRL(metrics.faturamentoTotal)}</span>
           </div>
-        </Card>
+        </SecondaryCard>
 
         {/* Base */}
-        <Card>
+        <SecondaryCard className="p-3">
           <div className="flex items-center gap-1.5 mb-2">
             <Users className="h-3.5 w-3.5 text-blue-400" />
             <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Base</p>
@@ -130,10 +117,10 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
               <p className="text-xl font-black">{metrics.contratosTotais}</p>
             </div>
           </div>
-        </Card>
+        </SecondaryCard>
 
         {/* MRR Add / Cancel / Pausado */}
-        <Card>
+        <SecondaryCard className="p-3">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
@@ -157,17 +144,17 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
               <span className="text-xs font-bold text-amber-400">{fmtBRL(metrics.pausadosMrr)}</span>
             </div>
           </div>
-        </Card>
+        </SecondaryCard>
 
-        {/* Ticket Médio */}
-        <Card className="flex flex-col items-center justify-center text-center">
+        {/* Ticket Medio */}
+        <SecondaryCard className="p-3 flex flex-col items-center justify-center text-center">
           <CreditCard className="h-4 w-4 text-zinc-400 mb-1" />
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Ticket Médio</p>
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">Ticket Medio</p>
           <p className="text-2xl font-black">{fmtBRL(metrics.ticketMedio)}</p>
-        </Card>
+        </SecondaryCard>
 
         {/* CXCS */}
-        <Card>
+        <SecondaryCard className="p-3">
           <div className="flex items-center gap-1.5 mb-1.5">
             <Handshake className="h-3.5 w-3.5 text-purple-400" />
             <p className="text-[10px] text-purple-400 font-bold uppercase tracking-wide">CXCS</p>
@@ -204,79 +191,76 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
               </div>
             </div>
           </div>
-        </Card>
+        </SecondaryCard>
       </div>
 
       {/* Bottom: Chart + MRR/Churn info */}
-      <div className="relative z-10 flex-1 grid grid-cols-7 gap-3 min-h-0">
+      <div className="flex-1 grid grid-cols-7 gap-3 min-h-0">
         {/* Chart: Receita x Churn */}
-        <Card className="col-span-5 flex flex-col">
-          <p className="text-sm font-bold text-zinc-300 mb-2">Receita x Churn</p>
-          <div className="flex-1 min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                  axisLine={{ stroke: "#3f3f46" }}
-                  tickLine={false}
-                />
-                <YAxis
-                  yAxisId="left"
-                  tick={{ fill: "#a1a1aa", fontSize: 10 }}
-                  axisLine={{ stroke: "#3f3f46" }}
-                  tickLine={false}
-                  tickFormatter={fmtK}
-                  width={50}
-                />
-                <YAxis
-                  yAxisId="right"
-                  orientation="right"
-                  tick={{ fill: "#f472b6", fontSize: 10 }}
-                  axisLine={{ stroke: "#3f3f46", strokeDasharray: "4 4" }}
-                  tickLine={false}
-                  tickFormatter={(v) => `${v}%`}
-                  domain={[0, 100]}
-                  width={40}
-                />
-                <Tooltip content={<ChartTooltipContent />} />
-                <Bar yAxisId="left" dataKey="mrr" name="MRR" stackId="a" radius={[0, 0, 0, 0]} barSize={32}>
-                  {chartData.map((entry, i) => (
-                    <Cell key={i} fill={entry.hasData ? "#34d399" : "transparent"} fillOpacity={0.7} />
-                  ))}
-                </Bar>
-                <Bar yAxisId="left" dataKey="churnBrl" name="Churn" stackId="a" radius={[4, 4, 0, 0]} barSize={32}>
-                  {chartData.map((entry, i) => (
-                    <Cell key={i} fill={entry.hasData ? "#f97316" : "transparent"} fillOpacity={0.5} stroke={entry.hasData ? "#f97316" : "transparent"} strokeWidth={1.5} />
-                  ))}
-                </Bar>
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="churnPct"
-                  name="Churn %"
-                  stroke="#ec4899"
-                  strokeWidth={2}
-                  dot={{ fill: "#ec4899", r: 4 }}
-                  connectNulls={false}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
+        <ChartCard title="Receita x Churn" className="col-span-5">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+              <XAxis
+                dataKey="label"
+                tick={{ fill: "#a1a1aa", fontSize: 11 }}
+                axisLine={{ stroke: "#3f3f46" }}
+                tickLine={false}
+              />
+              <YAxis
+                yAxisId="left"
+                tick={{ fill: "#a1a1aa", fontSize: 10 }}
+                axisLine={{ stroke: "#3f3f46" }}
+                tickLine={false}
+                tickFormatter={fmtK}
+                width={50}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fill: "#f472b6", fontSize: 10 }}
+                axisLine={{ stroke: "#3f3f46", strokeDasharray: "4 4" }}
+                tickLine={false}
+                tickFormatter={(v) => `${v}%`}
+                domain={[0, 100]}
+                width={40}
+              />
+              <Tooltip content={<ChartTooltipContent />} />
+              <Bar yAxisId="left" dataKey="mrr" name="MRR" stackId="a" radius={[0, 0, 0, 0]} barSize={32}>
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={entry.hasData ? "#34d399" : "transparent"} fillOpacity={0.7} />
+                ))}
+              </Bar>
+              <Bar yAxisId="left" dataKey="churnBrl" name="Churn" stackId="a" radius={[4, 4, 0, 0]} barSize={32}>
+                {chartData.map((entry, i) => (
+                  <Cell key={i} fill={entry.hasData ? "#f97316" : "transparent"} fillOpacity={0.5} stroke={entry.hasData ? "#f97316" : "transparent"} strokeWidth={1.5} />
+                ))}
+              </Bar>
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="churnPct"
+                name="Churn %"
+                stroke="#ec4899"
+                strokeWidth={2}
+                dot={{ fill: "#ec4899", r: 4 }}
+                connectNulls={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        </ChartCard>
 
         {/* MRR Ativo + Meta Churn */}
         <div className="col-span-2 flex flex-col gap-3">
-          <Card className="flex-1 flex flex-col justify-center">
+          <SecondaryCard className="flex-1 flex flex-col justify-center p-3">
             <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">MRR Ativo — {mesLabel}</p>
             <p className="text-2xl font-black text-emerald-400">{fmtFull(metrics.mrrAtivo)}</p>
-          </Card>
+          </SecondaryCard>
 
-          <Card className="flex-1 flex flex-col justify-center">
+          <SecondaryCard className="flex-1 flex flex-col justify-center p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Target className="h-3.5 w-3.5 text-red-400" />
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Meta Churn Máx.</p>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Meta Churn Max.</p>
             </div>
             <p className="text-2xl font-black text-red-400">{fmtFull(metrics.churnMetaMensal)}</p>
             <div className="flex items-center gap-2 mt-1.5">
@@ -294,9 +278,9 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
                   : "—"}
               </span>
             </div>
-          </Card>
+          </SecondaryCard>
         </div>
       </div>
-    </div>
+    </SlideLayout>
   );
 }
