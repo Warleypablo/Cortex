@@ -2161,3 +2161,23 @@ export async function seedChamadoCategories(): Promise<void> {
     console.error('[database] Error seeding chamado categories:', error);
   }
 }
+
+export async function initializeCapacityTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.capacity_operador (
+        id SERIAL PRIMARY KEY,
+        operador TEXT NOT NULL,
+        produto TEXT NOT NULL,
+        squad TEXT NOT NULL,
+        max_contratos INTEGER NOT NULL,
+        atualizado_por TEXT,
+        atualizado_em TIMESTAMP DEFAULT NOW(),
+        UNIQUE(operador, produto)
+      )
+    `);
+    console.log('[database] Capacity table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing capacity table:', error);
+  }
+}

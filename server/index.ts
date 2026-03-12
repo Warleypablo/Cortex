@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import rateLimit from "express-rate-limit";
@@ -139,6 +139,7 @@ app.use((req, res, next) => {
     initializeClientCredentialsTable(),
     initializeChamadosTables(),
     initializeNotasFiscaisTable(),
+    initializeCapacityTable(),
   ]);
   
   // Phase 2: Depends on catalogs being ready
@@ -214,11 +215,11 @@ app.use((req, res, next) => {
       const { syncMetaAds } = await import("./services/metaAdsSync");
       const { Pool } = await import("pg");
       const pool = new Pool({
-        host: requireEnv("DATABASE_HOST"),
-        port: 5432,
-        database: "dados_turbo",
-        user: "postgres",
-        password: requireEnv("DATABASE_PASSWORD"),
+        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'dados_turbo',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
         ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
       });
       const result = await syncMetaAds(pool, { since: undefined, until: undefined });
@@ -253,11 +254,11 @@ app.use((req, res, next) => {
       const { syncGoogleAdsKeywords } = await import("./services/googleAdsSync");
       const { Pool } = await import("pg");
       const pool = new Pool({
-        host: requireEnv("DATABASE_HOST"),
-        port: 5432,
-        database: "dados_turbo",
-        user: "postgres",
-        password: requireEnv("DATABASE_PASSWORD"),
+        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'dados_turbo',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
         ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
       });
       const result = await syncGoogleAdsKeywords(pool);
