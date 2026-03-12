@@ -1,153 +1,127 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
-import { upsertCapacitySchema } from "@shared/schema";
+
+// Tabela de referência: nível do Gestor de Performance → metas
+const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> = {
+  "Estágio": { mrr_alvo: 0, ticket_alvo: 0 },
+  "I":       { mrr_alvo: 8000, ticket_alvo: 2000 },
+  "I+":      { mrr_alvo: 13000, ticket_alvo: 2167 },
+  "II":      { mrr_alvo: 18000, ticket_alvo: 2250 },
+  "II+":     { mrr_alvo: 23000, ticket_alvo: 2300 },
+  "III":     { mrr_alvo: 28000, ticket_alvo: 2333 },
+  "III+":    { mrr_alvo: 34000, ticket_alvo: 2429 },
+  "IV":      { mrr_alvo: 40000, ticket_alvo: 2857 },
+  "IV+":     { mrr_alvo: 40000, ticket_alvo: 3333 },
+  "V":       { mrr_alvo: 50000, ticket_alvo: 5000 },
+  "V+":      { mrr_alvo: 50000, ticket_alvo: 5000 },
+  "VI":      { mrr_alvo: 50000, ticket_alvo: 5000 },
+  "VI+":     { mrr_alvo: 50000, ticket_alvo: 5000 },
+};
 
 export function registerCapacityRoutes(app: Express, db: any) {
 
-  // GET /api/capacity — lista todas as capacities com utilizacao calculada
+  // GET /api/capacity/gestores — capacity automática por nível de cargo
+  app.get("/api/capacity/gestores", async (req, res) => {
+    try {
+      // 1) Buscar gestores ativos + contratos via fuzzy match
+      const result = await db.execute(sql`
+        WITH gestores AS (
+          SELECT nome, cargo, nivel, squad
+          FROM "Inhire".rh_pessoal
+          WHERE cargo = 'Gestor de Performance'
+            AND status = 'Ativo'
+        ),
+        contratos_expanded AS (
+          SELECT
+            c.id_subtask,
+            TRIM(r.responsavel_part) as responsavel_part,
+            COALESCE(c.valorr, 0) as valorr,
+            c.produto
+          FROM "Clickup".cup_contratos c
+          CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS r(responsavel_part)
+          WHERE c.status IN ('ativo', 'onboarding', 'triagem')
+            AND c.responsavel IS NOT NULL AND c.responsavel != ''
+        ),
+        best_match AS (
+          SELECT DISTINCT ON (ce.id_subtask, ce.responsavel_part)
+            g.nome as gestor_nome,
+            ce.id_subtask,
+            ce.valorr,
+            ce.produto
+          FROM contratos_expanded ce
+          CROSS JOIN gestores g
+          WHERE similarity(g.nome, ce.responsavel_part) > 0.4
+          ORDER BY ce.id_subtask, ce.responsavel_part, similarity(g.nome, ce.responsavel_part) DESC
+        ),
+        agg AS (
+          SELECT
+            gestor_nome,
+            SUM(valorr)::numeric as mrr_atual,
+            COUNT(DISTINCT id_subtask)::int as contratos_atuais
+          FROM best_match
+          GROUP BY gestor_nome
+        )
+        SELECT
+          g.nome,
+          g.nivel,
+          g.squad,
+          COALESCE(a.mrr_atual, 0)::numeric as mrr_atual,
+          COALESCE(a.contratos_atuais, 0)::int as contratos_atuais,
+          CASE WHEN COALESCE(a.contratos_atuais, 0) > 0
+            THEN ROUND(COALESCE(a.mrr_atual, 0)::numeric / a.contratos_atuais, 2)
+            ELSE 0
+          END as ticket_medio_atual
+        FROM gestores g
+        LEFT JOIN agg a ON g.nome = a.gestor_nome
+        ORDER BY g.squad, g.nome
+      `);
+
+      // 2) Enriquecer com metas do nível
+      const rows = result.rows.map((row: any) => {
+        const nivel = (row.nivel || "").replace(/^X\s+/, "").trim();
+        const levelData = GESTOR_LEVELS[nivel] || { mrr_alvo: 0, ticket_alvo: 0 };
+        const mrr_atual = parseFloat(row.mrr_atual) || 0;
+        const contratos_atuais = parseInt(row.contratos_atuais) || 0;
+        const ticket_medio = parseFloat(row.ticket_medio_atual) || 0;
+        const mrr_alvo = levelData.mrr_alvo;
+        const utilizacao_pct = mrr_alvo > 0 ? Math.round((mrr_atual / mrr_alvo) * 1000) / 10 : 0;
+
+        return {
+          nome: row.nome,
+          nivel,
+          squad: row.squad,
+          mrr_alvo,
+          ticket_alvo: levelData.ticket_alvo,
+          mrr_atual,
+          contratos_atuais,
+          ticket_medio_atual: ticket_medio,
+          utilizacao_pct,
+        };
+      });
+
+      res.json(rows);
+    } catch (error) {
+      console.error("[api] Error fetching capacity gestores:", error);
+      res.status(500).json({ error: "Failed to fetch capacity gestores" });
+    }
+  });
+
+  // GET /api/capacity/levels — referência de níveis
+  app.get("/api/capacity/levels", async (_req, res) => {
+    res.json(GESTOR_LEVELS);
+  });
+
+  // ── Endpoints legados (mantidos para compatibilidade) ──
+
   app.get("/api/capacity", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT
-          cap.id,
-          cap.operador,
-          cap.produto,
-          cap.squad,
-          cap.max_contratos,
-          cap.atualizado_por,
-          cap.atualizado_em,
-          COALESCE(ctr.contratos_atuais, 0)::int as contratos_atuais,
-          (cap.max_contratos - COALESCE(ctr.contratos_atuais, 0))::int as vagas_livres,
-          CASE
-            WHEN cap.max_contratos > 0
-            THEN ROUND((COALESCE(ctr.contratos_atuais, 0)::numeric / cap.max_contratos) * 100, 1)
-            ELSE 0
-          END as utilizacao_pct
-        FROM cortex_core.capacity_operador cap
-        LEFT JOIN (
-          SELECT
-            responsavel,
-            produto,
-            COUNT(*)::int as contratos_atuais
-          FROM "Clickup".cup_contratos
-          WHERE status IN ('ativo', 'onboarding', 'triagem')
-          GROUP BY responsavel, produto
-        ) ctr ON cap.operador = ctr.responsavel AND cap.produto = ctr.produto
-        ORDER BY cap.squad, cap.operador, cap.produto
+        SELECT * FROM cortex_core.capacity_operador ORDER BY squad, operador, produto
       `);
       res.json(result.rows);
     } catch (error) {
       console.error("[api] Error fetching capacity:", error);
       res.status(500).json({ error: "Failed to fetch capacity" });
-    }
-  });
-
-  // GET /api/capacity/consolidado — dados agregados por squad e produto
-  app.get("/api/capacity/consolidado", async (req, res) => {
-    try {
-      const result = await db.execute(sql`
-        SELECT
-          cap.squad,
-          cap.produto,
-          SUM(cap.max_contratos)::int as capacity_total,
-          SUM(COALESCE(ctr.contratos_atuais, 0))::int as contratos_total,
-          (SUM(cap.max_contratos) - SUM(COALESCE(ctr.contratos_atuais, 0)))::int as vagas_livres,
-          CASE
-            WHEN SUM(cap.max_contratos) > 0
-            THEN ROUND((SUM(COALESCE(ctr.contratos_atuais, 0))::numeric / SUM(cap.max_contratos)) * 100, 1)
-            ELSE 0
-          END as utilizacao_pct
-        FROM cortex_core.capacity_operador cap
-        LEFT JOIN (
-          SELECT
-            responsavel,
-            produto,
-            COUNT(*)::int as contratos_atuais
-          FROM "Clickup".cup_contratos
-          WHERE status IN ('ativo', 'onboarding', 'triagem')
-          GROUP BY responsavel, produto
-        ) ctr ON cap.operador = ctr.responsavel AND cap.produto = ctr.produto
-        GROUP BY cap.squad, cap.produto
-        ORDER BY cap.squad, cap.produto
-      `);
-      res.json(result.rows);
-    } catch (error) {
-      console.error("[api] Error fetching capacity consolidado:", error);
-      res.status(500).json({ error: "Failed to fetch capacity consolidado" });
-    }
-  });
-
-  // POST /api/capacity — upsert (cria ou atualiza)
-  app.post("/api/capacity", async (req, res) => {
-    try {
-      const validation = upsertCapacitySchema.safeParse(req.body);
-      if (!validation.success) {
-        return res.status(400).json({ error: "Invalid data", details: validation.error });
-      }
-      const { operador, produto, squad, max_contratos } = validation.data;
-      const email = (req as any).user?.email || "unknown";
-
-      const result = await db.execute(sql`
-        INSERT INTO cortex_core.capacity_operador (operador, produto, squad, max_contratos, atualizado_por, atualizado_em)
-        VALUES (${operador}, ${produto}, ${squad}, ${max_contratos}, ${email}, NOW())
-        ON CONFLICT (operador, produto)
-        DO UPDATE SET
-          max_contratos = ${max_contratos},
-          squad = ${squad},
-          atualizado_por = ${email},
-          atualizado_em = NOW()
-        RETURNING *
-      `);
-      res.json(result.rows[0]);
-    } catch (error) {
-      console.error("[api] Error upserting capacity:", error);
-      res.status(500).json({ error: "Failed to upsert capacity" });
-    }
-  });
-
-  // GET /api/capacity/operadores — lista operadores distintos (responsaveis ativos)
-  app.get("/api/capacity/operadores", async (req, res) => {
-    try {
-      const result = await db.execute(sql`
-        SELECT DISTINCT responsavel
-        FROM "Clickup".cup_contratos
-        WHERE responsavel IS NOT NULL AND responsavel != ''
-          AND status IN ('ativo', 'onboarding', 'triagem')
-        ORDER BY responsavel
-      `);
-      res.json(result.rows.map((r: any) => r.responsavel));
-    } catch (error) {
-      console.error("[api] Error fetching operadores:", error);
-      res.status(500).json({ error: "Failed to fetch operadores" });
-    }
-  });
-
-  // GET /api/capacity/produtos — lista produtos distintos
-  app.get("/api/capacity/produtos", async (req, res) => {
-    try {
-      const result = await db.execute(sql`
-        SELECT DISTINCT produto
-        FROM "Clickup".cup_contratos
-        WHERE produto IS NOT NULL AND produto != ''
-          AND status IN ('ativo', 'onboarding', 'triagem')
-        ORDER BY produto
-      `);
-      res.json(result.rows.map((r: any) => r.produto));
-    } catch (error) {
-      console.error("[api] Error fetching produtos:", error);
-      res.status(500).json({ error: "Failed to fetch produtos" });
-    }
-  });
-
-  // DELETE /api/capacity/:id
-  app.delete("/api/capacity/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      await db.execute(sql`DELETE FROM cortex_core.capacity_operador WHERE id = ${parseInt(id)}`);
-      res.json({ success: true });
-    } catch (error) {
-      console.error("[api] Error deleting capacity:", error);
-      res.status(500).json({ error: "Failed to delete capacity" });
     }
   });
 }
