@@ -64,11 +64,17 @@ export default function SlideRankingSDRs({ ranking, topReunioes }: Props) {
     <div className="w-full h-full text-white flex flex-col relative overflow-hidden" style={{ padding: "32px 40px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
       {/* Title */}
-      <div className="relative z-10 flex items-center gap-3 shrink-0" style={{ marginBottom: 24 }}>
-        <Trophy className="h-7 w-7 text-emerald-400" />
-        <h2 className="text-2xl font-bold">Ranking SDRs</h2>
-        <span className="text-sm text-zinc-500 ml-2">por MRR gerado</span>
+      <div className="relative z-10 shrink-0" style={{ marginBottom: 24 }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="bg-white/10 backdrop-blur p-2 rounded-lg">
+            <Trophy className="h-5 w-5 text-emerald-400" />
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight">Ranking SDRs</h2>
+          <span className="text-sm text-zinc-500 ml-2">por MRR gerado</span>
+        </div>
+        <div className="h-px bg-gradient-to-r from-emerald-500/40 to-transparent" />
       </div>
 
       {/* Content */}
@@ -105,21 +111,21 @@ export default function SlideRankingSDRs({ ranking, topReunioes }: Props) {
         {/* Top Reuniões */}
         {topReunioes && (
           <div className="flex items-center shrink-0" style={{ width: 240 }}>
-            <div className="w-full bg-gradient-to-b from-emerald-500/15 to-emerald-900/5 border border-emerald-500/30 rounded-2xl flex flex-col items-center text-center"
+            <div className="w-full bg-white/[0.03] backdrop-blur-xl border border-emerald-500/15 rounded-2xl flex flex-col items-center text-center shadow-lg shadow-black/20"
               style={{ padding: "32px 24px" }}>
               <div className="flex items-center gap-2 mb-5">
                 <CalendarCheck className="h-5 w-5 text-emerald-400" />
                 <span className="text-sm font-bold text-emerald-400 uppercase tracking-widest">Top Reunioes</span>
               </div>
 
-              <div className="rounded-full mb-4"
+              <div className="rounded-full mb-4 ring-2 ring-white/10 shadow-lg shadow-emerald-500/20"
                 style={{ padding: 4, border: "4px solid #10b981" }}>
                 <Foto nome={topReunioes.name} url={topReunioes.fotoUrl} px={120} />
               </div>
 
               <p className="text-xl font-bold">{firstName(topReunioes.name)}</p>
 
-              <div className="bg-emerald-500/15 rounded-xl px-6 py-3 mt-4">
+              <div className="bg-white/[0.04] border border-emerald-500/20 rounded-xl px-6 py-3 mt-4">
                 <p className="text-3xl font-bold text-emerald-400">{topReunioes.reunioes}</p>
                 <p className="text-sm text-zinc-400 mt-1">reunioes realizadas</p>
               </div>
