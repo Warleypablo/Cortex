@@ -27,7 +27,7 @@ function fmtK(v: number): string {
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-zinc-900/60 border border-zinc-800 rounded-xl p-3 ${className}`}>
+    <div className={`bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] shadow-lg shadow-black/20 rounded-xl p-3 ${className}`}>
       {children}
     </div>
   );
@@ -75,10 +75,16 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
     <div className="w-full h-full flex flex-col text-white relative overflow-hidden" style={{ padding: "24px 32px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
       {/* Header */}
-      <div className="relative z-10 flex items-center gap-3 mb-3 shrink-0">
-        <Activity className="h-6 w-6 text-cyan-400" />
-        <h2 className="text-xl font-bold">Turbo Commerce — {mesLabel}</h2>
+      <div className="relative z-10 shrink-0 mb-3">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="bg-white/10 backdrop-blur p-1.5 rounded-lg">
+            <Activity className="h-4 w-4 text-cyan-400" />
+          </div>
+          <h2 className="text-xl font-bold tracking-tight">Turbo Commerce — {mesLabel}</h2>
+        </div>
+        <div className="h-px bg-gradient-to-r from-cyan-500/40 to-transparent" />
       </div>
 
       {/* Top row: 5 compact cards */}
@@ -183,7 +189,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
               <span className="text-[10px] text-zinc-400">Vl Retido:</span>
               <span className="text-[10px] font-bold text-emerald-400">{fmtBRL(metrics.retencoesValor)}</span>
             </div>
-            <div className="border-t border-zinc-800 pt-0.5 mt-0.5 space-y-0.5">
+            <div className="border-t border-white/[0.06] pt-0.5 mt-0.5 space-y-0.5">
               <div className="flex justify-between">
                 <span className="text-[10px] text-zinc-400">Cross Rec:</span>
                 <span className="text-[10px] font-bold text-emerald-400">{fmtBRL(metrics.crosssellMrr)}</span>

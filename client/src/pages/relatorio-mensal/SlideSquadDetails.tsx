@@ -64,9 +64,11 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
     <div className="w-full h-full flex flex-col text-white relative overflow-hidden" style={{ padding: "28px 36px", background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
       {/* Header */}
       <div className="relative z-10 shrink-0 mb-4">
-        <h2 className="text-2xl font-bold">Detalhes por Squad — {mesLabel}</h2>
+        <h2 className="text-2xl font-bold tracking-tight mb-3">Detalhes por Squad — {mesLabel}</h2>
+        <div className="h-px bg-gradient-to-r from-purple-500/40 to-transparent" />
       </div>
 
       {/* Grid of cards */}
@@ -81,10 +83,10 @@ export default function SlideSquadDetails({ details, mesLabel }: Props) {
           return (
             <div
               key={sq.squad}
-              className="rounded-xl flex flex-col"
+              className="rounded-xl flex flex-col backdrop-blur-xl shadow-lg shadow-black/20"
               style={{
-                background: "rgba(24, 24, 27, 0.8)",
-                border: `1px solid ${color}30`,
+                background: "rgba(255, 255, 255, 0.04)",
+                border: `1px solid ${color}25`,
               }}
             >
               {/* Card header */}

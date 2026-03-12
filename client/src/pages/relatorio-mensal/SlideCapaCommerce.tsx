@@ -6,10 +6,13 @@ export default function SlideCapaCommerce() {
     <div className="w-full h-full flex flex-col items-center justify-center text-white p-12 relative overflow-hidden" style={{ background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)" }}>
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
 
       <div className="relative z-10 flex flex-col items-center gap-6">
         <img src={turboLogo} alt="Turbo Partners" className="h-12 object-contain opacity-60" />
-        <ShoppingCart className="h-16 w-16 text-purple-500" />
+        <div className="bg-white/10 backdrop-blur p-4 rounded-2xl shadow-[0_0_40px_rgba(168,85,247,0.3)]">
+          <ShoppingCart className="h-16 w-16 text-purple-500" />
+        </div>
         <h1 className="text-4xl font-bold tracking-tight">Commerce</h1>
         <p className="text-zinc-400 text-lg">E-Commerce e Performance Digital</p>
       </div>
