@@ -380,6 +380,7 @@ export default function GrowthOrcadoRealizado() {
       if (!res.ok) throw new Error('Failed to fetch MQL metrics');
       return res.json();
     },
+    staleTime: 0,
   });
 
   interface NaoMQLMetrics {
@@ -409,6 +410,7 @@ export default function GrowthOrcadoRealizado() {
       if (!res.ok) throw new Error('Failed to fetch Não-MQL metrics');
       return res.json();
     },
+    staleTime: 0,
   });
 
   interface AdsMetrics {
@@ -434,6 +436,7 @@ export default function GrowthOrcadoRealizado() {
       if (!res.ok) throw new Error('Failed to fetch Ads metrics');
       return res.json();
     },
+    staleTime: 0,
   });
 
   const mqlMetrics: Metric[] = useMemo(() => {
