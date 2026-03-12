@@ -92,6 +92,7 @@ export const PERMISSION_KEYS = {
     CLIENTES_INADIMPLENTES: 'jur.clientes_inadimplentes',
     CONTRATOS_MODULE: 'jur.contratos_module',
     CONTRATOS_COLABORADORES: 'jur.contratos_colaboradores',
+    CONTRATOS_CREATORS: 'jur.contratos_creators',
     PROCESSOS: 'jur.processos',
     ASSISTENTE: 'jur.assistente',
     RELATORIOS: 'jur.relatorios',
@@ -255,6 +256,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/juridico/processos': PERMISSION_KEYS.JUR.PROCESSOS,
   '/contratos-module': PERMISSION_KEYS.JUR.CONTRATOS_MODULE,
   '/juridico/contratos-colaborador': PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES,
+  '/juridico/creators': PERMISSION_KEYS.JUR.CONTRATOS_CREATORS,
   '/juridico/relatorios': PERMISSION_KEYS.JUR.RELATORIOS,
   // Reports
   '/investors-report': PERMISSION_KEYS.REPORTS.INVESTORS,
@@ -484,6 +486,7 @@ export const NAV_CONFIG = {
       { title: 'Processos', url: '/juridico/processos', icon: 'Scale', permissionKey: PERMISSION_KEYS.JUR.PROCESSOS },
       { title: 'Contratos', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_MODULE },
       { title: 'Contratos Colaboradores', url: '/juridico/contratos-colaborador', icon: 'Users', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES },
+      { title: 'Contratos Creators', url: '/juridico/creators', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_CREATORS },
     ],
   },
   
@@ -660,6 +663,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.JUR.PROCESSOS]: 'Processos',
   [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
   [PERMISSION_KEYS.JUR.ASSISTENTE]: 'Assistente IA',
+  [PERMISSION_KEYS.JUR.CONTRATOS_CREATORS]: 'Contratos Creators',
   [PERMISSION_KEYS.JUR.RELATORIOS]: 'Relatórios',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
