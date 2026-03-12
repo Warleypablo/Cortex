@@ -88,6 +88,7 @@ export default function SlideRankingSquads({ ranking }: Props) {
       {/* Background glow effects */}
       <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
       <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
+      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
 
       {/* Title */}
       <div className="relative z-10 mb-6">
@@ -117,7 +118,7 @@ export default function SlideRankingSquads({ ranking }: Props) {
                   height: iSize,
                   background: `radial-gradient(circle at 30% 30%, ${color}50, ${color}20)`,
                   border: `4px solid ${color}`,
-                  boxShadow: `0 0 20px ${color}40`,
+                  boxShadow: `0 0 30px ${color}50, 0 0 60px ${color}20`,
                 }}
               >
                 {emoji ? (
