@@ -4137,12 +4137,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateFilter = sql`c.data_solicitacao_encerramento >= (NOW() - make_interval(months => ${mesesNum}))::date`;
       }
 
-      // Query principal em cup_churn - sem necessidade de JOIN com cup_clientes
+      // Query principal em cup_churn com JOIN para pegar nome do cliente
       const churnResult = await db.execute(sql`
         SELECT
           c.task_id,
           c.parent_id,
           c.nome,
+          cl.nome as nome_cliente,
           c.status,
           c.responsavel_geral,
           c.cs_responsavel,
@@ -4172,6 +4173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           c.reteve,
           c.abonar_churn
         FROM "Clickup".cup_churn c
+        LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND ${dateFilter}
         ORDER BY c.data_solicitacao_encerramento DESC
@@ -4189,7 +4191,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         return {
           id: row.task_id,
-          cliente_nome: row.nome || 'Cliente não identificado',
+          cliente_nome: row.nome_cliente || row.nome || 'Cliente não identificado',
+          contrato_nome: row.nome || 'Contrato não identificado',
           cnpj: '',
           produto: row.produto || 'Não especificado',
           squad: row.squad || 'Não especificado',
