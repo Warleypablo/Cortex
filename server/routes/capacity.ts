@@ -105,6 +105,40 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
+  // GET /api/capacity/operadores — lista operadores distintos (responsaveis ativos)
+  app.get("/api/capacity/operadores", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT responsavel
+        FROM "Clickup".cup_contratos
+        WHERE responsavel IS NOT NULL AND responsavel != ''
+          AND status IN ('ativo', 'onboarding', 'triagem')
+        ORDER BY responsavel
+      `);
+      res.json(result.rows.map((r: any) => r.responsavel));
+    } catch (error) {
+      console.error("[api] Error fetching operadores:", error);
+      res.status(500).json({ error: "Failed to fetch operadores" });
+    }
+  });
+
+  // GET /api/capacity/produtos — lista produtos distintos
+  app.get("/api/capacity/produtos", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT produto
+        FROM "Clickup".cup_contratos
+        WHERE produto IS NOT NULL AND produto != ''
+          AND status IN ('ativo', 'onboarding', 'triagem')
+        ORDER BY produto
+      `);
+      res.json(result.rows.map((r: any) => r.produto));
+    } catch (error) {
+      console.error("[api] Error fetching produtos:", error);
+      res.status(500).json({ error: "Failed to fetch produtos" });
+    }
+  });
+
   // DELETE /api/capacity/:id
   app.delete("/api/capacity/:id", async (req, res) => {
     try {
