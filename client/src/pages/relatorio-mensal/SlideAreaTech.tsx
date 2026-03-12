@@ -104,23 +104,26 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
 
   return (
     <div
-      className="w-full h-full flex flex-col text-white"
+      className="w-full h-full flex flex-col text-white relative overflow-hidden"
       style={{
         padding: "28px 36px",
-        background: "linear-gradient(135deg, #0c0a1a 0%, #1a1030 40%, #0f0d1f 100%)",
+        background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)",
       }}
     >
+      {/* Glow effects */}
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15" style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
+      <div className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10" style={{ background: "radial-gradient(circle, #6366f1 0%, transparent 70%)" }} />
       {/* Title */}
-      <h2 className="text-4xl font-black text-center mb-5 shrink-0 tracking-tight" style={{ fontFamily: "serif" }}>
+      <h2 className="text-4xl font-black text-center mb-5 shrink-0 tracking-tight relative z-10" style={{ fontFamily: "serif" }}>
         Área Tech
       </h2>
 
       {/* Top row */}
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 mb-4">
+      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 mb-4 relative z-10">
         {/* KPI cards */}
         <div className="flex gap-3">
           {/* Projetos Entregues */}
-          <div className="flex-1 border border-zinc-600/50 rounded-xl flex flex-col items-center justify-center p-3">
+          <div className="flex-1 border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center p-3">
             <p className="text-xs text-zinc-300 text-center mb-2">Projetos<br />entregues</p>
             <p className="text-4xl font-black mb-3">{kpis.entregues}</p>
             <span className="text-xs text-emerald-400 border border-emerald-500/30 rounded-lg px-3 py-1">
@@ -129,14 +132,14 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
           </div>
 
           {/* Tempo Medio */}
-          <div className="flex-1 border border-zinc-600/50 rounded-xl flex flex-col items-center justify-center p-3">
+          <div className="flex-1 border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center p-3">
             <p className="text-xs text-zinc-300 text-center mb-2">Tempo médio<br />por projeto</p>
             <p className="text-4xl font-black mb-3">{kpis.tempoMedio}</p>
             <span className="text-xs text-zinc-500 invisible px-3 py-1">—</span>
           </div>
 
           {/* Adicionados */}
-          <div className="flex-1 border border-zinc-600/50 rounded-xl flex flex-col items-center justify-center p-3">
+          <div className="flex-1 border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm flex flex-col items-center justify-center p-3">
             <p className="text-xs text-zinc-300 text-center mb-2">Adicionados em<br />{displayLabel}</p>
             <p className="text-4xl font-black mb-3">{kpis.adicionados}</p>
             <span className="text-xs text-cyan-400 border border-cyan-500/30 rounded-lg px-3 py-1">
@@ -146,7 +149,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
         </div>
 
         {/* Stacked Bar: N Projetos Entregues */}
-        <div className="border border-zinc-600/50 rounded-xl p-3 flex flex-col">
+        <div className="border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm p-3 flex flex-col">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <p className="text-sm font-bold text-zinc-200">N° Projetos Entregues</p>
             <div className="flex items-center gap-2 flex-wrap">
@@ -183,9 +186,9 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
       </div>
 
       {/* Bottom row */}
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
+      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 relative z-10">
         {/* Pie: Projetos em Aberto */}
-        <div className="border border-zinc-600/50 rounded-xl p-3 flex flex-col">
+        <div className="border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm p-3 flex flex-col">
           <p className="text-sm font-bold text-zinc-200 text-center mb-1">Projetos em Aberto</p>
           <div className="flex-1 min-h-0 flex items-center">
             <div className="w-1/2 h-full">
@@ -224,7 +227,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
         </div>
 
         {/* Stacked Bar: Receita Tech */}
-        <div className="border border-zinc-600/50 rounded-xl p-3 flex flex-col">
+        <div className="border border-purple-500/20 rounded-xl bg-white/5 backdrop-blur-sm p-3 flex flex-col">
           <div className="flex items-center gap-3 mb-1 flex-wrap">
             <p className="text-sm font-bold text-zinc-200">Receita Tech</p>
             <div className="flex items-center gap-2 flex-wrap">
