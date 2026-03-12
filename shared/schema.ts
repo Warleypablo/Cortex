@@ -2977,6 +2977,53 @@ export const clientCredentials = cortexCoreSchema.table("client_credentials", {
 export type ClientCredential = typeof clientCredentials.$inferSelect;
 export type InsertClientCredential = typeof clientCredentials.$inferInsert;
 
+// ── Creators (Freelancers) ───────────────────────────────────────────────────
+export const creators = cortexCoreSchema.table("creators", {
+  id: serial("id").primaryKey(),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  cpf: varchar("cpf", { length: 14 }),
+  cnpj: varchar("cnpj", { length: 18 }),
+  email: varchar("email", { length: 255 }).notNull(),
+  endereco: text("endereco"),
+  cidade: varchar("cidade", { length: 100 }),
+  estado: varchar("estado", { length: 2 }),
+  cep: varchar("cep", { length: 10 }),
+  chavePix: text("chave_pix"),
+  tipoPix: varchar("tipo_pix", { length: 20 }),
+  ativo: boolean("ativo").default(true),
+  observacoes: text("observacoes"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const insertCreatorSchema = createInsertSchema(creators)
+  .omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type Creator = typeof creators.$inferSelect;
+export type InsertCreator = z.infer<typeof insertCreatorSchema>;
+
+export const contratosCreators = cortexCoreSchema.table("contratos_creators", {
+  id: serial("id").primaryKey(),
+  creatorId: integer("creator_id").notNull(),
+  clienteTaskId: varchar("cliente_task_id", { length: 50 }),
+  clienteNome: varchar("cliente_nome", { length: 255 }),
+  entregaveis: jsonb("entregaveis"),
+  valorRemuneracao: decimal("valor_remuneracao", { precision: 10, scale: 2 }),
+  prazoEntregaDias: integer("prazo_entrega_dias").default(3),
+  observacoes: text("observacoes"),
+  asssinafyDocumentId: varchar("assinafy_document_id", { length: 255 }),
+  asssinafyStatus: varchar("assinafy_status", { length: 50 }),
+  enviadoEm: timestamp("enviado_em"),
+  assinadoEm: timestamp("assinado_em"),
+  status: varchar("status", { length: 50 }).default("rascunho"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const insertContratoCreatorSchema = createInsertSchema(contratosCreators)
+  .omit({ id: true, criadoEm: true, atualizadoEm: true });
+export type ContratoCreator = typeof contratosCreators.$inferSelect;
+export type InsertContratoCreator = z.infer<typeof insertContratoCreatorSchema>;
+
 // ── Capacity Operador ────────────────────────────────────────────────────────
 export const capacityOperadorSchema = z.object({
   id: z.number().optional(),
