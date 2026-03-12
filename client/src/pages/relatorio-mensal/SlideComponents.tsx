@@ -113,7 +113,7 @@ export function ChartCard({ title, children, className = "" }: ChartCardProps) {
   return (
     <div className={`bg-white/[0.04] border border-white/[0.08] rounded-xl shadow-lg shadow-black/20 p-3 flex flex-col ${className}`}>
       {title && <p className="text-sm font-bold text-zinc-300 mb-2">{title}</p>}
-      <div className="flex-1 min-h-0">{children}</div>
+      <div className="flex-1 min-h-0 flex flex-col">{children}</div>
     </div>
   );
 }
