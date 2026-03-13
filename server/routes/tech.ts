@@ -111,9 +111,10 @@ async function fetchBulkTimeInStatus(taskIds: string[]): Promise<Record<string, 
     );
     if (response.ok) {
       const data = await response.json();
-      if (data.data) {
-        for (const item of data.data) {
-          results[item.task_id] = item.status_history;
+      // API returns {taskId: {current_status, status_history}} directly at root level
+      for (const [taskId, taskData] of Object.entries(data)) {
+        if (taskData && typeof taskData === 'object' && (taskData as any).status_history) {
+          results[taskId] = (taskData as any).status_history;
         }
       }
     } else {
@@ -128,37 +129,28 @@ async function fetchBulkTimeInStatus(taskIds: string[]): Promise<Record<string, 
 
 async function syncStatusHistory(db: any, taskIds: string[], taskCreationDates: Record<string, string>) {
   const bulkData = await fetchBulkTimeInStatus(taskIds);
+  console.log(`[tech-sync] Got bulk status data for ${Object.keys(bulkData).length} tasks`);
 
   await db.execute(sql`TRUNCATE TABLE "Clickup".cup_status_history`);
 
-  for (const [taskId, statusData] of Object.entries(bulkData)) {
-    if (!statusData) continue;
+  for (const [taskId, statusHistory] of Object.entries(bulkData)) {
+    if (!statusHistory || !Array.isArray(statusHistory)) continue;
 
-    const entries: Array<{status: string, totalTime: number, orderindex: number}> = [];
+    // statusHistory is an array of {status, color, type, total_time: {by_minute, since}, orderindex}
+    const entries = statusHistory.map((entry: any) => ({
+      status: (entry.status || '').toLowerCase(),
+      totalTimeMs: (parseInt(entry.total_time?.by_minute) || 0) * 60000, // minutes → ms
+      orderindex: parseInt(entry.orderindex) || 0,
+    }));
 
-    for (const [statusName, info] of Object.entries(statusData as Record<string, any>)) {
-      if (info.status_history) {
-        for (const hist of info.status_history) {
-          entries.push({
-            status: statusName.toLowerCase(),
-            totalTime: parseInt(hist.total_time) || 0,
-            orderindex: parseInt(hist.orderindex) || 0,
-          });
-        }
-      } else {
-        entries.push({
-          status: statusName.toLowerCase(),
-          totalTime: parseInt(info.total_time) || 0,
-          orderindex: parseInt(info.orderindex) || 0,
-        });
-      }
-    }
-
-    entries.sort((a, b) => a.orderindex - b.orderindex);
+    entries.sort((a: any, b: any) => a.orderindex - b.orderindex);
 
     const creationDate = taskCreationDates[taskId];
     let cumulativeMs = 0;
-    const baseTime = creationDate ? new Date(parseInt(creationDate)).getTime() : Date.now();
+    // creationDate can be Date object (from pg), string (ISO/ms), or null
+    const baseTime = creationDate
+      ? (creationDate instanceof Date ? creationDate.getTime() : new Date(String(creationDate)).getTime())
+      : Date.now();
 
     for (let i = 0; i < entries.length; i++) {
       const prev = i > 0 ? entries[i - 1].status : null;
@@ -168,10 +160,10 @@ async function syncStatusHistory(db: any, taskIds: string[], taskCreationDates: 
       await db.execute(sql`
         INSERT INTO "Clickup".cup_status_history
         (clickup_task_id, status_anterior, status_novo, data_transicao, duracao_ms)
-        VALUES (${taskId}, ${prev}, ${curr.status}, ${transicaoDate}, ${curr.totalTime})
+        VALUES (${taskId}, ${prev}, ${curr.status}, ${transicaoDate}, ${curr.totalTimeMs})
       `);
 
-      cumulativeMs += curr.totalTime;
+      cumulativeMs += curr.totalTimeMs;
     }
   }
 }
