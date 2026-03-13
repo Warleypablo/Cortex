@@ -151,7 +151,6 @@ const ALL_ROUTES = [
   '/sugestoes',
   '/visao-geral',
   '/okr-2026',
-  '/dashboard/financeiro',
   '/dashboard/geg',
   '/dashboard/inhire',
   '/dashboard/recrutamento',
