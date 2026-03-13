@@ -266,6 +266,37 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(500).json({ error: "CLICKUP_API_KEY not configured" });
       }
 
+      // Ensure cup_status_history and cup_comentarios tables exist
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "Clickup".cup_status_history (
+          id SERIAL PRIMARY KEY,
+          clickup_task_id TEXT NOT NULL,
+          status_anterior TEXT,
+          status_novo TEXT NOT NULL,
+          data_transicao TIMESTAMP,
+          duracao_ms BIGINT DEFAULT 0
+        )
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS idx_status_history_task_id
+        ON "Clickup".cup_status_history (clickup_task_id, data_transicao)
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS "Clickup".cup_comentarios (
+          id SERIAL PRIMARY KEY,
+          clickup_task_id TEXT NOT NULL,
+          clickup_comment_id TEXT UNIQUE NOT NULL,
+          autor TEXT,
+          texto TEXT,
+          data_criacao TIMESTAMP,
+          tags_extraidas TEXT[] DEFAULT '{}'
+        )
+      `);
+      await db.execute(sql`
+        CREATE INDEX IF NOT EXISTS idx_comentarios_task_id
+        ON "Clickup".cup_comentarios (clickup_task_id, data_criacao)
+      `);
+
       console.log("[tech-sync] Starting ClickUp sync...");
       const tasks = await fetchAllClickUpTasks(CLICKUP_TECH_LIST_ID);
       console.log(`[tech-sync] Fetched ${tasks.length} tasks from ClickUp`);
