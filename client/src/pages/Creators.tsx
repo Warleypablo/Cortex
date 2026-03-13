@@ -323,7 +323,7 @@ export default function Creators() {
               <Megaphone className="w-4 h-4" />
               Creators
             </TabsTrigger>
-            <TabsTrigger value="contratos" className="gap-2" disabled={!selectedCreator}>
+            <TabsTrigger value="contratos" className="gap-2">
               <FileText className="w-4 h-4" />
               Contratos {selectedCreator ? `- ${selectedCreator.nome}` : ""}
             </TabsTrigger>
@@ -373,16 +373,17 @@ export default function Creators() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map(c => (
-                    <TableRow key={c.id} className={!c.ativo ? "opacity-50" : ""}>
+                    <TableRow
+                      key={c.id}
+                      className={`cursor-pointer hover:bg-muted/50 ${!c.ativo ? "opacity-50" : ""} ${selectedCreator?.id === c.id ? "bg-muted/30" : ""}`}
+                      onClick={() => { setSelectedCreator(c); setActiveTab("contratos"); }}
+                    >
                       <TableCell className="font-medium">{c.nome}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{c.email}</TableCell>
                       <TableCell className="text-sm">{c.cnpj || c.cpf || "—"}</TableCell>
                       <TableCell className="text-sm">{[c.cidade, c.estado].filter(Boolean).join("/") || "—"}</TableCell>
                       <TableCell className="text-sm">{c.chave_pix ? `${c.tipo_pix || "PIX"}: ${c.chave_pix.substring(0, 20)}...` : "—"}</TableCell>
-                      <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="sm" onClick={() => { setSelectedCreator(c); setActiveTab("contratos"); }}>
-                          <FileText className="w-4 h-4" />
-                        </Button>
+                      <TableCell className="text-right space-x-1" onClick={e => e.stopPropagation()}>
                         <Button variant="ghost" size="sm" onClick={() => openEditCreator(c)}>
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -402,7 +403,17 @@ export default function Creators() {
 
         {/* ── TAB CONTRATOS ────────────────────────────────────────────── */}
         <TabsContent value="contratos" className="space-y-4">
-          {selectedCreator && (
+          {!selectedCreator ? (
+            <Card>
+              <CardContent className="py-16 text-center">
+                <Megaphone className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+                <p className="text-muted-foreground">Selecione um creator na aba anterior para ver os contratos</p>
+                <Button variant="outline" className="mt-4" onClick={() => setActiveTab("creators")}>
+                  Ir para Creators
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
             <>
               <Card>
                 <CardContent className="pt-4 pb-3">
@@ -483,6 +494,7 @@ export default function Creators() {
             </>
           )}
         </TabsContent>
+
       </Tabs>
 
       {/* ── Dialog: Creator Form ──────────────────────────────────────── */}
