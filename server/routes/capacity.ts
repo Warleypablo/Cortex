@@ -18,6 +18,12 @@ const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> =
   "VI+":     { mrr_alvo: 50000, ticket_alvo: 5000 },
 };
 
+// Remove emoji prefixes from squad names (e.g. "🐍 Selva" → "Selva")
+function normalizeSquad(squad: string | null): string {
+  if (!squad) return "";
+  return squad.replace(/^[^\p{L}]+/u, "").trim();
+}
+
 export function registerCapacityRoutes(app: Express, db: any) {
 
   // GET /api/capacity/gestores — capacity automática por nível de cargo
@@ -26,8 +32,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
       // 1) Buscar gestores ativos + contratos via fuzzy match
       const result = await db.execute(sql`
         WITH gestores AS (
-          SELECT nome, cargo, nivel,
-            TRIM(regexp_replace(squad, '^[^a-zA-ZÀ-ÿ]+', '')) as squad
+          SELECT nome, cargo, nivel, squad
           FROM "Inhire".rh_pessoal
           WHERE cargo = 'Gestor de Performance'
             AND status = 'Ativo'
@@ -90,7 +95,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
         return {
           nome: row.nome,
           nivel,
-          squad: row.squad,
+          squad: normalizeSquad(row.squad),
           mrr_alvo,
           ticket_alvo: levelData.ticket_alvo,
           mrr_atual,
