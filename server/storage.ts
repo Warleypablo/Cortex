@@ -8454,6 +8454,63 @@ export class DbStorage implements IStorage {
     return result.rows;
   }
 
+  async getTechProjetoHistorico(taskId: string, tipo?: string): Promise<any[]> {
+    const validTipos = ['tudo', 'bloqueios', 'comentarios', 'status'];
+    const safeTipo = validTipos.includes(tipo || '') ? tipo : 'tudo';
+
+    let tipoFilter = '';
+    if (safeTipo === 'bloqueios') {
+      tipoFilter = `WHERE tipo_evento = 'bloqueio'`;
+    } else if (safeTipo === 'comentarios') {
+      tipoFilter = `WHERE tipo_evento IN ('comentario', 'bloqueio')`;
+    } else if (safeTipo === 'status') {
+      tipoFilter = `WHERE tipo_evento = 'status'`;
+    }
+
+    const safeTaskId = taskId.replace(/'/g, "''");
+
+    const result = await db.execute(sql.raw(`
+      SELECT * FROM (
+        SELECT
+          'status' AS tipo_evento,
+          COALESCE(status_anterior, '(início)') || ' → ' || status_novo AS descricao,
+          NULL AS autor,
+          data_transicao AS data_evento,
+          duracao_ms,
+          NULL AS tags
+        FROM "Clickup".cup_status_history
+        WHERE clickup_task_id = '${safeTaskId}'
+
+        UNION ALL
+
+        SELECT
+          CASE
+            WHEN 'bloqueio' = ANY(tags_extraidas) THEN 'bloqueio'
+            ELSE 'comentario'
+          END AS tipo_evento,
+          texto AS descricao,
+          autor,
+          data_criacao AS data_evento,
+          NULL AS duracao_ms,
+          tags_extraidas::text AS tags
+        FROM "Clickup".cup_comentarios
+        WHERE clickup_task_id = '${safeTaskId}'
+      ) combined
+      ${tipoFilter}
+      ORDER BY data_evento DESC
+    `));
+    return result.rows;
+  }
+
+  async getTechProjetoComentarios(taskId: string): Promise<any[]> {
+    const result = await db.execute(sql`
+      SELECT * FROM "Clickup".cup_comentarios
+      WHERE clickup_task_id = ${taskId}
+      ORDER BY data_criacao DESC
+    `);
+    return result.rows;
+  }
+
   // ============== INADIMPLÊNCIA ==============
 
   async getInadimplenciaResumo(dataInicio?: string, dataFim?: string): Promise<{
