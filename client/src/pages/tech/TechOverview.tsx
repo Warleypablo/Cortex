@@ -69,20 +69,72 @@ interface ProjetoEmAndamento {
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = {
-  design: "#a78bfa",
-  dev: "#6366f1",
-  review: "#818cf8",
-  qa: "#c4b5fd",
-  deploy: "#ddd6fe",
-};
+// Pipeline phases in logical order with display names and colors
+const PHASE_CONFIG: { key: string; label: string; color: string; patterns: string[] }[] = [
+  { key: "backlog", label: "Backlog / Triagem", color: "#94a3b8", patterns: ["open", "backlog", "não iniciado", "novo projeto", "to do", "aguardando", "em andamento"] },
+  { key: "planejamento", label: "Planejamento", color: "#a78bfa", patterns: ["planejamento", "kickoff"] },
+  { key: "design", label: "Design", color: "#8b5cf6", patterns: ["pronto p/ design", "design", "em design", "wireframe", "design + copy"] },
+  { key: "design_review", label: "Design Review", color: "#7c3aed", patterns: ["design - review", "design review", "ajuste design"] },
+  { key: "pronto_dev", label: "Pronto p/ Dev", color: "#6366f1", patterns: ["pronto p/ dev", "pronto desenvolvimento", "pronto p/ desenvolvimento"] },
+  { key: "dev", label: "Desenvolvimento", color: "#4f46e5", patterns: ["dev", "desenvolvimento", "em progresso", "doing"] },
+  { key: "dev_review", label: "Dev Review", color: "#4338ca", patterns: ["dev. review", "dev review", "review final", "qualidade", "configurações & review"] },
+  { key: "lancamento", label: "Lançamento", color: "#3730a3", patterns: ["pronto para lançar", "telas ok"] },
+  { key: "pendencias", label: "Pendências", color: "#f59e0b", patterns: ["deploy com pend", "deplay com ped"] },
+  { key: "bloqueado", label: "Bloqueado / Pausado", color: "#ef4444", patterns: ["bloqueado", "pausado"] },
+  { key: "aguardando", label: "Aguardando Externo", color: "#f97316", patterns: ["aguardando externo", "aguardando interno"] },
+];
 
-function getStatusColor(status: string): string {
-  const key = status.toLowerCase().trim();
-  for (const [pattern, color] of Object.entries(STATUS_COLORS)) {
-    if (key.includes(pattern)) return color;
+// End-state statuses to exclude
+const END_STATES = ["deploy 🚀", "deploy", "encerrado 🚀", "complete", "completo"];
+
+function groupStatusIntoPhases(data: PrazoPorStatus[]): { label: string; media_dias: number; total_transicoes: number; color: string }[] {
+  // Filter out end states
+  const filtered = data.filter(d => !END_STATES.includes(d.status.toLowerCase().trim()));
+
+  // Group by phase using weighted average
+  const phaseMap: Record<string, { totalWeightedDays: number; totalTransitions: number; color: string; label: string; order: number }> = {};
+
+  for (const item of filtered) {
+    const statusLower = item.status.toLowerCase().trim();
+    let matched = false;
+
+    for (let i = 0; i < PHASE_CONFIG.length; i++) {
+      const phase = PHASE_CONFIG[i];
+      if (phase.patterns.some(p => statusLower.includes(p))) {
+        if (!phaseMap[phase.key]) {
+          phaseMap[phase.key] = { totalWeightedDays: 0, totalTransitions: 0, color: phase.color, label: phase.label, order: i };
+        }
+        const dias = parseFloat(String(item.media_dias || 0));
+        const trans = parseInt(String(item.total_transicoes || 0));
+        phaseMap[phase.key].totalWeightedDays += dias * trans;
+        phaseMap[phase.key].totalTransitions += trans;
+        matched = true;
+        break;
+      }
+    }
+
+    // Skip unmatched statuses with very few transitions
+    if (!matched && parseInt(String(item.total_transicoes || 0)) >= 10) {
+      const key = `_other_${statusLower}`;
+      phaseMap[key] = {
+        totalWeightedDays: parseFloat(String(item.media_dias || 0)) * parseInt(String(item.total_transicoes || 0)),
+        totalTransitions: parseInt(String(item.total_transicoes || 0)),
+        color: "#94a3b8",
+        label: item.status.charAt(0).toUpperCase() + item.status.slice(1),
+        order: 99,
+      };
+    }
   }
-  return "#94a3b8";
+
+  return Object.values(phaseMap)
+    .map(p => ({
+      label: p.label,
+      media_dias: p.totalTransitions > 0 ? Math.round((p.totalWeightedDays / p.totalTransitions) * 10) / 10 : 0,
+      total_transicoes: p.totalTransitions,
+      color: p.color,
+    }))
+    .filter(p => p.media_dias > 0)
+    .sort((a, b) => b.media_dias - a.media_dias);
 }
 
 function daysUntil(dateStr: string | null): number | null {
@@ -230,51 +282,69 @@ export default function TechOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Tempo Médio por Fase */}
         <div className="bg-white dark:bg-zinc-800 rounded-xl p-5 border border-gray-200 dark:border-zinc-700">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-4">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300 mb-1">
             Tempo Medio por Fase
           </h3>
+          <p className="text-xs text-gray-400 dark:text-zinc-500 mb-4">
+            Media ponderada em dias (excluindo fases finais)
+          </p>
           {loadingPrazo ? (
             <div className="flex items-center justify-center h-48">
               <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
             </div>
           ) : prazoPorStatus && prazoPorStatus.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart
-                layout="vertical"
-                data={prazoPorStatus.map((d) => ({
-                  ...d,
-                  media_dias: parseFloat(String(d.media_dias || 0)),
-                }))}
-                margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(v: number) => `${v.toFixed(1)}d`}
-                />
-                <YAxis
-                  dataKey="status"
-                  type="category"
-                  tick={{ fontSize: 12 }}
-                  width={100}
-                />
-                <Tooltip
-                  formatter={(value: number) => [`${value.toFixed(1)} dias`, "Media"]}
-                  contentStyle={{
-                    backgroundColor: "var(--tooltip-bg, #fff)",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                  }}
-                />
-                <Bar dataKey="media_dias" radius={[0, 4, 4, 0]} maxBarSize={28}>
-                  {prazoPorStatus.map((entry, idx) => (
-                    <Cell key={idx} fill={getStatusColor(entry.status)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            (() => {
+              const grouped = groupStatusIntoPhases(prazoPorStatus);
+              const barH = 36;
+              const chartHeight = Math.max(220, grouped.length * barH + 40);
+              return (
+                <ResponsiveContainer width="100%" height={chartHeight}>
+                  <BarChart
+                    layout="vertical"
+                    data={grouped}
+                    margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
+                    barCategoryGap="20%"
+                  >
+                    <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.1} />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 11, fill: "#9ca3af" }}
+                      tickFormatter={(v: number) => `${Math.round(v)}d`}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      dataKey="label"
+                      type="category"
+                      tick={{ fontSize: 12, fill: "#d1d5db" }}
+                      width={140}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                      formatter={(value: number, _name: string, props: any) => [
+                        `${value} dias (${props.payload.total_transicoes} transicoes)`,
+                        "Media",
+                      ]}
+                      contentStyle={{
+                        backgroundColor: "#18181b",
+                        border: "1px solid #3f3f46",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        color: "#e4e4e7",
+                      }}
+                      labelStyle={{ color: "#a1a1aa", fontWeight: 600 }}
+                    />
+                    <Bar dataKey="media_dias" radius={[0, 6, 6, 0]} maxBarSize={24}>
+                      {grouped.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            })()
           ) : (
             <p className="text-sm text-gray-400 dark:text-zinc-500 text-center py-12">
               Sem dados de prazo por status
