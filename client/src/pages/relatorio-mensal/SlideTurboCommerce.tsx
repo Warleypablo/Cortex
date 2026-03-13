@@ -92,6 +92,21 @@ export default function SlideTurboCommerce({ ano, mes, okrObjectives, mrrAtivo }
           const mapping = KEY_TO_KR[item.key];
           const achievementTarget = mapping?.brlTarget ?? item.target;
           const colorClass = actual != null ? getAchievementColor(actual, achievementTarget, direction) : "";
+          // Progress bar calculation
+          let progressPct = 0;
+          let barColor = "bg-zinc-600";
+          if (actual != null) {
+            if (direction === "lte") {
+              // Lower is better: 100% when actual=0, 0% when actual>=target
+              progressPct = achievementTarget > 0 ? Math.max(0, Math.min(100, (1 - actual / achievementTarget) * 100)) : 100;
+            } else {
+              progressPct = achievementTarget > 0 ? Math.min(100, (actual / achievementTarget) * 100) : 0;
+            }
+            if (progressPct >= 80) barColor = "bg-emerald-500";
+            else if (progressPct >= 50) barColor = "bg-amber-500";
+            else barColor = "bg-red-500";
+          }
+
           return (
             <div key={item.key} className="bg-white/[0.04] border border-white/[0.08] shadow-lg shadow-black/20 rounded-xl p-5 flex flex-col justify-between">
               <div>
@@ -105,8 +120,19 @@ export default function SlideTurboCommerce({ ano, mes, okrObjectives, mrrAtivo }
                   </p>
                 )}
               </div>
+              {actual != null && (
+                <div className="mt-2">
+                  <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${barColor}`}
+                      style={{ width: `${progressPct}%`, opacity: 0.85 }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-zinc-500 mt-1 text-right">{Math.round(progressPct)}%</p>
+                </div>
+              )}
               {item.subLabel && (
-                <p className="text-xs text-zinc-500 mt-2">{item.subLabel}</p>
+                <p className="text-xs text-zinc-500 mt-1">{item.subLabel}</p>
               )}
             </div>
           );
