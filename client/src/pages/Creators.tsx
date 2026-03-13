@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,19 +19,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -50,23 +37,17 @@ import {
 import {
   Megaphone,
   Search,
-  Plus,
   Pencil,
   Trash2,
   FileText,
   Send,
   Loader2,
   Eye,
-  X,
   UserPlus,
-  Mail,
-  Phone,
-  MapPin,
-  DollarSign,
   Check,
   Clock,
   AlertCircle,
-  ChevronsUpDown,
+  Plus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -94,11 +75,12 @@ interface Creator {
 interface ContratoCreator {
   id: number;
   creator_id: number;
-  cliente_task_id: string | null;
-  cliente_nome: string;
-  entregaveis: Entregavel[];
+  cargo: string | null;
+  descricao_servicos: string | null;
   valor_remuneracao: string | null;
-  prazo_entrega_dias: number;
+  duracao_meses: number;
+  data_inicio: string | null;
+  data_fim: string | null;
   observacoes: string | null;
   assinafy_document_id: string | null;
   assinafy_status: string | null;
@@ -106,18 +88,6 @@ interface ContratoCreator {
   assinado_em: string | null;
   status: string;
   criado_em: string;
-}
-
-interface Entregavel {
-  tipo: string;
-  quantidade: number;
-}
-
-interface ClienteSearch {
-  task_id: string;
-  nome: string;
-  cnpj: string | null;
-  status: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -144,17 +114,18 @@ function statusBadge(status: string) {
   );
 }
 
-// ── Entregáveis presets ───────────────────────────────────────────────────────
+// ── Presets de cargo ──────────────────────────────────────────────────────────
 
-const TIPOS_ENTREGAVEIS = [
-  "Vídeo UGC",
-  "Reels/Stories",
-  "Fotos",
-  "Review de Produto",
-  "Unboxing",
-  "Tutorial",
-  "Post Feed",
-  "Carrossel",
+const CARGOS_PRESET = [
+  "Editor de Vídeo",
+  "Designer",
+  "Social Media",
+  "Copywriter",
+  "Gestor de Tráfego",
+  "Fotógrafo",
+  "Motion Designer",
+  "Produtor de Conteúdo",
+  "Consultor de Marketing",
   "Outro",
 ];
 
@@ -181,13 +152,10 @@ export default function Creators() {
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
   const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
   const [contratoForm, setContratoForm] = useState({
-    cliente_nome: "", cliente_task_id: "", entregaveis: [{ tipo: "Vídeo UGC", quantidade: 1 }] as Entregavel[],
-    valor_remuneracao: "", prazo_entrega_dias: "3", observacoes: ""
+    cargo: "", descricao_servicos: "",
+    valor_remuneracao: "", duracao_meses: "6",
+    data_inicio: "", data_fim: "", observacoes: ""
   });
-  const [clienteSearch, setClienteSearch] = useState("");
-  const [clienteResults, setClienteResults] = useState<ClienteSearch[]>([]);
-  const [searchingClientes, setSearchingClientes] = useState(false);
-  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -243,7 +211,7 @@ export default function Creators() {
   });
 
   const saveContrato = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: { cargo: string; descricao_servicos: string; valor_remuneracao: number; duracao_meses: number; data_inicio: string; data_fim: string; observacoes: string }) => {
       const res = await apiRequest("POST", `/api/creators/${selectedCreator!.id}/contratos`, data);
       return res.json();
     },
@@ -281,12 +249,19 @@ export default function Creators() {
 
   function resetContratoForm() {
     setContratoForm({
-      cliente_nome: "", cliente_task_id: "",
-      entregaveis: [{ tipo: "Vídeo UGC", quantidade: 1 }],
-      valor_remuneracao: "", prazo_entrega_dias: "3", observacoes: ""
+      cargo: "", descricao_servicos: "",
+      valor_remuneracao: "", duracao_meses: "6",
+      data_inicio: "", data_fim: "", observacoes: ""
     });
-    setClienteSearch("");
-    setClienteResults([]);
+  }
+
+  function calcDataFim(dataInicio: string, meses: number): string {
+    if (!dataInicio) return "";
+    try {
+      const d = new Date(dataInicio + 'T12:00:00');
+      d.setMonth(d.getMonth() + meses);
+      return d.toISOString().split('T')[0];
+    } catch { return ""; }
   }
 
   function openEditCreator(creator: Creator) {
@@ -304,18 +279,6 @@ export default function Creators() {
     resetCreatorForm();
     setCreatorDialogOpen(true);
   }
-
-  // Cliente search with debounce
-  const searchClientes = useCallback(async (q: string) => {
-    if (q.length < 2) { setClienteResults([]); return; }
-    setSearchingClientes(true);
-    try {
-      const res = await fetch(`/api/creators/clientes/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      setClienteResults(data);
-    } catch { setClienteResults([]); }
-    finally { setSearchingClientes(false); }
-  }, []);
 
   // Filter creators
   const filtered = creators.filter(c =>
@@ -452,20 +415,16 @@ export default function Creators() {
                         <div className="flex items-start justify-between gap-4 flex-wrap">
                           <div className="space-y-1 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium">{ct.cliente_nome}</span>
+                              <span className="font-medium">{ct.cargo || 'Contrato'}</span>
                               {statusBadge(ct.status)}
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              Valor: {formatCurrency(ct.valor_remuneracao)} | Prazo: {ct.prazo_entrega_dias} dias
+                              Valor mensal: {formatCurrency(ct.valor_remuneracao)} | {ct.duracao_meses} meses
                             </p>
-                            {ct.entregaveis && Array.isArray(ct.entregaveis) && ct.entregaveis.length > 0 && (
-                              <div className="flex gap-1 flex-wrap mt-1">
-                                {ct.entregaveis.map((e: any, i: number) => (
-                                  <Badge key={i} variant="outline" className="text-xs">
-                                    {e.quantidade}x {e.tipo}
-                                  </Badge>
-                                ))}
-                              </div>
+                            {ct.data_inicio && ct.data_fim && (
+                              <p className="text-sm text-muted-foreground">
+                                Vigência: {format(new Date(ct.data_inicio + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })} a {format(new Date(ct.data_fim + 'T12:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+                              </p>
                             )}
                             <p className="text-xs text-muted-foreground mt-1">
                               Criado em {format(new Date(ct.criado_em), "dd/MM/yyyy", { locale: ptBR })}
@@ -595,155 +554,114 @@ export default function Creators() {
           <form onSubmit={(e) => {
             e.preventDefault();
             saveContrato.mutate({
-              cliente_nome: contratoForm.cliente_nome,
-              cliente_task_id: contratoForm.cliente_task_id,
-              entregaveis: contratoForm.entregaveis,
+              cargo: contratoForm.cargo,
+              descricao_servicos: contratoForm.descricao_servicos,
               valor_remuneracao: parseFloat(contratoForm.valor_remuneracao.replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
-              prazo_entrega_dias: parseInt(contratoForm.prazo_entrega_dias) || 3,
+              duracao_meses: parseInt(contratoForm.duracao_meses) || 6,
+              data_inicio: contratoForm.data_inicio,
+              data_fim: contratoForm.data_fim || calcDataFim(contratoForm.data_inicio, parseInt(contratoForm.duracao_meses) || 6),
               observacoes: contratoForm.observacoes,
             });
           }} className="space-y-4">
-            {/* Cliente search - Combobox */}
+            {/* Cargo */}
             <div>
-              <Label>Cliente / Marca *</Label>
-              <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={clientePopoverOpen}
-                    className="w-full justify-between font-normal"
-                    type="button"
-                  >
-                    {contratoForm.cliente_nome || "Selecione o cliente..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Buscar cliente..."
-                      value={clienteSearch}
-                      onValueChange={(v) => {
-                        setClienteSearch(v);
-                        if (v.length >= 2) {
-                          searchClientes(v);
-                        } else {
-                          setClienteResults([]);
-                        }
-                      }}
-                    />
-                    <CommandList>
-                      {searchingClientes ? (
-                        <div className="flex items-center justify-center py-6">
-                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : clienteSearch.length < 2 ? (
-                        <CommandEmpty>Digite pelo menos 2 caracteres...</CommandEmpty>
-                      ) : clienteResults.length === 0 ? (
-                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                      ) : (
-                        <CommandGroup>
-                          {clienteResults.map(cl => (
-                            <CommandItem
-                              key={cl.task_id}
-                              value={cl.task_id}
-                              onSelect={() => {
-                                setContratoForm(f => ({ ...f, cliente_nome: cl.nome, cliente_task_id: cl.task_id }));
-                                setClienteSearch("");
-                                setClienteResults([]);
-                                setClientePopoverOpen(false);
-                              }}
-                            >
-                              <div className="flex items-center justify-between w-full">
-                                <span>{cl.nome}</span>
-                                {cl.cnpj && <span className="text-xs text-muted-foreground ml-2">{cl.cnpj}</span>}
-                              </div>
-                              {contratoForm.cliente_task_id === cl.task_id && (
-                                <Check className="ml-2 h-4 w-4 shrink-0" />
-                              )}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      )}
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Label>Cargo / Função *</Label>
+              <Select
+                value={CARGOS_PRESET.includes(contratoForm.cargo) ? contratoForm.cargo : "Outro"}
+                onValueChange={v => {
+                  if (v === "Outro") {
+                    setContratoForm(f => ({ ...f, cargo: "" }));
+                  } else {
+                    setContratoForm(f => ({ ...f, cargo: v }));
+                  }
+                }}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione o cargo" /></SelectTrigger>
+                <SelectContent>
+                  {CARGOS_PRESET.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {(!CARGOS_PRESET.includes(contratoForm.cargo) || contratoForm.cargo === "") && (
+                <Input
+                  className="mt-2"
+                  placeholder="Digite o cargo..."
+                  value={contratoForm.cargo === "Outro" ? "" : contratoForm.cargo}
+                  onChange={e => setContratoForm(f => ({ ...f, cargo: e.target.value }))}
+                  required
+                />
+              )}
             </div>
 
-            {/* Entregáveis */}
+            {/* Descrição dos Serviços */}
             <div>
-              <Label>Entregáveis</Label>
-              <div className="space-y-2 mt-1">
-                {contratoForm.entregaveis.map((ent, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <Select
-                      value={ent.tipo}
-                      onValueChange={v => {
-                        const updated = [...contratoForm.entregaveis];
-                        updated[i] = { ...updated[i], tipo: v };
-                        setContratoForm(f => ({ ...f, entregaveis: updated }));
-                      }}
-                    >
-                      <SelectTrigger className="flex-1"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {TIPOS_ENTREGAVEIS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      type="number"
-                      min={1}
-                      className="w-20"
-                      value={ent.quantidade}
-                      onChange={e => {
-                        const updated = [...contratoForm.entregaveis];
-                        updated[i] = { ...updated[i], quantidade: parseInt(e.target.value) || 1 };
-                        setContratoForm(f => ({ ...f, entregaveis: updated }));
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setContratoForm(f => ({ ...f, entregaveis: f.entregaveis.filter((_, idx) => idx !== i) }));
-                      }}
-                      disabled={contratoForm.entregaveis.length <= 1}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setContratoForm(f => ({ ...f, entregaveis: [...f.entregaveis, { tipo: "Vídeo UGC", quantidade: 1 }] }))}
-                >
-                  <Plus className="w-3 h-3 mr-1" /> Adicionar
-                </Button>
-              </div>
+              <Label>Descrição dos Serviços *</Label>
+              <Textarea
+                placeholder="Ex: criar, gravar e editar vídeos para campanhas de marketing digital, redes sociais, YouTube..."
+                value={contratoForm.descricao_servicos}
+                onChange={e => setContratoForm(f => ({ ...f, descricao_servicos: e.target.value }))}
+                rows={4}
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">Descreva as atribuições que constarão na cláusula do objeto do contrato</p>
             </div>
 
+            {/* Valor e Duração */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Valor (R$) *</Label>
+                <Label>Valor Mensal (R$) *</Label>
                 <Input
-                  placeholder="0,00"
+                  placeholder="2.500,00"
                   value={contratoForm.valor_remuneracao}
                   onChange={e => setContratoForm(f => ({ ...f, valor_remuneracao: e.target.value }))}
                   required
                 />
               </div>
               <div>
-                <Label>Prazo de Entrega (dias)</Label>
+                <Label>Duração (meses)</Label>
                 <Input
                   type="number"
                   min={1}
-                  value={contratoForm.prazo_entrega_dias}
-                  onChange={e => setContratoForm(f => ({ ...f, prazo_entrega_dias: e.target.value }))}
+                  max={60}
+                  value={contratoForm.duracao_meses}
+                  onChange={e => {
+                    const meses = parseInt(e.target.value) || 6;
+                    setContratoForm(f => ({
+                      ...f,
+                      duracao_meses: e.target.value,
+                      data_fim: f.data_inicio ? calcDataFim(f.data_inicio, meses) : f.data_fim
+                    }));
+                  }}
                 />
+              </div>
+            </div>
+
+            {/* Datas */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Data de Início *</Label>
+                <Input
+                  type="date"
+                  value={contratoForm.data_inicio}
+                  onChange={e => {
+                    const inicio = e.target.value;
+                    const meses = parseInt(contratoForm.duracao_meses) || 6;
+                    setContratoForm(f => ({
+                      ...f,
+                      data_inicio: inicio,
+                      data_fim: calcDataFim(inicio, meses)
+                    }));
+                  }}
+                  required
+                />
+              </div>
+              <div>
+                <Label>Data de Fim</Label>
+                <Input
+                  type="date"
+                  value={contratoForm.data_fim}
+                  onChange={e => setContratoForm(f => ({ ...f, data_fim: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">Calculada automaticamente</p>
               </div>
             </div>
 
