@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-03-13 | feat(tech): implement Performance section with deploy metrics
+
+**O que foi feito:**
+- Implementado componente TechPerformance completo com toggle Geral/Por PO
+- Seletor de periodo (6/12/24 meses) para filtrar dados
+- KPI cards: tempo medio deploy, entregas no trimestre, gargalo principal, fases monitoradas
+- Graficos de barras para tempo de deploy e entregas por trimestre (Recharts)
+- Grafico horizontal de tempo de deploy por PO (modo por-po)
+- Phase cards (design/dev/review/qa/deploy) com destaque de gargalo
+
+**Por que:**
+- Secao Performance do TechHub necessaria para visualizar metricas de deploy e identificar gargalos no pipeline
+
+**Arquivos alterados:**
+- `client/src/pages/tech/TechPerformance.tsx` - Substituido placeholder por componente completo com charts, KPIs e phase cards
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-13 | feat(tech): create ProjectCard and PrazoStatusBar components
 
 **O que foi feito:**
