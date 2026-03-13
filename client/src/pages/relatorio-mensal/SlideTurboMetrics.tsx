@@ -1,5 +1,5 @@
 import { Activity, Users, TrendingUp, TrendingDown, Pause, CreditCard, Target, Handshake } from "lucide-react";
-import { ComposedChart, BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { TurboMetrics } from "./types";
 import SlideLayout from "./SlideLayout";
 import { SlideHeader, ChartCard, SecondaryCard } from "./SlideComponents";
@@ -266,38 +266,37 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
 
         {/* MRR Ativo + Meta Churn */}
         <div className="col-span-2 flex flex-col gap-3">
-          <SecondaryCard className="flex-1 flex flex-col p-3">
-            <div className="flex items-baseline justify-between mb-1">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">MRR Ativo — {mesLabel}</p>
-            </div>
-            <p className="text-xl font-black text-emerald-400 mb-1">{fmtFull(metrics.mrrAtivo)}</p>
-            <div className="flex-1 min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData.filter(d => d.hasData)} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: "#71717a", fontSize: 8 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (!active || !payload?.length) return null;
-                      return (
-                        <div className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[10px]">
-                          <p className="text-white font-bold">{label}: {fmtFull(payload[0].value as number)}</p>
+          <SecondaryCard className="flex-1 flex flex-col p-3 overflow-hidden">
+            <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">MRR Ativo — {mesLabel}</p>
+            <p className="text-xl font-black text-emerald-400 mb-2">{fmtFull(metrics.mrrAtivo)}</p>
+            {(() => {
+              const mrrData = chartData.filter(d => d.hasData && d.mrr > 0);
+              if (mrrData.length === 0) return null;
+              const maxMrr = Math.max(...mrrData.map(d => d.mrr));
+              return (
+                <div className="flex-1 flex items-end gap-1 min-h-0">
+                  {mrrData.map((d, i) => {
+                    const isLast = i === mrrData.length - 1;
+                    const pct = maxMrr > 0 ? Math.max((d.mrr / maxMrr) * 100, 8) : 8;
+                    return (
+                      <div key={d.label} className="flex flex-col items-center flex-1 min-w-0 max-w-[28px]" title={`${d.label}: ${fmtFull(d.mrr)}`}>
+                        <div className="w-full flex-1 flex items-end">
+                          <div
+                            className="w-full rounded-t-sm transition-all"
+                            style={{
+                              height: `${pct}%`,
+                              backgroundColor: "#34d399",
+                              opacity: isLast ? 0.9 : 0.2 + (i / mrrData.length) * 0.35,
+                            }}
+                          />
                         </div>
-                      );
-                    }}
-                  />
-                  <Bar dataKey="mrr" radius={[3, 3, 0, 0]} barSize={16}>
-                    {chartData.filter(d => d.hasData).map((entry, i, arr) => (
-                      <Cell key={i} fill={i === arr.length - 1 ? "#34d399" : "#34d399"} fillOpacity={i === arr.length - 1 ? 0.9 : 0.3} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+                        <span className="text-[7px] text-zinc-500 mt-0.5 leading-none">{d.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </SecondaryCard>
 
           <SecondaryCard className="flex-1 flex flex-col justify-center p-3">
