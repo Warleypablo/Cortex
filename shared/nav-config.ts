@@ -218,6 +218,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/operacao/tasks': PERMISSION_KEYS.OPS.TASKS_CLIENTES,
   '/operacao/onboardings': PERMISSION_KEYS.OPS.ONBOARDINGS,
   // Tech
+  '/tech': PERMISSION_KEYS.TECH.VISAO_GERAL,
   '/dashboard/tech': PERMISSION_KEYS.TECH.VISAO_GERAL,
   '/tech/projetos': PERMISSION_KEYS.TECH.PROJETOS,
   '/tech/evolucao': PERMISSION_KEYS.TECH.EVOLUCAO,
@@ -452,10 +453,7 @@ export const NAV_CONFIG = {
       title: 'Tech',
       icon: 'Monitor',
       items: [
-        { title: 'Visão Geral', url: '/dashboard/tech', icon: 'Eye', permissionKey: PERMISSION_KEYS.TECH.VISAO_GERAL },
-        { title: 'Projetos', url: '/tech/projetos', icon: 'FolderOpen', permissionKey: PERMISSION_KEYS.TECH.PROJETOS },
-        { title: 'Evolução Mensal', url: '/tech/evolucao', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.TECH.EVOLUCAO },
-        { title: 'Análise Financeira', url: '/tech/financeiro', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.TECH.FINANCEIRO },
+        { title: 'Tech Hub', url: '/tech', icon: 'LayoutDashboard', permissionKey: PERMISSION_KEYS.TECH.VISAO_GERAL },
       ],
     },
   ],
