@@ -78,6 +78,7 @@ const DashboardTech = lazyWithRetry(() => import("@/pages/DashboardTech"));
 const TechProjetos = lazyWithRetry(() => import("@/pages/TechProjetos"));
 const TechEvolucao = lazyWithRetry(() => import("@/pages/TechEvolucao"));
 const TechFinanceiro = lazyWithRetry(() => import("@/pages/TechFinanceiro"));
+const TechHub = lazyWithRetry(() => import("@/pages/TechHub"));
 const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
@@ -208,6 +209,12 @@ function PageSkeleton() {
   );
 }
 
+function RedirectTo({ to }: { to: string }) {
+  const [, setLocation] = useLocation();
+  useEffect(() => { setLocation(to); }, [to, setLocation]);
+  return null;
+}
+
 function ProtectedRoute({ path, component: Component }: { path: string; component: React.ComponentType }) {
   const { user, hasAccess } = useAuth();
 
@@ -314,10 +321,11 @@ function ProtectedRouter() {
       <Route path="/operacao/onboardings">{() => <ProtectedRoute path="/operacao/onboardings" component={OnboardingsClientes} />}</Route>
       
       {/* Tech */}
-      <Route path="/dashboard/tech">{() => <ProtectedRoute path="/dashboard/tech" component={DashboardTech} />}</Route>
-      <Route path="/tech/projetos">{() => <ProtectedRoute path="/tech/projetos" component={TechProjetos} />}</Route>
-      <Route path="/tech/evolucao">{() => <ProtectedRoute path="/tech/evolucao" component={TechEvolucao} />}</Route>
-      <Route path="/tech/financeiro">{() => <ProtectedRoute path="/tech/financeiro" component={TechFinanceiro} />}</Route>
+      <Route path="/tech">{() => <ProtectedRoute path="/tech" component={TechHub} />}</Route>
+      <Route path="/dashboard/tech">{() => <RedirectTo to="/tech" />}</Route>
+      <Route path="/tech/projetos">{() => <RedirectTo to="/tech?section=projetos" />}</Route>
+      <Route path="/tech/evolucao">{() => <RedirectTo to="/tech" />}</Route>
+      <Route path="/tech/financeiro">{() => <RedirectTo to="/tech" />}</Route>
       
       {/* Comercial */}
       <Route path="/dashboard/comercial/closers">{() => <ProtectedRoute path="/dashboard/comercial/closers" component={DashboardClosers} />}</Route>
