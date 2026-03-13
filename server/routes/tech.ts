@@ -116,6 +116,8 @@ async function fetchBulkTimeInStatus(taskIds: string[]): Promise<Record<string, 
           results[item.task_id] = item.status_history;
         }
       }
+    } else {
+      console.warn(`[Tech Sync] Bulk status history batch failed (status ${response.status}), skipping ${batch.length} tasks`);
     }
     if (i + 100 < taskIds.length) {
       await new Promise(resolve => setTimeout(resolve, 1000));
