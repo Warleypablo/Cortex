@@ -19,8 +19,10 @@ function isApprover(user: any): boolean {
 // Zod schemas
 const createSolicitacaoSchema = z.object({
   nome_item: z.string().min(3).max(255),
+  categoria: z.string().min(1),
   valor_unitario: z.number().min(0.01),
   quantidade: z.number().int().min(1),
+  recorrencia: z.enum(["mensal", "anual", "unico"]),
   link_compra: z.string().url(),
   motivo: z.string().min(10),
 });
@@ -56,6 +58,15 @@ async function ensureTable() {
         aprovado_em TIMESTAMP,
         comprado_em TIMESTAMP
       )
+    `);
+    // Migrations: add new columns if missing
+    await db.execute(sql`
+      ALTER TABLE cortex_core.solicitacao_ferramentas
+      ADD COLUMN IF NOT EXISTS recorrencia VARCHAR(20) DEFAULT 'unico'
+    `);
+    await db.execute(sql`
+      ALTER TABLE cortex_core.solicitacao_ferramentas
+      ADD COLUMN IF NOT EXISTS categoria VARCHAR(50)
     `);
     tableInitialized = true;
     console.log("[solicitacao-ferramentas] table initialized");
@@ -157,14 +168,14 @@ export function registerSolicitacaoFerramentasRoutes(app: Express) {
         return res.status(400).json({ message: "Dados inválidos", errors: parsed.error.flatten() });
       }
 
-      const { nome_item, valor_unitario, quantidade, link_compra, motivo } = parsed.data;
+      const { nome_item, categoria, valor_unitario, quantidade, recorrencia, link_compra, motivo } = parsed.data;
       const valor_total = valor_unitario * quantidade;
 
       const result = await db.execute(sql`
         INSERT INTO cortex_core.solicitacao_ferramentas
-          (nome_item, valor_unitario, quantidade, valor_total, link_compra, motivo,
+          (nome_item, categoria, valor_unitario, quantidade, valor_total, recorrencia, link_compra, motivo,
            solicitante_id, solicitante_nome, solicitante_email)
-        VALUES (${nome_item}, ${valor_unitario}, ${quantidade}, ${valor_total},
+        VALUES (${nome_item}, ${categoria}, ${valor_unitario}, ${quantidade}, ${valor_total}, ${recorrencia},
                 ${link_compra}, ${motivo}, ${user.googleId || user.id}, ${user.name}, ${user.email})
         RETURNING *
       `);
