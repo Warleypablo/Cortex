@@ -1,183 +1,97 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { Loader2, FileText, RefreshCw, Play, CheckCircle, XCircle, Clock, AlertTriangle, EyeOff, RotateCcw, CalendarIcon, FileStack, Search, Presentation } from "lucide-react";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-interface PageSelection {
-  cover: boolean;
-  executiveSummary: boolean;
-  investmentChannels: boolean;
-  funnelTraffic: boolean;
-  campaignsRecommendations: boolean;
-}
-import { queryClient } from "@/lib/queryClient";
-import { format, subDays, startOfWeek, endOfWeek, subWeeks } from "date-fns";
-import { ptBR } from "date-fns/locale";
+// Sub-components
+import AutoReportToolbar from "./auto-report/AutoReportToolbar";
+import AutoReportFilters from "./auto-report/AutoReportFilters";
+import AutoReportTable from "./auto-report/AutoReportTable";
+import AutoReportActionBar from "./auto-report/AutoReportActionBar";
+import AutoReportJobsDrawer from "./auto-report/AutoReportJobsDrawer";
+
+// Types and utils
+import type {
+  AutoReportCliente,
+  AutoReportJob,
+  PageSelection,
+  OutputFormat,
+  StatusTab,
+  SortState,
+  SortColumn,
+} from "./auto-report/types";
+import { DEFAULT_PAGE_SELECTION } from "./auto-report/types";
+import {
+  getDefaultDateRange,
+  classifyClientStatus,
+  parseUltimaGeracao,
+} from "./auto-report/utils";
+
 import type { DateRange } from "react-day-picker";
-
-interface AutoReportCliente {
-  rowIndex: number;
-  gerar: boolean;
-  cliente: string;
-  categoria: 'ecommerce' | 'lead_com_site' | 'lead_sem_site' | '';
-  linkPainel: string;
-  linkPasta: string;
-  idGoogleAds: string;
-  idMetaAds: string;
-  idGa4: string;
-  gestor: string;
-  squad: string;
-  status: string;
-  ultimaGeracao: string;
-}
-
-interface AutoReportJob {
-  id: string;
-  clienteNome: string;
-  categoria: string;
-  status: 'pendente' | 'processando' | 'concluido' | 'erro';
-  mensagem?: string;
-  presentationId?: string;
-  presentationUrl?: string;
-  downloadUrl?: string;
-  fileName?: string;
-  criadoEm: string;
-  concluidoEm?: string;
-}
-
-function getCategoriaLabel(categoria: string): string {
-  switch (categoria) {
-    case 'ecommerce': return 'E-commerce';
-    case 'lead_com_site': return 'Lead (Com Site)';
-    case 'lead_sem_site': return 'Lead (Sem Site)';
-    default: return categoria || 'Não definida';
-  }
-}
-
-function getCategoriaBadgeVariant(categoria: string): "default" | "secondary" | "outline" | "destructive" {
-  switch (categoria) {
-    case 'ecommerce': return 'default';
-    case 'lead_com_site': return 'secondary';
-    case 'lead_sem_site': return 'outline';
-    default: return 'outline';
-  }
-}
-
-function getStatusBadge(status: string) {
-  const statusLower = status?.toLowerCase() || '';
-  
-  if (statusLower.includes('conclu') || statusLower.includes('sucesso')) {
-    return <Badge variant="default" className="bg-green-600"><CheckCircle className="w-3 h-3 mr-1" /> Concluído</Badge>;
-  }
-  if (statusLower.includes('process')) {
-    return <Badge variant="secondary"><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Processando</Badge>;
-  }
-  if (statusLower.includes('erro')) {
-    return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" /> Erro</Badge>;
-  }
-  if (statusLower.includes('pend')) {
-    return <Badge variant="outline"><Clock className="w-3 h-3 mr-1" /> Pendente</Badge>;
-  }
-  
-  return <Badge variant="outline">{status || 'Aguardando'}</Badge>;
-}
-
-function getDefaultDateRange(): DateRange {
-  const hoje = new Date();
-  const inicioSemanaPassada = startOfWeek(subWeeks(hoje, 1), { weekStartsOn: 1 });
-  const fimSemanaPassada = endOfWeek(subWeeks(hoje, 1), { weekStartsOn: 1 });
-  return { from: inicioSemanaPassada, to: fimSemanaPassada };
-}
-
-const DEFAULT_PAGE_SELECTION: PageSelection = {
-  cover: true,
-  executiveSummary: true,
-  investmentChannels: true,
-  funnelTraffic: true,
-  campaignsRecommendations: true,
-};
-
-const PAGE_OPTIONS = [
-  { key: 'investmentChannels' as keyof PageSelection, label: 'Investimento & Canais', description: 'Google Ads + Meta Ads', icon: '💰' },
-  { key: 'funnelTraffic' as keyof PageSelection, label: 'Funil & Tráfego', description: 'Métricas GA4', icon: '📊' },
-  { key: 'campaignsRecommendations' as keyof PageSelection, label: 'Campanhas & Recomendações', description: 'Detalhes + Insights', icon: '🎯' },
-];
 
 export default function AutoReport() {
   const { toast } = useToast();
-  const [selectedClientes, setSelectedClientes] = useState<Set<number>>(new Set());
-  const [filtroGestor, setFiltroGestor] = useState<string>('todos');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [hiddenClientes, setHiddenClientes] = useState<Set<number>>(new Set());
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(getDefaultDateRange());
-  const [pageSelection, setPageSelection] = useState<PageSelection>(DEFAULT_PAGE_SELECTION);
-  const [outputFormat, setOutputFormat] = useState<'pdf' | 'slides'>('pdf');
 
-  const togglePage = (key: keyof PageSelection) => {
-    setPageSelection(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  // --- Toolbar state ---
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(
+    getDefaultDateRange()
+  );
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>("slides");
+  const [pageSelection, setPageSelection] =
+    useState<PageSelection>(DEFAULT_PAGE_SELECTION);
 
-  const selectedPagesCount = Object.values(pageSelection).filter(Boolean).length;
+  // --- Filter state ---
+  const [activeTab, setActiveTab] = useState<StatusTab>("todos");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filtroGestor, setFiltroGestor] = useState("todos");
+  const [filtroSquad, setFiltroSquad] = useState("todos");
 
-  const { data: clientes = [], isLoading: loadingClientes, refetch: refetchClientes } = useQuery<AutoReportCliente[]>({
-    queryKey: ['/api/autoreport/clientes'],
+  // --- Selection state ---
+  const [selectedClientes, setSelectedClientes] = useState<Set<number>>(
+    new Set()
+  );
+
+  // --- Table sort ---
+  const [sortState, setSortState] = useState<SortState>({
+    column: null,
+    direction: "asc",
+  });
+
+  // --- Jobs drawer ---
+  const [jobsDrawerOpen, setJobsDrawerOpen] = useState(false);
+
+  // --- Batch tracking ---
+  const [batchClientNames, setBatchClientNames] = useState<string[]>([]);
+  const [batchDone, setBatchDone] = useState(false);
+
+  // ========== React Query ==========
+
+  const {
+    data: clientes = [],
+    isLoading,
+    isError,
+    refetch: refetchClientes,
+  } = useQuery<AutoReportCliente[]>({
+    queryKey: ["/api/autoreport/clientes"],
   });
 
   const { data: jobs = [], refetch: refetchJobs } = useQuery<AutoReportJob[]>({
-    queryKey: ['/api/autoreport/jobs'],
+    queryKey: ["/api/autoreport/jobs"],
     refetchInterval: 5000,
   });
 
-  const gestores = useMemo(() => {
-    const uniqueGestores = new Set(clientes.map(c => c.gestor).filter(Boolean));
-    return Array.from(uniqueGestores).sort();
-  }, [clientes]);
-
-  const formatDateRange = () => {
-    if (!dateRange?.from) return 'Selecionar período';
-    if (!dateRange.to) return format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR });
-    return `${format(dateRange.from, 'dd/MM', { locale: ptBR })} - ${format(dateRange.to, 'dd/MM/yyyy', { locale: ptBR })}`;
-  };
-
-  const setPresetRange = (preset: 'ultima_semana' | 'ultimos_7' | 'ultimos_14' | 'ultimos_30') => {
-    const hoje = new Date();
-    switch (preset) {
-      case 'ultima_semana':
-        setDateRange(getDefaultDateRange());
-        break;
-      case 'ultimos_7':
-        setDateRange({ from: subDays(hoje, 7), to: subDays(hoje, 1) });
-        break;
-      case 'ultimos_14':
-        setDateRange({ from: subDays(hoje, 14), to: subDays(hoje, 1) });
-        break;
-      case 'ultimos_30':
-        setDateRange({ from: subDays(hoje, 30), to: subDays(hoje, 1) });
-        break;
-    }
-  };
+  // ========== Mutations ==========
 
   const gerarRelatorioMutation = useMutation({
     mutationFn: async (cliente: AutoReportCliente): Promise<AutoReportJob> => {
       if (!dateRange?.from || !dateRange?.to) {
-        throw new Error('Selecione um período válido');
+        throw new Error("Selecione um periodo valido");
       }
-      const response = await fetch('/api/autoreport/gerar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
+      const response = await fetch("/api/autoreport/gerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
           cliente,
           dataInicio: dateRange.from.toISOString(),
           dataFim: dateRange.to.toISOString(),
@@ -187,45 +101,52 @@ export default function AutoReport() {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Erro ao gerar relatório');
+        throw new Error(error.error || "Erro ao gerar relatorio");
       }
       return response.json();
     },
     onSuccess: (data: AutoReportJob) => {
-      let description = `Processando relatório de ${data.clienteNome}...`;
-      if (data.status === 'concluido' && data.downloadUrl) {
-        const isPptx = data.fileName?.endsWith('.pptx');
-        description = isPptx 
+      let description = `Processando relatorio de ${data.clienteNome}...`;
+      if (data.status === "concluido" && data.downloadUrl) {
+        const isPptx = data.fileName?.endsWith(".pptx");
+        description = isPptx
           ? `PPTX de ${data.clienteNome} pronto para download.`
           : `PDF de ${data.clienteNome} pronto para download.`;
       }
       toast({
-        title: data.status === 'concluido' ? 'Relatório gerado!' : 'Relatório em processamento',
+        title:
+          data.status === "concluido"
+            ? "Relatorio gerado!"
+            : "Relatorio em processamento",
         description,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/autoreport/jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/autoreport/clientes'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/autoreport/jobs"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/autoreport/clientes"],
+      });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
-        title: 'Erro ao gerar relatório',
-        description: error.message || 'Tente novamente mais tarde.',
-        variant: 'destructive',
+        title: "Erro ao gerar relatorio",
+        description: error.message || "Tente novamente mais tarde.",
+        variant: "destructive",
       });
     },
   });
 
   const gerarLoteMutation = useMutation({
-    mutationFn: async (clientes: AutoReportCliente[]): Promise<AutoReportJob[]> => {
+    mutationFn: async (
+      clientesList: AutoReportCliente[]
+    ): Promise<AutoReportJob[]> => {
       if (!dateRange?.from || !dateRange?.to) {
-        throw new Error('Selecione um período válido');
+        throw new Error("Selecione um periodo valido");
       }
-      const response = await fetch('/api/autoreport/gerar-lote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ 
-          clientes,
+      const response = await fetch("/api/autoreport/gerar-lote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          clientes: clientesList,
           dataInicio: dateRange.from.toISOString(),
           dataFim: dateRange.to.toISOString(),
           pageSelection,
@@ -234,502 +155,269 @@ export default function AutoReport() {
       });
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Erro ao gerar relatórios');
+        throw new Error(error.error || "Erro ao gerar relatorios");
       }
       return response.json();
     },
     onSuccess: (data: AutoReportJob[]) => {
-      const concluidos = data.filter(j => j.status === 'concluido').length;
-      const erros = data.filter(j => j.status === 'erro').length;
-      toast({
-        title: 'Geração em lote concluída',
-        description: `${concluidos} relatórios gerados, ${erros} erros.`,
-      });
+      const concluidos = data.filter((j) => j.status === "concluido").length;
+      const erros = data.filter((j) => j.status === "erro").length;
+      setBatchDone(true);
+      setJobsDrawerOpen(true);
       setSelectedClientes(new Set());
-      queryClient.invalidateQueries({ queryKey: ['/api/autoreport/jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/autoreport/clientes'] });
-    },
-    onError: (error: any) => {
       toast({
-        title: 'Erro na geração em lote',
-        description: error.message || 'Tente novamente mais tarde.',
-        variant: 'destructive',
+        title: "Geracao em lote concluida",
+        description: `${concluidos} relatorios gerados, ${erros} erros.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/autoreport/jobs"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/autoreport/clientes"],
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro na geracao em lote",
+        description: error.message || "Tente novamente mais tarde.",
+        variant: "destructive",
       });
     },
   });
 
-  const toggleCliente = (rowIndex: number) => {
-    const newSelected = new Set(selectedClientes);
-    if (newSelected.has(rowIndex)) {
-      newSelected.delete(rowIndex);
-    } else {
-      newSelected.add(rowIndex);
+  // ========== Computed values ==========
+
+  const gestores = useMemo(
+    () =>
+      Array.from(new Set(clientes.map((c) => c.gestor).filter(Boolean))).sort(),
+    [clientes]
+  );
+
+  const squads = useMemo(
+    () =>
+      Array.from(new Set(clientes.map((c) => c.squad).filter(Boolean))).sort(),
+    [clientes]
+  );
+
+  const clientesValidos = useMemo(
+    () => clientes.filter((c) => c.categoria),
+    [clientes]
+  );
+
+  // Apply search + gestor + squad filters
+  const clientesFiltrados = useMemo(() => {
+    return clientesValidos.filter((c) => {
+      if (filtroGestor !== "todos" && c.gestor !== filtroGestor) return false;
+      if (filtroSquad !== "todos" && c.squad !== filtroSquad) return false;
+      if (
+        searchTerm &&
+        !c.cliente.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+        return false;
+      return true;
+    });
+  }, [clientesValidos, filtroGestor, filtroSquad, searchTerm]);
+
+  // Tab counts (from filtered clients, not tab-filtered)
+  const tabCounts = useMemo(() => {
+    const counts: Record<StatusTab, number> = {
+      todos: 0,
+      pendentes: 0,
+      gerados: 0,
+      com_erro: 0,
+    };
+    counts.todos = clientesFiltrados.length;
+    clientesFiltrados.forEach((c) => {
+      const status = classifyClientStatus(c, dateRange?.from);
+      if (status !== "todos") counts[status]++;
+    });
+    return counts;
+  }, [clientesFiltrados, dateRange]);
+
+  // Apply tab filter
+  const clientesByTab = useMemo(() => {
+    if (activeTab === "todos") return clientesFiltrados;
+    return clientesFiltrados.filter(
+      (c) => classifyClientStatus(c, dateRange?.from) === activeTab
+    );
+  }, [clientesFiltrados, activeTab, dateRange]);
+
+  // Apply sort
+  const clientesSorted = useMemo(() => {
+    const arr = [...clientesByTab];
+    if (!sortState.column) {
+      // Default sort: never generated first, then oldest
+      return arr.sort((a, b) => {
+        const dateA = parseUltimaGeracao(a.ultimaGeracao);
+        const dateB = parseUltimaGeracao(b.ultimaGeracao);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return -1;
+        if (!dateB) return 1;
+        return dateA.getTime() - dateB.getTime();
+      });
     }
-    setSelectedClientes(newSelected);
+    const dir = sortState.direction === "asc" ? 1 : -1;
+    return arr.sort((a, b) => {
+      switch (sortState.column) {
+        case "nome":
+          return a.cliente.localeCompare(b.cliente) * dir;
+        case "gestor":
+          return (a.gestor || "").localeCompare(b.gestor || "") * dir;
+        case "squad":
+          return (a.squad || "").localeCompare(b.squad || "") * dir;
+        case "ultimaGeracao": {
+          const dA = parseUltimaGeracao(a.ultimaGeracao);
+          const dB = parseUltimaGeracao(b.ultimaGeracao);
+          if (!dA && !dB) return 0;
+          if (!dA) return -1 * dir;
+          if (!dB) return 1 * dir;
+          return (dA.getTime() - dB.getTime()) * dir;
+        }
+        default:
+          return 0;
+      }
+    });
+  }, [clientesByTab, sortState]);
+
+  // Batch progress from polling jobs
+  const batchProgress = useMemo(() => {
+    if (batchClientNames.length === 0) return { completed: 0, errors: 0 };
+    let completed = 0;
+    let errors = 0;
+    batchClientNames.forEach((name) => {
+      const job = jobs.find((j) => j.clienteNome === name);
+      if (job?.status === "concluido") completed++;
+      if (job?.status === "erro") errors++;
+    });
+    return { completed, errors };
+  }, [jobs, batchClientNames]);
+
+  // ========== Handlers ==========
+
+  const togglePage = (key: keyof PageSelection) => {
+    setPageSelection((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const selectAllGerar = () => {
-    const toSelect = clientesFiltrados.filter(c => c.gerar && c.categoria).map(c => c.rowIndex);
-    setSelectedClientes(new Set(toSelect));
+  const toggleCliente = (rowIndex: number) => {
+    setSelectedClientes((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowIndex)) next.delete(rowIndex);
+      else next.add(rowIndex);
+      return next;
+    });
+  };
+
+  const handleSelectAll = (rowIndexes: number[]) => {
+    setSelectedClientes((prev) => {
+      const allSelected = rowIndexes.every((r) => prev.has(r));
+      if (allSelected) return new Set(); // deselect all
+      return new Set(rowIndexes);
+    });
+  };
+
+  const handleSort = (column: SortColumn) => {
+    setSortState((prev) => {
+      if (prev.column === column) {
+        if (prev.direction === "asc")
+          return { column, direction: "desc" as const };
+        return { column: null, direction: "asc" as const }; // reset
+      }
+      return { column, direction: "asc" as const };
+    });
+  };
+
+  const handleSelectPendentes = () => {
+    const pendentes = clientesFiltrados
+      .filter((c) => classifyClientStatus(c, dateRange?.from) === "pendentes")
+      .map((c) => c.rowIndex);
+    setSelectedClientes(new Set(pendentes));
   };
 
   const handleGerarLote = () => {
-    const clientesSelecionados = clientes.filter(c => selectedClientes.has(c.rowIndex));
-    if (clientesSelecionados.length === 0) {
-      toast({
-        title: 'Nenhum cliente selecionado',
-        description: 'Selecione pelo menos um cliente para gerar relatórios.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    gerarLoteMutation.mutate(clientesSelecionados);
+    const selected = clientes.filter((c) => selectedClientes.has(c.rowIndex));
+    if (selected.length === 0) return;
+    setBatchClientNames(selected.map((c) => c.cliente));
+    setBatchDone(false);
+    gerarLoteMutation.mutate(selected);
   };
 
-  const hideCliente = (rowIndex: number) => {
-    const newHidden = new Set(hiddenClientes);
-    newHidden.add(rowIndex);
-    setHiddenClientes(newHidden);
-    const newSelected = new Set(selectedClientes);
-    newSelected.delete(rowIndex);
-    setSelectedClientes(newSelected);
-    toast({
-      title: 'Cliente oculto',
-      description: 'O cliente foi removido da lista. Use "Restaurar Ocultos" para trazer de volta.',
-    });
+  const handleRetryJob = (clienteNome: string) => {
+    const cliente = clientes.find((c) => c.cliente === clienteNome);
+    if (cliente) gerarRelatorioMutation.mutate(cliente);
   };
 
-  const restoreHidden = () => {
-    setHiddenClientes(new Set());
-    toast({
-      title: 'Clientes restaurados',
-      description: `${hiddenClientes.size} cliente(s) foram restaurados à lista.`,
-    });
+  const handleDismissBatch = () => {
+    setBatchDone(false);
+    setBatchClientNames([]);
   };
 
-  const clientesValidos = clientes.filter(c => c.categoria);
-  const clientesParaGerar = clientes.filter(c => c.gerar && c.categoria);
-  
-  const clientesFiltrados = useMemo(() => {
-    return clientesValidos.filter(c => {
-      if (hiddenClientes.has(c.rowIndex)) return false;
-      if (filtroGestor !== 'todos' && c.gestor !== filtroGestor) return false;
-      if (searchTerm && !c.cliente.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      return true;
-    });
-  }, [clientesValidos, hiddenClientes, filtroGestor, searchTerm]);
+  // ========== Render ==========
 
   return (
-    <div className="p-6 space-y-6" data-testid="autoreport-page">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Auto Report</h1>
-          <p className="text-muted-foreground">
-            Geração automática de relatórios semanais para clientes
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => { refetchClientes(); refetchJobs(); }}
-            data-testid="button-refresh"
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
-        </div>
-      </div>
+    <div className="p-6 space-y-4 pb-24" data-testid="autoreport-page">
+      <AutoReportToolbar
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        outputFormat={outputFormat}
+        onOutputFormatChange={setOutputFormat}
+        pageSelection={pageSelection}
+        onTogglePage={togglePage}
+        onRefresh={() => {
+          refetchClientes();
+          refetchJobs();
+        }}
+        onOpenJobs={() => setJobsDrawerOpen(true)}
+        isRefreshing={isLoading}
+      />
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Período do Relatório</CardTitle>
-          <CardDescription>Selecione o intervalo de datas para coleta de métricas</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-[260px] justify-start text-left" data-testid="button-date-picker">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formatDateRange()}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPresetRange('ultima_semana')} data-testid="button-preset-semana">
-                Última Semana
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPresetRange('ultimos_7')} data-testid="button-preset-7">
-                Últimos 7 dias
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPresetRange('ultimos_14')} data-testid="button-preset-14">
-                Últimos 14 dias
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setPresetRange('ultimos_30')} data-testid="button-preset-30">
-                Últimos 30 dias
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <AutoReportFilters
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        tabCounts={tabCounts}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        filtroGestor={filtroGestor}
+        onGestorChange={setFiltroGestor}
+        filtroSquad={filtroSquad}
+        onSquadChange={setFiltroSquad}
+        gestores={gestores}
+        squads={squads}
+      />
 
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <FileStack className="w-5 h-5 text-primary" />
-                <CardTitle className="text-base">Configurações do Relatório</CardTitle>
-              </div>
-              <CardDescription>Escolha o formato e as páginas que serão geradas</CardDescription>
-            </div>
-            <RadioGroup 
-              value={outputFormat} 
-              onValueChange={(value: 'pdf' | 'slides') => setOutputFormat(value)}
-              className="flex gap-4"
-            >
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-all ${
-                outputFormat === 'pdf' ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
-              }`}>
-                <RadioGroupItem value="pdf" id="format-pdf" />
-                <Label htmlFor="format-pdf" className="flex items-center gap-2 cursor-pointer">
-                  <FileText className="w-4 h-4" />
-                  <span className="font-medium">PDF</span>
-                </Label>
-              </div>
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-all ${
-                outputFormat === 'slides' ? 'bg-primary/10 border-primary' : 'hover:bg-muted/50'
-              }`}>
-                <RadioGroupItem value="slides" id="format-slides" />
-                <Label htmlFor="format-slides" className="flex items-center gap-2 cursor-pointer">
-                  <Presentation className="w-4 h-4" />
-                  <span className="font-medium">Google Slides</span>
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {outputFormat === 'pdf' && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Páginas do PDF ({selectedPagesCount} de 5 páginas):</p>
-              <div className="flex items-center gap-4 flex-wrap">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50">
-                  <Checkbox checked disabled className="opacity-60" />
-                  <span className="text-sm text-muted-foreground">Capa (obrigatória)</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50">
-                  <Checkbox checked disabled className="opacity-60" />
-                  <span className="text-sm text-muted-foreground">Resumo Executivo (obrigatória)</span>
-                </div>
-                {PAGE_OPTIONS.map((page) => (
-                  <div 
-                    key={page.key}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors ${
-                      pageSelection[page.key] 
-                        ? 'bg-primary/10 border-primary/30' 
-                        : 'bg-muted/30 border-transparent hover:bg-muted/50'
-                    }`}
-                    onClick={() => togglePage(page.key)}
-                    data-testid={`toggle-page-${page.key}`}
-                  >
-                    <Checkbox 
-                      checked={pageSelection[page.key]} 
-                      onClick={(e) => e.stopPropagation()}
-                      onCheckedChange={() => togglePage(page.key)}
-                    />
-                    <div>
-                      <div className="text-sm font-medium">{page.label}</div>
-                      <div className="text-xs text-muted-foreground">{page.description}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {outputFormat === 'slides' && (
-            <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg">
-              <Presentation className="w-8 h-8 text-primary" />
-              <div>
-                <p className="text-sm font-medium">Apresentação Google Slides</p>
-                <p className="text-xs text-muted-foreground">
-                  O relatório será gerado como uma apresentação editável no Google Slides, 
-                  com todos os dados preenchidos automaticamente no template.
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <AutoReportTable
+        clientes={clientesSorted}
+        selectedClientes={selectedClientes}
+        onToggleCliente={toggleCliente}
+        onSelectAll={handleSelectAll}
+        sortState={sortState}
+        onSort={handleSort}
+        onGerarIndividual={(c) => gerarRelatorioMutation.mutate(c)}
+        isGenerating={gerarRelatorioMutation.isPending}
+        isLoading={isLoading}
+        isError={isError}
+        onRetryLoad={() => refetchClientes()}
+        totalClientes={clientesValidos.length}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total de Clientes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-clientes">{clientesValidos.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Marcados para Gerar</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600" data-testid="text-para-gerar">{clientesParaGerar.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Selecionados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary" data-testid="text-selecionados">{selectedClientes.size}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Jobs Recentes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-jobs-recentes">{jobs.length}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <AutoReportActionBar
+        selectedCount={selectedClientes.size}
+        onSelectPendentes={handleSelectPendentes}
+        onClearSelection={() => setSelectedClientes(new Set())}
+        onGerar={handleGerarLote}
+        isGenerating={gerarLoteMutation.isPending}
+        batchTotal={batchClientNames.length}
+        batchCompleted={batchProgress.completed}
+        batchErrors={batchProgress.errors}
+        batchDone={batchDone}
+        onVerDetalhes={() => setJobsDrawerOpen(true)}
+        onDismiss={handleDismissBatch}
+        outputFormat={outputFormat}
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div>
-                <CardTitle>Clientes</CardTitle>
-                <CardDescription>
-                  {clientesFiltrados.length} de {clientesValidos.length} clientes
-                  {hiddenClientes.size > 0 && ` (${hiddenClientes.size} ocultos)`}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Pesquisar cliente..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 w-[180px]"
-                    data-testid="input-search-cliente"
-                  />
-                </div>
-                <Select value={filtroGestor} onValueChange={setFiltroGestor}>
-                  <SelectTrigger className="w-[180px]" data-testid="select-gestor">
-                    <SelectValue placeholder="Filtrar por gestor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os Gestores</SelectItem>
-                    {gestores.map(gestor => (
-                      <SelectItem key={gestor} value={gestor}>{gestor}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {hiddenClientes.size > 0 && (
-                  <Button variant="outline" size="sm" onClick={restoreHidden} data-testid="button-restore-hidden">
-                    <RotateCcw className="w-4 h-4 mr-1" />
-                    Restaurar ({hiddenClientes.size})
-                  </Button>
-                )}
-                <Button variant="outline" size="sm" onClick={selectAllGerar} data-testid="button-select-all">
-                  Selecionar Todos
-                </Button>
-                <Button 
-                  size="sm" 
-                  onClick={handleGerarLote}
-                  disabled={selectedClientes.size === 0 || gerarLoteMutation.isPending}
-                  data-testid="button-gerar-lote"
-                >
-                  {gerarLoteMutation.isPending ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Play className="w-4 h-4 mr-2" />
-                  )}
-                  Gerar ({selectedClientes.size})
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loadingClientes ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : clientesFiltrados.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                {clientesValidos.length === 0 ? (
-                  <>
-                    <p>Nenhum cliente encontrado na planilha central.</p>
-                    <p className="text-sm mt-2">Verifique se a planilha está configurada corretamente.</p>
-                  </>
-                ) : (
-                  <>
-                    <p>Nenhum cliente corresponde aos filtros aplicados.</p>
-                    <p className="text-sm mt-2">Altere o filtro de gestor ou restaure os clientes ocultos.</p>
-                  </>
-                )}
-              </div>
-            ) : (
-              <ScrollArea className="h-[500px]">
-                <div className="space-y-2">
-                  {clientesFiltrados.map((cliente) => (
-                    <div 
-                      key={cliente.rowIndex}
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                        selectedClientes.has(cliente.rowIndex) ? 'bg-primary/5 border-primary/20' : 'hover:bg-muted/50'
-                      }`}
-                      data-testid={`row-cliente-${cliente.rowIndex}`}
-                    >
-                      <Checkbox
-                        checked={selectedClientes.has(cliente.rowIndex)}
-                        onCheckedChange={() => toggleCliente(cliente.rowIndex)}
-                        data-testid={`checkbox-cliente-${cliente.rowIndex}`}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">{cliente.cliente}</span>
-                          {cliente.gerar && (
-                            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                              Auto
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                          <span>{cliente.gestor || 'Sem gestor'}</span>
-                          <span>•</span>
-                          <span>{cliente.squad || 'Sem squad'}</span>
-                        </div>
-                      </div>
-                      <Badge variant={getCategoriaBadgeVariant(cliente.categoria)}>
-                        {getCategoriaLabel(cliente.categoria)}
-                      </Badge>
-                      {getStatusBadge(cliente.status)}
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => gerarRelatorioMutation.mutate(cliente)}
-                          disabled={gerarRelatorioMutation.isPending}
-                          title="Gerar relatório"
-                          data-testid={`button-gerar-${cliente.rowIndex}`}
-                        >
-                          {gerarRelatorioMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <FileText className="w-4 h-4" />
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => hideCliente(cliente.rowIndex)}
-                          title="Ocultar da lista"
-                          data-testid={`button-hide-${cliente.rowIndex}`}
-                        >
-                          <EyeOff className="w-4 h-4 text-muted-foreground" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Jobs Recentes</CardTitle>
-            <CardDescription>Histórico de relatórios gerados</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {jobs.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Nenhum relatório gerado ainda</p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[500px]">
-                <div className="space-y-3">
-                  {jobs.map((job) => (
-                    <div 
-                      key={job.id}
-                      className="p-3 rounded-lg border space-y-2"
-                      data-testid={`job-${job.id}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm truncate">{job.clienteNome}</span>
-                        {job.status === 'concluido' && (
-                          <Badge variant="default" className="bg-green-600">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            OK
-                          </Badge>
-                        )}
-                        {job.status === 'processando' && (
-                          <Badge variant="secondary">
-                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                            ...
-                          </Badge>
-                        )}
-                        {job.status === 'erro' && (
-                          <Badge variant="destructive">
-                            <XCircle className="w-3 h-3 mr-1" />
-                            Erro
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(job.criadoEm).toLocaleString('pt-BR')}
-                      </div>
-                      {job.downloadUrl && (
-                        <a 
-                          href={job.downloadUrl}
-                          download={job.fileName || 'relatorio.pdf'}
-                          className="flex items-center gap-1 text-xs text-primary hover:underline"
-                          data-testid={`link-download-${job.id}`}
-                        >
-                          {job.fileName?.endsWith('.pptx') ? (
-                            <>
-                              <Presentation className="w-3 h-3" />
-                              Baixar PPTX
-                            </>
-                          ) : (
-                            <>
-                              <FileText className="w-3 h-3" />
-                              Baixar PDF
-                            </>
-                          )}
-                        </a>
-                      )}
-                      {job.mensagem && (
-                        <div className="text-xs text-destructive">{job.mensagem}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <AutoReportJobsDrawer
+        open={jobsDrawerOpen}
+        onOpenChange={setJobsDrawerOpen}
+        jobs={jobs}
+        onRetryJob={handleRetryJob}
+      />
     </div>
   );
 }
