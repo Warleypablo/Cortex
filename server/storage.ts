@@ -8545,15 +8545,14 @@ export class DbStorage implements IStorage {
 
     const result = await db.execute(sql.raw(`
       SELECT
-        EXTRACT(YEAR FROM data_entregue::date) AS ano,
-        EXTRACT(QUARTER FROM data_entregue::date) AS trimestre,
-        'Q' || EXTRACT(QUARTER FROM data_entregue::date) || ' ' || EXTRACT(YEAR FROM data_entregue::date) AS label,
+        EXTRACT(YEAR FROM data_entregue) AS ano,
+        EXTRACT(QUARTER FROM data_entregue) AS trimestre,
+        'Q' || EXTRACT(QUARTER FROM data_entregue) || ' ' || EXTRACT(YEAR FROM data_entregue) AS label,
         COUNT(*) AS total_entregas,
-        AVG(CASE WHEN valor_p IS NOT NULL AND valor_p != '' THEN valor_p::numeric / 100.0 ELSE 0 END) AS valor_medio
+        AVG(COALESCE(valor_p, 0) / 100.0) AS valor_medio
       FROM "Clickup".cup_projetos_tech_fechados
       WHERE data_entregue IS NOT NULL
-      AND data_entregue != ''
-      AND data_entregue::date >= NOW() - INTERVAL '${safeMeses} months'
+      AND data_entregue >= (CURRENT_DATE - INTERVAL '${safeMeses} months')
       GROUP BY ano, trimestre
       ORDER BY ano, trimestre
     `));
@@ -8580,13 +8579,12 @@ export class DbStorage implements IStorage {
           p.responsavel,
           p.data_entregue,
           MIN(CASE WHEN h.status_novo ILIKE '%design%' THEN h.data_transicao END) AS inicio_design,
-          EXTRACT(YEAR FROM p.data_entregue::date) AS ano,
-          EXTRACT(QUARTER FROM p.data_entregue::date) AS trimestre
+          EXTRACT(YEAR FROM p.data_entregue) AS ano,
+          EXTRACT(QUARTER FROM p.data_entregue) AS trimestre
         FROM "Clickup".cup_projetos_tech_fechados p
         JOIN "Clickup".cup_status_history h ON h.clickup_task_id = p.clickup_task_id
         WHERE p.data_entregue IS NOT NULL
-        AND p.data_entregue != ''
-        AND p.data_entregue::date >= NOW() - INTERVAL '${safeMeses} months'
+        AND p.data_entregue >= (CURRENT_DATE - INTERVAL '${safeMeses} months')
         GROUP BY p.clickup_task_id, p.responsavel, p.data_entregue
       )
       SELECT
