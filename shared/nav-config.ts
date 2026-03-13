@@ -193,7 +193,6 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/solicitacao-ferramentas': PERMISSION_KEYS.GENERAL.SOLICITACAO_FERRAMENTAS,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   // Financeiro
-  '/dashboard/financeiro': PERMISSION_KEYS.FIN.VISAO_GERAL,
   '/dashboard/dfc': PERMISSION_KEYS.FIN.DFC,
   '/dashboard/fluxo-caixa': PERMISSION_KEYS.FIN.FLUXO_CAIXA,
   '/dashboard/revenue-goals': PERMISSION_KEYS.FIN.REVENUE_GOALS,

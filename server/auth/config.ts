@@ -63,7 +63,6 @@ export function configurePassport() {
             '/ferramentas',
             '/turbozap',
             '/visao-geral',
-            '/dashboard/financeiro',
             '/dashboard/geg',
             '/dashboard/inhire',
             '/dashboard/recrutamento',
