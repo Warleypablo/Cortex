@@ -112,6 +112,7 @@ export interface TurboMetrics {
   crosssellPontual: number;
   cxcsSolicitacoes: number;
   faturamentoPontual: number;
+  pontualCommerceQtr: number;
   churnMetaMensal: number;
   receitaChurnSeries: ReceitaChurnMes[];
   retencoesSolicitacoesCount: number;

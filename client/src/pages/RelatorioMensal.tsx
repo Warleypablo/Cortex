@@ -220,7 +220,7 @@ export default function RelatorioMensal() {
       case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
       case 9: return <SlideCapaCommerce />;
       case 10: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 11: return <SlideTurboCommerce ano={ano} mes={mes} okrObjectives={data.okrObjectives} mrrAtivo={data.turboMetrics.mrrAtivo} />;
+      case 11: return <SlideTurboCommerce ano={ano} mes={mes} okrObjectives={data.okrObjectives} mrrAtivo={data.turboMetrics.mrrAtivo} pontualCommerceQtr={data.turboMetrics.pontualCommerceQtr} />;
       case 12: return <SlideRankingSquads ranking={data.rankingSquads} />;
       case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
       case 14: return <SlideCapaTech />;
