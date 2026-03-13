@@ -273,22 +273,27 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
               const mrrData = chartData.filter(d => d.hasData && d.mrr > 0);
               if (mrrData.length === 0) return null;
               const maxMrr = Math.max(...mrrData.map(d => d.mrr));
+              const BAR_AREA_H = 60; // px fixo para a área das barras
               return (
-                <div className="flex-1 flex items-end gap-1 min-h-0">
+                <div className="flex items-end gap-[3px] mt-auto" style={{ height: BAR_AREA_H + 14 }}>
                   {mrrData.map((d, i) => {
                     const isLast = i === mrrData.length - 1;
-                    const pct = maxMrr > 0 ? Math.max((d.mrr / maxMrr) * 100, 8) : 8;
+                    const barH = maxMrr > 0 ? Math.max(Math.round((d.mrr / maxMrr) * BAR_AREA_H), 12) : 12;
+                    const opacity = isLast ? 0.95 : 0.2 + (i / mrrData.length) * 0.4;
                     return (
-                      <div key={d.label} className="flex flex-col items-center flex-1 min-w-0 max-w-[28px]" title={`${d.label}: ${fmtFull(d.mrr)}`}>
-                        <div className="w-full flex-1 flex items-end">
-                          <div
-                            className="w-full rounded-t-sm transition-all"
-                            style={{
-                              height: `${pct}%`,
-                              backgroundColor: "#34d399",
-                              opacity: isLast ? 0.9 : 0.2 + (i / mrrData.length) * 0.35,
-                            }}
-                          />
+                      <div key={d.label} className="flex flex-col items-center" style={{ width: 22 }} title={`${d.label}: ${fmtFull(d.mrr)}`}>
+                        <div
+                          className="w-full rounded-t-sm relative overflow-hidden flex items-center justify-center"
+                          style={{ height: barH, backgroundColor: "#34d399", opacity }}
+                        >
+                          {barH >= 30 && (
+                            <span
+                              className="text-[6px] font-bold text-white/80 whitespace-nowrap"
+                              style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                            >
+                              {fmtBRL(d.mrr)}
+                            </span>
+                          )}
                         </div>
                         <span className="text-[7px] text-zinc-500 mt-0.5 leading-none">{d.label}</span>
                       </div>
