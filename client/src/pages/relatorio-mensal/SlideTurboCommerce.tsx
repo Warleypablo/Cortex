@@ -17,6 +17,7 @@ interface Props {
   mes: number;
   okrObjectives?: ObjectiveSlide[];
   mrrAtivo?: number;
+  pontualCommerceQtr?: number;
 }
 
 function formatBRL(value: number): string {
@@ -29,9 +30,13 @@ function getActualForKey(
   key: string,
   okrObjectives?: ObjectiveSlide[],
   mrrAtivo?: number,
+  pontualCommerceQtr?: number,
 ): { value: number | null; unit: "BRL" | "PCT" } {
   if (key === "mrr_commerce" && mrrAtivo != null) {
     return { value: mrrAtivo, unit: "BRL" };
+  }
+  if (key === "pontual_commerce" && pontualCommerceQtr != null) {
+    return { value: pontualCommerceQtr, unit: "BRL" };
   }
   const mapping = KEY_TO_KR[key];
   if (!mapping || !okrObjectives) return { value: null, unit: "BRL" };
@@ -61,7 +66,7 @@ function getAchievementColor(
   return "text-red-400";
 }
 
-export default function SlideTurboCommerce({ ano, mes, okrObjectives, mrrAtivo }: Props) {
+export default function SlideTurboCommerce({ ano, mes, okrObjectives, mrrAtivo, pontualCommerceQtr }: Props) {
   const qKey = getQuarterKey(ano, mes);
   const quarter = TURBO_COMMERCE_TARGETS[qKey];
 
@@ -87,7 +92,7 @@ export default function SlideTurboCommerce({ ano, mes, okrObjectives, mrrAtivo }
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 auto-rows-min">
         {quarter.items.map((item) => {
-          const { value: actual, unit: actualUnit } = getActualForKey(item.key, okrObjectives, mrrAtivo);
+          const { value: actual, unit: actualUnit } = getActualForKey(item.key, okrObjectives, mrrAtivo, pontualCommerceQtr);
           const direction = (item.key === "churn" || item.key === "inadimplencia") ? "lte" as const : "gte" as const;
           const mapping = KEY_TO_KR[item.key];
           const achievementTarget = mapping?.brlTarget ?? item.target;
