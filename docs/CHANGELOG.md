@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-03-13 | feat(tech): create ProjectCard and PrazoStatusBar components
+
+**O que foi feito:**
+- Criado componente `ProjectCard` com borda de urgência, badges de status/fase/tipo, barra de progresso do prazo e tags de alerta
+- Criado componente `PrazoStatusBar` com segmentos proporcionais coloridos mostrando tempo em cada fase de status
+
+**Por que:**
+- Componentes reutilizáveis necessários para as views Board (Kanban) e Projetos do TechHub
+
+**Arquivos alterados:**
+- `client/src/components/tech/ProjectCard.tsx` - Componente de card de projeto com visual rico e suporte dark/light mode
+- `client/src/components/tech/PrazoStatusBar.tsx` - Barra horizontal empilhada com tempo por status
+
+**Impacto arquitetural:** Nenhum — novos componentes isolados em `components/tech/`
+
+---
+
 ## 2026-03-11 | fix(growth): show last 12 months in orcado-realizado month selector
 
 **O que foi feito:**
