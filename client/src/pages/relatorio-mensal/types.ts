@@ -75,6 +75,14 @@ export interface Indicacoes {
   valorPontual: number;
 }
 
+export interface VendasMes {
+  month: string;
+  label: string;
+  vendasMrr: number;
+  vendasPontual: number;
+  numContratos: number;
+}
+
 export interface ContratosMes {
   numContratos: number;
   contratosRecorrente: number;
@@ -84,6 +92,7 @@ export interface ContratosMes {
   tmRecorrente: number;
   tmPontual: number;
   pipelineBreakdown: PipelineBreakdown[];
+  vendasSeries: VendasMes[];
 }
 
 export interface TurboMetrics {
