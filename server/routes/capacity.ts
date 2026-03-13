@@ -26,7 +26,8 @@ export function registerCapacityRoutes(app: Express, db: any) {
       // 1) Buscar gestores ativos + contratos via fuzzy match
       const result = await db.execute(sql`
         WITH gestores AS (
-          SELECT nome, cargo, nivel, squad
+          SELECT nome, cargo, nivel,
+            TRIM(regexp_replace(squad, '^[^a-zA-ZÀ-ÿ]+', '')) as squad
           FROM "Inhire".rh_pessoal
           WHERE cargo = 'Gestor de Performance'
             AND status = 'Ativo'
