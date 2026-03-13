@@ -100,6 +100,80 @@ async function fetchAllClickUpTasks(listId: string): Promise<ClickUpTask[]> {
   return allTasks;
 }
 
+async function fetchBulkTimeInStatus(taskIds: string[]): Promise<Record<string, any>> {
+  const results: Record<string, any> = {};
+  for (let i = 0; i < taskIds.length; i += 100) {
+    const batch = taskIds.slice(i, i + 100);
+    const queryParams = batch.map(id => `task_ids=${id}`).join('&');
+    const response = await fetch(
+      `https://api.clickup.com/api/v2/task/bulk_time_in_status/task_ids?${queryParams}`,
+      { headers: { Authorization: CLICKUP_API_KEY || '' } }
+    );
+    if (response.ok) {
+      const data = await response.json();
+      if (data.data) {
+        for (const item of data.data) {
+          results[item.task_id] = item.status_history;
+        }
+      }
+    }
+    if (i + 100 < taskIds.length) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  return results;
+}
+
+async function syncStatusHistory(db: any, taskIds: string[], taskCreationDates: Record<string, string>) {
+  const bulkData = await fetchBulkTimeInStatus(taskIds);
+
+  await db.execute(sql`TRUNCATE TABLE "Clickup".cup_status_history`);
+
+  for (const [taskId, statusData] of Object.entries(bulkData)) {
+    if (!statusData) continue;
+
+    const entries: Array<{status: string, totalTime: number, orderindex: number}> = [];
+
+    for (const [statusName, info] of Object.entries(statusData as Record<string, any>)) {
+      if (info.status_history) {
+        for (const hist of info.status_history) {
+          entries.push({
+            status: statusName.toLowerCase(),
+            totalTime: parseInt(hist.total_time) || 0,
+            orderindex: parseInt(hist.orderindex) || 0,
+          });
+        }
+      } else {
+        entries.push({
+          status: statusName.toLowerCase(),
+          totalTime: parseInt(info.total_time) || 0,
+          orderindex: parseInt(info.orderindex) || 0,
+        });
+      }
+    }
+
+    entries.sort((a, b) => a.orderindex - b.orderindex);
+
+    const creationDate = taskCreationDates[taskId];
+    let cumulativeMs = 0;
+    const baseTime = creationDate ? new Date(parseInt(creationDate)).getTime() : Date.now();
+
+    for (let i = 0; i < entries.length; i++) {
+      const prev = i > 0 ? entries[i - 1].status : null;
+      const curr = entries[i];
+      const transicaoDate = new Date(baseTime + cumulativeMs);
+
+      await db.execute(sql`
+        INSERT INTO "Clickup".cup_status_history
+        (clickup_task_id, status_anterior, status_novo, data_transicao, duracao_ms)
+        VALUES (${taskId}, ${prev}, ${curr.status}, ${transicaoDate}, ${curr.totalTime})
+      `);
+
+      cumulativeMs += curr.totalTime;
+    }
+  }
+}
+
 export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
   // Tech Dashboard API routes
 
@@ -353,12 +427,22 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
         }
       });
 
+      // Sync status history (bulk API, all tasks)
+      const allTaskIds = tasks.map((t: any) => t.id);
+      const taskCreationDates: Record<string, string> = {};
+      for (const t of tasks) {
+        taskCreationDates[t.id] = t.date_created || '';
+      }
+      await syncStatusHistory(db, allTaskIds, taskCreationDates);
+      console.log(`[tech-sync] Status history synced for ${allTaskIds.length} tasks`);
+
       console.log(`[tech-sync] Done: ${openRows.length} open, ${closedRows.length} closed`);
       res.json({
         success: true,
         total: tasks.length,
         open: openRows.length,
         closed: closedRows.length,
+        statusHistorySynced: allTaskIds.length,
       });
     } catch (error: any) {
       console.error("[tech-sync] Error:", error?.message || error);
