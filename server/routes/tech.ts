@@ -174,6 +174,76 @@ async function syncStatusHistory(db: any, taskIds: string[], taskCreationDates: 
   }
 }
 
+async function fetchTaskComments(taskId: string): Promise<any[]> {
+  const comments: any[] = [];
+  let startId: string | undefined;
+
+  while (true) {
+    let url = `https://api.clickup.com/api/v2/task/${taskId}/comment?`;
+    if (startId) url += `start_id=${startId}&`;
+
+    const response = await fetch(url, {
+      headers: { Authorization: CLICKUP_API_KEY || '' }
+    });
+
+    if (!response.ok) break;
+    const data = await response.json();
+    if (!data.comments || data.comments.length === 0) break;
+
+    comments.push(...data.comments);
+
+    if (data.comments.length < 25) break;
+    startId = data.comments[data.comments.length - 1].id;
+  }
+
+  return comments;
+}
+
+function extractTags(text: string): string[] {
+  if (!text) return [];
+  const lower = text.toLowerCase();
+  const tags: string[] = [];
+
+  if (/bloqueio|bloqueado|impedimento|impedido/.test(lower)) {
+    tags.push('bloqueio');
+  }
+  if (/pendência|pendencia|aguardando cliente|aguardando aprovação|aguardando aprovacao/.test(lower)) {
+    tags.push('pendencia_cliente');
+  }
+  if (/atraso|risco|urgente|crítico|critico/.test(lower)) {
+    tags.push('alerta');
+  }
+
+  return tags;
+}
+
+async function syncComments(db: any, openTaskIds: string[]) {
+  for (const taskId of openTaskIds) {
+    const comments = await fetchTaskComments(taskId);
+
+    for (const comment of comments) {
+      const text = Array.isArray(comment.comment_text)
+        ? comment.comment_text.map((c: any) => c.text || '').join('')
+        : (comment.comment_text || '');
+
+      const tags = extractTags(text);
+      const autor = comment.user?.username || comment.user?.email || 'unknown';
+      const dataCriacao = comment.date ? new Date(parseInt(comment.date)) : null;
+
+      await db.execute(sql`
+        INSERT INTO "Clickup".cup_comentarios
+        (clickup_task_id, clickup_comment_id, autor, texto, data_criacao, tags_extraidas)
+        VALUES (${taskId}, ${comment.id}, ${autor}, ${text}, ${dataCriacao}, ${tags})
+        ON CONFLICT (clickup_comment_id) DO UPDATE SET
+          texto = EXCLUDED.texto,
+          tags_extraidas = EXCLUDED.tags_extraidas
+      `);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+}
+
 export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
   // Tech Dashboard API routes
 
@@ -436,6 +506,11 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
       await syncStatusHistory(db, allTaskIds, taskCreationDates);
       console.log(`[tech-sync] Status history synced for ${allTaskIds.length} tasks`);
 
+      // Sync comments (open projects only)
+      const openTaskIds = openTasks.map((t: any) => t.id);
+      await syncComments(db, openTaskIds);
+      console.log(`[tech-sync] Comments synced for ${openTaskIds.length} open tasks`);
+
       console.log(`[tech-sync] Done: ${openRows.length} open, ${closedRows.length} closed`);
       res.json({
         success: true,
@@ -443,6 +518,7 @@ export function registerTechRoutes(app: Express, db: any, storage: IStorage) {
         open: openRows.length,
         closed: closedRows.length,
         statusHistorySynced: allTaskIds.length,
+        commentsSynced: openTaskIds.length,
       });
     } catch (error: any) {
       console.error("[tech-sync] Error:", error?.message || error);
