@@ -117,7 +117,6 @@ const BpProdutos = lazyWithRetry(() => import("@/pages/BpProdutos"));
 const AdminNotificationRules = lazyWithRetry(() => import("@/pages/AdminNotificationRules"));
 const AdminDesignSystem = lazyWithRetry(() => import("@/pages/AdminDesignSystem"));
 const Calendario = lazyWithRetry(() => import("@/pages/Calendario"));
-const OnboardingRH = lazyWithRetry(() => import("@/pages/OnboardingRH"));
 const OnboardingsClientes = lazyWithRetry(() => import("@/pages/OnboardingsClientes"));
 const PesquisasGG = lazyWithRetry(() => import("@/pages/PesquisasGG"));
 const NpsPesquisa = lazyWithRetry(() => import("@/pages/NpsPesquisa"));
@@ -306,7 +305,6 @@ function ProtectedRouter() {
       <Route path="/dashboard/geg">{() => <ProtectedRoute path="/dashboard/geg" component={DashboardGeG} />}</Route>
       <Route path="/dashboard/inhire">{() => <ProtectedRoute path="/dashboard/inhire" component={DashboardInhire} />}</Route>
       <Route path="/dashboard/recrutamento">{() => <ProtectedRoute path="/dashboard/recrutamento" component={DashboardRecrutamento} />}</Route>
-      <Route path="/rh/onboarding">{() => <ProtectedRoute path="/rh/onboarding" component={OnboardingRH} />}</Route>
       <Route path="/rh/pesquisas">{() => <ProtectedRoute path="/rh/pesquisas" component={PesquisasGG} />}</Route>
       <Route path="/rh/nps/responder">{() => <ProtectedRoute path="/rh/nps/responder" component={NpsPesquisa} />}</Route>
       <Route path="/gg/calendario-ferias">{() => <ProtectedRoute path="/gg/calendario-ferias" component={CalendarioFerias} />}</Route>
