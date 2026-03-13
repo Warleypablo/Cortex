@@ -8467,7 +8467,7 @@ export class DbStorage implements IStorage {
       tipoFilter = `WHERE tipo_evento = 'status'`;
     }
 
-    const safeTaskId = taskId.replace(/'/g, "''");
+    const safeTaskId = taskId.replace(/['"%;\\]/g, '');
 
     const result = await db.execute(sql.raw(`
       SELECT * FROM (

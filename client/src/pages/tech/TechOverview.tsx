@@ -194,7 +194,7 @@ export default function TechOverview() {
   // ── Render ─────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* ── KPI Cards ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <KPICard
