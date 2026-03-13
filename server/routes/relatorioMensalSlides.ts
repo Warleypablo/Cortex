@@ -152,6 +152,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         okrHeadcountResult,
         okrPrazoResult,
         vendasSeriesResult,
+        pontualCommerceQtrResult,
       ] = await Promise.all([
         // 1. Novos colaboradores (admitidos no mês de dados)
         db.execute(sql`
@@ -726,6 +727,16 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           GROUP BY TO_CHAR(d.data_fechamento, 'YYYY-MM')
           ORDER BY month
         `),
+
+        // 28. Pontual Commerce acumulado no trimestre (cup_contratos data_entrega)
+        db.execute(sql`
+          SELECT COALESCE(SUM(valorp::numeric), 0) as pontual_commerce_qtr
+          FROM "Clickup".cup_contratos
+          WHERE data_entrega >= ${`${anoDados}-${String(quarterStartMonth).padStart(2, '0')}-01`}
+            AND data_entrega < ${dataEnd}
+            AND valorp IS NOT NULL
+            AND valorp::numeric > 0
+        `),
       ]);
 
       // Build closer photo map
@@ -938,6 +949,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         crosssellPontual: parseFloat(turboCxcs.crosssell_pontual) || 0,
         cxcsSolicitacoes: parseInt(turboCxcs.solicitacoes) || 0,
         faturamentoPontual: parseFloat(turboFat.faturamento_pontual) || 0,
+        pontualCommerceQtr: parseFloat((pontualCommerceQtrResult.rows as any[])[0]?.pontual_commerce_qtr) || 0,
         churnMetaMensal,
         receitaChurnSeries,
         retencoesSolicitacoesCount: parseInt(turboRetencoes.solicitacoes_count) || 0,
