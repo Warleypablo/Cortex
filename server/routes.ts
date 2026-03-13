@@ -26,6 +26,7 @@ import { registerDRERoutes } from "./routes/dre";
 import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
+import { registerTechHubRoutes } from "./routes/tech-hub";
 import { registerRelatorioMensalRoutes } from "./routes/relatorioMensal";
 import { registerRelatorioMensalSlidesRoutes } from "./routes/relatorioMensalSlides";
 import { registerChatRoutes } from "./routes/chat";
@@ -6870,6 +6871,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Tech Module - registered from separate file
   registerTechRoutes(app, db, storage);
+  registerTechHubRoutes(app, db, storage);
 
   // Relatório Mensal PDF - registered from separate file
   registerRelatorioMensalRoutes(app, db);
