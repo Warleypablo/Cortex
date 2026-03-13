@@ -246,7 +246,6 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
   '/dashboard/recrutamento': PERMISSION_KEYS.GG.RECRUTAMENTO,
-  '/rh/onboarding': PERMISSION_KEYS.GG.ONBOARDING,
   '/rh/pesquisas': PERMISSION_KEYS.GG.PESQUISAS,
   '/colaboradores': PERMISSION_KEYS.GG.COLABORADORES,
   '/colaboradores/analise': PERMISSION_KEYS.GG.COLABORADORES,
@@ -466,7 +465,6 @@ export const NAV_CONFIG = {
       { title: 'Visão Geral', url: '/dashboard/geg', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GG.VISAO_GERAL },
       { title: 'Colaboradores', url: '/colaboradores', icon: 'UserCog', permissionKey: PERMISSION_KEYS.GG.COLABORADORES },
       { title: 'Recrutamento', url: '/dashboard/recrutamento', icon: 'UserPlus', permissionKey: PERMISSION_KEYS.GG.RECRUTAMENTO },
-      { title: 'Onboarding', url: '/rh/onboarding', icon: 'ClipboardList', permissionKey: PERMISSION_KEYS.GG.ONBOARDING },
       { title: 'Pesquisas', url: '/rh/pesquisas', icon: 'BarChart2', permissionKey: PERMISSION_KEYS.GG.PESQUISAS },
       { title: 'Patrimônio', url: '/patrimonio', icon: 'Building2', permissionKey: PERMISSION_KEYS.GG.PATRIMONIO },
       { title: 'Calendário de Férias', url: '/gg/calendario-ferias', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GG.CALENDARIO_FERIAS },
