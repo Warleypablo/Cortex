@@ -8422,6 +8422,38 @@ export class DbStorage implements IStorage {
     }));
   }
 
+  // ============== TECH HUB ==============
+
+  async getTechBoard(status?: string, tipo?: string, prioridade?: string): Promise<any[]> {
+    const sanitize = (v: string) => v.replace(/['"%;\\]/g, '');
+
+    const conditions: string[] = [];
+    if (status) conditions.push(`p.status_projeto ILIKE '%${sanitize(status)}%'`);
+    if (tipo) conditions.push(`p.tipo ILIKE '%${sanitize(tipo)}%'`);
+    if (prioridade) conditions.push(`p.prioridade ILIKE '%${sanitize(prioridade)}%'`);
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const result = await db.execute(sql.raw(`
+      SELECT
+        p.*,
+        COALESCE(
+          (SELECT array_agg(DISTINCT tag)
+           FROM "Clickup".cup_comentarios c, unnest(c.tags_extraidas) AS tag
+           WHERE c.clickup_task_id = p.clickup_task_id),
+          '{}'
+        ) AS tags_ativas,
+        (SELECT MIN(data_transicao)
+         FROM "Clickup".cup_status_history h
+         WHERE h.clickup_task_id = p.clickup_task_id
+         AND h.status_novo ILIKE '%design%') AS data_inicio_prazo
+      FROM "Clickup".cup_projetos_tech p
+      ${whereClause}
+      ORDER BY p.responsavel, p.data_vencimento ASC
+    `));
+    return result.rows;
+  }
+
   // ============== INADIMPLÊNCIA ==============
 
   async getInadimplenciaResumo(dataInicio?: string, dataFim?: string): Promise<{
