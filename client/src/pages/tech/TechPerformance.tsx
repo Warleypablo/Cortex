@@ -37,25 +37,24 @@ export default function TechPerformance() {
     },
   });
 
-  // Fetch deploy by PO (all POs in one call without responsavel filter)
+  // Fetch deploy by PO (parallel requests instead of sequential N+1)
   const { data: deployByPO = [] } = useQuery({
     queryKey: ['/api/tech/tempo-deploy', periodo, 'all-pos'],
     queryFn: async () => {
-      const res = await fetch(`/api/tech/board`);
+      const res = await fetch('/api/tech/board');
       if (!res.ok) return [];
       const columns = await res.json();
-      const results = [];
-      for (const col of columns) {
-        const poRes = await fetch(`/api/tech/tempo-deploy?meses=${periodo}&responsavel=${encodeURIComponent(col.responsavel)}`);
-        if (poRes.ok) {
+      const poResults = await Promise.all(
+        columns.map(async (col: any) => {
+          const poRes = await fetch(`/api/tech/tempo-deploy?meses=${periodo}&responsavel=${encodeURIComponent(col.responsavel)}`);
+          if (!poRes.ok) return null;
           const poData = await poRes.json();
-          if (poData.length > 0) {
-            const avgDays = poData.reduce((sum: number, d: any) => sum + (parseFloat(d.media_dias) || 0), 0) / poData.length;
-            results.push({ responsavel: col.responsavel, media_dias: Math.round(avgDays * 10) / 10 });
-          }
-        }
-      }
-      return results.sort((a: any, b: any) => b.media_dias - a.media_dias);
+          if (poData.length === 0) return null;
+          const avgDays = poData.reduce((sum: number, d: any) => sum + (parseFloat(d.media_dias) || 0), 0) / poData.length;
+          return { responsavel: col.responsavel, media_dias: Math.round(avgDays * 10) / 10 };
+        })
+      );
+      return poResults.filter(Boolean).sort((a: any, b: any) => b.media_dias - a.media_dias);
     },
     enabled: viewMode === 'por-po',
   });
