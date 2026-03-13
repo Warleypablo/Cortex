@@ -64,7 +64,6 @@ const TurboZap = lazyWithRetry(() => import("@/pages/TurboZap"));
 const Atendimento = lazyWithRetry(() => import("@/pages/Atendimento"));
 const ChatAtendimento = lazyWithRetry(() => import("@/pages/ChatAtendimento"));
 const VisaoGeral = lazyWithRetry(() => import("@/pages/VisaoGeral"));
-const DashboardFinanceiro = lazyWithRetry(() => import("@/pages/DashboardFinanceiro"));
 const DashboardGeG = lazyWithRetry(() => import("@/pages/DashboardGeG"));
 const CalendarioFerias = lazyWithRetry(() => import("@/pages/CalendarioFerias"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
@@ -135,6 +134,7 @@ const AnaliseSquads = lazyWithRetry(() => import("@/pages/AnaliseSquads"));
 const SaudeBaseAtiva = lazyWithRetry(() => import("@/pages/SaudeBaseAtiva"));
 const AutoReport = lazyWithRetry(() => import("@/pages/AutoReport"));
 const Chamados = lazyWithRetry(() => import("@/pages/Chamados"));
+const SolicitacaoFerramentas = lazyWithRetry(() => import("@/pages/SolicitacaoFerramentas"));
 const Capacity = lazyWithRetry(() => import("@/pages/Capacity"));
 const PortalCliente = PortalClientePage;
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
@@ -279,6 +279,7 @@ function ProtectedRouter() {
       <Route path="/sugestoes">{() => <ProtectedRoute path="/sugestoes" component={Sugestoes} />}</Route>
       <Route path="/processos-internos">{() => <ProtectedRoute path="/processos-internos" component={ProcessosInternos} />}</Route>
       <Route path="/chamados">{() => <ProtectedRoute path="/chamados" component={Chamados} />}</Route>
+      <Route path="/solicitacao-ferramentas">{() => <ProtectedRoute path="/solicitacao-ferramentas" component={SolicitacaoFerramentas} />}</Route>
       <Route path="/cases/chat">{() => <ProtectedRoute path="/cases/chat" component={CasesChat} />}</Route>
       
       {/* Operação */}
@@ -291,7 +292,6 @@ function ProtectedRouter() {
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       
       {/* Financeiro */}
-      <Route path="/dashboard/financeiro">{() => <ProtectedRoute path="/dashboard/financeiro" component={DashboardFinanceiro} />}</Route>
       <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
       <Route path="/dashboard/fluxo-caixa">{() => <ProtectedRoute path="/dashboard/fluxo-caixa" component={FluxoCaixa} />}</Route>
       <Route path="/dashboard/revenue-goals">{() => <ProtectedRoute path="/dashboard/revenue-goals" component={RevenueGoals} />}</Route>
