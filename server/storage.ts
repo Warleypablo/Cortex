@@ -8511,6 +8511,101 @@ export class DbStorage implements IStorage {
     return result.rows;
   }
 
+  async getTechPrazoPorStatus(responsavel?: string): Promise<any[]> {
+    const sanitize = (v: string) => v.replace(/['"%;\\]/g, '');
+    let responsavelFilter = '';
+
+    if (responsavel) {
+      responsavelFilter = `AND p.responsavel ILIKE '%${sanitize(responsavel)}%'`;
+    }
+
+    const query = `
+      SELECT
+        h.status_novo AS status,
+        AVG(h.duracao_ms) / 86400000.0 AS media_dias,
+        COUNT(*) AS total_transicoes
+      FROM "Clickup".cup_status_history h
+      LEFT JOIN (
+        SELECT clickup_task_id, responsavel FROM "Clickup".cup_projetos_tech
+        UNION ALL
+        SELECT clickup_task_id, responsavel FROM "Clickup".cup_projetos_tech_fechados
+      ) p ON p.clickup_task_id = h.clickup_task_id
+      WHERE h.duracao_ms > 0
+      ${responsavelFilter}
+      GROUP BY h.status_novo
+      ORDER BY AVG(h.duracao_ms) DESC
+    `;
+
+    const result = await db.execute(sql.raw(query));
+    return result.rows;
+  }
+
+  async getTechEntregasTrimestre(meses: number = 12): Promise<any[]> {
+    const safeMeses = Math.max(1, Math.min(Math.floor(meses) || 12, 60));
+
+    const result = await db.execute(sql.raw(`
+      SELECT
+        EXTRACT(YEAR FROM data_entregue::date) AS ano,
+        EXTRACT(QUARTER FROM data_entregue::date) AS trimestre,
+        'Q' || EXTRACT(QUARTER FROM data_entregue::date) || ' ' || EXTRACT(YEAR FROM data_entregue::date) AS label,
+        COUNT(*) AS total_entregas,
+        AVG(CASE WHEN valor_p IS NOT NULL AND valor_p != '' THEN valor_p::numeric / 100.0 ELSE 0 END) AS valor_medio
+      FROM "Clickup".cup_projetos_tech_fechados
+      WHERE data_entregue IS NOT NULL
+      AND data_entregue != ''
+      AND data_entregue::date >= NOW() - INTERVAL '${safeMeses} months'
+      GROUP BY ano, trimestre
+      ORDER BY ano, trimestre
+    `));
+    return result.rows;
+  }
+
+  async getTechTempoDeploy(meses: number = 12, responsavel?: string): Promise<any[]> {
+    const safeMeses = Math.max(1, Math.min(Math.floor(meses) || 12, 60));
+    const sanitize = (v: string) => v.replace(/['"%;\\]/g, '');
+    let responsavelFilter = '';
+    let groupByResponsavel = 'NULL AS responsavel';
+    let groupByClause = 'GROUP BY ano, trimestre';
+
+    if (responsavel) {
+      responsavelFilter = `AND responsavel ILIKE '%${sanitize(responsavel)}%'`;
+      groupByResponsavel = 'responsavel';
+      groupByClause = 'GROUP BY ano, trimestre, responsavel';
+    }
+
+    const query = `
+      WITH deploy_times AS (
+        SELECT
+          p.clickup_task_id,
+          p.responsavel,
+          p.data_entregue,
+          MIN(CASE WHEN h.status_novo ILIKE '%design%' THEN h.data_transicao END) AS inicio_design,
+          EXTRACT(YEAR FROM p.data_entregue::date) AS ano,
+          EXTRACT(QUARTER FROM p.data_entregue::date) AS trimestre
+        FROM "Clickup".cup_projetos_tech_fechados p
+        JOIN "Clickup".cup_status_history h ON h.clickup_task_id = p.clickup_task_id
+        WHERE p.data_entregue IS NOT NULL
+        AND p.data_entregue != ''
+        AND p.data_entregue::date >= NOW() - INTERVAL '${safeMeses} months'
+        GROUP BY p.clickup_task_id, p.responsavel, p.data_entregue
+      )
+      SELECT
+        'Q' || trimestre || ' ' || ano AS label,
+        ano, trimestre,
+        ${groupByResponsavel},
+        AVG(EXTRACT(EPOCH FROM (data_entregue::timestamp - inicio_design)) / 86400) AS media_dias,
+        COUNT(*) AS total_projetos
+      FROM deploy_times
+      WHERE inicio_design IS NOT NULL
+      ${responsavelFilter}
+      ${groupByClause}
+      ORDER BY ano, trimestre
+    `;
+
+    const result = await db.execute(sql.raw(query));
+    return result.rows;
+  }
+
   // ============== INADIMPLÊNCIA ==============
 
   async getInadimplenciaResumo(dataInicio?: string, dataFim?: string): Promise<{
