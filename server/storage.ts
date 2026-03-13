@@ -282,6 +282,14 @@ export interface IStorage {
   getTechFinanceiro(startDate?: string, endDate?: string): Promise<TechFinanceiroAnalise>;
   getTechReceitaMensal(meses?: number): Promise<{ mes: string; valorRealizado: number; valorPrevisto: number }[]>;
 
+  // Tech Hub
+  getTechBoard(status?: string, tipo?: string, prioridade?: string): Promise<any[]>;
+  getTechProjetoHistorico(taskId: string, tipo?: string): Promise<any[]>;
+  getTechProjetoComentarios(taskId: string): Promise<any[]>;
+  getTechPrazoPorStatus(responsavel?: string): Promise<any[]>;
+  getTechEntregasTrimestre(meses?: number): Promise<any[]>;
+  getTechTempoDeploy(meses?: number, responsavel?: string): Promise<any[]>;
+
   // Metric Formatting Rules
   getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]>;
   getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null>;
@@ -1078,6 +1086,26 @@ export class MemStorage implements IStorage {
   }
 
   async getTechReceitaMensal(meses?: number): Promise<{ mes: string; valorRealizado: number; valorPrevisto: number }[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+
+  // Tech Hub MemStorage stubs
+  async getTechBoard(status?: string, tipo?: string, prioridade?: string): Promise<any[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getTechProjetoHistorico(taskId: string, tipo?: string): Promise<any[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getTechProjetoComentarios(taskId: string): Promise<any[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getTechPrazoPorStatus(responsavel?: string): Promise<any[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getTechEntregasTrimestre(meses?: number): Promise<any[]> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async getTechTempoDeploy(meses?: number, responsavel?: string): Promise<any[]> {
     throw new Error("Not implemented in MemStorage");
   }
 
