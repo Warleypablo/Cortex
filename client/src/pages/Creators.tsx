@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -19,6 +19,19 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Select,
   SelectContent,
@@ -53,6 +66,7 @@ import {
   Check,
   Clock,
   AlertCircle,
+  ChevronsUpDown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -173,6 +187,7 @@ export default function Creators() {
   const [clienteSearch, setClienteSearch] = useState("");
   const [clienteResults, setClienteResults] = useState<ClienteSearch[]>([]);
   const [searchingClientes, setSearchingClientes] = useState(false);
+  const [clientePopoverOpen, setClientePopoverOpen] = useState(false);
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -301,11 +316,6 @@ export default function Creators() {
     } catch { setClienteResults([]); }
     finally { setSearchingClientes(false); }
   }, []);
-
-  useEffect(() => {
-    const t = setTimeout(() => searchClientes(clienteSearch), 300);
-    return () => clearTimeout(t);
-  }, [clienteSearch, searchClientes]);
 
   // Filter creators
   const filtered = creators.filter(c =>
@@ -593,39 +603,73 @@ export default function Creators() {
               observacoes: contratoForm.observacoes,
             });
           }} className="space-y-4">
-            {/* Cliente search */}
+            {/* Cliente search - Combobox */}
             <div>
               <Label>Cliente / Marca *</Label>
-              <div className="relative">
-                <Input
-                  placeholder="Buscar cliente..."
-                  value={clienteSearch || contratoForm.cliente_nome}
-                  onChange={e => {
-                    setClienteSearch(e.target.value);
-                    setContratoForm(f => ({ ...f, cliente_nome: e.target.value, cliente_task_id: "" }));
-                  }}
-                />
-                {searchingClientes && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />}
-              </div>
-              {clienteResults.length > 0 && (
-                <div className="border rounded-md mt-1 max-h-40 overflow-y-auto dark:border-zinc-700 bg-background">
-                  {clienteResults.map(cl => (
-                    <button
-                      key={cl.task_id}
-                      type="button"
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-muted/50 flex items-center justify-between"
-                      onClick={() => {
-                        setContratoForm(f => ({ ...f, cliente_nome: cl.nome, cliente_task_id: cl.task_id }));
-                        setClienteSearch("");
-                        setClienteResults([]);
+              <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={clientePopoverOpen}
+                    className="w-full justify-between font-normal"
+                    type="button"
+                  >
+                    {contratoForm.cliente_nome || "Selecione o cliente..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Buscar cliente..."
+                      value={clienteSearch}
+                      onValueChange={(v) => {
+                        setClienteSearch(v);
+                        if (v.length >= 2) {
+                          searchClientes(v);
+                        } else {
+                          setClienteResults([]);
+                        }
                       }}
-                    >
-                      <span>{cl.nome}</span>
-                      {cl.cnpj && <span className="text-xs text-muted-foreground">{cl.cnpj}</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
+                    />
+                    <CommandList>
+                      {searchingClientes ? (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : clienteSearch.length < 2 ? (
+                        <CommandEmpty>Digite pelo menos 2 caracteres...</CommandEmpty>
+                      ) : clienteResults.length === 0 ? (
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                      ) : (
+                        <CommandGroup>
+                          {clienteResults.map(cl => (
+                            <CommandItem
+                              key={cl.task_id}
+                              value={cl.task_id}
+                              onSelect={() => {
+                                setContratoForm(f => ({ ...f, cliente_nome: cl.nome, cliente_task_id: cl.task_id }));
+                                setClienteSearch("");
+                                setClienteResults([]);
+                                setClientePopoverOpen(false);
+                              }}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span>{cl.nome}</span>
+                                {cl.cnpj && <span className="text-xs text-muted-foreground ml-2">{cl.cnpj}</span>}
+                              </div>
+                              {contratoForm.cliente_task_id === cl.task_id && (
+                                <Check className="ml-2 h-4 w-4 shrink-0" />
+                              )}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Entregáveis */}
