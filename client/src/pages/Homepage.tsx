@@ -926,7 +926,7 @@ function DashboardAdmin() {
           <QuickLinkCard
             title="Dashboard Financeiro"
             description="Receitas, despesas e fluxo de caixa"
-            href="/dashboard/financeiro"
+            href="/dashboard/dfc"
             icon={<Wallet className="w-5 h-5" />}
           />
           <QuickLinkCard
@@ -1132,21 +1132,21 @@ function DashboardFinanceiro() {
             value={formatCurrency(kpisData?.aReceberTotal || 0)}
             subtitle={`Vencido: ${formatCurrencyCompact(kpisData?.aReceberVencidoValor || 0)}`}
             icon={<TrendingUp className="w-4 h-4" />}
-            href="/dashboard/financeiro"
+            href="/dashboard/dfc"
           />
           <MetricCard
             title="A Pagar"
             value={formatCurrency(kpisData?.aPagarTotal || 0)}
             subtitle={`Vencido: ${formatCurrencyCompact(kpisData?.aPagarVencidoValor || 0)}`}
             icon={<TrendingDown className="w-4 h-4" />}
-            href="/dashboard/financeiro"
+            href="/dashboard/dfc"
           />
           <MetricCard
             title="Resultado Mês"
             value={formatCurrency(kpisData?.resultadoMesAtual || 0)}
             subtitle={`Receita: ${formatCurrencyCompact(kpisData?.receitaMesAtual || 0)}`}
             icon={<BarChart3 className="w-4 h-4" />}
-            href="/dashboard/financeiro"
+            href="/dashboard/dfc"
           />
         </div>
       </div>
@@ -1184,7 +1184,7 @@ function DashboardFinanceiro() {
           <QuickLinkCard
             title="Dashboard Financeiro"
             description="Análise completa de receitas e despesas"
-            href="/dashboard/financeiro"
+            href="/dashboard/dfc"
             icon={<PieChart className="w-5 h-5" />}
           />
           <QuickLinkCard
