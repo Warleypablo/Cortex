@@ -61,7 +61,7 @@ const DEFAULT_SUGGESTIONS = [
 ];
 
 const PAGE_SUGGESTIONS: Record<string, string[]> = {
-  "/dashboard/financeiro": [
+  "/dashboard/dfc": [
     "Qual é o resultado financeiro atual?",
     "Como está o fluxo de caixa?",
     "Quais são as principais despesas?",
