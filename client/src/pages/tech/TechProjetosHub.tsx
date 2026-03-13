@@ -22,15 +22,15 @@ export default function TechProjetosHub() {
 
   // Extract unique values for filter dropdowns
   const responsaveis = useMemo(() =>
-    [...new Set(projetos.map((p: any) => p.responsavel).filter(Boolean))].sort() as string[],
+    Array.from(new Set(projetos.map((p: any) => p.responsavel).filter(Boolean))).sort() as string[],
     [projetos]
   );
   const statuses = useMemo(() =>
-    [...new Set(projetos.map((p: any) => p.status_projeto || p.statusProjeto).filter(Boolean))].sort() as string[],
+    Array.from(new Set(projetos.map((p: any) => p.status_projeto || p.statusProjeto).filter(Boolean))).sort() as string[],
     [projetos]
   );
   const tipos = useMemo(() =>
-    [...new Set(projetos.map((p: any) => p.tipo).filter(Boolean))].sort() as string[],
+    Array.from(new Set(projetos.map((p: any) => p.tipo).filter(Boolean))).sort() as string[],
     [projetos]
   );
 
