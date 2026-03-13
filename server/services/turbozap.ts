@@ -473,7 +473,7 @@ export async function previewCobrancas(): Promise<PreviewNivel[]> {
 // Envio via Evolution API
 // ============================================
 
-async function enviarMensagemWhatsApp(
+export async function enviarMensagemWhatsApp(
   numero: string,
   texto: string,
   instancia: "financeiro" | "juridico" = "financeiro",

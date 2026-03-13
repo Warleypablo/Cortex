@@ -3,12 +3,96 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { storage } from "../storage";
 import { z } from "zod";
+import { enviarMensagemWhatsApp, normalizarNumero } from "../services/turbozap";
 
 // Approvers hardcoded
 const APPROVER_EMAILS = [
   "victor.peixoto@turbopartners.com.br",
   "rodrigo.queiroz@turbopartners.com.br",
 ];
+
+// Extra WhatsApp notification number
+const EXTRA_NOTIFICATION_NUMBER = "5527997823958";
+
+const RECORRENCIA_LABELS: Record<string, string> = {
+  unico: "Pagamento Único",
+  mensal: "Mensal",
+  anual: "Anual",
+};
+
+const CATEGORIA_LABELS: Record<string, string> = {
+  ferramenta_ia: "Ferramenta de IA",
+  curso: "Curso / Treinamento",
+  software: "Software / SaaS",
+  hardware: "Hardware / Equipamento",
+  livro: "Livro / Material",
+  certificacao: "Certificação",
+  outros: "Outros",
+};
+
+async function notificarAprovadoresWhatsApp(solicitacao: any, solicitanteNome: string) {
+  const valorFormatado = parseFloat(solicitacao.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const valorUnit = parseFloat(solicitacao.valor_unitario).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const categoriaLabel = CATEGORIA_LABELS[solicitacao.categoria] || solicitacao.categoria || "—";
+  const recorrenciaLabel = RECORRENCIA_LABELS[solicitacao.recorrencia] || solicitacao.recorrencia || "Único";
+  const appUrl = process.env.APP_URL || "https://cortex.turbopartners.com.br";
+
+  const mensagem = [
+    `*Nova Solicitação de Ferramenta/Curso*`,
+    ``,
+    `*Item:* ${solicitacao.nome_item}`,
+    `*Categoria:* ${categoriaLabel}`,
+    `*Descrição:* ${solicitacao.descricao_produto || "—"}`,
+    `*Valor:* ${solicitacao.quantidade}x ${valorUnit} = *${valorFormatado}*`,
+    `*Recorrência:* ${recorrenciaLabel}`,
+    `*Motivo:* ${solicitacao.motivo}`,
+    ``,
+    `*Solicitante:* ${solicitanteNome}`,
+    `*Link:* ${solicitacao.link_compra}`,
+    ``,
+    `Acesse para aprovar: ${appUrl}/solicitacao-ferramentas`,
+  ].join("\n");
+
+  // Get phone numbers from colaboradores table
+  const numeros: string[] = [];
+
+  for (const email of APPROVER_EMAILS) {
+    try {
+      const result = await db.execute(sql`
+        SELECT telefone FROM "Inhire".rh_pessoal
+        WHERE LOWER(email_turbo) = LOWER(${email})
+          AND status = 'Ativo'
+          AND telefone IS NOT NULL
+        LIMIT 1
+      `);
+      if (result.rows.length > 0) {
+        const tel = normalizarNumero((result.rows[0] as any).telefone);
+        if (tel.length >= 10) {
+          numeros.push(tel.startsWith("55") ? tel : `55${tel}`);
+        }
+      }
+    } catch (err) {
+      console.error(`[solicitacao-ferramentas] Error fetching phone for ${email}:`, err);
+    }
+  }
+
+  // Add extra notification number
+  numeros.push(EXTRA_NOTIFICATION_NUMBER);
+
+  // Send to all numbers
+  for (const numero of numeros) {
+    try {
+      const result = await enviarMensagemWhatsApp(numero, mensagem, "financeiro");
+      if (result.success) {
+        console.log(`[solicitacao-ferramentas] WhatsApp sent to ${numero}`);
+      } else {
+        console.error(`[solicitacao-ferramentas] WhatsApp failed for ${numero}: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(`[solicitacao-ferramentas] WhatsApp error for ${numero}:`, err);
+    }
+  }
+}
 
 function isApprover(user: any): boolean {
   return (
@@ -198,7 +282,7 @@ export function registerSolicitacaoFerramentasRoutes(app: Express) {
 
       const solicitacao = result.rows[0] as any;
 
-      // Notify approvers
+      // Notify approvers (in-app)
       try {
         await storage.createNotification({
           type: "solicitacao_ferramentas",
@@ -214,6 +298,11 @@ export function registerSolicitacaoFerramentasRoutes(app: Express) {
       } catch (err) {
         console.error("[solicitacao-ferramentas] Error creating notification:", err);
       }
+
+      // Notify approvers (WhatsApp) — fire and forget
+      notificarAprovadoresWhatsApp(solicitacao, user.name).catch((err) =>
+        console.error("[solicitacao-ferramentas] WhatsApp notification error:", err)
+      );
 
       res.status(201).json(solicitacao);
     } catch (error) {
