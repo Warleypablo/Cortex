@@ -151,6 +151,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         okrInadResult,
         okrHeadcountResult,
         okrPrazoResult,
+        vendasSeriesResult,
       ] = await Promise.all([
         // 1. Novos colaboradores (admitidos no mês de dados)
         db.execute(sql`
@@ -710,6 +711,21 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND EXTRACT(MONTH FROM lancamento) >= ${quarterStartMonth}
             AND EXTRACT(MONTH FROM lancamento) <= ${mesDados}
         `),
+
+        // 27. Vendas mensais (MRR + Pontual) por mês do ano de dados
+        db.execute(sql`
+          SELECT
+            TO_CHAR(d.data_fechamento, 'YYYY-MM') as month,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as vendas_mrr,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as vendas_pontual,
+            COUNT(*)::int as num_contratos
+          FROM "Bitrix".crm_deal d
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.data_fechamento >= ${`${anoDados}-01-01`}
+            AND d.data_fechamento < ${dataEnd}
+          GROUP BY TO_CHAR(d.data_fechamento, 'YYYY-MM')
+          ORDER BY month
+        `),
       ]);
 
       // Build closer photo map
@@ -1079,6 +1095,16 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           tmRecorrente: totalContratosRec > 0 ? totalRecorrente / totalContratosRec : 0,
           tmPontual: totalContratosPont > 0 ? totalPontual / totalContratosPont : 0,
           pipelineBreakdown,
+          vendasSeries: (vendasSeriesResult.rows as any[]).map((row: any) => {
+            const [y, m] = row.month.split("-").map(Number);
+            return {
+              month: row.month,
+              label: MESES_SHORT[m - 1],
+              vendasMrr: parseFloat(row.vendas_mrr) || 0,
+              vendasPontual: parseFloat(row.vendas_pontual) || 0,
+              numContratos: parseInt(row.num_contratos) || 0,
+            };
+          }),
         },
         turboMetrics,
         rankingSquads,
