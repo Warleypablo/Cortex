@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Loader2, CheckCircle2, Clock, XCircle, ShoppingCart, Package, ExternalLink, Wrench } from "lucide-react";
+import { Plus, Loader2, CheckCircle2, Clock, XCircle, ShoppingCart, Package, ExternalLink, Wrench, Eye, EyeOff, KeyRound } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -29,8 +29,11 @@ interface SolicitacaoItem {
   quantidade: number;
   valor_total: string;
   recorrencia: string;
+  descricao_produto: string | null;
   link_compra: string;
   motivo: string;
+  login_email: string | null;
+  login_senha: string | null;
   status: string;
   motivo_rejeicao: string | null;
   solicitante_id: string;
@@ -78,12 +81,15 @@ const CATEGORIA_OPTIONS = [
 
 const solicitacaoFormSchema = z.object({
   nome_item: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").max(255),
+  descricao_produto: z.string().min(5, "Descreva o que o produto faz"),
   categoria: z.string().min(1, "Selecione uma categoria"),
   valor_unitario: z.number().min(0.01, "Valor deve ser maior que 0"),
   quantidade: z.number().int().min(1, "Quantidade mínima é 1"),
   recorrencia: z.enum(["mensal", "anual", "unico"]),
   link_compra: z.string().url("Insira uma URL válida"),
   motivo: z.string().min(10, "Descreva melhor o motivo (mínimo 10 caracteres)"),
+  login_email: z.string().optional().default(""),
+  login_senha: z.string().optional().default(""),
 });
 
 type SolicitacaoFormData = z.infer<typeof solicitacaoFormSchema>;
@@ -132,12 +138,15 @@ export default function SolicitacaoFerramentas() {
     resolver: zodResolver(solicitacaoFormSchema),
     defaultValues: {
       nome_item: "",
+      descricao_produto: "",
       categoria: "",
       valor_unitario: 0,
       quantidade: 1,
       recorrencia: "unico" as const,
       link_compra: "",
       motivo: "",
+      login_email: "",
+      login_senha: "",
     },
   });
 
@@ -219,6 +228,24 @@ export default function SolicitacaoFerramentas() {
                       <FormLabel className="text-gray-700 dark:text-zinc-300">Nome do Item</FormLabel>
                       <FormControl>
                         <Input placeholder="Ex: Notion Pro, Curso React Avançado" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="descricao_produto"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-700 dark:text-zinc-300">O que faz? (Descrição do produto)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Descreva brevemente o que essa ferramenta/curso faz e como será usado..."
+                          className="min-h-[60px]"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -354,6 +381,42 @@ export default function SolicitacaoFerramentas() {
                   )}
                 />
 
+                {/* Login credentials - optional */}
+                <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 space-y-3">
+                  <p className="text-xs font-medium text-gray-500 dark:text-zinc-400 flex items-center gap-1">
+                    <KeyRound className="w-3 h-3" />
+                    Credenciais de acesso (opcional — preencha se a ferramenta precisar de login)
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="login_email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 dark:text-zinc-300 text-xs">E-mail da plataforma</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="email@exemplo.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="login_senha"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 dark:text-zinc-300 text-xs">Senha da plataforma</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
@@ -463,8 +526,8 @@ export default function SolicitacaoFerramentas() {
                       return (
                         <TableRow key={s.id} className="border-gray-100 dark:border-zinc-800">
                           <TableCell>
-                            <div>
-                              <div className="flex items-center gap-2">
+                            <div className="max-w-md">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <p className="font-medium text-gray-900 dark:text-white">{s.nome_item}</p>
                                 {s.categoria && (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-zinc-400">
@@ -472,7 +535,12 @@ export default function SolicitacaoFerramentas() {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-500 dark:text-zinc-500">
+                              {s.descricao_produto && (
+                                <p className="text-xs text-gray-600 dark:text-zinc-400 mt-0.5 line-clamp-2">
+                                  {s.descricao_produto}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">
                                 {s.quantidade}x {formatCurrency(s.valor_unitario)}
                                 {s.recorrencia && s.recorrencia !== "unico" && (
                                   <span className="ml-1 text-purple-600 dark:text-purple-400">
@@ -480,6 +548,13 @@ export default function SolicitacaoFerramentas() {
                                   </span>
                                 )}
                               </p>
+                              {approver && (s.login_email || s.login_senha) && (
+                                <div className="mt-1 text-[10px] text-gray-500 dark:text-zinc-500 flex items-center gap-2">
+                                  <KeyRound className="w-3 h-3" />
+                                  <span>{s.login_email || "—"}</span>
+                                  <span className="select-all bg-gray-100 dark:bg-zinc-800 px-1 rounded">{s.login_senha || "—"}</span>
+                                </div>
+                              )}
                               {s.motivo_rejeicao && (
                                 <p className="text-xs text-red-500 dark:text-red-400 mt-1">
                                   Motivo: {s.motivo_rejeicao}

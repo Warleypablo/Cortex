@@ -19,12 +19,15 @@ function isApprover(user: any): boolean {
 // Zod schemas
 const createSolicitacaoSchema = z.object({
   nome_item: z.string().min(3).max(255),
+  descricao_produto: z.string().min(5, "Descreva o que o produto faz"),
   categoria: z.string().min(1),
   valor_unitario: z.number().min(0.01),
   quantidade: z.number().int().min(1),
   recorrencia: z.enum(["mensal", "anual", "unico"]),
   link_compra: z.string().url(),
   motivo: z.string().min(10),
+  login_email: z.string().optional().default(""),
+  login_senha: z.string().optional().default(""),
 });
 
 const updateSolicitacaoSchema = z.object({
@@ -67,6 +70,18 @@ async function ensureTable() {
     await db.execute(sql`
       ALTER TABLE cortex_core.solicitacao_ferramentas
       ADD COLUMN IF NOT EXISTS categoria VARCHAR(50)
+    `);
+    await db.execute(sql`
+      ALTER TABLE cortex_core.solicitacao_ferramentas
+      ADD COLUMN IF NOT EXISTS descricao_produto TEXT
+    `);
+    await db.execute(sql`
+      ALTER TABLE cortex_core.solicitacao_ferramentas
+      ADD COLUMN IF NOT EXISTS login_email VARCHAR(255)
+    `);
+    await db.execute(sql`
+      ALTER TABLE cortex_core.solicitacao_ferramentas
+      ADD COLUMN IF NOT EXISTS login_senha VARCHAR(255)
     `);
     tableInitialized = true;
     console.log("[solicitacao-ferramentas] table initialized");
@@ -168,15 +183,16 @@ export function registerSolicitacaoFerramentasRoutes(app: Express) {
         return res.status(400).json({ message: "Dados inválidos", errors: parsed.error.flatten() });
       }
 
-      const { nome_item, categoria, valor_unitario, quantidade, recorrencia, link_compra, motivo } = parsed.data;
+      const { nome_item, descricao_produto, categoria, valor_unitario, quantidade, recorrencia, link_compra, motivo, login_email, login_senha } = parsed.data;
       const valor_total = valor_unitario * quantidade;
 
       const result = await db.execute(sql`
         INSERT INTO cortex_core.solicitacao_ferramentas
-          (nome_item, categoria, valor_unitario, quantidade, valor_total, recorrencia, link_compra, motivo,
-           solicitante_id, solicitante_nome, solicitante_email)
-        VALUES (${nome_item}, ${categoria}, ${valor_unitario}, ${quantidade}, ${valor_total}, ${recorrencia},
-                ${link_compra}, ${motivo}, ${user.googleId || user.id}, ${user.name}, ${user.email})
+          (nome_item, descricao_produto, categoria, valor_unitario, quantidade, valor_total, recorrencia, link_compra, motivo,
+           login_email, login_senha, solicitante_id, solicitante_nome, solicitante_email)
+        VALUES (${nome_item}, ${descricao_produto}, ${categoria}, ${valor_unitario}, ${quantidade}, ${valor_total}, ${recorrencia},
+                ${link_compra}, ${motivo}, ${login_email || null}, ${login_senha || null},
+                ${user.googleId || user.id}, ${user.name}, ${user.email})
         RETURNING *
       `);
 
