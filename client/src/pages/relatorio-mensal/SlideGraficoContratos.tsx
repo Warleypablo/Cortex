@@ -82,37 +82,51 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
       </div>
 
       {/* Bottom: Chart + metrics */}
-      <div className="flex-1 grid grid-cols-5 gap-3 min-h-0">
-        {/* Chart */}
-        <div className="col-span-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-3 flex flex-col">
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-2">Vendas por Mês</p>
-          <div className="flex-1 min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={series} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fill: "#a1a1aa", fontSize: 10 }}
-                  axisLine={{ stroke: "#3f3f46" }}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fill: "#a1a1aa", fontSize: 9 }}
-                  axisLine={{ stroke: "#3f3f46" }}
-                  tickLine={false}
-                  tickFormatter={fmtK}
-                  width={45}
-                />
-                <Tooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="vendasMrr" name="MRR" stackId="vendas" radius={[0, 0, 0, 0]} barSize={28} fill="#34d399" fillOpacity={0.8} />
-                <Bar dataKey="vendasPontual" name="Pontual" stackId="vendas" radius={[4, 4, 0, 0]} barSize={28} fill="#a855f7" fillOpacity={0.7} />
-              </BarChart>
-            </ResponsiveContainer>
+      <div className={`flex-1 grid ${series.length > 0 ? "grid-cols-5" : "grid-cols-2"} gap-3 min-h-0`}>
+        {/* Chart - only if data exists */}
+        {series.length > 0 && (
+          <div className="col-span-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-3 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Vendas por Mês</p>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
+                  <span className="text-[9px] text-zinc-500">MRR</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-purple-500" />
+                  <span className="text-[9px] text-zinc-500">Pontual</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={series} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fill: "#a1a1aa", fontSize: 10 }}
+                    axisLine={{ stroke: "#3f3f46" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: "#a1a1aa", fontSize: 9 }}
+                    axisLine={{ stroke: "#3f3f46" }}
+                    tickLine={false}
+                    tickFormatter={fmtK}
+                    width={45}
+                  />
+                  <Tooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="vendasMrr" name="MRR" stackId="vendas" radius={[0, 0, 0, 0]} barSize={28} fill="#34d399" fillOpacity={0.8} />
+                  <Bar dataKey="vendasPontual" name="Pontual" stackId="vendas" radius={[4, 4, 0, 0]} barSize={28} fill="#a855f7" fillOpacity={0.7} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Metrics cards */}
-        <div className="col-span-2 flex flex-col gap-3">
+        <div className={`${series.length > 0 ? "col-span-2" : "col-span-2"} flex flex-col gap-3`}>
           {/* Recorrente */}
           <div className="flex-1 bg-white/[0.03] border border-emerald-500/15 rounded-2xl p-3 flex flex-col">
             <div className="flex items-center gap-1.5 mb-2">
