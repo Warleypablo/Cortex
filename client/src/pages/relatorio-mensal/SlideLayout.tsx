@@ -36,23 +36,23 @@ export default function SlideLayout({
       className="w-full h-full flex flex-col text-white relative overflow-hidden"
       style={{
         padding,
-        background: "linear-gradient(145deg, #0d0b2e 0%, #1e1145 35%, #2a1a5e 55%, #1a0f3a 80%, #0d0b2e 100%)",
+        background: "linear-gradient(145deg, #060511 0%, #0e0a24 30%, #150f35 50%, #0e0a24 75%, #060511 100%)",
       }}
     >
       {/* Glow 1 - top right */}
       <div
-        className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-15"
+        className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] rounded-full opacity-[0.12]"
         style={{ background: `radial-gradient(circle, ${theme.glow1} 0%, transparent 70%)` }}
       />
       {/* Glow 2 - bottom left */}
       <div
-        className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-10"
+        className="absolute bottom-[-15%] left-[-5%] w-[400px] h-[400px] rounded-full opacity-[0.08]"
         style={{ background: `radial-gradient(circle, ${theme.glow2} 0%, transparent 70%)` }}
       />
       {/* Grid overlay */}
       {showGrid && (
         <div
-          className="absolute inset-0 opacity-[0.03]"
+          className="absolute inset-0 opacity-[0.02]"
           style={{
             backgroundImage:
               "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
