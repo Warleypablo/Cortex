@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
@@ -23,9 +24,11 @@ import { ptBR } from "date-fns/locale";
 interface SolicitacaoItem {
   id: number;
   nome_item: string;
+  categoria: string;
   valor_unitario: string;
   quantidade: number;
   valor_total: string;
+  recorrencia: string;
   link_compra: string;
   motivo: string;
   status: string;
@@ -57,10 +60,28 @@ interface User {
   role: "admin" | "user";
 }
 
+const RECORRENCIA_OPTIONS = [
+  { value: "unico", label: "Pagamento Único" },
+  { value: "mensal", label: "Mensal" },
+  { value: "anual", label: "Anual" },
+];
+
+const CATEGORIA_OPTIONS = [
+  { value: "ferramenta_ia", label: "Ferramenta de IA" },
+  { value: "curso", label: "Curso / Treinamento" },
+  { value: "software", label: "Software / SaaS" },
+  { value: "hardware", label: "Hardware / Equipamento" },
+  { value: "livro", label: "Livro / Material" },
+  { value: "certificacao", label: "Certificação" },
+  { value: "outros", label: "Outros" },
+];
+
 const solicitacaoFormSchema = z.object({
   nome_item: z.string().min(3, "Nome deve ter pelo menos 3 caracteres").max(255),
+  categoria: z.string().min(1, "Selecione uma categoria"),
   valor_unitario: z.number().min(0.01, "Valor deve ser maior que 0"),
   quantidade: z.number().int().min(1, "Quantidade mínima é 1"),
+  recorrencia: z.enum(["mensal", "anual", "unico"]),
   link_compra: z.string().url("Insira uma URL válida"),
   motivo: z.string().min(10, "Descreva melhor o motivo (mínimo 10 caracteres)"),
 });
@@ -111,8 +132,10 @@ export default function SolicitacaoFerramentas() {
     resolver: zodResolver(solicitacaoFormSchema),
     defaultValues: {
       nome_item: "",
+      categoria: "",
       valor_unitario: 0,
       quantidade: 1,
+      recorrencia: "unico" as const,
       link_compra: "",
       motivo: "",
     },
@@ -201,6 +224,53 @@ export default function SolicitacaoFerramentas() {
                     </FormItem>
                   )}
                 />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="categoria"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 dark:text-zinc-300">Categoria</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {CATEGORIA_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="recorrencia"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 dark:text-zinc-300">Recorrência</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {RECORRENCIA_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <div className="grid grid-cols-3 gap-3">
                   <FormField
@@ -394,9 +464,21 @@ export default function SolicitacaoFerramentas() {
                         <TableRow key={s.id} className="border-gray-100 dark:border-zinc-800">
                           <TableCell>
                             <div>
-                              <p className="font-medium text-gray-900 dark:text-white">{s.nome_item}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-gray-900 dark:text-white">{s.nome_item}</p>
+                                {s.categoria && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-zinc-400">
+                                    {CATEGORIA_OPTIONS.find(c => c.value === s.categoria)?.label || s.categoria}
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-gray-500 dark:text-zinc-500">
                                 {s.quantidade}x {formatCurrency(s.valor_unitario)}
+                                {s.recorrencia && s.recorrencia !== "unico" && (
+                                  <span className="ml-1 text-purple-600 dark:text-purple-400">
+                                    ({RECORRENCIA_OPTIONS.find(r => r.value === s.recorrencia)?.label || s.recorrencia})
+                                  </span>
+                                )}
                               </p>
                               {s.motivo_rejeicao && (
                                 <p className="text-xs text-red-500 dark:text-red-400 mt-1">
