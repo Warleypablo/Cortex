@@ -16,6 +16,7 @@ export const PERMISSION_KEYS = {
     PROCESSOS_INTERNOS: 'general.processos_internos',
     CHAT_CLIENTES: 'general.chat_clientes',
     CHAMADOS: 'general.chamados',
+    SOLICITACAO_FERRAMENTAS: 'general.solicitacao_ferramentas',
   },
   // Financeiro
   FIN: {
@@ -189,6 +190,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/processos-internos': PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS,
   '/chat-clientes': PERMISSION_KEYS.GENERAL.CHAT_CLIENTES,
   '/chamados': PERMISSION_KEYS.GENERAL.CHAMADOS,
+  '/solicitacao-ferramentas': PERMISSION_KEYS.GENERAL.SOLICITACAO_FERRAMENTAS,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   // Financeiro
   '/dashboard/financeiro': PERMISSION_KEYS.FIN.VISAO_GERAL,
@@ -354,6 +356,7 @@ export const NAV_CONFIG = {
         { title: 'TurboZap', url: '/turbozap', icon: 'Zap', permissionKey: PERMISSION_KEYS.FIN.TURBOZAP },
         { title: 'Chamados', url: '/chamados', icon: 'Ticket', permissionKey: PERMISSION_KEYS.GENERAL.CHAMADOS },
         { title: 'Sugestões', url: '/sugestoes', icon: 'Lightbulb', permissionKey: PERMISSION_KEYS.GENERAL.SUGESTOES },
+        { title: 'Solicitação Ferramentas', url: '/solicitacao-ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.SOLICITACAO_FERRAMENTAS },
       ],
     },
     {
@@ -379,6 +382,7 @@ export const NAV_CONFIG = {
       { title: 'Turbo Tools', url: '/ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.TURBO_TOOLS },
       { title: 'Chat Clientes', url: '/chat-clientes', icon: 'MessageSquare', permissionKey: PERMISSION_KEYS.GENERAL.CHAT_CLIENTES },
       { title: 'Chamados', url: '/chamados', icon: 'Ticket', permissionKey: PERMISSION_KEYS.GENERAL.CHAMADOS },
+      { title: 'Solicitação Ferramentas', url: '/solicitacao-ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.SOLICITACAO_FERRAMENTAS },
       { title: 'OKR 2026', url: '/okr-2026', icon: 'Trophy', permissionKey: PERMISSION_KEYS.ADMIN.OKR_2026 },
     ],
   },
@@ -398,7 +402,6 @@ export const NAV_CONFIG = {
       title: 'Financeiro',
       icon: 'DollarSign',
       items: [
-        { title: 'Visão Geral', url: '/dashboard/financeiro', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.FIN.VISAO_GERAL },
         { title: 'DFC', url: '/dashboard/dfc', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.FIN.DFC },
         { title: 'DRE', url: '/dashboard/dre', icon: 'FileBarChart', permissionKey: PERMISSION_KEYS.FIN.DRE },
         { title: 'Fluxo de Caixa', url: '/dashboard/fluxo-caixa', icon: 'Wallet', permissionKey: PERMISSION_KEYS.FIN.FLUXO_CAIXA },
@@ -668,6 +671,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.REPORTS.MENSAL]: 'Reporte Mensal',
   [PERMISSION_KEYS.GENERAL.PROCESSOS_INTERNOS]: 'Processos Internos',
   [PERMISSION_KEYS.GENERAL.CHAMADOS]: 'Chamados',
+  [PERMISSION_KEYS.GENERAL.SOLICITACAO_FERRAMENTAS]: 'Solicitação Ferramentas',
   [PERMISSION_KEYS.FIN.TURBOZAP]: 'TurboZap',
   [PERMISSION_KEYS.FIN.DRE]: 'DRE',
   [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
