@@ -45,6 +45,7 @@ import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
+import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -6930,6 +6931,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // BP Produtos Module
   registerBpProdutosRoutes(app);
+
+  // Solicitação de Ferramentas/Cursos - registered from separate file
+  registerSolicitacaoFerramentasRoutes(app);
 
   // ============================================
   // Sugestões API
