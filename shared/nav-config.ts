@@ -253,13 +253,11 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/patrimonio': PERMISSION_KEYS.GG.PATRIMONIO,
   '/gg/calendario-ferias': PERMISSION_KEYS.GG.CALENDARIO_FERIAS,
   // Jurídico
-  '/juridico/assistente': PERMISSION_KEYS.JUR.ASSISTENTE,
   '/juridico/clientes': PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES,
   '/juridico/processos': PERMISSION_KEYS.JUR.PROCESSOS,
   '/contratos-module': PERMISSION_KEYS.JUR.CONTRATOS_MODULE,
   '/juridico/contratos-colaborador': PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES,
   '/juridico/creators': PERMISSION_KEYS.JUR.CONTRATOS_CREATORS,
-  '/juridico/relatorios': PERMISSION_KEYS.JUR.RELATORIOS,
   // Reports
   '/investors-report': PERMISSION_KEYS.REPORTS.INVESTORS,
   '/reports/mensal': PERMISSION_KEYS.REPORTS.MENSAL,
@@ -480,8 +478,6 @@ export const NAV_CONFIG = {
     title: 'Jurídico',
     icon: 'Scale',
     items: [
-      { title: 'Assistente IA', url: '/juridico/assistente', icon: 'Bot', permissionKey: PERMISSION_KEYS.JUR.ASSISTENTE },
-      { title: 'Relatórios', url: '/juridico/relatorios', icon: 'FileBarChart', permissionKey: PERMISSION_KEYS.JUR.RELATORIOS },
       { title: 'Clientes Inadimplentes', url: '/juridico/clientes', icon: 'Gavel', permissionKey: PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES },
       { title: 'Processos', url: '/juridico/processos', icon: 'Scale', permissionKey: PERMISSION_KEYS.JUR.PROCESSOS },
       { title: 'Contratos', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_MODULE },
