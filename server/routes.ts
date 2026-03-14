@@ -1936,6 +1936,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           UNION
           SELECT squad FROM "Clickup".cup_contratos WHERE squad IS NOT NULL AND squad != ''
         ) combined
+        WHERE squad NOT LIKE '%(OFF)%'
         ORDER BY squad
       `);
 
