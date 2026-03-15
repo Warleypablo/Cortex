@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-03-15 | feat(contribuicao): show resultado when collapsed and add contrib % column
+
+**O que foi feito:**
+- Exibir valores de resultado (margem) nas células de mês quando squad está colapsado
+- Adicionada coluna "Contrib %" com percentual de contribuição anual de cada squad
+- Footer TOTAL mostra 100% na coluna de contribuição
+
+**Por que:**
+- Permitir visão rápida dos resultados sem precisar expandir cada squad
+- Mostrar peso relativo de cada squad na receita total
+
+**Arquivos alterados:**
+- `client/src/pages/ContribuicaoSquad.tsx` - Adicionada coluna contrib % e resultado no estado colapsado
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-03-15 | refactor(contribuicao): replace cluttered UI with clean contribution table
 
 **O que foi feito:**
