@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-03-15 | refactor(contribuicao): replace cluttered UI with clean contribution table
+
+**O que foi feito:**
+- Removido Hero Ranking, Resumo Anual, Tabela Mês a Mês, KPI Cards e DFC detalhado
+- Criada tabela única e limpa com squads agrupados mostrando Receita/Despesas/Margem/Margem% por mês
+- Cada squad é colapsável (expandido por padrão)
+- Footer TOTAL com valores agregados de todos os squads
+- Mantida lógica de rateio proporcional de despesas
+
+**Por que:**
+- Tela estava muito poluída com muitas seções redundantes
+- Usuário queria visão limpa e objetiva: receitas, despesas e margem por squad mês a mês
+
+**Arquivos alterados:**
+- `client/src/pages/ContribuicaoSquad.tsx` - Reescrita completa: 828 linhas removidas, 317 adicionadas
+
+**Impacto arquitetural:** Nenhum — apenas reestruturação visual do componente, sem mudanças no backend ou API.
+
+---
+
 ## 2026-03-13 | feat(tech): implement Performance section with deploy metrics
 
 **O que foi feito:**
