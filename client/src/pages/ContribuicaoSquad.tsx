@@ -418,73 +418,171 @@ export default function ContribuicaoSquad() {
       )}
 
       {/* Monthly Breakdown Table - when "todos" is selected */}
-      {squadSelecionado === "todos" && squadRanking.length > 0 && (
-        <Card>
-          <CardHeader className="px-4 py-3">
-            <CardTitle className="text-sm font-semibold">Visão Mês a Mês por Squad</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <ScrollArea className="w-full">
-              <div className="min-w-[900px]">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-xs text-muted-foreground">
-                      <th className="text-left py-2 pr-3 sticky left-0 bg-background z-10">Squad</th>
-                      {monthlyResults.map((m) => (
-                        <th key={m.mes} className="text-right py-2 px-2 whitespace-nowrap">
-                          {formatMesLabel(m.mesLabel)}
-                        </th>
-                      ))}
-                      <th className="text-right py-2 pl-3 font-bold">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {squadRanking.map((sq) => (
-                      <tr
-                        key={sq.squad}
-                        className="border-b border-border/50 hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={() => setSquadSelecionado(sq.squad)}
-                      >
-                        <td className="py-1.5 pr-3 font-medium text-xs sticky left-0 bg-background z-10 whitespace-nowrap">
-                          {sq.squad}
-                        </td>
-                        {sq.porMes.map((valor, i) => (
-                          <td key={i} className={cn(
-                            "py-1.5 px-2 text-right text-xs",
-                            valor === 0 && "text-muted-foreground"
-                          )}>
-                            {valor > 0 ? formatCurrencyNoDecimals(valor) : "-"}
-                          </td>
+      {squadSelecionado === "todos" && squadRanking.length > 0 && (() => {
+        // Pré-calcula despesas totais por mês
+        const despesaTotalPorMes = monthlyResults.map((m, i) => {
+          const receitaMes = squadRanking.reduce((acc, sq) => acc + (sq.porMes[i] || 0), 0);
+          const desp = bulkData?.despesasMensais?.[m.mes];
+          return receitaMes * taxaDecimal + (desp?.salarios || 0) + (desp?.cxcs || 0) + (desp?.freelancers || 0);
+        });
+        // Receita total por mês
+        const receitaTotalPorMes = monthlyResults.map((_, i) =>
+          squadRanking.reduce((acc, sq) => acc + (sq.porMes[i] || 0), 0)
+        );
+        // Resultado por squad por mês
+        const resultadoPorSquadMes = (sq: typeof squadRanking[0], mesIdx: number) => {
+          const receitaMes = receitaTotalPorMes[mesIdx];
+          const proporcao = receitaMes > 0 ? (sq.porMes[mesIdx] || 0) / receitaMes : 0;
+          return (sq.porMes[mesIdx] || 0) - despesaTotalPorMes[mesIdx] * proporcao;
+        };
+        const resultadoTotalSquad = (sq: typeof squadRanking[0]) =>
+          monthlyResults.reduce((acc, _, i) => acc + resultadoPorSquadMes(sq, i), 0);
+        const resultadoTotalMes = (mesIdx: number) =>
+          squadRanking.reduce((acc, sq) => acc + resultadoPorSquadMes(sq, mesIdx), 0);
+        const resultadoGeralTotal = monthlyResults.reduce((acc, _, i) => acc + resultadoTotalMes(i), 0);
+
+        return (
+          <Card>
+            <CardHeader className="px-4 py-3">
+              <CardTitle className="text-sm font-semibold">Resultado Mês a Mês por Squad</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <ScrollArea className="w-full">
+                <div className="min-w-[900px]">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-xs text-muted-foreground">
+                        <th className="text-left py-2 pr-3 sticky left-0 bg-background z-10">Squad</th>
+                        {monthlyResults.map((m) => (
+                          <th key={m.mes} className="text-right py-2 px-2 whitespace-nowrap">
+                            {formatMesLabel(m.mesLabel)}
+                          </th>
                         ))}
-                        <td className="py-1.5 pl-3 text-right text-xs font-bold">
-                          {formatCurrencyNoDecimals(sq.receitaTotal)}
-                        </td>
+                        <th className="text-right py-2 pl-3 font-bold">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 font-bold text-xs">
-                      <td className="py-2 pr-3 sticky left-0 bg-background z-10">Total</td>
-                      {monthlyResults.map((m, i) => {
-                        const totalMes = squadRanking.reduce((acc, sq) => acc + (sq.porMes[i] || 0), 0);
+                    </thead>
+                    <tbody>
+                      {squadRanking.map((sq) => {
+                        const totalSq = resultadoTotalSquad(sq);
                         return (
-                          <td key={m.mes} className="py-2 px-2 text-right text-emerald-500">
-                            {totalMes > 0 ? formatCurrencyNoDecimals(totalMes) : "-"}
-                          </td>
+                          <tr
+                            key={sq.squad}
+                            className="border-b border-border/50 hover:bg-muted/50 cursor-pointer transition-colors"
+                            onClick={() => setSquadSelecionado(sq.squad)}
+                          >
+                            <td className="py-1.5 pr-3 font-medium text-xs sticky left-0 bg-background z-10 whitespace-nowrap">
+                              {sq.squad}
+                            </td>
+                            {sq.porMes.map((_, i) => {
+                              const resultado = resultadoPorSquadMes(sq, i);
+                              return (
+                                <td key={i} className={cn(
+                                  "py-1.5 px-2 text-right text-xs",
+                                  resultado > 0 ? "text-emerald-500" : resultado < 0 ? "text-red-500" : "text-muted-foreground"
+                                )}>
+                                  {sq.porMes[i] > 0 ? formatCurrencyNoDecimals(resultado) : "-"}
+                                </td>
+                              );
+                            })}
+                            <td className={cn(
+                              "py-1.5 pl-3 text-right text-xs font-bold",
+                              totalSq >= 0 ? "text-emerald-500" : "text-red-500"
+                            )}>
+                              {formatCurrencyNoDecimals(totalSq)}
+                            </td>
+                          </tr>
                         );
                       })}
-                      <td className="py-2 pl-3 text-right text-emerald-500">
-                        {formatCurrencyNoDecimals(totalReceitas)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 font-bold text-xs">
+                        <td className="py-2 pr-3 sticky left-0 bg-background z-10">Total</td>
+                        {monthlyResults.map((_, i) => {
+                          const total = resultadoTotalMes(i);
+                          return (
+                            <td key={i} className={cn(
+                              "py-2 px-2 text-right",
+                              total >= 0 ? "text-emerald-500" : "text-red-500"
+                            )}>
+                              {receitaTotalPorMes[i] > 0 ? formatCurrencyNoDecimals(total) : "-"}
+                            </td>
+                          );
+                        })}
+                        <td className={cn(
+                          "py-2 pl-3 text-right",
+                          resultadoGeralTotal >= 0 ? "text-emerald-500" : "text-red-500"
+                        )}>
+                          {formatCurrencyNoDecimals(resultadoGeralTotal)}
+                        </td>
+                      </tr>
+                      {/* Linha de contribuição percentual */}
+                      <tr className="border-t text-xs text-muted-foreground">
+                        <td className="py-2 pr-3 sticky left-0 bg-background z-10 font-medium">Contribuição %</td>
+                        {monthlyResults.map((_, i) => {
+                          const total = receitaTotalPorMes[i];
+                          return (
+                            <td key={i} className="py-2 px-2 text-right" colSpan={1}>
+                              {total > 0 ? "100%" : "-"}
+                            </td>
+                          );
+                        })}
+                        <td className="py-2 pl-3 text-right font-medium">100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+
+                  {/* Tabela de % de contribuição por squad */}
+                  <div className="mt-4 pt-3 border-t border-border">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">Contribuição Percentual por Squad</p>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-xs text-muted-foreground">
+                          <th className="text-left py-2 pr-3 sticky left-0 bg-background z-10">Squad</th>
+                          {monthlyResults.map((m) => (
+                            <th key={m.mes} className="text-right py-2 px-2 whitespace-nowrap">
+                              {formatMesLabel(m.mesLabel)}
+                            </th>
+                          ))}
+                          <th className="text-right py-2 pl-3 font-bold">Anual</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {squadRanking.map((sq) => (
+                          <tr
+                            key={sq.squad}
+                            className="border-b border-border/50 hover:bg-muted/50 cursor-pointer transition-colors"
+                            onClick={() => setSquadSelecionado(sq.squad)}
+                          >
+                            <td className="py-1.5 pr-3 font-medium text-xs sticky left-0 bg-background z-10 whitespace-nowrap">
+                              {sq.squad}
+                            </td>
+                            {sq.porMes.map((_, i) => {
+                              const total = receitaTotalPorMes[i];
+                              const pct = total > 0 ? ((sq.porMes[i] || 0) / total) * 100 : 0;
+                              return (
+                                <td key={i} className={cn(
+                                  "py-1.5 px-2 text-right text-xs",
+                                  pct === 0 && "text-muted-foreground"
+                                )}>
+                                  {pct > 0 ? `${pct.toFixed(1)}%` : "-"}
+                                </td>
+                              );
+                            })}
+                            <td className="py-1.5 pl-3 text-right text-xs font-bold">
+                              {sq.contribuicaoPct.toFixed(1)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* KPI Cards - show when specific squad is selected */}
       {squadSelecionado !== "todos" && (
