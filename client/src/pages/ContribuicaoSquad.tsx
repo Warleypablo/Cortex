@@ -280,6 +280,9 @@ export default function ContribuicaoSquad() {
                       <th className="text-right py-2.5 px-3 text-xs font-bold text-foreground min-w-[100px]">
                         Total
                       </th>
+                      <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground min-w-[70px]">
+                        Contrib %
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -306,11 +309,33 @@ export default function ContribuicaoSquad() {
                                 {sq.squad}
                               </span>
                             </td>
-                            {/* Empty month cells on header */}
-                            {monthlyResults.map((m) => (
-                              <td key={m.mes} className="py-2 px-2" />
-                            ))}
-                            <td className="py-2 px-3" />
+                            {/* When collapsed, show resultado per month */}
+                            {monthlyResults.map((_, i) => {
+                              const receita = sq.porMes[i] || 0;
+                              const desp = tableData.despesaSquadMes(sq, i);
+                              const margem = receita - desp;
+                              return (
+                                <td key={i} className={cn(
+                                  "py-2 px-2 text-right text-xs",
+                                  isCollapsed
+                                    ? margem >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+                                    : ""
+                                )}>
+                                  {isCollapsed && receita > 0 ? formatCurrencyNoDecimals(margem) : ""}
+                                </td>
+                              );
+                            })}
+                            <td className={cn(
+                              "py-2 px-3 text-right text-xs font-semibold",
+                              isCollapsed
+                                ? totalMargemSquad >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
+                                : ""
+                            )}>
+                              {isCollapsed ? formatCurrencyNoDecimals(totalMargemSquad) : ""}
+                            </td>
+                            <td className="py-2 px-3 text-right text-xs font-bold text-muted-foreground">
+                              {sq.contribuicaoPct.toFixed(1)}%
+                            </td>
                           </tr>
 
                           {!isCollapsed && (
@@ -328,6 +353,7 @@ export default function ContribuicaoSquad() {
                                 <td className="py-1.5 px-3 text-right text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                                   {formatCurrencyNoDecimals(sq.receitaTotal)}
                                 </td>
+                                <td />
                               </tr>
 
                               {/* Despesas */}
@@ -346,6 +372,7 @@ export default function ContribuicaoSquad() {
                                 <td className="py-1.5 px-3 text-right text-xs font-semibold text-red-500 dark:text-red-400">
                                   {formatCurrencyNoDecimals(totalDespesaSquad)}
                                 </td>
+                                <td />
                               </tr>
 
                               {/* Margem */}
@@ -372,6 +399,7 @@ export default function ContribuicaoSquad() {
                                 )}>
                                   {formatCurrencyNoDecimals(totalMargemSquad)}
                                 </td>
+                                <td />
                               </tr>
 
                               {/* Margem % */}
@@ -392,6 +420,7 @@ export default function ContribuicaoSquad() {
                                 <td className="py-1.5 px-3 text-right text-xs font-semibold text-muted-foreground">
                                   {totalMargemPctSquad > 0 ? `${totalMargemPctSquad.toFixed(1)}%` : "-"}
                                 </td>
+                                <td />
                               </tr>
                             </>
                           )}
@@ -410,6 +439,7 @@ export default function ContribuicaoSquad() {
                         <td key={m.mes} className="py-2.5 px-2" />
                       ))}
                       <td className="py-2.5 px-3" />
+                      <td className="py-2.5 px-3 text-right text-xs font-bold text-muted-foreground">100%</td>
                     </tr>
                     {/* Total Receita */}
                     <tr className="border-b border-border/30 bg-muted/30">
@@ -424,6 +454,7 @@ export default function ContribuicaoSquad() {
                       <td className="py-1.5 px-3 text-right text-xs font-bold text-emerald-600 dark:text-emerald-400">
                         {formatCurrencyNoDecimals(tableData.totalReceita)}
                       </td>
+                      <td />
                     </tr>
                     {/* Total Despesas */}
                     <tr className="border-b border-border/30 bg-muted/30">
@@ -438,6 +469,7 @@ export default function ContribuicaoSquad() {
                       <td className="py-1.5 px-3 text-right text-xs font-bold text-red-500 dark:text-red-400">
                         {formatCurrencyNoDecimals(tableData.totalDespesa)}
                       </td>
+                      <td />
                     </tr>
                     {/* Total Margem */}
                     <tr className="border-b border-border/30 bg-muted/30">
@@ -461,6 +493,7 @@ export default function ContribuicaoSquad() {
                       )}>
                         {formatCurrencyNoDecimals(tableData.totalMargem)}
                       </td>
+                      <td />
                     </tr>
                     {/* Total Margem % */}
                     <tr className="bg-muted/30">
@@ -480,6 +513,7 @@ export default function ContribuicaoSquad() {
                       <td className="py-1.5 px-3 text-right text-xs font-bold text-muted-foreground">
                         {tableData.totalMargemPct !== 0 ? `${tableData.totalMargemPct.toFixed(1)}%` : "-"}
                       </td>
+                      <td />
                     </tr>
                   </tfoot>
                 </table>
