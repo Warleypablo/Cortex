@@ -9,6 +9,8 @@ import SquadDetalhe from "@/components/squads/SquadDetalhe";
 import { formatCurrencyNoDecimals, formatPercent, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -151,6 +153,8 @@ export default function AnaliseSquads() {
   }, [selectedMonth]);
 
   const [selectedSquad, setSelectedSquad] = useState<string | null>(null);
+  const [perfilDataInicio, setPerfilDataInicio] = useState("");
+  const [perfilDataFim, setPerfilDataFim] = useState("");
 
   const { data, isLoading } = useQuery<AnaliseSquadsResponse>({
     queryKey: ["/api/analise-squads", mesAno],
@@ -306,7 +310,7 @@ export default function AnaliseSquads() {
                 Performance consolidada por squad
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <Select value={selectedSquad} onValueChange={(v) => setSelectedSquad(v === "todos" ? null : v)}>
                 <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
                   <SelectValue placeholder="Todos os Squads" />
@@ -319,6 +323,38 @@ export default function AnaliseSquads() {
                 </SelectContent>
               </Select>
               <MonthYearPicker value={selectedMonth} onChange={setSelectedMonth} minYear={2025} />
+              <div className="flex items-center gap-2 border-l border-gray-200 dark:border-zinc-700 pl-3">
+                <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">Período Churn:</span>
+                <Input
+                  type="date"
+                  value={perfilDataInicio}
+                  onChange={(e) => setPerfilDataInicio(e.target.value)}
+                  className="w-36 h-9 text-xs bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+                />
+                <span className="text-xs text-gray-400 dark:text-zinc-500">até</span>
+                <Input
+                  type="date"
+                  value={perfilDataFim}
+                  onChange={(e) => setPerfilDataFim(e.target.value)}
+                  className="w-36 h-9 text-xs bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+                />
+                {[3, 6, 12].map((m) => (
+                  <Button key={m} variant="outline" size="sm" className="h-9 text-xs px-2.5" onClick={() => {
+                    const hoje = new Date();
+                    const inicio = new Date(hoje);
+                    inicio.setMonth(inicio.getMonth() - m);
+                    setPerfilDataInicio(inicio.toISOString().slice(0, 10));
+                    setPerfilDataFim(hoje.toISOString().slice(0, 10));
+                  }}>
+                    {m}M
+                  </Button>
+                ))}
+                {(perfilDataInicio || perfilDataFim) && (
+                  <Button variant="ghost" size="sm" className="h-9 text-xs px-2 text-gray-500 dark:text-zinc-400" onClick={() => { setPerfilDataInicio(""); setPerfilDataFim(""); }}>
+                    Limpar
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -327,6 +363,8 @@ export default function AnaliseSquads() {
           mesAno={mesAno}
           chartColors={chartColors}
           onBack={() => setSelectedSquad(null)}
+          perfilDataInicio={perfilDataInicio}
+          perfilDataFim={perfilDataFim}
         />
       </div>
     );
