@@ -423,4 +423,36 @@ export function registerSolicitacaoFerramentasRoutes(app: Express) {
       res.status(500).json({ message: "Erro ao atualizar solicitação" });
     }
   });
+
+  // DELETE /api/solicitacao-ferramentas/:id - Delete a request
+  app.delete("/api/solicitacao-ferramentas/:id", async (req, res) => {
+    try {
+      await ensureTable();
+      const user = (req as any).user;
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
+
+      // Check ownership or approver
+      const current = await db.execute(sql`
+        SELECT solicitante_email FROM cortex_core.solicitacao_ferramentas WHERE id = ${id}
+      `);
+      if (current.rows.length === 0) {
+        return res.status(404).json({ message: "Solicitação não encontrada" });
+      }
+
+      const owner = (current.rows[0] as any).solicitante_email === user.email;
+      if (!owner && !isApprover(user)) {
+        return res.status(403).json({ message: "Sem permissão para excluir" });
+      }
+
+      await db.execute(sql`
+        DELETE FROM cortex_core.solicitacao_ferramentas WHERE id = ${id}
+      `);
+
+      res.json({ message: "Solicitação excluída" });
+    } catch (error) {
+      console.error("[solicitacao-ferramentas] Error deleting:", error);
+      res.status(500).json({ message: "Erro ao excluir solicitação" });
+    }
+  });
 }

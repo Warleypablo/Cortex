@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Loader2, CheckCircle2, Clock, XCircle, ShoppingCart, Package, ExternalLink, Wrench, Eye, EyeOff, KeyRound } from "lucide-react";
+import { Plus, Loader2, CheckCircle2, Clock, XCircle, ShoppingCart, Package, ExternalLink, Wrench, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -182,6 +182,20 @@ export default function SolicitacaoFerramentas() {
     },
     onError: () => {
       toast({ title: "Erro ao atualizar", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/solicitacao-ferramentas/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Solicitação excluída!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/solicitacao-ferramentas"] });
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir", variant: "destructive" });
     },
   });
 
@@ -649,6 +663,21 @@ export default function SolicitacaoFerramentas() {
                                   Marcar Comprado
                                 </Button>
                               )}
+
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                onClick={() => {
+                                  if (confirm("Excluir esta solicitação?")) {
+                                    deleteMutation.mutate(s.id);
+                                  }
+                                }}
+                                disabled={deleteMutation.isPending}
+                                title="Excluir solicitação"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
