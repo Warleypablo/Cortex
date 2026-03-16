@@ -185,6 +185,8 @@ function getMotivoBadgeColor(motivo: string): string {
 export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: SquadDetalheProps) {
   const [busca, setBusca] = useState("");
   const [mesSelecionadoChurn, setMesSelecionadoChurn] = useState<string | null>(null);
+  const [perfilDataInicio, setPerfilDataInicio] = useState("");
+  const [perfilDataFim, setPerfilDataFim] = useState("");
 
   const { data, isLoading } = useQuery<DetalheResponse>({
     queryKey: ["/api/analise-squads/detalhe", squad, mesAno],
@@ -313,12 +315,25 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     return data.contratosChurn.filter((c) => c.mes === mesAno);
   }, [data, mesAno]);
 
-  // Perfil dos clientes que cancelaram (reativo ao mês do gráfico ou mesAno do topo)
+  // Perfil dos clientes que cancelaram (reativo a período, mês do gráfico ou mesAno)
   const perfilChurnLocal = useMemo(() => {
     if (!data?.contratosChurn) return null;
 
-    const mesFiltro = mesSelecionadoChurn || mesAno;
-    const filtrados = data.contratosChurn.filter((c) => c.mes === mesFiltro);
+    let filtrados: ContratoChurn[];
+    if (perfilDataInicio || perfilDataFim) {
+      // Período personalizado por dia
+      filtrados = data.contratosChurn.filter((c) => {
+        if (!c.data_encerramento) return false;
+        const d = c.data_encerramento.slice(0, 10); // YYYY-MM-DD
+        if (perfilDataInicio && d < perfilDataInicio) return false;
+        if (perfilDataFim && d > perfilDataFim) return false;
+        return true;
+      });
+    } else if (mesSelecionadoChurn) {
+      filtrados = data.contratosChurn.filter((c) => c.mes === mesSelecionadoChurn);
+    } else {
+      filtrados = data.contratosChurn.filter((c) => c.mes === mesAno);
+    }
 
     if (filtrados.length === 0) return null;
 
@@ -350,8 +365,8 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     const singleCount = Object.values(parentGroups).filter((v) => v === 1).length;
     const pctSingleProduct = totalParents > 0 ? Math.round((singleCount / totalParents) * 1000) / 10 : 0;
 
-    return { ltMedio, ticketMedio: ticketMedioChurn, pctMenos3m, segmentoPredominante, pctSingleProduct, total: filtrados.length, mes: mesFiltro };
-  }, [data, mesAno, mesSelecionadoChurn]);
+    return { ltMedio, ticketMedio: ticketMedioChurn, pctMenos3m, segmentoPredominante, pctSingleProduct, total: filtrados.length };
+  }, [data, mesAno, mesSelecionadoChurn, perfilDataInicio, perfilDataFim]);
 
   // Contratos filtrados por busca
   const contratosFiltrados = useMemo(() => {
@@ -693,19 +708,60 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
         {/* Tab: Churns */}
         <TabsContent value="churns" className="space-y-4">
           {/* Card: Perfil dos Clientes que Cancelaram */}
-          {perfilChurnLocal && (
+          {(perfilChurnLocal || data?.contratosChurn?.length) && (
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
-              <CardHeader className="pb-2">
+              <CardHeader className="pb-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <Users className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
                     Perfil dos Clientes que Cancelaram
-                    <Badge variant="secondary" className="text-[10px] font-normal ml-1">{perfilChurnLocal.total} churns</Badge>
+                    {perfilChurnLocal && (
+                      <Badge variant="secondary" className="text-[10px] font-normal ml-1">{perfilChurnLocal.total} churns</Badge>
+                    )}
                   </CardTitle>
+                </div>
+                <div className="flex flex-wrap gap-3 items-end mt-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-500 dark:text-zinc-400">Data Início</label>
+                    <Input
+                      type="date"
+                      value={perfilDataInicio}
+                      onChange={(e) => { setPerfilDataInicio(e.target.value); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
+                      className="w-36 h-8 text-xs bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-500 dark:text-zinc-400">Data Fim</label>
+                    <Input
+                      type="date"
+                      value={perfilDataFim}
+                      onChange={(e) => { setPerfilDataFim(e.target.value); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
+                      className="w-36 h-8 text-xs bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
+                    />
+                  </div>
+                  <div className="flex gap-1.5">
+                    {[3, 6, 12].map((m) => (
+                      <Button key={m} variant="outline" size="sm" className="h-8 text-xs px-2.5" onClick={() => {
+                        const hoje = new Date();
+                        const inicio = new Date(hoje);
+                        inicio.setMonth(inicio.getMonth() - m);
+                        setPerfilDataInicio(inicio.toISOString().slice(0, 10));
+                        setPerfilDataFim(hoje.toISOString().slice(0, 10));
+                        setMesSelecionadoChurn(null);
+                      }}>
+                        {m}M
+                      </Button>
+                    ))}
+                    {(perfilDataInicio || perfilDataFim) && (
+                      <Button variant="ghost" size="sm" className="h-8 text-xs px-2 text-gray-500 dark:text-zinc-400" onClick={() => { setPerfilDataInicio(""); setPerfilDataFim(""); }}>
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
                   {mesSelecionadoChurn && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
-                        {formatMesLabel(mesSelecionadoChurn)}
+                        Gráfico: {formatMesLabel(mesSelecionadoChurn)}
                       </Badge>
                       <Button variant="ghost" size="sm" className="h-6 text-xs text-gray-500 dark:text-zinc-400 px-1.5" onClick={() => setMesSelecionadoChurn(null)}>
                         Limpar
@@ -715,43 +771,47 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-5 gap-4">
-                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
-                    <Clock className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
-                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">LT Médio</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">
-                      {perfilChurnLocal.ltMedio != null ? `${perfilChurnLocal.ltMedio}m` : "N/D"}
-                    </span>
+                {perfilChurnLocal ? (
+                  <div className="grid grid-cols-5 gap-4">
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                      <Clock className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">LT Médio</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">
+                        {perfilChurnLocal.ltMedio != null ? `${perfilChurnLocal.ltMedio}m` : "N/D"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                      <FileText className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Single-Product</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">
+                        {perfilChurnLocal.pctSingleProduct}%
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                      <DollarSign className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Ticket Médio</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">
+                        {formatCurrencyNoDecimals(perfilChurnLocal.ticketMedio)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                      <Users className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Segmento</span>
+                      <span className="text-lg font-bold text-gray-900 dark:text-white">
+                        {perfilChurnLocal.segmentoPredominante || "N/D"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                      <TrendingDown className={`w-4 h-4 mb-1.5 ${perfilChurnLocal.pctMenos3m > 30 ? "text-rose-500" : "text-gray-400 dark:text-zinc-500"}`} />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Churns &lt; 3m</span>
+                      <span className={`text-lg font-bold ${perfilChurnLocal.pctMenos3m > 30 ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white"}`}>
+                        {perfilChurnLocal.pctMenos3m}%
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
-                    <FileText className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
-                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Single-Product</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">
-                      {perfilChurnLocal.pctSingleProduct}%
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
-                    <DollarSign className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
-                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Ticket Médio</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">
-                      {formatCurrencyNoDecimals(perfilChurnLocal.ticketMedio)}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
-                    <Users className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
-                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Segmento</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white">
-                      {perfilChurnLocal.segmentoPredominante || "N/D"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
-                    <TrendingDown className={`w-4 h-4 mb-1.5 ${perfilChurnLocal.pctMenos3m > 30 ? "text-rose-500" : "text-gray-400 dark:text-zinc-500"}`} />
-                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Churns &lt; 3m</span>
-                    <span className={`text-lg font-bold ${perfilChurnLocal.pctMenos3m > 30 ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white"}`}>
-                      {perfilChurnLocal.pctMenos3m}%
-                    </span>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-zinc-500 text-center py-4">Sem churns no período selecionado</p>
+                )}
               </CardContent>
             </Card>
           )}
