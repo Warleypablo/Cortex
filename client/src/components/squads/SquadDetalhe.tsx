@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  DollarSign, Users, TrendingDown, TrendingUp, FileText, ArrowLeft, Search, UserCheck,
+  DollarSign, Users, TrendingDown, TrendingUp, FileText, ArrowLeft, Search, UserCheck, Clock,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -88,6 +88,16 @@ interface ContratoChurn {
   motivo_cancelamento: string;
   submotivo_cancelamento: string;
   lt_meses: number | null;
+  tipo_negocio?: string;
+  parent_id?: string;
+}
+
+interface PerfilChurn {
+  ltMedio: number | null;
+  ticketMedio: number;
+  pctMenos3m: number;
+  segmentoPredominante: string | null;
+  pctSingleProduct: number;
 }
 
 interface TotaisAnterior {
@@ -130,6 +140,7 @@ interface DetalheResponse {
   evolucaoChurn: { mes: string; churns: number; mrr_churn: number }[];
   churnPorMotivo?: { mes: string; motivo: string; mrr_churn: number }[];
   contratosAtivos: ContratoAtivo[];
+  perfilChurn?: PerfilChurn | null;
 }
 
 function computeVariation(current: number, previous: number): { pct: number; label: string } | null {
@@ -641,6 +652,57 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
 
         {/* Tab: Churns */}
         <TabsContent value="churns" className="space-y-4">
+          {/* Card: Perfil dos Clientes que Cancelaram */}
+          {data?.perfilChurn && (
+            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Users className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
+                  Perfil dos Clientes que Cancelaram
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-5 gap-4">
+                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                    <Clock className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">LT Médio</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">
+                      {data.perfilChurn.ltMedio != null ? `${data.perfilChurn.ltMedio}m` : "N/D"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                    <FileText className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Single-Product</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">
+                      {data.perfilChurn.pctSingleProduct}%
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                    <DollarSign className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Ticket Médio</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">
+                      {formatCurrencyNoDecimals(data.perfilChurn.ticketMedio)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                    <Users className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Segmento</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">
+                      {data.perfilChurn.segmentoPredominante || "N/D"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                    <TrendingDown className={`w-4 h-4 mb-1.5 ${data.perfilChurn.pctMenos3m > 30 ? "text-rose-500" : "text-gray-400 dark:text-zinc-500"}`} />
+                    <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Churns &lt; 3m</span>
+                    <span className={`text-lg font-bold ${data.perfilChurn.pctMenos3m > 30 ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white"}`}>
+                      {data.perfilChurn.pctMenos3m}%
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Stacked Bar: MRR Churn por Motivo por Mês */}
           {churnMotivoData.length > 0 && (
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
