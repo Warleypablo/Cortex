@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { formatCurrencyNoDecimals, formatPercent, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
 import {
-  DollarSign, Users, TrendingDown, TrendingUp, FileText, ArrowLeft, Search, UserCheck, Clock,
+  DollarSign, Users, TrendingDown, TrendingUp, FileText, ArrowLeft, Search, UserCheck, Clock, FileDown,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -187,6 +190,10 @@ function getMotivoBadgeColor(motivo: string): string {
 export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfilDataInicio = "", perfilDataFim = "" }: SquadDetalheProps) {
   const [busca, setBusca] = useState("");
   const [mesSelecionadoChurn, setMesSelecionadoChurn] = useState<string | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [showPdfContent, setShowPdfContent] = useState(false);
+  const pdfRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const { data, isLoading } = useQuery<DetalheResponse>({
     queryKey: ["/api/analise-squads/detalhe", squad, mesAno],
@@ -309,11 +316,23 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
     return data.contratosChurn.filter((c) => c.mes === mesSelecionadoChurn);
   }, [mesSelecionadoChurn, data]);
 
-  // Churns do mês selecionado no filtro principal (mesAno)
-  const churnsDoMes = useMemo(() => {
+  // Churns filtrados (reativo a período, mês do gráfico ou mesAno)
+  const churnsFiltrados = useMemo(() => {
     if (!data?.contratosChurn) return [];
+    if (perfilDataInicio || perfilDataFim) {
+      return data.contratosChurn.filter((c) => {
+        if (!c.data_encerramento) return false;
+        const d = c.data_encerramento.slice(0, 10);
+        if (perfilDataInicio && d < perfilDataInicio) return false;
+        if (perfilDataFim && d > perfilDataFim) return false;
+        return true;
+      });
+    }
+    if (mesSelecionadoChurn) {
+      return data.contratosChurn.filter((c) => c.mes === mesSelecionadoChurn);
+    }
     return data.contratosChurn.filter((c) => c.mes === mesAno);
-  }, [data, mesAno]);
+  }, [data, mesAno, mesSelecionadoChurn, perfilDataInicio, perfilDataFim]);
 
   // Perfil dos clientes que cancelaram (reativo a período, mês do gráfico ou mesAno)
   const perfilChurnLocal = useMemo(() => {
@@ -381,6 +400,48 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
         (c.responsavel || "").toLowerCase().includes(term)
     );
   }, [data, busca]);
+
+  // PDF export
+  const exportToPdf = useCallback(() => {
+    setIsExportingPdf(true);
+    setShowPdfContent(true);
+  }, []);
+
+  useEffect(() => {
+    if (!showPdfContent || !pdfRef.current) return;
+    const generatePdf = async () => {
+      try {
+        const canvas = await html2canvas(pdfRef.current!, { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false });
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+        const pw = pdf.internal.pageSize.getWidth();
+        const ph = pdf.internal.pageSize.getHeight();
+        const m = 8;
+        const uw = pw - m * 2;
+        const imgH = uw * (canvas.height / canvas.width);
+        if (imgH <= ph - m * 2) {
+          pdf.addImage(imgData, "PNG", m, m, uw, imgH);
+        } else {
+          const pageH = ph - m * 2;
+          const pages = Math.ceil(imgH / pageH);
+          for (let i = 0; i < pages; i++) {
+            if (i > 0) pdf.addPage();
+            pdf.addImage(imgData, "PNG", m, m - i * pageH, uw, imgH);
+          }
+        }
+        const nome = `churn-${squad}-${perfilDataInicio || mesAno}-a-${perfilDataFim || mesAno}.pdf`;
+        pdf.save(nome);
+        toast({ title: "PDF exportado!", description: `Arquivo: ${nome}` });
+      } catch (e) {
+        console.error("Erro PDF:", e);
+        toast({ title: "Erro", description: "Não foi possível gerar o PDF.", variant: "destructive" });
+      } finally {
+        setShowPdfContent(false);
+        setIsExportingPdf(false);
+      }
+    };
+    setTimeout(generatePdf, 150);
+  }, [showPdfContent, squad, mesAno, perfilDataInicio, perfilDataFim, toast]);
 
   if (isLoading) {
     return (
@@ -886,13 +947,26 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
             </Card>
           )}
 
-          {!mesSelecionadoChurn && (
           <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <TrendingDown className="w-4 h-4" />
-                Churns do Mês ({churnsDoMes.length})
+                {(perfilDataInicio || perfilDataFim)
+                  ? `Churns do Período (${churnsFiltrados.length})`
+                  : mesSelecionadoChurn
+                    ? `Churns de ${formatMesLabel(mesSelecionadoChurn)} (${churnsFiltrados.length})`
+                    : `Churns do Mês (${churnsFiltrados.length})`}
               </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToPdf}
+                disabled={isExportingPdf || churnsFiltrados.length === 0}
+                className="text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-600"
+              >
+                <FileDown className="w-4 h-4 mr-1" />
+                {isExportingPdf ? "Gerando..." : "Exportar PDF"}
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -909,7 +983,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {churnsDoMes.map((c, idx) => (
+                    {churnsFiltrados.map((c, idx) => (
                       <TableRow key={idx} className="border-gray-100 dark:border-zinc-800">
                         <TableCell className="font-medium text-gray-900 dark:text-white max-w-[180px] truncate">{c.cliente || "—"}</TableCell>
                         <TableCell className="text-gray-700 dark:text-zinc-300">{c.contrato || "—"}</TableCell>
@@ -930,7 +1004,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                         </TableCell>
                       </TableRow>
                     ))}
-                    {churnsDoMes.length === 0 && (
+                    {churnsFiltrados.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-gray-500 dark:text-zinc-500 py-8">
                           Sem churns no período
@@ -942,9 +1016,80 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
               </div>
             </CardContent>
           </Card>
-          )}
         </TabsContent>
       </Tabs>
+
+      {/* Hidden PDF render container */}
+      {showPdfContent && (
+        <div
+          ref={pdfRef}
+          style={{
+            position: "fixed", left: "-9999px", top: 0, width: "1400px",
+            background: "#fff", color: "#111", fontFamily: "system-ui, sans-serif",
+            fontSize: "12px", padding: "32px", zIndex: -1,
+          }}
+        >
+          {/* Header */}
+          <div style={{ borderBottom: "2px solid #e5e7eb", paddingBottom: "16px", marginBottom: "24px" }}>
+            <h1 style={{ fontSize: "22px", fontWeight: "bold", margin: 0 }}>
+              Relatório de Churn — {squad}
+            </h1>
+            <p style={{ color: "#666", fontSize: "13px", margin: "4px 0 0" }}>
+              {(perfilDataInicio || perfilDataFim)
+                ? `Período: ${perfilDataInicio ? new Date(perfilDataInicio + "T12:00").toLocaleDateString("pt-BR") : "—"} até ${perfilDataFim ? new Date(perfilDataFim + "T12:00").toLocaleDateString("pt-BR") : "—"}`
+                : `Mês: ${mesSelecionadoChurn ? formatMesLabel(mesSelecionadoChurn) : formatMesLabel(mesAno)}`}
+            </p>
+          </div>
+
+          {/* Metrics grid */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: "24px" }}>
+            {[
+              { label: "LT Médio", value: perfilChurnLocal?.ltMedio != null ? `${perfilChurnLocal.ltMedio} meses` : "—" },
+              { label: "Single-Product %", value: perfilChurnLocal?.pctSingleProduct != null ? `${perfilChurnLocal.pctSingleProduct}%` : "—" },
+              { label: "Ticket Médio", value: perfilChurnLocal?.ticketMedio != null ? formatCurrencyNoDecimals(perfilChurnLocal.ticketMedio) : "—" },
+              { label: "Churns < 3m", value: perfilChurnLocal?.pctMenos3m != null ? `${perfilChurnLocal.pctMenos3m}%` : "—" },
+              { label: "Total Churns", value: String(churnsFiltrados.length) },
+              { label: "MRR Churn Total", value: formatCurrencyNoDecimals(churnsFiltrados.reduce((s, c) => s + (parseFloat(String(c.valorr)) || 0), 0)) },
+              { label: "Clientes Únicos", value: String(new Set(churnsFiltrados.map(c => c.cliente)).size) },
+              { label: "Churn Rate", value: data?.totais?.churnRate != null ? formatPercent(data.totais.churnRate) : "—" },
+            ].map((m, i) => (
+              <div key={i} style={{ border: "1px solid #e5e7eb", borderRadius: "8px", padding: "12px" }}>
+                <div style={{ fontSize: "10px", color: "#888", textTransform: "uppercase", marginBottom: "4px" }}>{m.label}</div>
+                <div style={{ fontSize: "16px", fontWeight: "bold" }}>{m.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Table */}
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+            <thead>
+              <tr style={{ background: "#f3f4f6" }}>
+                {["Cliente", "Contrato", "MRR Perdido", "Responsável", "Data", "Motivo", "LT (meses)"].map((h) => (
+                  <th key={h} style={{ padding: "8px 10px", textAlign: "left", borderBottom: "2px solid #e5e7eb", fontWeight: 600 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {churnsFiltrados.map((c, idx) => (
+                <tr key={idx} style={{ borderBottom: "1px solid #f3f4f6" }}>
+                  <td style={{ padding: "6px 10px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.cliente || "—"}</td>
+                  <td style={{ padding: "6px 10px" }}>{c.contrato || "—"}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", fontWeight: 600, color: "#e11d48" }}>{formatCurrencyNoDecimals(parseFloat(String(c.valorr)) || 0)}</td>
+                  <td style={{ padding: "6px 10px" }}>{c.responsavel || "—"}</td>
+                  <td style={{ padding: "6px 10px" }}>{c.data_encerramento ? new Date(c.data_encerramento).toLocaleDateString("pt-BR") : "—"}</td>
+                  <td style={{ padding: "6px 10px" }}>{c.motivo_cancelamento || "—"}</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right" }}>{c.lt_meses != null ? `${c.lt_meses}m` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Footer */}
+          <div style={{ marginTop: "24px", borderTop: "1px solid #e5e7eb", paddingTop: "8px", fontSize: "10px", color: "#999" }}>
+            Gerado em {new Date().toLocaleString("pt-BR")} — Córtex
+          </div>
+        </div>
+      )}
     </div>
   );
 }
