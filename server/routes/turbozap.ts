@@ -3,6 +3,8 @@ import {
   initTurboZapTables,
   previewCobrancas,
   executarCobrancas,
+  previewPorData,
+  executarEnvioMassa,
   getHistorico,
   getStats,
   getConfiguracoes,
@@ -54,6 +56,47 @@ export function registerTurboZapRoutes(app: Express) {
     } catch (error) {
       console.error("[turbozap] Error executing cobrancas:", error);
       res.status(500).json({ message: "Erro ao executar cobranças" });
+    }
+  });
+
+  // GET /api/turbozap/preview-por-data - Preview de clientes por data de vencimento
+  app.get("/api/turbozap/preview-por-data", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+
+      const data = req.query.data as string;
+      if (!data) {
+        return res.status(400).json({ message: "Parâmetro 'data' é obrigatório (YYYY-MM-DD)" });
+      }
+
+      const preview = await previewPorData(data);
+      res.json(preview);
+    } catch (error) {
+      console.error("[turbozap] Error fetching preview por data:", error);
+      res.status(500).json({ message: "Erro ao buscar preview por data" });
+    }
+  });
+
+  // POST /api/turbozap/executar-massa - Executa envio em massa por data
+  app.post("/api/turbozap/executar-massa", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+
+      const user = req.user as any;
+      const executadoPor = user?.email || user?.name || "sistema";
+      const { data, template } = req.body;
+
+      if (!data || !template) {
+        return res.status(400).json({ message: "Campos 'data' e 'template' são obrigatórios" });
+      }
+
+      const resultado = await executarEnvioMassa(data, template, executadoPor);
+      res.json(resultado);
+    } catch (error: any) {
+      console.error("[turbozap] Error executing envio massa:", error);
+      res.status(500).json({ message: error.message || "Erro ao executar envio em massa" });
     }
   });
 
