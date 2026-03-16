@@ -747,6 +747,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
             </Card>
           )}
 
+          {!mesSelecionadoChurn && (
           <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
             <CardHeader>
               <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
@@ -800,6 +801,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
               </div>
             </CardContent>
           </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
