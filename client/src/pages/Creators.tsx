@@ -334,7 +334,7 @@ export default function Creators() {
           <TabsList>
             <TabsTrigger value="creators" className="gap-2">
               <Megaphone className="w-4 h-4" />
-              Creators
+              Freelancers
             </TabsTrigger>
             <TabsTrigger value="contratos" className="gap-2">
               <FileText className="w-4 h-4" />
@@ -422,7 +422,7 @@ export default function Creators() {
                 <Megaphone className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
                 <p className="text-muted-foreground">Selecione um creator na aba anterior para ver os contratos</p>
                 <Button variant="outline" className="mt-4" onClick={() => setActiveTab("creators")}>
-                  Ir para Creators
+                  Ir para Freelancers
                 </Button>
               </CardContent>
             </Card>
