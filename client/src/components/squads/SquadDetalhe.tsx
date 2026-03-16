@@ -10,7 +10,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  DollarSign, Users, TrendingDown, FileText, ArrowLeft, Search, UserCheck,
+  DollarSign, Users, TrendingDown, TrendingUp, FileText, ArrowLeft, Search, UserCheck,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -88,6 +88,24 @@ interface ContratoChurn {
   submotivo_cancelamento: string;
 }
 
+interface TotaisAnterior {
+  mrr: number;
+  contratos: number;
+  clientes: number;
+  churns: number;
+  churnRate: number;
+  mrrChurn: number;
+}
+
+interface OperadorAnterior {
+  nome: string;
+  mrr: number;
+  contratos: number;
+  clientes: number;
+  churns: number;
+  mrrChurn: number;
+}
+
 interface DetalheResponse {
   squad: string;
   mesAno: string;
@@ -102,11 +120,35 @@ interface DetalheResponse {
     headcount: number;
   };
   operadores: Operador[];
+  totaisAnterior?: TotaisAnterior;
+  operadoresAnterior?: OperadorAnterior[];
   evolucaoMrr: { mes: string; mrr: number }[];
   evolucaoOperadores: { mes: string; operador: string; mrr: number }[];
   contratosChurn: ContratoChurn[];
   evolucaoChurn: { mes: string; churns: number; mrr_churn: number }[];
   contratosAtivos: ContratoAtivo[];
+}
+
+function computeVariation(current: number, previous: number): { pct: number; label: string } | null {
+  if (previous === 0 && current === 0) return null;
+  if (previous === 0) return { pct: 100, label: "+100%" };
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  return { pct, label: `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%` };
+}
+
+function DeltaBadge({ current, previous, isNegative = false }: { current: number; previous: number; isNegative?: boolean }) {
+  const variation = computeVariation(current, previous);
+  if (!variation) return null;
+  const isPositive = isNegative ? variation.pct <= 0 : variation.pct >= 0;
+  return (
+    <div className="flex items-center gap-1 mt-1">
+      {variation.pct >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+      <span className={cn("text-xs font-medium", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+        {variation.label}
+      </span>
+      <span className="text-[10px] text-gray-400 dark:text-zinc-500">vs mês ant.</span>
+    </div>
+  );
 }
 
 function ChurnRateIndicator({ rate }: { rate: number }) {
@@ -187,6 +229,17 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     return { operadorChartData: chartData, topOperadores: top };
   }, [data]);
 
+  // Mapa de operadores do mês anterior para delta na tabela
+  const operadorAntMap = useMemo(() => {
+    const map = new Map<string, OperadorAnterior>();
+    if (data?.operadoresAnterior) {
+      for (const op of data.operadoresAnterior) {
+        map.set(op.nome, op);
+      }
+    }
+    return map;
+  }, [data]);
+
   // Contratos filtrados por busca
   const contratosFiltrados = useMemo(() => {
     if (!data?.contratosAtivos) return [];
@@ -218,13 +271,15 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
 
   const t = data?.totais;
 
+  const tAnt = data?.totaisAnterior;
+
   const kpiCards = [
-    { title: "MRR Total", value: formatCurrencyNoDecimals(t?.mrr || 0), icon: DollarSign, color: "text-cyan-600 dark:text-cyan-400", bgGlow: "from-cyan-500/10 to-transparent" },
-    { title: "Contratos", value: (t?.contratos || 0).toLocaleString("pt-BR"), icon: FileText, color: "text-blue-600 dark:text-blue-400", bgGlow: "from-blue-500/10 to-transparent" },
-    { title: "Clientes", value: (t?.clientes || 0).toLocaleString("pt-BR"), icon: Users, color: "text-violet-600 dark:text-violet-400", bgGlow: "from-violet-500/10 to-transparent" },
-    { title: "Churn Rate", value: formatPercent(t?.churnRate || 0), icon: TrendingDown, color: (t?.churnRate || 0) <= 3 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400", bgGlow: (t?.churnRate || 0) <= 3 ? "from-emerald-500/10 to-transparent" : "from-rose-500/10 to-transparent" },
-    { title: "MRR Churn", value: formatCurrencyNoDecimals(t?.mrrChurn || 0), icon: TrendingDown, color: "text-amber-600 dark:text-amber-400", bgGlow: "from-amber-500/10 to-transparent" },
-    { title: "Headcount", value: (t?.headcount || 0).toString(), icon: UserCheck, color: "text-teal-600 dark:text-teal-400", bgGlow: "from-teal-500/10 to-transparent" },
+    { title: "MRR Total", value: formatCurrencyNoDecimals(t?.mrr || 0), icon: DollarSign, color: "text-cyan-600 dark:text-cyan-400", bgGlow: "from-cyan-500/10 to-transparent", current: t?.mrr || 0, previous: tAnt?.mrr ?? null, isNegative: false },
+    { title: "Contratos", value: (t?.contratos || 0).toLocaleString("pt-BR"), icon: FileText, color: "text-blue-600 dark:text-blue-400", bgGlow: "from-blue-500/10 to-transparent", current: t?.contratos || 0, previous: tAnt?.contratos ?? null, isNegative: false },
+    { title: "Clientes", value: (t?.clientes || 0).toLocaleString("pt-BR"), icon: Users, color: "text-violet-600 dark:text-violet-400", bgGlow: "from-violet-500/10 to-transparent", current: t?.clientes || 0, previous: tAnt?.clientes ?? null, isNegative: false },
+    { title: "Churn Rate", value: formatPercent(t?.churnRate || 0), icon: TrendingDown, color: (t?.churnRate || 0) <= 3 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400", bgGlow: (t?.churnRate || 0) <= 3 ? "from-emerald-500/10 to-transparent" : "from-rose-500/10 to-transparent", current: t?.churnRate || 0, previous: tAnt?.churnRate ?? null, isNegative: true },
+    { title: "MRR Churn", value: formatCurrencyNoDecimals(t?.mrrChurn || 0), icon: TrendingDown, color: "text-amber-600 dark:text-amber-400", bgGlow: "from-amber-500/10 to-transparent", current: t?.mrrChurn || 0, previous: tAnt?.mrrChurn ?? null, isNegative: true },
+    { title: "Headcount", value: (t?.headcount || 0).toString(), icon: UserCheck, color: "text-teal-600 dark:text-teal-400", bgGlow: "from-teal-500/10 to-transparent", current: null, previous: null, isNegative: false },
   ];
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -269,6 +324,9 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
             </CardHeader>
             <CardContent className="relative">
               <div className="text-lg font-bold text-gray-900 dark:text-white">{card.value}</div>
+              {card.current !== null && card.previous !== null && (
+                <DeltaBadge current={card.current} previous={card.previous} isNegative={card.isNegative} />
+              )}
             </CardContent>
           </Card>
         ))}
@@ -354,6 +412,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                     <TableRow className="border-gray-200 dark:border-zinc-700">
                       <TableHead className="text-gray-600 dark:text-zinc-400">Nome</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">MRR</TableHead>
+                      <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Δ MRR</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Contratos</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Clientes</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Churns</TableHead>
@@ -367,6 +426,26 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                       <TableRow key={op.nome} className="border-gray-100 dark:border-zinc-800">
                         <TableCell className="font-medium text-gray-900 dark:text-white">{op.nome}</TableCell>
                         <TableCell className="text-right font-semibold text-gray-900 dark:text-white">{formatCurrencyNoDecimals(op.mrr)}</TableCell>
+                        <TableCell className="text-right">
+                          {(() => {
+                            const prev = operadorAntMap.get(op.nome);
+                            if (!prev) return <span className="text-gray-400 dark:text-zinc-600">—</span>;
+                            const diff = op.mrr - prev.mrr;
+                            const variation = computeVariation(op.mrr, prev.mrr);
+                            if (!variation) return <span className="text-gray-400 dark:text-zinc-600">—</span>;
+                            const isPositive = diff >= 0;
+                            return (
+                              <div className="flex flex-col items-end">
+                                <span className={cn("text-xs font-semibold", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                  {isPositive ? "+" : ""}{formatCurrencyNoDecimals(diff)}
+                                </span>
+                                <span className={cn("text-[10px]", isPositive ? "text-emerald-500/70 dark:text-emerald-400/60" : "text-rose-500/70 dark:text-rose-400/60")}>
+                                  {variation.label}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="text-right text-gray-700 dark:text-zinc-300">{op.contratos}</TableCell>
                         <TableCell className="text-right text-gray-700 dark:text-zinc-300">{op.clientes}</TableCell>
                         <TableCell className="text-right text-gray-700 dark:text-zinc-300">{op.churns}</TableCell>
@@ -380,6 +459,25 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                       <TableRow className="border-t-2 border-gray-300 dark:border-zinc-600 bg-gray-50/50 dark:bg-zinc-800/30 font-semibold">
                         <TableCell className="text-gray-900 dark:text-white">Total</TableCell>
                         <TableCell className="text-right text-gray-900 dark:text-white">{formatCurrencyNoDecimals(t.mrr)}</TableCell>
+                        <TableCell className="text-right">
+                          {(() => {
+                            if (!tAnt) return <span className="text-gray-400 dark:text-zinc-600">—</span>;
+                            const diff = t.mrr - tAnt.mrr;
+                            const variation = computeVariation(t.mrr, tAnt.mrr);
+                            if (!variation) return <span className="text-gray-400 dark:text-zinc-600">—</span>;
+                            const isPositive = diff >= 0;
+                            return (
+                              <div className="flex flex-col items-end">
+                                <span className={cn("text-xs font-semibold", isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                  {isPositive ? "+" : ""}{formatCurrencyNoDecimals(diff)}
+                                </span>
+                                <span className={cn("text-[10px]", isPositive ? "text-emerald-500/70 dark:text-emerald-400/60" : "text-rose-500/70 dark:text-rose-400/60")}>
+                                  {variation.label}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </TableCell>
                         <TableCell className="text-right text-gray-900 dark:text-white">{t.contratos}</TableCell>
                         <TableCell className="text-right text-gray-900 dark:text-white">{t.clientes}</TableCell>
                         <TableCell className="text-right text-gray-900 dark:text-white">{t.churns}</TableCell>
