@@ -337,6 +337,15 @@ async function ensureContratosTablesExist() {
       )
     `);
 
+    // Add per-service date columns if they don't exist
+    await db.execute(sql`
+      DO $$ BEGIN
+        ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_inicio DATE;
+        ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_fim DATE;
+      EXCEPTION WHEN others THEN NULL;
+      END $$
+    `);
+
     // Entregaveis - tasks de entrega hierarquicas
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS staging.entregaveis (
@@ -1271,7 +1280,7 @@ Exemplos:
               contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
               modalidade, valor_original, valor_negociado, desconto_percentual,
               tipo_desconto, valor_desconto, valor_final, economia, observacoes,
-              escopo, is_personalizado
+              escopo, is_personalizado, data_inicio, data_fim
             ) VALUES (
               ${contratoId}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
               ${itemValorNegociado}, ${itemValorNegociado},
@@ -1279,7 +1288,8 @@ Exemplos:
               ${itemValorNegociado}, ${Number(item.desconto_percentual) || 0},
               ${item.tipo_desconto || 'percentual'}, ${itemEconomia},
               ${itemValorNegociado}, ${itemEconomia}, ${item.observacoes || null},
-              ${item.escopo || null}, ${item.is_personalizado || false}
+              ${item.escopo || null}, ${item.is_personalizado || false},
+              ${item.data_inicio || null}, ${item.data_fim || null}
             )
           `);
         }
@@ -1343,14 +1353,16 @@ Exemplos:
             INSERT INTO staging.contratos_itens (
               contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
               modalidade, valor_original, valor_negociado, desconto_percentual,
-              tipo_desconto, valor_desconto, valor_final, economia, observacoes
+              tipo_desconto, valor_desconto, valor_final, economia, observacoes,
+              data_inicio, data_fim
             ) VALUES (
               ${parseInt(id)}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
               ${item.valor_unitario || 0}, ${item.valor_total || 0},
               ${item.modalidade || null}, ${item.valor_original || 0},
               ${item.valor_negociado || 0}, ${item.desconto_percentual || 0},
               ${item.tipo_desconto || null}, ${item.valor_desconto || 0},
-              ${item.valor_final || 0}, ${item.economia || 0}, ${item.observacoes || null}
+              ${item.valor_final || 0}, ${item.economia || 0}, ${item.observacoes || null},
+              ${item.data_inicio || null}, ${item.data_fim || null}
             )
           `);
         }
