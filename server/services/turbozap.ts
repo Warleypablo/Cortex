@@ -470,6 +470,154 @@ export async function previewCobrancas(): Promise<PreviewNivel[]> {
 }
 
 // ============================================
+// Preview por Data (Envio em Massa)
+// ============================================
+
+export async function previewPorData(dataVencimento: string): Promise<{
+  data_vencimento: string;
+  clientes: ClienteCobranca[];
+  total_valor: number;
+}> {
+  const skipNumerosRaw = await getConfiguracao("skip_numeros");
+  const skipNumeros = new Set<string>(
+    skipNumerosRaw ? JSON.parse(skipNumerosRaw) : DEFAULT_SKIP_NUMEROS,
+  );
+
+  let clientes = await buscarClientesPorVencimento(dataVencimento);
+
+  // Filter out skip numbers
+  clientes = clientes.filter((c) => {
+    const num = normalizarNumero(c.telefone);
+    return !skipNumeros.has(num);
+  });
+
+  // Deduplicate by id_cliente + data_vencimento
+  const vistos = new Set<string>();
+  const unicos: ClienteCobranca[] = [];
+  for (const c of clientes) {
+    const chave = `${c.id_cliente}_${c.data_vencimento}`;
+    if (!vistos.has(chave)) {
+      vistos.add(chave);
+      unicos.push(c);
+    }
+  }
+
+  const totalValor = unicos.reduce((sum, c) => sum + (Number(c.total) || 0), 0);
+
+  return { data_vencimento: dataVencimento, clientes: unicos, total_valor: totalValor };
+}
+
+// ============================================
+// Executar Envio em Massa
+// ============================================
+
+export async function executarEnvioMassa(
+  dataVencimento: string,
+  tipoTemplate: string,
+  executadoPor: string,
+): Promise<{ execucaoId: string; enviados: number; erros: number; pulados: number }> {
+  const execucaoId = randomUUID();
+
+  const { clientes } = await previewPorData(dataVencimento);
+
+  const template = await getConfiguracao(`template_${tipoTemplate}`);
+  if (!template) {
+    throw new Error(`Template '${tipoTemplate}' não encontrado`);
+  }
+
+  // Determine instance: D+30 and above → juridico, else financeiro
+  const nivelInfo = NIVEIS_COBRANCA.find((n) => n.tipo === tipoTemplate);
+  const instancia: "financeiro" | "juridico" = nivelInfo ? nivelInfo.instancia : "financeiro";
+
+  const delayMinRaw = await getConfiguracao("delay_min");
+  const delayMaxRaw = await getConfiguracao("delay_max");
+  const delayMin = parseFloat(delayMinRaw || "10") * 1000;
+  const delayMax = parseFloat(delayMaxRaw || "20") * 1000;
+
+  const tipoCobranca = `MASSA_${tipoTemplate}`;
+
+  let enviados = 0;
+  let erros = 0;
+  let pulados = 0;
+
+  for (const cliente of clientes) {
+    // Check for duplicate: same client + same tipo + same day
+    const today = new Date().toISOString().split("T")[0];
+    const dupCheck = await db.execute(sql`
+      SELECT id FROM cortex_core.turbozap_envios
+      WHERE cnpj = ${cliente.cnpj || ""}
+        AND tipo_cobranca = ${tipoCobranca}
+        AND criado_em::date = ${today}::date
+        AND status = 'enviado'
+      LIMIT 1
+    `);
+
+    if (dupCheck.rows.length > 0) {
+      pulados++;
+      await db.execute(sql`
+        INSERT INTO cortex_core.turbozap_envios (
+          id_cliente, cliente_nome, cnpj, telefone,
+          data_vencimento, valor, link_pagamento,
+          tipo_cobranca, mensagem_enviada, status, erro_detalhe,
+          executado_por, execucao_id
+        ) VALUES (
+          ${cliente.id_cliente}, ${cliente.cliente_nome}, ${cliente.cnpj || ""},
+          ${cliente.telefone}, ${cliente.data_vencimento}, ${Number(cliente.total)},
+          ${cliente.link_pagamento || ""}, ${tipoCobranca}, ${""},
+          'pulado', 'Duplicata: já enviado hoje para este cliente/tipo',
+          ${executadoPor}, ${execucaoId}
+        )
+      `);
+      continue;
+    }
+
+    const numero = normalizarNumero(cliente.telefone);
+    const mensagem = formatarMensagem(template, cliente);
+
+    const resultado = await enviarMensagemWhatsApp(numero, mensagem, instancia);
+
+    if (resultado.success) {
+      enviados++;
+      await db.execute(sql`
+        INSERT INTO cortex_core.turbozap_envios (
+          id_cliente, cliente_nome, cnpj, telefone,
+          data_vencimento, valor, link_pagamento,
+          tipo_cobranca, mensagem_enviada, status,
+          executado_por, execucao_id
+        ) VALUES (
+          ${cliente.id_cliente}, ${cliente.cliente_nome}, ${cliente.cnpj || ""},
+          ${cliente.telefone}, ${cliente.data_vencimento}, ${Number(cliente.total)},
+          ${cliente.link_pagamento || ""}, ${tipoCobranca}, ${mensagem},
+          'enviado', ${executadoPor}, ${execucaoId}
+        )
+      `);
+    } else {
+      erros++;
+      await db.execute(sql`
+        INSERT INTO cortex_core.turbozap_envios (
+          id_cliente, cliente_nome, cnpj, telefone,
+          data_vencimento, valor, link_pagamento,
+          tipo_cobranca, mensagem_enviada, status, erro_detalhe,
+          executado_por, execucao_id
+        ) VALUES (
+          ${cliente.id_cliente}, ${cliente.cliente_nome}, ${cliente.cnpj || ""},
+          ${cliente.telefone}, ${cliente.data_vencimento}, ${Number(cliente.total)},
+          ${cliente.link_pagamento || ""}, ${tipoCobranca}, ${mensagem},
+          'erro', ${resultado.error || "Erro desconhecido"},
+          ${executadoPor}, ${execucaoId}
+        )
+      `);
+    }
+
+    // Random delay between sends
+    const delay = Math.random() * (delayMax - delayMin) + delayMin;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+
+  return { execucaoId, enviados, erros, pulados };
+}
+
+// ============================================
 // Envio via Evolution API
 // ============================================
 

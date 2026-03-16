@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Zap, Send, History, Settings, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, SkipForward, Search, Loader2,
-  MessageSquare, TrendingUp, AlertTriangle, Phone, X, Scale,
+  MessageSquare, TrendingUp, AlertTriangle, Phone, X, Scale, Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -193,6 +193,9 @@ export default function TurboZap() {
           <TabsTrigger value="configuracoes" className="gap-2">
             <Settings className="w-4 h-4" /> Configurações
           </TabsTrigger>
+          <TabsTrigger value="envio-massa" className="gap-2">
+            <Calendar className="w-4 h-4" /> Envio em Massa
+          </TabsTrigger>
           <TabsTrigger value="pipeline" className="gap-2">
             <Scale className="w-4 h-4" /> Pipeline Jurídico
           </TabsTrigger>
@@ -202,6 +205,7 @@ export default function TurboZap() {
       {activeTab === "preview" && <PreviewTab />}
       {activeTab === "historico" && <HistoricoTab />}
       {activeTab === "configuracoes" && <ConfiguracoesTab />}
+      {activeTab === "envio-massa" && <EnvioMassaTab />}
       {activeTab === "pipeline" && <PipelineJuridicoTab />}
     </div>
   );
@@ -955,6 +959,224 @@ function ConfiguracoesTab() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ============================================
+// Envio em Massa Tab
+// ============================================
+
+const TEMPLATE_OPTIONS = [
+  { value: "D-3", label: "D-3 (Lembrete)" },
+  { value: "D+0", label: "D+0 (Vencimento)" },
+  { value: "D+3", label: "D+3 (3 dias)" },
+  { value: "D+7", label: "D+7 (Suspensão)" },
+  { value: "D+10", label: "D+10 (Rescisão)" },
+  { value: "D+15", label: "D+15 (Encerramento)" },
+  { value: "D+20", label: "D+20 (Cancelado)" },
+  { value: "D+30", label: "D+30 (Formalização Jurídica)" },
+  { value: "D+40", label: "D+40 (Comunicação Protesto)" },
+  { value: "D+45", label: "D+45 (Protesto Efetivado)" },
+  { value: "D+50", label: "D+50 (Aviso Negativação)" },
+  { value: "D+55", label: "D+55 (Negativação Efetivada)" },
+];
+
+function EnvioMassaTab() {
+  const { toast } = useToast();
+  const [dataVencimento, setDataVencimento] = useState("");
+  const [templateSelecionado, setTemplateSelecionado] = useState("D+0");
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const { data: preview, isLoading: isLoadingPreview, isFetching, refetch } = useQuery<{
+    data_vencimento: string;
+    clientes: ClienteCobranca[];
+    total_valor: number;
+  }>({
+    queryKey: ["/api/turbozap/preview-por-data", dataVencimento],
+    queryFn: async () => {
+      const res = await fetch(`/api/turbozap/preview-por-data?data=${dataVencimento}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Erro ao buscar preview");
+      return res.json();
+    },
+    enabled: false,
+  });
+
+  const enviarMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/turbozap/executar-massa", {
+        data: dataVencimento,
+        template: templateSelecionado,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/historico"] });
+      toast({
+        title: "Envio em massa concluído!",
+        description: `${data.enviados} enviados, ${data.erros} erros, ${data.pulados} pulados`,
+      });
+      setShowConfirm(false);
+    },
+    onError: () => {
+      toast({ title: "Erro ao executar envio em massa", variant: "destructive" });
+      setShowConfirm(false);
+    },
+  });
+
+  const clientes = preview?.clientes ?? [];
+  const totalValor = preview?.total_valor ?? 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
+                Data de Vencimento
+              </label>
+              <Input
+                type="date"
+                value={dataVencimento}
+                onChange={(e) => setDataVencimento(e.target.value)}
+                className="w-[180px] bg-gray-50 dark:bg-zinc-800"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
+                Template
+              </label>
+              <Select value={templateSelecionado} onValueChange={setTemplateSelecionado}>
+                <SelectTrigger className="w-[280px] bg-gray-50 dark:bg-zinc-800">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEMPLATE_OPTIONS.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => refetch()}
+              disabled={!dataVencimento || isLoadingPreview || isFetching}
+              className="gap-2"
+            >
+              {(isLoadingPreview || isFetching) ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
+              Buscar Clientes
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results */}
+      {preview && (
+        <>
+          {/* Summary */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600 dark:text-zinc-400">
+              <span className="font-semibold text-gray-900 dark:text-white">{clientes.length}</span> cliente{clientes.length !== 1 ? "s" : ""} encontrado{clientes.length !== 1 ? "s" : ""} —{" "}
+              <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(totalValor)}</span> total
+            </p>
+            <Button
+              onClick={() => setShowConfirm(true)}
+              disabled={clientes.length === 0 || enviarMutation.isPending}
+              className="gap-2"
+            >
+              {enviarMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              {enviarMutation.isPending ? "Enviando..." : "Enviar Mensagens"}
+            </Button>
+          </div>
+
+          {/* Client table */}
+          {clientes.length > 0 ? (
+            <Card className="bg-white dark:bg-zinc-900 overflow-hidden border-gray-200 dark:border-zinc-800">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 dark:border-zinc-800">
+                      <th className="text-left p-3 text-xs font-medium text-gray-500 dark:text-zinc-400">Cliente</th>
+                      <th className="text-left p-3 text-xs font-medium text-gray-500 dark:text-zinc-400">CNPJ</th>
+                      <th className="text-left p-3 text-xs font-medium text-gray-500 dark:text-zinc-400">Telefone</th>
+                      <th className="text-right p-3 text-xs font-medium text-gray-500 dark:text-zinc-400">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientes.map((c, idx) => (
+                      <tr key={`${c.id_cliente}-${idx}`} className="border-b border-gray-50 dark:border-zinc-800/50">
+                        <td className="p-3">
+                          <p className="font-medium text-gray-900 dark:text-white">{c.cliente_nome}</p>
+                        </td>
+                        <td className="p-3 text-gray-600 dark:text-zinc-400 font-mono text-xs">{c.cnpj}</td>
+                        <td className="p-3 text-gray-600 dark:text-zinc-400">
+                          <div className="flex items-center gap-1">
+                            <Phone className="w-3 h-3" />
+                            {c.telefone}
+                          </div>
+                        </td>
+                        <td className="p-3 text-right font-medium text-gray-900 dark:text-white">
+                          {formatCurrency(c.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+              <CardContent className="p-12 text-center">
+                <Calendar className="w-8 h-8 text-gray-300 dark:text-zinc-600 mx-auto mb-3" />
+                <p className="text-gray-400 dark:text-zinc-500">Nenhum cliente com parcela pendente nesta data</p>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* Confirm Dialog */}
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-900 dark:text-white">
+              Confirmar envio em massa
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-500 dark:text-zinc-400">
+              Você está prestes a enviar mensagens via WhatsApp para:
+              <br /><br />
+              <strong className="text-gray-900 dark:text-white">{clientes.length} clientes</strong> com vencimento em{" "}
+              <strong className="text-gray-900 dark:text-white">{formatDate(dataVencimento)}</strong>
+              <br />
+              Template: <strong className="text-gray-900 dark:text-white">{templateSelecionado}</strong>
+              <br />
+              Total: <strong className="text-gray-900 dark:text-white">{formatCurrency(totalValor)}</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="dark:bg-zinc-800 dark:text-white dark:border-zinc-700">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => enviarMutation.mutate()}
+              disabled={enviarMutation.isPending}
+              className="bg-primary"
+            >
+              {enviarMutation.isPending ? "Enviando..." : "Confirmar Envio"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
