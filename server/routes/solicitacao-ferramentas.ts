@@ -31,8 +31,9 @@ const CATEGORIA_LABELS: Record<string, string> = {
 };
 
 async function notificarAprovadoresWhatsApp(solicitacao: any, solicitanteNome: string) {
-  const valorFormatado = parseFloat(solicitacao.valor_total).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const valorUnit = parseFloat(solicitacao.valor_unitario).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const moeda = solicitacao.moeda || "BRL";
+  const valorFormatado = parseFloat(solicitacao.valor_total).toLocaleString("pt-BR", { style: "currency", currency: moeda });
+  const valorUnit = parseFloat(solicitacao.valor_unitario).toLocaleString("pt-BR", { style: "currency", currency: moeda });
   const categoriaLabel = CATEGORIA_LABELS[solicitacao.categoria] || solicitacao.categoria || "—";
   const recorrenciaLabel = RECORRENCIA_LABELS[solicitacao.recorrencia] || solicitacao.recorrencia || "Único";
   const appUrl = process.env.APP_URL || "https://cortex.turbopartners.com.br";
@@ -112,6 +113,7 @@ const createSolicitacaoSchema = z.object({
   motivo: z.string().min(10),
   login_email: z.string().optional().default(""),
   login_senha: z.string().optional().default(""),
+  moeda: z.enum(["BRL", "USD"]).default("BRL"),
 });
 
 const updateSolicitacaoSchema = z.object({
@@ -166,6 +168,10 @@ async function ensureTable() {
     await db.execute(sql`
       ALTER TABLE cortex_core.solicitacao_ferramentas
       ADD COLUMN IF NOT EXISTS login_senha VARCHAR(255)
+    `);
+    await db.execute(sql`
+      ALTER TABLE cortex_core.solicitacao_ferramentas
+      ADD COLUMN IF NOT EXISTS moeda VARCHAR(3) DEFAULT 'BRL'
     `);
     tableInitialized = true;
     console.log("[solicitacao-ferramentas] table initialized");
@@ -267,15 +273,15 @@ export function registerSolicitacaoFerramentasRoutes(app: Express) {
         return res.status(400).json({ message: "Dados inválidos", errors: parsed.error.flatten() });
       }
 
-      const { nome_item, descricao_produto, categoria, valor_unitario, quantidade, recorrencia, link_compra, motivo, login_email, login_senha } = parsed.data;
+      const { nome_item, descricao_produto, categoria, valor_unitario, quantidade, recorrencia, link_compra, motivo, login_email, login_senha, moeda } = parsed.data;
       const valor_total = valor_unitario * quantidade;
 
       const result = await db.execute(sql`
         INSERT INTO cortex_core.solicitacao_ferramentas
           (nome_item, descricao_produto, categoria, valor_unitario, quantidade, valor_total, recorrencia, link_compra, motivo,
-           login_email, login_senha, solicitante_id, solicitante_nome, solicitante_email)
+           login_email, login_senha, moeda, solicitante_id, solicitante_nome, solicitante_email)
         VALUES (${nome_item}, ${descricao_produto}, ${categoria}, ${valor_unitario}, ${quantidade}, ${valor_total}, ${recorrencia},
-                ${link_compra}, ${motivo}, ${login_email || null}, ${login_senha || null},
+                ${link_compra}, ${motivo}, ${login_email || null}, ${login_senha || null}, ${moeda},
                 ${user.googleId || user.id}, ${user.name}, ${user.email})
         RETURNING *
       `);
