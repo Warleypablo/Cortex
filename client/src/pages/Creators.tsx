@@ -457,7 +457,7 @@ export default function Creators() {
                               {statusBadge(ct.status)}
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              Valor mensal: {formatCurrency(ct.valor_remuneracao)} | {ct.duracao_meses} {ct.unidade_prazo || 'meses'}
+                              Valor: {formatCurrency(ct.valor_remuneracao)} | Prazo: {ct.duracao_meses} {ct.unidade_prazo || 'meses'}
                             </p>
                             {ct.data_inicio && ct.data_fim && (
                               <p className="text-sm text-muted-foreground">
@@ -770,7 +770,7 @@ export default function Creators() {
             {/* Valor e Duração */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Valor Mensal (R$) *</Label>
+                <Label>Valor (R$) *</Label>
                 <Input
                   placeholder="2.500,00"
                   value={contratoForm.valor_remuneracao}
@@ -779,7 +779,7 @@ export default function Creators() {
                 />
               </div>
               <div>
-                <Label>Duração</Label>
+                <Label>Prazo</Label>
                 <div className="flex gap-2">
                   <Input
                     type="number"
