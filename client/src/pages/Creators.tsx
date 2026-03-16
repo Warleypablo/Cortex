@@ -721,7 +721,7 @@ export default function Creators() {
             {contratoForm.cargo === "Produtor de Conteúdo" && (
               <div className="grid grid-cols-2 gap-3 p-3 rounded-md border dark:border-zinc-700 bg-muted/20">
                 <div>
-                  <Label>Qtd Vídeos/mês</Label>
+                  <Label>Qtd Vídeos</Label>
                   <Input
                     type="number"
                     min={1}
