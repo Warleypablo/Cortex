@@ -31,6 +31,7 @@ const CATEGORIA_LABELS: Record<string, string> = {
 };
 
 async function notificarAprovadoresWhatsApp(solicitacao: any, solicitanteNome: string) {
+  console.log(`[solicitacao-ferramentas] Sending WhatsApp to approvers for item "${solicitacao.nome_item}" by ${solicitanteNome}`);
   const moeda = solicitacao.moeda || "BRL";
   const valorFormatado = parseFloat(solicitacao.valor_total).toLocaleString("pt-BR", { style: "currency", currency: moeda });
   const valorUnit = parseFloat(solicitacao.valor_unitario).toLocaleString("pt-BR", { style: "currency", currency: moeda });
@@ -92,6 +93,56 @@ async function notificarAprovadoresWhatsApp(solicitacao: any, solicitanteNome: s
     } catch (err) {
       console.error(`[solicitacao-ferramentas] WhatsApp error for ${numero}:`, err);
     }
+  }
+}
+
+async function notificarSolicitanteWhatsApp(solicitacao: any, status: string, aprovadorNome: string, motivoRejeicao?: string) {
+  const moeda = solicitacao.moeda || "BRL";
+  const valorFormatado = parseFloat(solicitacao.valor_total).toLocaleString("pt-BR", { style: "currency", currency: moeda });
+  const categoriaLabel = CATEGORIA_LABELS[solicitacao.categoria] || solicitacao.categoria || "—";
+  const statusLabels: Record<string, string> = { aprovado: "✅ Aprovada", rejeitado: "❌ Rejeitada", comprado: "🛒 Comprada" };
+
+  const linhas = [
+    `*Atualização de Solicitação de Ferramenta*`,
+    ``,
+    `*Status:* ${statusLabels[status] || status}`,
+    `*Item:* ${solicitacao.nome_item}`,
+    `*Categoria:* ${categoriaLabel}`,
+    `*Valor:* ${valorFormatado}`,
+    `*${status === "rejeitado" ? "Rejeitado" : "Aprovado"} por:* ${aprovadorNome}`,
+  ];
+
+  if (status === "rejeitado" && motivoRejeicao) {
+    linhas.push(`*Motivo:* ${motivoRejeicao}`);
+  }
+
+  const mensagem = linhas.join("\n");
+
+  // Buscar telefone do solicitante
+  try {
+    const result = await db.execute(sql`
+      SELECT telefone FROM "Inhire".rh_pessoal
+      WHERE LOWER(email_turbo) = LOWER(${solicitacao.solicitante_email})
+        AND status = 'Ativo'
+        AND telefone IS NOT NULL
+      LIMIT 1
+    `);
+    if (result.rows.length === 0) {
+      console.log(`[solicitacao-ferramentas] Telefone não encontrado para ${solicitacao.solicitante_email}`);
+      return;
+    }
+    const tel = normalizarNumero((result.rows[0] as any).telefone);
+    if (tel.length < 10) return;
+    const numero = tel.startsWith("55") ? tel : `55${tel}`;
+
+    const envio = await enviarMensagemWhatsApp(numero, mensagem, "financeiro");
+    if (envio.success) {
+      console.log(`[solicitacao-ferramentas] WhatsApp (${status}) sent to solicitante ${numero}`);
+    } else {
+      console.error(`[solicitacao-ferramentas] WhatsApp (${status}) failed for solicitante ${numero}: ${envio.error}`);
+    }
+  } catch (err) {
+    console.error(`[solicitacao-ferramentas] WhatsApp error notifying solicitante:`, err);
   }
 }
 
@@ -416,6 +467,11 @@ export function registerSolicitacaoFerramentasRoutes(app: Express) {
       } catch (err) {
         console.error("[solicitacao-ferramentas] Error creating notification:", err);
       }
+
+      // Notify solicitante via WhatsApp — fire and forget
+      notificarSolicitanteWhatsApp(solicitacao, status, user.name, motivo_rejeicao).catch((err) =>
+        console.error("[solicitacao-ferramentas] WhatsApp solicitante notification error:", err)
+      );
 
       res.json(solicitacao);
     } catch (error) {
