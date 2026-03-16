@@ -139,8 +139,8 @@ const CARGOS_PRESET = [
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Creators() {
-  useSetPageInfo("Contratos Creators", "Gestão de creators/freelancers e contratos de prestação de serviços");
-  usePageTitle("Contratos Creators");
+  useSetPageInfo("Contratos Freelancers", "Gestão de creators/freelancers e contratos de prestação de serviços");
+  usePageTitle("Contratos Freelancers");
 
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("creators");
