@@ -13,7 +13,7 @@ import {
   DollarSign, Users, TrendingDown, TrendingUp, FileText, ArrowLeft, Search, UserCheck,
 } from "lucide-react";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  AreaChart, Area, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Bar, ComposedChart, Line,
 } from "recharts";
 
@@ -126,6 +126,7 @@ interface DetalheResponse {
   evolucaoOperadores: { mes: string; operador: string; mrr: number }[];
   contratosChurn: ContratoChurn[];
   evolucaoChurn: { mes: string; churns: number; mrr_churn: number }[];
+  churnPorMotivo?: { mes: string; motivo: string; mrr_churn: number }[];
   contratosAtivos: ContratoAtivo[];
 }
 
@@ -238,6 +239,46 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
       }
     }
     return map;
+  }, [data]);
+
+  // Churn por motivo por mês (stacked bar chart)
+  const MOTIVO_COLORS = [
+    "#f43f5e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899",
+    "#10b981", "#6366f1", "#84cc16",
+  ];
+
+  const { churnMotivoData, topMotivos } = useMemo(() => {
+    if (!data?.churnPorMotivo?.length) return { churnMotivoData: [], topMotivos: [] };
+
+    const rows = data.churnPorMotivo;
+    const meses = Array.from(new Set(rows.map((r) => r.mes))).sort();
+
+    // Top 6 motivos por MRR total, resto = "Outros"
+    const motivoTotals = new Map<string, number>();
+    for (const r of rows) {
+      motivoTotals.set(r.motivo, (motivoTotals.get(r.motivo) || 0) + (parseFloat(String(r.mrr_churn)) || 0));
+    }
+    const sorted = Array.from(motivoTotals.entries()).sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 6).map(([m]) => m);
+    const hasOutros = sorted.length > 6;
+
+    const allKeys = hasOutros ? [...top, "Outros"] : top;
+
+    const chartData = meses.map((mes) => {
+      const row: Record<string, any> = { mes: formatMesLabel(mes) };
+      for (const motivo of top) {
+        const match = rows.find((r) => r.mes === mes && r.motivo === motivo);
+        row[motivo] = match ? parseFloat(String(match.mrr_churn)) || 0 : 0;
+      }
+      if (hasOutros) {
+        row["Outros"] = rows
+          .filter((r) => r.mes === mes && !top.includes(r.motivo))
+          .reduce((sum, r) => sum + (parseFloat(String(r.mrr_churn)) || 0), 0);
+      }
+      return row;
+    });
+
+    return { churnMotivoData: chartData, topMotivos: allKeys };
   }, [data]);
 
   // Contratos filtrados por busca
@@ -579,6 +620,31 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
 
         {/* Tab: Churns */}
         <TabsContent value="churns" className="space-y-4">
+          {/* Stacked Bar: MRR Churn por Motivo por Mês */}
+          {churnMotivoData.length > 0 && (
+            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">
+                  MRR Churn por Motivo (12 meses)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={340}>
+                  <BarChart data={churnMotivoData} margin={{ left: 10, right: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                    <XAxis dataKey="mes" tick={{ fill: chartColors.axisTick, fontSize: 11 }} axisLine={{ stroke: chartColors.axisLine }} />
+                    <YAxis tick={{ fill: chartColors.axisTick, fontSize: 11 }} tickFormatter={(v) => formatCurrencyNoDecimals(v)} axisLine={{ stroke: chartColors.axisLine }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8} />
+                    {topMotivos.map((motivo, idx) => (
+                      <Bar key={motivo} dataKey={motivo} stackId="motivo" fill={MOTIVO_COLORS[idx % MOTIVO_COLORS.length]} radius={idx === topMotivos.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} maxBarSize={40} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
             <CardHeader>
               <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
