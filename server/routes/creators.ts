@@ -130,7 +130,7 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
 
   // Calcular altura
   doc.fontSize(9).font('Helvetica');
-  const leftH = doc.heightOfString(`Direito de Uso de Imagem?\n(x) Sim ( ) Não\nPeríodo:\nDurante ${contrato.duracao_meses} ${unidadePrazo}`, { width: colW - 2 * cellPad });
+  const leftH = doc.heightOfString(`Direito de Uso de Imagem?\n(x) Sim ( ) Não\nPeríodo:\nDurante 12 meses`, { width: colW - 2 * cellPad });
   const rightH = doc.heightOfString(`Canais:\n(x) Redes Sociais\n(x) Anúncios\n(x) Canais de Comunicação`, { width: colW - 2 * cellPad });
   const rowH = Math.max(leftH, rightH) + 2 * cellPad + 10;
 
@@ -142,7 +142,7 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
      .text('Direito de Uso de Imagem?', tableX + cellPad, tableY + cellPad, { width: colW - 2 * cellPad });
   doc.font('Helvetica').text('(x) Sim ( ) Não', { width: colW - 2 * cellPad });
   doc.font('Helvetica-Bold').text('Período:', { width: colW - 2 * cellPad });
-  doc.font('Helvetica').text(`Durante ${contrato.duracao_meses} ${unidadePrazo}`, { width: colW - 2 * cellPad });
+  doc.font('Helvetica').text('Durante 12 meses', { width: colW - 2 * cellPad });
 
   // Coluna direita
   doc.fontSize(9).font('Helvetica-Bold')
