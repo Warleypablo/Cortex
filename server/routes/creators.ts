@@ -159,7 +159,7 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
   // ══════════════════════════════════════════════════════════════════════════
   heading('CLÁUSULA TERCEIRA – DA REMUNERAÇÃO');
 
-  p(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração no valor de ${valorFormatado} (${valorPorExtenso(valorNum)}) mensais, enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`, { spacing: 0.5 });
+  p(`3.1 - A título de contraprestação pelos serviços prestados no âmbito deste contrato, a CONTRATADA fará jus à remuneração no valor de ${valorFormatado} (${valorPorExtenso(valorNum)}), enquanto vigente o presente instrumento, observado o escopo e a periodicidade das entregas pactuadas entre as partes.`, { spacing: 0.5 });
 
   p('Parágrafo Primeiro. Os valores que resultarem do disposto nesta cláusula constituem os únicos valores/créditos devidos pela CONTRATANTE ao CONTRATADO em razão do presente contrato, eximindo-se a CONTRATANTE de responder por quaisquer outros valores que sejam cobrados pelo CONTRATADO.', { spacing: 0.5 });
 
