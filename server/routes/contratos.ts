@@ -2041,84 +2041,84 @@ Exemplos:
     currentY = drawSectionTitle('SERVIÇOS CONTRATADOS', currentY);
 
     // Função para desenhar tabela de serviços com paginação
-    const drawServiceTable = (items: any[], modalidade: string, dataInicio: string, dataCobranca: string, valorTotal: number) => {
+    const drawServiceTable = (items: any[], modalidade: string, valorTotal: number) => {
       if (items.length === 0) return currentY;
-      
+
       const tableX = marginLeft;
       const tableW = contentWidth;
       const maxY = 720;
-      
+
       if (currentY + 100 > maxY) {
         doc.addPage();
         currentY = 100;
       }
-      
-      doc.roundedRect(tableX, currentY, tableW, 35, 4).fill(corHeader);
+
+      doc.roundedRect(tableX, currentY, tableW, 28, 4).fill(corHeader);
       doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
         .text(`MODALIDADE ${modalidade.toUpperCase()}`, tableX + 16, currentY + 8);
-      doc.fontSize(8).fillColor('#e2e8f1')
-        .text(`Início do Serviço: ${dataInicio} | Primeiro Vencimento: ${dataCobranca}`, tableX + 16, currentY + 22);
-      currentY += 40;
-      
+      currentY += 33;
+
       const drawTableHeader = () => {
         doc.rect(tableX, currentY, tableW, 22).fill('#e9eff3');
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#333');
-        doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 200 });
-        doc.text('Valor Negociado', tableX + 220, currentY + 6, { width: 120, align: 'center' });
-        doc.text('Detalhes', tableX + 350, currentY + 6, { width: tableW - 360, align: 'center' });
+        doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 170 });
+        doc.text('Valor Negociado', tableX + 185, currentY + 6, { width: 100, align: 'center' });
+        doc.text('Início', tableX + 290, currentY + 6, { width: 80, align: 'center' });
+        doc.text('Fim', tableX + 375, currentY + 6, { width: 80, align: 'center' });
         currentY += 22;
       };
-      
+
       drawTableHeader();
-      
+
       for (const item of items) {
         const servicoNome = item.servico_nome || 'Serviço';
         const planoNome = item.plano_nome || item.descricao || 'Personalizado';
         const valorItem = parseFloat(item.valor_negociado) || parseFloat(item.valor_original) || 0;
+        const dataIni = formatDate(item.data_inicio);
+        const dataFim = formatDate(item.data_fim);
         const rowH = 28;
-        
+
         if (currentY + rowH > maxY) {
           doc.addPage();
           currentY = 100;
           drawTableHeader();
         }
-        
+
         doc.rect(tableX, currentY, tableW, rowH).stroke('#E6EAF6');
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
-          .text(servicoNome, tableX + 10, currentY + 5, { width: 200 });
+          .text(servicoNome, tableX + 10, currentY + 5, { width: 170 });
         doc.font('Helvetica').fontSize(8).fillColor('#666')
-          .text(planoNome, tableX + 10, currentY + 16, { width: 200 });
+          .text(planoNome, tableX + 10, currentY + 16, { width: 170 });
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#28a745')
-          .text(formatCurrency(valorItem), tableX + 220, currentY + 10, { width: 120, align: 'center' });
-        
+          .text(formatCurrency(valorItem), tableX + 185, currentY + 10, { width: 100, align: 'center' });
+        doc.fontSize(8).font('Helvetica').fillColor('#555')
+          .text(dataIni, tableX + 290, currentY + 10, { width: 80, align: 'center' });
+        doc.text(dataFim, tableX + 375, currentY + 10, { width: 80, align: 'center' });
+
         currentY += rowH;
       }
-      
+
       if (currentY + 30 > maxY) {
         doc.addPage();
         currentY = 100;
       }
-      
+
       doc.rect(tableX, currentY, tableW, 25).fill('#f7fafc');
       doc.fontSize(10).font('Helvetica-Bold').fillColor('#333')
         .text(`VALOR ${modalidade.toUpperCase()}: ${formatCurrency(valorTotal)}`, tableX, currentY + 7, { width: tableW, align: 'center' });
       currentY += 35;
-      
+
       return currentY;
     };
 
     // Renderizar serviços recorrentes
     if (itensRecorrentes.length > 0) {
-      const dataInicioRec = formatDate(contrato.data_inicio_recorrentes);
-      const dataCobrancaRec = formatDate(contrato.data_inicio_cobranca_recorrentes || contrato.data_inicio_recorrentes);
-      currentY = drawServiceTable(itensRecorrentes, 'RECORRENTE', dataInicioRec, dataCobrancaRec, valorRecorrente);
+      currentY = drawServiceTable(itensRecorrentes, 'RECORRENTE', valorRecorrente);
     }
 
     // Renderizar serviços pontuais
     if (itensPontuais.length > 0) {
-      const dataInicioPont = formatDate(contrato.data_inicio_pontuais);
-      const dataCobrancaPont = formatDate(contrato.data_inicio_cobranca_pontuais || contrato.data_inicio_pontuais);
-      currentY = drawServiceTable(itensPontuais, 'PONTUAL', dataInicioPont, dataCobrancaPont, valorPontual);
+      currentY = drawServiceTable(itensPontuais, 'PONTUAL', valorPontual);
     }
 
     // ======= SEÇÃO: OBSERVAÇÕES =======
@@ -2357,10 +2357,6 @@ Exemplos:
         telefone: entidade.telefone || null,
         nome_socio: entidade.nome_socio || null,
         cpf_socio: entidade.cpf_socio || null,
-        data_inicio_recorrentes: formData.data_inicio_recorrentes || null,
-        data_inicio_cobranca_recorrentes: formData.data_inicio_cobranca_recorrentes || null,
-        data_inicio_pontuais: formData.data_inicio_pontuais || null,
-        data_inicio_cobranca_pontuais: formData.data_inicio_cobranca_pontuais || null,
         observacoes: formData.observacoes || null,
         comercial_nome: formData.comercial_nome || null,
         comercial_email: formData.comercial_email || null,
@@ -2630,94 +2626,85 @@ Exemplos:
       currentY = drawSectionTitle('SERVIÇOS CONTRATADOS', currentY);
 
       // Função para desenhar tabela de serviços (estilo PHP) com paginação
-      const drawServiceTable = (items: any[], modalidade: string, dataInicio: string, dataCobranca: string, valorTotal: number) => {
+      const drawServiceTable = (items: any[], modalidade: string, valorTotal: number) => {
         if (items.length === 0) return currentY;
-        
+
         const tableX = marginLeft;
         const tableW = contentWidth;
-        const maxY = 720; // Limite antes do footer
-        
-        // Verificar espaço para header da modalidade
+        const maxY = 720;
+
         if (currentY + 100 > maxY) {
           doc.addPage();
           currentY = 100;
         }
-        
-        // Header escuro da modalidade (estilo PHP)
-        doc.roundedRect(tableX, currentY, tableW, 35, 4).fill(corHeader);
+
+        doc.roundedRect(tableX, currentY, tableW, 28, 4).fill(corHeader);
         doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
           .text(`MODALIDADE ${modalidade.toUpperCase()}`, tableX + 16, currentY + 8);
-        doc.fontSize(8).fillColor('#e2e8f1')
-          .text(`Início do Serviço: ${dataInicio} | Primeiro Vencimento: ${dataCobranca}`, tableX + 16, currentY + 22);
-        currentY += 40;
-        
-        // Função para desenhar header da tabela
+        currentY += 33;
+
         const drawTableHeader = () => {
           doc.rect(tableX, currentY, tableW, 22).fill('#e9eff3');
           doc.fontSize(9).font('Helvetica-Bold').fillColor('#333');
-          doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 200 });
-          doc.text('Valor Negociado', tableX + 220, currentY + 6, { width: 120, align: 'center' });
-          doc.text('Detalhes', tableX + 350, currentY + 6, { width: tableW - 360, align: 'center' });
+          doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 170 });
+          doc.text('Valor Negociado', tableX + 185, currentY + 6, { width: 100, align: 'center' });
+          doc.text('Início', tableX + 290, currentY + 6, { width: 80, align: 'center' });
+          doc.text('Fim', tableX + 375, currentY + 6, { width: 80, align: 'center' });
           currentY += 22;
         };
-        
-        // Header inicial da tabela
+
         drawTableHeader();
-        
-        // Linhas de serviços com paginação
+
         for (const item of items) {
           const servicoNome = item.servico_nome || 'Serviço';
           const planoNome = item.plano_nome || item.descricao || 'Personalizado';
           const valorItem = parseFloat(item.valor_negociado) || parseFloat(item.valor_original) || 0;
-          
+          const dataIni = formatDate(item.data_inicio);
+          const dataFim = formatDate(item.data_fim);
+
           const rowH = 28;
-          
-          // Verificar se precisa nova página
+
           if (currentY + rowH > maxY) {
             doc.addPage();
             currentY = 100;
-            // Redesenhar header da tabela na nova página
             drawTableHeader();
           }
-          
+
           doc.rect(tableX, currentY, tableW, rowH).stroke('#E6EAF6');
           doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
-            .text(servicoNome, tableX + 10, currentY + 5, { width: 200 });
+            .text(servicoNome, tableX + 10, currentY + 5, { width: 170 });
           doc.font('Helvetica').fontSize(8).fillColor('#666')
-            .text(planoNome, tableX + 10, currentY + 16, { width: 200 });
+            .text(planoNome, tableX + 10, currentY + 16, { width: 170 });
           doc.fontSize(9).font('Helvetica-Bold').fillColor('#28a745')
-            .text(formatCurrency(valorItem), tableX + 220, currentY + 10, { width: 120, align: 'center' });
-          
+            .text(formatCurrency(valorItem), tableX + 185, currentY + 10, { width: 100, align: 'center' });
+          doc.fontSize(8).font('Helvetica').fillColor('#555')
+            .text(dataIni, tableX + 290, currentY + 10, { width: 80, align: 'center' });
+          doc.text(dataFim, tableX + 375, currentY + 10, { width: 80, align: 'center' });
+
           currentY += rowH;
         }
-        
-        // Verificar espaço para resumo
+
         if (currentY + 30 > maxY) {
           doc.addPage();
           currentY = 100;
         }
-        
-        // Resumo do valor
+
         doc.rect(tableX, currentY, tableW, 25).fill('#f7fafc');
         doc.fontSize(10).font('Helvetica-Bold').fillColor('#333')
           .text(`VALOR ${modalidade.toUpperCase()}: ${formatCurrency(valorTotal)}`, tableX, currentY + 7, { width: tableW, align: 'center' });
         currentY += 35;
-        
+
         return currentY;
       };
 
       // Renderizar serviços recorrentes
       if (itensRecorrentes.length > 0) {
-        const dataInicioRec = formatDate(contrato.data_inicio_recorrentes);
-        const dataCobrancaRec = formatDate(contrato.data_inicio_cobranca_recorrentes || contrato.data_inicio_recorrentes);
-        currentY = drawServiceTable(itensRecorrentes, 'RECORRENTE', dataInicioRec, dataCobrancaRec, valorRecorrente);
+        currentY = drawServiceTable(itensRecorrentes, 'RECORRENTE', valorRecorrente);
       }
 
       // Renderizar serviços pontuais
       if (itensPontuais.length > 0) {
-        const dataInicioPont = formatDate(contrato.data_inicio_pontuais);
-        const dataCobrancaPont = formatDate(contrato.data_inicio_cobranca_pontuais || contrato.data_inicio_pontuais);
-        currentY = drawServiceTable(itensPontuais, 'PONTUAL', dataInicioPont, dataCobrancaPont, valorPontual);
+        currentY = drawServiceTable(itensPontuais, 'PONTUAL', valorPontual);
       }
 
       if (checkAborted()) return;
