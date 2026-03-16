@@ -5,9 +5,17 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useTheme } from "@/components/ThemeProvider";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
 import TopMrrPorArea from "@/components/squads/TopMrrPorArea";
+import SquadDetalhe from "@/components/squads/SquadDetalhe";
 import { formatCurrencyNoDecimals, formatPercent, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -141,6 +149,8 @@ export default function AnaliseSquads() {
   const mesAno = useMemo(() => {
     return `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, "0")}`;
   }, [selectedMonth]);
+
+  const [selectedSquad, setSelectedSquad] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<AnaliseSquadsResponse>({
     queryKey: ["/api/analise-squads", mesAno],
@@ -284,6 +294,44 @@ export default function AnaliseSquads() {
     );
   };
 
+  if (selectedSquad) {
+    return (
+      <div className="space-y-0">
+        {/* Header with month picker persists */}
+        <div className="p-6 pb-0">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Análise de Squads</h1>
+              <p className="text-sm text-gray-600 dark:text-zinc-400">
+                Performance consolidada por squad
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Select value={selectedSquad} onValueChange={(v) => setSelectedSquad(v === "todos" ? null : v)}>
+                <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
+                  <SelectValue placeholder="Todos os Squads" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os Squads</SelectItem>
+                  {(data?.squadsLista || []).map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <MonthYearPicker value={selectedMonth} onChange={setSelectedMonth} minYear={2025} />
+            </div>
+          </div>
+        </div>
+        <SquadDetalhe
+          squad={selectedSquad}
+          mesAno={mesAno}
+          chartColors={chartColors}
+          onBack={() => setSelectedSquad(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -294,7 +342,20 @@ export default function AnaliseSquads() {
             Performance consolidada por squad
           </p>
         </div>
-        <MonthYearPicker value={selectedMonth} onChange={setSelectedMonth} minYear={2025} />
+        <div className="flex items-center gap-3">
+          <Select value="todos" onValueChange={(v) => setSelectedSquad(v === "todos" ? null : v)}>
+            <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
+              <SelectValue placeholder="Todos os Squads" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os Squads</SelectItem>
+              {(data?.squadsLista || []).map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <MonthYearPicker value={selectedMonth} onChange={setSelectedMonth} minYear={2025} />
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -458,7 +519,8 @@ export default function AnaliseSquads() {
                   .map((squad, index) => (
                     <TableRow
                       key={squad.squad}
-                      className="border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/30"
+                      className="border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/30 cursor-pointer transition-colors"
+                      onClick={() => setSelectedSquad(squad.squad)}
                     >
                       <TableCell className="font-medium text-gray-500 dark:text-zinc-500">
                         {index + 1}

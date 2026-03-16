@@ -5568,7 +5568,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const inicioMesStr = inicioMes.toISOString().split('T')[0];
       const fimMesStr = fimMes.toISOString().split('T')[0];
 
-      const evolucaoStart = new Date(ano, mes - 7, 1);
+      const evolucaoStart = new Date(ano, mes - 13, 1);
       const evolucaoStartStr = evolucaoStart.toISOString().split('T')[0];
 
       const agora = new Date();
@@ -5776,6 +5776,69 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         };
       });
 
+      // 6) Headcount do squad (rh_pessoal)
+      const headcountResult = await db.execute(sql`
+        SELECT COUNT(*) as headcount
+        FROM "Inhire".rh_pessoal
+        WHERE LOWER(TRIM(COALESCE(status, ''))) = 'ativo'
+          AND (COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squad}, '^[^a-zA-Z]+', '', 'g'))
+      `);
+      const headcount = parseInt((headcountResult.rows[0] as any)?.headcount) || 0;
+
+      // 7) Evolução Churn mensal (12 meses)
+      const evolucaoChurnResult = await db.execute(sql`
+        SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
+          COUNT(*) as churns, COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND valor_r > 0
+          AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+        GROUP BY 1 ORDER BY 1
+      `);
+
+      // 8) Contratos ativos do squad
+      let contratosAtivosRows: any[];
+      if (isMesAtual) {
+        const result = await db.execute(sql`
+          SELECT cl.nome as cliente, c.servico, c.produto,
+            c.valorr::numeric as valorr, c.responsavel, c.data_inicio, c.id_subtask
+          FROM "Clickup".cup_contratos c
+          LEFT JOIN "Clickup".cup_clientes cl ON c.id_task = cl.task_id
+          WHERE c.status IN ('ativo', 'onboarding', 'triagem')
+            AND c.valorr > 0
+            AND COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squad}
+          ORDER BY c.valorr::numeric DESC
+        `);
+        contratosAtivosRows = result.rows as any[];
+      } else {
+        const snapshotResult = await db.execute(sql`
+          SELECT MAX(data_snapshot) as ds
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= ${inicioMes}::timestamp
+            AND data_snapshot <= ${fimMes}::timestamp
+        `);
+        const dataSnapshot = (snapshotResult.rows[0] as any)?.ds;
+        if (dataSnapshot) {
+          const result = await db.execute(sql`
+            SELECT cl.nome as cliente, h.servico, h.produto,
+              h.valorr::numeric as valorr, h.responsavel, h.data_inicio, h.id_subtask
+            FROM "Clickup".cup_data_hist h
+            LEFT JOIN "Clickup".cup_clientes cl ON h.id_task = cl.task_id
+            WHERE h.data_snapshot = ${dataSnapshot}::timestamp
+              AND h.status IN ('ativo', 'onboarding', 'triagem')
+              AND h.valorr > 0
+              AND COALESCE(NULLIF(TRIM(h.squad), ''), 'Sem Squad') = ${squad}
+            ORDER BY h.valorr::numeric DESC
+          `);
+          contratosAtivosRows = result.rows as any[];
+        } else {
+          contratosAtivosRows = [];
+        }
+      }
+
       // Totais do squad
       const totalMrr = operadores.reduce((s, o) => s + o.mrr, 0);
       const totalContratos = operadores.reduce((s, o) => s + o.contratos, 0);
@@ -5796,11 +5859,14 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           churnRate,
           mrrChurn: totalMrrChurn,
           ticketMedio,
+          headcount,
         },
         operadores,
         evolucaoMrr: evolucaoMrrResult.rows,
         evolucaoOperadores: evolucaoOperadoresResult.rows,
         contratosChurn: contratosChurnResult.rows,
+        evolucaoChurn: evolucaoChurnResult.rows,
+        contratosAtivos: contratosAtivosRows,
       });
     } catch (error) {
       console.error("[api] Error fetching analise squads detalhe:", error);
