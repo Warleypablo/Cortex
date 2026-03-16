@@ -16,7 +16,8 @@ import {
   AreaChart, Area, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Bar, ComposedChart, Line,
 } from "recharts";
-import { MonthYearPicker } from "@/components/ui/month-year-picker";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
 
 const SQUAD_COLORS: Record<string, string> = {
   "Aurea": "#fbbf24", "Aurea (OFF)": "#fcd34d", "Black": "#475569",
@@ -186,8 +187,7 @@ function getMotivoBadgeColor(motivo: string): string {
 export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: SquadDetalheProps) {
   const [busca, setBusca] = useState("");
   const [mesSelecionadoChurn, setMesSelecionadoChurn] = useState<string | null>(null);
-  const [perfilDe, setPerfilDe] = useState<string | null>(null);
-  const [perfilAte, setPerfilAte] = useState<string | null>(null);
+  const [perfilDateRange, setPerfilDateRange] = useState<DateRange | undefined>(undefined);
 
   const { data, isLoading } = useQuery<DetalheResponse>({
     queryKey: ["/api/analise-squads/detalhe", squad, mesAno],
@@ -316,46 +316,36 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     return data.contratosChurn.filter((c) => c.mes === mesAno);
   }, [data, mesAno]);
 
-  // Meses disponíveis nos dados de churn (para o seletor de período)
-  const mesesDisponiveis = useMemo(() => {
-    if (!data?.contratosChurn) return [];
-    const set = new Set(data.contratosChurn.map((c) => c.mes).filter(Boolean));
-    return Array.from(set).sort() as string[];
-  }, [data]);
-
-  // Perfil dos clientes que cancelaram (reativo a mês do gráfico ou período selecionado)
+  // Perfil dos clientes que cancelaram (reativo a mês do gráfico ou date range)
   const perfilChurnLocal = useMemo(() => {
     if (!data?.contratosChurn) return null;
 
     let filtrados: ContratoChurn[];
     if (mesSelecionadoChurn) {
-      // Mês clicado no gráfico tem prioridade
       filtrados = data.contratosChurn.filter((c) => c.mes === mesSelecionadoChurn);
-    } else if (perfilDe || perfilAte) {
-      // Período personalizado
-      const de = perfilDe || "0000-00";
-      const ate = perfilAte || "9999-99";
-      filtrados = data.contratosChurn.filter((c) => c.mes && c.mes >= de && c.mes <= ate);
+    } else if (perfilDateRange?.from) {
+      const from = perfilDateRange.from;
+      const to = perfilDateRange.to || from;
+      filtrados = data.contratosChurn.filter((c) => {
+        if (!c.data_encerramento) return false;
+        const d = new Date(c.data_encerramento);
+        return d >= from && d <= to;
+      });
     } else {
-      // Default: mês principal
       filtrados = data.contratosChurn.filter((c) => c.mes === mesAno);
     }
 
     if (filtrados.length === 0) return null;
 
-    // LT médio
     const lts = filtrados.map((c) => c.lt_meses).filter((v): v is number => v != null && !isNaN(v));
     const ltMedio = lts.length > 0 ? Math.round((lts.reduce((s, v) => s + v, 0) / lts.length) * 10) / 10 : null;
 
-    // Ticket médio
     const valores = filtrados.map((c) => parseFloat(String(c.valorr)) || 0);
     const ticketMedioChurn = Math.round(valores.reduce((s, v) => s + v, 0) / filtrados.length);
 
-    // % churns < 3 meses
     const churnsMenos3m = lts.filter((v) => v < 3).length;
     const pctMenos3m = lts.length > 0 ? Math.round((churnsMenos3m / lts.length) * 1000) / 10 : 0;
 
-    // Segmento predominante
     const segmentoCount: Record<string, number> = {};
     for (const c of filtrados) {
       const tipo = c.tipo_negocio;
@@ -366,7 +356,6 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
       ? segEntries.sort((a, b) => b[1] - a[1])[0][0]
       : null;
 
-    // % single-product
     const parentGroups: Record<string, number> = {};
     for (const c of filtrados) {
       const pid = c.parent_id || c.contrato;
@@ -377,16 +366,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     const pctSingleProduct = totalParents > 0 ? Math.round((singleCount / totalParents) * 1000) / 10 : 0;
 
     return { ltMedio, ticketMedio: ticketMedioChurn, pctMenos3m, segmentoPredominante, pctSingleProduct, total: filtrados.length };
-  }, [data, mesAno, mesSelecionadoChurn, perfilDe, perfilAte]);
-
-  // Label descritivo do período ativo no perfil
-  const perfilPeriodoLabel = useMemo(() => {
-    if (mesSelecionadoChurn) return formatMesLabel(mesSelecionadoChurn);
-    if (perfilDe && perfilAte) return `${formatMesLabel(perfilDe)} — ${formatMesLabel(perfilAte)}`;
-    if (perfilDe) return `A partir de ${formatMesLabel(perfilDe)}`;
-    if (perfilAte) return `Até ${formatMesLabel(perfilAte)}`;
-    return formatMesLabel(mesAno);
-  }, [mesAno, mesSelecionadoChurn, perfilDe, perfilAte]);
+  }, [data, mesAno, mesSelecionadoChurn, perfilDateRange]);
 
   // Contratos filtrados por busca
   const contratosFiltrados = useMemo(() => {
@@ -735,7 +715,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                   <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <Users className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
                     Perfil dos Clientes que Cancelaram
-                    <Badge variant="secondary" className="text-[10px] font-normal ml-1">{perfilChurnLocal.total} churns · {perfilPeriodoLabel}</Badge>
+                    <Badge variant="secondary" className="text-[10px] font-normal ml-1">{perfilChurnLocal.total} churns</Badge>
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     {mesSelecionadoChurn && (
@@ -743,19 +723,14 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                         Filtrado pelo gráfico
                       </Badge>
                     )}
-                    <MonthYearPicker
-                      value={perfilDe ? { month: parseInt(perfilDe.split("-")[1]), year: parseInt(perfilDe.split("-")[0]) } : { month: parseInt(mesAno.split("-")[1]), year: parseInt(mesAno.split("-")[0]) }}
-                      onChange={({ month, year }) => { setPerfilDe(`${year}-${String(month).padStart(2, "0")}`); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
-                      triggerClassName="h-8 text-xs px-3"
+                    <DateRangePicker
+                      value={perfilDateRange}
+                      onChange={(range) => { setPerfilDateRange(range); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
+                      triggerClassName="h-8 text-xs min-w-[200px]"
+                      placeholder="Filtrar por período"
                     />
-                    <span className="text-xs text-gray-400 dark:text-zinc-500">até</span>
-                    <MonthYearPicker
-                      value={perfilAte ? { month: parseInt(perfilAte.split("-")[1]), year: parseInt(perfilAte.split("-")[0]) } : { month: parseInt(mesAno.split("-")[1]), year: parseInt(mesAno.split("-")[0]) }}
-                      onChange={({ month, year }) => { setPerfilAte(`${year}-${String(month).padStart(2, "0")}`); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
-                      triggerClassName="h-8 text-xs px-3"
-                    />
-                    {(perfilDe || perfilAte) && (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-500 dark:text-zinc-400 px-2" onClick={() => { setPerfilDe(null); setPerfilAte(null); }}>
+                    {perfilDateRange && (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-500 dark:text-zinc-400 px-2" onClick={() => setPerfilDateRange(undefined)}>
                         Limpar
                       </Button>
                     )}
