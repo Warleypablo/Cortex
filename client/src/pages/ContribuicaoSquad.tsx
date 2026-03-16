@@ -59,7 +59,7 @@ export default function ContribuicaoSquad() {
   const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
   const [taxaImposto, setTaxaImposto] = useState(18);
   const taxaDecimal = taxaImposto / 100;
-  const [collapsedSquads, setCollapsedSquads] = useState<Set<string>>(new Set());
+  const [collapsedSquads, setCollapsedSquads] = useState<Set<string> | "all">("all");
 
   const anos = Array.from({ length: 5 }, (_, i) => hoje.getFullYear() - i);
 
@@ -85,8 +85,17 @@ export default function ContribuicaoSquad() {
   );
   const monthlyResults = bulkData?.meses || [];
 
+  const isSquadCollapsed = (squad: string) =>
+    collapsedSquads === "all" || collapsedSquads.has(squad);
+
   const toggleSquadCollapse = (squad: string) => {
     setCollapsedSquads(prev => {
+      if (prev === "all") {
+        // First interaction: expand only this squad (rest stay collapsed)
+        const allSquads = new Set(squadRanking.map(s => s.squad));
+        allSquads.delete(squad);
+        return allSquads;
+      }
       const next = new Set(prev);
       if (next.has(squad)) {
         next.delete(squad);
@@ -287,7 +296,7 @@ export default function ContribuicaoSquad() {
                   </thead>
                   <tbody>
                     {squadRanking.map((sq) => {
-                      const isCollapsed = collapsedSquads.has(sq.squad);
+                      const isCollapsed = isSquadCollapsed(sq.squad);
                       const totalDespesaSquad = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaSquadMes(sq, i), 0);
                       const totalMargemSquad = sq.receitaTotal - totalDespesaSquad;
                       const totalMargemPctSquad = sq.receitaTotal > 0 ? (totalMargemSquad / sq.receitaTotal) * 100 : 0;
@@ -309,29 +318,23 @@ export default function ContribuicaoSquad() {
                                 {sq.squad}
                               </span>
                             </td>
-                            {/* When collapsed, show resultado per month */}
+                            {/* When collapsed, show receita per month */}
                             {monthlyResults.map((_, i) => {
                               const receita = sq.porMes[i] || 0;
-                              const desp = tableData.despesaSquadMes(sq, i);
-                              const margem = receita - desp;
                               return (
                                 <td key={i} className={cn(
                                   "py-2 px-2 text-right text-xs",
-                                  isCollapsed
-                                    ? margem >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
-                                    : ""
+                                  isCollapsed ? "text-emerald-600 dark:text-emerald-400" : ""
                                 )}>
-                                  {isCollapsed && receita > 0 ? formatCurrencyNoDecimals(margem) : ""}
+                                  {isCollapsed && receita > 0 ? formatCurrencyNoDecimals(receita) : ""}
                                 </td>
                               );
                             })}
                             <td className={cn(
                               "py-2 px-3 text-right text-xs font-semibold",
-                              isCollapsed
-                                ? totalMargemSquad >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"
-                                : ""
+                              isCollapsed ? "text-emerald-600 dark:text-emerald-400" : ""
                             )}>
-                              {isCollapsed ? formatCurrencyNoDecimals(totalMargemSquad) : ""}
+                              {isCollapsed ? formatCurrencyNoDecimals(sq.receitaTotal) : ""}
                             </td>
                             <td className="py-2 px-3 text-right text-xs font-bold text-muted-foreground">
                               {sq.contribuicaoPct.toFixed(1)}%
