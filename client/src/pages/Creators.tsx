@@ -164,7 +164,8 @@ export default function Creators() {
     valor_remuneracao: "", duracao_meses: "6",
     data_inicio: "", data_fim: "", observacoes: "",
     qtd_videos: "", qtd_creators: "", qtd_variacoes_gancho: "",
-    unidade_prazo: "meses", cliente_nome: "", cliente_task_id: ""
+    unidade_prazo: "meses", cliente_nome: "", cliente_task_id: "",
+    prazo_entrega_dias: "3"
   });
   const [clienteSearch, setClienteSearch] = useState("");
   const [clienteResults, setClienteResults] = useState<Array<{ task_id: string; nome: string; cnpj: string }>>([]);
@@ -283,7 +284,8 @@ export default function Creators() {
       valor_remuneracao: "", duracao_meses: "6",
       data_inicio: "", data_fim: "", observacoes: "",
       qtd_videos: "", qtd_creators: "", qtd_variacoes_gancho: "",
-      unidade_prazo: "meses", cliente_nome: "", cliente_task_id: ""
+      unidade_prazo: "meses", cliente_nome: "", cliente_task_id: "",
+      prazo_entrega_dias: "3"
     });
     setClienteSearch("");
     setClienteResults([]);
@@ -637,6 +639,7 @@ export default function Creators() {
               unidade_prazo: contratoForm.unidade_prazo,
               cliente_nome: contratoForm.cliente_nome || null,
               cliente_task_id: contratoForm.cliente_task_id || null,
+              prazo_entrega_dias: parseInt(contratoForm.prazo_entrega_dias) || 3,
               ...(contratoForm.cargo === "Produtor de Conteúdo" ? {
                 qtd_videos: parseInt(contratoForm.qtd_videos) || null,
                 qtd_variacoes_gancho: parseInt(contratoForm.qtd_variacoes_gancho) || null,
@@ -834,6 +837,19 @@ export default function Creators() {
                 />
                 <p className="text-xs text-muted-foreground mt-1">Calculada automaticamente</p>
               </div>
+            </div>
+
+            <div>
+              <Label>Prazo de Entrega (dias úteis)</Label>
+              <Input
+                type="number"
+                min={1}
+                max={90}
+                value={contratoForm.prazo_entrega_dias}
+                onChange={e => setContratoForm(f => ({ ...f, prazo_entrega_dias: e.target.value }))}
+                placeholder="3"
+              />
+              <p className="text-xs text-muted-foreground mt-1">Prazo para entrega dos conteúdos após briefing</p>
             </div>
 
             <div>
