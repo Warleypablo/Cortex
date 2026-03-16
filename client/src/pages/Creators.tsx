@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -48,6 +48,7 @@ import {
   Clock,
   AlertCircle,
   Plus,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -88,6 +89,12 @@ interface ContratoCreator {
   assinado_em: string | null;
   status: string;
   criado_em: string;
+  qtd_videos: number | null;
+  qtd_creators: number | null;
+  qtd_variacoes_gancho: number | null;
+  unidade_prazo: string | null;
+  cliente_nome: string | null;
+  cliente_task_id: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -155,8 +162,29 @@ export default function Creators() {
   const [contratoForm, setContratoForm] = useState({
     cargo: "", descricao_servicos: "",
     valor_remuneracao: "", duracao_meses: "6",
-    data_inicio: "", data_fim: "", observacoes: ""
+    data_inicio: "", data_fim: "", observacoes: "",
+    qtd_videos: "", qtd_creators: "", qtd_variacoes_gancho: "",
+    unidade_prazo: "meses", cliente_nome: "", cliente_task_id: ""
   });
+  const [clienteSearch, setClienteSearch] = useState("");
+  const [clienteResults, setClienteResults] = useState<Array<{ task_id: string; nome: string; cnpj: string }>>([]);
+  const [showClienteDropdown, setShowClienteDropdown] = useState(false);
+  const clienteSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const searchClientes = useCallback((q: string) => {
+    if (clienteSearchTimer.current) clearTimeout(clienteSearchTimer.current);
+    if (q.length < 2) { setClienteResults([]); setShowClienteDropdown(false); return; }
+    clienteSearchTimer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/creators/clientes/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setClienteResults(data);
+          setShowClienteDropdown(data.length > 0);
+        }
+      } catch { /* ignore */ }
+    }, 300);
+  }, []);
 
   // ── Queries ──────────────────────────────────────────────────────────────
 
@@ -212,7 +240,7 @@ export default function Creators() {
   });
 
   const saveContrato = useMutation({
-    mutationFn: async (data: { cargo: string; descricao_servicos: string; valor_remuneracao: number; duracao_meses: number; data_inicio: string; data_fim: string; observacoes: string }) => {
+    mutationFn: async (data: Record<string, any>) => {
       const res = await apiRequest("POST", `/api/creators/${selectedCreator!.id}/contratos`, data);
       return res.json();
     },
@@ -253,15 +281,23 @@ export default function Creators() {
     setContratoForm({
       cargo: "", descricao_servicos: "",
       valor_remuneracao: "", duracao_meses: "6",
-      data_inicio: "", data_fim: "", observacoes: ""
+      data_inicio: "", data_fim: "", observacoes: "",
+      qtd_videos: "", qtd_creators: "", qtd_variacoes_gancho: "",
+      unidade_prazo: "meses", cliente_nome: "", cliente_task_id: ""
     });
+    setClienteSearch("");
+    setClienteResults([]);
   }
 
-  function calcDataFim(dataInicio: string, meses: number): string {
+  function calcDataFim(dataInicio: string, valor: number, unidade: string = "meses"): string {
     if (!dataInicio) return "";
     try {
       const d = new Date(dataInicio + 'T12:00:00');
-      d.setMonth(d.getMonth() + meses);
+      if (unidade === "dias") {
+        d.setDate(d.getDate() + valor);
+      } else {
+        d.setMonth(d.getMonth() + valor);
+      }
       return d.toISOString().split('T')[0];
     } catch { return ""; }
   }
@@ -421,7 +457,7 @@ export default function Creators() {
                               {statusBadge(ct.status)}
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              Valor mensal: {formatCurrency(ct.valor_remuneracao)} | {ct.duracao_meses} meses
+                              Valor mensal: {formatCurrency(ct.valor_remuneracao)} | {ct.duracao_meses} {ct.unidade_prazo || 'meses'}
                             </p>
                             {ct.data_inicio && ct.data_fim && (
                               <p className="text-sm text-muted-foreground">
@@ -589,16 +625,70 @@ export default function Creators() {
           ) : (
           <form onSubmit={(e) => {
             e.preventDefault();
+            const duracao = parseInt(contratoForm.duracao_meses) || 6;
             saveContrato.mutate({
               cargo: contratoForm.cargo,
               descricao_servicos: contratoForm.descricao_servicos,
               valor_remuneracao: parseFloat(contratoForm.valor_remuneracao.replace(/[^\d.,]/g, '').replace(',', '.')) || 0,
-              duracao_meses: parseInt(contratoForm.duracao_meses) || 6,
+              duracao_meses: duracao,
               data_inicio: contratoForm.data_inicio,
-              data_fim: contratoForm.data_fim || calcDataFim(contratoForm.data_inicio, parseInt(contratoForm.duracao_meses) || 6),
+              data_fim: contratoForm.data_fim || calcDataFim(contratoForm.data_inicio, duracao, contratoForm.unidade_prazo),
               observacoes: contratoForm.observacoes,
+              unidade_prazo: contratoForm.unidade_prazo,
+              cliente_nome: contratoForm.cliente_nome || null,
+              cliente_task_id: contratoForm.cliente_task_id || null,
+              ...(contratoForm.cargo === "Produtor de Conteúdo" ? {
+                qtd_videos: parseInt(contratoForm.qtd_videos) || null,
+                qtd_creators: parseInt(contratoForm.qtd_creators) || null,
+                qtd_variacoes_gancho: parseInt(contratoForm.qtd_variacoes_gancho) || null,
+              } : {}),
             });
           }} className="space-y-4">
+            {/* Busca de Cliente */}
+            <div className="relative">
+              <Label>Cliente (opcional)</Label>
+              {contratoForm.cliente_nome ? (
+                <div className="flex items-center gap-2 mt-1 p-2 rounded-md border dark:border-zinc-700 bg-muted/30">
+                  <span className="text-sm flex-1">{contratoForm.cliente_nome}</span>
+                  <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => {
+                    setContratoForm(f => ({ ...f, cliente_nome: "", cliente_task_id: "" }));
+                    setClienteSearch("");
+                  }}>
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Input
+                    placeholder="Buscar cliente por nome..."
+                    value={clienteSearch}
+                    onChange={e => { setClienteSearch(e.target.value); searchClientes(e.target.value); }}
+                    onFocus={() => { if (clienteResults.length > 0) setShowClienteDropdown(true); }}
+                    onBlur={() => setTimeout(() => setShowClienteDropdown(false), 200)}
+                  />
+                  {showClienteDropdown && clienteResults.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-md border dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg">
+                      {clienteResults.map(c => (
+                        <button
+                          key={c.task_id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 border-b dark:border-zinc-800 last:border-0"
+                          onMouseDown={() => {
+                            setContratoForm(f => ({ ...f, cliente_nome: c.nome, cliente_task_id: c.task_id }));
+                            setClienteSearch("");
+                            setShowClienteDropdown(false);
+                          }}
+                        >
+                          <span className="font-medium">{c.nome}</span>
+                          {c.cnpj && <span className="text-muted-foreground ml-2">({c.cnpj})</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
             {/* Cargo */}
             <div>
               <Label>Cargo / Função *</Label>
@@ -628,6 +718,42 @@ export default function Creators() {
               )}
             </div>
 
+            {/* Campos condicionais — Produtor de Conteúdo */}
+            {contratoForm.cargo === "Produtor de Conteúdo" && (
+              <div className="grid grid-cols-3 gap-3 p-3 rounded-md border dark:border-zinc-700 bg-muted/20">
+                <div>
+                  <Label>Qtd Vídeos/mês</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="10"
+                    value={contratoForm.qtd_videos}
+                    onChange={e => setContratoForm(f => ({ ...f, qtd_videos: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Qtd Creators</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="3"
+                    value={contratoForm.qtd_creators}
+                    onChange={e => setContratoForm(f => ({ ...f, qtd_creators: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <Label>Variações de Gancho</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="2"
+                    value={contratoForm.qtd_variacoes_gancho}
+                    onChange={e => setContratoForm(f => ({ ...f, qtd_variacoes_gancho: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Descrição dos Serviços */}
             <div>
               <Label>Descrição dos Serviços *</Label>
@@ -653,21 +779,41 @@ export default function Creators() {
                 />
               </div>
               <div>
-                <Label>Duração (meses)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={contratoForm.duracao_meses}
-                  onChange={e => {
-                    const meses = parseInt(e.target.value) || 6;
-                    setContratoForm(f => ({
-                      ...f,
-                      duracao_meses: e.target.value,
-                      data_fim: f.data_inicio ? calcDataFim(f.data_inicio, meses) : f.data_fim
-                    }));
-                  }}
-                />
+                <Label>Duração</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={contratoForm.unidade_prazo === "dias" ? 365 : 60}
+                    className="flex-1"
+                    value={contratoForm.duracao_meses}
+                    onChange={e => {
+                      const val = parseInt(e.target.value) || 6;
+                      setContratoForm(f => ({
+                        ...f,
+                        duracao_meses: e.target.value,
+                        data_fim: f.data_inicio ? calcDataFim(f.data_inicio, val, f.unidade_prazo) : f.data_fim
+                      }));
+                    }}
+                  />
+                  <Select
+                    value={contratoForm.unidade_prazo}
+                    onValueChange={v => {
+                      const val = parseInt(contratoForm.duracao_meses) || 6;
+                      setContratoForm(f => ({
+                        ...f,
+                        unidade_prazo: v,
+                        data_fim: f.data_inicio ? calcDataFim(f.data_inicio, val, v) : f.data_fim
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="meses">Meses</SelectItem>
+                      <SelectItem value="dias">Dias</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -680,11 +826,11 @@ export default function Creators() {
                   value={contratoForm.data_inicio}
                   onChange={e => {
                     const inicio = e.target.value;
-                    const meses = parseInt(contratoForm.duracao_meses) || 6;
+                    const val = parseInt(contratoForm.duracao_meses) || 6;
                     setContratoForm(f => ({
                       ...f,
                       data_inicio: inicio,
-                      data_fim: calcDataFim(inicio, meses)
+                      data_fim: calcDataFim(inicio, val, f.unidade_prazo)
                     }));
                   }}
                   required
