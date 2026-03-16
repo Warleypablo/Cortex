@@ -5652,6 +5652,76 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       `);
       const churnPorOperadorRows = churnResult.rows as any[];
 
+      // 2b) Dados do mês anterior para comparativo
+      const mesAnterior = new Date(ano, mes - 2, 1); // -2 pois mes é 1-indexed
+      const fimMesAnterior = new Date(ano, mes - 1, 0, 23, 59, 59);
+      const inicioMesAnteriorStr = mesAnterior.toISOString().split('T')[0];
+      const fimMesAnteriorStr = fimMesAnterior.toISOString().split('T')[0];
+
+      const isMesAnteriorAtual = mesAnterior.getFullYear() === agora.getFullYear() && (mesAnterior.getMonth() + 1) === (agora.getMonth() + 1);
+
+      // MRR por operador do mês anterior
+      let mrrPorOperadorAnteriorRows: any[] = [];
+      if (isMesAnteriorAtual) {
+        const result = await db.execute(sql`
+          SELECT
+            COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável') as responsavel,
+            COALESCE(SUM(valorr::numeric), 0) as mrr,
+            COUNT(DISTINCT id_subtask) as contratos,
+            COUNT(DISTINCT id_task) as clientes
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND valorr IS NOT NULL AND valorr > 0
+            AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+          GROUP BY COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável')
+          ORDER BY mrr DESC
+        `);
+        mrrPorOperadorAnteriorRows = result.rows as any[];
+      } else {
+        const snapshotAntResult = await db.execute(sql`
+          SELECT MAX(data_snapshot) as ds
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= ${mesAnterior}::timestamp
+            AND data_snapshot <= ${fimMesAnterior}::timestamp
+        `);
+        const dataSnapshotAnt = (snapshotAntResult.rows[0] as any)?.ds;
+        if (dataSnapshotAnt) {
+          const result = await db.execute(sql`
+            SELECT
+              COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável') as responsavel,
+              COALESCE(SUM(valorr::numeric), 0) as mrr,
+              COUNT(DISTINCT id_subtask) as contratos,
+              COUNT(DISTINCT id_task) as clientes
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot = ${dataSnapshotAnt}::timestamp
+              AND status IN ('ativo', 'onboarding', 'triagem')
+              AND valorr IS NOT NULL AND valorr > 0
+              AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+            GROUP BY COALESCE(NULLIF(TRIM(responsavel), ''), 'Sem Responsável')
+            ORDER BY mrr DESC
+          `);
+          mrrPorOperadorAnteriorRows = result.rows as any[];
+        }
+      }
+
+      // Churn do mês anterior
+      const churnAnteriorResult = await db.execute(sql`
+        SELECT
+          COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
+          COUNT(*) as churns,
+          COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento >= ${inicioMesAnteriorStr}::date
+          AND data_solicitacao_encerramento <= ${fimMesAnteriorStr}::date
+          AND valor_r > 0
+          AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+        GROUP BY COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável')
+      `);
+      const churnAnteriorRows = churnAnteriorResult.rows as any[];
+
       // 3) Evolução MRR do squad (últimos 6 meses)
       const evolucaoMrrResult = await db.execute(sql`
         WITH snapshots_mensais AS (
@@ -5848,6 +5918,30 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const totalMrrChurn = operadores.reduce((s, o) => s + o.mrrChurn, 0);
       const ticketMedio = totalContratos > 0 ? Math.round((totalMrr / totalContratos) * 100) / 100 : 0;
 
+      // Montar dados do mês anterior por operador
+      const churnAntMap = new Map<string, { churns: number; mrrChurn: number }>();
+      for (const row of churnAnteriorRows) {
+        churnAntMap.set(row.responsavel, {
+          churns: parseInt(row.churns) || 0,
+          mrrChurn: parseFloat(row.mrr_churn) || 0,
+        });
+      }
+
+      const operadoresAnterior = mrrPorOperadorAnteriorRows.map((row) => {
+        const mrr = parseFloat(row.mrr) || 0;
+        const contratos = parseInt(row.contratos) || 0;
+        const clientes = parseInt(row.clientes) || 0;
+        const churnData = churnAntMap.get(row.responsavel) || { churns: 0, mrrChurn: 0 };
+        return { nome: row.responsavel, mrr, contratos, clientes, churns: churnData.churns, mrrChurn: churnData.mrrChurn };
+      });
+
+      const totalMrrAnt = operadoresAnterior.reduce((s, o) => s + o.mrr, 0);
+      const totalContratosAnt = operadoresAnterior.reduce((s, o) => s + o.contratos, 0);
+      const totalClientesAnt = operadoresAnterior.reduce((s, o) => s + o.clientes, 0);
+      const totalChurnsAnt = operadoresAnterior.reduce((s, o) => s + o.churns, 0);
+      const churnRateAnt = totalContratosAnt > 0 ? Math.round((totalChurnsAnt / totalContratosAnt) * 10000) / 100 : 0;
+      const totalMrrChurnAnt = operadoresAnterior.reduce((s, o) => s + o.mrrChurn, 0);
+
       res.json({
         squad,
         mesAno,
@@ -5862,6 +5956,15 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           headcount,
         },
         operadores,
+        totaisAnterior: {
+          mrr: totalMrrAnt,
+          contratos: totalContratosAnt,
+          clientes: totalClientesAnt,
+          churns: totalChurnsAnt,
+          churnRate: churnRateAnt,
+          mrrChurn: totalMrrChurnAnt,
+        },
+        operadoresAnterior,
         evolucaoMrr: evolucaoMrrResult.rows,
         evolucaoOperadores: evolucaoOperadoresResult.rows,
         contratosChurn: contratosChurnResult.rows,
