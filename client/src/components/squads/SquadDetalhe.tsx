@@ -16,6 +16,7 @@ import {
   AreaChart, Area, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Bar, ComposedChart, Line,
 } from "recharts";
+import { MonthYearPicker } from "@/components/ui/month-year-picker";
 
 const SQUAD_COLORS: Record<string, string> = {
   "Aurea": "#fbbf24", "Aurea (OFF)": "#fcd34d", "Black": "#475569",
@@ -742,26 +743,17 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                         Filtrado pelo gráfico
                       </Badge>
                     )}
-                    <select
-                      value={perfilDe || ""}
-                      onChange={(e) => { setPerfilDe(e.target.value || null); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
-                      className="text-xs h-7 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 px-2"
-                    >
-                      <option value="">De: início</option>
-                      {mesesDisponiveis.map((m) => (
-                        <option key={m} value={m}>{formatMesLabel(m)}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={perfilAte || ""}
-                      onChange={(e) => { setPerfilAte(e.target.value || null); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
-                      className="text-xs h-7 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 px-2"
-                    >
-                      <option value="">Até: fim</option>
-                      {mesesDisponiveis.map((m) => (
-                        <option key={m} value={m}>{formatMesLabel(m)}</option>
-                      ))}
-                    </select>
+                    <MonthYearPicker
+                      value={perfilDe ? { month: parseInt(perfilDe.split("-")[1]), year: parseInt(perfilDe.split("-")[0]) } : { month: parseInt(mesAno.split("-")[1]), year: parseInt(mesAno.split("-")[0]) }}
+                      onChange={({ month, year }) => { setPerfilDe(`${year}-${String(month).padStart(2, "0")}`); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
+                      triggerClassName="h-8 text-xs px-3"
+                    />
+                    <span className="text-xs text-gray-400 dark:text-zinc-500">até</span>
+                    <MonthYearPicker
+                      value={perfilAte ? { month: parseInt(perfilAte.split("-")[1]), year: parseInt(perfilAte.split("-")[0]) } : { month: parseInt(mesAno.split("-")[1]), year: parseInt(mesAno.split("-")[0]) }}
+                      onChange={({ month, year }) => { setPerfilAte(`${year}-${String(month).padStart(2, "0")}`); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
+                      triggerClassName="h-8 text-xs px-3"
+                    />
                     {(perfilDe || perfilAte) && (
                       <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-500 dark:text-zinc-400 px-2" onClick={() => { setPerfilDe(null); setPerfilAte(null); }}>
                         Limpar
