@@ -988,19 +988,15 @@ function EnvioMassaTab() {
   const [templateSelecionado, setTemplateSelecionado] = useState("D+0");
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const { data: preview, isLoading: isLoadingPreview, isFetching, refetch } = useQuery<{
-    data_vencimento: string;
-    clientes: ClienteCobranca[];
-    total_valor: number;
-  }>({
-    queryKey: ["/api/turbozap/preview-por-data", dataVencimento],
-    queryFn: async () => {
-      const res = await fetch(`/api/turbozap/preview-por-data?data=${dataVencimento}`, { credentials: "include" });
+  const previewMutation = useMutation({
+    mutationFn: async (data: string) => {
+      const res = await fetch(`/api/turbozap/preview-por-data?data=${data}`, { credentials: "include" });
       if (!res.ok) throw new Error("Erro ao buscar preview");
-      return res.json();
+      return res.json() as Promise<{ data_vencimento: string; clientes: ClienteCobranca[]; total_valor: number }>;
     },
-    enabled: false,
   });
+
+  const preview = previewMutation.data;
 
   const enviarMutation = useMutation({
     mutationFn: async () => {
@@ -1061,11 +1057,11 @@ function EnvioMassaTab() {
               </Select>
             </div>
             <Button
-              onClick={() => refetch()}
-              disabled={!dataVencimento || isLoadingPreview || isFetching}
+              onClick={() => previewMutation.mutate(dataVencimento)}
+              disabled={!dataVencimento || previewMutation.isPending}
               className="gap-2"
             >
-              {(isLoadingPreview || isFetching) ? (
+              {previewMutation.isPending ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Search className="w-4 h-4" />
