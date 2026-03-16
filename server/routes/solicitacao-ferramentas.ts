@@ -480,6 +480,37 @@ export function registerSolicitacaoFerramentasRoutes(app: Express) {
     }
   });
 
+  // POST /api/solicitacao-ferramentas/:id/notificar - Resend WhatsApp notification
+  app.post("/api/solicitacao-ferramentas/:id/notificar", async (req, res) => {
+    try {
+      await ensureTable();
+      const user = (req as any).user;
+      if (!isApprover(user)) {
+        return res.status(403).json({ message: "Apenas aprovadores podem reenviar notificações" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
+
+      const result = await db.execute(sql`
+        SELECT * FROM cortex_core.solicitacao_ferramentas WHERE id = ${id}
+      `);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Solicitação não encontrada" });
+      }
+
+      const solicitacao = result.rows[0] as any;
+
+      // Send WhatsApp to approvers
+      await notificarAprovadoresWhatsApp(solicitacao, solicitacao.solicitante_nome || "Desconhecido");
+
+      res.json({ message: "Notificação WhatsApp enviada com sucesso" });
+    } catch (error) {
+      console.error("[solicitacao-ferramentas] Error sending notification:", error);
+      res.status(500).json({ message: "Erro ao enviar notificação" });
+    }
+  });
+
   // DELETE /api/solicitacao-ferramentas/:id - Delete a request
   app.delete("/api/solicitacao-ferramentas/:id", async (req, res) => {
     try {
