@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Loader2, CheckCircle2, Clock, XCircle, ShoppingCart, Package, ExternalLink, Wrench, Eye, EyeOff, KeyRound, Trash2 } from "lucide-react";
+import { Plus, Loader2, CheckCircle2, Clock, XCircle, ShoppingCart, Package, ExternalLink, Wrench, Eye, EyeOff, KeyRound, Trash2, Send } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -196,6 +196,19 @@ export default function SolicitacaoFerramentas() {
     },
     onError: () => {
       toast({ title: "Erro ao excluir", variant: "destructive" });
+    },
+  });
+
+  const notifyMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/solicitacao-ferramentas/${id}/notificar`);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Notificação WhatsApp enviada!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao enviar notificação", variant: "destructive" });
     },
   });
 
@@ -647,6 +660,16 @@ export default function SolicitacaoFerramentas() {
                                     disabled={updateMutation.isPending}
                                   >
                                     Rejeitar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                                    onClick={() => notifyMutation.mutate(s.id)}
+                                    disabled={notifyMutation.isPending}
+                                    title="Enviar notificação WhatsApp"
+                                  >
+                                    <Send className="w-3.5 h-3.5" />
                                   </Button>
                                 </>
                               )}
