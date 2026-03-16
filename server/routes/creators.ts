@@ -663,7 +663,7 @@ export function registerCreatorsRoutes(app: Express) {
 
       // 1. Buscar config + dados
       const [configResult, dataResult] = await Promise.all([
-        db.execute(sql`SELECT account_id, api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'colaboradores' LIMIT 1`),
+        db.execute(sql`SELECT account_id, api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'creators' LIMIT 1`),
         db.execute(sql`
           SELECT cc.*, c.nome, c.cpf, c.cnpj, c.email, c.endereco, c.cidade, c.estado, c.cep
           FROM cortex_core.contratos_creators cc
