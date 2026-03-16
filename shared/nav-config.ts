@@ -67,6 +67,7 @@ export const PERMISSION_KEYS = {
     ANALISE_VENDAS: 'com.analise_vendas',
     APRESENTACAO: 'com.apresentacao',
     REUNIOES: 'com.reunioes',
+    CONTRATOS_CLIENTES: 'com.contratos_clientes',
   },
   // Growth
   GROWTH: {
@@ -254,7 +255,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   // Jurídico
   '/juridico/clientes': PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES,
   '/juridico/processos': PERMISSION_KEYS.JUR.PROCESSOS,
-  '/contratos-module': PERMISSION_KEYS.JUR.CONTRATOS_MODULE,
+  '/contratos-module': PERMISSION_KEYS.COM.CONTRATOS_CLIENTES,
   '/juridico/contratos-colaborador': PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES,
   '/juridico/creators': PERMISSION_KEYS.JUR.CONTRATOS_CREATORS,
   // Reports
@@ -433,6 +434,7 @@ export const NAV_CONFIG = {
         { title: 'Detalhamento Vendas', url: '/dashboard/comercial/detalhamento-vendas', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.COM.DET_VENDAS },
         { title: 'Análise de Vendas', url: '/dashboard/comercial/analise-vendas', icon: 'LineChart', permissionKey: PERMISSION_KEYS.COM.ANALISE_VENDAS },
         { title: 'Reuniões', url: '/dashboard/comercial/reunioes', icon: 'Phone', permissionKey: PERMISSION_KEYS.COM.REUNIOES },
+        { title: 'Contratos Clientes', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.COM.CONTRATOS_CLIENTES },
       ],
     },
     {
@@ -478,7 +480,6 @@ export const NAV_CONFIG = {
     items: [
       { title: 'Clientes Inadimplentes', url: '/juridico/clientes', icon: 'Gavel', permissionKey: PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES },
       { title: 'Processos', url: '/juridico/processos', icon: 'Scale', permissionKey: PERMISSION_KEYS.JUR.PROCESSOS },
-      { title: 'Contratos Clientes', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_MODULE },
       { title: 'Contratos Colaboradores', url: '/juridico/contratos-colaborador', icon: 'Users', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES },
       { title: 'Contratos Freelancers', url: '/juridico/creators', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_CREATORS },
     ],
@@ -655,7 +656,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GG.CALENDARIO_FERIAS]: 'Calendário de Férias',
   [PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES]: 'Clientes Inadimplentes',
   [PERMISSION_KEYS.JUR.PROCESSOS]: 'Processos',
-  [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
+  [PERMISSION_KEYS.COM.CONTRATOS_CLIENTES]: 'Contratos Clientes',
   [PERMISSION_KEYS.JUR.ASSISTENTE]: 'Assistente IA',
   [PERMISSION_KEYS.JUR.CONTRATOS_CREATORS]: 'Contratos Freelancers',
   [PERMISSION_KEYS.JUR.RELATORIOS]: 'Relatórios',
