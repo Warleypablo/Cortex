@@ -185,6 +185,8 @@ function getMotivoBadgeColor(motivo: string): string {
 export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: SquadDetalheProps) {
   const [busca, setBusca] = useState("");
   const [mesSelecionadoChurn, setMesSelecionadoChurn] = useState<string | null>(null);
+  const [perfilDe, setPerfilDe] = useState<string | null>(null);
+  const [perfilAte, setPerfilAte] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<DetalheResponse>({
     queryKey: ["/api/analise-squads/detalhe", squad, mesAno],
@@ -312,6 +314,78 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     if (!data?.contratosChurn) return [];
     return data.contratosChurn.filter((c) => c.mes === mesAno);
   }, [data, mesAno]);
+
+  // Meses disponíveis nos dados de churn (para o seletor de período)
+  const mesesDisponiveis = useMemo(() => {
+    if (!data?.contratosChurn) return [];
+    const set = new Set(data.contratosChurn.map((c) => c.mes).filter(Boolean));
+    return Array.from(set).sort() as string[];
+  }, [data]);
+
+  // Perfil dos clientes que cancelaram (reativo a mês do gráfico ou período selecionado)
+  const perfilChurnLocal = useMemo(() => {
+    if (!data?.contratosChurn) return null;
+
+    let filtrados: ContratoChurn[];
+    if (mesSelecionadoChurn) {
+      // Mês clicado no gráfico tem prioridade
+      filtrados = data.contratosChurn.filter((c) => c.mes === mesSelecionadoChurn);
+    } else if (perfilDe || perfilAte) {
+      // Período personalizado
+      const de = perfilDe || "0000-00";
+      const ate = perfilAte || "9999-99";
+      filtrados = data.contratosChurn.filter((c) => c.mes && c.mes >= de && c.mes <= ate);
+    } else {
+      // Default: mês principal
+      filtrados = data.contratosChurn.filter((c) => c.mes === mesAno);
+    }
+
+    if (filtrados.length === 0) return null;
+
+    // LT médio
+    const lts = filtrados.map((c) => c.lt_meses).filter((v): v is number => v != null && !isNaN(v));
+    const ltMedio = lts.length > 0 ? Math.round((lts.reduce((s, v) => s + v, 0) / lts.length) * 10) / 10 : null;
+
+    // Ticket médio
+    const valores = filtrados.map((c) => parseFloat(String(c.valorr)) || 0);
+    const ticketMedioChurn = Math.round(valores.reduce((s, v) => s + v, 0) / filtrados.length);
+
+    // % churns < 3 meses
+    const churnsMenos3m = lts.filter((v) => v < 3).length;
+    const pctMenos3m = lts.length > 0 ? Math.round((churnsMenos3m / lts.length) * 1000) / 10 : 0;
+
+    // Segmento predominante
+    const segmentoCount: Record<string, number> = {};
+    for (const c of filtrados) {
+      const tipo = c.tipo_negocio;
+      if (tipo) segmentoCount[tipo] = (segmentoCount[tipo] || 0) + 1;
+    }
+    const segEntries = Object.entries(segmentoCount);
+    const segmentoPredominante = segEntries.length > 0
+      ? segEntries.sort((a, b) => b[1] - a[1])[0][0]
+      : null;
+
+    // % single-product
+    const parentGroups: Record<string, number> = {};
+    for (const c of filtrados) {
+      const pid = c.parent_id || c.contrato;
+      parentGroups[pid] = (parentGroups[pid] || 0) + 1;
+    }
+    const totalParents = Object.keys(parentGroups).length;
+    const singleCount = Object.values(parentGroups).filter((v) => v === 1).length;
+    const pctSingleProduct = totalParents > 0 ? Math.round((singleCount / totalParents) * 1000) / 10 : 0;
+
+    return { ltMedio, ticketMedio: ticketMedioChurn, pctMenos3m, segmentoPredominante, pctSingleProduct, total: filtrados.length };
+  }, [data, mesAno, mesSelecionadoChurn, perfilDe, perfilAte]);
+
+  // Label descritivo do período ativo no perfil
+  const perfilPeriodoLabel = useMemo(() => {
+    if (mesSelecionadoChurn) return formatMesLabel(mesSelecionadoChurn);
+    if (perfilDe && perfilAte) return `${formatMesLabel(perfilDe)} — ${formatMesLabel(perfilAte)}`;
+    if (perfilDe) return `A partir de ${formatMesLabel(perfilDe)}`;
+    if (perfilAte) return `Até ${formatMesLabel(perfilAte)}`;
+    return formatMesLabel(mesAno);
+  }, [mesAno, mesSelecionadoChurn, perfilDe, perfilAte]);
 
   // Contratos filtrados por busca
   const contratosFiltrados = useMemo(() => {
@@ -653,13 +727,48 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
         {/* Tab: Churns */}
         <TabsContent value="churns" className="space-y-4">
           {/* Card: Perfil dos Clientes que Cancelaram */}
-          {data?.perfilChurn && (
+          {perfilChurnLocal && (
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Users className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
-                  Perfil dos Clientes que Cancelaram
-                </CardTitle>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Users className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
+                    Perfil dos Clientes que Cancelaram
+                    <Badge variant="secondary" className="text-[10px] font-normal ml-1">{perfilChurnLocal.total} churns · {perfilPeriodoLabel}</Badge>
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    {mesSelecionadoChurn && (
+                      <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                        Filtrado pelo gráfico
+                      </Badge>
+                    )}
+                    <select
+                      value={perfilDe || ""}
+                      onChange={(e) => { setPerfilDe(e.target.value || null); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
+                      className="text-xs h-7 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 px-2"
+                    >
+                      <option value="">De: início</option>
+                      {mesesDisponiveis.map((m) => (
+                        <option key={m} value={m}>{formatMesLabel(m)}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={perfilAte || ""}
+                      onChange={(e) => { setPerfilAte(e.target.value || null); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
+                      className="text-xs h-7 rounded border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 px-2"
+                    >
+                      <option value="">Até: fim</option>
+                      {mesesDisponiveis.map((m) => (
+                        <option key={m} value={m}>{formatMesLabel(m)}</option>
+                      ))}
+                    </select>
+                    {(perfilDe || perfilAte) && (
+                      <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-500 dark:text-zinc-400 px-2" onClick={() => { setPerfilDe(null); setPerfilAte(null); }}>
+                        Limpar
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-5 gap-4">
@@ -667,35 +776,35 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                     <Clock className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
                     <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">LT Médio</span>
                     <span className="text-lg font-bold text-gray-900 dark:text-white">
-                      {data.perfilChurn.ltMedio != null ? `${data.perfilChurn.ltMedio}m` : "N/D"}
+                      {perfilChurnLocal.ltMedio != null ? `${perfilChurnLocal.ltMedio}m` : "N/D"}
                     </span>
                   </div>
                   <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
                     <FileText className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
                     <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Single-Product</span>
                     <span className="text-lg font-bold text-gray-900 dark:text-white">
-                      {data.perfilChurn.pctSingleProduct}%
+                      {perfilChurnLocal.pctSingleProduct}%
                     </span>
                   </div>
                   <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
                     <DollarSign className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
                     <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Ticket Médio</span>
                     <span className="text-lg font-bold text-gray-900 dark:text-white">
-                      {formatCurrencyNoDecimals(data.perfilChurn.ticketMedio)}
+                      {formatCurrencyNoDecimals(perfilChurnLocal.ticketMedio)}
                     </span>
                   </div>
                   <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
                     <Users className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
                     <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Segmento</span>
                     <span className="text-lg font-bold text-gray-900 dark:text-white">
-                      {data.perfilChurn.segmentoPredominante || "N/D"}
+                      {perfilChurnLocal.segmentoPredominante || "N/D"}
                     </span>
                   </div>
                   <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
-                    <TrendingDown className={`w-4 h-4 mb-1.5 ${data.perfilChurn.pctMenos3m > 30 ? "text-rose-500" : "text-gray-400 dark:text-zinc-500"}`} />
+                    <TrendingDown className={`w-4 h-4 mb-1.5 ${perfilChurnLocal.pctMenos3m > 30 ? "text-rose-500" : "text-gray-400 dark:text-zinc-500"}`} />
                     <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Churns &lt; 3m</span>
-                    <span className={`text-lg font-bold ${data.perfilChurn.pctMenos3m > 30 ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white"}`}>
-                      {data.perfilChurn.pctMenos3m}%
+                    <span className={`text-lg font-bold ${perfilChurnLocal.pctMenos3m > 30 ? "text-rose-600 dark:text-rose-400" : "text-gray-900 dark:text-white"}`}>
+                      {perfilChurnLocal.pctMenos3m}%
                     </span>
                   </div>
                 </div>
