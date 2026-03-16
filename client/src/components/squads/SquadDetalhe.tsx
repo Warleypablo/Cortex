@@ -356,7 +356,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
 
     if (filtrados.length === 0) return null;
 
-    const lts = filtrados.map((c) => c.lt_meses).filter((v): v is number => v != null && !isNaN(v));
+    const lts = filtrados.map((c) => parseFloat(String(c.lt_meses))).filter((v) => !isNaN(v));
     const ltMedio = lts.length > 0 ? Math.round((lts.reduce((s, v) => s + v, 0) / lts.length) * 10) / 10 : null;
 
     const valores = filtrados.map((c) => parseFloat(String(c.valorr)) || 0);
