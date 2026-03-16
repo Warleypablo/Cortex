@@ -125,10 +125,9 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
   p(`1.1.1. Os serviços serão prestados por pessoa previamente indicada pelo CONTRATADO e compreendem, de modo exemplificativo, as seguintes atribuições: ${contrato.descricao_servicos}, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE.`, { spacing: 0.5 });
 
   // Cláusula condicional para Produtor de Conteúdo
-  if (contrato.cargo === 'Produtor de Conteúdo' && (contrato.qtd_videos || contrato.qtd_creators || contrato.qtd_variacoes_gancho)) {
+  if (contrato.cargo === 'Produtor de Conteúdo' && (contrato.qtd_videos || contrato.qtd_variacoes_gancho)) {
     const partes: string[] = [];
     if (contrato.qtd_videos) partes.push(`${contrato.qtd_videos} vídeos por mês`);
-    if (contrato.qtd_creators) partes.push(`${contrato.qtd_creators} creators`);
     if (contrato.qtd_variacoes_gancho) partes.push(`${contrato.qtd_variacoes_gancho} variações de gancho por conteúdo`);
     const clienteRef = contrato.cliente_nome ? `, para o cliente ${contrato.cliente_nome}` : '';
     p(`1.1.2. O escopo de produção compreende ${partes.join(', com ')}${clienteRef}.`, { spacing: 0.5 });
