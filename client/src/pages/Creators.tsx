@@ -151,6 +151,7 @@ export default function Creators() {
   // Contrato state
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
   const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
+  const [contratoCriadoId, setContratoCriadoId] = useState<number | null>(null);
   const [contratoForm, setContratoForm] = useState({
     cargo: "", descricao_servicos: "",
     valor_remuneracao: "", duracao_meses: "6",
@@ -215,11 +216,10 @@ export default function Creators() {
       const res = await apiRequest("POST", `/api/creators/${selectedCreator!.id}/contratos`, data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast({ title: "Contrato criado" });
       queryClient.invalidateQueries({ queryKey: ["/api/creators", selectedCreator?.id, "contratos"] });
-      setContratoDialogOpen(false);
-      resetContratoForm();
+      setContratoCriadoId(data.id);
     },
     onError: (err: any) => {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
@@ -234,6 +234,8 @@ export default function Creators() {
     onSuccess: (data: any) => {
       toast({ title: "Contrato enviado!", description: `Email: ${data.emailEnviado}` });
       queryClient.invalidateQueries({ queryKey: ["/api/creators", selectedCreator?.id, "contratos"] });
+      setContratoDialogOpen(false);
+      setContratoCriadoId(null);
     },
     onError: (err: any) => {
       toast({ title: "Erro ao enviar", description: err.message, variant: "destructive" });
@@ -395,7 +397,7 @@ export default function Creators() {
                       <h3 className="font-semibold text-lg">{selectedCreator.nome}</h3>
                       <p className="text-sm text-muted-foreground">{selectedCreator.email} | {selectedCreator.cnpj || selectedCreator.cpf || "Sem doc"}</p>
                     </div>
-                    <Button onClick={() => { resetContratoForm(); setContratoDialogOpen(true); }} className="gap-2">
+                    <Button onClick={() => { resetContratoForm(); setContratoCriadoId(null); setContratoDialogOpen(true); }} className="gap-2">
                       <Plus className="w-4 h-4" />
                       Novo Contrato
                     </Button>
@@ -546,11 +548,45 @@ export default function Creators() {
       </Dialog>
 
       {/* ── Dialog: Contrato Form ─────────────────────────────────────── */}
-      <Dialog open={contratoDialogOpen} onOpenChange={setContratoDialogOpen}>
+      <Dialog open={contratoDialogOpen} onOpenChange={(open) => { setContratoDialogOpen(open); if (!open) setContratoCriadoId(null); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Contrato para {selectedCreator?.nome}</DialogTitle>
+            <DialogTitle>{contratoCriadoId ? 'Contrato Criado' : `Novo Contrato para ${selectedCreator?.nome}`}</DialogTitle>
           </DialogHeader>
+
+          {contratoCriadoId ? (
+            <div className="space-y-6 py-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+                <Check className="w-5 h-5 text-green-500 shrink-0" />
+                <p className="text-sm">Contrato criado com sucesso para <strong>{selectedCreator?.nome}</strong></p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  className="gap-2 h-auto py-4 flex-col"
+                  onClick={() => window.open(`/api/creators/contratos/${contratoCriadoId}/preview-pdf`, '_blank')}
+                >
+                  <Eye className="w-5 h-5" />
+                  Visualizar PDF
+                </Button>
+                <Button
+                  className="gap-2 h-auto py-4 flex-col"
+                  disabled={enviarAssinatura.isPending}
+                  onClick={() => enviarAssinatura.mutate(contratoCriadoId)}
+                >
+                  {enviarAssinatura.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                  Enviar para Assinatura
+                </Button>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setContratoDialogOpen(false); setContratoCriadoId(null); }}>
+                  Fechar
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
           <form onSubmit={(e) => {
             e.preventDefault();
             saveContrato.mutate({
@@ -682,6 +718,7 @@ export default function Creators() {
               </Button>
             </DialogFooter>
           </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>
