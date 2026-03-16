@@ -130,6 +130,8 @@ interface ContratoItem {
   servico_id?: number | null;
   escopo?: string;
   is_personalizado?: boolean;
+  data_inicio?: string | null;
+  data_fim?: string | null;
 }
 
 interface Servico {
@@ -1040,7 +1042,6 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
     comercial_email: string;
     id_crm: string;
     status: string;
-    data_inicio_recorrentes: string;
     observacoes: string;
   }>({
     numero_contrato: contrato?.numero_contrato || '',
@@ -1049,7 +1050,6 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
     comercial_email: contrato?.comercial_email || '',
     id_crm: contrato?.id_crm || '',
     status: contrato?.status || 'rascunho',
-    data_inicio_recorrentes: contrato?.data_inicio_recorrentes ? contrato.data_inicio_recorrentes.split('T')[0] : '',
     observacoes: contrato?.observacoes || '',
   });
 
@@ -1179,6 +1179,8 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
       modalidade: null,
       observacoes: null,
       is_personalizado: false,
+      data_inicio: null,
+      data_fim: null,
     }]);
   };
 
@@ -1383,15 +1385,6 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Data de Início Recorrentes</Label>
-              <Input
-                data-testid="input-data-inicio"
-                type="date"
-                value={formData.data_inicio_recorrentes}
-                onChange={(e) => setFormData({ ...formData, data_inicio_recorrentes: e.target.value })}
-              />
-            </div>
           </div>
 
           <div className="space-y-4">
@@ -1522,6 +1515,25 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                           type="number"
                           value={item.quantidade}
                           onChange={(e) => updateItem(index, 'quantidade', parseInt(e.target.value) || 1)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Data Início</Label>
+                        <Input
+                          type="date"
+                          value={item.data_inicio || ''}
+                          onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Data Fim</Label>
+                        <Input
+                          type="date"
+                          value={item.data_fim || ''}
+                          onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)}
                         />
                       </div>
                     </div>
@@ -2082,47 +2094,7 @@ function ContratosTab() {
                   </Card>
                 </div>
 
-                {/* Datas */}
-                <Card className="p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    <Label className="text-sm font-semibold">Datas do Contrato</Label>
-                  </div>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs text-muted-foreground mb-1">Início Recorrentes</p>
-                      <p className="font-medium">
-                        {contratoDetail.data_inicio_recorrentes 
-                          ? new Date(contratoDetail.data_inicio_recorrentes).toLocaleDateString('pt-BR') 
-                          : '-'}
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs text-muted-foreground mb-1">Cobrança Recorrentes</p>
-                      <p className="font-medium">
-                        {contratoDetail.data_inicio_cobranca_recorrentes 
-                          ? new Date(contratoDetail.data_inicio_cobranca_recorrentes).toLocaleDateString('pt-BR') 
-                          : '-'}
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs text-muted-foreground mb-1">Início Pontuais</p>
-                      <p className="font-medium">
-                        {contratoDetail.data_inicio_pontuais 
-                          ? new Date(contratoDetail.data_inicio_pontuais).toLocaleDateString('pt-BR') 
-                          : '-'}
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-lg bg-muted/50">
-                      <p className="text-xs text-muted-foreground mb-1">Cobrança Pontuais</p>
-                      <p className="font-medium">
-                        {contratoDetail.data_inicio_cobranca_pontuais 
-                          ? new Date(contratoDetail.data_inicio_cobranca_pontuais).toLocaleDateString('pt-BR') 
-                          : '-'}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
+                {/* Datas removidas - agora são por serviço na tabela de itens */}
 
                 {/* Documento Assinado */}
                 {contratoDetail.assinafy_document_id && (
@@ -2163,13 +2135,15 @@ function ContratosTab() {
                             <TableHead className="font-semibold text-right">Valor Tabela</TableHead>
                             <TableHead className="font-semibold text-right">Valor Negociado</TableHead>
                             <TableHead className="font-semibold text-right">Desconto</TableHead>
+                            <TableHead className="font-semibold text-center">Início</TableHead>
+                            <TableHead className="font-semibold text-center">Fim</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {contratoDetail.itens.map((item, index) => (
                             <TableRow key={index}>
                               <TableCell className="font-medium">
-                                {item.servico_nome && item.plano_nome 
+                                {item.servico_nome && item.plano_nome
                                   ? `${item.servico_nome} - ${item.plano_nome}`
                                   : item.servico_nome || item.plano_nome || item.descricao || '-'}
                               </TableCell>
@@ -2185,6 +2159,12 @@ function ContratosTab() {
                                   -{(Number(item.desconto_percentual) || 0).toFixed(1)}%
                                 </Badge>
                               </TableCell>
+                              <TableCell className="text-center text-sm">
+                                {item.data_inicio ? new Date(item.data_inicio).toLocaleDateString('pt-BR') : '-'}
+                              </TableCell>
+                              <TableCell className="text-center text-sm">
+                                {item.data_fim ? new Date(item.data_fim).toLocaleDateString('pt-BR') : '-'}
+                              </TableCell>
                             </TableRow>
                           ))}
                           <TableRow className="bg-muted/50 border-t-2">
@@ -2192,7 +2172,7 @@ function ContratosTab() {
                             <TableCell className="text-right font-bold text-lg">
                               {formatCurrency(contratoDetail.itens.reduce((acc, i) => acc + (i.valor_negociado * i.quantidade), 0))}
                             </TableCell>
-                            <TableCell></TableCell>
+                            <TableCell colSpan={3}></TableCell>
                           </TableRow>
                         </TableBody>
                       </Table>
@@ -2235,10 +2215,6 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
     comercial_email: '',
     id_crm: '',
     status: 'rascunho',
-    data_inicio_recorrentes: '',
-    data_inicio_cobranca_recorrentes: '',
-    data_inicio_pontuais: '',
-    data_inicio_cobranca_pontuais: '',
     observacoes: '',
   });
 
@@ -2338,6 +2314,8 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
       modalidade: 'recorrente',
       observacoes: null,
       is_personalizado: false,
+      data_inicio: null,
+      data_fim: null,
     }]);
   };
 
@@ -2464,49 +2442,38 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
               </div>
             </div>
 
-            {/* Datas */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Datas e Vigência</h4>
-              <div className="rounded-lg border bg-muted/30 p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-green-600">Recorrentes</p>
-                    <p className="text-sm"><span className="text-muted-foreground">Início serviço:</span> {formatDate(formData.data_inicio_recorrentes)}</p>
-                    <p className="text-sm"><span className="text-muted-foreground">Início cobrança:</span> {formatDate(formData.data_inicio_cobranca_recorrentes)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-purple-600">Pontuais</p>
-                    <p className="text-sm"><span className="text-muted-foreground">Início serviço:</span> {formatDate(formData.data_inicio_pontuais)}</p>
-                    <p className="text-sm"><span className="text-muted-foreground">Início cobrança:</span> {formatDate(formData.data_inicio_cobranca_pontuais)}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Serviços */}
             {itens.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Serviços ({itens.length})</h4>
                 <div className="rounded-lg border divide-y">
                   {itens.map((item, idx) => (
-                    <div key={idx} className="p-3 flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="text-xs">
-                          {item.modalidade === 'recorrente' ? 'Rec' : 'Pont'}
-                        </Badge>
-                        <div>
-                          <p className="font-medium">{item.servico_nome || item.descricao || item.plano_nome || 'Serviço'}</p>
-                          {item.plano_nome && item.servico_nome && (
-                            <p className="text-xs text-muted-foreground">{item.plano_nome}</p>
+                    <div key={idx} className="p-3 text-sm space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-xs">
+                            {item.modalidade === 'recorrente' ? 'Rec' : 'Pont'}
+                          </Badge>
+                          <div>
+                            <p className="font-medium">{item.servico_nome || item.descricao || item.plano_nome || 'Serviço'}</p>
+                            {item.plano_nome && item.servico_nome && (
+                              <p className="text-xs text-muted-foreground">{item.plano_nome}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">{formatCurrency(item.valor_negociado || item.valor_final || 0)}</p>
+                          {item.valor_tabela && item.valor_tabela > 0 && item.valor_tabela !== item.valor_negociado && (
+                            <p className="text-xs text-muted-foreground line-through">{formatCurrency(item.valor_tabela)}</p>
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium">{formatCurrency(item.valor_negociado || item.valor_final || 0)}</p>
-                        {item.valor_tabela && item.valor_tabela > 0 && item.valor_tabela !== item.valor_negociado && (
-                          <p className="text-xs text-muted-foreground line-through">{formatCurrency(item.valor_tabela)}</p>
-                        )}
-                      </div>
+                      {(item.data_inicio || item.data_fim) && (
+                        <div className="flex gap-4 text-xs text-muted-foreground pl-10">
+                          {item.data_inicio && <span>Início: {formatDate(item.data_inicio)}</span>}
+                          {item.data_fim && <span>Fim: {formatDate(item.data_fim)}</span>}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -2749,48 +2716,6 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
             </CardContent>
           </Card>
 
-          {/* Datas */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileCheck className="h-5 w-5 text-blue-500" />
-                Datas e Vigência
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-4 p-4 rounded-xl bg-green-500/5 border border-green-500/10">
-                  <p className="font-medium text-green-600 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-green-500" />
-                    Serviços Recorrentes
-                  </p>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Início do Serviço</Label>
-                    <Input type="date" value={formData.data_inicio_recorrentes} onChange={(e) => setFormData({ ...formData, data_inicio_recorrentes: e.target.value })} data-testid="input-data-inicio-rec" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Início da Cobrança</Label>
-                    <Input type="date" value={formData.data_inicio_cobranca_recorrentes} onChange={(e) => setFormData({ ...formData, data_inicio_cobranca_recorrentes: e.target.value })} data-testid="input-data-cobranca-rec" />
-                  </div>
-                </div>
-                <div className="space-y-4 p-4 rounded-xl bg-purple-500/5 border border-purple-500/10">
-                  <p className="font-medium text-purple-600 flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-purple-500" />
-                    Serviços Pontuais
-                  </p>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Início do Serviço</Label>
-                    <Input type="date" value={formData.data_inicio_pontuais} onChange={(e) => setFormData({ ...formData, data_inicio_pontuais: e.target.value })} data-testid="input-data-inicio-pont" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Início da Cobrança</Label>
-                    <Input type="date" value={formData.data_inicio_cobranca_pontuais} onChange={(e) => setFormData({ ...formData, data_inicio_cobranca_pontuais: e.target.value })} data-testid="input-data-cobranca-pont" />
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Serviços */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -2861,7 +2786,7 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                           <Textarea value={item.escopo || ''} onChange={(e) => updateItem(index, 'escopo', e.target.value)} rows={3} placeholder="Descreva o escopo do serviço personalizado..." />
                         </div>
                       )}
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-4 gap-4">
                         <div className="space-y-2">
                           <Label className="text-xs">Valor Tabela</Label>
                           <Input type="number" value={item.valor_tabela || ''} onChange={(e) => updateItem(index, 'valor_tabela', parseFloat(e.target.value) || 0)} disabled={!item.is_personalizado} />
@@ -2871,10 +2796,12 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                           <Input type="number" value={item.valor_negociado || ''} onChange={(e) => updateItem(index, 'valor_negociado', parseFloat(e.target.value) || 0)} className="border-green-500/50 focus:border-green-500" />
                         </div>
                         <div className="space-y-2">
-                          <Label className="text-xs">Desconto</Label>
-                          <div className="flex items-center h-9 px-3 rounded-md bg-muted">
-                            <span className="text-green-600 font-medium">{(item.desconto_percentual || 0).toFixed(1)}%</span>
-                          </div>
+                          <Label className="text-xs">Data Início</Label>
+                          <Input type="date" value={item.data_inicio || ''} onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Data Fim</Label>
+                          <Input type="date" value={item.data_fim || ''} onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)} />
                         </div>
                       </div>
                     </div>
