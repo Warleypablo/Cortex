@@ -84,6 +84,7 @@ interface ContratoChurn {
   valorr: number;
   responsavel: string;
   data_encerramento: string;
+  mes?: string;
   motivo_cancelamento: string;
   submotivo_cancelamento: string;
 }
@@ -171,6 +172,7 @@ function getMotivoBadgeColor(motivo: string): string {
 
 export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: SquadDetalheProps) {
   const [busca, setBusca] = useState("");
+  const [mesSelecionadoChurn, setMesSelecionadoChurn] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<DetalheResponse>({
     queryKey: ["/api/analise-squads/detalhe", squad, mesAno],
@@ -247,8 +249,8 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     "#10b981", "#6366f1", "#84cc16",
   ];
 
-  const { churnMotivoData, topMotivos } = useMemo(() => {
-    if (!data?.churnPorMotivo?.length) return { churnMotivoData: [], topMotivos: [] };
+  const { churnMotivoData, topMotivos, labelToMesChurn } = useMemo(() => {
+    if (!data?.churnPorMotivo?.length) return { churnMotivoData: [], topMotivos: [], labelToMesChurn: new Map<string, string>() };
 
     const rows = data.churnPorMotivo;
     const meses = Array.from(new Set(rows.map((r) => r.mes))).sort();
@@ -278,8 +280,26 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
       return row;
     });
 
-    return { churnMotivoData: chartData, topMotivos: allKeys };
+    // Mapa label→YYYY-MM para reverter o clique
+    const labelToMes = new Map<string, string>();
+    for (const mes of meses) {
+      labelToMes.set(formatMesLabel(mes), mes);
+    }
+
+    return { churnMotivoData: chartData, topMotivos: allKeys, labelToMesChurn: labelToMes };
   }, [data]);
+
+  // Contratos churned filtrados pelo mês clicado no gráfico
+  const churnsDrilldown = useMemo(() => {
+    if (!mesSelecionadoChurn || !data?.contratosChurn) return [];
+    return data.contratosChurn.filter((c) => c.mes === mesSelecionadoChurn);
+  }, [mesSelecionadoChurn, data]);
+
+  // Churns do mês selecionado no filtro principal (mesAno)
+  const churnsDoMes = useMemo(() => {
+    if (!data?.contratosChurn) return [];
+    return data.contratosChurn.filter((c) => c.mes === mesAno);
+  }, [data, mesAno]);
 
   // Contratos filtrados por busca
   const contratosFiltrados = useMemo(() => {
@@ -624,13 +644,33 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
           {churnMotivoData.length > 0 && (
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
               <CardHeader>
-                <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">
-                  MRR Churn por Motivo (12 meses)
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">
+                    MRR Churn por Motivo (12 meses)
+                  </CardTitle>
+                  {mesSelecionadoChurn && (
+                    <Button variant="ghost" size="sm" onClick={() => setMesSelecionadoChurn(null)} className="text-xs text-gray-500 dark:text-zinc-400 h-7">
+                      Limpar seleção
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">Clique em uma barra para ver o detalhamento</p>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={340}>
-                  <BarChart data={churnMotivoData} margin={{ left: 10, right: 10 }}>
+                  <BarChart
+                    data={churnMotivoData}
+                    margin={{ left: 10, right: 10 }}
+                    onClick={(state) => {
+                      if (state?.activeLabel) {
+                        const mesYYYYMM = labelToMesChurn.get(state.activeLabel);
+                        if (mesYYYYMM) {
+                          setMesSelecionadoChurn(mesYYYYMM === mesSelecionadoChurn ? null : mesYYYYMM);
+                        }
+                      }
+                    }}
+                    style={{ cursor: "pointer" }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
                     <XAxis dataKey="mes" tick={{ fill: chartColors.axisTick, fontSize: 11 }} axisLine={{ stroke: chartColors.axisLine }} />
                     <YAxis tick={{ fill: chartColors.axisTick, fontSize: 11 }} tickFormatter={(v) => formatCurrencyNoDecimals(v)} axisLine={{ stroke: chartColors.axisLine }} />
@@ -645,11 +685,73 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
             </Card>
           )}
 
+          {/* Drilldown: detalhes do mês clicado no gráfico */}
+          {mesSelecionadoChurn && (
+            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50 border-l-4 border-l-rose-500">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <TrendingDown className="w-4 h-4 text-rose-500" />
+                    Detalhamento — {formatMesLabel(mesSelecionadoChurn)} ({churnsDrilldown.length} churns, {formatCurrencyNoDecimals(churnsDrilldown.reduce((s, c) => s + (parseFloat(String(c.valorr)) || 0), 0))} perdidos)
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setMesSelecionadoChurn(null)} className="h-7 text-gray-500 dark:text-zinc-400">
+                    <ArrowLeft className="w-3 h-3 mr-1" /> Fechar
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-gray-200 dark:border-zinc-700">
+                        <TableHead className="text-gray-600 dark:text-zinc-400">Cliente</TableHead>
+                        <TableHead className="text-gray-600 dark:text-zinc-400">Contrato</TableHead>
+                        <TableHead className="text-gray-600 dark:text-zinc-400 text-right">MRR Perdido</TableHead>
+                        <TableHead className="text-gray-600 dark:text-zinc-400">Responsável</TableHead>
+                        <TableHead className="text-gray-600 dark:text-zinc-400">Data</TableHead>
+                        <TableHead className="text-gray-600 dark:text-zinc-400">Motivo</TableHead>
+                        <TableHead className="text-gray-600 dark:text-zinc-400">Submotivo</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {churnsDrilldown.map((c, idx) => (
+                        <TableRow key={idx} className="border-gray-100 dark:border-zinc-800">
+                          <TableCell className="font-medium text-gray-900 dark:text-white max-w-[180px] truncate">{c.cliente || "—"}</TableCell>
+                          <TableCell className="text-gray-700 dark:text-zinc-300">{c.contrato || "—"}</TableCell>
+                          <TableCell className="text-right font-semibold text-rose-600 dark:text-rose-400">{formatCurrencyNoDecimals(parseFloat(String(c.valorr)) || 0)}</TableCell>
+                          <TableCell className="text-gray-700 dark:text-zinc-300">{c.responsavel || "—"}</TableCell>
+                          <TableCell className="text-gray-700 dark:text-zinc-300">
+                            {c.data_encerramento ? new Date(c.data_encerramento).toLocaleDateString("pt-BR") : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {c.motivo_cancelamento ? (
+                              <Badge variant="secondary" className={cn("text-xs", getMotivoBadgeColor(c.motivo_cancelamento))}>
+                                {c.motivo_cancelamento}
+                              </Badge>
+                            ) : "—"}
+                          </TableCell>
+                          <TableCell className="text-gray-500 dark:text-zinc-500 text-xs max-w-[150px] truncate">{c.submotivo_cancelamento || "—"}</TableCell>
+                        </TableRow>
+                      ))}
+                      {churnsDrilldown.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-gray-500 dark:text-zinc-500 py-8">
+                            Sem churns neste mês
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
             <CardHeader>
               <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                 <TrendingDown className="w-4 h-4" />
-                Churns do Mês ({(data?.contratosChurn || []).length})
+                Churns do Mês ({churnsDoMes.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -667,7 +769,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(data?.contratosChurn || []).map((c, idx) => (
+                    {churnsDoMes.map((c, idx) => (
                       <TableRow key={idx} className="border-gray-100 dark:border-zinc-800">
                         <TableCell className="font-medium text-gray-900 dark:text-white max-w-[180px] truncate">{c.cliente || "—"}</TableCell>
                         <TableCell className="text-gray-700 dark:text-zinc-300">{c.contrato || "—"}</TableCell>
@@ -686,7 +788,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                         <TableCell className="text-gray-500 dark:text-zinc-500 text-xs max-w-[150px] truncate">{c.submotivo_cancelamento || "—"}</TableCell>
                       </TableRow>
                     ))}
-                    {(data?.contratosChurn || []).length === 0 && (
+                    {churnsDoMes.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-gray-500 dark:text-zinc-500 py-8">
                           Sem churns no período
