@@ -55,6 +55,8 @@ interface SquadDetalheProps {
   mesAno: string;
   chartColors: ChartColors;
   onBack: () => void;
+  perfilDataInicio?: string;
+  perfilDataFim?: string;
 }
 
 interface Operador {
@@ -182,11 +184,9 @@ function getMotivoBadgeColor(motivo: string): string {
   return "bg-zinc-100 text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300";
 }
 
-export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: SquadDetalheProps) {
+export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfilDataInicio = "", perfilDataFim = "" }: SquadDetalheProps) {
   const [busca, setBusca] = useState("");
   const [mesSelecionadoChurn, setMesSelecionadoChurn] = useState<string | null>(null);
-  const [perfilDataInicio, setPerfilDataInicio] = useState("");
-  const [perfilDataFim, setPerfilDataFim] = useState("");
 
   const { data, isLoading } = useQuery<DetalheResponse>({
     queryKey: ["/api/analise-squads/detalhe", squad, mesAno],
@@ -710,8 +710,8 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
           {/* Card: Perfil dos Clientes que Cancelaram */}
           {(perfilChurnLocal || data?.contratosChurn?.length) && (
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                     <Users className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
                     Perfil dos Clientes que Cancelaram
@@ -719,45 +719,6 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                       <Badge variant="secondary" className="text-[10px] font-normal ml-1">{perfilChurnLocal.total} churns</Badge>
                     )}
                   </CardTitle>
-                </div>
-                <div className="flex flex-wrap gap-3 items-end mt-2">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-500 dark:text-zinc-400">Data Início</label>
-                    <Input
-                      type="date"
-                      value={perfilDataInicio}
-                      onChange={(e) => { setPerfilDataInicio(e.target.value); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
-                      className="w-36 h-8 text-xs bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-500 dark:text-zinc-400">Data Fim</label>
-                    <Input
-                      type="date"
-                      value={perfilDataFim}
-                      onChange={(e) => { setPerfilDataFim(e.target.value); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
-                      className="w-36 h-8 text-xs bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700"
-                    />
-                  </div>
-                  <div className="flex gap-1.5">
-                    {[3, 6, 12].map((m) => (
-                      <Button key={m} variant="outline" size="sm" className="h-8 text-xs px-2.5" onClick={() => {
-                        const hoje = new Date();
-                        const inicio = new Date(hoje);
-                        inicio.setMonth(inicio.getMonth() - m);
-                        setPerfilDataInicio(inicio.toISOString().slice(0, 10));
-                        setPerfilDataFim(hoje.toISOString().slice(0, 10));
-                        setMesSelecionadoChurn(null);
-                      }}>
-                        {m}M
-                      </Button>
-                    ))}
-                    {(perfilDataInicio || perfilDataFim) && (
-                      <Button variant="ghost" size="sm" className="h-8 text-xs px-2 text-gray-500 dark:text-zinc-400" onClick={() => { setPerfilDataInicio(""); setPerfilDataFim(""); }}>
-                        Limpar
-                      </Button>
-                    )}
-                  </div>
                   {mesSelecionadoChurn && (
                     <div className="flex items-center gap-1.5">
                       <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
