@@ -375,6 +375,21 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
       ? segEntries.sort((a, b) => b[1] - a[1])[0][0]
       : null;
 
+    // Percentuais de segmento (case-insensitive)
+    const totalComSegmento = segEntries.reduce((s, [, v]) => s + v, 0);
+    let countEcommerce = 0;
+    let countLead = 0;
+    for (const [key, val] of segEntries) {
+      const lower = key.toLowerCase().trim();
+      if (lower.includes("commerce") || lower.includes("ecomm")) countEcommerce += val;
+      else if (lower.includes("lead")) countLead += val;
+    }
+    const pctEcommerce = totalComSegmento > 0 ? Math.round((countEcommerce / totalComSegmento) * 1000) / 10 : 0;
+    const pctLead = totalComSegmento > 0 ? Math.round((countLead / totalComSegmento) * 1000) / 10 : 0;
+
+    // MRR total churn do período
+    const mrrTotal = valores.reduce((s, v) => s + v, 0);
+
     const parentGroups: Record<string, number> = {};
     for (const c of filtrados) {
       const pid = c.parent_id || c.contrato;
@@ -384,7 +399,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
     const singleCount = Object.values(parentGroups).filter((v) => v === 1).length;
     const pctSingleProduct = totalParents > 0 ? Math.round((singleCount / totalParents) * 1000) / 10 : 0;
 
-    return { ltMedio, ticketMedio: ticketMedioChurn, pctMenos3m, segmentoPredominante, pctSingleProduct, total: filtrados.length };
+    return { ltMedio, ticketMedio: ticketMedioChurn, pctMenos3m, segmentoPredominante, pctEcommerce, pctLead, pctSingleProduct, mrrTotal, total: filtrados.length };
   }, [data, mesAno, mesSelecionadoChurn, perfilDataInicio, perfilDataFim]);
 
   // Contratos filtrados por busca
@@ -794,19 +809,19 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
               </CardHeader>
               <CardContent>
                 {perfilChurnLocal ? (
-                  <div className="grid grid-cols-5 gap-4">
+                  <div className="grid grid-cols-6 gap-3">
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/40">
+                      <DollarSign className="w-4 h-4 text-rose-500 dark:text-rose-400 mb-1.5" />
+                      <span className="text-xs text-rose-600 dark:text-rose-400 mb-1">MRR Churn Total</span>
+                      <span className="text-lg font-bold text-rose-700 dark:text-rose-300">
+                        {formatCurrencyNoDecimals(perfilChurnLocal.mrrTotal)}
+                      </span>
+                    </div>
                     <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
                       <Clock className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
                       <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">LT Médio</span>
                       <span className="text-lg font-bold text-gray-900 dark:text-white">
                         {perfilChurnLocal.ltMedio != null ? `${perfilChurnLocal.ltMedio}m` : "N/D"}
-                      </span>
-                    </div>
-                    <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
-                      <FileText className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
-                      <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Single-Product</span>
-                      <span className="text-lg font-bold text-gray-900 dark:text-white">
-                        {perfilChurnLocal.pctSingleProduct}%
                       </span>
                     </div>
                     <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
@@ -819,8 +834,20 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                     <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
                       <Users className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
                       <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Segmento</span>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                          {perfilChurnLocal.pctEcommerce}% <span className="text-[10px] font-normal text-gray-500 dark:text-zinc-400">E-com</span>
+                        </span>
+                        <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+                          {perfilChurnLocal.pctLead}% <span className="text-[10px] font-normal text-gray-500 dark:text-zinc-400">Lead</span>
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
+                      <FileText className="w-4 h-4 text-gray-400 dark:text-zinc-500 mb-1.5" />
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 mb-1">Single-Product</span>
                       <span className="text-lg font-bold text-gray-900 dark:text-white">
-                        {perfilChurnLocal.segmentoPredominante || "N/D"}
+                        {perfilChurnLocal.pctSingleProduct}%
                       </span>
                     </div>
                     <div className="flex flex-col items-center text-center p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50">
