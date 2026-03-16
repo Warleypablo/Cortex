@@ -1454,25 +1454,19 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
 
                 {(item.plano_servico_id || item.is_personalizado) && (
                   <div className="space-y-4 pt-2 border-t">
-                    {item.escopo && !item.is_personalizado && (
-                      <div className="p-3 bg-muted/50 rounded-lg">
-                        <Label className="text-xs text-muted-foreground">Escopo do Plano</Label>
-                        <p className="text-sm mt-1 whitespace-pre-wrap">{item.escopo}</p>
-                      </div>
-                    )}
-
-                    {item.is_personalizado && (
-                      <div className="space-y-1">
-                        <Label className="text-xs">Escopo Personalizado</Label>
-                        <Textarea
-                          data-testid={`textarea-item-escopo-${index}`}
-                          value={item.escopo || ''}
-                          onChange={(e) => updateItem(index, 'escopo', e.target.value)}
-                          placeholder="Descreva o escopo do serviço personalizado..."
-                          rows={3}
-                        />
-                      </div>
-                    )}
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">
+                        {item.is_personalizado ? "Escopo Personalizado" : "Escopo do Plano"}
+                      </Label>
+                      <Textarea
+                        data-testid={`textarea-item-escopo-${index}`}
+                        value={item.escopo || ''}
+                        onChange={(e) => updateItem(index, 'escopo', e.target.value)}
+                        placeholder={item.is_personalizado ? "Descreva o escopo do serviço personalizado..." : "Escopo padrão do plano (editável para personalizar)"}
+                        rows={3}
+                        className="text-sm"
+                      />
+                    </div>
 
                     <div className="grid grid-cols-4 gap-3">
                       <div className="space-y-1">
@@ -2780,10 +2774,18 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                           </Select>
                         </div>
                       </div>
-                      {item.is_personalizado && (
+                      {(item.plano_servico_id || item.is_personalizado || item.escopo) && (
                         <div className="space-y-2">
-                          <Label className="text-xs">Escopo do Serviço</Label>
-                          <Textarea value={item.escopo || ''} onChange={(e) => updateItem(index, 'escopo', e.target.value)} rows={3} placeholder="Descreva o escopo do serviço personalizado..." />
+                          <Label className="text-xs text-gray-500 dark:text-zinc-400">
+                            {item.is_personalizado ? "Escopo Personalizado" : "Escopo do Plano"}
+                          </Label>
+                          <Textarea
+                            value={item.escopo || ''}
+                            onChange={(e) => updateItem(index, 'escopo', e.target.value)}
+                            rows={3}
+                            placeholder={item.is_personalizado ? "Descreva o escopo do serviço personalizado..." : "Escopo padrão do plano (editável para personalizar)"}
+                            className="text-sm"
+                          />
                         </div>
                       )}
                       <div className="grid grid-cols-4 gap-4">
