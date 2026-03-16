@@ -5869,6 +5869,20 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         GROUP BY 1 ORDER BY 1
       `);
 
+      // 7b) MRR Churn por motivo por mês (12 meses)
+      const churnPorMotivoResult = await db.execute(sql`
+        SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
+          COALESCE(NULLIF(TRIM(motivo_cancelamento), ''), 'Sem Motivo') as motivo,
+          COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND valor_r > 0
+          AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
+        GROUP BY 1, 2 ORDER BY 1
+      `);
+
       // 8) Contratos ativos do squad
       let contratosAtivosRows: any[];
       if (isMesAtual) {
@@ -5969,6 +5983,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         evolucaoOperadores: evolucaoOperadoresResult.rows,
         contratosChurn: contratosChurnResult.rows,
         evolucaoChurn: evolucaoChurnResult.rows,
+        churnPorMotivo: churnPorMotivoResult.rows,
         contratosAtivos: contratosAtivosRows,
       });
     } catch (error) {
