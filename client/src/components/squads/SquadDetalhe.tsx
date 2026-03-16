@@ -87,6 +87,7 @@ interface ContratoChurn {
   mes?: string;
   motivo_cancelamento: string;
   submotivo_cancelamento: string;
+  lt_meses: number | null;
 }
 
 interface TotaisAnterior {
@@ -710,7 +711,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                         <TableHead className="text-gray-600 dark:text-zinc-400">Responsável</TableHead>
                         <TableHead className="text-gray-600 dark:text-zinc-400">Data</TableHead>
                         <TableHead className="text-gray-600 dark:text-zinc-400">Motivo</TableHead>
-                        <TableHead className="text-gray-600 dark:text-zinc-400">Submotivo</TableHead>
+                        <TableHead className="text-gray-600 dark:text-zinc-400 text-right">LT (meses)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -730,7 +731,9 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                               </Badge>
                             ) : "—"}
                           </TableCell>
-                          <TableCell className="text-gray-500 dark:text-zinc-500 text-xs max-w-[150px] truncate">{c.submotivo_cancelamento || "—"}</TableCell>
+                          <TableCell className="text-right text-gray-700 dark:text-zinc-300 font-medium">
+                            {c.lt_meses != null ? `${c.lt_meses}m` : "—"}
+                          </TableCell>
                         </TableRow>
                       ))}
                       {churnsDrilldown.length === 0 && (
@@ -766,7 +769,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                       <TableHead className="text-gray-600 dark:text-zinc-400">Responsável</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400">Data</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400">Motivo</TableHead>
-                      <TableHead className="text-gray-600 dark:text-zinc-400">Submotivo</TableHead>
+                      <TableHead className="text-gray-600 dark:text-zinc-400 text-right">LT (meses)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -786,7 +789,9 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                             </Badge>
                           ) : "—"}
                         </TableCell>
-                        <TableCell className="text-gray-500 dark:text-zinc-500 text-xs max-w-[150px] truncate">{c.submotivo_cancelamento || "—"}</TableCell>
+                        <TableCell className="text-right text-gray-700 dark:text-zinc-300 font-medium">
+                          {c.lt_meses != null ? `${c.lt_meses}m` : "—"}
+                        </TableCell>
                       </TableRow>
                     ))}
                     {churnsDoMes.length === 0 && (
