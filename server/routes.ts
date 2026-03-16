@@ -5795,7 +5795,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         ORDER BY mes, operador
       `);
 
-      // 5) Contratos churned no mês (lista detalhada via cup_churn, excluindo abonado)
+      // 5) Contratos churned - últimos 12 meses (lista detalhada via cup_churn, excluindo abonado)
       const contratosChurnResult = await db.execute(sql`
         SELECT
           c.nome as cliente,
@@ -5803,18 +5803,18 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           c.valor_r::numeric as valorr,
           COALESCE(NULLIF(TRIM(c.responsavel_geral), ''), 'Sem Responsável') as responsavel,
           c.data_solicitacao_encerramento as data_encerramento,
+          TO_CHAR(c.data_solicitacao_encerramento, 'YYYY-MM') as mes,
           c.motivo_cancelamento,
           c.submotivo_cancelamento,
           c.status_cancelamento
         FROM "Clickup".cup_churn c
         WHERE c.data_solicitacao_encerramento IS NOT NULL
-          AND c.data_solicitacao_encerramento >= ${inicioMesStr}::date
-          AND c.data_solicitacao_encerramento <= ${fimMesStr}::date
+          AND c.data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND c.valor_r > 0
           AND COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squad}
           AND COALESCE(c.abonar_churn, '') != 'Sim'
           AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
-        ORDER BY c.valor_r::numeric DESC
+        ORDER BY c.data_solicitacao_encerramento DESC, c.valor_r::numeric DESC
       `);
 
       // Montar dados por operador
