@@ -132,6 +132,9 @@ interface ContratoItem {
   is_personalizado?: boolean;
   data_inicio?: string | null;
   data_fim?: string | null;
+  forma_pagamento?: string | null;
+  num_parcelas?: number | null;
+  valor_parcela?: number | null;
 }
 
 interface Servico {
@@ -1181,6 +1184,9 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
       is_personalizado: false,
       data_inicio: null,
       data_fim: null,
+      forma_pagamento: 'Boleto',
+      num_parcelas: null,
+      valor_parcela: null,
     }]);
   };
 
@@ -1528,6 +1534,43 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                           type="date"
                           value={item.data_fim || ''}
                           onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Forma de Pagamento</Label>
+                        <select
+                          className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                          value={item.forma_pagamento || 'Boleto'}
+                          onChange={(e) => updateItem(index, 'forma_pagamento', e.target.value)}
+                        >
+                          <option value="Boleto">Boleto</option>
+                          <option value="PIX">PIX</option>
+                          <option value="Cartão">Cartão</option>
+                          <option value="Transferência">Transferência</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Nº Parcelas</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={item.num_parcelas || ''}
+                          onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)}
+                          placeholder="Ex: 12"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Valor Parcela</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          value={item.valor_parcela || ''}
+                          onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)}
+                          placeholder="R$ 0,00"
                         />
                       </div>
                     </div>
@@ -2310,6 +2353,9 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
       is_personalizado: false,
       data_inicio: null,
       data_fim: null,
+      forma_pagamento: 'Boleto',
+      num_parcelas: null,
+      valor_parcela: null,
     }]);
   };
 
@@ -2804,6 +2850,29 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                         <div className="space-y-2">
                           <Label className="text-xs">Data Fim</Label>
                           <Input type="date" value={item.data_fim || ''} onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Forma de Pagamento</Label>
+                          <select
+                            className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                            value={item.forma_pagamento || 'Boleto'}
+                            onChange={(e) => updateItem(index, 'forma_pagamento', e.target.value)}
+                          >
+                            <option value="Boleto">Boleto</option>
+                            <option value="PIX">PIX</option>
+                            <option value="Cartão">Cartão</option>
+                            <option value="Transferência">Transferência</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Nº Parcelas</Label>
+                          <Input type="number" min={1} value={item.num_parcelas || ''} onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)} placeholder="Ex: 12" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Valor Parcela</Label>
+                          <Input type="number" step="0.01" min={0} value={item.valor_parcela || ''} onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)} placeholder="R$ 0,00" />
                         </div>
                       </div>
                     </div>

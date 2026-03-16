@@ -1280,7 +1280,8 @@ Exemplos:
               contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
               modalidade, valor_original, valor_negociado, desconto_percentual,
               tipo_desconto, valor_desconto, valor_final, economia, observacoes,
-              escopo, is_personalizado, data_inicio, data_fim
+              escopo, is_personalizado, data_inicio, data_fim,
+              forma_pagamento, num_parcelas, valor_parcela
             ) VALUES (
               ${contratoId}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
               ${itemValorNegociado}, ${itemValorNegociado},
@@ -1289,7 +1290,8 @@ Exemplos:
               ${item.tipo_desconto || 'percentual'}, ${itemEconomia},
               ${itemValorNegociado}, ${itemEconomia}, ${item.observacoes || null},
               ${item.escopo || null}, ${item.is_personalizado || false},
-              ${item.data_inicio || null}, ${item.data_fim || null}
+              ${item.data_inicio || null}, ${item.data_fim || null},
+              ${item.forma_pagamento || null}, ${item.num_parcelas || null}, ${item.valor_parcela || null}
             )
           `);
         }
@@ -1354,7 +1356,7 @@ Exemplos:
               contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
               modalidade, valor_original, valor_negociado, desconto_percentual,
               tipo_desconto, valor_desconto, valor_final, economia, observacoes,
-              data_inicio, data_fim
+              data_inicio, data_fim, forma_pagamento, num_parcelas, valor_parcela
             ) VALUES (
               ${parseInt(id)}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
               ${item.valor_unitario || 0}, ${item.valor_total || 0},
@@ -1362,7 +1364,8 @@ Exemplos:
               ${item.valor_negociado || 0}, ${item.desconto_percentual || 0},
               ${item.tipo_desconto || null}, ${item.valor_desconto || 0},
               ${item.valor_final || 0}, ${item.economia || 0}, ${item.observacoes || null},
-              ${item.data_inicio || null}, ${item.data_fim || null}
+              ${item.data_inicio || null}, ${item.data_fim || null},
+              ${item.forma_pagamento || null}, ${item.num_parcelas || null}, ${item.valor_parcela || null}
             )
           `);
         }
@@ -2029,7 +2032,7 @@ Exemplos:
     rightY += writeField((contrato.cliente_nome || 'Cliente').toUpperCase(), colRight, rightY, { width: colW, font: 'Helvetica-Bold' });
     rightY += writeField(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '_____________'}`, colRight, rightY, { width: colW });
     if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
-      rightY += writeField(`Sócio: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '_____________'}`, colRight, rightY, { width: colW });
+      rightY += writeField(`Representante Legal: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '_____________'}`, colRight, rightY, { width: colW });
     }
     rightY += writeField(`Endereço: ${enderecoCliente || '_____________'}`, colRight, rightY, { width: colW });
     rightY += writeField(`Telefone: ${contrato.telefone || '_____________'}`, colRight, rightY, { width: colW });
@@ -2040,7 +2043,7 @@ Exemplos:
     // ======= SEÇÃO: SERVIÇOS CONTRATADOS =======
     currentY = drawSectionTitle('SERVIÇOS CONTRATADOS', currentY);
 
-    // Função para desenhar tabela de serviços com paginação
+    // Função para desenhar tabela de serviços (modelo CT-000756) com paginação
     const drawServiceTable = (items: any[], modalidade: string, valorTotal: number) => {
       if (items.length === 0) return currentY;
 
@@ -2048,23 +2051,36 @@ Exemplos:
       const tableW = contentWidth;
       const maxY = 720;
 
-      if (currentY + 100 > maxY) {
+      if (currentY + 120 > maxY) {
         doc.addPage();
         currentY = 100;
       }
 
+      // Derivar datas e método de pagamento dos itens
+      const datasInicio = items.map((i: any) => i.data_inicio).filter(Boolean).sort();
+      const inicioServico = datasInicio.length > 0 ? formatDate(datasInicio[0]) : 'A definir';
+      const primeiroVencimento = inicioServico;
+      const metodoPagamento = items.find((i: any) => i.forma_pagamento)?.forma_pagamento || 'Boleto';
+
+      // Barra de modalidade
       doc.roundedRect(tableX, currentY, tableW, 28, 4).fill(corHeader);
       doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
         .text(`MODALIDADE ${modalidade.toUpperCase()}`, tableX + 16, currentY + 8);
       currentY += 33;
 
+      // Sub-header com datas e método de pagamento (estilo modelo CT-000756)
+      doc.rect(tableX, currentY, tableW, 20).fill('#f0f4f8');
+      doc.fontSize(8).font('Helvetica').fillColor('#555')
+        .text(`Início do Serviço: ${inicioServico}  |  Primeiro Vencimento: ${primeiroVencimento}  |  Método de Pagamento: ${metodoPagamento}`, tableX + 16, currentY + 5, { width: tableW - 32 });
+      currentY += 25;
+
+      // Colunas: Serviço/Plano | Valor Negociado | Detalhes
       const drawTableHeader = () => {
         doc.rect(tableX, currentY, tableW, 22).fill('#e9eff3');
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#333');
-        doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 170 });
-        doc.text('Valor Negociado', tableX + 185, currentY + 6, { width: 100, align: 'center' });
-        doc.text('Início', tableX + 290, currentY + 6, { width: 80, align: 'center' });
-        doc.text('Fim', tableX + 375, currentY + 6, { width: 80, align: 'center' });
+        doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 180 });
+        doc.text('Valor Negociado', tableX + 195, currentY + 6, { width: 110, align: 'center' });
+        doc.text('Detalhes', tableX + 310, currentY + 6, { width: 145, align: 'center' });
         currentY += 22;
       };
 
@@ -2074,8 +2090,19 @@ Exemplos:
         const servicoNome = item.servico_nome || 'Serviço';
         const planoNome = item.plano_nome || item.descricao || 'Personalizado';
         const valorItem = parseFloat(item.valor_negociado) || parseFloat(item.valor_original) || 0;
-        const dataIni = formatDate(item.data_inicio);
-        const dataFim = formatDate(item.data_fim);
+
+        // Montar texto de Detalhes
+        let detalhes = '';
+        if (item.num_parcelas && item.valor_parcela) {
+          const vp = parseFloat(item.valor_parcela) || 0;
+          detalhes = `Pagamento: em ${item.num_parcelas}x de ${formatCurrency(vp)} mensais`;
+        } else if (item.data_inicio || item.data_fim) {
+          const parts: string[] = [];
+          if (item.data_inicio) parts.push(`Início: ${formatDate(item.data_inicio)}`);
+          if (item.data_fim) parts.push(`Fim: ${formatDate(item.data_fim)}`);
+          detalhes = parts.join(' | ');
+        }
+
         const rowH = 28;
 
         if (currentY + rowH > maxY) {
@@ -2086,14 +2113,13 @@ Exemplos:
 
         doc.rect(tableX, currentY, tableW, rowH).stroke('#E6EAF6');
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
-          .text(servicoNome, tableX + 10, currentY + 5, { width: 170 });
+          .text(servicoNome, tableX + 10, currentY + 5, { width: 180 });
         doc.font('Helvetica').fontSize(8).fillColor('#666')
-          .text(planoNome, tableX + 10, currentY + 16, { width: 170 });
+          .text(planoNome, tableX + 10, currentY + 16, { width: 180 });
         doc.fontSize(9).font('Helvetica-Bold').fillColor('#28a745')
-          .text(formatCurrency(valorItem), tableX + 185, currentY + 10, { width: 100, align: 'center' });
+          .text(formatCurrency(valorItem), tableX + 195, currentY + 10, { width: 110, align: 'center' });
         doc.fontSize(8).font('Helvetica').fillColor('#555')
-          .text(dataIni, tableX + 290, currentY + 10, { width: 80, align: 'center' });
-        doc.text(dataFim, tableX + 375, currentY + 10, { width: 80, align: 'center' });
+          .text(detalhes, tableX + 310, currentY + 5, { width: 145, align: 'center' });
 
         currentY += rowH;
       }
@@ -2612,7 +2638,7 @@ Exemplos:
       rightY += writeField((contrato.cliente_nome || 'Cliente').toUpperCase(), colRight, rightY, { width: colW, font: 'Helvetica-Bold' });
       rightY += writeField(`${contrato.tipo_pessoa === 'juridica' ? 'CNPJ' : 'CPF'}: ${contrato.cpf_cnpj || '_____________'}`, colRight, rightY, { width: colW });
       if (contrato.tipo_pessoa === 'juridica' && contrato.nome_socio) {
-        rightY += writeField(`Sócio: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '_____________'}`, colRight, rightY, { width: colW });
+        rightY += writeField(`Representante Legal: ${contrato.nome_socio}, CPF: ${contrato.cpf_socio || '_____________'}`, colRight, rightY, { width: colW });
       }
       rightY += writeField(`Endereço: ${enderecoCliente || '_____________'}`, colRight, rightY, { width: colW });
       rightY += writeField(`Telefone: ${contrato.telefone || '_____________'}`, colRight, rightY, { width: colW });
@@ -2625,7 +2651,7 @@ Exemplos:
       // ======= SEÇÃO: SERVIÇOS CONTRATADOS =======
       currentY = drawSectionTitle('SERVIÇOS CONTRATADOS', currentY);
 
-      // Função para desenhar tabela de serviços (estilo PHP) com paginação
+      // Função para desenhar tabela de serviços (modelo CT-000756) com paginação
       const drawServiceTable = (items: any[], modalidade: string, valorTotal: number) => {
         if (items.length === 0) return currentY;
 
@@ -2633,23 +2659,36 @@ Exemplos:
         const tableW = contentWidth;
         const maxY = 720;
 
-        if (currentY + 100 > maxY) {
+        if (currentY + 120 > maxY) {
           doc.addPage();
           currentY = 100;
         }
 
+        // Derivar datas e método de pagamento dos itens
+        const datasInicio = items.map((i: any) => i.data_inicio).filter(Boolean).sort();
+        const inicioServico = datasInicio.length > 0 ? formatDate(datasInicio[0]) : 'A definir';
+        const primeiroVencimento = inicioServico;
+        const metodoPagamento = items.find((i: any) => i.forma_pagamento)?.forma_pagamento || 'Boleto';
+
+        // Barra de modalidade
         doc.roundedRect(tableX, currentY, tableW, 28, 4).fill(corHeader);
         doc.fontSize(10).font('Helvetica-Bold').fillColor('#ffffff')
           .text(`MODALIDADE ${modalidade.toUpperCase()}`, tableX + 16, currentY + 8);
         currentY += 33;
 
+        // Sub-header com datas e método de pagamento (estilo modelo CT-000756)
+        doc.rect(tableX, currentY, tableW, 20).fill('#f0f4f8');
+        doc.fontSize(8).font('Helvetica').fillColor('#555')
+          .text(`Início do Serviço: ${inicioServico}  |  Primeiro Vencimento: ${primeiroVencimento}  |  Método de Pagamento: ${metodoPagamento}`, tableX + 16, currentY + 5, { width: tableW - 32 });
+        currentY += 25;
+
+        // Colunas: Serviço/Plano | Valor Negociado | Detalhes
         const drawTableHeader = () => {
           doc.rect(tableX, currentY, tableW, 22).fill('#e9eff3');
           doc.fontSize(9).font('Helvetica-Bold').fillColor('#333');
-          doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 170 });
-          doc.text('Valor Negociado', tableX + 185, currentY + 6, { width: 100, align: 'center' });
-          doc.text('Início', tableX + 290, currentY + 6, { width: 80, align: 'center' });
-          doc.text('Fim', tableX + 375, currentY + 6, { width: 80, align: 'center' });
+          doc.text('Serviço/Plano', tableX + 10, currentY + 6, { width: 180 });
+          doc.text('Valor Negociado', tableX + 195, currentY + 6, { width: 110, align: 'center' });
+          doc.text('Detalhes', tableX + 310, currentY + 6, { width: 145, align: 'center' });
           currentY += 22;
         };
 
@@ -2659,8 +2698,18 @@ Exemplos:
           const servicoNome = item.servico_nome || 'Serviço';
           const planoNome = item.plano_nome || item.descricao || 'Personalizado';
           const valorItem = parseFloat(item.valor_negociado) || parseFloat(item.valor_original) || 0;
-          const dataIni = formatDate(item.data_inicio);
-          const dataFim = formatDate(item.data_fim);
+
+          // Montar texto de Detalhes
+          let detalhes = '';
+          if (item.num_parcelas && item.valor_parcela) {
+            const vp = parseFloat(item.valor_parcela) || 0;
+            detalhes = `Pagamento: em ${item.num_parcelas}x de ${formatCurrency(vp)} mensais`;
+          } else if (item.data_inicio || item.data_fim) {
+            const parts: string[] = [];
+            if (item.data_inicio) parts.push(`Início: ${formatDate(item.data_inicio)}`);
+            if (item.data_fim) parts.push(`Fim: ${formatDate(item.data_fim)}`);
+            detalhes = parts.join(' | ');
+          }
 
           const rowH = 28;
 
@@ -2672,14 +2721,13 @@ Exemplos:
 
           doc.rect(tableX, currentY, tableW, rowH).stroke('#E6EAF6');
           doc.fontSize(9).font('Helvetica-Bold').fillColor('#333')
-            .text(servicoNome, tableX + 10, currentY + 5, { width: 170 });
+            .text(servicoNome, tableX + 10, currentY + 5, { width: 180 });
           doc.font('Helvetica').fontSize(8).fillColor('#666')
-            .text(planoNome, tableX + 10, currentY + 16, { width: 170 });
+            .text(planoNome, tableX + 10, currentY + 16, { width: 180 });
           doc.fontSize(9).font('Helvetica-Bold').fillColor('#28a745')
-            .text(formatCurrency(valorItem), tableX + 185, currentY + 10, { width: 100, align: 'center' });
+            .text(formatCurrency(valorItem), tableX + 195, currentY + 10, { width: 110, align: 'center' });
           doc.fontSize(8).font('Helvetica').fillColor('#555')
-            .text(dataIni, tableX + 290, currentY + 10, { width: 80, align: 'center' });
-          doc.text(dataFim, tableX + 375, currentY + 10, { width: 80, align: 'center' });
+            .text(detalhes, tableX + 310, currentY + 5, { width: 145, align: 'center' });
 
           currentY += rowH;
         }
