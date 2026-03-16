@@ -5811,7 +5811,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             WHEN c.data_inicio_projeto IS NOT NULL AND c.data_solicitacao_encerramento IS NOT NULL
             THEN ROUND(EXTRACT(EPOCH FROM (c.data_solicitacao_encerramento::timestamp - c.data_inicio_projeto::timestamp)) / 86400 / 30.44, 1)
             ELSE NULL
-          END as lt_meses
+          END as lt_meses,
+          COALESCE(NULLIF(TRIM(c.tipo_negocio), ''), '') as tipo_negocio,
+          c.parent_id
         FROM "Clickup".cup_churn c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
@@ -5962,6 +5964,56 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const churnRateAnt = totalContratosAnt > 0 ? Math.round((totalChurnsAnt / totalContratosAnt) * 10000) / 100 : 0;
       const totalMrrChurnAnt = operadoresAnterior.reduce((s, o) => s + o.mrrChurn, 0);
 
+      // Perfil dos churns do mês selecionado
+      const churnsDoMes = (contratosChurnResult.rows as any[]).filter((c: any) => c.mes === mesAno);
+      const totalChurnsMes = churnsDoMes.length;
+
+      let perfilChurn = null;
+      if (totalChurnsMes > 0) {
+        // LT médio
+        const lts = churnsDoMes.map((c: any) => parseFloat(c.lt_meses)).filter((v: number) => !isNaN(v) && v !== null);
+        const ltMedio = lts.length > 0 ? Math.round((lts.reduce((s: number, v: number) => s + v, 0) / lts.length) * 10) / 10 : null;
+
+        // Ticket médio
+        const valores = churnsDoMes.map((c: any) => parseFloat(c.valorr) || 0);
+        const ticketMedioChurn = Math.round(valores.reduce((s: number, v: number) => s + v, 0) / totalChurnsMes);
+
+        // % churns < 3 meses
+        const churnsMenos3m = lts.filter((v: number) => v < 3).length;
+        const pctMenos3m = lts.length > 0 ? Math.round((churnsMenos3m / lts.length) * 1000) / 10 : 0;
+
+        // Segmento predominante
+        const segmentoCount: Record<string, number> = {};
+        for (const c of churnsDoMes) {
+          const tipo = (c as any).tipo_negocio;
+          if (tipo) {
+            segmentoCount[tipo] = (segmentoCount[tipo] || 0) + 1;
+          }
+        }
+        const segmentoEntries = Object.entries(segmentoCount);
+        const segmentoPredominante = segmentoEntries.length > 0
+          ? segmentoEntries.sort((a, b) => b[1] - a[1])[0][0]
+          : null;
+
+        // % single-product (clientes com apenas 1 contrato cancelado no mês)
+        const parentGroups: Record<string, number> = {};
+        for (const c of churnsDoMes) {
+          const pid = (c as any).parent_id || (c as any).contrato;
+          parentGroups[pid] = (parentGroups[pid] || 0) + 1;
+        }
+        const totalParents = Object.keys(parentGroups).length;
+        const singleProductCount = Object.values(parentGroups).filter((v) => v === 1).length;
+        const pctSingleProduct = totalParents > 0 ? Math.round((singleProductCount / totalParents) * 1000) / 10 : 0;
+
+        perfilChurn = {
+          ltMedio,
+          ticketMedio: ticketMedioChurn,
+          pctMenos3m,
+          segmentoPredominante,
+          pctSingleProduct,
+        };
+      }
+
       res.json({
         squad,
         mesAno,
@@ -5991,6 +6043,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         evolucaoChurn: evolucaoChurnResult.rows,
         churnPorMotivo: churnPorMotivoResult.rows,
         contratosAtivos: contratosAtivosRows,
+        perfilChurn,
       });
     } catch (error) {
       console.error("[api] Error fetching analise squads detalhe:", error);
