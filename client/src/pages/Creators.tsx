@@ -639,7 +639,6 @@ export default function Creators() {
               cliente_task_id: contratoForm.cliente_task_id || null,
               ...(contratoForm.cargo === "Produtor de Conteúdo" ? {
                 qtd_videos: parseInt(contratoForm.qtd_videos) || null,
-                qtd_creators: parseInt(contratoForm.qtd_creators) || null,
                 qtd_variacoes_gancho: parseInt(contratoForm.qtd_variacoes_gancho) || null,
               } : {}),
             });
@@ -720,7 +719,7 @@ export default function Creators() {
 
             {/* Campos condicionais — Produtor de Conteúdo */}
             {contratoForm.cargo === "Produtor de Conteúdo" && (
-              <div className="grid grid-cols-3 gap-3 p-3 rounded-md border dark:border-zinc-700 bg-muted/20">
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-md border dark:border-zinc-700 bg-muted/20">
                 <div>
                   <Label>Qtd Vídeos/mês</Label>
                   <Input
@@ -729,16 +728,6 @@ export default function Creators() {
                     placeholder="10"
                     value={contratoForm.qtd_videos}
                     onChange={e => setContratoForm(f => ({ ...f, qtd_videos: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <Label>Qtd Creators</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="3"
-                    value={contratoForm.qtd_creators}
-                    onChange={e => setContratoForm(f => ({ ...f, qtd_creators: e.target.value }))}
                   />
                 </div>
                 <div>
