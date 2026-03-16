@@ -50,6 +50,10 @@ async function ensureCreatorsTables() {
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS duracao_meses INTEGER DEFAULT 6`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS data_inicio DATE`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS data_fim DATE`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS qtd_videos INTEGER`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS qtd_creators INTEGER`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS qtd_variacoes_gancho INTEGER`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS unidade_prazo VARCHAR(10) DEFAULT 'meses'`,
     ];
     for (const ddl of newCols) {
       try { await db.execute(sql.raw(ddl)); } catch { /* column already exists */ }
@@ -64,7 +68,7 @@ async function ensureCreatorsTables() {
 
 interface ContratoCreatorPDFData {
   creator: { nome: string; cpf: string | null; cnpj: string | null; endereco: string | null; cidade: string | null; estado: string | null; cep: string | null };
-  contrato: { cargo: string; descricao_servicos: string; valor_remuneracao: string; duracao_meses: number; data_inicio: string; data_fim: string };
+  contrato: { cargo: string; descricao_servicos: string; valor_remuneracao: string; duracao_meses: number; data_inicio: string; data_fim: string; qtd_videos?: number; qtd_creators?: number; qtd_variacoes_gancho?: number; unidade_prazo?: string; cliente_nome?: string };
 }
 
 async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDFData): Promise<Buffer> {
@@ -76,6 +80,7 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
   const enderecoCompleto = [creator.endereco, creator.cidade, creator.estado, creator.cep].filter(Boolean).join(', ');
   const valorNum = parseFloat((contrato.valor_remuneracao || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
   const valorFormatado = valorNum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const unidadePrazo = contrato.unidade_prazo || 'meses';
   const duracaoExtenso = numeroPorExtenso(contrato.duracao_meses);
 
   const dataInicioFmt = contrato.data_inicio ? formatDateBR(contrato.data_inicio) : '___/___/______';
@@ -119,6 +124,18 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
 
   p(`1.1.1. Os serviços serão prestados por pessoa previamente indicada pelo CONTRATADO e compreendem, de modo exemplificativo, as seguintes atribuições: ${contrato.descricao_servicos}, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE.`, { spacing: 0.5 });
 
+  // Cláusula condicional para Produtor de Conteúdo
+  if (contrato.cargo === 'Produtor de Conteúdo' && (contrato.qtd_videos || contrato.qtd_creators || contrato.qtd_variacoes_gancho)) {
+    const partes: string[] = [];
+    if (contrato.qtd_videos) partes.push(`${contrato.qtd_videos} vídeos por mês`);
+    if (contrato.qtd_creators) partes.push(`${contrato.qtd_creators} creators`);
+    if (contrato.qtd_variacoes_gancho) partes.push(`${contrato.qtd_variacoes_gancho} variações de gancho por conteúdo`);
+    const clienteRef = contrato.cliente_nome ? `, para o cliente ${contrato.cliente_nome}` : '';
+    p(`1.1.2. O escopo de produção compreende ${partes.join(', com ')}${clienteRef}.`, { spacing: 0.5 });
+  } else if (contrato.cliente_nome) {
+    p(`1.1.2. Os serviços serão prestados em favor do cliente ${contrato.cliente_nome}.`, { spacing: 0.5 });
+  }
+
   p('Parágrafo Primeiro. Fica certo e ajustado entre as PARTES que não haverá qualquer controle de horário e/ou carga horária do profissional alocado pela CONTRATADA para a execução dos serviços, tampouco obrigatoriedade quanto ao local de realização das tarefas.', { spacing: 0.5 });
 
   p('Parágrafo Segundo. Toda e qualquer pessoa eventualmente envolvida pela CONTRATADA na execução dos serviços contratados atuará em nome e por conta exclusiva da própria CONTRATADA, sendo esta a única responsável por sua relação jurídica, operacional e contratual com tais profissionais, sem qualquer vínculo direto ou indireto com a CONTRATANTE.', { spacing: 0.5 });
@@ -130,7 +147,7 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
   // ══════════════════════════════════════════════════════════════════════════
   heading('CLÁUSULA SEGUNDA – DO PRAZO');
 
-  p(`2.1 – O presente contrato tem prazo de ${contrato.duracao_meses} [${duracaoExtenso}] meses, com início em ${dataInicioFmt} e fim em ${dataFimFmt}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes, ocasião em que será reavaliado o escopo e as condições comerciais, desde que nenhuma das partes se manifeste no prazo de antecedência mínimo de 30 (trinta) dias anteriores ao término temporal contratual.`, { spacing: 0.5 });
+  p(`2.1 – O presente contrato tem prazo de ${contrato.duracao_meses} [${duracaoExtenso}] ${unidadePrazo}, com início em ${dataInicioFmt} e fim em ${dataFimFmt}. Ao final deste prazo, o CONTRATO poderá ser renovado mediante manifestação expressa das partes, ocasião em que será reavaliado o escopo e as condições comerciais, desde que nenhuma das partes se manifeste no prazo de antecedência mínimo de 30 (trinta) dias anteriores ao término temporal contratual.`, { spacing: 0.5 });
 
   p('Parágrafo Primeiro. Ao final deste prazo, o contrato poderá ser renovado, sendo este realizado por simples aditivo contratual.', { spacing: 0.5 });
 
@@ -569,18 +586,20 @@ export function registerCreatorsRoutes(app: Express) {
   app.post("/api/creators/:id/contratos", async (req, res) => {
     try {
       const creatorId = parseInt(req.params.id);
-      const { cargo, descricao_servicos, valor_remuneracao, duracao_meses, data_inicio, data_fim, observacoes } = req.body;
+      const { cargo, descricao_servicos, valor_remuneracao, duracao_meses, data_inicio, data_fim, observacoes, qtd_videos, qtd_creators, qtd_variacoes_gancho, unidade_prazo, cliente_nome, cliente_task_id } = req.body;
 
       if (!cargo) return res.status(400).json({ error: "Cargo é obrigatório" });
       if (!descricao_servicos) return res.status(400).json({ error: "Descrição dos serviços é obrigatória" });
 
       const result = await db.execute(sql`
         INSERT INTO cortex_core.contratos_creators
-          (creator_id, cargo, descricao_servicos, valor_remuneracao, duracao_meses, data_inicio, data_fim, observacoes)
+          (creator_id, cargo, descricao_servicos, valor_remuneracao, duracao_meses, data_inicio, data_fim, observacoes, qtd_videos, qtd_creators, qtd_variacoes_gancho, unidade_prazo, cliente_nome, cliente_task_id)
         VALUES (
           ${creatorId}, ${cargo}, ${descricao_servicos},
           ${valor_remuneracao || 0}, ${duracao_meses || 6},
-          ${data_inicio || null}, ${data_fim || null}, ${observacoes || null}
+          ${data_inicio || null}, ${data_fim || null}, ${observacoes || null},
+          ${qtd_videos || null}, ${qtd_creators || null}, ${qtd_variacoes_gancho || null},
+          ${unidade_prazo || 'meses'}, ${cliente_nome || null}, ${cliente_task_id || null}
         )
         RETURNING *
       `);
@@ -638,6 +657,11 @@ export function registerCreatorsRoutes(app: Express) {
           duracao_meses: row.duracao_meses || 6,
           data_inicio: row.data_inicio || '',
           data_fim: row.data_fim || '',
+          qtd_videos: row.qtd_videos || undefined,
+          qtd_creators: row.qtd_creators || undefined,
+          qtd_variacoes_gancho: row.qtd_variacoes_gancho || undefined,
+          unidade_prazo: row.unidade_prazo || 'meses',
+          cliente_nome: row.cliente_nome || undefined,
         }
       });
 
@@ -697,6 +721,11 @@ export function registerCreatorsRoutes(app: Express) {
           duracao_meses: row.duracao_meses || 6,
           data_inicio: row.data_inicio || '',
           data_fim: row.data_fim || '',
+          qtd_videos: row.qtd_videos || undefined,
+          qtd_creators: row.qtd_creators || undefined,
+          qtd_variacoes_gancho: row.qtd_variacoes_gancho || undefined,
+          unidade_prazo: row.unidade_prazo || 'meses',
+          cliente_nome: row.cliente_nome || undefined,
         }
       });
       console.log(`[assinafy-creator] PDF gerado: ${pdfBuffer.length} bytes [${Date.now() - startTime}ms]`);
