@@ -16,8 +16,6 @@ import {
   AreaChart, Area, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Bar, ComposedChart, Line,
 } from "recharts";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import type { DateRange } from "react-day-picker";
 
 const SQUAD_COLORS: Record<string, string> = {
   "Aurea": "#fbbf24", "Aurea (OFF)": "#fcd34d", "Black": "#475569",
@@ -187,7 +185,6 @@ function getMotivoBadgeColor(motivo: string): string {
 export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: SquadDetalheProps) {
   const [busca, setBusca] = useState("");
   const [mesSelecionadoChurn, setMesSelecionadoChurn] = useState<string | null>(null);
-  const [perfilDateRange, setPerfilDateRange] = useState<DateRange | undefined>(undefined);
 
   const { data, isLoading } = useQuery<DetalheResponse>({
     queryKey: ["/api/analise-squads/detalhe", squad, mesAno],
@@ -316,24 +313,12 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     return data.contratosChurn.filter((c) => c.mes === mesAno);
   }, [data, mesAno]);
 
-  // Perfil dos clientes que cancelaram (reativo a mês do gráfico ou date range)
+  // Perfil dos clientes que cancelaram (reativo ao mês do gráfico ou mesAno do topo)
   const perfilChurnLocal = useMemo(() => {
     if (!data?.contratosChurn) return null;
 
-    let filtrados: ContratoChurn[];
-    if (mesSelecionadoChurn) {
-      filtrados = data.contratosChurn.filter((c) => c.mes === mesSelecionadoChurn);
-    } else if (perfilDateRange?.from) {
-      const from = perfilDateRange.from;
-      const to = perfilDateRange.to || from;
-      filtrados = data.contratosChurn.filter((c) => {
-        if (!c.data_encerramento) return false;
-        const d = new Date(c.data_encerramento);
-        return d >= from && d <= to;
-      });
-    } else {
-      filtrados = data.contratosChurn.filter((c) => c.mes === mesAno);
-    }
+    const mesFiltro = mesSelecionadoChurn || mesAno;
+    const filtrados = data.contratosChurn.filter((c) => c.mes === mesFiltro);
 
     if (filtrados.length === 0) return null;
 
@@ -365,8 +350,8 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
     const singleCount = Object.values(parentGroups).filter((v) => v === 1).length;
     const pctSingleProduct = totalParents > 0 ? Math.round((singleCount / totalParents) * 1000) / 10 : 0;
 
-    return { ltMedio, ticketMedio: ticketMedioChurn, pctMenos3m, segmentoPredominante, pctSingleProduct, total: filtrados.length };
-  }, [data, mesAno, mesSelecionadoChurn, perfilDateRange]);
+    return { ltMedio, ticketMedio: ticketMedioChurn, pctMenos3m, segmentoPredominante, pctSingleProduct, total: filtrados.length, mes: mesFiltro };
+  }, [data, mesAno, mesSelecionadoChurn]);
 
   // Contratos filtrados por busca
   const contratosFiltrados = useMemo(() => {
@@ -717,24 +702,16 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack }: Squ
                     Perfil dos Clientes que Cancelaram
                     <Badge variant="secondary" className="text-[10px] font-normal ml-1">{perfilChurnLocal.total} churns</Badge>
                   </CardTitle>
-                  <div className="flex items-center gap-2">
-                    {mesSelecionadoChurn && (
+                  {mesSelecionadoChurn && (
+                    <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
-                        Filtrado pelo gráfico
+                        {formatMesLabel(mesSelecionadoChurn)}
                       </Badge>
-                    )}
-                    <DateRangePicker
-                      value={perfilDateRange}
-                      onChange={(range) => { setPerfilDateRange(range); if (mesSelecionadoChurn) setMesSelecionadoChurn(null); }}
-                      triggerClassName="h-8 text-xs min-w-[200px]"
-                      placeholder="Filtrar por período"
-                    />
-                    {perfilDateRange && (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs text-gray-500 dark:text-zinc-400 px-2" onClick={() => setPerfilDateRange(undefined)}>
+                      <Button variant="ghost" size="sm" className="h-6 text-xs text-gray-500 dark:text-zinc-400 px-1.5" onClick={() => setMesSelecionadoChurn(null)}>
                         Limpar
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
