@@ -480,7 +480,7 @@ export const NAV_CONFIG = {
       { title: 'Processos', url: '/juridico/processos', icon: 'Scale', permissionKey: PERMISSION_KEYS.JUR.PROCESSOS },
       { title: 'Contratos Clientes', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_MODULE },
       { title: 'Contratos Colaboradores', url: '/juridico/contratos-colaborador', icon: 'Users', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES },
-      { title: 'Contratos Creators', url: '/juridico/creators', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_CREATORS },
+      { title: 'Contratos Freelancers', url: '/juridico/creators', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_CREATORS },
     ],
   },
   
@@ -657,7 +657,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.JUR.PROCESSOS]: 'Processos',
   [PERMISSION_KEYS.JUR.CONTRATOS_MODULE]: 'Contratos',
   [PERMISSION_KEYS.JUR.ASSISTENTE]: 'Assistente IA',
-  [PERMISSION_KEYS.JUR.CONTRATOS_CREATORS]: 'Contratos Creators',
+  [PERMISSION_KEYS.JUR.CONTRATOS_CREATORS]: 'Contratos Freelancers',
   [PERMISSION_KEYS.JUR.RELATORIOS]: 'Relatórios',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
