@@ -2267,6 +2267,7 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
     [colaboradoresDropdownNovo]
   );
 
+  const [clienteOpenNovo, setClienteOpenNovo] = useState(false);
   const [comercialOpenNovo, setComercialOpenNovo] = useState(false);
 
   const { data: servicosData } = useQuery<{ servicos: Servico[] }>({
@@ -2642,21 +2643,51 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
 
               <div className="space-y-2">
                 <Label>Cliente *</Label>
-                <Select value={formData.cliente_id?.toString() || ''} onValueChange={(v) => setFormData({ ...formData, cliente_id: parseInt(v) })}>
-                  <SelectTrigger data-testid="select-cliente-novo">
-                    <SelectValue placeholder="Selecione o cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {entidadesData?.entidades.map((e) => (
-                      <SelectItem key={e.id} value={e.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4" />
-                          {e.nome}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={clienteOpenNovo} onOpenChange={setClienteOpenNovo}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={clienteOpenNovo}
+                      className="w-full justify-between font-normal"
+                      data-testid="select-cliente-novo"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        {formData.cliente_id ? (
+                          <>
+                            <Building2 className="h-4 w-4 shrink-0" />
+                            {entidadesData?.entidades.find(e => e.id === formData.cliente_id)?.nome || "Selecione o cliente"}
+                          </>
+                        ) : "Selecione o cliente"}
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[450px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar cliente..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {entidadesData?.entidades.map((e) => (
+                            <CommandItem
+                              key={e.id}
+                              value={e.nome}
+                              onSelect={() => {
+                                setFormData({ ...formData, cliente_id: e.id });
+                                setClienteOpenNovo(false);
+                              }}
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", formData.cliente_id === e.id ? "opacity-100" : "opacity-0")} />
+                              <Building2 className="h-4 w-4 mr-2" />
+                              {e.nome}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
