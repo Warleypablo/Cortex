@@ -34,6 +34,7 @@ interface SolicitacaoItem {
   motivo: string;
   login_email: string | null;
   login_senha: string | null;
+  moeda: string;
   status: string;
   motivo_rejeicao: string | null;
   solicitante_id: string;
@@ -90,6 +91,7 @@ const solicitacaoFormSchema = z.object({
   motivo: z.string().min(10, "Descreva melhor o motivo (mínimo 10 caracteres)"),
   login_email: z.string().optional().default(""),
   login_senha: z.string().optional().default(""),
+  moeda: z.enum(["BRL", "USD"]).default("BRL"),
 });
 
 type SolicitacaoFormData = z.infer<typeof solicitacaoFormSchema>;
@@ -106,9 +108,9 @@ const APPROVER_EMAILS = [
   "rodrigo.queiroz@turbopartners.com.br",
 ];
 
-function formatCurrency(value: string | number): string {
+function formatCurrency(value: string | number, moeda: string = "BRL"): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
-  return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return num.toLocaleString("pt-BR", { style: "currency", currency: moeda });
 }
 
 export default function SolicitacaoFerramentas() {
@@ -147,6 +149,7 @@ export default function SolicitacaoFerramentas() {
       motivo: "",
       login_email: "",
       login_senha: "",
+      moeda: "BRL" as const,
     },
   });
 
@@ -184,6 +187,7 @@ export default function SolicitacaoFerramentas() {
 
   const watchValor = form.watch("valor_unitario") || 0;
   const watchQtd = form.watch("quantidade") || 0;
+  const watchMoeda = form.watch("moeda") || "BRL";
   const valorTotal = watchValor * watchQtd;
 
   const handleReject = () => {
@@ -299,13 +303,34 @@ export default function SolicitacaoFerramentas() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="moeda"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 dark:text-zinc-300">Moeda</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="BRL">R$ (BRL)</SelectItem>
+                            <SelectItem value="USD">$ (USD)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="valor_unitario"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-gray-700 dark:text-zinc-300">Valor Unit. (R$)</FormLabel>
+                        <FormLabel className="text-gray-700 dark:text-zinc-300">Valor Unit.</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
@@ -343,7 +368,7 @@ export default function SolicitacaoFerramentas() {
                     <p className="text-sm font-medium text-gray-700 dark:text-zinc-300 mb-2">Valor Total</p>
                     <div className="h-9 flex items-center px-3 rounded-md bg-gray-100 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700">
                       <span className="font-semibold text-sm text-gray-900 dark:text-white">
-                        {formatCurrency(valorTotal)}
+                        {formatCurrency(valorTotal, watchMoeda)}
                       </span>
                     </div>
                   </div>
@@ -541,7 +566,7 @@ export default function SolicitacaoFerramentas() {
                                 </p>
                               )}
                               <p className="text-xs text-gray-500 dark:text-zinc-500 mt-0.5">
-                                {s.quantidade}x {formatCurrency(s.valor_unitario)}
+                                {s.quantidade}x {formatCurrency(s.valor_unitario, s.moeda)}
                                 {s.recorrencia && s.recorrencia !== "unico" && (
                                   <span className="ml-1 text-purple-600 dark:text-purple-400">
                                     ({RECORRENCIA_OPTIONS.find(r => r.value === s.recorrencia)?.label || s.recorrencia})
@@ -566,7 +591,7 @@ export default function SolicitacaoFerramentas() {
                             {s.solicitante_nome}
                           </TableCell>
                           <TableCell className="text-right font-medium text-gray-900 dark:text-white">
-                            {formatCurrency(s.valor_total)}
+                            {formatCurrency(s.valor_total, s.moeda)}
                           </TableCell>
                           <TableCell>
                             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${cfg.variant}`}>
