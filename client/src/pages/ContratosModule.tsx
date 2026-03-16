@@ -73,6 +73,9 @@ import {
   Sparkles,
   Check,
   ChevronsUpDown,
+  Settings,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -2948,6 +2951,386 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+// ============================================================================
+// SERVIÇOS TAB
+// ============================================================================
+
+function ServicosTab() {
+  const { toast } = useToast();
+  const [expandedServico, setExpandedServico] = useState<number | null>(null);
+  const [servicoDialog, setServicoDialog] = useState<{ open: boolean; mode: 'create' | 'edit'; data?: Servico }>({ open: false, mode: 'create' });
+  const [planoDialog, setPlanoDialog] = useState<{ open: boolean; mode: 'create' | 'edit'; servicoId?: number; data?: PlanoServico }>({ open: false, mode: 'create' });
+  const [servicoForm, setServicoForm] = useState({ nome: '', descricao: '' });
+  const [planoForm, setPlanoForm] = useState({ nome: '', escopo: '', diretrizes: '', valor: '', periodicidade: 'mensal' });
+
+  const { data: servicosData, isLoading: loadingServicos } = useQuery<{ servicos: Servico[] }>({
+    queryKey: ['/api/contratos/servicos'],
+  });
+
+  const { data: planosData } = useQuery<{ planos: PlanoServico[] }>({
+    queryKey: ['/api/contratos/planos-servicos'],
+  });
+
+  const createServico = useMutation({
+    mutationFn: (data: { nome: string; descricao: string }) =>
+      apiRequest('POST', '/api/contratos/servicos', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/servicos'] });
+      setServicoDialog({ open: false, mode: 'create' });
+      toast({ title: "Serviço criado com sucesso" });
+    },
+    onError: () => toast({ title: "Erro ao criar serviço", variant: "destructive" }),
+  });
+
+  const updateServico = useMutation({
+    mutationFn: ({ id, ...data }: { id: number; nome: string; descricao: string }) =>
+      apiRequest('PUT', `/api/contratos/servicos/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/servicos'] });
+      setServicoDialog({ open: false, mode: 'create' });
+      toast({ title: "Serviço atualizado com sucesso" });
+    },
+    onError: () => toast({ title: "Erro ao atualizar serviço", variant: "destructive" }),
+  });
+
+  const deleteServico = useMutation({
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/contratos/servicos/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/servicos'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/planos-servicos'] });
+      toast({ title: "Serviço excluído com sucesso" });
+    },
+    onError: () => toast({ title: "Erro ao excluir serviço", variant: "destructive" }),
+  });
+
+  const createPlano = useMutation({
+    mutationFn: (data: any) => apiRequest('POST', '/api/contratos/planos-servicos', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/planos-servicos'] });
+      setPlanoDialog({ open: false, mode: 'create' });
+      toast({ title: "Plano criado com sucesso" });
+    },
+    onError: () => toast({ title: "Erro ao criar plano", variant: "destructive" }),
+  });
+
+  const updatePlano = useMutation({
+    mutationFn: ({ id, ...data }: any) =>
+      apiRequest('PUT', `/api/contratos/planos-servicos/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/planos-servicos'] });
+      setPlanoDialog({ open: false, mode: 'create' });
+      toast({ title: "Plano atualizado com sucesso" });
+    },
+    onError: () => toast({ title: "Erro ao atualizar plano", variant: "destructive" }),
+  });
+
+  const deletePlano = useMutation({
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/contratos/planos-servicos/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/planos-servicos'] });
+      toast({ title: "Plano excluído com sucesso" });
+    },
+    onError: () => toast({ title: "Erro ao excluir plano", variant: "destructive" }),
+  });
+
+  const servicos: Servico[] = servicosData?.servicos || [];
+  const planos: PlanoServico[] = planosData?.planos || [];
+
+  const openCreateServico = () => {
+    setServicoForm({ nome: '', descricao: '' });
+    setServicoDialog({ open: true, mode: 'create' });
+  };
+
+  const openEditServico = (s: Servico) => {
+    setServicoForm({ nome: s.nome, descricao: s.descricao || '' });
+    setServicoDialog({ open: true, mode: 'edit', data: s });
+  };
+
+  const openCreatePlano = (servicoId: number) => {
+    setPlanoForm({ nome: '', escopo: '', diretrizes: '', valor: '', periodicidade: 'mensal' });
+    setPlanoDialog({ open: true, mode: 'create', servicoId });
+  };
+
+  const openEditPlano = (p: PlanoServico) => {
+    setPlanoForm({
+      nome: p.nome,
+      escopo: p.escopo || '',
+      diretrizes: p.diretrizes || '',
+      valor: String(p.valor || ''),
+      periodicidade: p.periodicidade || 'mensal',
+    });
+    setPlanoDialog({ open: true, mode: 'edit', data: p });
+  };
+
+  const handleServicoSubmit = () => {
+    if (!servicoForm.nome.trim()) return;
+    if (servicoDialog.mode === 'edit' && servicoDialog.data) {
+      updateServico.mutate({ id: servicoDialog.data.id, ...servicoForm });
+    } else {
+      createServico.mutate(servicoForm);
+    }
+  };
+
+  const handlePlanoSubmit = () => {
+    if (!planoForm.nome.trim()) return;
+    const payload = {
+      ...planoForm,
+      valor: parseFloat(planoForm.valor) || 0,
+    };
+    if (planoDialog.mode === 'edit' && planoDialog.data) {
+      updatePlano.mutate({ id: planoDialog.data.id, ...payload });
+    } else {
+      createPlano.mutate({ ...payload, servico_id: planoDialog.servicoId });
+    }
+  };
+
+  if (loadingServicos) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Serviços e Planos</h2>
+        <Button onClick={openCreateServico}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo Serviço
+        </Button>
+      </div>
+
+      {servicos.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Nenhum serviço cadastrado. Clique em "Novo Serviço" para começar.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {servicos.map((servico) => {
+            const servicoPlanos = planos.filter((p) => p.servico_id === servico.id);
+            const isExpanded = expandedServico === servico.id;
+
+            return (
+              <Card key={servico.id} className="overflow-hidden">
+                <div
+                  className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setExpandedServico(isExpanded ? null : servico.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                    <div>
+                      <h3 className="font-semibold">{servico.nome}</h3>
+                      {servico.descricao && (
+                        <p className="text-sm text-muted-foreground mt-0.5">{servico.descricao}</p>
+                      )}
+                    </div>
+                    <Badge variant="secondary" className="ml-2">
+                      {servicoPlanos.length} {servicoPlanos.length === 1 ? 'plano' : 'planos'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" onClick={() => openEditServico(servico)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => {
+                        if (confirm(`Excluir o serviço "${servico.nome}" e todos os seus planos?`)) {
+                          deleteServico.mutate(servico.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <div className="border-t px-5 py-4 bg-muted/20">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium text-muted-foreground">Planos deste serviço</span>
+                      <Button size="sm" variant="outline" onClick={() => openCreatePlano(servico.id)}>
+                        <Plus className="h-3 w-3 mr-1" />
+                        Novo Plano
+                      </Button>
+                    </div>
+
+                    {servicoPlanos.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum plano cadastrado para este serviço.
+                      </p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Valor</TableHead>
+                            <TableHead>Periodicidade</TableHead>
+                            <TableHead>Escopo</TableHead>
+                            <TableHead className="w-[100px]">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {servicoPlanos.map((plano) => (
+                            <TableRow key={plano.id}>
+                              <TableCell className="font-medium">{plano.nome}</TableCell>
+                              <TableCell>{formatCurrency(plano.valor)}</TableCell>
+                              <TableCell className="capitalize">{plano.periodicidade || '—'}</TableCell>
+                              <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+                                {plano.escopo || '—'}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Button variant="ghost" size="icon" onClick={() => openEditPlano(plano)}>
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm(`Excluir o plano "${plano.nome}"?`)) {
+                                        deletePlano.mutate(plano.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Dialog Serviço */}
+      <Dialog open={servicoDialog.open} onOpenChange={(open) => !open && setServicoDialog({ open: false, mode: 'create' })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{servicoDialog.mode === 'edit' ? 'Editar Serviço' : 'Novo Serviço'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input
+                value={servicoForm.nome}
+                onChange={(e) => setServicoForm({ ...servicoForm, nome: e.target.value })}
+                placeholder="Ex: Gestão de Redes Sociais"
+              />
+            </div>
+            <div>
+              <Label>Descrição</Label>
+              <Textarea
+                value={servicoForm.descricao}
+                onChange={(e) => setServicoForm({ ...servicoForm, descricao: e.target.value })}
+                placeholder="Descrição do serviço"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setServicoDialog({ open: false, mode: 'create' })}>
+              Cancelar
+            </Button>
+            <Button onClick={handleServicoSubmit} disabled={createServico.isPending || updateServico.isPending}>
+              {(createServico.isPending || updateServico.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {servicoDialog.mode === 'edit' ? 'Salvar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Plano */}
+      <Dialog open={planoDialog.open} onOpenChange={(open) => !open && setPlanoDialog({ open: false, mode: 'create' })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{planoDialog.mode === 'edit' ? 'Editar Plano' : 'Novo Plano'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome do Plano</Label>
+              <Input
+                value={planoForm.nome}
+                onChange={(e) => setPlanoForm({ ...planoForm, nome: e.target.value })}
+                placeholder="Ex: Plano Básico"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Valor (R$)</Label>
+                <Input
+                  type="number"
+                  value={planoForm.valor}
+                  onChange={(e) => setPlanoForm({ ...planoForm, valor: e.target.value })}
+                  placeholder="0,00"
+                />
+              </div>
+              <div>
+                <Label>Periodicidade</Label>
+                <Select value={planoForm.periodicidade} onValueChange={(v) => setPlanoForm({ ...planoForm, periodicidade: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mensal">Mensal</SelectItem>
+                    <SelectItem value="trimestral">Trimestral</SelectItem>
+                    <SelectItem value="semestral">Semestral</SelectItem>
+                    <SelectItem value="anual">Anual</SelectItem>
+                    <SelectItem value="pontual">Pontual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Escopo</Label>
+              <Textarea
+                value={planoForm.escopo}
+                onChange={(e) => setPlanoForm({ ...planoForm, escopo: e.target.value })}
+                placeholder="Descreva o escopo do plano..."
+                rows={4}
+              />
+            </div>
+            <div>
+              <Label>Diretrizes</Label>
+              <Textarea
+                value={planoForm.diretrizes}
+                onChange={(e) => setPlanoForm({ ...planoForm, diretrizes: e.target.value })}
+                placeholder="Diretrizes e regras do plano..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPlanoDialog({ open: false, mode: 'create' })}>
+              Cancelar
+            </Button>
+            <Button onClick={handlePlanoSubmit} disabled={createPlano.isPending || updatePlano.isPending}>
+              {(createPlano.isPending || updatePlano.isPending) && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {planoDialog.mode === 'edit' ? 'Salvar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function ContratosModule() {
   usePageTitle("Contratos");
   useSetPageInfo("Contratos", "Gestão de entidades e contratos");
@@ -2959,7 +3342,7 @@ export default function ContratosModule() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <Card className="mb-6 bg-gradient-to-r from-background via-muted/30 to-background border-muted/50">
           <CardContent className="p-2">
-            <TabsList className="w-full grid grid-cols-4 gap-2 bg-transparent h-auto p-0" data-testid="tabs-contratos">
+            <TabsList className="w-full grid grid-cols-5 gap-2 bg-transparent h-auto p-0" data-testid="tabs-contratos">
               <TabsTrigger 
                 value="dashboard" 
                 data-testid="tab-dashboard"
@@ -3000,6 +3383,16 @@ export default function ContratosModule() {
                 </div>
                 <span className="font-medium text-sm">Novo Contrato</span>
               </TabsTrigger>
+              <TabsTrigger
+                value="servicos"
+                data-testid="tab-servicos"
+                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-violet-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+              >
+                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
+                  <Settings className="h-5 w-5" />
+                </div>
+                <span className="font-medium text-sm">Serviços</span>
+              </TabsTrigger>
             </TabsList>
           </CardContent>
         </Card>
@@ -3018,6 +3411,10 @@ export default function ContratosModule() {
 
         <TabsContent value="novo" className="mt-0">
           <NovoContratoTab onSuccess={() => setActiveTab("contratos")} />
+        </TabsContent>
+
+        <TabsContent value="servicos" className="mt-0">
+          <ServicosTab />
         </TabsContent>
       </Tabs>
     </div>

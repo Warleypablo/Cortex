@@ -1071,6 +1071,74 @@ Exemplos:
     }
   });
 
+  // Serviços - Update
+  app.put("/api/contratos/servicos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nome, descricao } = req.body;
+      await db.execute(sql`
+        UPDATE staging.servicos SET nome = ${nome}, descricao = ${descricao || null}
+        WHERE id = ${parseInt(id)} AND ativo = true
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating servico:", error);
+      res.status(500).json({ error: "Failed to update servico" });
+    }
+  });
+
+  // Serviços - Soft Delete
+  app.delete("/api/contratos/servicos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.execute(sql`
+        UPDATE staging.servicos SET ativo = false WHERE id = ${parseInt(id)}
+      `);
+      await db.execute(sql`
+        UPDATE staging.planos_servicos SET ativo = false WHERE servico_id = ${parseInt(id)}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting servico:", error);
+      res.status(500).json({ error: "Failed to delete servico" });
+    }
+  });
+
+  // Planos de Serviços - Update
+  app.put("/api/contratos/planos-servicos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      await db.execute(sql`
+        UPDATE staging.planos_servicos SET
+          nome = ${data.nome},
+          escopo = ${data.escopo || null},
+          diretrizes = ${data.diretrizes || null},
+          valor = ${data.valor || 0},
+          periodicidade = ${data.periodicidade || null}
+        WHERE id = ${parseInt(id)} AND ativo = true
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating plano:", error);
+      res.status(500).json({ error: "Failed to update plano" });
+    }
+  });
+
+  // Planos de Serviços - Soft Delete
+  app.delete("/api/contratos/planos-servicos/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.execute(sql`
+        UPDATE staging.planos_servicos SET ativo = false WHERE id = ${parseInt(id)}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting plano:", error);
+      res.status(500).json({ error: "Failed to delete plano" });
+    }
+  });
+
   // ============================================================================
   // CONTRATOS ROUTES
   // ============================================================================
