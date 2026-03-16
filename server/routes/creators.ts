@@ -215,7 +215,7 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
 
   p('__________________________', { align: 'center', spacing: 0.2 });
   p('TURBO PARTNERS LTDA', { bold: true, align: 'center', spacing: 0.1 });
-  p('Rodrigo Queiroz Santos', { align: 'center', spacing: 3 });
+  p('Roberto Fachetti', { align: 'center', spacing: 3 });
 
   p('__________________________', { align: 'center', spacing: 0.2 });
   p(creator.nome, { bold: true, align: 'center' });
