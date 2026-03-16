@@ -5798,16 +5798,22 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       // 5) Contratos churned - últimos 12 meses (lista detalhada via cup_churn, excluindo abonado)
       const contratosChurnResult = await db.execute(sql`
         SELECT
-          c.nome as cliente,
-          c.produto as contrato,
+          COALESCE(cl.nome, c.nome) as cliente,
+          c.nome as contrato,
           c.valor_r::numeric as valorr,
           COALESCE(NULLIF(TRIM(c.responsavel_geral), ''), 'Sem Responsável') as responsavel,
           c.data_solicitacao_encerramento as data_encerramento,
           TO_CHAR(c.data_solicitacao_encerramento, 'YYYY-MM') as mes,
           c.motivo_cancelamento,
           c.submotivo_cancelamento,
-          c.status_cancelamento
+          c.status_cancelamento,
+          CASE
+            WHEN c.data_inicio_projeto IS NOT NULL AND c.data_solicitacao_encerramento IS NOT NULL
+            THEN ROUND(EXTRACT(EPOCH FROM (c.data_solicitacao_encerramento::timestamp - c.data_inicio_projeto::timestamp)) / 86400 / 30.44, 1)
+            ELSE NULL
+          END as lt_meses
         FROM "Clickup".cup_churn c
+        LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND c.data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND c.valor_r > 0
