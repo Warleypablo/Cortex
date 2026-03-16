@@ -104,7 +104,7 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
   // ══════════════════════════════════════════════════════════════════════════
   p('Pelo presente instrumento particular, e na melhor forma de direito, as partes a seguir qualificadas:', { spacing: 0.8 });
 
-  p('CONTRATANTE: TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Rodrigo Queiroz Santos;', { spacing: 0.8 });
+  p('CONTRATANTE: TURBO PARTNERS LTDA, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº 42.100.292/0001-84, com sede na Avenida João Batista Parra, 633, Enseada do Suá, Vitória-ES, 29052-120, neste ato representada por seu sócio Roberto Fachetti;', { spacing: 0.8 });
 
   p(`CONTRATADA: ${creator.nome}, pessoa jurídica de direito privado inscrita no ${creator.cnpj ? 'CNPJ' : 'CPF'} ${cpfCnpj}${enderecoCompleto ? `, com sede na ${enderecoCompleto}` : ''}${creator.cpf && creator.cnpj ? `, devidamente registrado no CPF ${creator.cpf}` : ''}.`, { spacing: 0.8 });
 
@@ -354,10 +354,7 @@ async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDF
   p(creator.nome.toUpperCase(), { bold: true, align: 'center', spacing: 2.5 });
 
   p('_____________________________________________', { align: 'center', spacing: 0.2 });
-  p('ANDRÉ MUSSO', { bold: true, align: 'center', spacing: 2.5 });
-
-  p('_____________________________________________', { align: 'center', spacing: 0.2 });
-  p('VICTOR DE SOUZA PEIXOTO', { bold: true, align: 'center' });
+  p('ROBERTO FACHETTI', { bold: true, align: 'center' });
 
   doc.end();
 
@@ -732,9 +729,7 @@ export function registerCreatorsRoutes(app: Express) {
       const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
 
       const sociosResponsaveis = [
-        { nome: "Rodrigo Queiroz Santos", email: "rodrigo.queiroz@turbopartners.com.br" },
-        { nome: "Victor Peixoto", email: "victor.peixoto@turbopartners.com.br" },
-        { nome: "Julia Viana", email: "julia.viana@turbopartners.com.br" }
+        { nome: "Roberto Fachetti", email: "roberto.fachetti@turbopartners.com.br" }
       ];
 
       const getOrCreateSigner = async (nome: string, email: string): Promise<string> => {
