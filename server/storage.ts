@@ -1789,6 +1789,36 @@ export class DbStorage implements IStorage {
 
   async getClientes(): Promise<ClienteCompleto[]> {
     const result = await db.execute(sql`
+      WITH contratos_agg AS (
+        SELECT
+          id_task,
+          string_agg(DISTINCT produto, ', ') as servicos,
+          MIN(data_inicio) as data_inicio_min,
+          ROUND(
+            EXTRACT(EPOCH FROM (
+              MAX(COALESCE(data_encerramento, NOW())) FILTER (WHERE data_inicio IS NOT NULL)
+              - MIN(data_inicio)
+            )) / 86400
+          )::double precision as lt_dias,
+          SUM(CASE WHEN LOWER(status) IN ('ativo', 'onboarding', 'triagem') AND valorr IS NOT NULL
+                   THEN valorr::double precision ELSE 0 END) as total_recorrente,
+          SUM(CASE WHEN LOWER(status) IN ('ativo', 'onboarding', 'triagem') AND valorp IS NOT NULL
+                   THEN valorp::double precision ELSE 0 END) as total_pontual
+        FROM "Clickup".cup_contratos
+        GROUP BY id_task
+      ),
+      pagamentos_agg AS (
+        SELECT
+          cr.cliente_id,
+          MIN(COALESCE(cr.data_vencimento, cr.data_criacao)) as primeiro_pagamento,
+          COUNT(DISTINCT TO_CHAR(
+            COALESCE(cr.data_vencimento, cr.data_criacao), 'YYYY-MM'
+          ))::double precision as lt_meses
+        FROM "Conta Azul".caz_receber cr
+        WHERE UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
+          AND COALESCE(cr.data_vencimento, cr.data_criacao) IS NOT NULL
+        GROUP BY cr.cliente_id
+      )
       SELECT DISTINCT ON (cc.task_id)
         COALESCE(caz.id, ('x' || substr(md5(cc.task_id), 1, 8))::bit(32)::int) as id,
         COALESCE(caz.nome, cc.nome) as nome,
@@ -1810,56 +1840,13 @@ export class DbStorage implements IStorage {
         NULL::text as "linkListaClickup",
         cc.cluster,
         cc.cnpj as "cnpjCliente",
-        (
-          SELECT string_agg(DISTINCT produto, ', ')
-          FROM "Clickup".cup_contratos
-          WHERE id_task = cc.task_id
-        ) as servicos,
-        (
-          SELECT MIN(data_inicio)
-          FROM "Clickup".cup_contratos
-          WHERE id_task = cc.task_id
-        ) as "dataInicio",
-        (
-          SELECT MIN(COALESCE(cr.data_vencimento, cr.data_criacao))
-          FROM "Conta Azul".caz_receber cr
-          WHERE cr.cliente_id = caz.ids
-            AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
-        ) as "dataPrimeiroPagamento",
-        COALESCE((
-          SELECT COUNT(DISTINCT TO_CHAR(
-            COALESCE(cr.data_vencimento, cr.data_criacao), 
-            'YYYY-MM'
-          ))::double precision
-          FROM "Conta Azul".caz_receber cr
-          WHERE cr.cliente_id = caz.ids
-            AND UPPER(cr.status) IN ('PAGO', 'ACQUITTED')
-            AND COALESCE(cr.data_vencimento, cr.data_criacao) IS NOT NULL
-        ), 0) as "ltMeses",
-        COALESCE((
-          SELECT ROUND(
-            EXTRACT(EPOCH FROM (
-              MAX(COALESCE(data_encerramento, NOW())) - MIN(data_inicio)
-            )) / 86400
-          )::double precision
-          FROM "Clickup".cup_contratos
-          WHERE id_task = cc.task_id
-          AND data_inicio IS NOT NULL
-        ), 0) as "ltDias",
-        COALESCE((
-          SELECT SUM(valorr::double precision)
-          FROM "Clickup".cup_contratos
-          WHERE id_task = cc.task_id
-            AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
-            AND valorr IS NOT NULL
-        ), 0) as "totalRecorrente",
-        COALESCE((
-          SELECT SUM(valorp::double precision)
-          FROM "Clickup".cup_contratos
-          WHERE id_task = cc.task_id
-            AND LOWER(status) IN ('ativo', 'onboarding', 'triagem')
-            AND valorp IS NOT NULL
-        ), 0) as "totalPontual",
+        ca.servicos,
+        ca.data_inicio_min as "dataInicio",
+        pa.primeiro_pagamento as "dataPrimeiroPagamento",
+        COALESCE(pa.lt_meses, 0) as "ltMeses",
+        COALESCE(ca.lt_dias, 0) as "ltDias",
+        COALESCE(ca.total_recorrente, 0) as "totalRecorrente",
+        COALESCE(ca.total_pontual, 0) as "totalPontual",
         NULL::text as "statusFinanceiro",
         NULL::text as "tipoNegocio",
         NULL::text as "faturamentoMensal",
@@ -1867,6 +1854,8 @@ export class DbStorage implements IStorage {
         cc.status_conta as "statusConta"
       FROM "Clickup".cup_clientes cc
       LEFT JOIN "Conta Azul".caz_clientes caz ON cc.cnpj = caz.cnpj
+      LEFT JOIN contratos_agg ca ON ca.id_task = cc.task_id
+      LEFT JOIN pagamentos_agg pa ON pa.cliente_id = caz.ids
       ORDER BY cc.task_id, caz.id DESC NULLS LAST, cc.nome
     `);
 
