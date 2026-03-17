@@ -26,15 +26,13 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, RefreshCw, Bot, CheckCircle2, XCircle, Loader2, Megaphone, Search } from "lucide-react";
+import { Users, Database, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, RefreshCw, Bot, CheckCircle2, XCircle, Loader2, Megaphone, Search } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
-import { AdminLogsContent } from "./AdminLogs";
 import { ColorPicker } from "@/components/ui/color-picker";
 
 type SortColumn = 'name' | 'email' | 'role' | 'allowedRoutes';
@@ -3493,51 +3491,7 @@ export default function AdminUsuarios() {
 
   return (
     <div className="p-6 space-y-6">
-      <Tabs defaultValue="usuarios" className="space-y-6">
-        <TabsList data-testid="tabs-admin">
-          <TabsTrigger value="usuarios" data-testid="tab-usuarios">
-            <Users className="h-4 w-4 mr-2" />
-            Usuários
-          </TabsTrigger>
-          <TabsTrigger value="logs" data-testid="tab-logs">
-            <Activity className="h-4 w-4 mr-2" />
-            Logs do Sistema
-          </TabsTrigger>
-          <TabsTrigger value="fields" data-testid="tab-fields">
-            <Settings className="h-4 w-4 mr-2" />
-            Campos do Sistema
-          </TabsTrigger>
-          <TabsTrigger value="notifications" data-testid="tab-notifications">
-            <BellRing className="h-4 w-4 mr-2" />
-            Regras de Notificação
-          </TabsTrigger>
-          <TabsTrigger value="database" data-testid="tab-database">
-            <Database className="h-4 w-4 mr-2" />
-            Estrutura do Banco
-          </TabsTrigger>
-          <TabsTrigger value="ai-config" data-testid="tab-ai-config">
-            <Bot className="h-4 w-4 mr-2" />
-            Configurações IA
-          </TabsTrigger>
-          <TabsTrigger value="catalogs" data-testid="tab-catalogs">
-            <Layers className="h-4 w-4 mr-2" />
-            Catálogos
-          </TabsTrigger>
-          <TabsTrigger value="system-fields" data-testid="tab-system-fields">
-            <FileText className="h-4 w-4 mr-2" />
-            Registro de Campos
-          </TabsTrigger>
-          <TabsTrigger value="access-profiles" data-testid="tab-access-profiles">
-            <Shield className="h-4 w-4 mr-2" />
-            Perfis de Acesso
-          </TabsTrigger>
-          <TabsTrigger value="avisos" data-testid="tab-avisos">
-            <Megaphone className="h-4 w-4 mr-2" />
-            Avisos
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="usuarios" className="space-y-6">
+      <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -3747,44 +3701,7 @@ export default function AdminUsuarios() {
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
       />
-        </TabsContent>
-
-        <TabsContent value="logs">
-          <AdminLogsContent />
-        </TabsContent>
-
-        <TabsContent value="fields">
-          <SystemFieldsContent />
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <NotificationRulesContent />
-        </TabsContent>
-
-        <TabsContent value="database">
-          <DatabaseExplorerContent />
-        </TabsContent>
-
-        <TabsContent value="ai-config">
-          <AIConfigContent />
-        </TabsContent>
-
-        <TabsContent value="catalogs">
-          <CatalogsContent />
-        </TabsContent>
-
-        <TabsContent value="system-fields">
-          <FieldRegistryContent />
-        </TabsContent>
-
-        <TabsContent value="access-profiles">
-          <AccessProfilesContent />
-        </TabsContent>
-
-        <TabsContent value="avisos">
-          <AvisosContent />
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 }
