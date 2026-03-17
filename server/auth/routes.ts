@@ -7,7 +7,7 @@ import { isExternalEmailAllowed, createExternalUser, EXTERNAL_USER_ROUTES } from
 import { validateBody } from "../middleware/validate";
 import { externalLoginSchema, clientLoginSchema } from "../middleware/schemas";
 import { db } from "../db";
-import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos, arClientes, arMetricas, arCampanhas, arCanais, clientCredentials } from "../../shared/schema";
+import { cazClientes, cazParcelas, chatMensagens, chatAtendimentos, cupClientes, cupContratos, portalCancelamentos, arClientes, arMetricas, arCampanhas, arCanais, clientCredentials, authLogs } from "../../shared/schema";
 import { eq, desc, sql, inArray, and, asc } from "drizzle-orm";
 
 // Hashed passwords for external users
@@ -15,6 +15,34 @@ const EXTERNAL_USER_PASSWORDS: Record<string, string> = {
   'ajame@icloud.com': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
   'warleyreserva4@gmail.com': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
 };
+
+async function logAuthEvent(params: {
+  userId?: string | null;
+  userEmail?: string | null;
+  userName?: string | null;
+  action: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  success: boolean;
+}) {
+  try {
+    await db.insert(authLogs).values({
+      userId: params.userId ?? null,
+      userEmail: params.userEmail ?? null,
+      userName: params.userName ?? null,
+      action: params.action,
+      ipAddress: params.ipAddress ?? null,
+      userAgent: params.userAgent ?? null,
+      success: params.success ? "true" : "false",
+    });
+  } catch (err) {
+    console.error("[auth] Failed to write auth log:", err);
+  }
+}
+
+function getClientIp(req: any): string | null {
+  return req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() || req.socket?.remoteAddress || null;
+}
 
 const router = Router();
 
@@ -59,24 +87,29 @@ router.get("/auth/google/callback",
       console.log("Info:", info);
       if (err) {
         console.error("❌ Erro na autenticação Google:", err);
+        logAuthEvent({ action: "login_google", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
         return res.redirect("/login");
       }
       if (!user) {
         console.error("❌ Usuário não retornado. Info:", info);
+        logAuthEvent({ action: "login_google", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
         return res.redirect("/login");
       }
       req.logIn(user, (loginErr) => {
         if (loginErr) {
           console.error("❌ Erro ao fazer login:", loginErr);
+          logAuthEvent({ userId: (user as User).id, userEmail: (user as User).email, userName: (user as User).name, action: "login_google", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
           return res.redirect("/login");
         }
         // Força o salvamento da sessão antes de redirecionar
         req.session.save((saveErr) => {
           if (saveErr) {
             console.error("❌ Erro ao salvar sessão:", saveErr);
+            logAuthEvent({ userId: (user as User).id, userEmail: (user as User).email, userName: (user as User).name, action: "login_google", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
             return res.redirect("/login");
           }
           console.log("✅ Login bem-sucedido!");
+          logAuthEvent({ userId: (user as User).id, userEmail: (user as User).email, userName: (user as User).name, action: "login_google", success: true, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
           res.redirect("/");
         });
       });
@@ -85,10 +118,13 @@ router.get("/auth/google/callback",
 );
 
 router.post("/auth/logout", (req, res) => {
+  const loggedUser = req.user as User | undefined;
   req.logout((err) => {
     if (err) {
+      logAuthEvent({ userId: loggedUser?.id, userEmail: loggedUser?.email, userName: loggedUser?.name, action: "logout", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
       return res.status(500).json({ message: "Logout failed" });
     }
+    logAuthEvent({ userId: loggedUser?.id, userEmail: loggedUser?.email, userName: loggedUser?.name, action: "logout", success: true, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
     // Destroi a sessão completamente para evitar cache de login
     req.session.destroy((destroyErr) => {
       if (destroyErr) {
