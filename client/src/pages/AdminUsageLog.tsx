@@ -243,14 +243,14 @@ export default function AdminUsageLog() {
                     <button
                       onClick={() => setAuthLogsPage(p => Math.max(1, p - 1))}
                       disabled={authLogsPage <= 1}
-                      className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+                      className="px-3 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-800 text-foreground disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-zinc-700"
                     >
                       Anterior
                     </button>
                     <button
                       onClick={() => setAuthLogsPage(p => Math.min(authLogs.totalPages, p + 1))}
                       disabled={authLogsPage >= authLogs.totalPages}
-                      className="px-3 py-1 text-sm border rounded disabled:opacity-50"
+                      className="px-3 py-1 text-sm border border-gray-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-800 text-foreground disabled:opacity-50 hover:bg-gray-50 dark:hover:bg-zinc-700"
                     >
                       Próxima
                     </button>
