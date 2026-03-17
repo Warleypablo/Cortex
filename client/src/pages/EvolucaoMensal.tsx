@@ -7,7 +7,8 @@ import { formatCurrencyNoDecimals, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, DollarSign, Activity, Percent, Zap } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
+import { HeroMetric } from "@/components/HeroMetric";
 import {
   AreaChart,
   Area,
@@ -273,7 +274,7 @@ export default function EvolucaoMensal() {
       const previousData = currentIndex > 0 ? aggregatedData[currentIndex - 1] : null;
 
       return (
-        <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm border border-gray-200 dark:border-zinc-700/50 rounded-lg p-4 shadow-xl min-w-[240px]">
+        <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 text-sm text-foreground min-w-[240px]">
           <p className="text-sm text-gray-700 dark:text-zinc-300 mb-3 font-semibold border-b border-gray-200 dark:border-zinc-700/50 pb-2">{label}</p>
           {payload.map((entry: any, index: number) => {
             const isMRR = entry.name === "mrr";
@@ -287,7 +288,7 @@ export default function EvolucaoMensal() {
                 <div className="flex items-center gap-2 mb-1">
                   <div
                     className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: entry.color, boxShadow: `0 0 8px ${entry.color}` }}
+                    style={{ backgroundColor: entry.color }}
                   />
                   <span className="text-xs text-gray-500 dark:text-zinc-400 uppercase font-medium">
                     {isMRR ? "MRR" : "Churn"}
@@ -305,7 +306,7 @@ export default function EvolucaoMensal() {
                   {previousValue !== null && (
                     <div className={cn(
                       "text-xs flex items-center gap-1 mt-1",
-                      isMRR ? (change >= 0 ? "text-emerald-400" : "text-rose-400") : (churnRateDiff <= 0 ? "text-emerald-400" : "text-rose-400")
+                      isMRR ? (change >= 0 ? "text-emerald-400" : "text-red-400") : (churnRateDiff <= 0 ? "text-emerald-400" : "text-red-400")
                     )}>
                       {isMRR ? (
                         change >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />
@@ -407,132 +408,58 @@ export default function EvolucaoMensal() {
         </Select>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="relative group" data-testid="card-mrr-atual">
-          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
-          <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-zinc-400">MRR Atual</CardTitle>
-              <div className="p-2 rounded-lg bg-cyan-500/10">
-                <DollarSign className="h-4 w-4 text-cyan-500 dark:text-cyan-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white font-mono">{formatCurrencyNoDecimals(totais.mrrAtual)}</div>
-              <p className={cn(
-                "text-xs mt-1 flex items-center gap-1",
-                totais.variacaoMrr >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-              )}>
-                {totais.variacaoMrr >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                {totais.variacaoMrr >= 0 ? "+" : ""}{formatCurrencyNoDecimals(totais.variacaoMrr)} vs anterior
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <div className="relative group" data-testid="card-variacao">
-          <div className={cn(
-            "absolute inset-0 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50",
-            totais.variacaoMrr >= 0 ? "bg-gradient-to-r from-emerald-500/20 to-green-500/20" : "bg-gradient-to-r from-rose-500/20 to-red-500/20"
-          )} />
-          <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-zinc-400">Variação MRR</CardTitle>
-              <div className={cn(
-                "p-2 rounded-lg",
-                totais.variacaoMrr >= 0 ? "bg-emerald-500/10" : "bg-rose-500/10"
-              )}>
-                {totais.variacaoMrr >= 0 ? (
-                  <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className={cn(
-                "text-2xl font-bold font-mono",
-                totais.variacaoMrr >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-              )}>
-                {totais.variacaoMrr >= 0 ? "+" : ""}{formatCurrencyNoDecimals(totais.variacaoMrr)}
-              </div>
-              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">
-                Último mês
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <div className="relative group" data-testid="card-churn-total">
-          <div className="absolute inset-0 bg-gradient-to-r from-rose-500/20 to-red-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
-          <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-zinc-400">Churn do Mês</CardTitle>
-              <div className="p-2 rounded-lg bg-rose-500/10">
-                <TrendingDown className="h-4 w-4 text-rose-600 dark:text-rose-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 font-mono">{formatCurrencyNoDecimals(totais.churnMesAtual)}</div>
-              {totais.churnMesAnterior > 0 && (
-                <p className={cn(
-                  "text-xs mt-1 flex items-center gap-1",
-                  totais.churnMesAtual <= totais.churnMesAnterior ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                )}>
-                  {totais.churnMesAtual <= totais.churnMesAnterior ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-                  {totais.churnMesAtual <= totais.churnMesAnterior ? "" : "+"}{formatCurrencyNoDecimals(totais.churnMesAtual - totais.churnMesAnterior)} vs anterior
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="relative group" data-testid="card-churn-rate">
-          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-xl blur-xl group-hover:blur-2xl transition-all opacity-50" />
-          <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium text-gray-600 dark:text-zinc-400">Taxa de Churn</CardTitle>
-              <div className="p-2 rounded-lg bg-amber-500/10">
-                <Percent className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 font-mono">{totais.churnRateAtual.toFixed(1)}%</div>
-              {totais.churnRateAnterior > 0 && (
-                <p className={cn(
-                  "text-xs mt-1 flex items-center gap-1",
-                  totais.churnRateAtual <= totais.churnRateAnterior ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                )}>
-                  {totais.churnRateAtual <= totais.churnRateAnterior ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-                  {totais.churnRateAtual <= totais.churnRateAnterior ? "" : "+"}{(totais.churnRateAtual - totais.churnRateAnterior).toFixed(1)}pp vs anterior
-                </p>
-              )}
-              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">
-                Média período: {totais.churnRate.toFixed(1)}%
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-2">
+        <HeroMetric
+          label="MRR Atual"
+          value={formatCurrencyNoDecimals(totais.mrrAtual)}
+          trend={{
+            value: `${totais.variacaoMrr >= 0 ? "+" : ""}${formatCurrencyNoDecimals(totais.variacaoMrr)} vs anterior`,
+            isPositive: totais.variacaoMrr >= 0,
+          }}
+        />
+        <HeroMetric
+          label="Variação MRR"
+          value={`${totais.variacaoMrr >= 0 ? "+" : ""}${formatCurrencyNoDecimals(totais.variacaoMrr)}`}
+          subtitle="Último mês"
+          trend={{
+            value: totais.variacaoMrr >= 0 ? "positiva" : "negativa",
+            isPositive: totais.variacaoMrr >= 0,
+          }}
+        />
+        <HeroMetric
+          label="Churn do Mês"
+          value={formatCurrencyNoDecimals(totais.churnMesAtual)}
+          trend={totais.churnMesAnterior > 0 ? {
+            value: `${totais.churnMesAtual <= totais.churnMesAnterior ? "" : "+"}${formatCurrencyNoDecimals(totais.churnMesAtual - totais.churnMesAnterior)} vs anterior`,
+            isPositive: totais.churnMesAtual <= totais.churnMesAnterior,
+          } : undefined}
+        />
+        <HeroMetric
+          label="Taxa de Churn"
+          value={`${totais.churnRateAtual.toFixed(1)}%`}
+          subtitle={`Média período: ${totais.churnRate.toFixed(1)}%`}
+          trend={totais.churnRateAnterior > 0 ? {
+            value: `${totais.churnRateAtual <= totais.churnRateAnterior ? "" : "+"}${(totais.churnRateAtual - totais.churnRateAnterior).toFixed(1)}pp vs anterior`,
+            isPositive: totais.churnRateAtual <= totais.churnRateAnterior,
+          } : undefined}
+        />
       </div>
 
-      <div className="relative" data-testid="card-chart-main">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-cyan-500/5 rounded-xl blur-2xl" />
-        <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+      <div data-testid="card-chart-main">
+        <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                <Activity className="h-4 w-4 text-cyan-500 dark:text-cyan-400" />
+              <CardTitle className="text-base font-semibold text-foreground">
                 Evolução MRR e Churn
               </CardTitle>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-gradient-to-b from-cyan-500/40 to-cyan-500/10 border-2 border-cyan-500" />
+                  <div className="w-4 h-4 rounded bg-cyan-500/20 border-2 border-cyan-500" />
                   <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">MRR (Eixo Esquerdo)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-1 rounded-full bg-rose-500" />
-                  <span className="text-sm font-medium text-rose-600 dark:text-rose-400">Churn (Eixo Direito)</span>
+                  <div className="w-4 h-1 rounded-full bg-red-500" />
+                  <span className="text-sm font-medium text-red-600 dark:text-red-400">Churn (Eixo Direito)</span>
                 </div>
               </div>
             </div>
@@ -541,24 +468,6 @@ export default function EvolucaoMensal() {
             <div className="h-[420px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={aggregatedData} margin={{ top: 10, right: 40, left: 10, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="mrrGradientTech" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.6}/>
-                      <stop offset="50%" stopColor="#0891b2" stopOpacity={0.3}/>
-                      <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.05}/>
-                    </linearGradient>
-                    <linearGradient id="churnGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.3}/>
-                      <stop offset="100%" stopColor="#f43f5e" stopOpacity={0}/>
-                    </linearGradient>
-                    <filter id="glow">
-                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                      <feMerge>
-                        <feMergeNode in="coloredBlur"/>
-                        <feMergeNode in="SourceGraphic"/>
-                      </feMerge>
-                    </filter>
-                  </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} opacity={0.5} />
                   <XAxis
                     dataKey="mes"
@@ -593,18 +502,18 @@ export default function EvolucaoMensal() {
                     name="mrr"
                     stroke="#06b6d4"
                     strokeWidth={3}
-                    fill="url(#mrrGradientTech)"
-                    filter="url(#glow)"
+                    fill="#06b6d4"
+                    fillOpacity={0.1}
                   />
                   <Line
                     yAxisId="right"
                     type="monotone"
                     dataKey="churn"
                     name="churn"
-                    stroke="#f43f5e"
+                    stroke="#ef4444"
                     strokeWidth={3}
-                    dot={{ fill: "#f43f5e", strokeWidth: 2, r: 5, filter: "url(#glow)", stroke: "#18181b" }}
-                    activeDot={{ r: 8, stroke: "#f43f5e", strokeWidth: 3, fill: "#18181b" }}
+                    dot={{ fill: "#ef4444", strokeWidth: 2, r: 5, stroke: isDark ? "#18181b" : "#ffffff" }}
+                    activeDot={{ r: 8, stroke: "#ef4444", strokeWidth: 3, fill: isDark ? "#18181b" : "#ffffff" }}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -614,14 +523,11 @@ export default function EvolucaoMensal() {
       </div>
 
       {viewMode === "squad" && chartData.length > 0 && (
-        <div className="relative" data-testid="card-chart-by-squad">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 via-pink-500/5 to-orange-500/5 rounded-xl blur-2xl" />
-          <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent" />
+        <div data-testid="card-chart-by-squad">
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                  <Zap className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <CardTitle className="text-base font-semibold text-foreground">
                   {tableMode === "mrr" ? "MRR por Squad" : "Churn % por Squad"}
                 </CardTitle>
                 <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5">
@@ -641,7 +547,7 @@ export default function EvolucaoMensal() {
                     className={cn(
                       "px-3 py-1 text-xs font-medium rounded-md transition-all",
                       tableMode === "churn"
-                        ? "bg-rose-500 text-white shadow-sm"
+                        ? "bg-red-500 text-white shadow-sm"
                         : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
                     )}
                   >
@@ -655,7 +561,7 @@ export default function EvolucaoMensal() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-zinc-700/50">
-                      <th className="text-left py-3 px-4 text-gray-600 dark:text-zinc-400 font-medium sticky left-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm">
+                      <th className="text-left py-3 px-4 text-gray-600 dark:text-zinc-400 font-medium sticky left-0 bg-white dark:bg-zinc-900">
                         Squad
                       </th>
                       {chartData.map((row) => (
@@ -665,7 +571,7 @@ export default function EvolucaoMensal() {
                       ))}
                       <th className={cn(
                         "text-right py-3 px-4 font-semibold whitespace-nowrap border-l border-gray-200 dark:border-zinc-700/50",
-                        tableMode === "churn" ? "text-rose-600 dark:text-rose-400" : "text-cyan-600 dark:text-cyan-400"
+                        tableMode === "churn" ? "text-red-600 dark:text-red-400" : "text-cyan-600 dark:text-cyan-400"
                       )}>
                         {tableMode === "churn" ? "Média" : "Total"}
                       </th>
@@ -707,11 +613,11 @@ export default function EvolucaoMensal() {
                           key={squad}
                           className="border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors"
                         >
-                          <td className="py-3 px-4 sticky left-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm">
+                          <td className="py-3 px-4 sticky left-0 bg-white dark:bg-zinc-900">
                             <div className="flex items-center gap-2">
                               <div
                                 className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
+                                style={{ backgroundColor: color }}
                               />
                               <span className="text-gray-800 dark:text-zinc-200 font-medium">{squad}</span>
                             </div>
@@ -730,12 +636,12 @@ export default function EvolucaoMensal() {
                                     <span className={cn(
                                       "text-gray-700 dark:text-zinc-300",
                                       trend === "up" && "text-emerald-600 dark:text-emerald-400",
-                                      trend === "down" && "text-rose-600 dark:text-rose-400"
+                                      trend === "down" && "text-red-600 dark:text-red-400"
                                     )}>
                                       {formatCurrencyNoDecimals(value)}
                                     </span>
                                     {churnValue > 0 && (
-                                      <div className="text-[11px] text-rose-500 dark:text-rose-400/80 mt-0.5">
+                                      <div className="text-[11px] text-red-500 dark:text-red-400/80 mt-0.5">
                                         -{formatCurrencyNoDecimals(churnValue)}
                                       </div>
                                     )}
@@ -747,7 +653,7 @@ export default function EvolucaoMensal() {
                                 {(() => {
                                   const totalChurn = chartData.reduce((acc, row) => acc + (Number(row[`churn_${squad}`]) || 0), 0);
                                   return totalChurn > 0 ? (
-                                    <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                    <div className="text-[11px] text-red-500 dark:text-red-400/80 font-normal mt-0.5">
                                       -{formatCurrencyNoDecimals(totalChurn)}
                                     </div>
                                   ) : null;
@@ -771,7 +677,7 @@ export default function EvolucaoMensal() {
                                           "font-medium",
                                           rate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
                                           rate <= 5 ? "text-amber-600 dark:text-amber-400" :
-                                          "text-rose-600 dark:text-rose-400"
+                                          "text-red-600 dark:text-red-400"
                                         )}>
                                           {rate.toFixed(1)}%
                                         </span>
@@ -797,7 +703,7 @@ export default function EvolucaoMensal() {
                                     <span className={cn(
                                       avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
                                       avgRate <= 5 ? "text-amber-600 dark:text-amber-400" :
-                                      "text-rose-600 dark:text-rose-400"
+                                      "text-red-600 dark:text-red-400"
                                     )}>
                                       {avgRate.toFixed(1)}%
                                     </span>
@@ -812,7 +718,7 @@ export default function EvolucaoMensal() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-gray-300 dark:border-zinc-600/50 bg-gray-100 dark:bg-zinc-800/30">
-                      <td className="py-3 px-4 sticky left-0 bg-gray-100 dark:bg-zinc-800/95 backdrop-blur-sm text-gray-800 dark:text-zinc-200 font-semibold">
+                      <td className="py-3 px-4 sticky left-0 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 font-semibold">
                         Total
                       </td>
                       {tableMode === "mrr" ? (
@@ -826,7 +732,7 @@ export default function EvolucaoMensal() {
                               <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
                                 {formatCurrencyNoDecimals(total)}
                                 {churnTotal > 0 && (
-                                  <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                  <div className="text-[11px] text-red-500 dark:text-red-400/80 font-normal mt-0.5">
                                     -{formatCurrencyNoDecimals(churnTotal)}
                                   </div>
                                 )}
@@ -841,7 +747,7 @@ export default function EvolucaoMensal() {
                                   .reduce((sum, squad) => sum + (Number(row[squad]) || 0), 0);
                               }, 0)
                             )}
-                            <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                            <div className="text-[11px] text-red-500 dark:text-red-400/80 font-normal mt-0.5">
                               -{formatCurrencyNoDecimals(
                                 chartData.reduce((acc, row) => acc + (Number(row.churn) || 0), 0)
                               )}
@@ -861,7 +767,7 @@ export default function EvolucaoMensal() {
                                 <span className={cn(
                                   rate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
                                   rate <= 5 ? "text-amber-600 dark:text-amber-400" :
-                                  "text-rose-600 dark:text-rose-400"
+                                  "text-red-600 dark:text-red-400"
                                 )}>
                                   {rate.toFixed(1)}%
                                 </span>
@@ -889,7 +795,7 @@ export default function EvolucaoMensal() {
                                 <span className={cn(
                                   avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
                                   avgRate <= 5 ? "text-amber-600 dark:text-amber-400" :
-                                  "text-rose-600 dark:text-rose-400"
+                                  "text-red-600 dark:text-red-400"
                                 )}>
                                   {avgRate.toFixed(1)}%
                                 </span>
@@ -908,14 +814,11 @@ export default function EvolucaoMensal() {
       )}
 
       {viewMode === "operador" && chartData.length > 0 && (
-        <div className="relative" data-testid="card-chart-by-operador">
-          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-teal-500/5 to-emerald-500/5 rounded-xl blur-2xl" />
-          <Card className="relative bg-white/80 dark:bg-zinc-900/80 border-gray-200 dark:border-zinc-700/50 backdrop-blur-sm overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+        <div data-testid="card-chart-by-operador">
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
-                  <Activity className="h-4 w-4 text-cyan-500 dark:text-cyan-400" />
+                <CardTitle className="text-base font-semibold text-foreground">
                   {tableMode === "mrr" ? "MRR por Operador" : "Churn % por Operador"}
                 </CardTitle>
                 <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5">
@@ -935,7 +838,7 @@ export default function EvolucaoMensal() {
                     className={cn(
                       "px-3 py-1 text-xs font-medium rounded-md transition-all",
                       tableMode === "churn"
-                        ? "bg-rose-500 text-white shadow-sm"
+                        ? "bg-red-500 text-white shadow-sm"
                         : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
                     )}
                   >
@@ -949,7 +852,7 @@ export default function EvolucaoMensal() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-zinc-700/50">
-                      <th className="text-left py-3 px-4 text-gray-600 dark:text-zinc-400 font-medium sticky left-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm">
+                      <th className="text-left py-3 px-4 text-gray-600 dark:text-zinc-400 font-medium sticky left-0 bg-white dark:bg-zinc-900">
                         Operador
                       </th>
                       {chartData.map((row) => (
@@ -959,7 +862,7 @@ export default function EvolucaoMensal() {
                       ))}
                       <th className={cn(
                         "text-right py-3 px-4 font-semibold whitespace-nowrap border-l border-gray-200 dark:border-zinc-700/50",
-                        tableMode === "churn" ? "text-rose-600 dark:text-rose-400" : "text-cyan-600 dark:text-cyan-400"
+                        tableMode === "churn" ? "text-red-600 dark:text-red-400" : "text-cyan-600 dark:text-cyan-400"
                       )}>
                         {tableMode === "churn" ? "Média" : "Total"}
                       </th>
@@ -1001,11 +904,11 @@ export default function EvolucaoMensal() {
                           key={operador}
                           className="border-b border-gray-100 dark:border-zinc-800/50 hover:bg-gray-50 dark:hover:bg-zinc-800/30 transition-colors"
                         >
-                          <td className="py-3 px-4 sticky left-0 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm">
+                          <td className="py-3 px-4 sticky left-0 bg-white dark:bg-zinc-900">
                             <div className="flex items-center gap-2">
                               <div
                                 className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
+                                style={{ backgroundColor: color }}
                               />
                               <span className="text-gray-800 dark:text-zinc-200 font-medium">{operador}</span>
                             </div>
@@ -1023,7 +926,7 @@ export default function EvolucaoMensal() {
                                     <span className={cn(
                                       "text-gray-700 dark:text-zinc-300",
                                       trend === "up" && "text-emerald-600 dark:text-emerald-400",
-                                      trend === "down" && "text-rose-600 dark:text-rose-400"
+                                      trend === "down" && "text-red-600 dark:text-red-400"
                                     )}>
                                       {formatCurrencyNoDecimals(value)}
                                     </span>
@@ -1051,7 +954,7 @@ export default function EvolucaoMensal() {
                                           "font-medium",
                                           rate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
                                           rate <= 5 ? "text-amber-600 dark:text-amber-400" :
-                                          "text-rose-600 dark:text-rose-400"
+                                          "text-red-600 dark:text-red-400"
                                         )}>
                                           {rate.toFixed(1)}%
                                         </span>
@@ -1077,7 +980,7 @@ export default function EvolucaoMensal() {
                                     <span className={cn(
                                       avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
                                       avgRate <= 5 ? "text-amber-600 dark:text-amber-400" :
-                                      "text-rose-600 dark:text-rose-400"
+                                      "text-red-600 dark:text-red-400"
                                     )}>
                                       {avgRate.toFixed(1)}%
                                     </span>
@@ -1092,7 +995,7 @@ export default function EvolucaoMensal() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-gray-300 dark:border-zinc-600/50 bg-gray-100 dark:bg-zinc-800/30">
-                      <td className="py-3 px-4 sticky left-0 bg-gray-100 dark:bg-zinc-800/95 backdrop-blur-sm text-gray-800 dark:text-zinc-200 font-semibold">
+                      <td className="py-3 px-4 sticky left-0 bg-gray-100 dark:bg-zinc-800 text-gray-800 dark:text-zinc-200 font-semibold">
                         Total
                       </td>
                       {tableMode === "mrr" ? (
@@ -1106,7 +1009,7 @@ export default function EvolucaoMensal() {
                               <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold text-gray-800 dark:text-zinc-200">
                                 {formatCurrencyNoDecimals(total)}
                                 {churnTotal > 0 && (
-                                  <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                                  <div className="text-[11px] text-red-500 dark:text-red-400/80 font-normal mt-0.5">
                                     -{formatCurrencyNoDecimals(churnTotal)}
                                   </div>
                                 )}
@@ -1121,7 +1024,7 @@ export default function EvolucaoMensal() {
                                   .reduce((sum, op) => sum + (Number(row[op]) || 0), 0);
                               }, 0)
                             )}
-                            <div className="text-[11px] text-rose-500 dark:text-rose-400/80 font-normal mt-0.5">
+                            <div className="text-[11px] text-red-500 dark:text-red-400/80 font-normal mt-0.5">
                               -{formatCurrencyNoDecimals(
                                 chartData.reduce((acc, row) => acc + (Number(row.churn) || 0), 0)
                               )}
@@ -1141,7 +1044,7 @@ export default function EvolucaoMensal() {
                                 <span className={cn(
                                   rate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
                                   rate <= 5 ? "text-amber-600 dark:text-amber-400" :
-                                  "text-rose-600 dark:text-rose-400"
+                                  "text-red-600 dark:text-red-400"
                                 )}>
                                   {rate.toFixed(1)}%
                                 </span>
@@ -1169,7 +1072,7 @@ export default function EvolucaoMensal() {
                                 <span className={cn(
                                   avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
                                   avgRate <= 5 ? "text-amber-600 dark:text-amber-400" :
-                                  "text-rose-600 dark:text-rose-400"
+                                  "text-red-600 dark:text-red-400"
                                 )}>
                                   {avgRate.toFixed(1)}%
                                 </span>

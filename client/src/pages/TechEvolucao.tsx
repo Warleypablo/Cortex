@@ -3,18 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
+import { useTheme } from "@/components/ThemeProvider";
+import { StatsCardV2 } from "@/components/StatsCardV2";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  TrendingUp,
-  DollarSign,
-  Clock,
-  Target,
-  Rocket,
-  BarChart3,
-  Layers,
-} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BarChart,
@@ -58,6 +51,8 @@ const formatMesLabel = (mes: string) => {
 export default function TechEvolucao() {
   usePageTitle("Tech - Evolução");
   useSetPageInfo("Tech - Evolução Mensal", "Análise temporal de entregas, valores e tendências");
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [periodo, setPeriodo] = useState<string>('12');
 
   const { data: evolucao, isLoading: isLoadingEvolucao } = useQuery<TechEvolucaoMensal[]>({
@@ -156,87 +151,24 @@ export default function TechEvolucao() {
 
         {/* KPIs */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/20 rounded-lg">
-                  <Rocket className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Entregas</p>
-                  {isLoadingEvolucao ? (
-                    <Skeleton className="h-7 w-12 mt-1" />
-                  ) : (
-                    <p className="text-2xl font-bold text-green-600">{stats.totalEntregas}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-500/20 rounded-lg">
-                  <DollarSign className="h-5 w-5 text-purple-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Valor Entregue</p>
-                  {isLoadingEvolucao ? (
-                    <Skeleton className="h-7 w-20 mt-1" />
-                  ) : (
-                    <p className="text-xl font-bold text-purple-600">{formatCurrencyCompact(stats.valorTotal)}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-orange-500/10 to-orange-500/5 border-orange-500/20">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-500/20 rounded-lg">
-                  <Clock className="h-5 w-5 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Tempo Médio</p>
-                  {isLoadingEvolucao ? (
-                    <Skeleton className="h-7 w-16 mt-1" />
-                  ) : (
-                    <p className="text-2xl font-bold text-orange-600">
-                      {Math.round(stats.tempoMedio)}
-                      <span className="text-sm font-normal ml-1">dias</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-cyan-500/20 rounded-lg">
-                  <Target className="h-5 w-5 text-cyan-500" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">No Prazo</p>
-                  {isLoadingEvolucao ? (
-                    <Skeleton className="h-7 w-14 mt-1" />
-                  ) : (
-                    <p className="text-2xl font-bold text-cyan-600">{formatPercent(stats.taxaMedia)}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {isLoadingEvolucao ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-lg" />
+            ))
+          ) : (
+            <>
+              <StatsCardV2 title="Total Entregas" value={String(stats.totalEntregas)} variant="success" />
+              <StatsCardV2 title="Valor Entregue" value={formatCurrencyCompact(stats.valorTotal)} />
+              <StatsCardV2 title="Tempo Médio" value={`${Math.round(stats.tempoMedio)} dias`} variant={stats.tempoMedio > 30 ? "warning" : "default"} />
+              <StatsCardV2 title="No Prazo" value={formatPercent(stats.taxaMedia)} variant={stats.taxaMedia >= 80 ? "success" : stats.taxaMedia >= 60 ? "warning" : "error"} />
+            </>
+          )}
         </div>
 
         {/* Gráfico 1: Entregas + Tempo Médio */}
         <Card className="mb-6">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-primary" />
+            <CardTitle className="text-base font-medium">
               Entregas e Tempo Médio por Mês
             </CardTitle>
             <CardDescription>Quantidade de projetos entregues e tempo médio de entrega</CardDescription>
@@ -251,31 +183,31 @@ export default function TechEvolucao() {
             ) : (
               <ResponsiveContainer width="100%" height={320}>
                 <ComposedChart data={entregasChartData} margin={{ top: 20, right: 40, left: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#3f3f46' : '#d1d5db'} opacity={0.5} />
                   <XAxis
                     dataKey="mes"
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tick={{ fontSize: 11, fill: isDark ? '#71717a' : '#6b7280' }}
+                    axisLine={{ stroke: isDark ? '#3f3f46' : '#d1d5db' }}
                   />
                   <YAxis
                     yAxisId="left"
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    label={{ value: 'Entregas', angle: -90, position: 'insideLeft', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fontSize: 11, fill: isDark ? '#71717a' : '#6b7280' }}
+                    axisLine={{ stroke: isDark ? '#3f3f46' : '#d1d5db' }}
+                    label={{ value: 'Entregas', angle: -90, position: 'insideLeft', fontSize: 10, fill: isDark ? '#71717a' : '#6b7280' }}
                   />
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
-                    axisLine={{ stroke: 'hsl(var(--border))' }}
-                    label={{ value: 'Dias', angle: 90, position: 'insideRight', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fontSize: 11, fill: isDark ? '#71717a' : '#6b7280' }}
+                    axisLine={{ stroke: isDark ? '#3f3f46' : '#d1d5db' }}
+                    label={{ value: 'Dias', angle: 90, position: 'insideRight', fontSize: 10, fill: isDark ? '#71717a' : '#6b7280' }}
                   />
                   <Tooltip
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-card border rounded-lg p-3 shadow-lg">
+                          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 text-sm text-foreground">
                             <p className="font-medium mb-2">{data.mes}</p>
                             <div className="space-y-1 text-sm">
                               <p>Entregas: <span className="font-medium">{data.entregas}</span></p>
@@ -301,8 +233,7 @@ export default function TechEvolucao() {
           {/* Gráfico 2: Valor por Tipo (empilhado) */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2">
-                <Layers className="h-4 w-4" />
+              <CardTitle className="text-base font-medium">
                 Valor Entregue por Tipo
               </CardTitle>
               <CardDescription>Distribuição de receita por tipo de projeto ao longo do tempo</CardDescription>
@@ -318,17 +249,17 @@ export default function TechEvolucao() {
                 <>
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={tipoChartData.data} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                      <XAxis dataKey="mes" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#3f3f46' : '#d1d5db'} opacity={0.5} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 10, fill: isDark ? '#71717a' : '#6b7280' }} />
                       <YAxis
-                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                        tick={{ fontSize: 10, fill: isDark ? '#71717a' : '#6b7280' }}
                         tickFormatter={(v) => formatCurrencyCompact(v)}
                       />
                       <Tooltip
                         formatter={(value: number, name: string) => [formatCurrency(value), name]}
                         contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
+                          backgroundColor: isDark ? '#18181b' : '#ffffff',
+                          border: `1px solid ${isDark ? '#3f3f46' : '#d1d5db'}`,
                           borderRadius: '8px',
                         }}
                       />
@@ -351,8 +282,7 @@ export default function TechEvolucao() {
           {/* Gráfico 3: Taxa de Cumprimento de Prazo */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2">
-                <Target className="h-4 w-4" />
+              <CardTitle className="text-base font-medium">
                 Taxa de Cumprimento de Prazo
               </CardTitle>
               <CardDescription>Percentual de projetos entregues dentro do prazo por mês</CardDescription>
@@ -367,24 +297,18 @@ export default function TechEvolucao() {
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={taxaChartData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
-                    <defs>
-                      <linearGradient id="taxaGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                    <XAxis dataKey="mes" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#3f3f46' : '#d1d5db'} opacity={0.5} />
+                    <XAxis dataKey="mes" tick={{ fontSize: 10, fill: isDark ? '#71717a' : '#6b7280' }} />
                     <YAxis
                       domain={[0, 100]}
-                      tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 10, fill: isDark ? '#71717a' : '#6b7280' }}
                       tickFormatter={(v) => `${v}%`}
                     />
                     <Tooltip
                       formatter={(value: number) => [`${value}%`, 'No Prazo']}
                       contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
+                        backgroundColor: isDark ? '#18181b' : '#ffffff',
+                        border: `1px solid ${isDark ? '#3f3f46' : '#d1d5db'}`,
                         borderRadius: '8px',
                       }}
                     />
@@ -393,7 +317,8 @@ export default function TechEvolucao() {
                       dataKey="taxa"
                       stroke="#06b6d4"
                       strokeWidth={3}
-                      fill="url(#taxaGradient)"
+                      fill="#06b6d4"
+                      fillOpacity={0.1}
                       dot={{ fill: '#06b6d4', r: 4 }}
                     />
                   </AreaChart>
@@ -406,8 +331,7 @@ export default function TechEvolucao() {
         {/* Tabela resumo mensal */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
+            <CardTitle className="text-base font-medium">
               Resumo Mensal
             </CardTitle>
             <CardDescription>Detalhamento mês a mês das métricas de entrega</CardDescription>
