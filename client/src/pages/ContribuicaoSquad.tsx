@@ -489,7 +489,9 @@ export default function ContribuicaoSquad() {
                                             <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 sticky left-0 z-10 bg-background truncate max-w-[160px]" title={colab.nome}>
                                               {colab.nome}
                                             </td>
-                                            <td colSpan={monthlyResults.length} />
+                                            {monthlyResults.map((_, i) => (
+                                              <td key={i} />
+                                            ))}
                                             <td className="py-0.5 px-3 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
                                               {formatCurrencyNoDecimals(colab.salario)}
                                             </td>
@@ -637,7 +639,9 @@ export default function ContribuicaoSquad() {
                                   <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 font-medium sticky left-0 z-10 bg-muted truncate max-w-[160px]" title={colab.nome}>
                                     {colab.nome}
                                   </td>
-                                  <td colSpan={monthlyResults.length} />
+                                  {monthlyResults.map((_, i) => (
+                                    <td key={i} />
+                                  ))}
                                   <td className="py-0.5 px-3 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
                                     {formatCurrencyNoDecimals(colab.salario)}
                                   </td>
