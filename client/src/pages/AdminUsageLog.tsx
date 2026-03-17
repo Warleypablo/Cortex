@@ -66,7 +66,7 @@ export default function AdminUsageLog() {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">Uso do Sistema</h1>
         <Select value={days} onValueChange={setDays}>
