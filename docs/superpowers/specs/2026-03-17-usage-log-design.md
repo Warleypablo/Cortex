@@ -76,6 +76,7 @@ Extract User-Agent: `req.headers['user-agent'] || null`
 
 - **Success logs**: Include userId, email, name from the authenticated user object
 - **Failure logs**: Include whatever is available (email from request body, no userId if auth failed)
+- **Client login mapping**: For client-portal logins, use `userId = client.id`, `userEmail = client.email || null`, `userName = client.nome`. Client login does NOT use Passport's `req.user` — data lives in `clientPayload`.
 - **Logout logs**: Capture user data from `req.user` BEFORE `req.logout()` destroys it (store in local variable first)
 - **Never block the response** — the `logAuthEvent` call is fire-and-forget (no `await` in the response path, or wrapped in try/catch)
 
@@ -91,6 +92,7 @@ export const pageViews = pgTable("page_views", {
   timestamp: timestamp("timestamp").defaultNow().notNull(),
   userId: varchar("user_id", { length: 100 }),
   userEmail: varchar("user_email", { length: 255 }),
+  userName: varchar("user_name", { length: 255 }),
   path: varchar("path", { length: 500 }).notNull(),
   pageTitle: varchar("page_title", { length: 255 }),
 });
@@ -123,6 +125,7 @@ app.post("/api/track/page-view", isAuthenticated, async (req, res) => {
     await db.insert(pageViews).values({
       userId: user.id,
       userEmail: user.email,
+      userName: user.name || null,
       path,
       pageTitle: pageTitle || null,
     });
@@ -277,3 +280,4 @@ useQuery("/api/admin/auth-logs?page=N") → auth logs table (reuses existing end
 - No real-time updates (polling or websockets) — manual refresh is sufficient
 - No tracking of API calls or non-page interactions
 - No changes to authentication flow logic itself
+- No page view tracking for client-portal sessions (they use a separate session mechanism, not Passport — `isAuthenticated` won't pass them through). Auth logs DO capture client login/logout.
