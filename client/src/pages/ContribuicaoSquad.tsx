@@ -463,7 +463,7 @@ export default function ContribuicaoSquad() {
                                       <Fragment key={label}>
                                         <tr
                                           className={cn("border-b border-border/20", expandable && "cursor-pointer hover:bg-muted/20")}
-                                          onClick={expandable ? () => toggleSalariosExpand(salKey) : undefined}
+                                          onClick={expandable ? (e) => { e.stopPropagation(); toggleSalariosExpand(salKey); } : undefined}
                                         >
                                           <td className="py-1 px-3 pl-12 text-[11px] text-red-400/70 dark:text-red-400/50 sticky left-0 z-10 bg-background">
                                             <span className="flex items-center gap-1">
@@ -484,8 +484,8 @@ export default function ContribuicaoSquad() {
                                           </td>
                                           <td />
                                         </tr>
-                                        {isExpanded && bulkData?.salariosDetalhes && bulkData.salariosDetalhes.map((colab) => (
-                                          <tr key={colab.nome} className="border-b border-border/10">
+                                        {isExpanded && bulkData?.salariosDetalhes?.map((colab, idx) => (
+                                          <tr key={`${colab.nome}-${idx}`} className="border-b border-border/10">
                                             <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 sticky left-0 z-10 bg-background truncate max-w-[160px]" title={colab.nome}>
                                               {colab.nome}
                                             </td>
@@ -614,7 +614,7 @@ export default function ContribuicaoSquad() {
                             <Fragment key={label}>
                               <tr
                                 className={cn("border-b border-border/20 bg-muted", expandable && "cursor-pointer hover:bg-muted/80")}
-                                onClick={expandable ? () => toggleSalariosExpand(salKey) : undefined}
+                                onClick={expandable ? (e) => { e.stopPropagation(); toggleSalariosExpand(salKey); } : undefined}
                               >
                                 <td className="py-1 px-3 pl-12 text-[11px] text-red-400/70 dark:text-red-400/50 font-medium sticky left-0 z-10 bg-muted">
                                   <span className="flex items-center gap-1">
@@ -632,8 +632,8 @@ export default function ContribuicaoSquad() {
                                 </td>
                                 <td />
                               </tr>
-                              {isExpanded && bulkData?.salariosDetalhes && bulkData.salariosDetalhes.map((colab) => (
-                                <tr key={colab.nome} className="border-b border-border/10 bg-muted">
+                              {isExpanded && bulkData?.salariosDetalhes?.map((colab, idx) => (
+                                <tr key={`${colab.nome}-${idx}`} className="border-b border-border/10 bg-muted">
                                   <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 font-medium sticky left-0 z-10 bg-muted truncate max-w-[160px]" title={colab.nome}>
                                     {colab.nome}
                                   </td>
