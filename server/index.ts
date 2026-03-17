@@ -301,6 +301,113 @@ app.use((req, res, next) => {
   };
   scheduleNextSnapshot();
 
+  // Assinafy signature polling — verifica status de contratos pendentes a cada 5 min
+  const ASSINAFY_POLL_INTERVAL = 5 * 60 * 1000; // 5 min
+  const pollAssinafyStatus = async () => {
+    try {
+      // Buscar config da API (qualquer tipo ativo serve, a api_key é a mesma)
+      const configResult = await db.execute(sql`
+        SELECT api_key, api_url FROM staging.assinafy_config WHERE ativo = true LIMIT 1
+      `);
+      const coreConfigResult = await db.execute(sql`
+        SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true LIMIT 1
+      `);
+      const config = (configResult.rows[0] || coreConfigResult.rows[0]) as any;
+      if (!config?.api_key) return;
+
+      // Contratos de clientes pendentes
+      const clientContratos = await db.execute(sql`
+        SELECT id, assinafy_document_id, status, assinafy_status
+        FROM staging.contratos
+        WHERE assinafy_document_id IS NOT NULL
+          AND status IN ('enviado para assinatura', 'enviado')
+          AND signature_completed_at IS NULL
+      `);
+
+      // Contratos de creators pendentes
+      const creatorContratos = await db.execute(sql`
+        SELECT id, assinafy_document_id, status, assinafy_status
+        FROM cortex_core.contratos_creators
+        WHERE assinafy_document_id IS NOT NULL
+          AND status = 'enviado'
+          AND assinado_em IS NULL
+      `);
+
+      const pending = [
+        ...((clientContratos.rows as any[]).map(r => ({ ...r, tipo: 'cliente' }))),
+        ...((creatorContratos.rows as any[]).map(r => ({ ...r, tipo: 'creator' }))),
+      ];
+
+      if (pending.length === 0) return;
+
+      let updated = 0;
+      for (const c of pending) {
+        try {
+          const statusUrl = `${config.api_url}/documents/${c.assinafy_document_id}`;
+          const resp = await fetch(statusUrl, { method: 'GET', headers: { 'X-Api-Key': config.api_key } });
+          const result = await resp.json() as any;
+          const docStatus = result.data?.status || result.status;
+
+          if (!docStatus || docStatus === c.assinafy_status) continue;
+
+          const isAssinado = docStatus === 'signed' || docStatus === 'completed' || docStatus === 'certificated';
+          const isRecusado = docStatus === 'declined';
+
+          if (c.tipo === 'cliente') {
+            if (isAssinado) {
+              await db.execute(sql`
+                UPDATE staging.contratos SET status = 'assinado', assinafy_status = 'signed', signature_completed_at = NOW(), data_atualizacao = NOW()
+                WHERE id = ${c.id}
+              `);
+              updated++;
+            } else if (isRecusado) {
+              await db.execute(sql`
+                UPDATE staging.contratos SET status = 'recusado', assinafy_status = 'declined', data_atualizacao = NOW()
+                WHERE id = ${c.id}
+              `);
+              updated++;
+            } else if (docStatus !== c.assinafy_status) {
+              await db.execute(sql`
+                UPDATE staging.contratos SET assinafy_status = ${docStatus}, data_atualizacao = NOW()
+                WHERE id = ${c.id}
+              `);
+            }
+          } else {
+            if (isAssinado) {
+              await db.execute(sql`
+                UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), atualizado_em = NOW()
+                WHERE id = ${c.id}
+              `);
+              updated++;
+            } else if (isRecusado) {
+              await db.execute(sql`
+                UPDATE cortex_core.contratos_creators SET status = 'recusado', assinafy_status = 'declined', atualizado_em = NOW()
+                WHERE id = ${c.id}
+              `);
+              updated++;
+            } else if (docStatus !== c.assinafy_status) {
+              await db.execute(sql`
+                UPDATE cortex_core.contratos_creators SET assinafy_status = ${docStatus}, atualizado_em = NOW()
+                WHERE id = ${c.id}
+              `);
+            }
+          }
+        } catch (docErr: any) {
+          console.error(`[assinafy-poll] Erro ao consultar doc ${c.assinafy_document_id}:`, docErr.message);
+        }
+      }
+
+      if (updated > 0) {
+        console.log(`[assinafy-poll] ${updated} contrato(s) atualizado(s) de ${pending.length} pendente(s)`);
+      }
+    } catch (err: any) {
+      console.error("[assinafy-poll] Erro:", err.message);
+    }
+  };
+  setTimeout(() => pollAssinafyStatus(), 15000); // 15s após startup
+  setInterval(() => pollAssinafyStatus(), ASSINAFY_POLL_INTERVAL);
+  console.log(`[assinafy-poll] Scheduled every ${ASSINAFY_POLL_INTERVAL / 60000}min`);
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
