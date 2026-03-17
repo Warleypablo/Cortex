@@ -143,161 +143,84 @@ export default function VisaoGeral() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            <Card data-testid="card-mrr">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  <span className="flex items-center gap-1.5">
-                    MRR Ativo
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Receita Mensal Recorrente de contratos ativos</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                </CardTitle>
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold" data-testid="text-mrr">
-                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.mrr || 0)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Contratos ativos, onboarding e triagem</p>
-              </CardContent>
-            </Card>
+          {/* Hero Metrics */}
+          <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-12 mb-8" data-testid="hero-metrics">
+            <div data-testid="card-mrr">
+              {isLoadingMetricas ? (
+                <Skeleton className="h-12 w-48 rounded" />
+              ) : (
+                <HeroMetric
+                  label="MRR Ativo"
+                  value={formatCurrencyNoDecimals(metricas?.mrr || 0)}
+                  subtitle="Receita Mensal Recorrente de contratos ativos"
+                />
+              )}
+            </div>
+            <div data-testid="card-churn-rate">
+              {isLoadingMetricas ? (
+                <Skeleton className="h-12 w-32 rounded" />
+              ) : (
+                <HeroMetric
+                  label="Churn Rate"
+                  value={`${(metricas?.churnRate || 0).toFixed(1)}%`}
+                  subtitle="Taxa de cancelamento sobre MRR"
+                />
+              )}
+            </div>
+          </div>
 
-            <Card data-testid="card-aquisicao-mrr">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  <span className="flex items-center gap-1.5">
-                    Aquisição MRR
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Valor de novos contratos recorrentes no mês</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                </CardTitle>
-                <TrendingUp className="w-4 h-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600" data-testid="text-aquisicao-mrr">
-                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.aquisicaoMrr || 0)}
+          {/* Supporting Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8" data-testid="supporting-cards">
+            {isLoadingMetricas ? (
+              <>
+                <Skeleton className="h-24 rounded-lg" />
+                <Skeleton className="h-24 rounded-lg" />
+                <Skeleton className="h-24 rounded-lg" />
+                <Skeleton className="h-24 rounded-lg" />
+                <Skeleton className="h-24 rounded-lg" />
+              </>
+            ) : (
+              <>
+                <div data-testid="card-aquisicao-mrr">
+                  <StatsCardV2
+                    title="Aquisição MRR"
+                    value={formatCurrencyNoDecimals(metricas?.aquisicaoMrr || 0)}
+                    variant="success"
+                    subtitle="Valor de novos contratos recorrentes no mês"
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Novos MRR</p>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-aquisicao-pontual">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  <span className="flex items-center gap-1.5">
-                    Aquisição Pontual
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Valor de novos contratos pontuais no mês</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                </CardTitle>
-                <TrendingUp className="w-4 h-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600" data-testid="text-aquisicao-pontual">
-                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.aquisicaoPontual || 0)}
+                <div data-testid="card-aquisicao-pontual">
+                  <StatsCardV2
+                    title="Aquisição Pontual"
+                    value={formatCurrencyNoDecimals(metricas?.aquisicaoPontual || 0)}
+                    subtitle="Valor de novos contratos pontuais no mês"
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Novos pontuais</p>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-receita-pontual-entregue">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  <span className="flex items-center gap-1.5">
-                    Receita Pontual Entregue
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Valor de projetos pontuais entregues no mês</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                </CardTitle>
-                <CheckCircle className="w-4 h-4 text-purple-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-purple-600" data-testid="text-receita-pontual-entregue">
-                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.receitaPontualEntregue || 0)}
+                <div data-testid="card-receita-pontual-entregue">
+                  <StatsCardV2
+                    title="Receita Pontual Entregue"
+                    value={formatCurrencyNoDecimals(metricas?.receitaPontualEntregue || 0)}
+                    subtitle="Valor de projetos pontuais entregues no mês"
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Projetos entregues</p>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-churn">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  <span className="flex items-center gap-1.5">
-                    Churn
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Valor de contratos cancelados no mês</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                </CardTitle>
-                <TrendingDown className="w-4 h-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600" data-testid="text-churn">
-                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.churn || 0)}
+                <div data-testid="card-churn">
+                  <StatsCardV2
+                    title="Churn"
+                    value={formatCurrencyNoDecimals(metricas?.churn || 0)}
+                    variant={(metricas?.churn || 0) > 0 ? "error" : "default"}
+                    subtitle="Valor de contratos cancelados no mês"
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Contratos encerrados{" "}
-                  <span className="font-semibold text-red-500" data-testid="text-churn-rate">
-                    {isLoadingMetricas ? "" : `(${(metricas?.churnRate || 0).toFixed(1)}%)`}
-                  </span>
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card data-testid="card-pausados">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  <span className="flex items-center gap-1.5">
-                    Pausados
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Valor de contratos pausados no mês</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
-                </CardTitle>
-                <PauseCircle className="w-4 h-4 text-orange-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600" data-testid="text-pausados">
-                  {isLoadingMetricas ? "..." : formatCurrency(metricas?.pausados || 0)}
+                <div data-testid="card-pausados">
+                  <StatsCardV2
+                    title="Pausados"
+                    value={formatCurrencyNoDecimals(metricas?.pausados || 0)}
+                    variant={(metricas?.pausados || 0) > 0 ? "warning" : "default"}
+                    subtitle="Valor de contratos pausados no mês"
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">Contratos pausados no mês</p>
-              </CardContent>
-            </Card>
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
