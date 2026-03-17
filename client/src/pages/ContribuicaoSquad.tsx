@@ -246,51 +246,33 @@ export default function ContribuicaoSquad() {
       </div>
 
       {/* Hero Metrics */}
-      {isLoading || !tableData ? (
-        <div className="hidden md:flex items-start gap-12">
-          <Skeleton className="h-12 w-40 rounded" />
-          <Skeleton className="h-12 w-40 rounded" />
-          <Skeleton className="h-12 w-40 rounded" />
-        </div>
-      ) : (
-        <div className="hidden md:flex items-start gap-12">
-          <HeroMetric
-            label="Receita Total"
-            value={formatCurrencyNoDecimals(tableData.totalReceita)}
-            subtitle="Receita bruta acumulada no ano"
-          />
-          <HeroMetric
-            label="Total Despesas"
-            value={formatCurrencyNoDecimals(tableData.totalDespesa)}
-            subtitle="Despesas rateadas (impostos + salários + CXCs + freelancers)"
-          />
-          <HeroMetric
-            label="Margem"
-            value={`${tableData.totalMargemPct.toFixed(1)}%`}
-            subtitle="Margem de contribuição consolidada"
-          />
-        </div>
-      )}
-      {/* Mobile heroes */}
-      {isLoading || !tableData ? null : (
-        <div className="grid grid-cols-1 gap-4 md:hidden">
-          <HeroMetric
-            label="Receita Total"
-            value={formatCurrencyNoDecimals(tableData.totalReceita)}
-            subtitle="Receita bruta acumulada no ano"
-          />
-          <HeroMetric
-            label="Total Despesas"
-            value={formatCurrencyNoDecimals(tableData.totalDespesa)}
-            subtitle="Despesas rateadas (impostos + salários + CXCs + freelancers)"
-          />
-          <HeroMetric
-            label="Margem"
-            value={`${tableData.totalMargemPct.toFixed(1)}%`}
-            subtitle="Margem de contribuição consolidada"
-          />
-        </div>
-      )}
+      {(() => {
+        const heroItems = tableData ? [
+          { label: "Receita Total", value: formatCurrencyNoDecimals(tableData.totalReceita), subtitle: "Receita bruta acumulada no ano" },
+          { label: "Total Despesas", value: formatCurrencyNoDecimals(tableData.totalDespesa), subtitle: "Despesas rateadas (impostos + salários + CXCs + freelancers)" },
+          { label: "Margem", value: `${tableData.totalMargemPct.toFixed(1)}%`, subtitle: "Margem de contribuição consolidada" },
+        ] : [];
+        const skeletons = Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-12 w-40 rounded" />);
+
+        if (isLoading || !tableData) {
+          return (
+            <>
+              <div className="hidden md:flex items-start gap-12">{skeletons}</div>
+              <div className="grid grid-cols-1 gap-4 md:hidden">{skeletons}</div>
+            </>
+          );
+        }
+        return (
+          <>
+            <div className="hidden md:flex items-start gap-12">
+              {heroItems.map((m, i) => <HeroMetric key={i} {...m} />)}
+            </div>
+            <div className="grid grid-cols-1 gap-4 md:hidden">
+              {heroItems.map((m, i) => <HeroMetric key={i} {...m} />)}
+            </div>
+          </>
+        );
+      })()}
 
       {/* Empty state */}
       {!isLoading && totalReceitas === 0 && (
