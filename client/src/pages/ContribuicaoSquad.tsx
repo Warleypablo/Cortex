@@ -303,10 +303,13 @@ export default function ContribuicaoSquad() {
       {isLoading && (
         <Card>
           <CardContent className="p-4">
-            <div className="space-y-2">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-8 w-full" />
-              ))}
+            <div className="space-y-3">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-[95%]" />
+              <Skeleton className="h-8 w-[90%]" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-[85%]" />
+              <Skeleton className="h-8 w-[92%]" />
             </div>
           </CardContent>
         </Card>
