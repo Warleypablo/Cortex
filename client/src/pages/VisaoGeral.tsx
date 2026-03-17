@@ -183,7 +183,7 @@ export default function VisaoGeral() {
                 <div data-testid="card-receita-pontual-entregue">
                   <StatsCardV2
                     title="Receita Pontual Entregue"
-                    value={formatCurrencyNoDecimals(metricas?.receitaPontualEntregue || 0)}
+                    value={formatCurrencyNoDecimals(metricas?.valorEntreguePontual || 0)}
                     subtitle="Valor de projetos pontuais entregues no mês"
                   />
                 </div>
