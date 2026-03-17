@@ -4466,12 +4466,12 @@ export class DbStorage implements IStorage {
         GROUP BY us.data_ultimo_snapshot
       `);
 
-      // Buscar Receita Pontual Entregue (projetos encerrados no mês)
+      // Buscar Receita Pontual Entregue (projetos entregues no mês — usa data_entrega, não data_encerramento)
       const pontualQuery = await db.execute(sql`
         SELECT COALESCE(SUM(valorp::numeric), 0) as receita_pontual
         FROM ${schema.cupContratos}
-        WHERE data_encerramento >= ${inicioMes}
-          AND data_encerramento <= ${fimMes}
+        WHERE data_entrega >= ${inicioMes}
+          AND data_entrega <= ${fimMes}
           AND valorp IS NOT NULL
           AND valorp > 0
       `);
