@@ -369,6 +369,7 @@ router.post("/auth/client-login", validateBody(clientLoginSchema), async (req, r
     });
   } catch (error) {
     console.error("Erro no login de cliente:", error);
+    logAuthEvent({ action: "login_client", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
     return res.status(500).json({ message: "Erro interno do servidor" });
   }
 });
