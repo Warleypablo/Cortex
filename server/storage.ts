@@ -8775,7 +8775,7 @@ export class DbStorage implements IStorage {
     // 1. Tempo médio de recebimento (data_quitacao - data_vencimento para parcelas pagas)
     const tempoMedioResult = await db.execute(sql.raw(`
       SELECT 
-        AVG(data_quitacao::date - data_vencimento::date) as tempo_medio_geral,
+        AVG(GREATEST(data_quitacao::date - data_vencimento::date, 0)) as tempo_medio_geral,
         AVG(CASE WHEN data_quitacao::date > data_vencimento::date THEN data_quitacao::date - data_vencimento::date END) as tempo_medio_inadimplentes,
         COUNT(CASE WHEN data_quitacao::date > data_vencimento::date THEN 1 END) as quantidade_pagos_atrasados
       FROM "Conta Azul".caz_parcelas
