@@ -159,15 +159,18 @@ router.post("/auth/dev-login", (req, res) => {
   req.login(devUser, (err) => {
     if (err) {
       console.error("Dev login error:", err);
+      logAuthEvent({ userId: devUser.id, userEmail: devUser.email, userName: devUser.name, action: "login_dev", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
       return res.status(500).json({ message: "Dev login failed" });
     }
     // Força o salvamento da sessão antes de retornar resposta
     req.session.save((saveErr) => {
       if (saveErr) {
         console.error("Dev login session save error:", saveErr);
+        logAuthEvent({ userId: devUser.id, userEmail: devUser.email, userName: devUser.name, action: "login_dev", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
         return res.status(500).json({ message: "Session save failed" });
       }
       console.log("✅ Dev Admin login successful");
+      logAuthEvent({ userId: devUser.id, userEmail: devUser.email, userName: devUser.name, action: "login_dev", success: true, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
       res.json({ message: "Dev login successful", user: devUser });
     });
   });
@@ -203,43 +206,51 @@ router.post("/auth/external-login", validateBody(externalLoginSchema), async (re
   // Verifica se o email está na lista de externos permitidos
   if (!isExternalEmailAllowed(normalizedEmail)) {
     console.log(`❌ Login externo negado para: ${normalizedEmail}`);
+    logAuthEvent({ userEmail: normalizedEmail, action: "login_external", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
     return res.status(403).json({ message: "Email não autorizado para acesso externo" });
   }
-  
+
   // Verifica a senha
   const storedHash = EXTERNAL_USER_PASSWORDS[normalizedEmail];
   if (!storedHash) {
     console.log(`❌ Senha não configurada para: ${normalizedEmail}`);
+    logAuthEvent({ userEmail: normalizedEmail, action: "login_external", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
     return res.status(403).json({ message: "Acesso não configurado para este email" });
   }
-  
+
   const isPasswordValid = bcrypt.compareSync(password, storedHash);
   if (!isPasswordValid) {
     console.log(`❌ Senha incorreta para: ${normalizedEmail}`);
+    logAuthEvent({ userEmail: normalizedEmail, action: "login_external", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
     return res.status(401).json({ message: "Senha incorreta" });
   }
-  
+
   try {
     // Cria ou busca usuário externo
     const user = await createExternalUser(normalizedEmail);
-    
+
     req.login(user, (err) => {
       if (err) {
         console.error("Erro no login externo:", err);
+        logAuthEvent({ userEmail: normalizedEmail, action: "login_external", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
         return res.status(500).json({ message: "Erro ao fazer login" });
       }
       // Força o salvamento da sessão antes de retornar resposta
       req.session.save((saveErr) => {
         if (saveErr) {
           console.error("Erro ao salvar sessão externa:", saveErr);
+          logAuthEvent({ userEmail: normalizedEmail, action: "login_external", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
           return res.status(500).json({ message: "Erro ao salvar sessão" });
         }
         console.log(`✅ Login externo bem-sucedido: ${normalizedEmail}`);
+        const u = user as User;
+        logAuthEvent({ userId: u.id, userEmail: u.email, userName: u.name, action: "login_external", success: true, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
         res.json({ message: "Login realizado com sucesso", user });
       });
     });
   } catch (error) {
     console.error("Erro ao criar usuário externo:", error);
+    logAuthEvent({ userEmail: normalizedEmail, action: "login_external", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
     return res.status(500).json({ message: "Erro interno do servidor" });
   }
 });
@@ -284,6 +295,7 @@ router.post("/auth/client-login", validateBody(clientLoginSchema), async (req, r
 
     if (!client) {
       console.log(`❌ CNPJ não encontrado no portal: ${formatted}`);
+      logAuthEvent({ action: "login_client", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
       return res.status(404).json({ message: "CNPJ não encontrado. Verifique os dados e tente novamente." });
     }
 
@@ -319,6 +331,7 @@ router.post("/auth/client-login", validateBody(clientLoginSchema), async (req, r
     // Valida a senha
     if (!bcrypt.compareSync(password, credential.passwordHash)) {
       console.log(`❌ Senha incorreta para CNPJ ${formatted}`);
+      logAuthEvent({ userName: client.nome, action: "login_client", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
       return res.status(401).json({ message: "Senha incorreta" });
     }
 
@@ -337,6 +350,7 @@ router.post("/auth/client-login", validateBody(clientLoginSchema), async (req, r
     req.session.regenerate((regenErr) => {
       if (regenErr) {
         console.error("Erro ao regenerar sessão:", regenErr);
+        logAuthEvent({ userId: String(client.id), userEmail: client.email || null, userName: client.nome, action: "login_client", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
         return res.status(500).json({ message: "Erro ao criar sessão" });
       }
 
@@ -345,9 +359,11 @@ router.post("/auth/client-login", validateBody(clientLoginSchema), async (req, r
       req.session.save((saveErr) => {
         if (saveErr) {
           console.error("Erro ao salvar sessão do cliente:", saveErr);
+          logAuthEvent({ userId: String(client.id), userEmail: client.email || null, userName: client.nome, action: "login_client", success: false, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
           return res.status(500).json({ message: "Erro ao salvar sessão" });
         }
         console.log(`✅ Login de cliente bem-sucedido: ${client.nome} (${client.cnpj}) mustChangePassword=${credential.mustChangePassword} sessionId=${req.sessionID}`);
+        logAuthEvent({ userId: String(client.id), userEmail: client.email || null, userName: client.nome, action: "login_client", success: true, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
         res.json({ message: "Login realizado com sucesso", client: clientPayload });
       });
     });
@@ -599,6 +615,8 @@ router.get("/api/portal-cliente/servicos", async (req, res) => {
 });
 
 router.post("/auth/client-logout", (req, res) => {
+  const clientData = (req.session as any).clientData;
+  logAuthEvent({ userId: clientData?.id, userEmail: clientData?.email || null, userName: clientData?.nome, action: "logout_client", success: true, ipAddress: getClientIp(req), userAgent: req.headers['user-agent'] || null });
   delete (req.session as any).clientData;
   req.session.save((err) => {
     if (err) console.error("Erro ao salvar sessão no logout do cliente:", err);
