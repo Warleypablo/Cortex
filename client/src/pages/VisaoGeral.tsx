@@ -293,9 +293,7 @@ export default function VisaoGeral() {
               </CardHeader>
               <CardContent>
                 {isLoadingTopResponsaveis ? (
-                  <div className="flex items-center justify-center h-48">
-                    <p className="text-muted-foreground">Carregando...</p>
-                  </div>
+                  <Skeleton className="h-48 rounded-lg" />
                 ) : isErrorTopResponsaveis ? (
                   <div className="flex items-center justify-center h-48">
                     <p className="text-destructive">Erro ao carregar dados. Tente novamente.</p>
@@ -362,16 +360,16 @@ export default function VisaoGeral() {
                               {resp.nome.split(' ')[0]}
                             </p>
                             <p className="text-xs font-bold text-primary">
-                              {formatCurrency(resp.mrr)}
+                              {formatCurrencyNoDecimals(resp.mrr)}
                             </p>
                           </div>
                           <div 
                             className={`
                               w-full ${heights[rank]} rounded-t-lg
-                              ${rank === 1 ? 'bg-gradient-to-t from-yellow-200 to-yellow-100 dark:from-yellow-900/40 dark:to-yellow-900/20' : ''}
-                              ${rank === 2 ? 'bg-gradient-to-t from-gray-200 to-gray-100 dark:from-gray-800/40 dark:to-gray-800/20' : ''}
-                              ${rank === 3 ? 'bg-gradient-to-t from-orange-200 to-orange-100 dark:from-orange-900/40 dark:to-orange-900/20' : ''}
-                              ${rank > 3 ? 'bg-gradient-to-t from-muted to-muted/50' : ''}
+                              ${rank === 1 ? 'bg-yellow-100 dark:bg-yellow-900/30' : ''}
+                              ${rank === 2 ? 'bg-gray-100 dark:bg-gray-800/30' : ''}
+                              ${rank === 3 ? 'bg-orange-100 dark:bg-orange-900/30' : ''}
+                              ${rank > 3 ? 'bg-muted' : ''}
                               flex items-center justify-center
                             `}
                           >
