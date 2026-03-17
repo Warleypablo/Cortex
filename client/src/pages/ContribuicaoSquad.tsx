@@ -61,6 +61,15 @@ export default function ContribuicaoSquad() {
   const [taxaImposto, setTaxaImposto] = useState(18);
   const taxaDecimal = taxaImposto / 100;
   const [collapsedSquads, setCollapsedSquads] = useState<Set<string> | "all">("all");
+  const [expandedDespesas, setExpandedDespesas] = useState<Set<string>>(new Set());
+
+  const toggleDespesasExpand = (key: string) => {
+    setExpandedDespesas(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   const anos = Array.from({ length: 5 }, (_, i) => hoje.getFullYear() - i);
 
@@ -151,11 +160,24 @@ export default function ContribuicaoSquad() {
       squadRanking.reduce((acc, sq) => acc + (sq.porMes[i] || 0), 0)
     );
 
+    // Componentes de despesa por mês (absolutos, sem rateio)
+    const impostosPorMes = monthlyResults.map((_, i) => receitaTotalPorMes[i] * taxaDecimal);
+    const salariosPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.salarios || 0);
+    const cxcsPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.cxcs || 0);
+    const freelancersPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.freelancers || 0);
+
     // Despesa rateada por squad por mês
     const despesaSquadMes = (sq: typeof squadRanking[0], mesIdx: number) => {
       const receitaMes = receitaTotalPorMes[mesIdx];
       const proporcao = receitaMes > 0 ? (sq.porMes[mesIdx] || 0) / receitaMes : 0;
       return despesaTotalPorMes[mesIdx] * proporcao;
+    };
+
+    // Componente de despesa rateado por squad por mês
+    const despesaComponenteSquadMes = (sq: typeof squadRanking[0], mesIdx: number, componente: number[]) => {
+      const receitaMes = receitaTotalPorMes[mesIdx];
+      const proporcao = receitaMes > 0 ? (sq.porMes[mesIdx] || 0) / receitaMes : 0;
+      return componente[mesIdx] * proporcao;
     };
 
     // Totais gerais
@@ -168,6 +190,11 @@ export default function ContribuicaoSquad() {
       despesaTotalPorMes,
       receitaTotalPorMes,
       despesaSquadMes,
+      despesaComponenteSquadMes,
+      impostosPorMes,
+      salariosPorMes,
+      cxcsPorMes,
+      freelancersPorMes,
       totalReceita,
       totalDespesa,
       totalMargem,
@@ -387,9 +414,10 @@ export default function ContribuicaoSquad() {
                                 <td />
                               </tr>
 
-                              {/* Despesas */}
-                              <tr className="border-b border-border/30">
-                                <td className="py-1.5 px-3 pl-9 text-xs text-red-500 dark:text-red-400 sticky left-0 z-10 bg-background">
+                              {/* Despesas (expandível) */}
+                              <tr className="border-b border-border/30 cursor-pointer hover:bg-muted/30" onClick={() => toggleDespesasExpand(sq.squad)}>
+                                <td className="py-1.5 px-3 pl-7 text-xs text-red-500 dark:text-red-400 sticky left-0 z-10 bg-background flex items-center gap-1">
+                                  {expandedDespesas.has(sq.squad) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                                   Despesas
                                 </td>
                                 {monthlyResults.map((_, i) => {
@@ -405,6 +433,37 @@ export default function ContribuicaoSquad() {
                                 </td>
                                 <td />
                               </tr>
+                              {expandedDespesas.has(sq.squad) && (
+                                <>
+                                  {[
+                                    { label: "Impostos", data: tableData.impostosPorMes },
+                                    { label: "Salários", data: tableData.salariosPorMes },
+                                    { label: "CXCs", data: tableData.cxcsPorMes },
+                                    { label: "Freelancers", data: tableData.freelancersPorMes },
+                                  ].map(({ label, data }) => {
+                                    const total = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaComponenteSquadMes(sq, i, data), 0);
+                                    return (
+                                      <tr key={label} className="border-b border-border/20">
+                                        <td className="py-1 px-3 pl-14 text-[11px] text-red-400/70 dark:text-red-400/50 sticky left-0 z-10 bg-background">
+                                          {label}
+                                        </td>
+                                        {monthlyResults.map((_, i) => {
+                                          const val = tableData.despesaComponenteSquadMes(sq, i, data);
+                                          return (
+                                            <td key={i} className="py-1 px-2 text-right text-[11px] text-red-400/70 dark:text-red-400/50">
+                                              {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                                            </td>
+                                          );
+                                        })}
+                                        <td className="py-1 px-3 text-right text-[11px] font-medium text-red-400/70 dark:text-red-400/50">
+                                          {total > 0 ? formatCurrencyNoDecimals(total) : "-"}
+                                        </td>
+                                        <td />
+                                      </tr>
+                                    );
+                                  })}
+                                </>
+                              )}
 
                               {/* Margem */}
                               <tr className="border-b border-border/30">
@@ -487,9 +546,10 @@ export default function ContribuicaoSquad() {
                       </td>
                       <td />
                     </tr>
-                    {/* Total Despesas */}
-                    <tr className="border-b border-border/30 bg-muted">
-                      <td className="py-1.5 px-3 pl-9 text-xs text-red-500 dark:text-red-400 font-medium sticky left-0 z-10 bg-muted">
+                    {/* Total Despesas (expandível) */}
+                    <tr className="border-b border-border/30 bg-muted cursor-pointer hover:bg-muted/80" onClick={() => toggleDespesasExpand("__total__")}>
+                      <td className="py-1.5 px-3 pl-7 text-xs text-red-500 dark:text-red-400 font-medium sticky left-0 z-10 bg-muted flex items-center gap-1">
+                        {expandedDespesas.has("__total__") ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                         Despesas
                       </td>
                       {tableData.despesaTotalPorMes.map((val, i) => (
@@ -502,6 +562,34 @@ export default function ContribuicaoSquad() {
                       </td>
                       <td />
                     </tr>
+                    {expandedDespesas.has("__total__") && (
+                      <>
+                        {[
+                          { label: "Impostos", data: tableData.impostosPorMes },
+                          { label: "Salários", data: tableData.salariosPorMes },
+                          { label: "CXCs", data: tableData.cxcsPorMes },
+                          { label: "Freelancers", data: tableData.freelancersPorMes },
+                        ].map(({ label, data }) => {
+                          const total = data.reduce((acc, v) => acc + v, 0);
+                          return (
+                            <tr key={label} className="border-b border-border/20 bg-muted">
+                              <td className="py-1 px-3 pl-14 text-[11px] text-red-400/70 dark:text-red-400/50 font-medium sticky left-0 z-10 bg-muted">
+                                {label}
+                              </td>
+                              {data.map((val, i) => (
+                                <td key={i} className="py-1 px-2 text-right text-[11px] text-red-400/70 dark:text-red-400/50">
+                                  {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                                </td>
+                              ))}
+                              <td className="py-1 px-3 text-right text-[11px] font-medium text-red-400/70 dark:text-red-400/50">
+                                {total > 0 ? formatCurrencyNoDecimals(total) : "-"}
+                              </td>
+                              <td />
+                            </tr>
+                          );
+                        })}
+                      </>
+                    )}
                     {/* Total Margem */}
                     <tr className="border-b border-border/30 bg-muted">
                       <td className="py-1.5 px-3 pl-9 text-xs font-bold text-blue-600 dark:text-blue-400 sticky left-0 z-10 bg-muted">
