@@ -40,6 +40,11 @@ interface DespesasMensais {
   };
 }
 
+interface SalarioDetalhe {
+  nome: string;
+  salario: number;
+}
+
 interface BulkResponse {
   ano: number;
   squad: string;
@@ -47,6 +52,7 @@ interface BulkResponse {
   meses: MonthlyData[];
   resumoPorSquad?: SquadResumo[];
   despesasMensais?: DespesasMensais;
+  salariosDetalhes?: SalarioDetalhe[];
 }
 
 const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
@@ -62,9 +68,18 @@ export default function ContribuicaoSquad() {
   const taxaDecimal = taxaImposto / 100;
   const [collapsedSquads, setCollapsedSquads] = useState<Set<string> | "all">("all");
   const [expandedDespesas, setExpandedDespesas] = useState<Set<string>>(new Set());
+  const [expandedSalarios, setExpandedSalarios] = useState<Set<string>>(new Set());
 
   const toggleDespesasExpand = (key: string) => {
     setExpandedDespesas(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSalariosExpand = (key: string) => {
+    setExpandedSalarios(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
@@ -436,30 +451,52 @@ export default function ContribuicaoSquad() {
                               {expandedDespesas.has(sq.squad) && (
                                 <>
                                   {[
-                                    { label: "Impostos", data: tableData.impostosPorMes },
-                                    { label: "Salários", data: tableData.salariosPorMes },
-                                    { label: "CXCs", data: tableData.cxcsPorMes },
-                                    { label: "Freelancers", data: tableData.freelancersPorMes },
-                                  ].map(({ label, data }) => {
+                                    { label: "Impostos", data: tableData.impostosPorMes, expandable: false },
+                                    { label: "Salários", data: tableData.salariosPorMes, expandable: true },
+                                    { label: "CXCs", data: tableData.cxcsPorMes, expandable: false },
+                                    { label: "Freelancers", data: tableData.freelancersPorMes, expandable: false },
+                                  ].map(({ label, data, expandable }) => {
                                     const total = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaComponenteSquadMes(sq, i, data), 0);
+                                    const salKey = `${sq.squad}__${label}`;
+                                    const isExpanded = expandable && expandedSalarios.has(salKey);
                                     return (
-                                      <tr key={label} className="border-b border-border/20">
-                                        <td className="py-1 px-3 pl-14 text-[11px] text-red-400/70 dark:text-red-400/50 sticky left-0 z-10 bg-background">
-                                          {label}
-                                        </td>
-                                        {monthlyResults.map((_, i) => {
-                                          const val = tableData.despesaComponenteSquadMes(sq, i, data);
-                                          return (
-                                            <td key={i} className="py-1 px-2 text-right text-[11px] text-red-400/70 dark:text-red-400/50">
-                                              {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                                      <Fragment key={label}>
+                                        <tr
+                                          className={cn("border-b border-border/20", expandable && "cursor-pointer hover:bg-muted/20")}
+                                          onClick={expandable ? () => toggleSalariosExpand(salKey) : undefined}
+                                        >
+                                          <td className="py-1 px-3 pl-12 text-[11px] text-red-400/70 dark:text-red-400/50 sticky left-0 z-10 bg-background">
+                                            <span className="flex items-center gap-1">
+                                              {expandable && (isExpanded ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />)}
+                                              {label}
+                                            </span>
+                                          </td>
+                                          {monthlyResults.map((_, i) => {
+                                            const val = tableData.despesaComponenteSquadMes(sq, i, data);
+                                            return (
+                                              <td key={i} className="py-1 px-2 text-right text-[11px] text-red-400/70 dark:text-red-400/50">
+                                                {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                                              </td>
+                                            );
+                                          })}
+                                          <td className="py-1 px-3 text-right text-[11px] font-medium text-red-400/70 dark:text-red-400/50">
+                                            {total > 0 ? formatCurrencyNoDecimals(total) : "-"}
+                                          </td>
+                                          <td />
+                                        </tr>
+                                        {isExpanded && bulkData?.salariosDetalhes && bulkData.salariosDetalhes.map((colab) => (
+                                          <tr key={colab.nome} className="border-b border-border/10">
+                                            <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 sticky left-0 z-10 bg-background truncate max-w-[160px]" title={colab.nome}>
+                                              {colab.nome}
                                             </td>
-                                          );
-                                        })}
-                                        <td className="py-1 px-3 text-right text-[11px] font-medium text-red-400/70 dark:text-red-400/50">
-                                          {total > 0 ? formatCurrencyNoDecimals(total) : "-"}
-                                        </td>
-                                        <td />
-                                      </tr>
+                                            <td colSpan={monthlyResults.length} />
+                                            <td className="py-0.5 px-3 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
+                                              {formatCurrencyNoDecimals(colab.salario)}
+                                            </td>
+                                            <td />
+                                          </tr>
+                                        ))}
+                                      </Fragment>
                                     );
                                   })}
                                 </>
@@ -565,27 +602,49 @@ export default function ContribuicaoSquad() {
                     {expandedDespesas.has("__total__") && (
                       <>
                         {[
-                          { label: "Impostos", data: tableData.impostosPorMes },
-                          { label: "Salários", data: tableData.salariosPorMes },
-                          { label: "CXCs", data: tableData.cxcsPorMes },
-                          { label: "Freelancers", data: tableData.freelancersPorMes },
-                        ].map(({ label, data }) => {
+                          { label: "Impostos", data: tableData.impostosPorMes, expandable: false },
+                          { label: "Salários", data: tableData.salariosPorMes, expandable: true },
+                          { label: "CXCs", data: tableData.cxcsPorMes, expandable: false },
+                          { label: "Freelancers", data: tableData.freelancersPorMes, expandable: false },
+                        ].map(({ label, data, expandable }) => {
                           const total = data.reduce((acc, v) => acc + v, 0);
+                          const salKey = `__total____${label}`;
+                          const isExpanded = expandable && expandedSalarios.has(salKey);
                           return (
-                            <tr key={label} className="border-b border-border/20 bg-muted">
-                              <td className="py-1 px-3 pl-14 text-[11px] text-red-400/70 dark:text-red-400/50 font-medium sticky left-0 z-10 bg-muted">
-                                {label}
-                              </td>
-                              {data.map((val, i) => (
-                                <td key={i} className="py-1 px-2 text-right text-[11px] text-red-400/70 dark:text-red-400/50">
-                                  {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                            <Fragment key={label}>
+                              <tr
+                                className={cn("border-b border-border/20 bg-muted", expandable && "cursor-pointer hover:bg-muted/80")}
+                                onClick={expandable ? () => toggleSalariosExpand(salKey) : undefined}
+                              >
+                                <td className="py-1 px-3 pl-12 text-[11px] text-red-400/70 dark:text-red-400/50 font-medium sticky left-0 z-10 bg-muted">
+                                  <span className="flex items-center gap-1">
+                                    {expandable && (isExpanded ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />)}
+                                    {label}
+                                  </span>
                                 </td>
+                                {data.map((val, i) => (
+                                  <td key={i} className="py-1 px-2 text-right text-[11px] text-red-400/70 dark:text-red-400/50">
+                                    {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
+                                  </td>
+                                ))}
+                                <td className="py-1 px-3 text-right text-[11px] font-medium text-red-400/70 dark:text-red-400/50">
+                                  {total > 0 ? formatCurrencyNoDecimals(total) : "-"}
+                                </td>
+                                <td />
+                              </tr>
+                              {isExpanded && bulkData?.salariosDetalhes && bulkData.salariosDetalhes.map((colab) => (
+                                <tr key={colab.nome} className="border-b border-border/10 bg-muted">
+                                  <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 font-medium sticky left-0 z-10 bg-muted truncate max-w-[160px]" title={colab.nome}>
+                                    {colab.nome}
+                                  </td>
+                                  <td colSpan={monthlyResults.length} />
+                                  <td className="py-0.5 px-3 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
+                                    {formatCurrencyNoDecimals(colab.salario)}
+                                  </td>
+                                  <td />
+                                </tr>
                               ))}
-                              <td className="py-1 px-3 text-right text-[11px] font-medium text-red-400/70 dark:text-red-400/50">
-                                {total > 0 ? formatCurrencyNoDecimals(total) : "-"}
-                              </td>
-                              <td />
-                            </tr>
+                            </Fragment>
                           );
                         })}
                       </>
