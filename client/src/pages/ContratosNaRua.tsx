@@ -8,17 +8,15 @@ import {
   Mail,
   Phone,
   Building2,
-  Package,
   User,
   X,
-  Send,
   Repeat,
   Zap,
   DollarSign,
-  Hash,
   Download,
   CheckCircle,
 } from "lucide-react";
+import { StatsCardV2 } from "@/components/StatsCardV2";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -279,56 +277,13 @@ export default function ContratosNaRua() {
     <div className="flex flex-col h-[calc(100vh-220px)]">
       {/* Dashboard */}
       <div className="px-4 pt-4 pb-3 border-b border-border space-y-3">
-        <div className="flex items-center gap-2">
-          <Send className="h-4 w-4 text-amber-500" />
-          <h2 className="text-sm font-semibold text-foreground">Contratos Pendentes de Assinatura</h2>
-        </div>
+        <h2 className="text-sm font-semibold text-foreground">Contratos Pendentes de Assinatura</h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
-          <div className="bg-card border border-border rounded-lg px-3 py-2.5 flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
-              <Hash className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-foreground leading-tight">{stats.numContratos}</p>
-              <p className="text-[11px] text-muted-foreground">Contratos</p>
-            </div>
-          </div>
-          <div className="bg-card border border-border rounded-lg px-3 py-2.5 flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-100 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400">
-              <Package className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-foreground leading-tight">{stats.numServicos}</p>
-              <p className="text-[11px] text-muted-foreground">Serviços</p>
-            </div>
-          </div>
-          <div className="bg-card border border-border rounded-lg px-3 py-2.5 flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
-              <Repeat className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-foreground leading-tight">{formatCurrencyShort(stats.totalRecorrente)}</p>
-              <p className="text-[11px] text-muted-foreground">Recorrente</p>
-            </div>
-          </div>
-          <div className="bg-card border border-border rounded-lg px-3 py-2.5 flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400">
-              <Zap className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-foreground leading-tight">{formatCurrencyShort(stats.totalPontual)}</p>
-              <p className="text-[11px] text-muted-foreground">Pontual</p>
-            </div>
-          </div>
-          <div className="bg-card border border-border rounded-lg px-3 py-2.5 flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-sky-100 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400">
-              <DollarSign className="h-4 w-4" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-foreground leading-tight">{formatCurrencyShort(stats.totalGeral)}</p>
-              <p className="text-[11px] text-muted-foreground">Total</p>
-            </div>
-          </div>
+          <StatsCardV2 title="Contratos" value={String(stats.numContratos)} />
+          <StatsCardV2 title="Serviços" value={String(stats.numServicos)} />
+          <StatsCardV2 title="Recorrente" value={formatCurrencyShort(stats.totalRecorrente)} variant="success" />
+          <StatsCardV2 title="Pontual" value={formatCurrencyShort(stats.totalPontual)} variant="warning" />
+          <StatsCardV2 title="Total" value={formatCurrencyShort(stats.totalGeral)} />
         </div>
       </div>
 
