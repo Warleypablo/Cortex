@@ -52,7 +52,7 @@ interface BulkResponse {
   meses: MonthlyData[];
   resumoPorSquad?: SquadResumo[];
   despesasMensais?: DespesasMensais;
-  salariosDetalhes?: SalarioDetalhe[];
+  salariosDetalhesPorSquad?: Record<string, SalarioDetalhe[]>;
 }
 
 const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
@@ -484,7 +484,7 @@ export default function ContribuicaoSquad() {
                                           </td>
                                           <td />
                                         </tr>
-                                        {isExpanded && bulkData?.salariosDetalhes?.map((colab, idx) => (
+                                        {isExpanded && (bulkData?.salariosDetalhesPorSquad?.[sq.squad] || []).map((colab, idx) => (
                                           <tr key={`${colab.nome}-${idx}`} className="border-b border-border/10">
                                             <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 sticky left-0 z-10 bg-background truncate max-w-[160px]" title={colab.nome}>
                                               {colab.nome}
@@ -632,7 +632,7 @@ export default function ContribuicaoSquad() {
                                 </td>
                                 <td />
                               </tr>
-                              {isExpanded && bulkData?.salariosDetalhes?.map((colab, idx) => (
+                              {isExpanded && Object.values(bulkData?.salariosDetalhesPorSquad || {}).flat().sort((a, b) => b.salario - a.salario).map((colab, idx) => (
                                 <tr key={`${colab.nome}-${idx}`} className="border-b border-border/10 bg-muted">
                                   <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 font-medium sticky left-0 z-10 bg-muted truncate max-w-[160px]" title={colab.nome}>
                                     {colab.nome}
