@@ -2,34 +2,16 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { formatCurrency, formatPercent } from "@/lib/utils";
+import { formatCurrency, formatPercent, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  DollarSign, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  Target,
-  BarChart3,
-  ArrowUpRight,
-  ArrowDownRight,
-  CalendarDays,
-  Zap,
-  X,
-  Building2,
-  User,
-  FileText,
-  Briefcase,
-  MessageCircle
+import {
+  CalendarDays, Building2, User, FileText, Briefcase, MessageCircle
 } from "lucide-react";
 import {
   ComposedChart,
@@ -42,6 +24,9 @@ import {
   Legend,
   ResponsiveContainer
 } from "recharts";
+import { useTheme } from "@/components/ThemeProvider";
+import { HeroMetric } from "@/components/HeroMetric";
+import { StatsCardV2 } from "@/components/StatsCardV2";
 
 interface RevenueGoalsData {
   resumo: {
@@ -102,95 +87,13 @@ const mesesNomes = [
 
 const mesesAbreviados = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-interface KPICardProps {
-  title: string;
-  value: string;
-  subtitle?: string;
-  icon: React.ReactNode;
-  trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
-  color?: 'default' | 'success' | 'warning' | 'danger';
-  progress?: number;
-}
-
-function KPICard({ title, value, subtitle, icon, trend, trendValue, color = 'default', progress, compact = false }: KPICardProps & { compact?: boolean }) {
-  const colorConfig = {
-    default: {
-      bg: 'bg-blue-100 dark:bg-blue-900/30',
-      text: 'text-blue-600 dark:text-blue-400',
-      border: 'border-blue-200 dark:border-blue-800',
-      gradient: 'from-blue-500/5 to-blue-500/10'
-    },
-    success: {
-      bg: 'bg-emerald-100 dark:bg-emerald-900/30',
-      text: 'text-emerald-600 dark:text-emerald-400',
-      border: 'border-emerald-200 dark:border-emerald-800',
-      gradient: 'from-emerald-500/5 to-emerald-500/10'
-    },
-    warning: {
-      bg: 'bg-amber-100 dark:bg-amber-900/30',
-      text: 'text-amber-600 dark:text-amber-400',
-      border: 'border-amber-200 dark:border-amber-800',
-      gradient: 'from-amber-500/5 to-amber-500/10'
-    },
-    danger: {
-      bg: 'bg-red-100 dark:bg-red-900/30',
-      text: 'text-red-600 dark:text-red-400',
-      border: 'border-red-200 dark:border-red-800',
-      gradient: 'from-red-500/5 to-red-500/10'
-    },
-  };
-
-  const config = colorConfig[color];
-
-  return (
-    <Card
-      className={`relative overflow-hidden border ${config.border} transition-all duration-200 hover:shadow-md hover:scale-[1.01] hover:border-opacity-80`}
-      data-testid={`card-kpi-${title.toLowerCase().replace(/\s+/g, '-')}`}
-    >
-      <div className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-50`} />
-      <CardContent className={`relative ${compact ? 'p-4' : 'p-5'}`}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <p className={`text-muted-foreground font-medium ${compact ? 'text-xs' : 'text-sm'}`}>{title}</p>
-            <p className={`font-bold mt-1 tracking-tight ${compact ? 'text-lg' : 'text-xl'}`}>{value}</p>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-            )}
-            {trend && trendValue && (
-              <div className="flex items-center gap-1.5 mt-1.5">
-                {trend === 'up' ? (
-                  <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600" />
-                ) : trend === 'down' ? (
-                  <ArrowDownRight className="w-3.5 h-3.5 text-red-500" />
-                ) : null}
-                <span className={`text-xs font-medium ${trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-red-500' : 'text-muted-foreground'}`}>
-                  {trendValue}
-                </span>
-              </div>
-            )}
-            {progress !== undefined && (
-              <div className="mt-2">
-                <Progress value={progress} className="h-1.5" />
-              </div>
-            )}
-          </div>
-          <div className={`p-2 rounded-xl shrink-0 ${config.bg}`}>
-            <div className={config.text}>{icon}</div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
     const data = payload[0]?.payload;
     const totalDia = (data?.recebido || 0) + (data?.pendente || 0) + (data?.inadimplente || 0);
     
     return (
-      <div className="bg-background/95 backdrop-blur-sm border rounded-xl shadow-xl p-4 min-w-[220px]">
+      <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 text-sm text-foreground min-w-[220px]">
         <div className="flex items-center gap-2 mb-3 pb-2 border-b">
           <CalendarDays className="w-4 h-4 text-muted-foreground" />
           <p className="font-semibold">Dia {label}</p>
@@ -264,7 +167,9 @@ function CustomLegend({ payload }: any) {
 export default function RevenueGoals() {
   usePageTitle("Metas de Receita");
   useSetPageInfo("Metas de Receita", "Acompanhamento de recebimentos do mês");
-  
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
   const hoje = new Date();
   const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
@@ -359,68 +264,116 @@ export default function RevenueGoals() {
 
       {isLoading ? (
         <div className="space-y-4">
-          <Skeleton className="h-[100px]" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-[120px]" />
+          <div className="flex items-start gap-12">
+            <Skeleton className="h-8 w-32" />
+            <Skeleton className="h-8 w-32" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-lg" />
             ))}
           </div>
+          <Skeleton className="h-[300px] rounded-lg" />
         </div>
       ) : data ? (
         <>
+          {/* Hero Metrics */}
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-12">
+            <HeroMetric
+              label="Recebido"
+              value={formatCurrency(data.resumo.totalRecebido)}
+              subtitle={`${data.resumo.quantidadeRecebidas} parcelas recebidas`}
+              trend={{
+                value: `${formatPercent(data.resumo.percentualRecebido)} da meta`,
+                isPositive: data.resumo.percentualRecebido >= 50,
+              }}
+            />
+            <HeroMetric
+              label="Total a Receber"
+              value={formatCurrency(data.resumo.totalPrevisto)}
+              subtitle={`${data.resumo.quantidadeParcelas} parcelas no mês`}
+            />
+          </div>
+
+          {/* Supporting Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatsCardV2
+              title="Pendente"
+              value={formatCurrency(data.resumo.totalPendente)}
+              subtitle={`${data.resumo.quantidadePendentes} parcelas aguardando pagamento`}
+              variant="warning"
+            />
+            <StatsCardV2
+              title="Inadimplente"
+              value={formatCurrency(data.resumo.totalInadimplente)}
+              subtitle={`${data.resumo.quantidadeInadimplentes} parcelas · ${formatPercent(data.resumo.percentualInadimplencia)}`}
+              variant="error"
+              trend={{
+                value: data.resumo.percentualInadimplencia > 10 ? 'Acima de 10%' : 'Controlado',
+                isPositive: data.resumo.percentualInadimplencia <= 10,
+              }}
+            />
+            <StatsCardV2
+              title="Projeção Final"
+              value={formatCurrency(projecaoFinal)}
+              subtitle={`${diasRestantes} dias restantes`}
+              variant={projecaoFinal >= data.resumo.totalPrevisto ? 'success' : 'warning'}
+              trend={{
+                value: projecaoFinal >= data.resumo.totalPrevisto ? 'Acima da meta' : 'Abaixo da meta',
+                isPositive: projecaoFinal >= data.resumo.totalPrevisto,
+              }}
+            />
+            <StatsCardV2
+              title="Média Diária"
+              value={formatCurrency(mediaDiariaRecebida)}
+              subtitle="Por dia com recebimento"
+            />
+          </div>
+
+          {/* Ticket Médio */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <StatsCardV2
+              title="Ticket Médio Recebido"
+              value={data.resumo.quantidadeRecebidas > 0
+                ? formatCurrency(data.resumo.totalRecebido / data.resumo.quantidadeRecebidas)
+                : 'R$ 0'}
+              subtitle={`Base: ${data.resumo.quantidadeRecebidas} parcelas`}
+              variant="success"
+            />
+            <StatsCardV2
+              title="Ticket Médio Pendente"
+              value={data.resumo.quantidadePendentes > 0
+                ? formatCurrency(data.resumo.totalPendente / data.resumo.quantidadePendentes)
+                : 'R$ 0'}
+              subtitle={`Base: ${data.resumo.quantidadePendentes} parcelas`}
+              variant="warning"
+            />
+            <StatsCardV2
+              title="Ticket Médio Inadimplente"
+              value={data.resumo.quantidadeInadimplentes > 0
+                ? formatCurrency(data.resumo.totalInadimplente / data.resumo.quantidadeInadimplentes)
+                : 'R$ 0'}
+              subtitle={`Base: ${data.resumo.quantidadeInadimplentes} parcelas`}
+              variant="error"
+            />
+          </div>
+
           {/* Gráfico Principal */}
-          <Card className="overflow-hidden">
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg">
             <CardHeader className="pb-2">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <BarChart3 className="w-5 h-5 text-primary" />
-                    Evolução de Recebimentos
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    Análise diária com comparativo de meta acumulada
-                  </CardDescription>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 dark:border-emerald-800">
-                    <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
-                    {formatCurrency(data.resumo.totalRecebido)}
-                  </Badge>
-                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200 dark:border-amber-800">
-                    <Clock className="w-3.5 h-3.5 mr-1.5" />
-                    {formatCurrency(data.resumo.totalPendente)}
-                  </Badge>
-                  <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-200 dark:border-red-800">
-                    <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />
-                    {formatCurrency(data.resumo.totalInadimplente)}
-                  </Badge>
-                </div>
-              </div>
+              <CardTitle className="text-lg">Evolução de Recebimentos</CardTitle>
+              <CardDescription>Análise diária com comparativo de meta acumulada</CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="h-[420px]">
+              <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
-                    <defs>
-                      <linearGradient id="recebidoGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.9}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.6}/>
-                      </linearGradient>
-                      <linearGradient id="pendenteGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.9}/>
-                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.6}/>
-                      </linearGradient>
-                      <linearGradient id="inadimplenteGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.9}/>
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.6}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                  <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 10 }} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
+                    <CartesianGrid vertical={false} stroke={isDark ? '#27272a' : '#f0f0f0'} />
                     <XAxis
                       dataKey="dia"
-                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#6b7280' }}
                       tickLine={false}
-                      axisLine={{ stroke: 'hsl(var(--border))' }}
+                      axisLine={{ stroke: isDark ? '#3f3f46' : '#e5e7eb' }}
                     />
                     <YAxis
                       yAxisId="bars"
@@ -429,10 +382,9 @@ export default function RevenueGoals() {
                         if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
                         return value.toString();
                       }}
-                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#6b7280' }}
                       tickLine={false}
                       axisLine={false}
-                      label={{ value: 'R$ Diário', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
                     />
                     <YAxis
                       yAxisId="lines"
@@ -442,60 +394,19 @@ export default function RevenueGoals() {
                         if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
                         return value.toString();
                       }}
-                      tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                      tick={{ fontSize: 11, fill: isDark ? '#a1a1aa' : '#6b7280' }}
                       tickLine={false}
                       axisLine={false}
-                      label={{ value: 'R$ Acumulado', angle: 90, position: 'insideRight', style: { fontSize: 11, fill: 'hsl(var(--muted-foreground))' } }}
                     />
-                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: isDark ? '#27272a' : '#f3f4f6', opacity: 0.5 }} />
                     <Legend content={<CustomLegend />} />
 
-                    <Bar
-                      yAxisId="bars"
-                      dataKey="recebido"
-                      name="Recebido"
-                      stackId="a"
-                      fill="url(#recebidoGradient)"
-                      radius={[0, 0, 0, 0]}
-                    />
-                    <Bar
-                      yAxisId="bars"
-                      dataKey="pendente"
-                      name="Pendente"
-                      stackId="a"
-                      fill="url(#pendenteGradient)"
-                      radius={[0, 0, 0, 0]}
-                    />
-                    <Bar
-                      yAxisId="bars"
-                      dataKey="inadimplente"
-                      name="Inadimplente"
-                      stackId="a"
-                      fill="url(#inadimplenteGradient)"
-                      radius={[4, 4, 0, 0]}
-                    />
+                    <Bar yAxisId="bars" dataKey="recebido" name="Recebido" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} />
+                    <Bar yAxisId="bars" dataKey="pendente" name="Pendente" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
+                    <Bar yAxisId="bars" dataKey="inadimplente" name="Inadimplente" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
 
-                    <Line
-                      yAxisId="lines"
-                      type="monotone"
-                      dataKey="metaAcumulada"
-                      name="Meta Acumulada"
-                      stroke="#3b82f6"
-                      strokeWidth={2.5}
-                      dot={false}
-                      activeDot={{ r: 6, strokeWidth: 2, fill: '#3b82f6' }}
-                    />
-                    <Line
-                      yAxisId="lines"
-                      type="monotone"
-                      dataKey="recebidoAcumulado"
-                      name="Recebido Acumulado"
-                      stroke="#10b981"
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={false}
-                      activeDot={{ r: 5, strokeWidth: 2, fill: '#10b981' }}
-                    />
+                    <Line yAxisId="lines" type="monotone" dataKey="metaAcumulada" name="Meta Acumulada" stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 6, strokeWidth: 2, fill: '#3b82f6' }} />
+                    <Line yAxisId="lines" type="monotone" dataKey="recebidoAcumulado" name="Recebido Acumulado" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 5, strokeWidth: 2, fill: '#10b981' }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -529,191 +440,82 @@ export default function RevenueGoals() {
                   const statusBadge = getStatusBadge(pctInad, target);
 
                   return (
-                    <Card
+                    <div
                       key={target}
-                      className={`relative overflow-hidden border transition-all duration-200 hover:shadow-md ${
+                      className={cn(
+                        "bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg p-5",
                         dentroMeta
-                          ? "border-emerald-200 dark:border-emerald-800"
-                          : "border-red-200 dark:border-red-800"
-                      }`}
+                          ? "border-l-[3px] border-l-emerald-500 dark:border-l-emerald-400"
+                          : "border-l-[3px] border-l-red-500 dark:border-l-red-400"
+                      )}
                     >
-                      <div
-                        className={`absolute inset-0 bg-gradient-to-br ${
-                          dentroMeta
-                            ? "from-emerald-500/5 to-emerald-500/10"
-                            : "from-red-500/5 to-red-500/10"
-                        } opacity-50`}
-                      />
-                      <CardContent className="relative p-5">
-                        <div className="flex items-start justify-between gap-3 mb-4">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm text-muted-foreground font-medium">{label}</p>
-                              <Badge className={`text-[10px] px-1.5 py-0 ${statusBadge.className}`}>
-                                {statusBadge.label}
-                              </Badge>
-                            </div>
-                            <div className="flex items-baseline gap-2 mt-1">
-                              <span className="text-3xl font-bold">{pctInad.toFixed(2)}%</span>
-                              <span className="text-sm text-muted-foreground">/ {target}%</span>
-                            </div>
+                      <div className="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+                            <Badge className={`text-[10px] px-1.5 py-0 ${statusBadge.className}`}>
+                              {statusBadge.label}
+                            </Badge>
                           </div>
+                          <div className="flex items-baseline gap-2 mt-1">
+                            <span className="text-2xl font-semibold text-foreground">{pctInad.toFixed(2)}%</span>
+                            <span className="text-sm text-muted-foreground">/ {target}%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Progresso</span>
+                          <span>{progressoPct.toFixed(0)}% do limite</span>
+                        </div>
+                        <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
                           <div
-                            className={`p-2.5 rounded-xl ${
-                              dentroMeta
-                                ? "bg-emerald-100 dark:bg-emerald-900/30"
-                                : "bg-red-100 dark:bg-red-900/30"
+                            className={`absolute inset-y-0 left-0 rounded-full transition-all ${
+                              dentroMeta ? "bg-emerald-500" : "bg-red-500"
                             }`}
-                          >
-                            {dentroMeta ? (
-                              <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                            )}
-                          </div>
+                            style={{ width: `${Math.min(progressoPct, 100)}%` }}
+                          />
                         </div>
+                      </div>
 
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-xs text-muted-foreground">
-                            <span>Progresso</span>
-                            <span>{progressoPct.toFixed(0)}% do limite</span>
-                          </div>
-                          <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className={`absolute inset-y-0 left-0 rounded-full transition-all ${
-                                dentroMeta ? "bg-emerald-500" : "bg-red-500"
-                              }`}
-                              style={{ width: `${Math.min(progressoPct, 100)}%` }}
-                            />
-                          </div>
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Inadimplente Atual</p>
+                          <p className="text-sm font-semibold mt-0.5">{formatCurrency(totalInad)}</p>
                         </div>
-
-                        <div className="grid grid-cols-2 gap-3 mt-4">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Inadimplente Atual</p>
-                            <p className="text-sm font-semibold mt-0.5">{formatCurrency(totalInad)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Limite ({target}%)</p>
-                            <p className="text-sm font-semibold mt-0.5">{formatCurrency(limiteReais)}</p>
-                          </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Limite ({target}%)</p>
+                          <p className="text-sm font-semibold mt-0.5">{formatCurrency(limiteReais)}</p>
                         </div>
+                      </div>
 
-                        {!dentroMeta && (
-                          <div className="mt-3 px-3 py-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-                            <p className="text-xs font-medium text-red-600 dark:text-red-400">
-                              Excedente: {formatCurrency(excedente)} acima do limite
-                            </p>
-                          </div>
-                        )}
-                        {dentroMeta && (
-                          <div className="mt-3 px-3 py-2 bg-emerald-100 dark:bg-emerald-900/20 rounded-lg">
-                            <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                              Folga: {formatCurrency(Math.abs(excedente))} abaixo do limite
-                            </p>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                      {!dentroMeta && (
+                        <div className="mt-3 px-3 py-2 bg-red-50 dark:bg-red-950/30 rounded-lg">
+                          <p className="text-xs font-medium text-red-600 dark:text-red-400">
+                            Excedente: {formatCurrency(excedente)} acima do limite
+                          </p>
+                        </div>
+                      )}
+                      {dentroMeta && (
+                        <div className="mt-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
+                          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                            Folga: {formatCurrency(Math.abs(excedente))} abaixo do limite
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   );
                 })}
               </div>
             );
           })()}
 
-          {/* KPIs Principais — Row 1: 3 large cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <KPICard title="Total a Receber" value={formatCurrency(data.resumo.totalPrevisto)} subtitle={`${data.resumo.quantidadeParcelas} parcelas no mês`} icon={<Target className="w-5 h-5" />} color="default" />
-            <KPICard title="Recebido" value={formatCurrency(data.resumo.totalRecebido)} subtitle={`${data.resumo.quantidadeRecebidas} parcelas`} icon={<CheckCircle className="w-5 h-5" />} color="success" progress={data.resumo.totalPrevisto > 0 ? (data.resumo.totalRecebido / data.resumo.totalPrevisto) * 100 : 0} />
-            <KPICard title="Pendente" value={formatCurrency(data.resumo.totalPendente)} subtitle={`${data.resumo.quantidadePendentes} parcelas`} icon={<Clock className="w-5 h-5" />} color="warning" />
-          </div>
-
-          {/* KPIs Secundários — Row 2: 3 compact cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <KPICard title="Inadimplente" value={formatCurrency(data.resumo.totalInadimplente)} subtitle={`${data.resumo.quantidadeInadimplentes} parcelas · ${formatPercent(data.resumo.percentualInadimplencia)}`} icon={<AlertTriangle className="w-4 h-4" />} trend={data.resumo.percentualInadimplencia > 10 ? 'down' : 'up'} trendValue={data.resumo.percentualInadimplencia > 10 ? 'Acima de 10%' : 'Controlado'} color="danger" compact />
-            <KPICard title="Projeção Final" value={formatCurrency(projecaoFinal)} subtitle={`${diasRestantes} dias restantes`} icon={<Zap className="w-4 h-4" />} trend={projecaoFinal >= data.resumo.totalPrevisto ? 'up' : 'down'} trendValue={projecaoFinal >= data.resumo.totalPrevisto ? 'Acima da meta' : 'Abaixo da meta'} color={projecaoFinal >= data.resumo.totalPrevisto ? 'success' : 'warning'} compact />
-            <KPICard title="Média Diária" value={formatCurrency(mediaDiariaRecebida)} subtitle="Por dia com recebimento" icon={<BarChart3 className="w-4 h-4" />} color="default" compact />
-          </div>
-
-          {/* Ticket Médio */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="border-emerald-200 dark:border-emerald-900 overflow-hidden transition-all duration-200 hover:shadow-md">
-              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500" />
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                    <DollarSign className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground font-medium">Ticket Médio Recebido</p>
-                    <p className="text-xl font-bold mt-0.5">
-                      {data.resumo.quantidadeRecebidas > 0
-                        ? formatCurrency(data.resumo.totalRecebido / data.resumo.quantidadeRecebidas)
-                        : 'R$ 0'
-                      }
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Base: {data.resumo.quantidadeRecebidas} parcelas
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-amber-200 dark:border-amber-900 overflow-hidden transition-all duration-200 hover:shadow-md">
-              <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                    <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground font-medium">Ticket Médio Pendente</p>
-                    <p className="text-xl font-bold mt-0.5">
-                      {data.resumo.quantidadePendentes > 0
-                        ? formatCurrency(data.resumo.totalPendente / data.resumo.quantidadePendentes)
-                        : 'R$ 0'
-                      }
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Base: {data.resumo.quantidadePendentes} parcelas
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-red-200 dark:border-red-900 overflow-hidden transition-all duration-200 hover:shadow-md">
-              <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-muted-foreground font-medium">Ticket Médio Inadimplente</p>
-                    <p className="text-xl font-bold mt-0.5">
-                      {data.resumo.quantidadeInadimplentes > 0
-                        ? formatCurrency(data.resumo.totalInadimplente / data.resumo.quantidadeInadimplentes)
-                        : 'R$ 0'
-                      }
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Base: {data.resumo.quantidadeInadimplentes} parcelas
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
         </>
       ) : (
-        <Card className="p-12">
-          <div className="text-center text-muted-foreground">
-            Nenhum dado disponível para o período selecionado.
-          </div>
-        </Card>
+        <p className="text-sm text-muted-foreground text-center py-12">
+          Sem dados para o período selecionado.
+        </p>
       )}
 
       <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
@@ -736,21 +538,21 @@ export default function RevenueGoals() {
           ) : diaDetalhes ? (
             <div className="flex-1 overflow-hidden flex flex-col">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                <div className="p-3 bg-muted/50 rounded-lg">
+                <div className="p-3 bg-gray-50 dark:bg-zinc-800/30 rounded-lg">
                   <p className="text-xs text-muted-foreground">Previsto</p>
-                  <p className="text-lg font-bold">{formatCurrency(diaDetalhes.resumo.totalPrevisto)}</p>
+                  <p className="text-lg font-medium">{formatCurrency(diaDetalhes.resumo.totalPrevisto)}</p>
                 </div>
-                <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
                   <p className="text-xs text-emerald-600 dark:text-emerald-400">Recebido</p>
-                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(diaDetalhes.resumo.totalRecebido)}</p>
+                  <p className="text-lg font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(diaDetalhes.resumo.totalRecebido)}</p>
                 </div>
-                <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
                   <p className="text-xs text-amber-600 dark:text-amber-400">Pendente</p>
-                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{formatCurrency(diaDetalhes.resumo.totalPendente)}</p>
+                  <p className="text-lg font-medium text-amber-600 dark:text-amber-400">{formatCurrency(diaDetalhes.resumo.totalPendente)}</p>
                 </div>
-                <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
                   <p className="text-xs text-red-600 dark:text-red-400">Inadimplente</p>
-                  <p className="text-lg font-bold text-red-600 dark:text-red-400">{formatCurrency(diaDetalhes.resumo.totalInadimplente)}</p>
+                  <p className="text-lg font-medium text-red-600 dark:text-red-400">{formatCurrency(diaDetalhes.resumo.totalInadimplente)}</p>
                 </div>
               </div>
 
