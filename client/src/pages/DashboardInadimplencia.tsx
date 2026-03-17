@@ -1,7 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
+import { formatCurrency, formatCurrencyCompact, formatPercent, cn } from "@/lib/utils";
+import { useTheme } from "@/components/ThemeProvider";
+import { HeroMetric } from "@/components/HeroMetric";
+import { StatsCardV2 } from "@/components/StatsCardV2";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,10 +57,6 @@ import {
 import {
   AlertTriangle,
   Users,
-  DollarSign,
-  Clock,
-  TrendingDown,
-  Building2,
   Filter,
   Search,
   Eye,
@@ -240,6 +239,8 @@ export default function DashboardInadimplencia() {
   usePageTitle("Inadimplência");
   const { setPageInfo } = usePageInfo();
   const { toast } = useToast();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [activeTab, setActiveTab] = useState("visao-geral");
 
   useEffect(() => {
@@ -642,96 +643,6 @@ export default function DashboardInadimplencia() {
     return "outline";
   };
 
-  const KPICard = ({
-    title,
-    value,
-    subtitle,
-    icon: Icon,
-    variant = "default",
-    loading = false,
-    testId,
-    delta,
-  }: {
-    title: string;
-    value: string;
-    subtitle?: string;
-    icon: any;
-    variant?: "default" | "success" | "danger" | "warning" | "info";
-    loading?: boolean;
-    testId: string;
-    delta?: { value: string; isPositive: boolean };
-  }) => {
-    const variantStyles = {
-      default: {
-        bg: "bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900",
-        icon: "bg-primary/10 text-primary",
-      },
-      success: {
-        bg: "bg-gradient-to-br from-green-50 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/20",
-        icon: "bg-green-500/20 text-green-600 dark:text-green-400",
-      },
-      danger: {
-        bg: "bg-gradient-to-br from-red-50 to-rose-100 dark:from-red-900/30 dark:to-rose-900/20",
-        icon: "bg-red-500/20 text-red-600 dark:text-red-400",
-      },
-      warning: {
-        bg: "bg-gradient-to-br from-amber-50 to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/20",
-        icon: "bg-amber-500/20 text-amber-600 dark:text-amber-400",
-      },
-      info: {
-        bg: "bg-gradient-to-br from-blue-50 to-sky-100 dark:from-blue-900/30 dark:to-sky-900/20",
-        icon: "bg-blue-500/20 text-blue-600 dark:text-blue-400",
-      },
-    };
-
-    const styles = variantStyles[variant];
-
-    if (loading) {
-      return (
-        <Card className={`${styles.bg} border-0 shadow-lg overflow-hidden`} data-testid={`${testId}-loading`}>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="space-y-2 flex-1 min-w-0">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-6 w-24" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-              <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    return (
-      <Card className={`${styles.bg} border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 overflow-hidden`} data-testid={testId}>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground truncate">{title}</p>
-              <p className="text-xl font-bold text-foreground truncate" data-testid={`${testId}-value`}>{value}</p>
-              {subtitle && (
-                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{subtitle}</p>
-              )}
-              {delta && (
-                <span className={`inline-flex items-center gap-0.5 mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                  delta.isPositive
-                    ? "bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                    : "bg-red-100/80 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                }`}>
-                  {delta.isPositive ? "↓" : "↑"} {delta.value} vs mês ant.
-                </span>
-              )}
-            </div>
-            <div className={`p-2.5 rounded-xl ${styles.icon} flex-shrink-0`}>
-              <Icon className="h-5 w-5" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
   // Custom rich tooltip for bar charts
   const BarChartRichTooltip = ({ active, payload, totalInadimplente }: any) => {
     if (!active || !payload?.length) return null;
@@ -739,7 +650,7 @@ export default function DashboardInadimplencia() {
     const nameKey = data.vendedor || data.squad || data.responsavel || 'N/A';
     const pctOfTotal = totalInadimplente > 0 ? (data.valorTotal / totalInadimplente * 100).toFixed(1) : '0';
     return (
-      <div className="bg-background border border-border rounded-lg shadow-lg p-3 text-sm min-w-[180px]">
+      <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 text-sm text-foreground min-w-[180px]">
         <p className="font-semibold text-foreground mb-1.5">{nameKey}</p>
         <div className="space-y-1 text-muted-foreground">
           <p>Valor: <span className="font-medium text-foreground">{formatCurrency(data.valorTotal)}</span></p>
@@ -835,100 +746,101 @@ export default function DashboardInadimplencia() {
 
   const renderVisaoGeral = () => (
     <div className="space-y-6" data-testid="section-visao-geral">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Total Inadimplente"
-          value={formatCurrency(resumoData?.totalInadimplente || 0)}
-          subtitle={`${resumoData?.quantidadeParcelas || 0} parcelas em aberto`}
-          icon={AlertTriangle}
-          variant="danger"
-          loading={isLoadingResumo}
-          testId="kpi-total-inadimplente"
-          delta={kpiDeltas.valor}
-        />
-        <KPICard
-          title="Clientes Inadimplentes"
-          value={String(resumoData?.quantidadeClientes || 0)}
-          subtitle="Com valores em atraso"
-          icon={Users}
-          variant="warning"
-          loading={isLoadingResumo}
-          testId="kpi-clientes-inadimplentes"
-          delta={kpiDeltas.clientes}
-        />
-        <KPICard
-          title="Ticket Médio"
-          value={formatCurrency(resumoData?.ticketMedio || 0)}
-          subtitle="Valor médio por cliente"
-          icon={DollarSign}
-          variant="info"
-          loading={isLoadingResumo}
-          testId="kpi-ticket-medio"
-        />
-        <KPICard
-          title="Últimos 45 dias"
-          value={formatCurrency(resumoData?.valorUltimos45Dias || 0)}
-          subtitle={`${resumoData?.quantidadeUltimos45Dias || 0} parcelas recentes`}
-          icon={Clock}
-          variant="warning"
-          loading={isLoadingResumo}
-          testId="kpi-ultimos-45-dias"
-        />
-      </div>
+      {/* Hero Metrics */}
+      {isLoadingResumo ? (
+        <div className="flex items-start gap-12">
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-8 w-24" />
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-12">
+          <HeroMetric
+            label="Total Inadimplente"
+            value={formatCurrency(resumoData?.totalInadimplente || 0)}
+            subtitle={`${resumoData?.quantidadeParcelas || 0} parcelas em aberto`}
+            trend={kpiDeltas.valor ? {
+              value: `${kpiDeltas.valor.value} vs mês ant.`,
+              isPositive: kpiDeltas.valor.isPositive,
+            } : undefined}
+          />
+          <HeroMetric
+            label="Clientes Inadimplentes"
+            value={String(resumoData?.quantidadeClientes || 0)}
+            subtitle="Com valores em atraso"
+            trend={kpiDeltas.clientes ? {
+              value: `${kpiDeltas.clientes.value} vs mês ant.`,
+              isPositive: kpiDeltas.clientes.isPositive,
+            } : undefined}
+          />
+        </div>
+      )}
+
+      {/* Supporting Cards */}
+      {isLoadingResumo ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCardV2
+            title="Ticket Médio"
+            value={formatCurrency(resumoData?.ticketMedio || 0)}
+            subtitle="Valor médio por cliente"
+          />
+          <StatsCardV2
+            title="Últimos 45 dias"
+            value={formatCurrency(resumoData?.valorUltimos45Dias || 0)}
+            subtitle={`${resumoData?.quantidadeUltimos45Dias || 0} parcelas recentes`}
+            variant="warning"
+          />
+          <StatsCardV2
+            title="Inadimplentes 1ª Parcela"
+            value={String(metricasRecebimento?.clientesInadimPrimeiraParcela || 0)}
+            subtitle={`${formatPercent(metricasRecebimento?.percentualInadimPrimeiraParcela || 0)} sobre ${metricasRecebimento?.totalClientesComParcelas || 0} clientes`}
+            variant="error"
+          />
+          <StatsCardV2
+            title="Nunca Pagaram"
+            value={String(metricasRecebimento?.clientesNuncaPagaram || 0)}
+            subtitle={`${formatPercent(metricasRecebimento?.percentualNuncaPagaram || 0)} · ${formatCurrency(metricasRecebimento?.valorNuncaPagaram || 0)}`}
+            variant="error"
+          />
+        </div>
+      )}
 
       {/* Métricas de Recebimento */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard
-          title="Tempo Médio Recebimento"
-          value={`${metricasRecebimento?.tempoMedioRecebimento || 0} dias`}
-          subtitle="Prazo médio entre vencimento e quitação"
-          icon={Clock}
-          variant="info"
-          loading={isLoadingMetricas}
-          testId="kpi-tempo-medio-recebimento"
-        />
-        <KPICard
-          title="Tempo Médio (Atrasados)"
-          value={`${metricasRecebimento?.tempoMedioRecebimentoInadimplentes || 0} dias`}
-          subtitle="Pagos após o vencimento"
-          icon={Clock}
-          variant="warning"
-          loading={isLoadingMetricas}
-          testId="kpi-tempo-medio-inadimplentes"
-        />
-        <KPICard
-          title="Inadimplentes 1ª Parcela"
-          value={String(metricasRecebimento?.clientesInadimPrimeiraParcela || 0)}
-          subtitle={`${formatPercent(metricasRecebimento?.percentualInadimPrimeiraParcela || 0)} sobre ${metricasRecebimento?.totalClientesComParcelas || 0} clientes • ${formatCurrency(metricasRecebimento?.valorInadimPrimeiraParcela || 0)}`}
-          icon={AlertTriangle}
-          variant="danger"
-          loading={isLoadingMetricas}
-          testId="kpi-inadim-primeira-parcela"
-        />
-        <KPICard
-          title="Nunca Pagaram"
-          value={String(metricasRecebimento?.clientesNuncaPagaram || 0)}
-          subtitle={`${formatPercent(metricasRecebimento?.percentualNuncaPagaram || 0)} • ${formatCurrency(metricasRecebimento?.valorNuncaPagaram || 0)}`}
-          icon={XCircle}
-          variant="danger"
-          loading={isLoadingMetricas}
-          testId="kpi-nunca-pagaram"
-        />
-      </div>
+      {isLoadingMetricas ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Skeleton className="h-24 rounded-lg" />
+          <Skeleton className="h-24 rounded-lg" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <StatsCardV2
+            title="Tempo Médio Recebimento"
+            value={`${metricasRecebimento?.tempoMedioRecebimento || 0} dias`}
+            subtitle="Prazo médio entre vencimento e quitação"
+          />
+          <StatsCardV2
+            title="Tempo Médio (Atrasados)"
+            value={`${metricasRecebimento?.tempoMedioRecebimentoInadimplentes || 0} dias`}
+            subtitle="Pagos após o vencimento"
+            variant="warning"
+          />
+        </div>
+      )}
 
       {isErrorResumo && (
-        <ErrorDisplay message="Erro ao carregar dados de resumo. Tente novamente." />
+        <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-sm">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>Erro ao carregar dados de resumo. Tente novamente.</span>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50" data-testid="card-distribuicao-faixas">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-700/50 pb-4">
-            <CardTitle className="text-base flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              </div>
-              Distribuição por Faixa de Atraso
-            </CardTitle>
+        <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg" data-testid="card-distribuicao-faixas">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base">Distribuição por Faixa de Atraso</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingResumo ? (
@@ -951,9 +863,9 @@ export default function DashboardInadimplencia() {
                     <YAxis type="category" dataKey="name" width={80} tick={{ fontSize: 12 }} />
                     <RechartsTooltip
                       contentStyle={{
-                        backgroundColor: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
+                        backgroundColor: isDark ? '#18181b' : '#ffffff',
+                        border: `1px solid ${isDark ? '#3f3f46' : '#e5e7eb'}`,
+                        borderRadius: '8px',
                       }}
                       formatter={(value: number) => [
                         formatCurrency(value),
@@ -985,15 +897,10 @@ export default function DashboardInadimplencia() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50" data-testid="card-evolucao-mensal">
-          <CardHeader className="border-b border-slate-100 dark:border-slate-700/50 pb-4">
+        <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg" data-testid="card-evolucao-mensal">
+          <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-                  <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
-                </div>
-                Evolução Mensal
-              </CardTitle>
+              <CardTitle className="text-base">Evolução Mensal</CardTitle>
               <div className="flex items-center gap-1 bg-muted/50 rounded-md p-0.5">
                 <button
                   onClick={() => setEvolucaoMode('valor')}
@@ -1042,9 +949,9 @@ export default function DashboardInadimplencia() {
                     />
                     <RechartsTooltip
                       contentStyle={{
-                        backgroundColor: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
+                        backgroundColor: isDark ? '#18181b' : '#ffffff',
+                        border: `1px solid ${isDark ? '#3f3f46' : '#e5e7eb'}`,
+                        borderRadius: '8px',
                       }}
                       formatter={(value: number) => [
                         evolucaoMode === 'valor' ? formatCurrency(value) : `${value} parcelas`,
@@ -1068,14 +975,9 @@ export default function DashboardInadimplencia() {
       {/* Gráficos de Inadimplência por Vendedor, Squad e Responsável */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Por Vendedor - Gráfico */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 hover:shadow-xl transition-shadow duration-300" data-testid="card-chart-vendedor">
-          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-700/50">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                <Users className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-              </div>
-              Por Vendedor
-            </CardTitle>
+        <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg" data-testid="card-chart-vendedor">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Por Vendedor</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingVendedores ? (
@@ -1124,14 +1026,9 @@ export default function DashboardInadimplencia() {
         </Card>
 
         {/* Por Squad - Gráfico */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 hover:shadow-xl transition-shadow duration-300" data-testid="card-chart-squad">
-          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-700/50">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                <Building2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-              </div>
-              Por Squad
-            </CardTitle>
+        <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg" data-testid="card-chart-squad">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Por Squad</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingSquads ? (
@@ -1180,14 +1077,9 @@ export default function DashboardInadimplencia() {
         </Card>
 
         {/* Por Responsável - Gráfico */}
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800/50 hover:shadow-xl transition-shadow duration-300" data-testid="card-chart-responsavel">
-          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-700/50">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-green-100 dark:bg-green-900/30">
-                <Users className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
-              </div>
-              Por Responsável
-            </CardTitle>
+        <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg" data-testid="card-chart-responsavel">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm">Por Responsável</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingResponsaveisDet ? (
@@ -1834,25 +1726,15 @@ export default function DashboardInadimplencia() {
   );
 
   return (
-    <div className="p-6 space-y-6 bg-gradient-to-br from-background via-background to-muted/20 min-h-screen" data-testid="page-inadimplencia">
+    <div className="p-6 space-y-6" data-testid="page-inadimplencia">
       {renderFiltros()}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-6 bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 p-1.5 rounded-xl shadow-sm border border-slate-200/50 dark:border-slate-700/50" data-testid="tabs-inadimplencia">
-          <TabsTrigger 
-            value="visao-geral" 
-            className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md rounded-lg px-4 py-2.5 transition-all duration-200"
-            data-testid="tab-visao-geral"
-          >
-            <TrendingDown className="h-4 w-4 mr-2" />
+        <TabsList className="mb-6" data-testid="tabs-inadimplencia">
+          <TabsTrigger value="visao-geral" data-testid="tab-visao-geral">
             Visão Geral
           </TabsTrigger>
-          <TabsTrigger
-            value="clientes"
-            className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md rounded-lg px-4 py-2.5 transition-all duration-200"
-            data-testid="tab-clientes"
-          >
-            <Users className="h-4 w-4 mr-2" />
+          <TabsTrigger value="clientes" data-testid="tab-clientes">
             Clientes ({clientesData?.clientes?.length || 0})
             {(resumoData?.faixas?.acima90dias?.quantidade || 0) > 0 && (
               <Badge variant="destructive" className="ml-1.5 text-[10px] px-1.5 py-0">
