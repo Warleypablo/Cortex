@@ -4,8 +4,8 @@ import { useLocation } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowUpDown, FileText, FileCheck, DollarSign, Activity, Edit2, Check, ChevronsUpDown } from "lucide-react";
-import StatsCard from "@/components/StatsCard";
+import { ArrowUpDown, Edit2, Check, ChevronsUpDown } from "lucide-react";
+import { StatsCardV2 } from "@/components/StatsCardV2";
 import { ContractsTableSkeleton } from "@/components/ui/table-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrencyNoDecimals, cn } from "@/lib/utils";
@@ -397,15 +397,7 @@ export default function Contracts({
         <div className="container mx-auto px-4 py-8 max-w-7xl" data-testid="loading-contracts">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-xl p-4 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10">
-                <div className="flex items-center gap-2 mb-2">
-                  <Skeleton className="w-7 h-7 rounded-md" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <div className="pl-9">
-                  <Skeleton className="h-6 w-16" />
-                </div>
-              </div>
+              <Skeleton key={i} className="h-24 rounded-lg" />
             ))}
           </div>
           <ContractsTableSkeleton />
@@ -431,47 +423,26 @@ export default function Contracts({
       <div className="container mx-auto px-4 py-8 max-w-7xl">
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <StatsCard
+          <StatsCardV2
             title="Total de Contratos"
             value={String(kpis.totalContratos)}
-            icon={FileText}
             subtitle={servicoFilter.length > 0 || statusFilter.length > 0 ? "Contratos filtrados" : "Contratos cadastrados"}
-            animateValue
-            rawValue={kpis.totalContratos}
-            formatValue={(v) => String(Math.round(v))}
           />
-          <StatsCard
+          <StatsCardV2
             title="Contratos Operando"
             value={String(kpis.contratosOperando)}
-            icon={Activity}
-            variant="info"
             subtitle="Triagem, onboarding, ativo ou em cancelamento"
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.contratosOperando}
-            formatValue={(v) => String(Math.round(v))}
           />
-          <StatsCard
+          <StatsCardV2
             title="Contratos Ativos"
             value={String(kpis.contratosAtivos)}
-            icon={FileCheck}
             variant="success"
             subtitle={`Recorrentes: ${kpis.ativosRecorrentes} | Pontuais: ${kpis.ativosPontuais}`}
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.contratosAtivos}
-            formatValue={(v) => String(Math.round(v))}
           />
-          <StatsCard
+          <StatsCardV2
             title="AOV Médio"
             value={formatCurrencyNoDecimals(kpis.aovMedio)}
-            icon={DollarSign}
-            variant="info"
             subtitle="Ticket médio por contrato"
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.aovMedio}
-            formatValue={(v) => formatCurrencyNoDecimals(v)}
           />
         </div>
 

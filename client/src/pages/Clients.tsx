@@ -3,9 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import ClientsTable from "@/components/ClientsTable";
 import { Button } from "@/components/ui/button";
-import { Users, UserCheck, TrendingUp, Clock, DollarSign, Activity } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import StatsCard from "@/components/StatsCard";
+import { StatsCardV2 } from "@/components/StatsCardV2";
 import { ClientsTableSkeleton } from "@/components/ui/table-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -298,15 +296,7 @@ export default function Clients({
         <div className="w-full px-6 py-4 h-full flex flex-col" data-testid="loading-clients">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-xl p-4 bg-white/60 dark:bg-white/5 border border-white/40 dark:border-white/10">
-                <div className="flex items-center gap-2 mb-2">
-                  <Skeleton className="w-7 h-7 rounded-md" />
-                  <Skeleton className="h-3 w-20" />
-                </div>
-                <div className="pl-9">
-                  <Skeleton className="h-6 w-16" />
-                </div>
-              </div>
+              <Skeleton key={i} className="h-24 rounded-lg" />
             ))}
           </div>
           <div className="flex-1 min-h-0">
@@ -321,69 +311,37 @@ export default function Clients({
     <div className="bg-background h-full">
       <div className="w-full px-6 py-4 h-full flex flex-col">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-4">
-          <StatsCard
+          <StatsCardV2
             title="Total de Clientes"
             value={String(kpis.totalClientes)}
-            icon={Users}
             subtitle="Quantidade de clientes cadastrados no ClickUp (ativos + inativos)"
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.totalClientes}
-            formatValue={(v) => String(Math.round(v))}
           />
-          <StatsCard
+          <StatsCardV2
             title="Clientes Operando"
             value={String(kpis.clientesOperando)}
-            icon={Activity}
-            variant="info"
-            subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesOperando / kpis.totalClientes) * 100) : '0%'} dos clientes estão com status Triagem, Onboarding, Ativo ou Em Cancelamento`}
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.clientesOperando}
-            formatValue={(v) => String(Math.round(v))}
+            subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesOperando / kpis.totalClientes) * 100) : '0%'} com status Triagem, Onboarding, Ativo ou Em Cancelamento`}
           />
-          <StatsCard
+          <StatsCardV2
             title="Clientes Ativos"
             value={String(kpis.clientesAtivos)}
-            icon={UserCheck}
             variant="success"
-            subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesAtivos / kpis.totalClientes) * 100) : '0%'} dos clientes estão com status Ativo, Onboarding ou Triagem`}
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.clientesAtivos}
-            formatValue={(v) => String(Math.round(v))}
+            subtitle={`${kpis.totalClientes > 0 ? formatPercent((kpis.clientesAtivos / kpis.totalClientes) * 100) : '0%'} com status Ativo, Onboarding ou Triagem`}
           />
-          <StatsCard
+          <StatsCardV2
             title="LTV Médio"
             value={formatCurrencyNoDecimals(kpis.ltvMedio)}
-            icon={TrendingUp}
-            variant="info"
-            subtitle="Soma de toda a receita paga dividida pelo número de clientes. Quanto maior, mais valor cada cliente gerou."
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.ltvMedio}
-            formatValue={(v) => formatCurrencyNoDecimals(v)}
+            subtitle="Soma de toda a receita paga dividida pelo número de clientes"
           />
-          <StatsCard
+          <StatsCardV2
             title="LT Médio"
             value={formatDecimal(kpis.ltMedio)}
-            icon={Clock}
-            subtitle="Média de meses que os clientes permanecem pagando. Quanto maior, mais tempo de relacionamento."
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.ltMedio}
-            formatValue={(v) => formatDecimal(v)}
+            subtitle="Média de meses que os clientes permanecem pagando"
           />
-          <StatsCard
+          <StatsCardV2
             title="AOV"
             value={formatCurrencyNoDecimals(kpis.aov)}
-            icon={DollarSign}
             variant="success"
-            subtitle="Ticket médio mensal por cliente. É o LTV dividido pelo LT (tempo de vida)."
-            tooltipType="help"
-            animateValue
-            rawValue={kpis.aov}
-            formatValue={(v) => formatCurrencyNoDecimals(v)}
+            subtitle="Ticket médio mensal por cliente (LTV ÷ LT)"
           />
         </div>
 
