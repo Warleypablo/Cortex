@@ -323,19 +323,19 @@ export default function ContribuicaoSquad() {
               <div className="min-w-[900px]">
                 <table className="w-full text-sm border-collapse">
                   <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground sticky left-0 z-10 bg-muted/50 min-w-[160px]">
+                    <tr className="border-b bg-muted">
+                      <th scope="col" className="text-left py-2.5 px-3 text-xs font-semibold text-muted-foreground sticky left-0 z-10 bg-muted min-w-[160px]">
                         Squad / Linha
                       </th>
                       {monthlyResults.map((m) => (
-                        <th key={m.mes} className="text-right py-2.5 px-2 text-xs font-semibold text-muted-foreground whitespace-nowrap min-w-[80px]">
+                        <th scope="col" key={m.mes} className="text-right py-2.5 px-2 text-xs font-semibold text-muted-foreground whitespace-nowrap min-w-[80px]">
                           {formatMesLabel(m.mesLabel)}
                         </th>
                       ))}
-                      <th className="text-right py-2.5 px-3 text-xs font-bold text-foreground min-w-[100px]">
+                      <th scope="col" className="text-right py-2.5 px-3 text-xs font-bold text-foreground min-w-[100px]">
                         Total
                       </th>
-                      <th className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground min-w-[70px]">
+                      <th scope="col" className="text-right py-2.5 px-3 text-xs font-semibold text-muted-foreground min-w-[70px]">
                         Contrib %
                       </th>
                     </tr>
@@ -351,10 +351,10 @@ export default function ContribuicaoSquad() {
                         <Fragment key={sq.squad}>
                           {/* Squad header row */}
                           <tr
-                            className="border-b border-border bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                            className="border-b border-border bg-muted cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => toggleSquadCollapse(sq.squad)}
                           >
-                            <td className="py-2 px-3 font-semibold text-sm sticky left-0 z-10 bg-muted/30 hover:bg-muted/50 transition-colors">
+                            <td className="py-2 px-3 font-semibold text-sm sticky left-0 z-10 bg-muted hover:bg-muted/50 transition-colors">
                               <span className="flex items-center gap-1.5">
                                 {isCollapsed ? (
                                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -480,8 +480,8 @@ export default function ContribuicaoSquad() {
 
                   {/* TOTAL row */}
                   <tfoot>
-                    <tr className="border-t-2 border-foreground/20 bg-muted/50">
-                      <td className="py-2.5 px-3 font-bold text-sm sticky left-0 z-10 bg-muted/50" colSpan={1}>
+                    <tr className="border-t-2 border-foreground/20 bg-muted">
+                      <td className="py-2.5 px-3 font-bold text-sm sticky left-0 z-10 bg-muted" colSpan={1}>
                         TOTAL
                       </td>
                       {monthlyResults.map((m) => (
@@ -491,8 +491,8 @@ export default function ContribuicaoSquad() {
                       <td className="py-2.5 px-3 text-right text-xs font-bold text-muted-foreground">100%</td>
                     </tr>
                     {/* Total Receita */}
-                    <tr className="border-b border-border/30 bg-muted/30">
-                      <td className="py-1.5 px-3 pl-9 text-xs text-emerald-600 dark:text-emerald-400 font-medium sticky left-0 z-10 bg-muted/30">
+                    <tr className="border-b border-border/30 bg-muted">
+                      <td className="py-1.5 px-3 pl-9 text-xs text-emerald-600 dark:text-emerald-400 font-medium sticky left-0 z-10 bg-muted">
                         Receita
                       </td>
                       {tableData.receitaTotalPorMes.map((val, i) => (
@@ -506,8 +506,8 @@ export default function ContribuicaoSquad() {
                       <td />
                     </tr>
                     {/* Total Despesas */}
-                    <tr className="border-b border-border/30 bg-muted/30">
-                      <td className="py-1.5 px-3 pl-9 text-xs text-red-500 dark:text-red-400 font-medium sticky left-0 z-10 bg-muted/30">
+                    <tr className="border-b border-border/30 bg-muted">
+                      <td className="py-1.5 px-3 pl-9 text-xs text-red-500 dark:text-red-400 font-medium sticky left-0 z-10 bg-muted">
                         Despesas
                       </td>
                       {tableData.despesaTotalPorMes.map((val, i) => (
@@ -521,8 +521,8 @@ export default function ContribuicaoSquad() {
                       <td />
                     </tr>
                     {/* Total Margem */}
-                    <tr className="border-b border-border/30 bg-muted/30">
-                      <td className="py-1.5 px-3 pl-9 text-xs font-bold text-blue-600 dark:text-blue-400 sticky left-0 z-10 bg-muted/30">
+                    <tr className="border-b border-border/30 bg-muted">
+                      <td className="py-1.5 px-3 pl-9 text-xs font-bold text-blue-600 dark:text-blue-400 sticky left-0 z-10 bg-muted">
                         Margem
                       </td>
                       {monthlyResults.map((_, i) => {
@@ -545,8 +545,8 @@ export default function ContribuicaoSquad() {
                       <td />
                     </tr>
                     {/* Total Margem % */}
-                    <tr className="bg-muted/30">
-                      <td className="py-1.5 px-3 pl-9 text-xs text-muted-foreground font-medium sticky left-0 z-10 bg-muted/30">
+                    <tr className="bg-muted">
+                      <td className="py-1.5 px-3 pl-9 text-xs text-muted-foreground font-medium sticky left-0 z-10 bg-muted">
                         Margem %
                       </td>
                       {monthlyResults.map((_, i) => {
