@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-03-17 | feat(squads): make salários row expandable with individual employee breakdown
+
+**O que foi feito:**
+- Adicionado `salariosDetalhes` na resposta da API com nome e salário de cada colaborador
+- Linha "Salários" agora é clicável com chevron, expandindo para mostrar colaboradores individuais
+- Funciona tanto na seção por squad quanto no footer TOTAL
+
+**Por que:**
+- Permitir visibilidade granular dos custos de salários por colaborador dentro da contribuição por squad
+
+**Arquivos alterados:**
+- `server/routes.ts` - Incluído array `salariosDetalhes` no response do endpoint bulk
+- `client/src/pages/ContribuicaoSquad.tsx` - Adicionado state `expandedSalarios`, interface `SalarioDetalhe`, e lógica de expansão nas sub-linhas de Salários
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-15 | feat(contribuicao): show resultado when collapsed and add contrib % column
 
 **O que foi feito:**
