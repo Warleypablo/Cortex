@@ -5141,12 +5141,13 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       `);
 
       let salarioTotal = 0;
-      const salariosPorColab = new Map<number, { nome: string; salario: number }>();
+      const salariosPorColab = new Map<number, { nome: string; salario: number; squad: string }>();
       for (const row of salarioResult.rows as any[]) {
         const id = Number(row.id);
         if (!salariosPorColab.has(id)) {
           const sal = Number(row.salario) || 0;
-          salariosPorColab.set(id, { nome: row.colaborador_nome, salario: sal });
+          const sq = row.squad || 'Sem Squad';
+          salariosPorColab.set(id, { nome: row.colaborador_nome, salario: sal, squad: sq });
           salarioTotal += sal;
         }
       }
@@ -5252,10 +5253,15 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }))
         .sort((a, b) => b.receitaTotal - a.receitaTotal);
 
-      // Detalhes individuais de salários para breakdown expandível
-      const salariosDetalhes = Array.from(salariosPorColab.values())
-        .map(({ nome, salario }) => ({ nome, salario }))
-        .sort((a, b) => b.salario - a.salario);
+      // Detalhes individuais de salários agrupados por squad
+      const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
+      for (const { nome, salario, squad: sq } of salariosPorColab.values()) {
+        if (!salariosDetalhesPorSquad[sq]) salariosDetalhesPorSquad[sq] = [];
+        salariosDetalhesPorSquad[sq].push({ nome, salario });
+      }
+      for (const key of Object.keys(salariosDetalhesPorSquad)) {
+        salariosDetalhesPorSquad[key].sort((a, b) => b.salario - a.salario);
+      }
 
       res.json({
         ano,
@@ -5264,7 +5270,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         meses: monthlyData,
         resumoPorSquad,
         despesasMensais,
-        salariosDetalhes,
+        salariosDetalhesPorSquad,
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
