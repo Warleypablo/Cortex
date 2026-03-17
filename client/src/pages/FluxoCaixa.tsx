@@ -26,13 +26,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip as TooltipUI, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Wallet, TrendingUp, TrendingDown, Calendar, AlertCircle, Info,
-  ArrowUpCircle, ArrowDownCircle, Banknote, CreditCard, Building2,
-  ChevronRight, CircleDollarSign, CalendarDays, ArrowRight, Receipt,
-  Loader2, X, Users, UserCheck, UserX, AlertTriangle, BarChart3, Download
+  ArrowUpCircle, ArrowDownCircle, Building2,
+  CalendarDays, Receipt,
+  Loader2, X, UserCheck, UserX, AlertTriangle, BarChart3, Download
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -41,10 +39,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, Cell, Area, ReferenceLine
+  ComposedChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line, ReferenceLine
 } from "recharts";
 import type { FluxoCaixaDiarioCompleto, FluxoCaixaInsightsPeriodo, ContaBanco, ClassificacaoClientesResponse, FluxoCaixaMensalResponse } from "@shared/schema";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/components/ThemeProvider";
+import { HeroMetric } from "@/components/HeroMetric";
+import { StatsCardV2 } from "@/components/StatsCardV2";
 import RelatorioSemanalFinanceiro from "./RelatorioSemanalFinanceiro";
 
 interface FluxoDiaDetalhe {
@@ -97,7 +98,9 @@ const classificacaoConfig: Record<string, { label: string; color: string }> = {
 export default function FluxoCaixa() {
   usePageTitle("Fluxo de Caixa");
   useSetPageInfo("Fluxo de Caixa", "Análise de entradas e saídas do período");
-  
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
   const hoje = new Date();
   const [viewMode, setViewMode] = useState<'diario' | 'mensal' | 'semanal'>('diario');
   const [selectedMonth, setSelectedMonth] = useState({ month: hoje.getMonth() + 1, year: hoje.getFullYear() });
@@ -362,120 +365,69 @@ export default function FluxoCaixa() {
         {viewMode === 'semanal' && <RelatorioSemanalFinanceiro />}
 
         {viewMode !== 'semanal' && <>
-        {/* KPIs Principais */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20" data-testid="card-saldo-atual">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">Saldo Atual (Hoje)</span>
-                <Wallet className="w-5 h-5 text-emerald-500" />
+        {/* Hero Metrics */}
+        <div className="flex flex-wrap items-start gap-8 sm:gap-12 mb-6" data-testid="hero-metrics">
+          {isLoadingInsights ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-8 w-36" />
               </div>
-              {isLoadingInsights ? (
-                <Skeleton className="h-8 w-32" />
-              ) : (
-                <div className="text-xl lg:text-2xl font-bold text-emerald-600 whitespace-nowrap" data-testid="text-saldo-atual">
-                  {formatCurrency(insightsPeriodo?.saldoAtual || 0)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20" data-testid="card-saldo-final">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1">
-                  <span className="text-sm font-medium text-muted-foreground">{viewMode === 'diario' ? 'Saldo Projetado (Fim do Mês)' : 'Saldo Projetado (Fim do Ano)'}</span>
-                  <TooltipProvider delayDuration={200}>
-                    <TooltipUI>
-                      <TooltipTrigger asChild>
-                        <Info className="w-3.5 h-3.5 text-muted-foreground/60 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[260px] text-xs">
-                        <p>Saldo atual + entradas previstas − saídas previstas para o período selecionado.</p>
-                      </TooltipContent>
-                    </TooltipUI>
-                  </TooltipProvider>
-                </div>
-                <TrendingUp className="w-5 h-5 text-blue-500" />
+              <div className="flex flex-col gap-1">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-8 w-36" />
               </div>
-              {isLoadingInsights ? (
-                <Skeleton className="h-8 w-32" />
-              ) : (
-                <div className={`text-xl lg:text-2xl font-bold whitespace-nowrap ${(insightsPeriodo?.saldoFinalPeriodo || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`} data-testid="text-saldo-final">
-                  {formatCurrency(insightsPeriodo?.saldoFinalPeriodo || 0)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-entradas-periodo">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">{viewMode === 'diario' ? 'Entradas do Mês' : 'Entradas do Ano'}</span>
-                <ArrowUpCircle className="w-5 h-5 text-green-500" />
-              </div>
-              {isLoadingInsights ? (
-                <Skeleton className="h-8 w-32" />
-              ) : (
-                <div className="text-xl lg:text-2xl font-bold text-green-600 whitespace-nowrap" data-testid="text-entradas-periodo">
-                  {formatCurrency(insightsPeriodo?.entradasPeriodo || 0)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-saidas-periodo">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-muted-foreground">{viewMode === 'diario' ? 'Saídas do Mês' : 'Saídas do Ano'}</span>
-                <ArrowDownCircle className="w-5 h-5 text-red-500" />
-              </div>
-              {isLoadingInsights ? (
-                <Skeleton className="h-8 w-32" />
-              ) : (
-                <div className="text-xl lg:text-2xl font-bold text-red-600 whitespace-nowrap" data-testid="text-saidas-periodo">
-                  {formatCurrency(insightsPeriodo?.saidasPeriodo || 0)}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+            </>
+          ) : (
+            <>
+              <HeroMetric
+                label="Saldo Atual"
+                value={formatCurrency(insightsPeriodo?.saldoAtual || 0)}
+              />
+              <HeroMetric
+                label={viewMode === 'diario' ? 'Saldo Projetado (Fim do Mês)' : 'Saldo Projetado (Fim do Ano)'}
+                value={formatCurrency(insightsPeriodo?.saldoFinalPeriodo || 0)}
+                subtitle="Saldo atual + entradas previstas − saídas previstas para o período selecionado."
+              />
+            </>
+          )}
         </div>
 
-        {/* Alertas de Vencidos */}
-        {((insightsPeriodo?.entradasVencidas || 0) > 0 || (insightsPeriodo?.saidasVencidas || 0) > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {(insightsPeriodo?.entradasVencidas || 0) > 0 && (
-              <Card className="border-amber-500/50 bg-amber-500/5" data-testid="card-entradas-vencidas">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-amber-500/20">
-                      <AlertCircle className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Entradas Vencidas</p>
-                      <p className="text-xl font-bold text-amber-600">{formatCurrency(insightsPeriodo?.entradasVencidas || 0)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-            {(insightsPeriodo?.saidasVencidas || 0) > 0 && (
-              <Card className="border-red-500/50 bg-red-500/5" data-testid="card-saidas-vencidas">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-red-500/20">
-                      <AlertCircle className="w-5 h-5 text-red-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Saídas Vencidas</p>
-                      <p className="text-xl font-bold text-red-600">{formatCurrency(insightsPeriodo?.saidasVencidas || 0)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
+        {/* Supporting KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" data-testid="supporting-kpis">
+          {isLoadingInsights ? (
+            <>
+              {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
+            </>
+          ) : (
+            <>
+              <StatsCardV2
+                title={viewMode === 'diario' ? 'Entradas do Mês' : 'Entradas do Ano'}
+                value={formatCurrency(insightsPeriodo?.entradasPeriodo || 0)}
+                variant="success"
+              />
+              <StatsCardV2
+                title={viewMode === 'diario' ? 'Saídas do Mês' : 'Saídas do Ano'}
+                value={formatCurrency(insightsPeriodo?.saidasPeriodo || 0)}
+                variant="error"
+              />
+              {(insightsPeriodo?.entradasVencidas || 0) > 0 && (
+                <StatsCardV2
+                  title="Entradas Vencidas"
+                  value={formatCurrency(insightsPeriodo?.entradasVencidas || 0)}
+                  variant="warning"
+                />
+              )}
+              {(insightsPeriodo?.saidasVencidas || 0) > 0 && (
+                <StatsCardV2
+                  title="Saídas Vencidas"
+                  value={formatCurrency(insightsPeriodo?.saidasVencidas || 0)}
+                  variant="error"
+                />
+              )}
+            </>
+          )}
+        </div>
 
         {/* Classificação de Clientes - Filtro do Gráfico */}
         <div className="grid grid-cols-3 gap-4 mb-6" data-testid="filtro-classificacao">
@@ -597,21 +549,21 @@ export default function FluxoCaixa() {
               </div>
               
               <div className="flex items-center gap-4">
-                <div className="text-center px-4 py-2 rounded-lg bg-green-500/10">
+                <div className="text-center px-3 py-1.5">
                   <p className="text-xs text-muted-foreground">Entradas</p>
-                  <p className="text-sm font-semibold text-green-600" data-testid="text-total-entradas">
+                  <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400" data-testid="text-total-entradas">
                     {formatCurrencyCompact(totais.entradas)}
                   </p>
                 </div>
-                <div className="text-center px-4 py-2 rounded-lg bg-red-500/10">
+                <div className="text-center px-3 py-1.5">
                   <p className="text-xs text-muted-foreground">Saídas</p>
-                  <p className="text-sm font-semibold text-red-600" data-testid="text-total-saidas">
+                  <p className="text-sm font-semibold text-red-600 dark:text-red-400" data-testid="text-total-saidas">
                     {formatCurrencyCompact(totais.saidas)}
                   </p>
                 </div>
-                <div className="text-center px-4 py-2 rounded-lg bg-blue-500/10">
+                <div className="text-center px-3 py-1.5">
                   <p className="text-xs text-muted-foreground">Saldo Final</p>
-                  <p className={`text-sm font-semibold ${totais.saldoFinal >= 0 ? 'text-blue-600' : 'text-red-600'}`} data-testid="text-total-saldo">
+                  <p className={cn("text-sm font-semibold", totais.saldoFinal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")} data-testid="text-total-saldo">
                     {formatCurrencyCompact(totais.saldoFinal)}
                   </p>
                 </div>
@@ -639,19 +591,15 @@ export default function FluxoCaixa() {
           
           <CardContent>
             {isLoadingChart ? (
-              <div className="flex items-center justify-center h-[400px]">
-                <Skeleton className="h-full w-full" />
-              </div>
+              <Skeleton className="h-[300px] rounded-lg" />
             ) : !chartData || chartData.length === 0 ? (
-              <div className="flex items-center justify-center h-[400px]">
-                <p className="text-muted-foreground">Nenhum dado para o período selecionado</p>
-              </div>
+              <p className="text-sm text-muted-foreground text-center py-12">Sem dados para o período selecionado.</p>
             ) : (
-              <div className="h-[400px] relative rounded-xl overflow-hidden bg-gradient-to-b from-cyan-500/5 to-slate-100/50 dark:from-cyan-500/5 dark:to-slate-900/50">
+              <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart 
-                    data={chartData} 
-                    margin={{ top: 30, right: 85, left: 25, bottom: 55 }}
+                  <ComposedChart
+                    data={chartData}
+                    margin={{ top: 20, right: 80, left: 20, bottom: 50 }}
                     barGap={4}
                     barCategoryGap="20%"
                     onClick={(chartEvent) => {
@@ -682,200 +630,137 @@ export default function FluxoCaixa() {
                     }}
                     style={{ cursor: 'pointer' }}
                   >
-                    <defs>
-                      <linearGradient id="gradientEntradas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#34d399" stopOpacity={1} />
-                        <stop offset="20%" stopColor="#10b981" stopOpacity={1} />
-                        <stop offset="80%" stopColor="#059669" stopOpacity={0.95} />
-                        <stop offset="100%" stopColor="#047857" stopOpacity={0.85} />
-                      </linearGradient>
-                      <linearGradient id="gradientSaidas" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#fb7185" stopOpacity={1} />
-                        <stop offset="20%" stopColor="#f43f5e" stopOpacity={1} />
-                        <stop offset="80%" stopColor="#e11d48" stopOpacity={0.95} />
-                        <stop offset="100%" stopColor="#be123c" stopOpacity={0.85} />
-                      </linearGradient>
-                      <linearGradient id="gradientSaldo" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.3} />
-                        <stop offset="50%" stopColor="#06b6d4" stopOpacity={0.12} />
-                        <stop offset="100%" stopColor="#0891b2" stopOpacity={0.02} />
-                      </linearGradient>
-                      <filter id="glowCyan" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                        <feMerge>
-                          <feMergeNode in="coloredBlur"/>
-                          <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                      </filter>
-                      <filter id="glowGreen" x="-50%" y="-50%" width="200%" height="200%">
-                        <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#34d399" floodOpacity="0.5"/>
-                      </filter>
-                      <filter id="glowRed" x="-50%" y="-50%" width="200%" height="200%">
-                        <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#fb7185" floodOpacity="0.4"/>
-                      </filter>
-                      <filter id="barShadow" x="-20%" y="-10%" width="140%" height="130%">
-                        <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="rgba(0,0,0,0.3)" floodOpacity="0.5"/>
-                      </filter>
-                    </defs>
-                    
-                    <CartesianGrid 
-                      strokeDasharray="1 6" 
-                      stroke="rgba(148, 163, 184, 0.15)" 
-                      vertical={false} 
+                    <CartesianGrid
+                      vertical={false}
+                      stroke={isDark ? "#27272a" : "#f0f0f0"}
                     />
-                    
+
                     <XAxis
                       dataKey="dataFormatada"
-                      tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: viewMode === 'mensal' ? 12 : 10, fontWeight: 500 }}
+                      tick={{ fill: isDark ? '#a1a1aa' : '#6b7280', fontSize: viewMode === 'mensal' ? 12 : 10 }}
                       tickLine={false}
-                      axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)', strokeWidth: 1 }}
+                      axisLine={false}
                       angle={viewMode === 'mensal' ? 0 : -45}
                       textAnchor={viewMode === 'mensal' ? 'middle' : 'end'}
                       height={viewMode === 'mensal' ? 35 : 55}
                       interval={viewMode === 'mensal' ? 0 : (chartData.length > 20 ? Math.floor(chartData.length / 10) : chartData.length > 10 ? 1 : 0)}
                       dy={viewMode === 'mensal' ? 5 : 12}
                     />
-                    
+
                     <YAxis
                       yAxisId="bars"
-                      tick={{ fill: 'rgba(148, 163, 184, 0.8)', fontSize: 10, fontWeight: 500 }}
+                      tick={{ fill: isDark ? '#a1a1aa' : '#6b7280', fontSize: 10 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
                       tickLine={false}
                       axisLine={false}
                       width={70}
                       domain={[0, chartDomains.barsMax]}
                     />
-                    
-                    <YAxis 
+
+                    <YAxis
                       yAxisId="line"
                       orientation="right"
-                      tick={{ fill: '#22d3ee', fontSize: 10, fontWeight: 600 }}
+                      tick={{ fill: isDark ? '#a1a1aa' : '#6b7280', fontSize: 10 }}
                       tickFormatter={(value) => formatCurrencyCompact(value)}
                       tickLine={false}
                       axisLine={false}
                       width={75}
                       domain={[chartDomains.lineMin, chartDomains.lineMax]}
                     />
-                    
+
                     <Tooltip
-                      cursor={{ fill: 'rgba(34, 211, 238, 0.08)', radius: 6 }}
+                      cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }}
                       content={({ active, payload, label }) => {
                         if (!active || !payload?.length) return null;
                         const data = payload[0]?.payload as typeof chartData[0];
                         const saldo = (data?.entradas || 0) - (data?.saidas || 0);
                         return (
-                          <div className="bg-slate-900/95 backdrop-blur-md border border-cyan-500/30 rounded-xl shadow-2xl p-4 min-w-[220px]" style={{ boxShadow: '0 0 20px rgba(34, 211, 238, 0.15)' }}>
-                            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-700">
-                              <CalendarDays className="w-4 h-4 text-cyan-400" />
-                              <p className="font-semibold text-white">{label}</p>
-                            </div>
-                            <div className="space-y-2.5">
+                          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 min-w-[200px]">
+                            <p className="text-sm font-semibold text-foreground mb-2 pb-2 border-b border-gray-100 dark:border-zinc-800">{label}</p>
+                            <div className="space-y-1.5">
                               <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px rgba(52, 211, 153, 0.6)' }} />
-                                  <span className="text-sm text-slate-400">Entradas</span>
-                                </div>
-                                <span className="text-sm font-semibold text-emerald-400">{formatCurrency(data?.entradas || 0)}</span>
+                                <span className="text-xs text-muted-foreground">Entradas</span>
+                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(data?.entradas || 0)}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 rounded-full bg-rose-400" style={{ boxShadow: '0 0 6px rgba(251, 113, 133, 0.6)' }} />
-                                  <span className="text-sm text-slate-400">Saídas</span>
-                                </div>
-                                <span className="text-sm font-semibold text-rose-400">{formatCurrency(data?.saidas || 0)}</span>
+                                <span className="text-xs text-muted-foreground">Saídas</span>
+                                <span className="text-xs font-medium text-red-600 dark:text-red-400">{formatCurrency(data?.saidas || 0)}</span>
                               </div>
-                              <div className="flex justify-between items-center pt-2 border-t border-slate-700 mt-2">
-                                <span className="text-sm font-medium text-slate-300">{viewMode === 'diario' ? 'Saldo do Dia' : 'Saldo do Mês'}</span>
-                                <span className={`text-sm font-bold ${saldo >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              <div className="flex justify-between items-center pt-1.5 border-t border-gray-100 dark:border-zinc-800">
+                                <span className="text-xs font-medium text-foreground">{viewMode === 'diario' ? 'Saldo do Dia' : 'Saldo do Mês'}</span>
+                                <span className={cn("text-xs font-semibold", saldo >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
                                   {formatCurrency(saldo)}
                                 </span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" style={{ boxShadow: '0 0 6px rgba(34, 211, 238, 0.6)' }} />
-                                  <span className="text-sm text-slate-400">{hasSnapshot ? 'Saldo Real' : 'Saldo Acumulado'}</span>
-                                </div>
-                                <span className="text-sm font-semibold text-cyan-400">{formatCurrency(data?.saldoAcumulado || 0)}</span>
+                                <span className="text-xs text-muted-foreground">{hasSnapshot ? 'Saldo Real' : 'Saldo Acumulado'}</span>
+                                <span className="text-xs font-medium text-foreground">{formatCurrency(data?.saldoAcumulado || 0)}</span>
                               </div>
                               {viewMode === 'diario' && hasSnapshot && (
                                 <div className="flex justify-between items-center">
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400" style={{ boxShadow: '0 0 6px rgba(251, 191, 36, 0.6)' }} />
-                                    <span className="text-sm text-slate-400">Saldo Esperado</span>
-                                  </div>
-                                  <span className="text-sm font-semibold text-amber-400">{formatCurrency(data?.saldoEsperado || 0)}</span>
+                                  <span className="text-xs text-muted-foreground">Saldo Esperado</span>
+                                  <span className="text-xs font-medium text-amber-600 dark:text-amber-400">{formatCurrency(data?.saldoEsperado || 0)}</span>
                                 </div>
                               )}
                             </div>
-                            <p className="text-xs text-slate-500 mt-3 pt-2 border-t border-slate-700 text-center">
+                            <p className="text-[10px] text-muted-foreground mt-2 pt-1.5 border-t border-gray-100 dark:border-zinc-800 text-center">
                               {viewMode === 'diario' ? 'Clique para ver detalhes' : 'Clique para ver o mês'}
                             </p>
                           </div>
                         );
                       }}
                     />
-                    
+
                     <Bar
                       yAxisId="bars"
                       dataKey="entradas"
                       name="entradas"
-                      fill="url(#gradientEntradas)"
-                      radius={[8, 8, 2, 2]}
+                      fill="#10b981"
+                      radius={[4, 4, 0, 0]}
                       maxBarSize={viewMode === 'mensal' ? 32 : 14}
-                      style={{ filter: 'url(#glowGreen)' }}
                     />
 
                     <Bar
                       yAxisId="bars"
                       dataKey="saidas"
                       name="saidas"
-                      fill="url(#gradientSaidas)"
-                      radius={[8, 8, 2, 2]}
+                      fill="#ef4444"
+                      radius={[4, 4, 0, 0]}
                       maxBarSize={viewMode === 'mensal' ? 32 : 14}
-                      style={{ filter: 'url(#glowRed)' }}
                     />
-                    
-                    <Area
+
+                    <Line
                       yAxisId="line"
                       type="monotone"
                       dataKey="saldoAcumulado"
-                      fill="url(#gradientSaldo)"
-                      stroke="none"
-                    />
-                    
-                    <Line 
-                      yAxisId="line"
-                      type="monotone" 
-                      dataKey="saldoAcumulado" 
                       name={hasSnapshot ? "Saldo Real" : "Saldo Acumulado"}
-                      stroke="#22d3ee" 
-                      strokeWidth={2.5}
+                      stroke="#3b82f6"
+                      strokeWidth={2}
                       dot={false}
-                      activeDot={{ r: 7, fill: '#22d3ee', stroke: '#0f172a', strokeWidth: 3, style: { filter: 'drop-shadow(0 0 8px rgba(34, 211, 238, 0.8))' } }}
-                      style={{ filter: 'url(#glowCyan)' }}
+                      activeDot={{ r: 5, fill: '#3b82f6', stroke: isDark ? '#18181b' : '#ffffff', strokeWidth: 2 }}
                     />
-                    
+
                     {viewMode === 'diario' && hasSnapshot && (
                       <Line
                         yAxisId="line"
                         type="monotone"
                         dataKey="saldoEsperado"
                         name="Saldo Esperado"
-                        stroke="#fbbf24"
-                        strokeWidth={2}
+                        stroke="#f59e0b"
+                        strokeWidth={1.5}
                         strokeDasharray="5 5"
                         dot={false}
-                        activeDot={{ r: 5, fill: '#fbbf24', stroke: '#0f172a', strokeWidth: 2 }}
+                        activeDot={{ r: 4, fill: '#f59e0b', stroke: isDark ? '#18181b' : '#ffffff', strokeWidth: 2 }}
                       />
                     )}
                     {viewMode === 'diario' && hojeFormatado && (
                       <ReferenceLine
                         x={hojeFormatado}
                         yAxisId="bars"
-                        stroke="#94a3b8"
+                        stroke={isDark ? '#71717a' : '#94a3b8'}
                         strokeDasharray="4 4"
                         strokeWidth={1.5}
-                        label={{ value: 'Hoje', position: 'top', fill: '#94a3b8', fontSize: 11, fontWeight: 600 }}
+                        label={{ value: 'Hoje', position: 'top', fill: isDark ? '#a1a1aa' : '#6b7280', fontSize: 11, fontWeight: 600 }}
                       />
                     )}
                   </ComposedChart>
@@ -930,7 +815,7 @@ export default function FluxoCaixa() {
                             <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">Inativa</Badge>
                           )}
                         </div>
-                        <p className={`text-base font-bold ${conta.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <p className={cn("text-base font-bold", conta.saldo >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
                           {formatCurrency(conta.saldo)}
                         </p>
                       </div>
@@ -970,23 +855,23 @@ export default function FluxoCaixa() {
             <div className="flex flex-col gap-4 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 120px)' }}>
               {/* Resumo do Dia */}
               <div className="grid grid-cols-3 gap-4 flex-shrink-0">
-                <div className="p-4 rounded-lg bg-green-500/10">
+                <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
                   <p className="text-xs text-muted-foreground">Total Entradas</p>
-                  <p className="text-xl font-bold text-green-600" data-testid="text-dia-entradas">
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-dia-entradas">
                     {formatCurrency(diaDetalhe.totalEntradas)}
                   </p>
                   <p className="text-xs text-muted-foreground">{diaDetalhe.entradas.length} transações</p>
                 </div>
-                <div className="p-4 rounded-lg bg-red-500/10">
+                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/30">
                   <p className="text-xs text-muted-foreground">Total Saídas</p>
-                  <p className="text-xl font-bold text-red-600" data-testid="text-dia-saidas">
+                  <p className="text-xl font-bold text-red-600 dark:text-red-400" data-testid="text-dia-saidas">
                     {formatCurrency(diaDetalhe.totalSaidas)}
                   </p>
                   <p className="text-xs text-muted-foreground">{diaDetalhe.saidas.length} transações</p>
                 </div>
-                <div className="p-4 rounded-lg bg-blue-500/10">
+                <div className="p-4 rounded-lg bg-gray-50 dark:bg-zinc-800/30">
                   <p className="text-xs text-muted-foreground">Saldo do Dia</p>
-                  <p className={`text-xl font-bold ${diaDetalhe.saldo >= 0 ? 'text-blue-600' : 'text-red-600'}`} data-testid="text-dia-saldo">
+                  <p className={cn("text-xl font-bold", diaDetalhe.saldo >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")} data-testid="text-dia-saldo">
                     {formatCurrency(diaDetalhe.saldo)}
                   </p>
                 </div>
