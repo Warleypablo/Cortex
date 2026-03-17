@@ -1,6 +1,9 @@
 import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { formatDecimal, formatPercent, formatCurrencyNoDecimals, formatCurrencyCompact } from "@/lib/utils";
+import { formatDecimal, formatPercent, formatCurrencyNoDecimals, formatCurrencyCompact, cn } from "@/lib/utils";
+import { useTheme } from "@/components/ThemeProvider";
+import { HeroMetric } from "@/components/HeroMetric";
+import { StatsCardV2 } from "@/components/StatsCardV2";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +19,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { 
-  Loader2, TrendingUp, TrendingDown, DollarSign, Calendar, ChevronRight, ChevronDown,
-  Wallet, ArrowUpCircle, ArrowDownCircle, BarChart3, Receipt,
-  CircleDollarSign, LineChart, Target, Activity, Percent,
+import {
+  Loader2, TrendingUp, TrendingDown, DollarSign, ChevronRight, ChevronDown,
+  ArrowUpCircle, ArrowDownCircle, Receipt,
+  Target, Percent,
   Sparkles, BrainCircuit, Send, MessageCircle, Bot, User, Minus, LayoutGrid, Table2,
   RotateCcw
 } from "lucide-react";
@@ -59,7 +62,9 @@ type VisibleItem =
 export default function DashboardDFC() {
   usePageTitle("DFC");
   useSetPageInfo("DFC - Demonstração de Fluxo de Caixa", "Análise hierárquica de receitas e despesas");
-  
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfYear(new Date()),
     to: undefined
@@ -373,9 +378,6 @@ export default function DashboardDFC() {
       <div className="flex-shrink-0 border-b bg-background px-6 py-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20">
-              <BarChart3 className="w-7 h-7 text-white" />
-            </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             {/* Filtro de empresa */}
@@ -393,7 +395,7 @@ export default function DashboardDFC() {
               </SelectContent>
             </Select>
             {/* Date Range Picker no header */}
-            <div className="flex items-center gap-2 bg-gradient-to-r from-slate-100 to-slate-50 dark:from-slate-800 dark:to-slate-900 rounded-xl px-3 py-2 border border-slate-200/60 dark:border-slate-700/60 shadow-sm">
+            <div className="flex items-center gap-2">
               <DateRangePicker
                 value={dateRange}
                 onChange={setDateRange}
@@ -443,10 +445,10 @@ export default function DashboardDFC() {
       {/* Chat Dialog */}
       <Dialog open={chatOpen} onOpenChange={setChatOpen}>
         <DialogContent className="max-w-2xl h-[80vh] overflow-hidden flex flex-col p-0">
-          <DialogHeader className="px-6 py-4 border-b bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30">
+          <DialogHeader className="px-6 py-4 border-b">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20">
-                <BrainCircuit className="w-5 h-5 text-violet-600" />
+              <div className="p-2 rounded-lg bg-muted">
+                <BrainCircuit className="w-5 h-5 text-muted-foreground" />
               </div>
               Assistente DFC
             </DialogTitle>
@@ -545,7 +547,7 @@ export default function DashboardDFC() {
               <Button
                 onClick={handleSendMessage}
                 disabled={!chatInput.trim() || chatMutation.isPending}
-                className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                className="bg-primary hover:bg-primary/90"
                 data-testid="button-send-message"
               >
                 {chatMutation.isPending ? (
@@ -563,259 +565,123 @@ export default function DashboardDFC() {
       <div className="flex-1 overflow-auto p-6 bg-muted/30">
         <div className="max-w-[1800px] mx-auto space-y-6">
           
-          {/* KPI Cards - Modern Design */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {/* Entradas */}
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/40 dark:to-emerald-900/20 overflow-hidden">
-              <CardContent className="p-4">
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-8 w-28" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Entradas</span>
-                      <ArrowUpCircle className="w-4 h-4 text-emerald-500" />
-                    </div>
-                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-                      {formatCurrencyCompact(kpis.totalReceitas)}
-                    </p>
-                    <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">
-                      Total no período
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
+          {/* Hero Metrics */}
+          {isLoading ? (
+            <div className="flex items-start gap-12">
+              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-12">
+              <HeroMetric
+                label="Entradas"
+                value={formatCurrencyCompact(kpis.totalReceitas)}
+                subtitle="Total de receitas no período"
+              />
+              <HeroMetric
+                label="Saídas"
+                value={formatCurrencyCompact(kpis.totalDespesas)}
+                subtitle="Total de despesas no período"
+              />
+              <HeroMetric
+                label="Saldo"
+                value={`${kpis.saldoLiquido >= 0 ? '+' : ''}${formatCurrencyCompact(kpis.saldoLiquido)}`}
+                subtitle="Entradas - Saídas"
+                trend={{
+                  value: formatPercent(kpis.margemMedia),
+                  isPositive: kpis.saldoLiquido >= 0,
+                }}
+              />
+            </div>
+          )}
 
-            {/* Saídas */}
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/40 dark:to-rose-900/20 overflow-hidden">
-              <CardContent className="p-4">
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-8 w-28" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-rose-600 dark:text-rose-400">Saídas</span>
-                      <ArrowDownCircle className="w-4 h-4 text-rose-500" />
-                    </div>
-                    <p className="text-xl font-bold text-rose-700 dark:text-rose-300">
-                      {formatCurrencyCompact(kpis.totalDespesas)}
-                    </p>
-                    <p className="text-xs text-rose-600/70 dark:text-rose-400/70 mt-1">
-                      Total no período
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Saldo */}
-            <Card className={`border-0 shadow-sm overflow-hidden ${
-              kpis.saldoLiquido >= 0 
-                ? 'bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20'
-                : 'bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/40 dark:to-orange-900/20'
-            }`}>
-              <CardContent className="p-4">
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-8 w-28" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-xs font-medium ${kpis.saldoLiquido >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                        Saldo
-                      </span>
-                      <Wallet className={`w-4 h-4 ${kpis.saldoLiquido >= 0 ? 'text-blue-500' : 'text-orange-500'}`} />
-                    </div>
-                    <p className={`text-xl font-bold ${kpis.saldoLiquido >= 0 ? 'text-blue-700 dark:text-blue-300' : 'text-orange-700 dark:text-orange-300'}`}>
-                      {kpis.saldoLiquido >= 0 ? '+' : ''}{formatCurrencyCompact(kpis.saldoLiquido)}
-                    </p>
-                    <p className={`text-xs mt-1 ${kpis.saldoLiquido >= 0 ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-orange-600/70 dark:text-orange-400/70'}`}>
-                      Entradas - Saídas
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Margem */}
-            <Card className={`border-0 shadow-sm overflow-hidden ${
-              kpis.margemMedia >= 20 
-                ? 'bg-gradient-to-br from-violet-50 to-violet-100/50 dark:from-violet-950/40 dark:to-violet-900/20'
-                : kpis.margemMedia >= 0
-                ? 'bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/40 dark:to-amber-900/20'
-                : 'bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/40 dark:to-red-900/20'
-            }`}>
-              <CardContent className="p-4">
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-8 w-28" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-xs font-medium ${
-                        kpis.margemMedia >= 20 ? 'text-violet-600 dark:text-violet-400' : 
-                        kpis.margemMedia >= 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'
-                      }`}>Margem Média</span>
-                      <Percent className={`w-4 h-4 ${
-                        kpis.margemMedia >= 20 ? 'text-violet-500' : 
-                        kpis.margemMedia >= 0 ? 'text-amber-500' : 'text-red-500'
-                      }`} />
-                    </div>
-                    <p className={`text-xl font-bold ${
-                      kpis.margemMedia >= 20 ? 'text-violet-700 dark:text-violet-300' : 
-                      kpis.margemMedia >= 0 ? 'text-amber-700 dark:text-amber-300' : 'text-red-700 dark:text-red-300'
-                    }`}>
-                      {formatPercent(kpis.margemMedia)}
-                    </p>
-                    <p className={`text-xs mt-1 ${
-                      kpis.margemMedia >= 20 ? 'text-violet-600/70 dark:text-violet-400/70' : 
-                      kpis.margemMedia >= 0 ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-red-600/70 dark:text-red-400/70'
-                    }`}>
-                      Resultado/Receita
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Meses */}
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/40 dark:to-slate-700/20 overflow-hidden">
-              <CardContent className="p-4">
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-8 w-28" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Período</span>
-                      <Calendar className="w-4 h-4 text-slate-500" />
-                    </div>
-                    <p className="text-xl font-bold text-slate-700 dark:text-slate-300">
-                      {kpis.totalMeses} meses
-                    </p>
-                    <p className="text-xs text-slate-600/70 dark:text-slate-400/70 mt-1">
-                      Analisados
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Categorias */}
-            <Card className="border-0 shadow-sm bg-gradient-to-br from-cyan-50 to-cyan-100/50 dark:from-cyan-950/40 dark:to-cyan-900/20 overflow-hidden">
-              <CardContent className="p-4">
-                {isLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-20" />
-                    <Skeleton className="h-8 w-28" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-cyan-600 dark:text-cyan-400">Categorias</span>
-                      <Receipt className="w-4 h-4 text-cyan-500" />
-                    </div>
-                    <p className="text-xl font-bold text-cyan-700 dark:text-cyan-300">
-                      {kpis.totalCategorias}
-                    </p>
-                    <p className="text-xs text-cyan-600/70 dark:text-cyan-400/70 mt-1">
-                      Ativas no período
-                    </p>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* Supporting Cards */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <StatsCardV2
+                title="Margem Média"
+                value={formatPercent(kpis.margemMedia)}
+                subtitle="Resultado / Receita"
+                variant={kpis.margemMedia >= 20 ? 'success' : kpis.margemMedia >= 0 ? 'warning' : 'error'}
+              />
+              <StatsCardV2
+                title="Período"
+                value={`${kpis.totalMeses} meses`}
+                subtitle="Analisados"
+              />
+              <StatsCardV2
+                title="Categorias"
+                value={String(kpis.totalCategorias)}
+                subtitle="Ativas no período"
+              />
+            </div>
+          )}
 
           {/* Charts Section */}
           {chartData.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Evolução do Fluxo */}
-              <Card className="shadow-sm border-0">
+              <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg">
                 <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <LineChart className="w-5 h-5 text-primary" />
-                    <CardTitle className="text-base">Evolução Mensal</CardTitle>
-                  </div>
+                  <CardTitle className="text-base">Evolução Mensal</CardTitle>
                   <CardDescription className="text-xs">Comparativo de entradas e saídas</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
                     <AreaChart data={chartData}>
-                      <defs>
-                        <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorDespesas" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/50" />
-                      <XAxis dataKey="mes" tick={{ fill: 'currentColor', fontSize: 10 }} />
-                      <YAxis tick={{ fill: 'currentColor', fontSize: 10 }} tickFormatter={formatCurrencyCompact} width={60} />
-                      <Tooltip 
+                      <CartesianGrid vertical={false} stroke={isDark ? '#27272a' : '#f0f0f0'} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 10, fill: isDark ? '#a1a1aa' : '#6b7280' }} />
+                      <YAxis tick={{ fontSize: 10, fill: isDark ? '#a1a1aa' : '#6b7280' }} tickFormatter={formatCurrencyCompact} width={60} />
+                      <Tooltip
                         formatter={(value: number, name: string) => [formatCurrencyNoDecimals(value), name === 'receitas' ? 'Entradas' : 'Saídas']}
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))', 
-                          border: '1px solid hsl(var(--border))', 
+                        contentStyle={{
+                          backgroundColor: isDark ? '#18181b' : '#ffffff',
+                          border: `1px solid ${isDark ? '#3f3f46' : '#e5e7eb'}`,
                           borderRadius: '8px',
                           fontSize: '12px'
                         }}
                       />
-                      <Area type="monotone" dataKey="receitas" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorReceitas)" />
-                      <Area type="monotone" dataKey="despesas" stroke="#f43f5e" strokeWidth={2} fillOpacity={1} fill="url(#colorDespesas)" />
+                      <Area type="monotone" dataKey="receitas" stroke="#10b981" strokeWidth={2} fill="#10b981" fillOpacity={0.1} />
+                      <Area type="monotone" dataKey="despesas" stroke="#ef4444" strokeWidth={2} fill="#ef4444" fillOpacity={0.1} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </CardContent>
               </Card>
 
               {/* Resultado Mensal */}
-              <Card className="shadow-sm border-0">
+              <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg">
                 <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-primary" />
-                    <CardTitle className="text-base">Resultado Mensal</CardTitle>
-                  </div>
+                  <CardTitle className="text-base">Resultado Mensal</CardTitle>
                   <CardDescription className="text-xs">Saldo e margem por mês</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ResponsiveContainer width="100%" height={220}>
                     <ComposedChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted/50" />
-                      <XAxis dataKey="mes" tick={{ fill: 'currentColor', fontSize: 10 }} />
-                      <YAxis yAxisId="left" tick={{ fill: 'currentColor', fontSize: 10 }} tickFormatter={formatCurrencyCompact} width={60} />
-                      <YAxis yAxisId="right" orientation="right" tick={{ fill: 'currentColor', fontSize: 10 }} tickFormatter={(v) => `${v}%`} width={40} />
-                      <Tooltip 
+                      <CartesianGrid vertical={false} stroke={isDark ? '#27272a' : '#f0f0f0'} />
+                      <XAxis dataKey="mes" tick={{ fontSize: 10, fill: isDark ? '#a1a1aa' : '#6b7280' }} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 10, fill: isDark ? '#a1a1aa' : '#6b7280' }} tickFormatter={formatCurrencyCompact} width={60} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: isDark ? '#a1a1aa' : '#6b7280' }} tickFormatter={(v) => `${v}%`} width={40} />
+                      <Tooltip
                         formatter={(value: number, name: string) => {
                           if (name === 'saldo') return [formatCurrencyNoDecimals(value), 'Resultado'];
                           return [formatPercent(value), 'Margem'];
                         }}
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))', 
-                          border: '1px solid hsl(var(--border))', 
+                        contentStyle={{
+                          backgroundColor: isDark ? '#18181b' : '#ffffff',
+                          border: `1px solid ${isDark ? '#3f3f46' : '#e5e7eb'}`,
                           borderRadius: '8px',
                           fontSize: '12px'
                         }}
                       />
-                      <ReferenceLine yAxisId="left" y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
+                      <ReferenceLine yAxisId="left" y={0} stroke={isDark ? '#52525b' : '#d1d5db'} strokeDasharray="3 3" />
                       <Bar yAxisId="left" dataKey="saldo" radius={[4, 4, 0, 0]}>
                         {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.saldo >= 0 ? '#10b981' : '#f43f5e'} />
+                          <Cell key={`cell-${index}`} fill={entry.saldo >= 0 ? '#10b981' : '#ef4444'} />
                         ))}
                       </Bar>
                       <Line yAxisId="right" type="monotone" dataKey="margem" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
@@ -827,19 +693,12 @@ export default function DashboardDFC() {
           )}
 
           {/* Filters and DFC Table */}
-          <Card className="shadow-sm border-0">
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg">
             <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Activity className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg">Demonstrativo de Fluxo de Caixa</CardTitle>
-                  <CardDescription className="text-xs">
-                    Clique nas categorias para expandir detalhes
-                  </CardDescription>
-                </div>
-              </div>
+              <CardTitle className="text-lg">Demonstrativo de Fluxo de Caixa</CardTitle>
+              <CardDescription className="text-xs">
+                Clique nas categorias para expandir detalhes
+              </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
               {isLoading ? (
@@ -860,10 +719,10 @@ export default function DashboardDFC() {
                 <div className="space-y-4">
                   {dfcData.nodes.filter(n => n.categoriaId === 'RECEITAS' || n.categoriaId === 'DESPESAS').map(rootNode => (
                     <div key={rootNode.categoriaId} className="space-y-3">
-                      <div className={`p-4 rounded-xl ${
-                        rootNode.categoriaId === 'RECEITAS' 
-                          ? 'bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border border-emerald-200/50 dark:border-emerald-800/30'
-                          : 'bg-gradient-to-r from-rose-50 to-rose-100/50 dark:from-rose-950/30 dark:to-rose-900/20 border border-rose-200/50 dark:border-rose-800/30'
+                      <div className={`p-4 rounded-lg ${
+                        rootNode.categoriaId === 'RECEITAS'
+                          ? 'bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-800/30'
+                          : 'bg-red-50 dark:bg-red-950/30 border border-red-200/50 dark:border-red-800/30'
                       }`}>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
@@ -950,7 +809,7 @@ export default function DashboardDFC() {
                       return (
                         <div 
                           key={`header-${mes}`} 
-                          className="sticky top-0 z-20 bg-muted/80 backdrop-blur-sm font-semibold p-3 border-b text-center text-sm capitalize"
+                          className="sticky top-0 z-20 bg-muted font-semibold p-3 border-b text-center text-sm capitalize"
                         >
                           {mesFormatado}
                         </div>
@@ -1164,7 +1023,7 @@ export default function DashboardDFC() {
                     
                     {/* Result Row */}
                     <div 
-                      className="sticky left-0 z-10 p-3 border-t-2 border-b border-r bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950 dark:to-indigo-950"
+                      className="sticky left-0 z-10 p-3 border-t-2 border-b border-r bg-blue-50 dark:bg-blue-950/30"
                       data-testid="dfc-row-resultado"
                     >
                       <div className="flex items-center gap-2">
@@ -1232,7 +1091,7 @@ export default function DashboardDFC() {
                     
                     {/* Margin Row */}
                     <div 
-                      className="sticky left-0 z-10 p-3 border-b border-r bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950 dark:to-purple-950"
+                      className="sticky left-0 z-10 p-3 border-b border-r bg-violet-50 dark:bg-violet-950/30"
                       data-testid="dfc-row-margem"
                     >
                       <div className="flex items-center gap-2">
