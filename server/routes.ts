@@ -5252,13 +5252,19 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }))
         .sort((a, b) => b.receitaTotal - a.receitaTotal);
 
+      // Detalhes individuais de salários para breakdown expandível
+      const salariosDetalhes = Array.from(salariosPorColab.values())
+        .map(({ nome, salario }) => ({ nome, salario }))
+        .sort((a, b) => b.salario - a.salario);
+
       res.json({
         ano,
         squad: squadFilter || 'todos',
         squads: Array.from(squadsSet).sort(),
         meses: monthlyData,
         resumoPorSquad,
-        despesasMensais
+        despesasMensais,
+        salariosDetalhes,
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
