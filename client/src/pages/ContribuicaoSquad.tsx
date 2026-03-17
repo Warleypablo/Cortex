@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { ChevronRight, ChevronDown, DollarSign } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { HeroMetric } from "@/components/HeroMetric";
 
 interface MonthlyData {
@@ -294,13 +294,9 @@ export default function ContribuicaoSquad() {
 
       {/* Empty state */}
       {!isLoading && totalReceitas === 0 && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <DollarSign className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-40" />
-            <p className="text-muted-foreground text-sm">Nenhum dado de receita encontrado para {anoSelecionado}.</p>
-            <p className="text-muted-foreground text-xs mt-1">Tente selecionar outro ano ou verifique os dados.</p>
-          </CardContent>
-        </Card>
+        <p className="text-sm text-muted-foreground text-center py-12">
+          Nenhum dado de receita encontrado para {anoSelecionado}.
+        </p>
       )}
 
       {/* Loading */}
