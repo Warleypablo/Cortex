@@ -1,9 +1,12 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
-import { DollarSign, TrendingUp, TrendingDown, PauseCircle, Info, CheckCircle } from "lucide-react";
+import { HeroMetric } from "@/components/HeroMetric";
+import { StatsCardV2 } from "@/components/StatsCardV2";
+import { useTheme } from "@/components/ThemeProvider";
+import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { ComposedChart, Bar, BarChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend } from "recharts";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -12,6 +15,8 @@ import { usePageTitle } from "@/hooks/use-page-title";
 export default function VisaoGeral() {
   usePageTitle("Visão Geral");
   useSetPageInfo("Visão Geral", "Métricas de MRR e performance");
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     return { month: now.getMonth() + 1, year: now.getFullYear() };
@@ -21,15 +26,6 @@ export default function VisaoGeral() {
   const mesVisaoGeral = useMemo(() => {
     return `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}`;
   }, [selectedMonth]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
 
   const getMesesDesdeNovembro2025 = () => {
     const meses = [];
@@ -86,16 +82,6 @@ export default function VisaoGeral() {
     },
   });
 
-  const formatMesLabel = (mesAno: string) => {
-    const [ano, mes] = mesAno.split('-');
-    const mesNum = parseInt(mes, 10);
-    const mesNomes = [
-      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'
-    ];
-    return `${mesNomes[mesNum - 1]}/${ano.slice(2)}`;
-  };
-
   const mrrEvolution = (mrrEvolucaoData || []).map(item => ({
     mes: item.mes,
     mrr: item.mrr,
@@ -114,6 +100,32 @@ export default function VisaoGeral() {
     mrr: item.mrr,
     cor: squadColors[item.squad] || '#6b7280',
   }));
+
+  const formatMesNome = (mesAno: string) => {
+    if (typeof mesAno === 'string' && mesAno.includes('-')) {
+      const [ano, mes] = mesAno.split('-');
+      const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      const idx = parseInt(mes) - 1;
+      if (idx >= 0 && idx < 12) return `${mesesNomes[idx]} ${ano}`;
+    }
+    return mesAno;
+  };
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 text-sm text-foreground">
+        <p className="font-medium mb-1">{formatMesNome(label)}</p>
+        {payload.map((entry: any, i: number) => (
+          <p key={i} style={{ color: entry.color }}>
+            {entry.name === 'mrr' ? 'MRR' : entry.name === 'receitaPontualEntregue' ? 'Pontual Entregue' : entry.name}:{' '}
+            {typeof entry.value === 'number' ? formatCurrencyNoDecimals(entry.value) : entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-background min-h-screen">
