@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
-import { Users, Database, Shield, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, RefreshCw, Bot, CheckCircle2, XCircle, Loader2, Megaphone, Search } from "lucide-react";
+import { Users, Database, Shield, Edit, UserCog, ShieldCheck, ShieldOff, Briefcase, ArrowUpDown, ArrowUp, ArrowDown, Plus, Activity, Settings, Layers, Flag, Trash2, Pencil, BellRing, Package, FileText, TrendingUp, Building2, AlertTriangle, FileCheck, UserMinus, Target, GitBranch, ChevronDown, ChevronUp, RefreshCw, Bot, CheckCircle2, XCircle, Loader2, Megaphone, Search } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
