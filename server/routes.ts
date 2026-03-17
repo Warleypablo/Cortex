@@ -546,15 +546,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/track/page-view", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const { path, pageTitle } = req.body;
-    if (!path || typeof path !== 'string') return res.status(400).json({ error: "path required" });
+    if (!path || typeof path !== 'string' || path.length > 500) return res.status(400).json({ error: "path required" });
+    const sanitizedTitle = typeof pageTitle === 'string' ? pageTitle.slice(0, 255) : null;
 
     try {
       await db.insert(pageViews).values({
         userId: user.id,
         userEmail: user.email,
         userName: user.name || null,
-        path,
-        pageTitle: pageTitle || null,
+        path: path.slice(0, 500),
+        pageTitle: sanitizedTitle,
       });
       res.json({ ok: true });
     } catch (err) {
@@ -565,7 +566,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/usage-stats", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const days = parseInt(req.query.days as string) || 30;
+      const days = Math.min(parseInt(req.query.days as string) || 30, 365);
 
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
@@ -644,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/page-views", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
-      const pageSize = parseInt(req.query.pageSize as string) || 50;
+      const pageSize = Math.min(parseInt(req.query.pageSize as string) || 50, 200);
       const offset = (page - 1) * pageSize;
       const userId = req.query.userId as string | undefined;
 
