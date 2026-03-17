@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertPatrimonioSchema, updateContratoSchema } from "@shared/schema";
+import { insertPatrimonioSchema, updateContratoSchema, pageViews } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
 import { validateBody } from "./middleware/validate";
@@ -540,6 +540,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching auth logs:", error);
       res.status(500).json({ error: "Failed to fetch auth logs" });
+    }
+  });
+
+  app.post("/api/track/page-view", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const { path, pageTitle } = req.body;
+    if (!path || typeof path !== 'string') return res.status(400).json({ error: "path required" });
+
+    try {
+      await db.insert(pageViews).values({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name || null,
+        path,
+        pageTitle: pageTitle || null,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("[track] page-view error:", err);
+      res.status(500).json({ error: "Failed to track page view" });
     }
   });
 
