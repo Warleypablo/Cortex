@@ -563,6 +563,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/usage-stats", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 30;
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const periodStart = new Date();
+      periodStart.setDate(periodStart.getDate() - days);
+
+      // Today's stats
+      const [activeUsersResult, pageViewsTodayResult, loginsTodayResult] = await Promise.all([
+        db.execute(sql`SELECT COUNT(DISTINCT user_id) as count FROM page_views WHERE timestamp >= ${todayStart}`),
+        db.execute(sql`SELECT COUNT(*) as count FROM page_views WHERE timestamp >= ${todayStart}`),
+        db.execute(sql`SELECT COUNT(*) as count FROM auth_logs WHERE timestamp >= ${todayStart} AND action LIKE 'login%' AND success = 'true'`),
+      ]);
+
+      const activeUsersToday = parseInt((activeUsersResult.rows[0] as any)?.count || '0');
+      const pageViewsToday = parseInt((pageViewsTodayResult.rows[0] as any)?.count || '0');
+      const loginsToday = parseInt((loginsTodayResult.rows[0] as any)?.count || '0');
+
+      // Top pages in period
+      const topPagesResult = await db.execute(sql`
+        SELECT path, page_title as "pageTitle", COUNT(*) as views
+        FROM page_views
+        WHERE timestamp >= ${periodStart}
+        GROUP BY path, page_title
+        ORDER BY views DESC
+        LIMIT 10
+      `);
+
+      // Top users in period
+      const topUsersResult = await db.execute(sql`
+        SELECT user_email as "userEmail", user_name as "userName", COUNT(*) as views
+        FROM page_views
+        WHERE timestamp >= ${periodStart}
+        GROUP BY user_email, user_name
+        ORDER BY views DESC
+        LIMIT 10
+      `);
+
+      // Daily activity in period
+      const dailyActivityResult = await db.execute(sql`
+        WITH daily_logins AS (
+          SELECT date_trunc('day', timestamp)::date as date, COUNT(*) as logins
+          FROM auth_logs
+          WHERE timestamp >= ${periodStart} AND action LIKE 'login%' AND success = 'true'
+          GROUP BY date_trunc('day', timestamp)::date
+        ),
+        daily_views AS (
+          SELECT date_trunc('day', timestamp)::date as date, COUNT(*) as page_views
+          FROM page_views
+          WHERE timestamp >= ${periodStart}
+          GROUP BY date_trunc('day', timestamp)::date
+        )
+        SELECT
+          COALESCE(l.date, v.date) as date,
+          COALESCE(l.logins, 0)::int as logins,
+          COALESCE(v.page_views, 0)::int as "pageViews"
+        FROM daily_logins l
+        FULL OUTER JOIN daily_views v ON l.date = v.date
+        ORDER BY date DESC
+      `);
+
+      res.json({
+        activeUsersToday,
+        pageViewsToday,
+        loginsToday,
+        topPages: topPagesResult.rows.map((r: any) => ({ ...r, views: parseInt(r.views) })),
+        topUsers: topUsersResult.rows.map((r: any) => ({ ...r, views: parseInt(r.views) })),
+        dailyActivity: dailyActivityResult.rows,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching usage stats:", error);
+      res.status(500).json({ error: "Failed to fetch usage stats" });
+    }
+  });
+
+  app.get("/api/admin/page-views", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const pageSize = parseInt(req.query.pageSize as string) || 50;
+      const offset = (page - 1) * pageSize;
+      const userId = req.query.userId as string | undefined;
+
+      let whereClause = sql`1=1`;
+      if (userId) {
+        whereClause = sql`user_id = ${userId}`;
+      }
+
+      const result = await db.execute(sql`
+        SELECT * FROM page_views
+        WHERE ${whereClause}
+        ORDER BY timestamp DESC
+        LIMIT ${pageSize} OFFSET ${offset}
+      `);
+
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as total FROM page_views WHERE ${whereClause}
+      `);
+      const total = parseInt((countResult.rows[0] as any)?.total || '0');
+
+      res.json({
+        items: result.rows,
+        total,
+        page,
+        pageSize,
+        totalPages: Math.ceil(total / pageSize),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching page views:", error);
+      res.status(500).json({ error: "Failed to fetch page views" });
+    }
+  });
+
   app.get("/api/admin/health", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const startTime = Date.now();
