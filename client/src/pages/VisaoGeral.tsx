@@ -7,10 +7,45 @@ import { useTheme } from "@/components/ThemeProvider";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { ComposedChart, Bar, BarChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, Legend } from "recharts";
+import type { TooltipProps } from "recharts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
+
+const MESES_NOMES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+const SQUAD_COLORS: Record<string, string> = {
+  'Supreme': '#3b82f6',
+  'Forja': '#a855f7',
+  'Squadra': '#14b8a6',
+  'Chama': '#f97316',
+};
+
+function formatMesNome(mesAno: string) {
+  if (typeof mesAno === 'string' && mesAno.includes('-')) {
+    const [ano, mes] = mesAno.split('-');
+    const idx = parseInt(mes) - 1;
+    if (idx >= 0 && idx < 12) return `${MESES_NOMES[idx]} ${ano}`;
+  }
+  return mesAno;
+}
+
+function CustomTooltip({ active, payload, label }: TooltipProps<number, string>) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 text-sm text-foreground">
+      <p className="font-medium mb-1">{formatMesNome(String(label))}</p>
+      {payload.map((entry, i) => (
+        <p key={i} style={{ color: entry.color }}>
+          {entry.dataKey === 'mrr' ? 'MRR' : entry.dataKey === 'receitaPontualEntregue' ? 'Pontual Entregue' : String(entry.name)}:{' '}
+          {typeof entry.value === 'number' ? formatCurrencyNoDecimals(entry.value) : entry.value}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 export default function VisaoGeral() {
   usePageTitle("Visão Geral");
@@ -27,24 +62,6 @@ export default function VisaoGeral() {
     return `${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}`;
   }, [selectedMonth]);
 
-  const getMesesDesdeNovembro2025 = () => {
-    const meses = [];
-    const now = new Date();
-    const inicio = new Date(2025, 10, 1);
-    
-    let data = new Date(inicio);
-    while (data <= now) {
-      const mesAno = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
-      const mesNome = [
-        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-      ][data.getMonth()];
-      meses.push({ valor: mesAno, label: `${mesNome} ${data.getFullYear()}` });
-      data.setMonth(data.getMonth() + 1);
-    }
-    
-    return meses.reverse();
-  };
 
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery({
     queryKey: ['/api/visao-geral/metricas', mesVisaoGeral],
@@ -88,44 +105,11 @@ export default function VisaoGeral() {
     receitaPontualEntregue: item.receitaPontualEntregue || 0,
   }));
 
-  const squadColors: Record<string, string> = {
-    'Supreme': '#3b82f6',
-    'Forja': '#a855f7',
-    'Squadra': '#14b8a6',
-    'Chama': '#f97316',
-  };
-
   const mrrSquadData = (topSquads || []).map(item => ({
     squad: item.squad,
     mrr: item.mrr,
-    cor: squadColors[item.squad] || '#6b7280',
+    cor: SQUAD_COLORS[item.squad] || '#6b7280',
   }));
-
-  const formatMesNome = (mesAno: string) => {
-    if (typeof mesAno === 'string' && mesAno.includes('-')) {
-      const [ano, mes] = mesAno.split('-');
-      const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-      const idx = parseInt(mes) - 1;
-      if (idx >= 0 && idx < 12) return `${mesesNomes[idx]} ${ano}`;
-    }
-    return mesAno;
-  };
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg p-3 text-sm text-foreground">
-        <p className="font-medium mb-1">{formatMesNome(label)}</p>
-        {payload.map((entry: any, i: number) => (
-          <p key={i} style={{ color: entry.color }}>
-            {entry.name === 'mrr' ? 'MRR' : entry.name === 'receitaPontualEntregue' ? 'Pontual Entregue' : entry.name}:{' '}
-            {typeof entry.value === 'number' ? formatCurrencyNoDecimals(entry.value) : entry.value}
-          </p>
-        ))}
-      </div>
-    );
-  };
 
   return (
     <div className="bg-background min-h-screen">
@@ -392,6 +376,9 @@ export default function VisaoGeral() {
                 <CardDescription>Distribuição de receita por equipe</CardDescription>
               </CardHeader>
               <CardContent>
+                {isLoadingTopSquads ? (
+                  <Skeleton className="h-[300px] rounded-lg" />
+                ) : (
                 <div role="img" aria-label="Gráfico de MRR por squad">
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={mrrSquadData} layout="vertical">
@@ -412,6 +399,7 @@ export default function VisaoGeral() {
                   </BarChart>
                 </ResponsiveContainer>
                 </div>
+                )}
               </CardContent>
             </Card>
           </div>
