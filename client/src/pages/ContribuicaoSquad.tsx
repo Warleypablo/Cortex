@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { ChevronRight, ChevronDown, DollarSign, Percent } from "lucide-react";
+import { ChevronRight, ChevronDown, DollarSign } from "lucide-react";
+import { HeroMetric } from "@/components/HeroMetric";
 
 interface MonthlyData {
   mes: string;
@@ -230,7 +231,6 @@ export default function ContribuicaoSquad() {
           </Select>
 
           <div className="flex items-center gap-1.5">
-            <Percent className="h-3.5 w-3.5 text-muted-foreground" />
             <Input
               type="number"
               min={0}
