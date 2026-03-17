@@ -1606,6 +1606,19 @@ export const authLogs = pgTable("auth_logs", {
 export type AuthLog = typeof authLogs.$inferSelect;
 export type InsertAuthLog = typeof authLogs.$inferInsert;
 
+export const pageViews = pgTable("page_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  userId: varchar("user_id", { length: 100 }),
+  userEmail: varchar("user_email", { length: 255 }),
+  userName: varchar("user_name", { length: 255 }),
+  path: varchar("path", { length: 500 }).notNull(),
+  pageTitle: varchar("page_title", { length: 255 }),
+});
+
+export type PageView = typeof pageViews.$inferSelect;
+export type InsertPageView = typeof pageViews.$inferInsert;
+
 // Sync Logs - Tracking integration synchronizations
 export const syncLogs = pgTable("sync_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
