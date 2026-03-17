@@ -5279,15 +5279,28 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         ORDER BY squad, salario DESC
       `);
 
+      // Normalizar nome de squad removendo emojis/símbolos para match
+      const stripEmoji = (s: string) =>
+        s.replace(/[^\p{L}\p{N}\s.&+]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+      // Mapa: nome normalizado → nome original da receita
+      const revenueSquadMap = new Map<string, string>();
+      for (const s of resumoPorSquad) {
+        revenueSquadMap.set(stripEmoji(s.squad), s.squad);
+      }
+
       const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
       const seen = new Set<number>();
       for (const row of salDetalhesResult.rows as any[]) {
         const id = Number(row.id);
         if (seen.has(id)) continue;
         seen.add(id);
-        const sq = row.squad || 'Sem Squad';
-        if (!salariosDetalhesPorSquad[sq]) salariosDetalhesPorSquad[sq] = [];
-        salariosDetalhesPorSquad[sq].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
+        const rawSquad = row.squad || 'Sem Squad';
+        const normKey = stripEmoji(rawSquad);
+        // Casar com o nome do squad da receita, fallback pro raw
+        const matchedSquad = revenueSquadMap.get(normKey) || rawSquad;
+        if (!salariosDetalhesPorSquad[matchedSquad]) salariosDetalhesPorSquad[matchedSquad] = [];
+        salariosDetalhesPorSquad[matchedSquad].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
       }
 
       res.json({
