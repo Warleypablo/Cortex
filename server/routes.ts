@@ -5253,14 +5253,41 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }))
         .sort((a, b) => b.receitaTotal - a.receitaTotal);
 
-      // Detalhes individuais de salários agrupados por squad
+      // Detalhes individuais de salários — query separada sem filtro de squad
+      const salDetalhesResult = await db.execute(sql`
+        WITH salarios_normalizados AS (
+          SELECT
+            rp.id,
+            rp.nome as colaborador_nome,
+            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
+            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
+            CASE
+              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
+              WHEN rp.salario::text LIKE '%,%' THEN
+                NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
+              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
+                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
+              ELSE
+                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
+            END as salario
+          FROM "Inhire".rh_pessoal rp
+        )
+        SELECT id, colaborador_nome, salario, squad
+        FROM salarios_normalizados
+        WHERE status_norm = 'ativo'
+          AND salario IS NOT NULL AND salario > 0
+        ORDER BY squad, salario DESC
+      `);
+
       const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
-      for (const { nome, salario, squad: sq } of salariosPorColab.values()) {
+      const seen = new Set<number>();
+      for (const row of salDetalhesResult.rows as any[]) {
+        const id = Number(row.id);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const sq = row.squad || 'Sem Squad';
         if (!salariosDetalhesPorSquad[sq]) salariosDetalhesPorSquad[sq] = [];
-        salariosDetalhesPorSquad[sq].push({ nome, salario });
-      }
-      for (const key of Object.keys(salariosDetalhesPorSquad)) {
-        salariosDetalhesPorSquad[key].sort((a, b) => b.salario - a.salario);
+        salariosDetalhesPorSquad[sq].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
       }
 
       res.json({
