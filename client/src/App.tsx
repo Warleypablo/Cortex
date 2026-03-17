@@ -125,6 +125,7 @@ const MeuPerfil = lazyWithRetry(() => import("@/pages/MeuPerfil"));
 const Avisos = lazyWithRetry(() => import("@/pages/Avisos"));
 const AdminHealth = lazyWithRetry(() => import("@/pages/AdminHealth"));
 const AdminOverrides = lazyWithRetry(() => import("@/pages/AdminOverrides"));
+const AdminUsageLog = lazyWithRetry(() => import("@/pages/AdminUsageLog"));
 const Sugestoes = lazyWithRetry(() => import("@/pages/Sugestoes"));
 const ProcessosInternos = lazyWithRetry(() => import("@/pages/ProcessosInternos"));
 const ContratosModule = lazyWithRetry(() => import("@/pages/ContratosModule"));
@@ -374,7 +375,8 @@ function ProtectedRouter() {
       <Route path="/admin/design-system">{() => <ProtectedRoute path="/admin/design-system" component={AdminDesignSystem} />}</Route>
       <Route path="/admin/health">{() => <ProtectedRoute path="/admin/health" component={AdminHealth} />}</Route>
       <Route path="/admin/kpi">{() => <ProtectedRoute path="/admin/kpi" component={AdminOverrides} />}</Route>
-      
+      <Route path="/admin/uso">{() => <ProtectedRoute path="/admin/uso" component={AdminUsageLog} />}</Route>
+
       {/* Homepage - Dashboard baseado no perfil do usuário (placed at end to avoid shadowing other routes) */}
       <Route path="/">{() => (
         <Suspense fallback={<PageSkeleton />}>

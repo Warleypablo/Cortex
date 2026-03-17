@@ -114,6 +114,7 @@ export const PERMISSION_KEYS = {
     HEALTH: 'admin.health',
     KPI: 'admin.kpi',
     AVISOS: 'admin.avisos',
+    USO: 'admin.uso',
   },
 } as const;
 
@@ -268,6 +269,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/admin/health': PERMISSION_KEYS.ADMIN.HEALTH,
   '/admin/kpi': PERMISSION_KEYS.ADMIN.KPI,
   '/admin/avisos': PERMISSION_KEYS.ADMIN.AVISOS,
+  '/admin/uso': PERMISSION_KEYS.ADMIN.USO,
 };
 
 // Convert permission keys to routes (for backwards compatibility)
@@ -505,6 +507,7 @@ export const NAV_CONFIG = {
     items: [
       { title: 'Usuários', url: '/admin/usuarios', icon: 'Users', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
       { title: 'Avisos', url: '/admin/avisos', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.ADMIN.AVISOS },
+      { title: 'Uso do Sistema', url: '/admin/uso', icon: 'Activity', permissionKey: PERMISSION_KEYS.ADMIN.USO },
     ],
   },
 };
