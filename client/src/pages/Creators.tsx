@@ -20,6 +20,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -146,6 +156,7 @@ export default function Creators() {
   const [activeTab, setActiveTab] = useState("creators");
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   // Creator form state
   const [creatorDialogOpen, setCreatorDialogOpen] = useState(false);
@@ -401,7 +412,7 @@ export default function Creators() {
                           <Pencil className="w-4 h-4" />
                         </Button>
                         {c.ativo && (
-                          <Button variant="ghost" size="sm" onClick={() => deleteCreator.mutate(c.id)}>
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(c.id)}>
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
                         )}
@@ -844,6 +855,29 @@ export default function Creators() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Desativar freelancer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação vai desativar o cadastro do freelancer. Os contratos existentes serão mantidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteConfirmId) deleteCreator.mutate(deleteConfirmId);
+                setDeleteConfirmId(null);
+              }}
+            >
+              Desativar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
