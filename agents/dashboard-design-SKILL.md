@@ -1,7 +1,8 @@
 # Dashboard Design Skill
 
 > **Quando usar:** ANTES de criar ou editar qualquer dashboard no Cortex.
-> **Escopo:** Todos os dashboards exceto Comercial (Closers, SDRs, Vendas).
+> **Escopo:** Todos os dashboards exceto Comercial (Closers, SDRs, Vendas, Reunioes, Funil, RevenueGoals).
+> **Spec completa:** `docs/superpowers/specs/2026-03-17-dashboard-design-system.md`
 
 ---
 
@@ -23,24 +24,38 @@ Cada elemento na tela deve justificar sua existencia. Se remover algo e ninguem 
 
 ---
 
-## Paleta e Cor
+## Paleta e Cor (tokens exatos)
 
-Cor e **semantica**, nunca decorativa:
+| Semantica | Light | Dark |
+|-----------|-------|------|
+| Positivo | `text-emerald-600` / `bg-emerald-50` | `text-emerald-400` / `bg-emerald-950/30` |
+| Negativo | `text-red-600` / `bg-red-50` | `text-red-400` / `bg-red-950/30` |
+| Atencao | `text-amber-600` / `bg-amber-50` | `text-amber-400` / `bg-amber-950/30` |
+| Neutro | `text-gray-600` / `bg-gray-50` | `text-zinc-400` / `bg-zinc-800/30` |
+| Card bg | `bg-white` | `bg-zinc-900` |
+| Card border | `border-gray-100` | `border-zinc-800` |
+| Borda semantica | `border-l-3 border-{color}-500` | `border-l-3 border-{color}-400` |
 
-| Cor | Significado | Uso |
-|-----|------------|-----|
-| Verde (emerald) | Positivo / dentro da meta | Trends positivos, status ok |
-| Vermelho (red) | Negativo / fora da meta | Trends negativos, alertas |
-| Ambar (amber) | Atencao / limitrofe | Valores em zona de risco |
-| Cinza (zinc/gray) | Neutro / sem julgamento | Dados informativos |
-
-- Charts: 1 cor primaria + cinza para comparacao. Maximo 3 cores por grafico.
+- Charts: 1 cor primaria + cinza. Max 3 cores por grafico.
 
 ---
 
 ## Componentes
 
-### StatsCard
+### HeroMetric (novo)
+
+```tsx
+// Numero grande sem card container, direto no fundo da pagina
+<div className="flex flex-col">
+  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Label</p>
+  <p className="text-2xl sm:text-3xl font-semibold text-foreground mt-1">R$ 487.230</p>
+  <span className="text-sm font-medium mt-1 text-emerald-600 dark:text-emerald-400">▲ 3,2%</span>
+</div>
+
+// Layout: flex items-start gap-12 (desktop), grid grid-cols-1 gap-4 (mobile)
+```
+
+### StatsCard (usar StatsCardV2 para novos dashboards)
 
 ```tsx
 // CORRETO
@@ -51,7 +66,7 @@ Cor e **semantica**, nunca decorativa:
 </div>
 ```
 
-**PROIBIDO no StatsCard:**
+**PROIBIDO:**
 - `bg-gradient-to-*` (gradientes)
 - `backdrop-blur-*`
 - `hover:scale-*`
@@ -59,21 +74,26 @@ Cor e **semantica**, nunca decorativa:
 - `useCountUpNumber` (animacao de contagem)
 - Overlay transparente
 
-**Variantes semanticas:** via borda esquerda de 3px (`border-l-3 border-emerald-500`), nao background colorido.
+**Variantes semanticas:** borda esquerda 3px (`border-l-3 border-emerald-500`), nao background colorido.
 
 ### Charts (Recharts)
 
 ```tsx
 <ResponsiveContainer width="100%" height={300}>
-  {/* Grid lines apenas horizontais */}
   <CartesianGrid vertical={false} stroke={isDark ? "#27272a" : "#f0f0f0"} />
-  {/* Sem eixo Y quando valores estao no tooltip */}
   <YAxis hide />
-  {/* Maximo 2 series */}
 </ResponsiveContainer>
 ```
 
-- Tooltip com fundo solido, sem transparencia
+- Tooltip padrao:
+  ```tsx
+  className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700
+             rounded-lg shadow-lg p-3 text-sm text-foreground"
+  ```
+- Limites de series:
+  - Line/Area: max 2
+  - Stacked bar: max 3
+  - Heatmap: sem limite
 - Legendas: abaixo do grafico, `text-xs text-muted-foreground`
 
 ### Tabelas
@@ -95,13 +115,13 @@ Cor e **semantica**, nunca decorativa:
 ## Anatomia de Pagina
 
 ```
-Titulo + Filtros
+Titulo + Filtros (max 4 visiveis)
 ─────────────────
 Hero Metrics (1-3 numeros grandes, SEM card wrapper)
 ─────────────────
 Supporting Cards (grid 3-4 cols)
 ─────────────────
-Chart Principal (1 por viewport, max 2 em grid-cols-2)
+Chart Principal (max 2 em grid-cols-2)
 ─────────────────
 Tabela de Detalhamento (sempre por ultimo)
 ```
@@ -115,6 +135,39 @@ Tabela de Detalhamento (sempre por ultimo)
 
 ---
 
+## Estados
+
+### Loading
+- Heroes: `<Skeleton className="h-8 w-32" />`
+- Cards: `<Skeleton className="h-24 rounded-lg" />`
+- Charts: `<Skeleton className="h-[300px] rounded-lg" />`
+- Tabelas: 5 linhas de `<Skeleton className="h-4" />` com larguras variadas
+
+### Error
+- Mensagem inline na secao afetada, nunca quebrar a pagina inteira:
+  ```tsx
+  <div className="flex items-center gap-2 p-4 rounded-lg bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 text-sm">
+    <AlertTriangle className="w-4 h-4 shrink-0" />
+    <span>Erro ao carregar dados. Tente novamente.</span>
+  </div>
+  ```
+
+### Empty
+- Charts/tabelas: `<p className="text-sm text-muted-foreground text-center py-12">Sem dados para o periodo selecionado.</p>`
+- Heroes/cards: mostrar "—" no valor, sem trend.
+
+---
+
+## Acessibilidade (minimo)
+
+- Contraste >= 4.5:1 (WCAG AA)
+- Trends: simbolo (▲/▼) + cor, nunca so cor
+- Filtros/botoes: `aria-label` quando texto insuficiente
+- Tabelas: `<th scope="col">`
+- Charts: `aria-label` descritivo no container
+
+---
+
 ## Regras por Dominio
 
 ### Financeiro
@@ -122,7 +175,7 @@ Tabela de Detalhamento (sempre por ultimo)
 - Valores completos nos heroes (`R$ 142.350,00`), abreviados em supporting
 - DRE/DFC = tabelas hierarquicas colapsiveis, NAO cards
 - Orcado vs realizado = barra horizontal dupla
-- PROIBIDO: grafico de pizza para composicao de receita
+- PROIBIDO: pizza chart (receita → barra empilhada, despesas → tabela colapsivel)
 
 ### Growth
 - **Heroes:** ROAS, CAC, Investimento Total
@@ -177,12 +230,22 @@ Antes de considerar QUALQUER dashboard pronto:
 - [ ] Filtros com defaults inteligentes?
 - [ ] Tabelas paginadas >20 linhas?
 
+### Estados
+- [ ] Loading state com Skeleton?
+- [ ] Error state isolado por secao?
+- [ ] Empty state para periodo sem dados?
+
 ### Consistencia
 - [ ] Valores monetarios formatados?
 - [ ] Labels uppercase + tracking-wide?
 - [ ] gap-6 secoes / gap-4 grids?
 - [ ] Dark + light mode ok?
 - [ ] Responsivo sm/md/lg?
+
+### Acessibilidade
+- [ ] Contraste >= 4.5:1?
+- [ ] Trends com simbolo + cor?
+- [ ] aria-labels em charts e filtros?
 
 ### Dominio
 - [ ] Segue regras do dominio?
