@@ -809,35 +809,7 @@ export default function Creators() {
               </div>
             </div>
 
-            {/* Datas */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Data de Início *</Label>
-                <Input
-                  type="date"
-                  value={contratoForm.data_inicio}
-                  onChange={e => {
-                    const inicio = e.target.value;
-                    const val = parseInt(contratoForm.duracao_meses) || 6;
-                    setContratoForm(f => ({
-                      ...f,
-                      data_inicio: inicio,
-                      data_fim: calcDataFim(inicio, val, f.unidade_prazo)
-                    }));
-                  }}
-                  required
-                />
-              </div>
-              <div>
-                <Label>Data de Fim</Label>
-                <Input
-                  type="date"
-                  value={contratoForm.data_fim}
-                  onChange={e => setContratoForm(f => ({ ...f, data_fim: e.target.value }))}
-                />
-                <p className="text-xs text-muted-foreground mt-1">Calculada automaticamente</p>
-              </div>
-            </div>
+            {/* Data de Início removida — usa data de assinatura do contrato */}
 
             <div>
               <Label>Prazo de Entrega (dias úteis)</Label>
