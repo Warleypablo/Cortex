@@ -246,61 +246,42 @@ export default function VisaoGeral() {
               </CardHeader>
               <CardContent>
                 {isLoadingMrrEvolucao ? (
-                  <div className="flex items-center justify-center h-[300px]">
-                    <p className="text-muted-foreground">Carregando...</p>
-                  </div>
+                  <Skeleton className="h-[300px] rounded-lg" />
                 ) : mrrEvolution.length === 0 ? (
                   <div className="flex items-center justify-center h-[300px]">
                     <p className="text-muted-foreground">Sem dados disponíveis para o período</p>
                   </div>
                 ) : (
+                  <div role="img" aria-label="Gráfico de evolução mensal de MRR e receita pontual">
                   <ResponsiveContainer width="100%" height={300}>
                     <ComposedChart data={mrrEvolution}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis 
-                        dataKey="mes" 
-                        className="text-sm"
-                        tick={{ fill: 'currentColor' }}
+                      <CartesianGrid vertical={false} stroke={isDark ? "#27272a" : "#f0f0f0"} />
+                      <XAxis
+                        dataKey="mes"
+                        tick={{ fill: 'currentColor', fontSize: 12 }}
                         tickFormatter={(value) => {
                           const [ano, mes] = value.split('-');
                           const mesesAbrev = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
                           return `${mesesAbrev[parseInt(mes) - 1]}/${ano.slice(2)}`;
                         }}
                       />
-                      <YAxis 
-                        className="text-sm"
-                        tick={{ fill: 'currentColor' }}
-                        tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-                      />
-                      <RechartsTooltip 
-                        formatter={(value: number, name: string) => [
-                          formatCurrency(value), 
-                          name === 'mrr' ? 'MRR' : 'Pontual Entregue'
-                        ]}
-                        labelFormatter={(label) => {
-                          const [ano, mes] = label.split('-');
-                          const mesesNomes = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-                          return `${mesesNomes[parseInt(mes) - 1]} ${ano}`;
-                        }}
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--background))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '6px',
-                        }}
-                      />
-                      <Legend 
+                      <YAxis hide />
+                      <RechartsTooltip content={<CustomTooltip />} />
+                      <Legend
                         formatter={(value) => value === 'mrr' ? 'MRR' : 'Pontual Entregue'}
+                        wrapperStyle={{ fontSize: 12, color: 'var(--muted-foreground)' }}
                       />
                       <Bar dataKey="mrr" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="receitaPontualEntregue" 
-                        stroke="#9333ea" 
+                      <Line
+                        type="monotone"
+                        dataKey="receitaPontualEntregue"
+                        stroke="#9333ea"
                         strokeWidth={2}
                         dot={{ fill: '#9333ea', strokeWidth: 2, r: 4 }}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
+                  </div>
                 )}
               </CardContent>
             </Card>
