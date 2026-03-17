@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
 import { AssistantWidget } from "@/components/AssistantWidget";
 import { useDealNotifications } from "@/hooks/use-deal-notifications";
+import { usePageTracking } from "@/hooks/use-page-tracking";
 import { MaintenanceBanner } from "@/components/MaintenanceBanner";
 
 // Wrapper around lazy() that retries with cache-busting on chunk load failure.
@@ -233,6 +234,7 @@ function ProtectedRoute({ path, component: Component }: { path: string; componen
 function ProtectedRouter() {
   const [location, setLocation] = useLocation();
   const { user, isLoading, error } = useAuth();
+  usePageTracking();
 
   useEffect(() => {
     if (!isLoading && (error || !user)) {
