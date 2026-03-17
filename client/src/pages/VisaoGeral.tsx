@@ -392,30 +392,18 @@ export default function VisaoGeral() {
                 <CardDescription>Distribuição de receita por equipe</CardDescription>
               </CardHeader>
               <CardContent>
+                <div role="img" aria-label="Gráfico de MRR por squad">
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={mrrSquadData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      type="number"
-                      className="text-sm"
-                      tick={{ fill: 'currentColor' }}
-                      tickFormatter={(value) => formatCurrency(value)}
-                    />
-                    <YAxis 
+                    <CartesianGrid horizontal={false} stroke={isDark ? "#27272a" : "#f0f0f0"} />
+                    <XAxis type="number" hide />
+                    <YAxis
                       type="category"
                       dataKey="squad"
-                      className="text-sm"
-                      tick={{ fill: 'currentColor' }}
+                      tick={{ fill: 'currentColor', fontSize: 12 }}
                       width={80}
                     />
-                    <RechartsTooltip 
-                      formatter={(value: number) => [formatCurrency(value), 'MRR']}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--background))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                      }}
-                    />
+                    <RechartsTooltip content={<CustomTooltip />} />
                     <Bar dataKey="mrr" radius={[0, 8, 8, 0]}>
                       {mrrSquadData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.cor} />
@@ -423,6 +411,7 @@ export default function VisaoGeral() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                </div>
               </CardContent>
             </Card>
           </div>
