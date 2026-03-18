@@ -3318,7 +3318,7 @@ Exemplos:
 
           if (isAssinadoCC) {
             await db.execute(sql`
-              UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), atualizado_em = NOW()
+              UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), etapa_pagamento = 'producao', atualizado_em = NOW()
               WHERE id = ${cc.id}
             `);
           } else if (isRecusadoCC) {
