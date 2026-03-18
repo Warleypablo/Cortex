@@ -89,6 +89,10 @@ export const PERMISSION_KEYS = {
     PATRIMONIO: 'gg.patrimonio',
     CALENDARIO_FERIAS: 'gg.calendario_ferias',
   },
+  // Social (Makers)
+  SOCIAL: {
+    CONTRATOS_CREATORS: 'social.contratos_creators',
+  },
   // Jurídico
   JUR: {
     CLIENTES_INADIMPLENTES: 'jur.clientes_inadimplentes',
@@ -149,6 +153,7 @@ export const ACCESS_PROFILES = {
       ...getCategoryKeys('TECH'),
       ...getCategoryKeys('COM'),
       ...getCategoryKeys('GROWTH'),
+      ...getCategoryKeys('SOCIAL'),
     ],
   },
   LIDER: {
@@ -164,6 +169,7 @@ export const ACCESS_PROFILES = {
       ...getCategoryKeys('GROWTH'),
       ...getCategoryKeys('GG'),
       ...getCategoryKeys('JUR'),
+      ...getCategoryKeys('SOCIAL'),
       ...getCategoryKeys('REPORTS'),
     ],
   },
@@ -258,7 +264,9 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/juridico/processos': PERMISSION_KEYS.JUR.PROCESSOS,
   '/contratos-module': PERMISSION_KEYS.COM.CONTRATOS_CLIENTES,
   '/juridico/contratos-colaborador': PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES,
-  '/juridico/creators': PERMISSION_KEYS.JUR.CONTRATOS_CREATORS,
+  '/juridico/creators': PERMISSION_KEYS.JUR.CONTRATOS_CREATORS, // compat antiga
+  // Social
+  '/social/creators': PERMISSION_KEYS.SOCIAL.CONTRATOS_CREATORS,
   // Reports
   '/investors-report': PERMISSION_KEYS.REPORTS.INVESTORS,
   '/reports/mensal': PERMISSION_KEYS.REPORTS.MENSAL,
@@ -459,6 +467,13 @@ export const NAV_CONFIG = {
         { title: 'Tech Hub', url: '/tech', icon: 'LayoutDashboard', permissionKey: PERMISSION_KEYS.TECH.VISAO_GERAL },
       ],
     },
+    {
+      title: 'Social',
+      icon: 'Megaphone',
+      items: [
+        { title: 'Contratos Freelancers', url: '/social/creators', icon: 'Users', permissionKey: PERMISSION_KEYS.SOCIAL.CONTRATOS_CREATORS },
+      ],
+    },
   ],
   
   // G&G (Pessoas)
@@ -483,7 +498,6 @@ export const NAV_CONFIG = {
       { title: 'Clientes Inadimplentes', url: '/juridico/clientes', icon: 'Gavel', permissionKey: PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES },
       { title: 'Processos', url: '/juridico/processos', icon: 'Scale', permissionKey: PERMISSION_KEYS.JUR.PROCESSOS },
       { title: 'Contratos Colaboradores', url: '/juridico/contratos-colaborador', icon: 'Users', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_COLABORADORES },
-      { title: 'Contratos Freelancers', url: '/juridico/creators', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.JUR.CONTRATOS_CREATORS },
     ],
   },
   
@@ -578,8 +592,16 @@ export const PERMISSION_CATEGORIES = [
       label: key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
     })),
   },
-  { 
-    key: 'JUR', 
+  {
+    key: 'SOCIAL',
+    label: 'Social',
+    permissions: Object.entries(PERMISSION_KEYS.SOCIAL).map(([key, value]) => ({
+      key: value,
+      label: key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase()),
+    })),
+  },
+  {
+    key: 'JUR',
     label: 'Jurídico',
     permissions: Object.entries(PERMISSION_KEYS.JUR).map(([key, value]) => ({
       key: value,
@@ -662,6 +684,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.COM.CONTRATOS_CLIENTES]: 'Contratos Clientes',
   [PERMISSION_KEYS.JUR.ASSISTENTE]: 'Assistente IA',
   [PERMISSION_KEYS.JUR.CONTRATOS_CREATORS]: 'Contratos Freelancers',
+  [PERMISSION_KEYS.SOCIAL.CONTRATOS_CREATORS]: 'Contratos Freelancers',
   [PERMISSION_KEYS.JUR.RELATORIOS]: 'Relatórios',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
