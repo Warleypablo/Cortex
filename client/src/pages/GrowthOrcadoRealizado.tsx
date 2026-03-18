@@ -125,7 +125,6 @@ const DEFAULT_ORCADO_ADS = {
   cliques: 89843,
   cliquesSaida: 8595,
   cpm: 100,
-  visualizacaoPagina: 7306,
   leads: 0,
   mqls: 0,
   cpl: 0,
@@ -171,7 +170,6 @@ const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   impressoes: { segment: 'ads', key: 'impressoes' },
   ctr: { segment: 'ads', key: 'ctr' },
   cliques_saida: { segment: 'ads', key: 'cliquesSaida' },
-  visualizacao_pagina: { segment: 'ads', key: 'visualizacaoPagina' },
   cps: { segment: 'ads', key: 'cps' },
   leads: { segment: 'ads', key: 'leads' },
   mqls: { segment: 'ads', key: 'mqls' },
@@ -421,7 +419,6 @@ export default function GrowthOrcadoRealizado() {
     cpm: number;
     ctr: number;
     cps: number;
-    visualizacaoPagina: number | null;
     leads: number;
     mqls: number;
     cpl: number;
@@ -586,7 +583,6 @@ export default function GrowthOrcadoRealizado() {
       { id: 'impressoes', name: 'Impressões', type: 'formula', orcado: ORCADO_ADS.impressoes, realizado: data.impressoes ?? 0, percentual: calcPercentual(ORCADO_ADS.impressoes, data.impressoes), format: 'number' },
       { id: 'ctr', name: 'CTR', type: 'manual', orcado: ORCADO_ADS.ctr, realizado: data.ctr ?? null, percentual: calcPercentual(ORCADO_ADS.ctr, data.ctr), format: 'percent' },
       { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: ORCADO_ADS.cliquesSaida, realizado: data.cliquesSaida ?? 0, percentual: calcPercentual(ORCADO_ADS.cliquesSaida, data.cliquesSaida), format: 'number' },
-      { id: 'visualizacao_pagina', name: 'Visualização de Página', type: 'formula', orcado: ORCADO_ADS.visualizacaoPagina, realizado: data.visualizacaoPagina ?? null, percentual: calcPercentual(ORCADO_ADS.visualizacaoPagina, data.visualizacaoPagina), format: 'number' },
       { id: 'cps', name: 'CPS', type: 'formula', orcado: ORCADO_ADS.cps, realizado: data.cps ?? null, percentual: calcPercentual(ORCADO_ADS.cps, data.cps), format: 'currency' },
       { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
       { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },
