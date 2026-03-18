@@ -70,6 +70,7 @@ import { ptBR } from "date-fns/locale";
 
 interface Creator {
   id: number;
+  tipo_pessoa: string;
   nome: string;
   cpf: string | null;
   cnpj: string | null;
@@ -167,6 +168,7 @@ export default function Creators() {
   const [creatorDialogOpen, setCreatorDialogOpen] = useState(false);
   const [editingCreator, setEditingCreator] = useState<Creator | null>(null);
   const [creatorForm, setCreatorForm] = useState({
+    tipo_pessoa: "" as "" | "fisica" | "juridica" | "ambos",
     nome: "", cpf: "", cnpj: "", email: "", endereco: "", cidade: "", estado: "", cep: "",
     chave_pix: "", tipo_pix: "", observacoes: ""
   });
@@ -307,7 +309,7 @@ export default function Creators() {
 
   function resetCreatorForm() {
     setEditingCreator(null);
-    setCreatorForm({ nome: "", cpf: "", cnpj: "", email: "", endereco: "", cidade: "", estado: "", cep: "", chave_pix: "", tipo_pix: "", observacoes: "" });
+    setCreatorForm({ tipo_pessoa: "", nome: "", cpf: "", cnpj: "", email: "", endereco: "", cidade: "", estado: "", cep: "", chave_pix: "", tipo_pix: "", observacoes: "" });
   }
 
   function resetContratoForm() {
@@ -352,6 +354,7 @@ export default function Creators() {
   function openEditCreator(creator: Creator) {
     setEditingCreator(creator);
     setCreatorForm({
+      tipo_pessoa: (creator.tipo_pessoa || "fisica") as "" | "fisica" | "juridica" | "ambos",
       nome: creator.nome, cpf: creator.cpf || "", cnpj: creator.cnpj || "",
       email: creator.email, endereco: creator.endereco || "", cidade: creator.cidade || "",
       estado: creator.estado || "", cep: creator.cep || "", chave_pix: creator.chave_pix || "",
@@ -575,6 +578,17 @@ export default function Creators() {
           <form onSubmit={(e) => { e.preventDefault(); saveCreator.mutate(creatorForm); }} className="space-y-4">
             <div className="grid grid-cols-1 gap-3">
               <div>
+                <Label>Tipo de Pessoa *</Label>
+                <Select value={creatorForm.tipo_pessoa} onValueChange={v => setCreatorForm(f => ({ ...f, tipo_pessoa: v as "fisica" | "juridica" | "ambos", cpf: v === "juridica" ? "" : f.cpf, cnpj: v === "fisica" ? "" : f.cnpj }))}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o tipo" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fisica">Pessoa Física</SelectItem>
+                    <SelectItem value="juridica">Pessoa Jurídica</SelectItem>
+                    <SelectItem value="ambos">Ambos (PF e PJ)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Nome *</Label>
                 <Input value={creatorForm.nome} onChange={e => setCreatorForm(f => ({ ...f, nome: e.target.value }))} required />
               </div>
@@ -582,37 +596,43 @@ export default function Creators() {
                 <Label>Email *</Label>
                 <Input type="email" value={creatorForm.email} onChange={e => setCreatorForm(f => ({ ...f, email: e.target.value }))} required />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>CPF</Label>
-                  <Input value={creatorForm.cpf} onChange={e => setCreatorForm(f => ({ ...f, cpf: e.target.value }))} placeholder="000.000.000-00" />
+              {creatorForm.tipo_pessoa && (
+                <div className={`grid gap-3 ${creatorForm.tipo_pessoa === 'ambos' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {(creatorForm.tipo_pessoa === 'fisica' || creatorForm.tipo_pessoa === 'ambos') && (
+                    <div>
+                      <Label>CPF *</Label>
+                      <Input value={creatorForm.cpf} onChange={e => setCreatorForm(f => ({ ...f, cpf: e.target.value }))} placeholder="000.000.000-00" required />
+                    </div>
+                  )}
+                  {(creatorForm.tipo_pessoa === 'juridica' || creatorForm.tipo_pessoa === 'ambos') && (
+                    <div>
+                      <Label>CNPJ *</Label>
+                      <Input value={creatorForm.cnpj} onChange={e => setCreatorForm(f => ({ ...f, cnpj: e.target.value }))} placeholder="00.000.000/0000-00" required />
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <Label>CNPJ</Label>
-                  <Input value={creatorForm.cnpj} onChange={e => setCreatorForm(f => ({ ...f, cnpj: e.target.value }))} placeholder="00.000.000/0000-00" />
-                </div>
-              </div>
+              )}
               <div>
-                <Label>Endereço</Label>
-                <Input value={creatorForm.endereco} onChange={e => setCreatorForm(f => ({ ...f, endereco: e.target.value }))} />
+                <Label>Endereço *</Label>
+                <Input value={creatorForm.endereco} onChange={e => setCreatorForm(f => ({ ...f, endereco: e.target.value }))} required />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label>Cidade</Label>
-                  <Input value={creatorForm.cidade} onChange={e => setCreatorForm(f => ({ ...f, cidade: e.target.value }))} />
+                  <Label>Cidade *</Label>
+                  <Input value={creatorForm.cidade} onChange={e => setCreatorForm(f => ({ ...f, cidade: e.target.value }))} required />
                 </div>
                 <div>
-                  <Label>UF</Label>
-                  <Input maxLength={2} value={creatorForm.estado} onChange={e => setCreatorForm(f => ({ ...f, estado: e.target.value.toUpperCase() }))} />
+                  <Label>UF *</Label>
+                  <Input maxLength={2} value={creatorForm.estado} onChange={e => setCreatorForm(f => ({ ...f, estado: e.target.value.toUpperCase() }))} required />
                 </div>
                 <div>
-                  <Label>CEP</Label>
-                  <Input value={creatorForm.cep} onChange={e => setCreatorForm(f => ({ ...f, cep: e.target.value }))} />
+                  <Label>CEP *</Label>
+                  <Input value={creatorForm.cep} onChange={e => setCreatorForm(f => ({ ...f, cep: e.target.value }))} required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Tipo PIX</Label>
+                  <Label>Tipo PIX *</Label>
                   <Select value={creatorForm.tipo_pix} onValueChange={v => setCreatorForm(f => ({ ...f, tipo_pix: v }))}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
@@ -625,8 +645,8 @@ export default function Creators() {
                   </Select>
                 </div>
                 <div>
-                  <Label>Chave PIX</Label>
-                  <Input value={creatorForm.chave_pix} onChange={e => setCreatorForm(f => ({ ...f, chave_pix: e.target.value }))} />
+                  <Label>Chave PIX *</Label>
+                  <Input value={creatorForm.chave_pix} onChange={e => setCreatorForm(f => ({ ...f, chave_pix: e.target.value }))} required />
                 </div>
               </div>
               <div>
