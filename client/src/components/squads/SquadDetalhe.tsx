@@ -633,6 +633,129 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
 
         {/* Tab: Colaboradores */}
         <TabsContent value="colaboradores" className="space-y-6">
+          {/* Painel de Cards */}
+          {data && data.operadores.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Card 1: Ranking MRR */}
+              <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Ranking MRR</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={Math.max(150, data.operadores.length * 28 + 20)}>
+                    <BarChart layout="vertical" data={[...data.operadores].sort((a, b) => b.mrr - a.mrr)} margin={{ left: 0, right: 10 }}>
+                      <XAxis type="number" hide />
+                      <YAxis type="category" dataKey="nome" width={100} tick={{ fill: 'currentColor', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(v: number) => formatCurrencyNoDecimals(v)} contentStyle={{ backgroundColor: chartColors.tooltipBg, border: `1px solid ${chartColors.tooltipBorder}`, color: chartColors.tooltipText, borderRadius: 8 }} />
+                      <Bar dataKey="mrr" radius={[0, 4, 4, 0]} fill={squadColor} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              {/* Card 2: Concentracao de Receita */}
+              <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Concentração de Receita</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {t && t.mrr > 0 ? (() => {
+                    const sorted = [...data.operadores].sort((a, b) => b.mrr - a.mrr);
+                    const top3 = sorted.slice(0, 3);
+                    const top3Pct = top3.map(op => ({ nome: op.nome, pct: (op.mrr / t.mrr) * 100 }));
+                    const outrosPct = Math.max(0, 100 - top3Pct.reduce((sum, o) => sum + o.pct, 0));
+                    const isConcentrated = top3Pct[0]?.pct > CONCENTRATION_ALERT_THRESHOLD;
+                    return (
+                      <div className="space-y-3">
+                        {isConcentrated && (
+                          <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]">
+                            <AlertTriangle className="w-3 h-3 mr-1" /> Alta concentração
+                          </Badge>
+                        )}
+                        {top3Pct.map((item, idx) => (
+                          <div key={item.nome} className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-700 dark:text-zinc-300 truncate">{idx + 1}. {item.nome}</span>
+                              <span className="font-semibold text-gray-900 dark:text-white">{item.pct.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-2 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full" style={{ width: `${item.pct}%`, backgroundColor: squadColor, opacity: 0.7 }} />
+                            </div>
+                          </div>
+                        ))}
+                        {sorted.length > 3 && outrosPct > 0 && (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500 dark:text-zinc-500">Outros</span>
+                              <span className="text-gray-500 dark:text-zinc-500">{outrosPct.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-2 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                              <div className="h-full rounded-full bg-gray-300 dark:bg-zinc-600" style={{ width: `${outrosPct}%` }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })() : <span className="text-xs text-gray-400 dark:text-zinc-600">Sem dados de MRR</span>}
+                </CardContent>
+              </Card>
+
+              {/* Card 3: Alertas de Saude */}
+              <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Alertas</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const alerts: { nome: string; type: 'churn' | 'mrr'; label: string }[] = [];
+                    for (const op of data.operadores) {
+                      if (op.churnRate > CHURN_RATE_ALERT_THRESHOLD) {
+                        alerts.push({ nome: op.nome, type: 'churn', label: `Churn alto: ${formatPercent(op.churnRate)}` });
+                      }
+                    }
+                    if (data.operadoresAnterior) {
+                      for (const op of data.operadores) {
+                        const prev = data.operadoresAnterior.find(p => p.nome === op.nome);
+                        if (prev && prev.mrr > 0) {
+                          const deltaPct = ((op.mrr - prev.mrr) / prev.mrr) * 100;
+                          if (deltaPct < -MRR_DELTA_ALERT_THRESHOLD) {
+                            alerts.push({ nome: op.nome, type: 'mrr', label: `Queda MRR: ${deltaPct.toFixed(1)}%` });
+                          }
+                        }
+                      }
+                    }
+                    const sortedAlerts = alerts.sort((a, b) => a.type === 'churn' && b.type !== 'churn' ? -1 : a.type !== 'churn' && b.type === 'churn' ? 1 : 0);
+                    if (sortedAlerts.length === 0) {
+                      return (
+                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span className="text-sm">Todos os indicadores saudáveis</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="space-y-2 max-h-[180px] overflow-y-auto">
+                        {sortedAlerts.map((alert, idx) => (
+                          <div key={`${alert.nome}-${alert.type}-${idx}`} className="flex items-center gap-2">
+                            <Badge className={cn("text-[10px] shrink-0",
+                              alert.type === 'churn'
+                                ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                                : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                            )}>
+                              {alert.type === 'churn' ? <TrendingDown className="w-3 h-3 mr-1" /> : <AlertTriangle className="w-3 h-3 mr-1" />}
+                              {alert.label}
+                            </Badge>
+                            <span className="text-xs text-gray-600 dark:text-zinc-400 truncate">{alert.nome}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
             <CardHeader>
               <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">
