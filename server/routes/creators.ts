@@ -58,6 +58,7 @@ async function ensureCreatorsTables() {
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS prazo_entrega_dias INTEGER`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS etapa_pagamento VARCHAR(20)`,
       // Portal token columns
+      `ALTER TABLE cortex_core.creators ADD COLUMN IF NOT EXISTS tipo_pessoa VARCHAR(20) NOT NULL DEFAULT 'fisica'`,
       `ALTER TABLE cortex_core.creators ADD COLUMN IF NOT EXISTS portal_token UUID`,
       `ALTER TABLE cortex_core.creators ADD COLUMN IF NOT EXISTS portal_token_criado_em TIMESTAMP`,
       // NF columns on contratos_creators
@@ -481,15 +482,23 @@ export function registerCreatorsRoutes(app: Express) {
   // POST /api/creators — Cadastrar
   app.post("/api/creators", async (req, res) => {
     try {
-      const { nome, cpf, cnpj, email, endereco, cidade, estado, cep, chave_pix, tipo_pix, observacoes } = req.body;
+      const { tipo_pessoa, nome, cpf, cnpj, email, endereco, cidade, estado, cep, chave_pix, tipo_pix, observacoes } = req.body;
 
-      if (!email) return res.status(400).json({ error: "Email é obrigatório" });
+      if (!tipo_pessoa || !['fisica', 'juridica', 'ambos'].includes(tipo_pessoa)) return res.status(400).json({ error: "Tipo de pessoa é obrigatório (fisica, juridica ou ambos)" });
       if (!nome) return res.status(400).json({ error: "Nome é obrigatório" });
-      if (!cpf && !cnpj) return res.status(400).json({ error: "CPF ou CNPJ é obrigatório" });
+      if (!email) return res.status(400).json({ error: "Email é obrigatório" });
+      if ((tipo_pessoa === 'fisica' || tipo_pessoa === 'ambos') && !cpf) return res.status(400).json({ error: "CPF é obrigatório para pessoa física" });
+      if ((tipo_pessoa === 'juridica' || tipo_pessoa === 'ambos') && !cnpj) return res.status(400).json({ error: "CNPJ é obrigatório para pessoa jurídica" });
+      if (!endereco) return res.status(400).json({ error: "Endereço é obrigatório" });
+      if (!cidade) return res.status(400).json({ error: "Cidade é obrigatória" });
+      if (!estado) return res.status(400).json({ error: "UF é obrigatório" });
+      if (!cep) return res.status(400).json({ error: "CEP é obrigatório" });
+      if (!tipo_pix) return res.status(400).json({ error: "Tipo PIX é obrigatório" });
+      if (!chave_pix) return res.status(400).json({ error: "Chave PIX é obrigatória" });
 
       const result = await db.execute(sql`
-        INSERT INTO cortex_core.creators (nome, cpf, cnpj, email, endereco, cidade, estado, cep, chave_pix, tipo_pix, observacoes)
-        VALUES (${nome}, ${cpf || null}, ${cnpj || null}, ${email}, ${endereco || null}, ${cidade || null}, ${estado || null}, ${cep || null}, ${chave_pix || null}, ${tipo_pix || null}, ${observacoes || null})
+        INSERT INTO cortex_core.creators (tipo_pessoa, nome, cpf, cnpj, email, endereco, cidade, estado, cep, chave_pix, tipo_pix, observacoes)
+        VALUES (${tipo_pessoa}, ${nome}, ${cpf || null}, ${cnpj || null}, ${email}, ${endereco || null}, ${cidade || null}, ${estado || null}, ${cep || null}, ${chave_pix || null}, ${tipo_pix || null}, ${observacoes || null})
         RETURNING *
       `);
 
@@ -504,10 +513,11 @@ export function registerCreatorsRoutes(app: Express) {
   app.put("/api/creators/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { nome, cpf, cnpj, email, endereco, cidade, estado, cep, chave_pix, tipo_pix, observacoes } = req.body;
+      const { tipo_pessoa, nome, cpf, cnpj, email, endereco, cidade, estado, cep, chave_pix, tipo_pix, observacoes } = req.body;
 
       const result = await db.execute(sql`
         UPDATE cortex_core.creators SET
+          tipo_pessoa = COALESCE(${tipo_pessoa || null}, tipo_pessoa),
           nome = COALESCE(${nome || null}, nome),
           cpf = ${cpf ?? null},
           cnpj = ${cnpj ?? null},
