@@ -490,9 +490,11 @@ export default function ContribuicaoSquad() {
                                               {colab.nome}
                                             </td>
                                             {monthlyResults.map((_, i) => (
-                                              <td key={i} />
+                                              <td key={i} className="py-0.5 px-2 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
+                                                {colab.salario > 0 ? formatCurrencyNoDecimals(colab.salario) : "-"}
+                                              </td>
                                             ))}
-                                            <td className="py-0.5 px-3 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
+                                            <td className="py-0.5 px-3 text-right text-[10px] font-medium text-red-400/50 dark:text-red-400/35">
                                               {formatCurrencyNoDecimals(colab.salario)}
                                             </td>
                                             <td />
@@ -640,9 +642,11 @@ export default function ContribuicaoSquad() {
                                     {colab.nome}
                                   </td>
                                   {monthlyResults.map((_, i) => (
-                                    <td key={i} />
+                                    <td key={i} className="py-0.5 px-2 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
+                                      {colab.salario > 0 ? formatCurrencyNoDecimals(colab.salario) : "-"}
+                                    </td>
                                   ))}
-                                  <td className="py-0.5 px-3 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
+                                  <td className="py-0.5 px-3 text-right text-[10px] font-medium text-red-400/50 dark:text-red-400/35">
                                     {formatCurrencyNoDecimals(colab.salario)}
                                   </td>
                                   <td />
