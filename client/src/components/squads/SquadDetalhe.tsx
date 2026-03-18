@@ -769,7 +769,9 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                     <TableRow className="border-gray-200 dark:border-zinc-700">
                       <TableHead className="text-gray-600 dark:text-zinc-400">Nome</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">MRR</TableHead>
+                      <TableHead className="text-gray-600 dark:text-zinc-400 text-center">Tendência</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Δ MRR</TableHead>
+                      <TableHead className="text-gray-600 dark:text-zinc-400 text-right">% Squad</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Contratos</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Clientes</TableHead>
                       <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Churns</TableHead>
@@ -779,10 +781,22 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(data?.operadores || []).map((op) => (
-                      <TableRow key={op.nome} className="border-gray-100 dark:border-zinc-800">
+                    {(data?.operadores || []).map((op, idx) => (
+                      <TableRow key={op.nome} className={cn(
+                        "border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors",
+                        idx === 2 && (data?.operadores || []).length >= 4 && "border-b-2 border-gray-300 dark:border-zinc-600"
+                      )}>
                         <TableCell className="font-medium text-gray-900 dark:text-white">{op.nome}</TableCell>
                         <TableCell className="text-right font-semibold text-gray-900 dark:text-white">{formatCurrencyNoDecimals(op.mrr)}</TableCell>
+                        <TableCell className="text-center">
+                          {(() => {
+                            const opData = (data?.evolucaoOperadores || [])
+                              .filter(e => e.operador === op.nome)
+                              .sort((a, b) => a.mes.localeCompare(b.mes))
+                              .map(e => parseFloat(String(e.mrr)) || 0);
+                            return opData.length >= 2 ? <MiniSparkline data={opData} /> : null;
+                          })()}
+                        </TableCell>
                         <TableCell className="text-right">
                           {(() => {
                             const prev = operadorAntMap.get(op.nome);
@@ -803,6 +817,9 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                             );
                           })()}
                         </TableCell>
+                        <TableCell className="text-right">
+                          {t && t.mrr > 0 ? <MrrProgressBar value={(op.mrr / t.mrr) * 100} color={squadColor} /> : null}
+                        </TableCell>
                         <TableCell className="text-right text-gray-700 dark:text-zinc-300">{op.contratos}</TableCell>
                         <TableCell className="text-right text-gray-700 dark:text-zinc-300">{op.clientes}</TableCell>
                         <TableCell className="text-right text-gray-700 dark:text-zinc-300">{op.churns}</TableCell>
@@ -816,6 +833,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                       <TableRow className="border-t-2 border-gray-300 dark:border-zinc-600 bg-gray-50/50 dark:bg-zinc-800/30 font-semibold">
                         <TableCell className="text-gray-900 dark:text-white">Total</TableCell>
                         <TableCell className="text-right text-gray-900 dark:text-white">{formatCurrencyNoDecimals(t.mrr)}</TableCell>
+                        <TableCell />
                         <TableCell className="text-right">
                           {(() => {
                             if (!tAnt) return <span className="text-gray-400 dark:text-zinc-600">—</span>;
@@ -835,6 +853,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                             );
                           })()}
                         </TableCell>
+                        <TableCell className="text-right text-xs text-gray-500 dark:text-zinc-500">100%</TableCell>
                         <TableCell className="text-right text-gray-900 dark:text-white">{t.contratos}</TableCell>
                         <TableCell className="text-right text-gray-900 dark:text-white">{t.clientes}</TableCell>
                         <TableCell className="text-right text-gray-900 dark:text-white">{t.churns}</TableCell>
