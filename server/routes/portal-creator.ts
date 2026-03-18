@@ -90,7 +90,7 @@ export function registerPortalCreatorRoutes(app: Express) {
                status, etapa_pagamento, assinado_em, criado_em,
                nf_arquivo_path, nf_arquivo_nome, nf_numero, nf_valor, nf_data_emissao, nf_anexado_em
         FROM cortex_core.contratos_creators
-        WHERE creator_id = ${creator.id} AND status = 'assinado'
+        WHERE creator_id = ${creator.id} AND status IN ('assinado', 'enviado')
         ORDER BY criado_em DESC
       `);
       res.json(result.rows);
