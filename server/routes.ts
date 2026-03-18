@@ -41,6 +41,7 @@ import { registerComercialRoutes } from "./routes/comercial";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
+import { registerPortalCreatorRoutes } from "./routes/portal-creator";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
@@ -413,6 +414,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: e.message });
     }
   });
+
+  // Portal Creator routes (before isAuthenticated — uses own session auth)
+  registerPortalCreatorRoutes(app);
 
   app.use("/api", isAuthenticated);
 
