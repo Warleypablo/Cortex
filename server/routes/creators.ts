@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import PDFDocument from "pdfkit";
+import crypto from "crypto";
 
 async function ensureCreatorsTables() {
   try {
@@ -56,10 +57,24 @@ async function ensureCreatorsTables() {
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS unidade_prazo VARCHAR(10) DEFAULT 'meses'`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS prazo_entrega_dias INTEGER`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS etapa_pagamento VARCHAR(20)`,
+      // Portal token columns
+      `ALTER TABLE cortex_core.creators ADD COLUMN IF NOT EXISTS portal_token UUID`,
+      `ALTER TABLE cortex_core.creators ADD COLUMN IF NOT EXISTS portal_token_criado_em TIMESTAMP`,
+      // NF columns on contratos_creators
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_arquivo_path TEXT`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_arquivo_nome TEXT`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_numero VARCHAR(50)`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_valor NUMERIC(10,2)`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_data_emissao DATE`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_anexado_em TIMESTAMP`,
     ];
     for (const ddl of newCols) {
       try { await db.execute(sql.raw(ddl)); } catch { /* column already exists */ }
     }
+    // Unique index on portal_token
+    try {
+      await db.execute(sql.raw(`CREATE UNIQUE INDEX IF NOT EXISTS idx_creators_portal_token ON cortex_core.creators(portal_token) WHERE portal_token IS NOT NULL`));
+    } catch { /* index already exists */ }
     // Backfill: contratos já assinados entram na primeira etapa do fluxo de pagamento
     await db.execute(sql`UPDATE cortex_core.contratos_creators SET etapa_pagamento = 'producao' WHERE status = 'assinado' AND etapa_pagamento IS NULL`);
     console.log("[creators] Tables ensured");
@@ -70,12 +85,12 @@ async function ensureCreatorsTables() {
 
 // ── PDF Generation ────────────────────────────────────────────────────────────
 
-interface ContratoCreatorPDFData {
+export interface ContratoCreatorPDFData {
   creator: { nome: string; cpf: string | null; cnpj: string | null; email?: string; endereco: string | null; cidade: string | null; estado: string | null; cep: string | null };
   contrato: { cargo: string; descricao_servicos: string; valor_remuneracao: string; duracao_meses: number; data_inicio: string; data_fim: string; qtd_videos?: number; qtd_variacoes_gancho?: number; unidade_prazo?: string; cliente_nome?: string; prazo_entrega_dias?: number };
 }
 
-async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDFData): Promise<Buffer> {
+export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCreatorPDFData): Promise<Buffer> {
   const doc = new PDFDocument({ size: 'A4', margins: { top: 60, bottom: 60, left: 60, right: 60 } });
   const chunks: Buffer[] = [];
   doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -835,6 +850,27 @@ export function registerCreatorsRoutes(app: Express) {
       res.json({ updated, total: pending.length, details });
     } catch (error: any) {
       console.error("[assinafy-sync-manual] Erro:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ── Gerar token do portal ─────────────────────────────────────────────────
+  app.post("/api/creators/:id/gerar-token", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+      const token = crypto.randomUUID();
+      await db.execute(sql`
+        UPDATE cortex_core.creators
+        SET portal_token = ${token}::uuid, portal_token_criado_em = NOW()
+        WHERE id = ${id}
+      `);
+
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      res.json({ token, url: `${baseUrl}/portal/creator?token=${token}` });
+    } catch (error: any) {
+      console.error("[creators] Erro ao gerar token:", error);
       res.status(500).json({ error: error.message });
     }
   });

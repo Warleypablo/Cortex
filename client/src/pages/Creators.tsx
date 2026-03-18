@@ -60,6 +60,8 @@ import {
   Plus,
   X,
   RefreshCw,
+  Link2,
+  Copy,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -158,6 +160,8 @@ export default function Creators() {
   const [search, setSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [portalLinkUrl, setPortalLinkUrl] = useState<string | null>(null);
+  const [generatingLink, setGeneratingLink] = useState<number | null>(null);
 
   // Creator form state
   const [creatorDialogOpen, setCreatorDialogOpen] = useState(false);
@@ -332,6 +336,19 @@ export default function Creators() {
     } catch { return ""; }
   }
 
+  async function gerarPortalLink(creatorId: number) {
+    setGeneratingLink(creatorId);
+    try {
+      const res = await apiRequest("POST", `/api/creators/${creatorId}/gerar-token`);
+      const data = await res.json();
+      setPortalLinkUrl(data.url);
+    } catch (err: any) {
+      toast({ title: "Erro ao gerar link", description: err.message, variant: "destructive" });
+    } finally {
+      setGeneratingLink(null);
+    }
+  }
+
   function openEditCreator(creator: Creator) {
     setEditingCreator(creator);
     setCreatorForm({
@@ -425,6 +442,9 @@ export default function Creators() {
                       <TableCell className="text-sm">{[c.cidade, c.estado].filter(Boolean).join("/") || "—"}</TableCell>
                       <TableCell className="text-sm">{c.chave_pix ? `${c.tipo_pix || "PIX"}: ${c.chave_pix.substring(0, 20)}...` : "—"}</TableCell>
                       <TableCell className="text-right space-x-1" onClick={e => e.stopPropagation()}>
+                        <Button variant="ghost" size="sm" onClick={() => gerarPortalLink(c.id)} disabled={generatingLink === c.id} title="Gerar Link Portal">
+                          {generatingLink === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => openEditCreator(c)}>
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -907,6 +927,35 @@ export default function Creators() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog: Portal Link */}
+      <Dialog open={portalLinkUrl !== null} onOpenChange={(open) => { if (!open) setPortalLinkUrl(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link do Portal Creator</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Compartilhe este link via WhatsApp para o freelancer acessar o portal.</p>
+          <div className="flex items-center gap-2">
+            <Input readOnly value={portalLinkUrl || ""} className="flex-1 text-xs" />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (portalLinkUrl) {
+                  navigator.clipboard.writeText(portalLinkUrl);
+                  toast({ title: "Link copiado!" });
+                }
+              }}
+            >
+              <Copy className="w-4 h-4 mr-1" />
+              Copiar
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPortalLinkUrl(null)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
