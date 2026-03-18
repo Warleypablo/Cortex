@@ -182,6 +182,31 @@ function ChurnRateIndicator({ rate }: { rate: number }) {
   return <span className={cn("font-semibold", color)}>{formatPercent(rate)}</span>;
 }
 
+function MiniSparkline({ data, width = 60, height = 24 }: { data: number[]; width?: number; height?: number }) {
+  if (data.length < 2) return null;
+  const color = data[data.length - 1] >= data[0] ? "#10b981" : "#f43f5e";
+  const chartData = data.map((value, index) => ({ index, value }));
+  return (
+    <LineChart width={width} height={height} data={chartData}>
+      <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
+    </LineChart>
+  );
+}
+
+function MrrProgressBar({ value, color }: { value: number; color: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-20 h-2 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${Math.min(value, 100)}%`, backgroundColor: color, opacity: 0.7 }}
+        />
+      </div>
+      <span className="text-xs text-gray-600 dark:text-zinc-400 w-10 text-right">{value.toFixed(1)}%</span>
+    </div>
+  );
+}
+
 function getMotivoBadgeColor(motivo: string): string {
   const m = (motivo || "").toLowerCase();
   if (m.includes("insatisf")) return "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400";
