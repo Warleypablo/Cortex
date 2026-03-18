@@ -343,11 +343,14 @@ function ProtectedRouter() {
       <Route path="/growth/orcado-realizado">{() => <ProtectedRoute path="/growth/orcado-realizado" component={GrowthOrcadoRealizado} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
       
+      {/* Social (Makers) */}
+      <Route path="/social/creators">{() => <ProtectedRoute path="/social/creators" component={Creators} />}</Route>
+
       {/* Jurídico */}
       <Route path="/juridico/clientes">{() => <ProtectedRoute path="/juridico/clientes" component={DashboardInadimplencia} />}</Route>
       <Route path="/juridico/processos">{() => <ProtectedRoute path="/juridico/processos" component={ProcessosJuridico} />}</Route>
       <Route path="/juridico/contratos-colaborador">{() => <ProtectedRoute path="/juridico/contratos-colaborador" component={ContratosColaboradores} />}</Route>
-      <Route path="/juridico/creators">{() => <ProtectedRoute path="/juridico/creators" component={Creators} />}</Route>
+      <Route path="/juridico/creators">{() => <RedirectTo to="/social/creators" />}</Route>
       
       {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
