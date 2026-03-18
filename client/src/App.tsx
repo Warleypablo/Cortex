@@ -108,6 +108,7 @@ const JuridicoClientes = lazyWithRetry(() => import("@/pages/JuridicoClientes"))
 const ProcessosJuridico = lazyWithRetry(() => import("@/pages/ProcessosJuridico"));
 const ContratosColaboradores = lazyWithRetry(() => import("@/pages/ContratosColaboradores"));
 const Creators = lazyWithRetry(() => import("@/pages/Creators"));
+const PagamentoFreelancers = lazyWithRetry(() => import("@/pages/PagamentoFreelancers"));
 const InvestorsReport = lazyWithRetry(() => import("@/pages/InvestorsReport"));
 const RelatorioMensal = lazyWithRetry(() => import("@/pages/RelatorioMensal"));
 const Acessos = lazyWithRetry(() => import("@/pages/Acessos"));
@@ -345,6 +346,7 @@ function ProtectedRouter() {
       
       {/* Social (Makers) */}
       <Route path="/social/creators">{() => <ProtectedRoute path="/social/creators" component={Creators} />}</Route>
+      <Route path="/social/pagamentos">{() => <ProtectedRoute path="/social/pagamentos" component={PagamentoFreelancers} />}</Route>
 
       {/* Jurídico */}
       <Route path="/juridico/clientes">{() => <ProtectedRoute path="/juridico/clientes" component={DashboardInadimplencia} />}</Route>
