@@ -305,33 +305,43 @@ app.use((req, res, next) => {
   const ASSINAFY_POLL_INTERVAL = 5 * 60 * 1000; // 5 min
   const pollAssinafyStatus = async () => {
     try {
-      // Buscar config da API (qualquer tipo ativo serve, a api_key é a mesma)
-      const configResult = await db.execute(sql`
+      const { db } = await import('./db');
+      const { sql } = await import('drizzle-orm');
+
+      // Buscar configs separadas: clientes (staging) e creators (cortex_core)
+      const clientConfigResult = await db.execute(sql`
         SELECT api_key, api_url FROM staging.assinafy_config WHERE ativo = true LIMIT 1
       `);
-      const coreConfigResult = await db.execute(sql`
+      const creatorConfigResult = await db.execute(sql`
+        SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'creators' LIMIT 1
+      `);
+      // Fallback: se não houver config específica de creators, tenta qualquer uma de cortex_core
+      const creatorConfigFallback = creatorConfigResult.rows[0] ? null : await db.execute(sql`
         SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true LIMIT 1
       `);
-      const config = (configResult.rows[0] || coreConfigResult.rows[0]) as any;
-      if (!config?.api_key) return;
+
+      const clientConfig = clientConfigResult.rows[0] as any;
+      const creatorConfig = (creatorConfigResult.rows[0] || creatorConfigFallback?.rows[0]) as any;
+
+      if (!clientConfig?.api_key && !creatorConfig?.api_key) return;
 
       // Contratos de clientes pendentes
-      const clientContratos = await db.execute(sql`
+      const clientContratos = clientConfig?.api_key ? await db.execute(sql`
         SELECT id, assinafy_document_id, status, assinafy_status
         FROM staging.contratos
         WHERE assinafy_document_id IS NOT NULL
           AND status IN ('enviado para assinatura', 'enviado')
           AND signature_completed_at IS NULL
-      `);
+      `) : { rows: [] };
 
       // Contratos de creators pendentes
-      const creatorContratos = await db.execute(sql`
+      const creatorContratos = creatorConfig?.api_key ? await db.execute(sql`
         SELECT id, assinafy_document_id, status, assinafy_status
         FROM cortex_core.contratos_creators
         WHERE assinafy_document_id IS NOT NULL
           AND status = 'enviado'
           AND assinado_em IS NULL
-      `);
+      `) : { rows: [] };
 
       const pending = [
         ...((clientContratos.rows as any[]).map(r => ({ ...r, tipo: 'cliente' }))),
@@ -340,18 +350,37 @@ app.use((req, res, next) => {
 
       if (pending.length === 0) return;
 
+      console.log(`[assinafy-poll] Verificando ${pending.length} contrato(s) pendente(s) (${(clientContratos.rows as any[]).length} clientes, ${(creatorContratos.rows as any[]).length} creators)`);
+
       let updated = 0;
       for (const c of pending) {
         try {
-          const statusUrl = `${config.api_url}/documents/${c.assinafy_document_id}`;
-          const resp = await fetch(statusUrl, { method: 'GET', headers: { 'X-Api-Key': config.api_key } });
-          const result = await resp.json() as any;
-          const docStatus = result.data?.status || result.status;
+          // Usar a config correta conforme o tipo de contrato
+          const cfg = c.tipo === 'creator' ? creatorConfig : clientConfig;
+          if (!cfg?.api_key) continue;
 
-          if (!docStatus || docStatus === c.assinafy_status) continue;
+          const statusUrl = `${cfg.api_url}/documents/${c.assinafy_document_id}`;
+          const resp = await fetch(statusUrl, { method: 'GET', headers: { 'X-Api-Key': cfg.api_key } });
+
+          if (!resp.ok) {
+            console.error(`[assinafy-poll] HTTP ${resp.status} ao consultar doc ${c.assinafy_document_id} (${c.tipo})`);
+            continue;
+          }
+
+          const result = await resp.json() as any;
+          const docStatus = result.data?.status || (typeof result.status === 'string' ? result.status : null);
+
+          if (!docStatus) {
+            console.warn(`[assinafy-poll] Status vazio para doc ${c.assinafy_document_id} (${c.tipo}), response:`, JSON.stringify(result).slice(0, 200));
+            continue;
+          }
+
+          if (docStatus === c.assinafy_status) continue;
 
           const isAssinado = docStatus === 'signed' || docStatus === 'completed' || docStatus === 'certificated';
           const isRecusado = docStatus === 'declined';
+
+          console.log(`[assinafy-poll] Doc ${c.assinafy_document_id} (${c.tipo} #${c.id}): ${c.assinafy_status} → ${docStatus}${isAssinado ? ' ✓ ASSINADO' : isRecusado ? ' ✗ RECUSADO' : ''}`);
 
           if (c.tipo === 'cliente') {
             if (isAssinado) {
@@ -366,7 +395,7 @@ app.use((req, res, next) => {
                 WHERE id = ${c.id}
               `);
               updated++;
-            } else if (docStatus !== c.assinafy_status) {
+            } else {
               await db.execute(sql`
                 UPDATE staging.contratos SET assinafy_status = ${docStatus}, data_atualizacao = NOW()
                 WHERE id = ${c.id}
@@ -385,7 +414,7 @@ app.use((req, res, next) => {
                 WHERE id = ${c.id}
               `);
               updated++;
-            } else if (docStatus !== c.assinafy_status) {
+            } else {
               await db.execute(sql`
                 UPDATE cortex_core.contratos_creators SET assinafy_status = ${docStatus}, atualizado_em = NOW()
                 WHERE id = ${c.id}
@@ -393,7 +422,7 @@ app.use((req, res, next) => {
             }
           }
         } catch (docErr: any) {
-          console.error(`[assinafy-poll] Erro ao consultar doc ${c.assinafy_document_id}:`, docErr.message);
+          console.error(`[assinafy-poll] Erro ao consultar doc ${c.assinafy_document_id} (${c.tipo} #${c.id}):`, docErr.message);
         }
       }
 
