@@ -700,4 +700,82 @@ export function registerCreatorsRoutes(app: Express) {
       res.status(500).json({ error: "Erro ao enviar para assinatura" });
     }
   });
+
+  // POST /api/creators/contratos/sync-assinaturas — Sync manual dos status de assinatura
+  app.post("/api/creators/contratos/sync-assinaturas", async (_req, res) => {
+    try {
+      const configResult = await db.execute(sql`
+        SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'creators' LIMIT 1
+      `);
+      const config = configResult.rows[0] as any;
+      if (!config?.api_key) {
+        return res.status(500).json({ error: "Config Assinafy creators não encontrada" });
+      }
+
+      const pendingResult = await db.execute(sql`
+        SELECT id, assinafy_document_id, status, assinafy_status
+        FROM cortex_core.contratos_creators
+        WHERE assinafy_document_id IS NOT NULL
+          AND status = 'enviado'
+          AND assinado_em IS NULL
+      `);
+
+      const pending = pendingResult.rows as any[];
+      if (pending.length === 0) {
+        return res.json({ message: "Nenhum contrato pendente", updated: 0, total: 0 });
+      }
+
+      let updated = 0;
+      const details: any[] = [];
+
+      for (const c of pending) {
+        try {
+          const resp = await fetch(`${config.api_url}/documents/${c.assinafy_document_id}`, {
+            method: 'GET',
+            headers: { 'X-Api-Key': config.api_key }
+          });
+
+          if (!resp.ok) {
+            details.push({ id: c.id, docId: c.assinafy_document_id, error: `HTTP ${resp.status}` });
+            continue;
+          }
+
+          const result = await resp.json() as any;
+          const docStatus = result.data?.status || (typeof result.status === 'string' ? result.status : null);
+
+          const isAssinado = docStatus === 'signed' || docStatus === 'completed' || docStatus === 'certificated';
+          const isRecusado = docStatus === 'declined';
+
+          if (isAssinado) {
+            await db.execute(sql`
+              UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), atualizado_em = NOW()
+              WHERE id = ${c.id}
+            `);
+            updated++;
+          } else if (isRecusado) {
+            await db.execute(sql`
+              UPDATE cortex_core.contratos_creators SET status = 'recusado', assinafy_status = 'declined', atualizado_em = NOW()
+              WHERE id = ${c.id}
+            `);
+            updated++;
+          } else if (docStatus && docStatus !== c.assinafy_status) {
+            await db.execute(sql`
+              UPDATE cortex_core.contratos_creators SET assinafy_status = ${docStatus}, atualizado_em = NOW()
+              WHERE id = ${c.id}
+            `);
+          }
+
+          details.push({ id: c.id, docId: c.assinafy_document_id, prevStatus: c.assinafy_status, apiStatus: docStatus, action: isAssinado ? 'assinado' : isRecusado ? 'recusado' : 'updated' });
+        } catch (err: any) {
+          details.push({ id: c.id, docId: c.assinafy_document_id, error: err.message });
+        }
+      }
+
+      console.log(`[assinafy-sync-manual] ${updated}/${pending.length} contratos creators atualizados`);
+      res.json({ updated, total: pending.length, details });
+    } catch (error: any) {
+      console.error("[assinafy-sync-manual] Erro:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 }
