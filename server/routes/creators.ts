@@ -97,13 +97,12 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
   const chunks: Buffer[] = [];
   doc.on('data', (chunk: Buffer) => chunks.push(chunk));
 
-  const cpfCnpj = creator.cnpj || creator.cpf || 'Não informado';
-  const docType = creator.cnpj ? 'CNPJ' : 'CPF';
-  const enderecoCompleto = [creator.endereco, creator.cidade, creator.estado, creator.cep].filter(Boolean).join(', ');
   const valorNum = parseFloat((contrato.valor_remuneracao || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
   const valorFormatado = valorNum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const unidadePrazo = contrato.unidade_prazo || 'meses';
+  const valorExtenso = valorPorExtenso(valorNum);
   const prazoEntrega = contrato.prazo_entrega_dias || 3;
+  const prazoExtenso = numeroPorExtenso(prazoEntrega);
+  const clienteNome = contrato.cliente_nome || 'do cliente';
 
   const dataAtual = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -118,6 +117,18 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
 
   const heading = (text: string) => p(text, { bold: true, fontSize: 11, spacing: 0.5 });
 
+  const bullet = (text: string) => {
+    doc.fontSize(10).font('Helvetica')
+       .text(`●  ${text}`, 80, undefined, { align: 'left', lineGap: 4, width: 460 });
+    doc.moveDown(0.3);
+  };
+
+  const romanItem = (text: string) => {
+    doc.fontSize(10).font('Helvetica')
+       .text(text, 75, undefined, { align: 'justify', lineGap: 4, width: 465 });
+    doc.moveDown(0.3);
+  };
+
   // ── TÍTULO ──
   p('CONTRATO DE PRESTAÇÃO DE SERVIÇOS', { bold: true, fontSize: 14, align: 'center', spacing: 1.5 });
 
@@ -126,107 +137,139 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
 
   p('Na qualidade de CONTRATANTE: TURBO PARTNERS LTDA, CNPJ 42.100.292/0001-84, com sede na R Treze de Maio, 9 - Centro, Vitória, ES, na forma de seu contrato social;', { spacing: 0.8 });
 
-  let contratadaText = `Na qualidade de CONTRATADA: ${creator.nome}`;
-  if (enderecoCompleto) contratadaText += `, residente e domiciliado na ${enderecoCompleto}`;
-  if (creator.email) contratadaText += `, e-mail ${creator.email}`;
-  contratadaText += ` e inscrita no ${docType} nº ${cpfCnpj}.`;
-  p(contratadaText, { spacing: 1 });
+  p(`Na qualidade de CONTRATADA: ${creator.nome}`, { spacing: 1 });
 
-  // ── CLÁUSULA 1ª - OBJETO ──
-  heading('Cláusula 1ª - OBJETO');
+  // ── CLÁUSULA 1 - OBJETO ──
+  heading('CLÁUSULA 1 - OBJETO');
 
-  const clienteRef = contrato.cliente_nome ? `para o cliente ${contrato.cliente_nome} ` : '';
-  p(`1. O CONTRATANTE tem interesse que a CONTRATADA preste serviços e ceda seus direitos de imagem ${clienteRef}de acordo com as condições estipuladas neste instrumento; Têm entre si justo e contratado a Prestação de Serviços objeto do presente instrumento, mediante as seguintes condições:`, { spacing: 0.8 });
+  p(`1.1 O presente contrato tem por objeto a prestação de serviços de criação de conteúdo audiovisual publicitário, bem como a cessão de direitos de imagem e de utilização do conteúdo produzido, destinados à divulgação da marca ${clienteNome}.`, { spacing: 0.5 });
 
-  p('1.1 - INFORMAÇÕES DA CAMPANHA', { bold: true, spacing: 0.5 });
-  p('IMAGEM / ÁUDIO', { spacing: 0.5 });
+  p('1.2 O conteúdo deverá observar as diretrizes constantes no briefing de campanha, que passa a integrar o presente contrato como documento complementar.', { spacing: 0.5 });
 
-  // ── Tabela Informações da Campanha ──
-  const tableX = 60;
-  const tableW = 480;
-  const tableY = doc.y;
-  const colW = tableW / 2;
-  const cellPad = 8;
+  p('1.3 A CONTRATADA compromete-se a produzir:', { spacing: 0.3 });
 
-  // Calcular altura
-  doc.fontSize(9).font('Helvetica');
-  const leftH = doc.heightOfString(`Direito de Uso de Imagem?\n(x) Sim ( ) Não\nPeríodo:\nDurante 12 meses`, { width: colW - 2 * cellPad });
-  const rightH = doc.heightOfString(`Canais:\n(x) Redes Sociais\n(x) Anúncios\n(x) Canais de Comunicação`, { width: colW - 2 * cellPad });
-  const rowH = Math.max(leftH, rightH) + 2 * cellPad + 10;
+  // Entregas como bullet list
+  const entregas = contrato.descricao_servicos.split(/\n|;/).map(s => s.trim()).filter(Boolean);
+  if (entregas.length > 0) {
+    for (const entrega of entregas) {
+      bullet(entrega);
+    }
+  } else {
+    bullet('Conteúdo conforme briefing de campanha.');
+  }
+  doc.moveDown(0.5);
 
-  doc.rect(tableX, tableY, colW, rowH).stroke();
-  doc.rect(tableX + colW, tableY, colW, rowH).stroke();
+  // ── CLÁUSULA 2 ──
+  heading('CLÁUSULA 2 - DAS OBRIGAÇÕES DA CONTRATADA');
 
-  // Coluna esquerda
-  doc.fontSize(9).font('Helvetica-Bold')
-     .text('Direito de Uso de Imagem?', tableX + cellPad, tableY + cellPad, { width: colW - 2 * cellPad });
-  doc.font('Helvetica').text('(x) Sim ( ) Não', { width: colW - 2 * cellPad });
-  doc.font('Helvetica-Bold').text('Período:', { width: colW - 2 * cellPad });
-  doc.font('Helvetica').text('Durante 12 meses', { width: colW - 2 * cellPad });
+  p('2.1. A CONTRATADA obriga-se a produzir o conteúdo objeto deste contrato em estrita conformidade com as diretrizes, orientações e especificações constantes no briefing de campanha fornecido pela CONTRATANTE, o qual passa a integrar o presente instrumento para todos os fins de direito.', { spacing: 0.5 });
 
-  // Coluna direita
-  doc.fontSize(9).font('Helvetica-Bold')
-     .text('Canais:', tableX + colW + cellPad, tableY + cellPad, { width: colW - 2 * cellPad });
-  doc.font('Helvetica')
-     .text('(x) Redes Sociais', { width: colW - 2 * cellPad })
-     .text('(x) Anúncios', { width: colW - 2 * cellPad })
-     .text('(x) Canais de Comunicação', { width: colW - 2 * cellPad });
+  p('2.2. O conteúdo produzido deverá atender a padrões mínimos de qualidade técnica e editorial compatíveis com a finalidade publicitária da campanha, devendo observar, entre outros aspectos, adequada captação de áudio, iluminação suficiente para a correta visualização do produto, enquadramento apropriado da imagem e fidelidade às informações e características do produto ou serviço divulgado.', { spacing: 0.5 });
 
-  doc.y = tableY + rowH + 15;
-  doc.x = 60;
+  p('2.3. A CONTRATADA compromete-se, ainda, a conduzir a produção do conteúdo de forma diligente e profissional, abstendo-se de realizar quaisquer manifestações, condutas ou inserções que possam comprometer a reputação, a imagem institucional ou os interesses comerciais da CONTRATANTE ou da marca objeto da campanha.', { spacing: 0.5 });
 
-  // 1.2 ENTREGAS
-  p('1.2 ENTREGAS', { bold: true, spacing: 0.5 });
-  p(contrato.descricao_servicos, { spacing: 1 });
+  p('2.4. A CONTRATANTE poderá solicitar ajustes técnicos ou editoriais no material entregue sempre que verificar desconformidade com o briefing, com os padrões de qualidade exigidos ou com as diretrizes da campanha, hipótese em que a CONTRATADA deverá proceder às adequações necessárias, sem custo adicional, nos termos deste contrato.', { spacing: 1 });
 
-  // ── CLÁUSULA 2ª ──
-  heading('Cláusula 2ª - DAS OBRIGAÇÕES DA CONTRATADA');
+  // ── CLÁUSULA 3 ──
+  heading('CLÁUSULA 3 – DAS OBRIGAÇÕES DA CONTRATANTE');
 
-  p('2.1 É dever da CONTRATADA observar fielmente as condições descritas no OBJETO do presente contrato e seguir detalhamentos do Briefing de Conteúdos;', { spacing: 0.5 });
+  p('3.1. Compete à CONTRATANTE fornecer à CONTRATADA todas as informações necessárias à adequada execução do conteúdo contratado, incluindo, entre outras, orientações relativas ao produto, forma de utilização, características, diferenciais e demais elementos relevantes para a correta elaboração do material.', { spacing: 0.5 });
 
-  p(`2.2 É responsabilidade da CONTRATADA entregar o conteúdo acordado no Briefing de Conteúdos dentro do período de ${prazoEntrega} dias corridos após o recebimento do produto;`, { spacing: 0.5 });
+  p('3.2. Constitui obrigação da CONTRATANTE encaminhar à CONTRATADA o(s) produto(s) objeto da campanha dentro do prazo previamente acordado entre as partes, de modo a não comprometer o cronograma de produção do conteúdo.', { spacing: 0.5 });
 
-  p('2.3 A CONTRATADA não poderá se fazer substituir por outro usuário na prestação de serviços, uma vez que foi escolhido pela CONTRATANTE em razão das suas características pessoais, tendo o presente contrato, intuitu personae.', { spacing: 1 });
+  p('3.3. A CONTRATANTE deverá disponibilizar à CONTRATADA o briefing da campanha, bem como quaisquer diretrizes, orientações ou materiais complementares necessários à correta execução do conteúdo.', { spacing: 1 });
 
-  // ── CLÁUSULA 3ª ──
-  heading('Cláusula 3ª - DAS OBRIGAÇÕES DO CONTRATANTE');
+  // ── CLÁUSULA 4 ──
+  heading('CLÁUSULA 4 – DO PRAZO DE ENTREGA');
 
-  p('3.1 O CONTRATANTE deverá passar para a CONTRATADA todas as informações relacionadas ao produto, como forma de manuseio, vantagens ou características;', { spacing: 0.5 });
+  p(`4.1 A CONTRATADA obriga-se a produzir e entregar o conteúdo audiovisual previsto no briefing no prazo máximo de ${String(prazoEntrega).padStart(2, '0')} (${prazoExtenso}) dias corridos, contados do recebimento do produto objeto da campanha, comprovado por registro de entrega ou confirmação eletrônica.`, { spacing: 0.5 });
 
-  p('3.2 É dever do CONTRATANTE enviar o(s) produto(s) acordados dentro do prazo estipulado para não atrasar a produção de conteúdo;', { spacing: 0.5 });
+  p('4.2 É dever da CONTRATADA observar fielmente as condições descritas no OBJETO do presente contrato e seguir detalhamentos do Briefing de Conteúdos;', { spacing: 0.5 });
 
-  p('3.3 A CONTRATADA compromete-se a entregar todos os conteúdos acordados no prazo estipulado no presente contrato. Caso ocorra atraso na entrega, sem justificativa prévia e aceita pela CONTRATANTE, deverá pagar uma multa no valor de R$ 300,00 (trezentos reais) por dia de atraso, a ser paga diretamente à CONTRATANTE, sem prejuízo da rescisão contratual e de eventuais danos e perdas que possam ser reclamados judicialmente.', { spacing: 1 });
+  p('4.3 Eventual prorrogação do prazo somente será admitida mediante concordância expressa da CONTRATANTE.', { spacing: 0.5 });
 
-  // ── CLÁUSULA 4ª ──
-  heading('Cláusula 4ª - REMUNERAÇÃO');
+  p('4.4. O atraso injustificado na entrega do conteúdo contratado sujeitará a CONTRATADA ao pagamento de multa moratória no valor de R$ 150,00 (cento e cinquenta reais) por dia de atraso, limitada ao montante máximo equivalente a 10 (dez) vezes o valor da remuneração contratada, sem prejuízo:', { spacing: 0.3 });
 
-  p(`4.1 A ação produzida pelo CONTRATADO para a CONTRATANTE será remunerado no valor de ${valorFormatado}. Além dos produtos utilizados para filmagem, conforme acordado entre as partes.`, { spacing: 0.5 });
+  romanItem('I – da possibilidade de rescisão imediata do contrato por inadimplemento;');
+  romanItem('II – da cobrança de eventuais perdas e danos, nos termos dos arts. 389, 395 e 402 do Código Civil;');
+  romanItem('III – da obrigação de restituição de eventuais valores antecipados.');
+  doc.moveDown(0.5);
 
-  p('4.2 O pagamento será efetuado exclusivamente após a aprovação final do material, considerando eventuais alterações que não estejam relacionadas ao briefing inicial. A nota fiscal somente poderá ser emitida após a devida aprovação do analista responsável, sendo que a autorização para pagamento ocorrerá após a validação final do conteúdo e o recebimento da nota fiscal correspondente.', { spacing: 1 });
+  // ── CLÁUSULA 5 ──
+  heading('CLÁUSULA 5 – DA AVALIAÇÃO, CORREÇÃO E REGRAVAÇÃO DO CONTEÚDO');
 
-  // ── CLÁUSULA 5ª ──
-  heading('Cláusula 5ª - DA AVALIAÇÃO DE PERFORMANCE');
+  p('5.1. O conteúdo produzido será submetido à avaliação da CONTRATANTE, que verificará sua conformidade com o briefing, com as diretrizes da campanha e com os padrões técnicos exigidos.', { spacing: 0.5 });
 
-  p('5.1 A execução dos serviços, objeto do presente contrato, passará por avaliação do CONTRATANTE para fins de constatar o cumprimento dos indicadores de produtividade.', { spacing: 0.5 });
+  p('5.2. Caso o material apresentado não esteja em conformidade com as especificações da campanha ou apresente inconsistências técnicas ou editoriais, a CONTRATADA obriga-se a realizar as correções ou regravações necessárias.', { spacing: 0.5 });
 
-  p('5.2 Caso não esteja dentro dos parâmetros acordados no Guia de Conteúdo, é dever da CONTRATADA regravar os conteúdos dentro do prazo de 3 dias corridos.', { spacing: 1 });
+  p('5.3. As adequações poderão compreender, entre outras medidas:', { spacing: 0.3 });
 
-  // ── CLÁUSULA 6ª ──
-  heading('Cláusula 6ª - DA RESCISÃO');
+  romanItem('I – regravação total ou parcial do conteúdo;');
+  romanItem('II – correção de falas ou informações veiculadas;');
+  romanItem('III – ajustes técnicos de áudio, iluminação ou enquadramento;');
+  romanItem('IV – adequação do roteiro às diretrizes da campanha.');
+  doc.moveDown(0.3);
 
-  p('6.1 Após a entrega, poderão as partes rescindir este contrato, desde que avise previamente e que nenhuma das partes seja lesada.', { spacing: 1 });
+  p('5.4. A nova versão do conteúdo deverá ser entregue no prazo máximo de 02 (dois) dias corridos, contados da solicitação de ajustes pela CONTRATANTE.', { spacing: 1 });
 
-  // ── CLÁUSULA 7ª ──
-  heading('Cláusula 7ª - DAS CONDIÇÕES GERAIS');
+  // ── CLÁUSULA 6 ──
+  heading('CLÁUSULA 6 – DOS PRODUTOS ENVIADOS PARA GRAVAÇÃO');
 
-  p('7.1 Fica compactuado entre as partes a total inexistência de vínculo trabalhista entre as partes contratantes, excluindo as obrigações previdenciárias e os encargos sociais, não havendo entre CONTRATADO e CONTRATANTE qualquer tipo de relação de subordinação.', { spacing: 0.5 });
+  p('6.1. Os produtos enviados pela CONTRATANTE destinam-se exclusivamente à produção do conteúdo objeto deste contrato.', { spacing: 0.5 });
 
-  p('7.2 Fica compactuado entre as partes a total inexistência de vínculo com o cliente para qual será produzido os conteúdos, excluindo as obrigações previdenciárias e os encargos sociais, não havendo entre CONTRATADO e CLIENTE qualquer tipo de relação de subordinação.', { spacing: 1 });
+  p('6.2. A CONTRATADA será responsável pela guarda, conservação e utilização adequada dos produtos desde o momento do recebimento até a conclusão da campanha.', { spacing: 0.5 });
 
-  // ── CLÁUSULA 8ª ──
-  heading('Cláusula 8ª - DO FORO');
+  p('6.3. A CONTRATADA responderá por eventuais danos, extravio ou deterioração dos produtos decorrentes de culpa, negligência ou uso inadequado.', { spacing: 1 });
 
-  p('8.1 Para dirimir quaisquer controvérsias oriundas do presente contrato, as partes elegem o foro da Comarca de Vitória, do Estado do Espírito Santo.', { spacing: 1.5 });
+  // ── CLÁUSULA 7 ──
+  heading('CLÁUSULA 7 – DA CESSÃO DE DIREITOS DE IMAGEM E CONTEÚDO');
+
+  p('7.1. A CONTRATADA autoriza a utilização de sua imagem, voz, nome e demais elementos de identificação pessoal pela CONTRATANTE, exclusivamente para fins de divulgação da campanha objeto deste contrato.', { spacing: 0.5 });
+
+  p('7.2. A autorização de uso será válida pelo prazo de 12 (doze) meses, contado da aprovação final do conteúdo.', { spacing: 0.5 });
+
+  p('7.3. Nos termos da Lei nº 9.610/1998, a CONTRATADA cede à CONTRATANTE os direitos patrimoniais de utilização do conteúdo produzido, limitados às finalidades e ao período previstos neste contrato.', { spacing: 1 });
+
+  // ── CLÁUSULA 8 ──
+  heading('CLÁUSULA 8 – DA REMUNERAÇÃO');
+
+  p(`8.1. Pela execução dos serviços objeto deste contrato, a CONTRATADA receberá a remuneração total de ${valorFormatado} (${valorExtenso}), além dos produtos utilizados para a gravação do conteúdo.`, { spacing: 0.5 });
+
+  p('8.2. O pagamento da remuneração prevista neste contrato será realizado somente após a aprovação final do material pela CONTRATANTE, considerando-se eventuais ajustes ou alterações que forem solicitadas.', { spacing: 0.5 });
+
+  p('8.3. A nota fiscal somente poderá ser emitida pela CONTRATADA após a aprovação do conteúdo pelo responsável designado pela CONTRATANTE.', { spacing: 0.5 });
+
+  p('8.4. Após a emissão da nota fiscal, o pagamento será efetuado pela CONTRATANTE no prazo de até 07 (sete) dias úteis, contados do seu recebimento e da validação final do conteúdo entregue.', { spacing: 1 });
+
+  // ── CLÁUSULA 9 ──
+  heading('CLÁUSULA 9 – DA CONFIDENCIALIDADE');
+
+  p('9.1. A CONTRATADA compromete-se a manter absoluto sigilo sobre quaisquer informações relacionadas à campanha, produtos, estratégias de marketing ou materiais promocionais fornecidos pela CONTRATANTE.', { spacing: 0.5 });
+
+  p('9.2. É vedada a divulgação antecipada de produtos, campanhas ou quaisquer informações que ainda não tenham sido tornadas públicas.', { spacing: 0.5 });
+
+  p('9.3. O descumprimento desta cláusula sujeitará a CONTRATADA ao pagamento de multa equivalente a 10 (dez) vezes o valor da remuneração contratada, sem prejuízo da indenização por eventuais danos.', { spacing: 1 });
+
+  // ── CLÁUSULA 10 ──
+  heading('CLÁUSULA 10 – DA RESCISÃO');
+
+  p('10.1. Caso a CONTRATADA promova a rescisão do presente contrato sem justa causa antes da conclusão das obrigações assumidas, ficará sujeita ao pagamento de multa compensatória equivalente a 05 (cinco) vezes o valor total da remuneração contratada, sem prejuízo da reparação de eventuais prejuízos adicionais suportados pela CONTRATANTE.', { spacing: 0.5 });
+
+  p('Parágrafo Primeiro. Esta ficará igualmente obrigada a devolver à CONTRATANTE, no prazo máximo de 03 (três) dias corridos, contados da comunicação da rescisão, todos os produtos que lhe tenham sido enviados para fins de produção do conteúdo.', { spacing: 0.5 });
+
+  p('10.2. O não cumprimento do prazo de devolução previsto na cláusula anterior sujeitará a CONTRATADA ao pagamento de multa adicional diária de 20% (vinte por cento) equivalente ao valor do produto retido, até a efetiva devolução do produto, sem prejuízo da cobrança do valor integral correspondente ao bem caso este não seja restituído.', { spacing: 1 });
+
+  // ── CLÁUSULA 11 ──
+  heading('CLÁUSULA 11 – DA NATUREZA JURÍDICA DA RELAÇÃO');
+
+  p('11.1. O presente contrato possui natureza estritamente civil, inexistindo vínculo empregatício entre as partes.', { spacing: 0.5 });
+
+  p('11.2. A CONTRATADA atuará com autonomia técnica e organizacional, inexistindo relação de subordinação jurídica.', { spacing: 1 });
+
+  // ── CLÁUSULA 12 ──
+  heading('CLÁUSULA 12 – DO FORO');
+
+  p('12.1. Para dirimir quaisquer controvérsias decorrentes deste contrato, as partes elegem o Foro da Comarca de Vitória, Estado do Espírito Santo, com renúncia expressa a qualquer outro, por mais privilegiado que seja.', { spacing: 1.5 });
 
   // ── ENCERRAMENTO E ASSINATURAS ──
   p('E por estarem assim, as partes justas e acertadas, firmam o presente contrato:', { spacing: 1.5 });
