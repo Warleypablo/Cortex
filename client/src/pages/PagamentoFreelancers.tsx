@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
   Video, Clock, CheckCircle2, Banknote, Search, CreditCard, AlertTriangle,
-  User, Mail, Key, CalendarDays, FileText, DollarSign, ArrowRight,
+  User, Mail, Key, CalendarDays, FileText, DollarSign, ArrowRight, Download, Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
@@ -36,6 +36,11 @@ interface ContratoPagamento {
   prazo_entrega_dias: number | null;
   chave_pix: string | null;
   tipo_pix: string | null;
+  nf_arquivo_nome: string | null;
+  nf_numero: string | null;
+  nf_valor: string | null;
+  nf_data_emissao: string | null;
+  nf_anexado_em: string | null;
 }
 
 // ============================================
@@ -262,6 +267,16 @@ function KanbanCard({ contrato: c, onClick }: { contrato: ContratoPagamento; onC
             PIX
           </span>
         )}
+        {c.nf_arquivo_nome ? (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 font-medium flex items-center gap-0.5">
+            <Receipt className="w-3 h-3" />
+            NF
+          </span>
+        ) : (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300 font-medium">
+            Sem NF
+          </span>
+        )}
         {atrasado && (
           <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 font-semibold flex items-center gap-0.5">
             <AlertTriangle className="w-3 h-3" />
@@ -396,6 +411,46 @@ function DetailSheet({
             {contrato.observacoes && (
               <InfoRow icon={<FileText className="w-4 h-4 text-gray-400" />} label="Observações" value={contrato.observacoes} />
             )}
+
+            <Separator className="dark:bg-zinc-800" />
+
+            {/* Nota Fiscal */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-zinc-300 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-emerald-500" />
+                Nota Fiscal
+              </label>
+              {contrato.nf_arquivo_nome ? (
+                <div className="rounded-lg border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-900/10 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">{contrato.nf_arquivo_nome}</span>
+                    <a
+                      href={`/api/creators/contratos/${contrato.id}/nf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition"
+                    >
+                      <Download className="w-3 h-3" />
+                      Baixar
+                    </a>
+                  </div>
+                  <div className="flex gap-4 text-xs text-gray-600 dark:text-zinc-400">
+                    {contrato.nf_numero && <span>Nº {contrato.nf_numero}</span>}
+                    {contrato.nf_valor && <span>R$ {parseFloat(contrato.nf_valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>}
+                    {contrato.nf_data_emissao && <span>Emissão: {new Date(contrato.nf_data_emissao).toLocaleDateString("pt-BR")}</span>}
+                  </div>
+                  {contrato.nf_anexado_em && (
+                    <p className="text-[11px] text-gray-400 dark:text-zinc-500">
+                      Anexada {formatDistanceToNow(new Date(contrato.nf_anexado_em), { addSuffix: true, locale: ptBR })}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-orange-200 dark:border-orange-800/50 bg-orange-50/50 dark:bg-orange-900/10 p-3">
+                  <p className="text-sm text-orange-600 dark:text-orange-400">NF ainda não anexada pelo creator.</p>
+                </div>
+              )}
+            </div>
 
             <Separator className="dark:bg-zinc-800" />
 
