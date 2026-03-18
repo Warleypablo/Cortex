@@ -331,6 +331,7 @@ export function registerCreatorsRoutes(app: Express) {
       const result = await db.execute(sql`
         SELECT cc.id, cc.creator_id, cc.cargo, cc.cliente_nome, cc.valor_remuneracao,
                cc.assinado_em, cc.etapa_pagamento, cc.observacoes, cc.atualizado_em,
+               cc.prazo_entrega_dias,
                cr.nome AS creator_nome, cr.email AS creator_email,
                cr.chave_pix, cr.tipo_pix
         FROM cortex_core.contratos_creators cc
