@@ -67,6 +67,8 @@ async function ensureCreatorsTables() {
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_valor NUMERIC(10,2)`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_data_emissao DATE`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_anexado_em TIMESTAMP`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_arquivo_data BYTEA`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS nf_arquivo_mimetype VARCHAR(100)`,
     ];
     for (const ddl of newCols) {
       try { await db.execute(sql.raw(ddl)); } catch { /* column already exists */ }
