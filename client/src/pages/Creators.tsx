@@ -872,19 +872,6 @@ export default function Creators() {
             {/* Data de Início removida — usa data de assinatura do contrato */}
 
             <div>
-              <Label>Prazo de Entrega (dias úteis)</Label>
-              <Input
-                type="number"
-                min={1}
-                max={90}
-                value={contratoForm.prazo_entrega_dias}
-                onChange={e => setContratoForm(f => ({ ...f, prazo_entrega_dias: e.target.value }))}
-                placeholder="3"
-              />
-              <p className="text-xs text-muted-foreground mt-1">Prazo para entrega dos conteúdos após briefing</p>
-            </div>
-
-            <div>
               <Label>Observações</Label>
               <Textarea
                 value={contratoForm.observacoes}
