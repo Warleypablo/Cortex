@@ -997,7 +997,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                       const motivoMap = new Map<string, number>();
                       for (const c of selectedOpData.churns) {
                         const motivo = c.motivo_cancelamento || "Sem motivo";
-                        motivoMap.set(motivo, (motivoMap.get(motivo) || 0) + c.valorr);
+                        motivoMap.set(motivo, (motivoMap.get(motivo) || 0) + (parseFloat(String(c.valorr)) || 0));
                       }
                       const pieData = [...motivoMap.entries()]
                         .map(([name, value]) => ({ name, value }))
