@@ -349,6 +349,7 @@ export function registerCreatorsRoutes(app: Express) {
         SELECT cc.id, cc.creator_id, cc.cargo, cc.cliente_nome, cc.valor_remuneracao,
                cc.assinado_em, cc.etapa_pagamento, cc.observacoes, cc.atualizado_em,
                cc.prazo_entrega_dias,
+               cc.nf_arquivo_nome, cc.nf_numero, cc.nf_valor, cc.nf_data_emissao, cc.nf_anexado_em,
                cr.nome AS creator_nome, cr.email AS creator_email,
                cr.chave_pix, cr.tipo_pix
         FROM cortex_core.contratos_creators cc
@@ -359,6 +360,32 @@ export function registerCreatorsRoutes(app: Express) {
       res.json(result.rows);
     } catch (error: any) {
       console.error("[creators] Erro ao listar pagamentos:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/creators/contratos/:id/nf — Download NF (equipe interna)
+  app.get("/api/creators/contratos/:id/nf", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ error: "ID inválido" });
+
+      const result = await db.execute(sql`
+        SELECT nf_arquivo_data, nf_arquivo_nome, nf_arquivo_mimetype
+        FROM cortex_core.contratos_creators WHERE id = ${id} LIMIT 1
+      `);
+      const row = (result.rows as any[])[0];
+      if (!row?.nf_arquivo_data) return res.status(404).json({ error: "NF não encontrada" });
+
+      const buffer = Buffer.isBuffer(row.nf_arquivo_data) ? row.nf_arquivo_data : Buffer.from(row.nf_arquivo_data);
+      res.set({
+        "Content-Type": row.nf_arquivo_mimetype || "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${row.nf_arquivo_nome || "nf.pdf"}"`,
+        "Content-Length": String(buffer.length),
+      });
+      res.send(buffer);
+    } catch (error: any) {
+      console.error("[creators] Erro ao baixar NF:", error);
       res.status(500).json({ error: error.message });
     }
   });
