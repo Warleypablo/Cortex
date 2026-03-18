@@ -59,6 +59,7 @@ import {
   AlertCircle,
   Plus,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -115,16 +116,16 @@ function formatCurrency(value: string | number | null): string {
 }
 
 function statusBadge(status: string) {
-  const map: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof Check }> = {
+  const map: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof Check; className?: string }> = {
     rascunho: { variant: "secondary", icon: Clock },
-    enviado: { variant: "default", icon: Send },
-    assinado: { variant: "default", icon: Check },
+    enviado: { variant: "outline", icon: Send, className: "border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-400" },
+    assinado: { variant: "default", icon: Check, className: "bg-green-600 hover:bg-green-700 text-white" },
     recusado: { variant: "destructive", icon: AlertCircle },
   };
   const cfg = map[status] || map.rascunho;
   const Icon = cfg.icon;
   return (
-    <Badge variant={cfg.variant} className="gap-1">
+    <Badge variant={cfg.variant} className={`gap-1 ${cfg.className || ''}`}>
       <Icon className="w-3 h-3" />
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
@@ -279,6 +280,22 @@ export default function Creators() {
     },
     onError: (err: any) => {
       toast({ title: "Erro ao enviar", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const syncAssinaturas = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/creators/contratos/sync-assinaturas`);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Sync concluído", description: `${data.updated}/${data.total} contrato(s) atualizado(s)` });
+      if (selectedCreator) {
+        queryClient.invalidateQueries({ queryKey: ["/api/creators", selectedCreator.id, "contratos"] });
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro no sync", description: err.message, variant: "destructive" });
     },
   });
 
@@ -446,10 +463,22 @@ export default function Creators() {
                       <h3 className="font-semibold text-lg">{selectedCreator.nome}</h3>
                       <p className="text-sm text-muted-foreground">{selectedCreator.email} | {selectedCreator.cnpj || selectedCreator.cpf || "Sem doc"}</p>
                     </div>
-                    <Button onClick={() => { resetContratoForm(); setContratoCriadoId(null); setContratoDialogOpen(true); }} className="gap-2">
-                      <Plus className="w-4 h-4" />
-                      Novo Contrato
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1"
+                        disabled={syncAssinaturas.isPending}
+                        onClick={() => syncAssinaturas.mutate()}
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${syncAssinaturas.isPending ? 'animate-spin' : ''}`} />
+                        Sync Assinaturas
+                      </Button>
+                      <Button onClick={() => { resetContratoForm(); setContratoCriadoId(null); setContratoDialogOpen(true); }} className="gap-2">
+                        <Plus className="w-4 h-4" />
+                        Novo Contrato
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
