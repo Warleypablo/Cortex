@@ -225,7 +225,7 @@ function PortalContent() {
             ) : contratos.length === 0 ? (
               <div className={`rounded-xl border p-8 text-center ${isDark ? "border-zinc-800 bg-zinc-900" : "border-gray-200 bg-white"}`}>
                 <Briefcase className={`w-10 h-10 mx-auto mb-3 ${isDark ? "text-white/20" : "text-gray-300"}`} />
-                <p className={`text-sm ${isDark ? "text-white/50" : "text-gray-500"}`}>Nenhum contrato assinado encontrado.</p>
+                <p className={`text-sm ${isDark ? "text-white/50" : "text-gray-500"}`}>Nenhum contrato encontrado.</p>
               </div>
             ) : (
               contratos.map((c) => (
@@ -239,7 +239,12 @@ function PortalContent() {
                         {c.unidade_prazo === "meses" ? "mês" : c.unidade_prazo || "mês"}
                       </p>
                     </div>
-                    {etapaBadge(c.etapa_pagamento)}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {c.status === "enviado" && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Aguardando Assinatura</span>
+                      )}
+                      {c.status === "assinado" && etapaBadge(c.etapa_pagamento)}
+                    </div>
                   </div>
 
                   {/* Details */}
@@ -273,17 +278,19 @@ function PortalContent() {
                       <FileText className="w-3.5 h-3.5" />
                       Baixar PDF
                     </a>
-                    <button
-                      onClick={() => openNfModal(c)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                        c.nf_arquivo_nome
-                          ? isDark ? "bg-zinc-800 hover:bg-zinc-700 text-white/60" : "bg-gray-100 hover:bg-gray-200 text-gray-500"
-                          : "bg-blue-600 hover:bg-blue-700 text-white"
-                      }`}
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      {c.nf_arquivo_nome ? "Substituir NF" : "Anexar NF"}
-                    </button>
+                    {c.status === "assinado" && (
+                      <button
+                        onClick={() => openNfModal(c)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                          c.nf_arquivo_nome
+                            ? isDark ? "bg-zinc-800 hover:bg-zinc-700 text-white/60" : "bg-gray-100 hover:bg-gray-200 text-gray-500"
+                            : "bg-blue-600 hover:bg-blue-700 text-white"
+                        }`}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        {c.nf_arquivo_nome ? "Substituir NF" : "Anexar NF"}
+                      </button>
+                    )}
                     {c.nf_arquivo_path && (
                       <a
                         href={`/api/portal/creator/contratos/${c.id}/nf`}
