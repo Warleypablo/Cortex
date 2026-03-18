@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-03-18 | feat(social): add Kanban board for freelancer payment tracking
+
+**O que foi feito:**
+- Nova coluna `etapa_pagamento` em `contratos_creators` com backfill automático de contratos assinados
+- Automação em 4 pontos de sync (polling, webhook, manual) para setar `etapa_pagamento='producao'` ao assinar
+- Endpoints GET `/api/creators/pagamentos` e PATCH `/api/creators/contratos/:id/etapa-pagamento`
+- Permission key `social.pagamentos_creators`, nav item e rota `/social/pagamentos`
+- Página Kanban `PagamentoFreelancers.tsx` com 4 etapas: Produção → Aguardando Aprovação → Aprovado → Pago
+- KPI cards com contagem e valor por etapa, busca client-side, Sheet de detalhes com ação de mover
+
+**Por que:**
+- Contratos freelancers já tinham fluxo de assinatura mas faltava acompanhamento pós-assinatura para pagamento
+
+**Arquivos alterados:**
+- `server/routes/creators.ts` - Migration etapa_pagamento + backfill + 2 novos endpoints + sync fix
+- `server/index.ts` - Adicionado etapa_pagamento nos 2 pontos de polling de assinatura
+- `server/routes/contratos.ts` - Adicionado etapa_pagamento no webhook handler
+- `shared/nav-config.ts` - Permission key, rota, nav item e label para pagamentos
+- `client/src/App.tsx` - Lazy import e route para PagamentoFreelancers
+- `client/src/pages/PagamentoFreelancers.tsx` - Nova página Kanban completa
+
+**Impacto arquitetural:** Nova página e fluxo de dados independente. Coluna adicionada com DDL IF NOT EXISTS (não-destrutiva).
+
+---
+
 ## 2026-03-17 | feat(squads): make salários row expandable with individual employee breakdown
 
 **O que foi feito:**
