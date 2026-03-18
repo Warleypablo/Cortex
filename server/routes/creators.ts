@@ -162,13 +162,21 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
 
   p('1.3 A CONTRATADA compromete-se a produzir:', { spacing: 0.3 });
 
-  // Entregas como bullet list
+  // Quantidades de vídeos e variações de gancho
+  if (contrato.qtd_videos) {
+    bullet(`${contrato.qtd_videos} (${numeroPorExtenso(contrato.qtd_videos)}) vídeo(s) de conteúdo`);
+  }
+  if (contrato.qtd_variacoes_gancho) {
+    bullet(`${contrato.qtd_variacoes_gancho} (${numeroPorExtenso(contrato.qtd_variacoes_gancho)}) variação(ões) de gancho`);
+  }
+
+  // Entregas adicionais como bullet list
   const entregas = contrato.descricao_servicos.split(/\n|;/).map(s => s.trim()).filter(Boolean);
   if (entregas.length > 0) {
     for (const entrega of entregas) {
       bullet(entrega);
     }
-  } else {
+  } else if (!contrato.qtd_videos && !contrato.qtd_variacoes_gancho) {
     bullet('Conteúdo conforme briefing de campanha.');
   }
   doc.moveDown(0.5);
