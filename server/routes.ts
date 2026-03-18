@@ -379,8 +379,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // TEMP DEBUG: salary test endpoint (remove after debugging)
+  app.get("/api/debug-salary-test", async (req, res) => {
+    try {
+      const salDetalhesResult = await db.execute(sql`
+        WITH salarios_normalizados AS (
+          SELECT
+            rp.id,
+            rp.nome as colaborador_nome,
+            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
+            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
+            rp.salario as salario_original,
+            rp.salario::text as salario_text,
+            CASE
+              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
+              WHEN rp.salario::text LIKE '%,%' THEN
+                NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
+              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
+                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
+              ELSE
+                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
+            END as salario_parsed
+          FROM "Inhire".rh_pessoal rp
+        )
+        SELECT id, colaborador_nome, salario_original, salario_text, salario_parsed, squad
+        FROM salarios_normalizados
+        WHERE status_norm = 'ativo'
+        ORDER BY squad, colaborador_nome
+        LIMIT 20
+      `);
+      res.json({ rows: salDetalhesResult.rows });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   app.use("/api", isAuthenticated);
-  
+
   app.get("/api/debug/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const users = await getAllUsers();
@@ -5291,6 +5326,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
       const seen = new Set<number>();
+      // DEBUG: log first 5 raw rows to diagnose salary values
+      console.log("[DEBUG salary] Raw rows sample:", (salDetalhesResult.rows as any[]).slice(0, 5).map(r => ({
+        id: r.id, nome: r.colaborador_nome, salario_raw: r.salario, salario_type: typeof r.salario, squad: r.squad
+      })));
       for (const row of salDetalhesResult.rows as any[]) {
         const id = Number(row.id);
         if (seen.has(id)) continue;
@@ -5301,6 +5340,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         const matchedSquad = revenueSquadMap.get(normKey) || rawSquad;
         if (!salariosDetalhesPorSquad[matchedSquad]) salariosDetalhesPorSquad[matchedSquad] = [];
         salariosDetalhesPorSquad[matchedSquad].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
+      }
+      // DEBUG: log first squad's details
+      const firstSquad = Object.keys(salariosDetalhesPorSquad)[0];
+      if (firstSquad) {
+        console.log("[DEBUG salary] First squad details:", firstSquad, salariosDetalhesPorSquad[firstSquad].slice(0, 3));
       }
 
       res.json({
