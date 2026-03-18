@@ -379,7 +379,7 @@ app.use((req, res, next) => {
                   if (c.tipo === 'creator') {
                     if (isAssinado) {
                       await db.execute(sql`
-                        UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), atualizado_em = NOW()
+                        UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), etapa_pagamento = 'producao', atualizado_em = NOW()
                         WHERE id = ${c.id}
                       `);
                       updated++;
@@ -452,7 +452,7 @@ app.use((req, res, next) => {
           } else {
             if (isAssinado) {
               await db.execute(sql`
-                UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), atualizado_em = NOW()
+                UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), etapa_pagamento = 'producao', atualizado_em = NOW()
                 WHERE id = ${c.id}
               `);
               updated++;

@@ -92,6 +92,7 @@ export const PERMISSION_KEYS = {
   // Social (Makers)
   SOCIAL: {
     CONTRATOS_CREATORS: 'social.contratos_creators',
+    PAGAMENTOS_CREATORS: 'social.pagamentos_creators',
   },
   // Jurídico
   JUR: {
@@ -267,6 +268,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/juridico/creators': PERMISSION_KEYS.JUR.CONTRATOS_CREATORS, // compat antiga
   // Social
   '/social/creators': PERMISSION_KEYS.SOCIAL.CONTRATOS_CREATORS,
+  '/social/pagamentos': PERMISSION_KEYS.SOCIAL.PAGAMENTOS_CREATORS,
   // Reports
   '/investors-report': PERMISSION_KEYS.REPORTS.INVESTORS,
   '/reports/mensal': PERMISSION_KEYS.REPORTS.MENSAL,
@@ -472,6 +474,7 @@ export const NAV_CONFIG = {
       icon: 'Megaphone',
       items: [
         { title: 'Contratos Freelancers', url: '/social/creators', icon: 'Users', permissionKey: PERMISSION_KEYS.SOCIAL.CONTRATOS_CREATORS },
+        { title: 'Pagamento Freelancers', url: '/social/pagamentos', icon: 'CreditCard', permissionKey: PERMISSION_KEYS.SOCIAL.PAGAMENTOS_CREATORS },
       ],
     },
   ],
@@ -685,6 +688,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.JUR.ASSISTENTE]: 'Assistente IA',
   [PERMISSION_KEYS.JUR.CONTRATOS_CREATORS]: 'Contratos Freelancers',
   [PERMISSION_KEYS.SOCIAL.CONTRATOS_CREATORS]: 'Contratos Freelancers',
+  [PERMISSION_KEYS.SOCIAL.PAGAMENTOS_CREATORS]: 'Pagamento Freelancers',
   [PERMISSION_KEYS.JUR.RELATORIOS]: 'Relatórios',
   [PERMISSION_KEYS.REPORTS.INVESTORS]: 'Investors Report',
   [PERMISSION_KEYS.REPORTS.AUTO_REPORT]: 'Auto Report',
