@@ -14,10 +14,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   DollarSign, Users, TrendingDown, TrendingUp, FileText, ArrowLeft, Search, UserCheck, Clock, FileDown,
+  CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, Bar, ComposedChart, Line,
+  ResponsiveContainer, Legend, Bar, ComposedChart, Line, LineChart,
 } from "recharts";
 
 const SQUAD_COLORS: Record<string, string> = {
@@ -33,6 +34,10 @@ const OPERATOR_COLORS = [
   "#06b6d4", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899",
   "#3b82f6", "#10b981", "#f43f5e", "#6366f1", "#14b8a6",
 ];
+
+const CHURN_RATE_ALERT_THRESHOLD = 5;
+const MRR_DELTA_ALERT_THRESHOLD = 10;
+const CONCENTRATION_ALERT_THRESHOLD = 40;
 
 function getSquadColor(squad: string): string {
   return SQUAD_COLORS[squad] || "#3b82f6";
