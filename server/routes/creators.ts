@@ -120,7 +120,7 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
 
   const bullet = (text: string) => {
     doc.fontSize(10).font('Helvetica')
-       .text(`●  ${text}`, 80, undefined, { align: 'left', lineGap: 4, width: 460 });
+       .text(`-  ${text}`, 80, undefined, { align: 'left', lineGap: 4, width: 460 });
     doc.moveDown(0.3);
   };
 
