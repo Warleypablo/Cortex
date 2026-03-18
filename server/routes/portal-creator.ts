@@ -2,7 +2,6 @@ import type { Express } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import multer from "multer";
-import crypto from "crypto";
 import path from "path";
 import { isCreatorAuth, type CreatorSessionData } from "../auth/creatorAuth";
 import { gerarContratoCreatorPDF } from "./creators";
@@ -175,29 +174,13 @@ export function registerPortalCreatorRoutes(app: Express) {
 
       const { nf_numero, nf_valor, nf_data_emissao } = req.body;
 
-      // Upload to GCS
-      const { objectStorageClient } = await import("../replit_integrations/object_storage");
-      const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
-      const ext = path.extname(file.originalname).toLowerCase();
-      const uuid = crypto.randomUUID();
-      const gcsPath = `${privateDir}/nf-creators/${creator.id}/${uuid}${ext}`;
-
-      // Parse path: /bucketName/objectName
-      const parts = gcsPath.replace(/^\//, "").split("/");
-      const bucketName = parts[0];
-      const objectName = parts.slice(1).join("/");
-
-      const bucket = objectStorageClient.bucket(bucketName);
-      const gcsFile = bucket.file(objectName);
-      await gcsFile.save(file.buffer, {
-        metadata: { contentType: file.mimetype },
-      });
-
-      // Update DB
+      // Save file as BYTEA directly in the database
       await db.execute(sql`
         UPDATE cortex_core.contratos_creators SET
-          nf_arquivo_path = ${gcsPath},
+          nf_arquivo_data = ${file.buffer},
           nf_arquivo_nome = ${file.originalname},
+          nf_arquivo_mimetype = ${file.mimetype},
+          nf_arquivo_path = ${"db"},
           nf_numero = ${nf_numero || null},
           nf_valor = ${nf_valor ? parseFloat(nf_valor) : null},
           nf_data_emissao = ${nf_data_emissao || null},
@@ -221,32 +204,21 @@ export function registerPortalCreatorRoutes(app: Express) {
       if (isNaN(contratoId)) return res.status(400).json({ error: "ID inválido" });
 
       const result = await db.execute(sql`
-        SELECT nf_arquivo_path, nf_arquivo_nome
+        SELECT nf_arquivo_data, nf_arquivo_nome, nf_arquivo_mimetype
         FROM cortex_core.contratos_creators
         WHERE id = ${contratoId} AND creator_id = ${creator.id}
         LIMIT 1
       `);
       const row = (result.rows as any[])[0];
-      if (!row?.nf_arquivo_path) return res.status(404).json({ error: "NF não encontrada" });
+      if (!row?.nf_arquivo_data) return res.status(404).json({ error: "NF não encontrada" });
 
-      const { objectStorageClient } = await import("../replit_integrations/object_storage");
-      const gcsPath = row.nf_arquivo_path as string;
-      const parts = gcsPath.replace(/^\//, "").split("/");
-      const bucketName = parts[0];
-      const objectName = parts.slice(1).join("/");
-
-      const bucket = objectStorageClient.bucket(bucketName);
-      const gcsFile = bucket.file(objectName);
-
-      const [exists] = await gcsFile.exists();
-      if (!exists) return res.status(404).json({ error: "Arquivo não encontrado no storage" });
-
-      const [metadata] = await gcsFile.getMetadata();
+      const buffer = Buffer.isBuffer(row.nf_arquivo_data) ? row.nf_arquivo_data : Buffer.from(row.nf_arquivo_data);
       res.set({
-        "Content-Type": metadata.contentType || "application/octet-stream",
+        "Content-Type": row.nf_arquivo_mimetype || "application/octet-stream",
         "Content-Disposition": `attachment; filename="${row.nf_arquivo_nome || "nf.pdf"}"`,
+        "Content-Length": String(buffer.length),
       });
-      gcsFile.createReadStream().pipe(res);
+      res.send(buffer);
     } catch (error: any) {
       console.error("[portal-creator] Erro GET /contratos/:id/nf:", error);
       res.status(500).json({ error: error.message });
