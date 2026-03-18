@@ -736,7 +736,18 @@ export function registerCreatorsRoutes(app: Express) {
           });
 
           if (!resp.ok) {
-            details.push({ id: c.id, docId: c.assinafy_document_id, error: `HTTP ${resp.status}` });
+            // Se 403/404, documento é inacessível — resetar para rascunho para permitir reenvio
+            if (resp.status === 403 || resp.status === 404) {
+              await db.execute(sql`
+                UPDATE cortex_core.contratos_creators
+                SET status = 'rascunho', assinafy_status = NULL, assinafy_document_id = NULL, enviado_em = NULL, atualizado_em = NOW()
+                WHERE id = ${c.id}
+              `);
+              details.push({ id: c.id, docId: c.assinafy_document_id, error: `HTTP ${resp.status}`, action: 'reset_rascunho' });
+              updated++;
+            } else {
+              details.push({ id: c.id, docId: c.assinafy_document_id, error: `HTTP ${resp.status}` });
+            }
             continue;
           }
 
