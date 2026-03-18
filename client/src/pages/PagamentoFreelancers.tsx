@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Video, Clock, CheckCircle2, Banknote, Search, CreditCard,
+  Video, Clock, CheckCircle2, Banknote, Search, CreditCard, AlertTriangle,
   User, Mail, Key, CalendarDays, FileText, DollarSign, ArrowRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,7 @@ interface ContratoPagamento {
   atualizado_em: string;
   creator_nome: string;
   creator_email: string;
+  prazo_entrega_dias: number | null;
   chave_pix: string | null;
   tipo_pix: string | null;
 }
@@ -58,6 +59,22 @@ function formatCurrency(val: string | number | null) {
   const num = typeof val === "string" ? parseFloat(val) : val;
   if (!num && num !== 0) return "R$ 0";
   return num.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function isAtrasado(c: ContratoPagamento): boolean {
+  if (c.etapa_pagamento !== "producao") return false;
+  if (!c.assinado_em || !c.prazo_entrega_dias) return false;
+  const deadline = new Date(c.assinado_em);
+  deadline.setDate(deadline.getDate() + c.prazo_entrega_dias);
+  return new Date() > deadline;
+}
+
+function diasAtraso(c: ContratoPagamento): number {
+  if (!c.assinado_em || !c.prazo_entrega_dias) return 0;
+  const deadline = new Date(c.assinado_em);
+  deadline.setDate(deadline.getDate() + c.prazo_entrega_dias);
+  const diff = Date.now() - deadline.getTime();
+  return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0;
 }
 
 function timeAgo(date: string | null) {
@@ -223,10 +240,18 @@ export default function PagamentoFreelancers() {
 // KanbanCard
 // ============================================
 function KanbanCard({ contrato: c, onClick }: { contrato: ContratoPagamento; onClick: () => void }) {
+  const atrasado = isAtrasado(c);
+  const dias = atrasado ? diasAtraso(c) : 0;
+
   return (
     <button
       onClick={onClick}
-      className="w-full text-left p-3 rounded-lg bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors cursor-pointer"
+      className={cn(
+        "w-full text-left p-3 rounded-lg transition-colors cursor-pointer",
+        atrasado
+          ? "bg-red-50 dark:bg-red-950/30 border-2 border-red-400 dark:border-red-600 hover:border-red-500 dark:hover:border-red-500"
+          : "bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 hover:border-indigo-300 dark:hover:border-indigo-600"
+      )}
     >
       <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300 font-medium">
@@ -237,11 +262,17 @@ function KanbanCard({ contrato: c, onClick }: { contrato: ContratoPagamento; onC
             PIX
           </span>
         )}
+        {atrasado && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 font-semibold flex items-center gap-0.5">
+            <AlertTriangle className="w-3 h-3" />
+            {dias}d atrasado
+          </span>
+        )}
       </div>
-      <p className="text-sm font-medium text-gray-900 dark:text-white line-clamp-1">{c.creator_nome}</p>
+      <p className={cn("text-sm font-medium line-clamp-1", atrasado ? "text-red-800 dark:text-red-300" : "text-gray-900 dark:text-white")}>{c.creator_nome}</p>
       <p className="text-xs text-gray-500 dark:text-zinc-400 line-clamp-1 mt-0.5">{c.cliente_nome}</p>
       <div className="flex items-center justify-between mt-2">
-        <span className="text-sm font-semibold text-gray-800 dark:text-zinc-200">
+        <span className={cn("text-sm font-semibold", atrasado ? "text-red-700 dark:text-red-400" : "text-gray-800 dark:text-zinc-200")}>
           {formatCurrency(c.valor_remuneracao)}
         </span>
         <span className="text-[11px] text-gray-400 dark:text-zinc-500">{timeAgo(c.assinado_em)}</span>
@@ -294,14 +325,23 @@ function DetailSheet({
 
   if (!contrato) return null;
 
+  const atrasado = isAtrasado(contrato);
+  const dias = atrasado ? diasAtraso(contrato) : 0;
+
   return (
     <Sheet open={open} onOpenChange={() => onClose()}>
       <SheetContent className="w-full sm:max-w-[480px] p-0 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800 flex flex-col">
         <SheetHeader className="p-5 pb-3">
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
             {etapaConfig && (
               <Badge className={cn("text-xs", etapaConfig.color)}>
                 {etapaConfig.label}
+              </Badge>
+            )}
+            {atrasado && (
+              <Badge className="text-xs bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                {dias}d atrasado
               </Badge>
             )}
           </div>
@@ -324,6 +364,20 @@ function DetailSheet({
               label="Assinado em"
               value={contrato.assinado_em ? new Date(contrato.assinado_em).toLocaleDateString("pt-BR") : "—"}
             />
+
+            {/* Prazo de entrega */}
+            {contrato.prazo_entrega_dias && contrato.assinado_em && (
+              <InfoRow
+                icon={<Clock className={cn("w-4 h-4", atrasado ? "text-red-500" : "text-amber-500")} />}
+                label="Prazo de entrega"
+                value={(() => {
+                  const deadline = new Date(contrato.assinado_em);
+                  deadline.setDate(deadline.getDate() + contrato.prazo_entrega_dias!);
+                  const formatted = deadline.toLocaleDateString("pt-BR");
+                  return atrasado ? `${formatted} (${dias}d atrasado)` : `${formatted} (${contrato.prazo_entrega_dias}d)`;
+                })()}
+              />
+            )}
 
             {/* Creator Info */}
             <InfoRow icon={<User className="w-4 h-4 text-indigo-500" />} label="Creator" value={contrato.creator_nome} />
