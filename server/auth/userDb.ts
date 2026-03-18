@@ -264,6 +264,16 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
     migratedRoutes.push('/rh/nps/responder');
   }
 
+  // Migrar Contratos Freelancers de Jurídico → Social
+  const oldCreatorsKeys = ['/juridico/creators', 'jur.contratos_creators'];
+  const newCreatorsKey = 'social.contratos_creators';
+  if (migratedRoutes.some(r => oldCreatorsKeys.includes(r))) {
+    if (!migratedRoutes.includes(newCreatorsKey)) {
+      migratedRoutes.push(newCreatorsKey);
+    }
+    migratedRoutes = migratedRoutes.filter(r => !oldCreatorsKeys.includes(r));
+  }
+
   return migratedRoutes;
 }
 
