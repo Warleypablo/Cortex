@@ -363,7 +363,55 @@ app.use((req, res, next) => {
           const resp = await fetch(statusUrl, { method: 'GET', headers: { 'X-Api-Key': cfg.api_key } });
 
           if (!resp.ok) {
-            console.error(`[assinafy-poll] HTTP ${resp.status} ao consultar doc ${c.assinafy_document_id} (${c.tipo})`);
+            // Se 403, tentar com a outra config (documento pode ter sido criado com outra conta)
+            const altCfg = c.tipo === 'creator' ? clientConfig : creatorConfig;
+            if (resp.status === 403 && altCfg?.api_key) {
+              const altResp = await fetch(`${altCfg.api_url}/documents/${c.assinafy_document_id}`, {
+                method: 'GET', headers: { 'X-Api-Key': altCfg.api_key }
+              });
+              if (altResp.ok) {
+                const altResult = await altResp.json() as any;
+                const altStatus = altResult.data?.status || (typeof altResult.status === 'string' ? altResult.status : null);
+                console.log(`[assinafy-poll] Doc ${c.assinafy_document_id} (${c.tipo} #${c.id}): encontrado via config alternativa, status=${altStatus}`);
+                if (altStatus) {
+                  const isAssinado = altStatus === 'signed' || altStatus === 'completed' || altStatus === 'certificated';
+                  const isRecusado = altStatus === 'declined';
+                  if (c.tipo === 'creator') {
+                    if (isAssinado) {
+                      await db.execute(sql`
+                        UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), atualizado_em = NOW()
+                        WHERE id = ${c.id}
+                      `);
+                      updated++;
+                    } else if (isRecusado) {
+                      await db.execute(sql`
+                        UPDATE cortex_core.contratos_creators SET status = 'recusado', assinafy_status = 'declined', atualizado_em = NOW()
+                        WHERE id = ${c.id}
+                      `);
+                      updated++;
+                    } else {
+                      await db.execute(sql`
+                        UPDATE cortex_core.contratos_creators SET assinafy_status = ${altStatus}, atualizado_em = NOW()
+                        WHERE id = ${c.id}
+                      `);
+                    }
+                  }
+                }
+                continue;
+              }
+            }
+            // Ambas configs falharam com 403 — documento órfão, resetar para rascunho
+            if (resp.status === 403 && c.tipo === 'creator') {
+              await db.execute(sql`
+                UPDATE cortex_core.contratos_creators
+                SET status = 'rascunho', assinafy_status = NULL, assinafy_document_id = NULL, enviado_em = NULL, atualizado_em = NOW()
+                WHERE id = ${c.id}
+              `);
+              console.log(`[assinafy-poll] Doc órfão ${c.assinafy_document_id} (creator #${c.id}) resetado para rascunho — reenvio necessário`);
+              updated++;
+            } else {
+              console.error(`[assinafy-poll] HTTP ${resp.status} ao consultar doc ${c.assinafy_document_id} (${c.tipo} #${c.id})`);
+            }
             continue;
           }
 
