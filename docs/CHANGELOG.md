@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-03-18 | feat(pagamentos): highlight overdue cards in red when delivery deadline exceeded
+
+**O que foi feito:**
+- Cards na etapa "Conteúdo em Produção" ficam vermelhos quando `assinado_em + prazo_entrega_dias` é excedido
+- Badge "Xd atrasado" com ícone de alerta no card e no sheet de detalhes
+- Prazo de entrega visível no sheet com data calculada e indicação de atraso
+
+**Por que:**
+- Facilitar identificação visual de conteúdos com prazo de entrega vencido
+
+**Arquivos alterados:**
+- `server/routes/creators.ts` - Incluído `prazo_entrega_dias` na query de pagamentos
+- `client/src/pages/PagamentoFreelancers.tsx` - Helpers isAtrasado/diasAtraso, visual vermelho no card e sheet
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-03-18 | feat(social): add Kanban board for freelancer payment tracking
 
 **O que foi feito:**
