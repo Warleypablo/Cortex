@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -222,6 +223,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
   const [mesSelecionadoChurn, setMesSelecionadoChurn] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [showPdfContent, setShowPdfContent] = useState(false);
+  const [selectedOperador, setSelectedOperador] = useState<string | null>(null);
   const pdfRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -293,6 +295,28 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
     }
     return map;
   }, [data]);
+
+  // Dados filtrados do operador selecionado (painel lateral)
+  const selectedOpData = useMemo(() => {
+    if (!selectedOperador || !data) return null;
+    const op = data.operadores.find(o => o.nome === selectedOperador);
+    if (!op) return null;
+
+    const evolucao = (data.evolucaoOperadores || [])
+      .filter(e => e.operador === selectedOperador)
+      .sort((a, b) => a.mes.localeCompare(b.mes))
+      .map(e => ({ mes: formatMesLabel(e.mes), mrr: parseFloat(String(e.mrr)) || 0 }));
+
+    const ativos = (data.contratosAtivos || [])
+      .filter(c => c.responsavel === selectedOperador);
+
+    const churns = (data.contratosChurn || [])
+      .filter(c => c.responsavel === selectedOperador);
+
+    const prev = (data.operadoresAnterior || []).find(p => p.nome === selectedOperador);
+
+    return { op, evolucao, ativos, churns, prev };
+  }, [selectedOperador, data]);
 
   // Churn por motivo por mês (stacked bar chart)
   const MOTIVO_COLORS = [
@@ -783,9 +807,9 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                   <TableBody>
                     {(data?.operadores || []).map((op, idx) => (
                       <TableRow key={op.nome} className={cn(
-                        "border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors",
+                        "border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer",
                         idx === 2 && (data?.operadores || []).length >= 4 && "border-b-2 border-gray-300 dark:border-zinc-600"
-                      )}>
+                      )} onClick={() => setSelectedOperador(op.nome)}>
                         <TableCell className="font-medium text-gray-900 dark:text-white">{op.nome}</TableCell>
                         <TableCell className="text-right font-semibold text-gray-900 dark:text-white">{formatCurrencyNoDecimals(op.mrr)}</TableCell>
                         <TableCell className="text-center">
@@ -893,6 +917,152 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
             </Card>
           )}
         </TabsContent>
+
+        {/* Sheet: Drill-Down Colaborador */}
+        {selectedOperador && selectedOpData && (
+          <Sheet open={!!selectedOperador} onOpenChange={(open) => { if (!open) setSelectedOperador(null); }}>
+            <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+              <SheetHeader>
+                <SheetTitle className="text-gray-900 dark:text-white">
+                  {selectedOperador}
+                </SheetTitle>
+                <p className="text-sm text-gray-500 dark:text-zinc-400">
+                  Detalhamento — {formatMesLabel(mesAno)}
+                </p>
+              </SheetHeader>
+
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                <div className="p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700">
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">MRR</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrencyNoDecimals(selectedOpData.op.mrr)}</p>
+                  {selectedOpData.prev && (
+                    <DeltaBadge current={selectedOpData.op.mrr} previous={selectedOpData.prev.mrr} />
+                  )}
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700">
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">Contratos Ativos</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{selectedOpData.ativos.length}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700">
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">Churns</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{selectedOpData.op.churns}</p>
+                  <p className="text-xs mt-1">Churn Rate: <ChurnRateIndicator rate={selectedOpData.op.churnRate} /></p>
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700">
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">Ticket Médio</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white">{formatCurrencyNoDecimals(selectedOpData.op.ticketMedio)}</p>
+                </div>
+              </div>
+
+              {/* Evolução MRR */}
+              {selectedOpData.evolucao.length >= 2 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Evolução MRR</h3>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <AreaChart data={selectedOpData.evolucao}>
+                      <defs>
+                        <linearGradient id="opMrrGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={squadColor} stopOpacity={0.3} />
+                          <stop offset="95%" stopColor={squadColor} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
+                      <XAxis dataKey="mes" tick={{ fill: chartColors.axisTick, fontSize: 11 }} axisLine={{ stroke: chartColors.axisLine }} />
+                      <YAxis tick={{ fill: chartColors.axisTick, fontSize: 11 }} axisLine={{ stroke: chartColors.axisLine }}
+                        tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip contentStyle={{ backgroundColor: chartColors.tooltipBg, border: `1px solid ${chartColors.tooltipBorder}`, color: chartColors.tooltipText, borderRadius: "8px" }}
+                        formatter={(value: number) => [formatCurrencyNoDecimals(value), "MRR"]} />
+                      <Area type="monotone" dataKey="mrr" stroke={squadColor} fill="url(#opMrrGradient)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Contratos Ativos */}
+              <div className="mt-6">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                  Contratos Ativos ({selectedOpData.ativos.length})
+                </h3>
+                {selectedOpData.ativos.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-zinc-400">Nenhum contrato ativo</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-gray-200 dark:border-zinc-700">
+                          <TableHead className="text-gray-600 dark:text-zinc-400">Cliente</TableHead>
+                          <TableHead className="text-gray-600 dark:text-zinc-400">Serviço</TableHead>
+                          <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Valor</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...selectedOpData.ativos].sort((a, b) => b.valorr - a.valorr).map((c, i) => (
+                          <TableRow key={`${c.id_subtask}-${i}`} className="border-gray-100 dark:border-zinc-800">
+                            <TableCell className="text-sm text-gray-900 dark:text-white">{c.cliente}</TableCell>
+                            <TableCell className="text-sm text-gray-600 dark:text-zinc-400">{c.servico}</TableCell>
+                            <TableCell className="text-sm text-right font-medium text-gray-900 dark:text-white">
+                              {formatCurrencyNoDecimals(c.valorr)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+
+              {/* Histórico de Churns */}
+              <div className="mt-6 mb-6">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                  Histórico de Churns ({selectedOpData.churns.length})
+                </h3>
+                {selectedOpData.churns.length === 0 ? (
+                  <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Nenhum churn registrado
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-gray-200 dark:border-zinc-700">
+                          <TableHead className="text-gray-600 dark:text-zinc-400">Cliente</TableHead>
+                          <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Valor</TableHead>
+                          <TableHead className="text-gray-600 dark:text-zinc-400">Data</TableHead>
+                          <TableHead className="text-gray-600 dark:text-zinc-400">Motivo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {[...selectedOpData.churns]
+                          .sort((a, b) => (b.data_encerramento || "").localeCompare(a.data_encerramento || ""))
+                          .map((c, i) => (
+                          <TableRow key={i} className="border-gray-100 dark:border-zinc-800">
+                            <TableCell className="text-sm text-gray-900 dark:text-white">{c.cliente}</TableCell>
+                            <TableCell className="text-sm text-right font-medium text-rose-600 dark:text-rose-400">
+                              {formatCurrencyNoDecimals(c.valorr)}
+                            </TableCell>
+                            <TableCell className="text-sm text-gray-600 dark:text-zinc-400">
+                              {c.data_encerramento ? new Date(c.data_encerramento).toLocaleDateString("pt-BR") : "—"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={cn("text-xs", getMotivoBadgeColor(c.motivo_cancelamento))}>
+                                {c.motivo_cancelamento || "Sem motivo"}
+                              </Badge>
+                              {c.submotivo_cancelamento && (
+                                <p className="text-[10px] text-gray-500 dark:text-zinc-500 mt-0.5">{c.submotivo_cancelamento}</p>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
 
         {/* Tab: Contratos */}
         <TabsContent value="contratos" className="space-y-4">
