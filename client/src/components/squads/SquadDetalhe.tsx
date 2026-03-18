@@ -20,6 +20,7 @@ import {
 import {
   AreaChart, Area, BarChart, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend, Bar, ComposedChart, Line, LineChart,
+  PieChart, Pie, Cell,
 } from "recharts";
 
 const SQUAD_COLORS: Record<string, string> = {
@@ -979,8 +980,97 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                 </div>
               )}
 
-              {/* Contratos Ativos */}
+              {/* Histórico de Churns */}
               <div className="mt-6">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                  Churns ({selectedOpData.churns.length})
+                </h3>
+                {selectedOpData.churns.length === 0 ? (
+                  <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Nenhum churn registrado
+                  </div>
+                ) : (
+                  <>
+                    {/* Pie chart de motivos */}
+                    {(() => {
+                      const motivoMap = new Map<string, number>();
+                      for (const c of selectedOpData.churns) {
+                        const motivo = c.motivo_cancelamento || "Sem motivo";
+                        motivoMap.set(motivo, (motivoMap.get(motivo) || 0) + c.valorr);
+                      }
+                      const pieData = [...motivoMap.entries()]
+                        .map(([name, value]) => ({ name, value }))
+                        .sort((a, b) => b.value - a.value);
+                      const PIE_COLORS = ["#f43f5e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#6366f1", "#10b981", "#475569"];
+                      return (
+                        <div className="flex items-center gap-4 mb-4">
+                          <ResponsiveContainer width={160} height={160}>
+                            <PieChart>
+                              <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={35} strokeWidth={1} stroke="transparent">
+                                {pieData.map((_, idx) => (
+                                  <Cell key={idx} fill={PIE_COLORS[idx % PIE_COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip contentStyle={{ backgroundColor: chartColors.tooltipBg, border: `1px solid ${chartColors.tooltipBorder}`, color: chartColors.tooltipText, borderRadius: "8px", fontSize: 12 }}
+                                formatter={(value: number) => [formatCurrencyNoDecimals(value), "MRR Churn"]} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                          <div className="flex flex-col gap-1.5">
+                            {pieData.map((item, idx) => (
+                              <div key={item.name} className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }} />
+                                <span className="text-xs text-gray-700 dark:text-zinc-300">{item.name}</span>
+                                <span className="text-xs font-medium text-gray-500 dark:text-zinc-400">{formatCurrencyNoDecimals(item.value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Tabela de churns */}
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-gray-200 dark:border-zinc-700">
+                            <TableHead className="text-gray-600 dark:text-zinc-400">Cliente</TableHead>
+                            <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Valor</TableHead>
+                            <TableHead className="text-gray-600 dark:text-zinc-400">Data</TableHead>
+                            <TableHead className="text-gray-600 dark:text-zinc-400">Motivo</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {[...selectedOpData.churns]
+                            .sort((a, b) => (b.data_encerramento || "").localeCompare(a.data_encerramento || ""))
+                            .map((c, i) => (
+                            <TableRow key={i} className="border-gray-100 dark:border-zinc-800">
+                              <TableCell className="text-sm text-gray-900 dark:text-white">{c.cliente}</TableCell>
+                              <TableCell className="text-sm text-right font-medium text-rose-600 dark:text-rose-400">
+                                {formatCurrencyNoDecimals(c.valorr)}
+                              </TableCell>
+                              <TableCell className="text-sm text-gray-600 dark:text-zinc-400">
+                                {c.data_encerramento ? new Date(c.data_encerramento).toLocaleDateString("pt-BR") : "—"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={cn("text-xs", getMotivoBadgeColor(c.motivo_cancelamento))}>
+                                  {c.motivo_cancelamento || "Sem motivo"}
+                                </Badge>
+                                {c.submotivo_cancelamento && (
+                                  <p className="text-[10px] text-gray-500 dark:text-zinc-500 mt-0.5">{c.submotivo_cancelamento}</p>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Contratos Ativos */}
+              <div className="mt-6 mb-6">
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
                   Contratos Ativos ({selectedOpData.ativos.length})
                 </h3>
@@ -1003,55 +1093,6 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                             <TableCell className="text-sm text-gray-600 dark:text-zinc-400">{c.servico}</TableCell>
                             <TableCell className="text-sm text-right font-medium text-gray-900 dark:text-white">
                               {formatCurrencyNoDecimals(c.valorr)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
-
-              {/* Histórico de Churns */}
-              <div className="mt-6 mb-6">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                  Histórico de Churns ({selectedOpData.churns.length})
-                </h3>
-                {selectedOpData.churns.length === 0 ? (
-                  <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    Nenhum churn registrado
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="border-gray-200 dark:border-zinc-700">
-                          <TableHead className="text-gray-600 dark:text-zinc-400">Cliente</TableHead>
-                          <TableHead className="text-gray-600 dark:text-zinc-400 text-right">Valor</TableHead>
-                          <TableHead className="text-gray-600 dark:text-zinc-400">Data</TableHead>
-                          <TableHead className="text-gray-600 dark:text-zinc-400">Motivo</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {[...selectedOpData.churns]
-                          .sort((a, b) => (b.data_encerramento || "").localeCompare(a.data_encerramento || ""))
-                          .map((c, i) => (
-                          <TableRow key={i} className="border-gray-100 dark:border-zinc-800">
-                            <TableCell className="text-sm text-gray-900 dark:text-white">{c.cliente}</TableCell>
-                            <TableCell className="text-sm text-right font-medium text-rose-600 dark:text-rose-400">
-                              {formatCurrencyNoDecimals(c.valorr)}
-                            </TableCell>
-                            <TableCell className="text-sm text-gray-600 dark:text-zinc-400">
-                              {c.data_encerramento ? new Date(c.data_encerramento).toLocaleDateString("pt-BR") : "—"}
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={cn("text-xs", getMotivoBadgeColor(c.motivo_cancelamento))}>
-                                {c.motivo_cancelamento || "Sem motivo"}
-                              </Badge>
-                              {c.submotivo_cancelamento && (
-                                <p className="text-[10px] text-gray-500 dark:text-zinc-500 mt-0.5">{c.submotivo_cancelamento}</p>
-                              )}
                             </TableCell>
                           </TableRow>
                         ))}
