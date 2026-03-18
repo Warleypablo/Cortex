@@ -261,14 +261,14 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
     const rows = data.evolucaoOperadores;
     const meses = Array.from(new Set(rows.map((r) => r.mes))).sort();
 
-    // Top 6 operadores por MRR total
+    // Top 5 operadores por MRR total
     const opTotals = new Map<string, number>();
     for (const r of rows) {
       opTotals.set(r.operador, (opTotals.get(r.operador) || 0) + (parseFloat(String(r.mrr)) || 0));
     }
     const top = [...opTotals.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
+      .slice(0, 5)
       .map(([op]) => op);
 
     const chartData = meses.map((mes) => {
@@ -873,7 +873,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700/50">
               <CardHeader>
                 <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">
-                  Evolução MRR por Colaborador (Top 6)
+                  Evolução MRR por Colaborador (Top 5)
                 </CardTitle>
               </CardHeader>
               <CardContent>
