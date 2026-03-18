@@ -5324,12 +5324,28 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         revenueSquadMap.set(stripEmoji(s.squad), s.squad);
       }
 
+      // Fallback: match parcial (um nome contém o outro) para squads como "Black" vs "Black Sheep"
+      const findRevenueSquad = (normKey: string): string | null => {
+        // 1. Match exato
+        if (revenueSquadMap.has(normKey)) return revenueSquadMap.get(normKey)!;
+        // 2. Match parcial: revenue contém HR ou HR contém revenue
+        let bestMatch: string | null = null;
+        let bestLen = 0;
+        for (const [revNorm, revName] of revenueSquadMap) {
+          if (normKey.startsWith(revNorm) || revNorm.startsWith(normKey)) {
+            // Preferir o match mais longo (mais específico)
+            const matchLen = Math.min(normKey.length, revNorm.length);
+            if (matchLen > bestLen) {
+              bestLen = matchLen;
+              bestMatch = revName;
+            }
+          }
+        }
+        return bestMatch;
+      };
+
       const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
       const seen = new Set<number>();
-      // DEBUG: log first 5 raw rows to diagnose salary values
-      console.log("[DEBUG salary] Raw rows sample:", (salDetalhesResult.rows as any[]).slice(0, 5).map(r => ({
-        id: r.id, nome: r.colaborador_nome, salario_raw: r.salario, salario_type: typeof r.salario, squad: r.squad
-      })));
       for (const row of salDetalhesResult.rows as any[]) {
         const id = Number(row.id);
         if (seen.has(id)) continue;
@@ -5337,14 +5353,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         const rawSquad = row.squad || 'Sem Squad';
         const normKey = stripEmoji(rawSquad);
         // Casar com o nome do squad da receita, fallback pro raw
-        const matchedSquad = revenueSquadMap.get(normKey) || rawSquad;
+        const matchedSquad = findRevenueSquad(normKey) || rawSquad;
         if (!salariosDetalhesPorSquad[matchedSquad]) salariosDetalhesPorSquad[matchedSquad] = [];
         salariosDetalhesPorSquad[matchedSquad].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
-      }
-      // DEBUG: log first squad's details
-      const firstSquad = Object.keys(salariosDetalhesPorSquad)[0];
-      if (firstSquad) {
-        console.log("[DEBUG salary] First squad details:", firstSquad, salariosDetalhesPorSquad[firstSquad].slice(0, 3));
       }
 
       res.json({
