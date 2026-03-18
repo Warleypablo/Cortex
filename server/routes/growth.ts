@@ -1549,6 +1549,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const mqlCondition = sql`(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
       const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
 
+      // Filtro inbound: apenas deals de fontes inbound
+      const inboundFilter = sql`AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')`;
+
       // Stages que indicam que o deal chegou em Reunião Agendada ou além
       const STAGES_RM_PLUS = [
         'Reunião agendada', 'Reunião marcada', 'RM - Reunião Marcada', 'Agendamento direto',
@@ -1576,6 +1579,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at < (${endDate}::date + INTERVAL '1 day')
           AND ${mqlCondition}
+          ${inboundFilter}
           ${funilFilter}
       `);
 
@@ -1587,6 +1591,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND d.data_reuniao_agendada::date >= ${startDate}::date
           AND d.data_reuniao_agendada::date <= ${endDate}::date
           AND ${mqlCondition}
+          ${inboundFilter}
           ${funilFilter}
       `);
 
@@ -1598,6 +1603,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND d.data_fechamento <= ${endDate}::date
           AND ${mqlCondition}
           AND ${stagesRrPlus}
+          ${inboundFilter}
           ${funilFilter}
       `);
 
@@ -1623,6 +1629,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
           AND ${mqlCondition}
+          ${inboundFilter}
           ${funilFilter}
       `);
 
@@ -1716,6 +1723,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const naoMqlCondition = sql`(d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')`;
       const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
 
+      // Filtro inbound: apenas deals de fontes inbound
+      const inboundFilter = sql`AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')`;
+
       // Stages que indicam que o deal chegou em Reunião Agendada ou além
       const STAGES_RM_PLUS = [
         'Reunião agendada', 'Reunião marcada', 'RM - Reunião Marcada', 'Agendamento direto',
@@ -1743,6 +1753,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at < (${endDate}::date + INTERVAL '1 day')
           AND ${naoMqlCondition}
+          ${inboundFilter}
           ${funilFilter}
       `);
 
@@ -1754,6 +1765,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND d.data_reuniao_agendada::date >= ${startDate}::date
           AND d.data_reuniao_agendada::date <= ${endDate}::date
           AND ${naoMqlCondition}
+          ${inboundFilter}
           ${funilFilter}
       `);
 
@@ -1765,6 +1777,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND d.data_fechamento <= ${endDate}::date
           AND ${naoMqlCondition}
           AND ${stagesRrPlus}
+          ${inboundFilter}
           ${funilFilter}
       `);
 
@@ -1790,6 +1803,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
           AND ${naoMqlCondition}
+          ${inboundFilter}
           ${funilFilter}
       `);
 
