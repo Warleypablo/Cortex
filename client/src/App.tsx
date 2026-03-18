@@ -137,6 +137,7 @@ const Chamados = lazyWithRetry(() => import("@/pages/Chamados"));
 const SolicitacaoFerramentas = lazyWithRetry(() => import("@/pages/SolicitacaoFerramentas"));
 const Capacity = lazyWithRetry(() => import("@/pages/Capacity"));
 const PortalCliente = PortalClientePage;
+const PortalCreator = lazyWithRetry(() => import("@/pages/PortalCreator"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
 // Error boundary to catch silent crashes in the portal.
@@ -409,6 +410,7 @@ function Router() {
         <Route path="/login" component={Login} />
         <Route path="/loginclientes" component={LoginCliente} />
         <Route path="/portal-cliente" component={PortalCliente} />
+        <Route path="/portal/creator" component={PortalCreator} />
         <Route><ProtectedRouter /></Route>
       </Switch>
     </Suspense>
@@ -427,13 +429,14 @@ function AppLayout() {
   const isLoginCliente = location === "/loginclientes";
   const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation";
   const isPortalCliente = location.startsWith("/portal-cliente");
+  const isPortalCreator = location.startsWith("/portal/creator");
 
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
-  if (isLoginPage || isLoginCliente || isPortalCliente) {
+  if (isLoginPage || isLoginCliente || isPortalCliente || isPortalCreator) {
     return <PortalErrorBoundary><Router /></PortalErrorBoundary>;
   }
 
