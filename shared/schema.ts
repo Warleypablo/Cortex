@@ -2993,6 +2993,7 @@ export type InsertClientCredential = typeof clientCredentials.$inferInsert;
 // ── Creators (Freelancers) ───────────────────────────────────────────────────
 export const creators = cortexCoreSchema.table("creators", {
   id: serial("id").primaryKey(),
+  tipoPessoa: varchar("tipo_pessoa", { length: 20 }).notNull().default("fisica"),
   nome: varchar("nome", { length: 255 }).notNull(),
   cpf: varchar("cpf", { length: 14 }),
   cnpj: varchar("cnpj", { length: 18 }),
