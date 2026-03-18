@@ -55,10 +55,13 @@ async function ensureCreatorsTables() {
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS qtd_variacoes_gancho INTEGER`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS unidade_prazo VARCHAR(10) DEFAULT 'meses'`,
       `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS prazo_entrega_dias INTEGER`,
+      `ALTER TABLE cortex_core.contratos_creators ADD COLUMN IF NOT EXISTS etapa_pagamento VARCHAR(20)`,
     ];
     for (const ddl of newCols) {
       try { await db.execute(sql.raw(ddl)); } catch { /* column already exists */ }
     }
+    // Backfill: contratos já assinados entram na primeira etapa do fluxo de pagamento
+    await db.execute(sql`UPDATE cortex_core.contratos_creators SET etapa_pagamento = 'producao' WHERE status = 'assinado' AND etapa_pagamento IS NULL`);
     console.log("[creators] Tables ensured");
   } catch (error) {
     console.error("[creators] Error creating tables:", error);
@@ -318,6 +321,51 @@ export function registerCreatorsRoutes(app: Express) {
       res.json(result.rows);
     } catch (error: any) {
       console.error("[creators] Erro ao listar:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // GET /api/creators/pagamentos — Contratos no fluxo de pagamento
+  app.get("/api/creators/pagamentos", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT cc.id, cc.creator_id, cc.cargo, cc.cliente_nome, cc.valor_remuneracao,
+               cc.assinado_em, cc.etapa_pagamento, cc.observacoes, cc.atualizado_em,
+               cr.nome AS creator_nome, cr.email AS creator_email,
+               cr.chave_pix, cr.tipo_pix
+        FROM cortex_core.contratos_creators cc
+        JOIN cortex_core.creators cr ON cr.id = cc.creator_id
+        WHERE cc.etapa_pagamento IS NOT NULL
+        ORDER BY cc.atualizado_em DESC
+      `);
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("[creators] Erro ao listar pagamentos:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // PATCH /api/creators/contratos/:id/etapa-pagamento — Mover contrato entre etapas
+  app.patch("/api/creators/contratos/:id/etapa-pagamento", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { etapa_pagamento } = req.body;
+      const validEtapas = ['producao', 'aguardando_aprovacao', 'aprovado', 'pago'];
+      if (!validEtapas.includes(etapa_pagamento)) {
+        return res.status(400).json({ error: `Etapa inválida. Valores aceitos: ${validEtapas.join(', ')}` });
+      }
+      const result = await db.execute(sql`
+        UPDATE cortex_core.contratos_creators
+        SET etapa_pagamento = ${etapa_pagamento}, atualizado_em = NOW()
+        WHERE id = ${id} AND status = 'assinado'
+        RETURNING *
+      `);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado ou não está assinado" });
+      }
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      console.error("[creators] Erro ao atualizar etapa pagamento:", error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -759,7 +807,7 @@ export function registerCreatorsRoutes(app: Express) {
 
           if (isAssinado) {
             await db.execute(sql`
-              UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), atualizado_em = NOW()
+              UPDATE cortex_core.contratos_creators SET status = 'assinado', assinafy_status = 'signed', assinado_em = NOW(), etapa_pagamento = 'producao', atualizado_em = NOW()
               WHERE id = ${c.id}
             `);
             updated++;
