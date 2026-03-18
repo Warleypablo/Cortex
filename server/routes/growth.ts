@@ -1579,14 +1579,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${funilFilter}
       `);
 
-      // 2. Reuniões Agendadas = data_fechamento no período + stage >= RM
+      // 2. Reuniões Agendadas = data_reuniao_agendada no período
       const raResult = await db.execute(sql`
         SELECT ${countExpr} as reunioes_agendadas_mql
         FROM "Bitrix".crm_deal d
-        WHERE d.data_fechamento >= ${startDate}::date
-          AND d.data_fechamento <= ${endDate}::date
+        WHERE d.data_reuniao_agendada IS NOT NULL
+          AND d.data_reuniao_agendada::date >= ${startDate}::date
+          AND d.data_reuniao_agendada::date <= ${endDate}::date
           AND ${mqlCondition}
-          AND ${stagesRmPlus}
           ${funilFilter}
       `);
 
@@ -1746,14 +1746,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${funilFilter}
       `);
 
-      // 2. Reuniões Agendadas = data_fechamento no período + stage >= RM
+      // 2. Reuniões Agendadas = data_reuniao_agendada no período
       const raResult = await db.execute(sql`
         SELECT ${countExpr} as reunioes_agendadas
         FROM "Bitrix".crm_deal d
-        WHERE d.data_fechamento >= ${startDate}::date
-          AND d.data_fechamento <= ${endDate}::date
+        WHERE d.data_reuniao_agendada IS NOT NULL
+          AND d.data_reuniao_agendada::date >= ${startDate}::date
+          AND d.data_reuniao_agendada::date <= ${endDate}::date
           AND ${naoMqlCondition}
-          AND ${stagesRmPlus}
           ${funilFilter}
       `);
 
