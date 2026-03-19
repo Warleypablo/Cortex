@@ -175,6 +175,22 @@ const ESCOPOS_POR_CARGO: Record<string, { titulo: string; escopo: string }> = {
     titulo: "GESTOR(A) DE COMUNIDADE",
     escopo: "recrutar, ativar e organizar creators na comunidade vinculada às marcas atendidas pela CONTRATANTE; conduzir a comunicação diária com a base de creators por meio de grupos e plataformas oficiais; publicar campanhas, orientações e missões direcionadas aos creators; acompanhar entregas de conteúdo e resolver dúvidas operacionais; manter a comunidade ativa, engajada e funcional; monitorar indicadores-chave de desempenho da comunidade, incluindo creators ativos, volume de conteúdos produzidos, alcance, engajamento e conversões em vendas; organizar relatórios claros e acionáveis para marcas parceiras e time interno; atuar como ponto de contato entre marca e creators, traduzindo demandas e expectativas em orientações práticas, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
   },
+  "LÍDER DE SQUAD - COMUNICAÇÃO": {
+    titulo: "LÍDER DE SQUAD - COMUNICAÇÃO",
+    escopo: "liderar analistas de redes sociais e analistas que conectam creators a grandes marcas, garantindo alinhamento e entrega de resultados; validar e supervisionar entregas com um olhar crítico para design, copywriting e estratégia, idealmente sabendo criar hooks, storytelling e CTAs de engajamento ou conversão; gestão de creators e influenciadores, incluindo seleção de creators, briefing criativo, gestão de entregas, curadoria de conteúdo e negociação; integração com mídia paga, compreendendo conteúdo que vira criativo de ads, o que funciona em UGC para performance e como conteúdo orgânico vira matéria-prima para tráfego; ser uma referência para o time, promovendo desenvolvimento profissional e colaboração; propor e implementar melhorias contínuas nos processos da área, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "LIDER DE SQUAD - COMUNICACAO": {
+    titulo: "LÍDER DE SQUAD - COMUNICAÇÃO",
+    escopo: "liderar analistas de redes sociais e analistas que conectam creators a grandes marcas, garantindo alinhamento e entrega de resultados; validar e supervisionar entregas com um olhar crítico para design, copywriting e estratégia, idealmente sabendo criar hooks, storytelling e CTAs de engajamento ou conversão; gestão de creators e influenciadores, incluindo seleção de creators, briefing criativo, gestão de entregas, curadoria de conteúdo e negociação; integração com mídia paga, compreendendo conteúdo que vira criativo de ads, o que funciona em UGC para performance e como conteúdo orgânico vira matéria-prima para tráfego; ser uma referência para o time, promovendo desenvolvimento profissional e colaboração; propor e implementar melhorias contínuas nos processos da área, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "LÍDER DE SQUAD - PERFORMANCE": {
+    titulo: "LÍDER DE SQUAD - PERFORMANCE",
+    escopo: "liderar o squad de tráfego e performance, garantindo ritmo, qualidade e alinhamento entre mídia, criação e estratégia; planejar, executar e otimizar campanhas de performance em Meta Ads, Google Ads, TikTok Ads, entre outros; criar e acompanhar planos de mídia mensais, com metas claras de CPA, ROAS e crescimento; coordenar as rotinas do time, definindo prioridades e acompanhando indicadores de entrega e resultado; participar de reuniões de diagnóstico, planejamento e acompanhamento com clientes e times internos; interpretar dados e gerar insights para tomadas de decisão estratégicas; garantir que o squad esteja sempre atualizado com as boas práticas e tendências das plataformas; identificar gargalos, propor melhorias e sustentar a cultura de testar, medir e escalar; acompanhar tendências do mercado e aplicar boas práticas em campanhas digitais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
+  "LIDER DE SQUAD - PERFORMANCE": {
+    titulo: "LÍDER DE SQUAD - PERFORMANCE",
+    escopo: "liderar o squad de tráfego e performance, garantindo ritmo, qualidade e alinhamento entre mídia, criação e estratégia; planejar, executar e otimizar campanhas de performance em Meta Ads, Google Ads, TikTok Ads, entre outros; criar e acompanhar planos de mídia mensais, com metas claras de CPA, ROAS e crescimento; coordenar as rotinas do time, definindo prioridades e acompanhando indicadores de entrega e resultado; participar de reuniões de diagnóstico, planejamento e acompanhamento com clientes e times internos; interpretar dados e gerar insights para tomadas de decisão estratégicas; garantir que o squad esteja sempre atualizado com as boas práticas e tendências das plataformas; identificar gargalos, propor melhorias e sustentar a cultura de testar, medir e escalar; acompanhar tendências do mercado e aplicar boas práticas em campanhas digitais, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
+  },
   "ANALISTA DE DADOS": {
     titulo: "ANALISTA DE DADOS",
     escopo: "coletar, organizar e analisar grandes volumes de dados para extrair insights estratégicos que impactem diretamente os resultados de nossos clientes, criar e manter dashboards no Power BI que permitam a visualização clara e precisa dos dados, fornecendo relatórios acionáveis para as equipes de marketing, produto e liderança, escrever e otimizar consultas SQL para extrair dados relevantes e facilitar a análise contínua, desenvolver recomendações baseadas em dados para impulsionar a performance dos negócios, ajudando a identificar oportunidades e soluções, atuar em cooperação técnica com equipes de marketing e produto, garantindo que os dados gerados alimentem e apoiem as estratégias de crescimento, sem que isso implique subordinação hierárquica ou integração à estrutura organizacional da CONTRATANTE"
@@ -185,11 +201,26 @@ const ESCOPOS_POR_CARGO: Record<string, { titulo: string; escopo: string }> = {
   },
 };
 
+// Squads de comunicação - Makers e Pulse; demais são performance
+const SQUADS_COMUNICACAO = ["MAKERS", "PULSE"];
+
+// Resolve cargo composto para líderes de squad com base no setor
+const resolveCargoLiderSquad = (cargo: string, setor: string | null): string => {
+  const cargoUpper = cargo.toUpperCase().trim();
+  if (!cargoUpper.includes("LÍDER DE SQUAD") && !cargoUpper.includes("LIDER DE SQUAD")) return cargo;
+  // Se já tem sufixo de comunicação/performance, retorna como está
+  if (cargoUpper.includes("COMUNICAÇÃO") || cargoUpper.includes("COMUNICACAO") || cargoUpper.includes("PERFORMANCE")) return cargo;
+  const setorUpper = (setor || "").toUpperCase().trim();
+  const isComunicacao = SQUADS_COMUNICACAO.some(s => setorUpper.includes(s));
+  return isComunicacao ? "Líder de Squad - Comunicação" : "Líder de Squad - Performance";
+};
+
 // Função para obter escopo baseado no cargo
-const getEscopoCargo = (cargo: string | null): { titulo: string; escopo: string } => {
+const getEscopoCargo = (cargo: string | null, setor?: string | null): { titulo: string; escopo: string } => {
   if (!cargo) return { titulo: "PRESTADOR DE SERVIÇOS", escopo: "prestar serviços conforme acordado entre as partes" };
 
-  const cargoUpper = cargo.toUpperCase().trim();
+  const cargoResolvido = resolveCargoLiderSquad(cargo, setor || null);
+  const cargoUpper = cargoResolvido.toUpperCase().trim();
 
   // Busca exata
   if (ESCOPOS_POR_CARGO[cargoUpper]) {
@@ -881,7 +912,7 @@ export default function ContratosColaboradores() {
     const dataFimDate = new Date(dataInicioDate);
     dataFimDate.setMonth(dataFimDate.getMonth() + 6);
     const dataFim = format(dataFimDate, "dd/MM/yyyy", { locale: ptBR });
-    const { titulo: cargoTitulo, escopo: escopoCargo } = getEscopoCargo(colaborador.cargo);
+    const { titulo: cargoTitulo, escopo: escopoCargo } = getEscopoCargo(colaborador.cargo, colaborador.setor);
 
     const gerarQualificacaoContratada = (): string => {
       const cnpjLimpo = (colaborador.cnpj || '').replace(/\D/g, '');
@@ -962,7 +993,7 @@ export default function ContratosColaboradores() {
           cnpj: selectedColaborador.cnpj,
           endereco: selectedColaborador.endereco,
           estado: selectedColaborador.estado,
-          cargo: selectedColaborador.cargo,
+          cargo: resolveCargoLiderSquad(selectedColaborador.cargo || '', selectedColaborador.setor),
           dataAdmissao,
           dataAtual,
           salario: selectedColaborador.salario,

@@ -651,6 +651,19 @@ export function registerJuridicoRoutes(app: Express) {
     }
   });
 
+  // Squads de comunicação - Makers e Pulse; demais são performance
+  const SQUADS_COMUNICACAO = ["MAKERS", "PULSE"];
+
+  // Resolve cargo composto para líderes de squad com base no setor
+  const resolveCargoLiderSquad = (cargo: string, setor: string | null): string => {
+    const cargoUpper = cargo.toUpperCase().trim();
+    if (!cargoUpper.includes("LÍDER DE SQUAD") && !cargoUpper.includes("LIDER DE SQUAD")) return cargo;
+    if (cargoUpper.includes("COMUNICAÇÃO") || cargoUpper.includes("COMUNICACAO") || cargoUpper.includes("PERFORMANCE")) return cargo;
+    const setorUpper = (setor || "").toUpperCase().trim();
+    const isComunicacao = SQUADS_COMUNICACAO.some(s => setorUpper.includes(s));
+    return isComunicacao ? "Líder de Squad - Comunicação" : "Líder de Squad - Performance";
+  };
+
   // Função compartilhada para gerar PDF de contrato de colaborador
   async function gerarContratoPDF(params: {
     nome: string;
@@ -1218,13 +1231,16 @@ export function registerJuridicoRoutes(app: Express) {
       ]);
       const patrimonio = (patrimonioResult.rows[0] as any)?.descricao || null;
 
+      // Resolve cargo composto para líderes de squad com base no setor
+      const cargoResolvido = resolveCargoLiderSquad(colaborador.cargo || '', colaborador.setor);
+
       const pdfBuffer = await gerarContratoPDF({
         nome: colaborador.nome,
         cpf: colaborador.cpf,
         cnpj: colaborador.cnpj,
         endereco: colaborador.endereco,
         estado: colaborador.estado,
-        cargo: colaborador.cargo,
+        cargo: cargoResolvido,
         salario: colaborador.salario?.toString() || '0',
         patrimonio,
       });
