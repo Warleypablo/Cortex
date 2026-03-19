@@ -1935,18 +1935,31 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const hasVazio = funilValues.includes('(Vazio)');
       const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
 
-      // Build campaign filter (JOIN + WHERE) when funil is selected
-      // Note: "(Vazio)" doesn't apply to campaign name filtering, only real values
-      const campaignJoin = realFunilValues.length > 0
-        ? sql`JOIN meta_ads.meta_campaigns mc ON mid.campaign_id = mc.campaign_id`
-        : sql``;
-
-      const campaignFilter = realFunilValues.length > 0
-        ? sql`AND (${sql.join(
-            realFunilValues.map(v => sql`mc.campaign_name ILIKE ${'%[' + v + ']%'}`),
-            sql` OR `
-          )})`
-        : sql``;
+      // Build campaign filter: use campaign IDs from Bitrix leads' UTM data
+      // This is more reliable than matching campaign names with [funil] pattern
+      let campaignFilter = sql``;
+      if (realFunilValues.length > 0) {
+        // Build funnel filter for the subquery
+        let funilSubFilter;
+        if (hasVazio && realFunilValues.length > 0) {
+          funilSubFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+        } else {
+          funilSubFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+        }
+        campaignFilter = sql`AND mid.campaign_id IN (
+          SELECT DISTINCT d.utm_campaign
+          FROM "Bitrix".crm_deal d
+          WHERE d.utm_campaign IS NOT NULL AND d.utm_campaign <> '' AND d.utm_campaign <> '{{campaign.id}}'
+            ${funilSubFilter}
+        )`;
+      } else if (hasVazio) {
+        campaignFilter = sql`AND mid.campaign_id IN (
+          SELECT DISTINCT d.utm_campaign
+          FROM "Bitrix".crm_deal d
+          WHERE d.utm_campaign IS NOT NULL AND d.utm_campaign <> '' AND d.utm_campaign <> '{{campaign.id}}'
+            AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')
+        )`;
+      }
 
       // Query Meta Ads
       const metaResult = await db.execute(sql`
@@ -1957,7 +1970,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(SUM(mid.inline_link_clicks), 0) as cliques_saida,
           COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina
         FROM meta_ads.meta_insights_daily mid
-        ${campaignJoin}
         WHERE mid.date_start >= ${startDate}::date
           AND mid.date_start <= ${endDate}::date
           AND mid.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
@@ -1971,11 +1983,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cliquesSaida = parseInt(metaRow.cliques_saida) || 0;
       const visualizacoesPagina = parseInt(metaRow.visualizacoes_pagina) || 0;
 
-      // Query Google Ads
+      // Query Google Ads (skip when funnel is selected — no campaign-to-funnel mapping available)
       let googleInvestimento = 0;
       let googleImpressoes = 0;
       let googleCliques = 0;
-      try {
+      if (funilValues.length > 0) {
+        // Skip Google Ads when filtering by funnel — UTM mapping not available for Google campaigns
+      } else try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
           WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
