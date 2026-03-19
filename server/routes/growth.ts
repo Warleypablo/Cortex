@@ -7,6 +7,10 @@ import { format } from "date-fns";
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
 
 export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
+  // Ensure landing_page_views column exists
+  db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
+    .catch(() => { /* column may already exist */ });
+
   // Growth - Investment Data (Google Ads + Meta Ads)
   app.get("/api/growth/investimento", async (req, res) => {
     try {
@@ -1950,7 +1954,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(SUM(mid.spend), 0) as investimento,
           COALESCE(SUM(mid.impressions), 0) as impressoes,
           COALESCE(SUM(mid.clicks), 0) as cliques,
-          COALESCE(SUM(mid.inline_link_clicks), 0) as cliques_saida
+          COALESCE(SUM(mid.inline_link_clicks), 0) as cliques_saida,
+          COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina
         FROM meta_ads.meta_insights_daily mid
         ${campaignJoin}
         WHERE mid.date_start >= ${startDate}::date
@@ -1964,6 +1969,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const metaImpressoes = parseInt(metaRow.impressoes) || 0;
       const metaCliques = parseInt(metaRow.cliques) || 0;
       const cliquesSaida = parseInt(metaRow.cliques_saida) || 0;
+      const visualizacoesPagina = parseInt(metaRow.visualizacoes_pagina) || 0;
 
       // Query Google Ads
       let googleInvestimento = 0;
@@ -2063,7 +2069,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cpm,
         ctr,
         cps,
-        visualizacaoPagina: null,
+        visualizacoesPagina,
         leads,
         mqls,
         cpl,
