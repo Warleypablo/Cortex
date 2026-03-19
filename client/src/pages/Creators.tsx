@@ -45,6 +45,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Tooltip as RadixTooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import {
   Megaphone,
   Search,
   Pencil,
@@ -150,6 +156,81 @@ const CARGOS_PRESET = [
   "Consultor de Marketing",
   "Outro",
 ];
+
+// ── Signers Tooltip (lazy-loaded on hover) ───────────────────────────────────
+
+function SignersTooltip({ contratoId, children }: { contratoId: number; children: React.ReactNode }) {
+  const [signers, setSigners] = useState<{ name: string; email: string; status: string }[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const fetched = useRef(false);
+
+  const fetchSigners = useCallback(async () => {
+    if (fetched.current || loading) return;
+    fetched.current = true;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/creators/contratos/${contratoId}/signing-url`);
+      if (res.ok) {
+        const data = await res.json();
+        setSigners(data.signers || []);
+      } else {
+        setSigners([]);
+      }
+    } catch {
+      setSigners([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [contratoId, loading]);
+
+  const statusLabel = (s: string) => {
+    if (s === "signed" || s === "completed") return "Assinado";
+    if (s === "declined") return "Recusado";
+    if (s === "pending" || s === "waiting") return "Pendente";
+    return s || "Pendente";
+  };
+
+  const statusColor = (s: string) => {
+    if (s === "signed" || s === "completed") return "text-green-600 dark:text-green-400";
+    if (s === "declined") return "text-red-600 dark:text-red-400";
+    return "text-amber-600 dark:text-amber-400";
+  };
+
+  return (
+    <TooltipProvider delayDuration={200}>
+    <RadixTooltip>
+      <TooltipTrigger asChild onMouseEnter={fetchSigners}>
+        <span className="cursor-default">{children}</span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="start" className="max-w-xs">
+        {loading ? (
+          <div className="flex items-center gap-2 py-1">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span className="text-xs">Carregando...</span>
+          </div>
+        ) : signers && signers.length > 0 ? (
+          <div className="space-y-1.5 py-0.5">
+            <p className="text-xs font-semibold text-muted-foreground">Assinantes</p>
+            {signers.map((s, i) => (
+              <div key={i} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium truncate">{s.name || s.email}</p>
+                  {s.name && <p className="text-[10px] text-muted-foreground truncate">{s.email}</p>}
+                </div>
+                <span className={`text-[10px] font-semibold shrink-0 ${statusColor(s.status)}`}>
+                  {statusLabel(s.status)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground py-0.5">Sem dados de assinatura</p>
+        )}
+      </TooltipContent>
+    </RadixTooltip>
+    </TooltipProvider>
+  );
+}
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
@@ -576,7 +657,13 @@ export default function Creators() {
                       <TableCell className="text-sm">{ct.cargo || "\u2014"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{ct.cliente_nome || "\u2014"}</TableCell>
                       <TableCell className="text-sm font-medium">{formatCurrency(ct.valor_remuneracao)}</TableCell>
-                      <TableCell>{statusBadge(ct.status)}</TableCell>
+                      <TableCell>
+                        {ct.assinafy_document_id ? (
+                          <SignersTooltip contratoId={ct.id}>{statusBadge(ct.status)}</SignersTooltip>
+                        ) : (
+                          statusBadge(ct.status)
+                        )}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {format(new Date(ct.criado_em), "dd/MM/yyyy", { locale: ptBR })}
                       </TableCell>
@@ -692,7 +779,11 @@ export default function Creators() {
                           <div className="space-y-1 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{ct.cargo || 'Contrato'}</span>
-                              {statusBadge(ct.status)}
+                              {ct.assinafy_document_id ? (
+                                <SignersTooltip contratoId={ct.id}>{statusBadge(ct.status)}</SignersTooltip>
+                              ) : (
+                                statusBadge(ct.status)
+                              )}
                             </div>
                             <p className="text-sm text-muted-foreground">
                               Valor: {formatCurrency(ct.valor_remuneracao)} | Prazo: {ct.duracao_meses} {ct.unidade_prazo || 'meses'}
