@@ -159,42 +159,58 @@ const CARGOS_PRESET = [
 
 // ── Signers Tooltip (lazy-loaded on hover) ───────────────────────────────────
 
-function SignersTooltip({ contratoId, children }: { contratoId: number; children: React.ReactNode }) {
-  const [signers, setSigners] = useState<{ name: string; email: string; status: string }[] | null>(null);
+function SignersTooltip({
+  contratoId, creatorNome, creatorEmail, clienteNome, hasDocId, children,
+}: {
+  contratoId: number; creatorNome: string; creatorEmail: string;
+  clienteNome?: string | null; hasDocId: boolean; children: React.ReactNode;
+}) {
+  const [apiSigners, setApiSigners] = useState<{ name: string; email: string; status: string }[] | null>(null);
   const [loading, setLoading] = useState(false);
   const fetched = useRef(false);
 
   const fetchSigners = useCallback(async () => {
-    if (fetched.current || loading) return;
+    if (fetched.current || loading || !hasDocId) return;
     fetched.current = true;
     setLoading(true);
     try {
       const res = await fetch(`/api/creators/contratos/${contratoId}/signing-url`);
       if (res.ok) {
         const data = await res.json();
-        setSigners(data.signers || []);
+        setApiSigners(data.signers || []);
       } else {
-        setSigners([]);
+        setApiSigners([]);
       }
     } catch {
-      setSigners([]);
+      setApiSigners([]);
     } finally {
       setLoading(false);
     }
-  }, [contratoId, loading]);
+  }, [contratoId, hasDocId, loading]);
+
+  const signerStatus = (email: string): string => {
+    if (!apiSigners) return "pending";
+    const match = apiSigners.find((s) => s.email?.toLowerCase() === email?.toLowerCase());
+    return match?.status || "pending";
+  };
+
+  const statusIcon = (s: string) => {
+    if (s === "signed" || s === "completed") return { icon: "✓", cls: "text-green-500 dark:text-green-400" };
+    if (s === "declined") return { icon: "✗", cls: "text-red-500 dark:text-red-400" };
+    return { icon: "○", cls: "text-amber-500 dark:text-amber-400" };
+  };
 
   const statusLabel = (s: string) => {
     if (s === "signed" || s === "completed") return "Assinado";
     if (s === "declined") return "Recusado";
-    if (s === "pending" || s === "waiting") return "Pendente";
-    return s || "Pendente";
+    return "Pendente";
   };
 
-  const statusColor = (s: string) => {
-    if (s === "signed" || s === "completed") return "text-green-600 dark:text-green-400";
-    if (s === "declined") return "text-red-600 dark:text-red-400";
-    return "text-amber-600 dark:text-amber-400";
-  };
+  // Build the two known signers from contract data
+  const parties = [
+    { role: "Creator", name: creatorNome, email: creatorEmail },
+    ...(clienteNome ? [{ role: "Cliente", name: clienteNome, email: "" }] : []),
+  ];
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -202,29 +218,50 @@ function SignersTooltip({ contratoId, children }: { contratoId: number; children
       <TooltipTrigger asChild onMouseEnter={fetchSigners}>
         <span className="cursor-default">{children}</span>
       </TooltipTrigger>
-      <TooltipContent side="bottom" align="start" className="max-w-xs">
+      <TooltipContent side="bottom" align="start" className="max-w-xs p-3">
         {loading ? (
           <div className="flex items-center gap-2 py-1">
             <Loader2 className="w-3 h-3 animate-spin" />
-            <span className="text-xs">Carregando...</span>
-          </div>
-        ) : signers && signers.length > 0 ? (
-          <div className="space-y-1.5 py-0.5">
-            <p className="text-xs font-semibold text-muted-foreground">Assinantes</p>
-            {signers.map((s, i) => (
-              <div key={i} className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-medium truncate">{s.name || s.email}</p>
-                  {s.name && <p className="text-[10px] text-muted-foreground truncate">{s.email}</p>}
-                </div>
-                <span className={`text-[10px] font-semibold shrink-0 ${statusColor(s.status)}`}>
-                  {statusLabel(s.status)}
-                </span>
-              </div>
-            ))}
+            <span className="text-xs">Verificando assinaturas...</span>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground py-0.5">Sem dados de assinatura</p>
+          <div className="space-y-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assinantes</p>
+            {parties.map((p, i) => {
+              const st = hasDocId ? signerStatus(p.email) : "pending";
+              const { icon, cls } = statusIcon(st);
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <span className={`text-sm font-bold ${cls}`}>{icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium truncate">{p.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{p.role}{p.email ? ` · ${p.email}` : ""}</p>
+                  </div>
+                  <span className={`text-[10px] font-semibold shrink-0 ${cls}`}>
+                    {statusLabel(st)}
+                  </span>
+                </div>
+              );
+            })}
+            {/* Show any extra signers from Assinafy not matched to known parties */}
+            {apiSigners && apiSigners
+              .filter((s) => !parties.some((p) => p.email && s.email?.toLowerCase() === p.email.toLowerCase()))
+              .map((s, i) => {
+                const { icon, cls } = statusIcon(s.status);
+                return (
+                  <div key={`extra-${i}`} className="flex items-center gap-2">
+                    <span className={`text-sm font-bold ${cls}`}>{icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">{s.name || s.email}</p>
+                      {s.name && <p className="text-[10px] text-muted-foreground">{s.email}</p>}
+                    </div>
+                    <span className={`text-[10px] font-semibold shrink-0 ${cls}`}>
+                      {statusLabel(s.status)}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
         )}
       </TooltipContent>
     </RadixTooltip>
@@ -658,8 +695,16 @@ export default function Creators() {
                       <TableCell className="text-sm text-muted-foreground">{ct.cliente_nome || "\u2014"}</TableCell>
                       <TableCell className="text-sm font-medium">{formatCurrency(ct.valor_remuneracao)}</TableCell>
                       <TableCell>
-                        {ct.assinafy_document_id ? (
-                          <SignersTooltip contratoId={ct.id}>{statusBadge(ct.status)}</SignersTooltip>
+                        {ct.status !== "rascunho" ? (
+                          <SignersTooltip
+                            contratoId={ct.id}
+                            creatorNome={ct.creator_nome}
+                            creatorEmail={ct.creator_email}
+                            clienteNome={ct.cliente_nome}
+                            hasDocId={!!ct.assinafy_document_id}
+                          >
+                            {statusBadge(ct.status)}
+                          </SignersTooltip>
                         ) : (
                           statusBadge(ct.status)
                         )}
@@ -779,8 +824,16 @@ export default function Creators() {
                           <div className="space-y-1 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="font-medium">{ct.cargo || 'Contrato'}</span>
-                              {ct.assinafy_document_id ? (
-                                <SignersTooltip contratoId={ct.id}>{statusBadge(ct.status)}</SignersTooltip>
+                              {ct.status !== "rascunho" ? (
+                                <SignersTooltip
+                                  contratoId={ct.id}
+                                  creatorNome={selectedCreator?.nome || ""}
+                                  creatorEmail={selectedCreator?.email || ""}
+                                  clienteNome={ct.cliente_nome}
+                                  hasDocId={!!ct.assinafy_document_id}
+                                >
+                                  {statusBadge(ct.status)}
+                                </SignersTooltip>
                               ) : (
                                 statusBadge(ct.status)
                               )}
