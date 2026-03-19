@@ -425,6 +425,7 @@ export default function GrowthOrcadoRealizado() {
     cpm: number;
     ctr: number;
     cps: number;
+    connectRate: number;
     visualizacoesPagina: number;
     leads: number;
     mqls: number;
@@ -593,7 +594,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'cps', name: 'CPS', type: 'formula', orcado: ORCADO_ADS.cps, realizado: data.cps ?? null, percentual: calcPercentual(ORCADO_ADS.cps, data.cps), format: 'currency' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0), format: 'percent' },
-      { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: (data.leads ?? 0) > 0 ? (data.mqls ?? 0) / (data.leads ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.connectRate, (data.leads ?? 0) > 0 ? (data.mqls ?? 0) / (data.leads ?? 1) : 0), format: 'percent' },
+      { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
       { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
       { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },
       { id: 'cpl', name: 'CPL', type: 'formula', orcado: ORCADO_ADS.cpl, realizado: data.cpl ?? null, percentual: calcPercentual(ORCADO_ADS.cpl, data.cpl), format: 'currency' },
