@@ -868,6 +868,58 @@ export function registerCreatorsRoutes(app: Express) {
     }
   });
 
+  // GET /api/creators/contratos/:id/signing-url — Buscar link de assinatura do Assinafy
+  app.get("/api/creators/contratos/:id/signing-url", async (req, res) => {
+    const contratoId = parseInt(req.params.id);
+    try {
+      const [configResult, dataResult] = await Promise.all([
+        db.execute(sql`SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'creators' LIMIT 1`),
+        db.execute(sql`
+          SELECT cc.assinafy_document_id, c.email AS creator_email
+          FROM cortex_core.contratos_creators cc
+          JOIN cortex_core.creators c ON c.id = cc.creator_id
+          WHERE cc.id = ${contratoId}
+        `)
+      ]);
+
+      const config = configResult.rows[0] as any;
+      if (!config?.api_key) return res.status(500).json({ error: "Config Assinafy não encontrada" });
+
+      const data = dataResult.rows[0] as any;
+      if (!data) return res.status(404).json({ error: "Contrato não encontrado" });
+      if (!data.assinafy_document_id) return res.status(400).json({ error: "Contrato não foi enviado para assinatura" });
+
+      const resp = await fetch(`${config.api_url}/documents/${data.assinafy_document_id}/assignments`, {
+        method: 'GET',
+        headers: { 'X-Api-Key': config.api_key }
+      });
+
+      if (!resp.ok) {
+        return res.status(resp.status).json({ error: `Erro ao buscar assignments: HTTP ${resp.status}` });
+      }
+
+      const result = await resp.json() as any;
+      const assignments = result.data || result || [];
+
+      const signers = (Array.isArray(assignments) ? assignments : []).map((a: any) => ({
+        name: a.signer?.full_name || a.full_name || '',
+        email: a.signer?.email || a.email || '',
+        url: a.url || a.signing_url || '',
+        status: a.status || '',
+      }));
+
+      const creatorSigner = signers.find((s: any) => s.email?.toLowerCase() === data.creator_email?.toLowerCase());
+
+      res.json({
+        url: creatorSigner?.url || signers[0]?.url || '',
+        signers,
+      });
+    } catch (error: any) {
+      console.error("[assinafy-signing-url] Erro:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // POST /api/creators/contratos/sync-assinaturas — Sync manual dos status de assinatura
   app.post("/api/creators/contratos/sync-assinaturas", async (_req, res) => {
     try {

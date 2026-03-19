@@ -545,6 +545,30 @@ export default function Creators() {
                               <Eye className="w-3.5 h-3.5" />
                               PDF
                             </Button>
+                            {ct.status === 'enviado' && ct.assinafy_document_id && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={async () => {
+                                  try {
+                                    const resp = await apiRequest(`/api/creators/contratos/${ct.id}/signing-url`);
+                                    const data = await resp.json();
+                                    if (data.url) {
+                                      await navigator.clipboard.writeText(data.url);
+                                      toast({ title: "Link copiado!", description: data.url });
+                                    } else {
+                                      toast({ title: "Link não encontrado", description: "Nenhuma URL de assinatura disponível", variant: "destructive" });
+                                    }
+                                  } catch {
+                                    toast({ title: "Erro ao buscar link", variant: "destructive" });
+                                  }
+                                }}
+                              >
+                                <Link2 className="w-3.5 h-3.5" />
+                                Link
+                              </Button>
+                            )}
                             {ct.status === 'rascunho' && (
                               <Button
                                 size="sm"
