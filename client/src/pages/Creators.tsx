@@ -62,6 +62,7 @@ import {
   RefreshCw,
   Link2,
   Copy,
+  FileStack,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -173,6 +174,10 @@ export default function Creators() {
     chave_pix: "", tipo_pix: "", observacoes: ""
   });
 
+  // Todos contratos state
+  const [todosStatusFilter, setTodosStatusFilter] = useState("");
+  const [todosSearch, setTodosSearch] = useState("");
+
   // Contrato state
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
   const [contratoDialogOpen, setContratoDialogOpen] = useState(false);
@@ -215,6 +220,24 @@ export default function Creators() {
       if (!res.ok) throw new Error("Erro ao carregar creators");
       return res.json();
     },
+  });
+
+  const { data: todosContratos = [], isLoading: loadingTodosContratos } = useQuery<(ContratoCreator & { creator_nome: string; creator_email: string })[]>({
+    queryKey: ["/api/creators/contratos/todos", todosStatusFilter],
+    queryFn: async () => {
+      const params = todosStatusFilter ? `?status=${todosStatusFilter}` : "";
+      const res = await fetch(`/api/creators/contratos/todos${params}`);
+      if (!res.ok) throw new Error("Erro ao carregar contratos");
+      return res.json();
+    },
+  });
+
+  const todosContratosFiltrados = todosContratos.filter(ct => {
+    if (!todosSearch) return true;
+    const q = todosSearch.toLowerCase();
+    return (ct.creator_nome || "").toLowerCase().includes(q) ||
+           (ct.cargo || "").toLowerCase().includes(q) ||
+           (ct.cliente_nome || "").toLowerCase().includes(q);
   });
 
   const { data: contratos = [], isLoading: loadingContratos } = useQuery<ContratoCreator[]>({
@@ -280,6 +303,7 @@ export default function Creators() {
     },
     onSuccess: (data: any) => {
       toast({ title: "Contrato enviado!", description: `Email: ${data.emailEnviado}` });
+      queryClient.invalidateQueries({ queryKey: ["/api/creators/contratos/todos"] });
       queryClient.invalidateQueries({ queryKey: ["/api/creators", selectedCreator?.id, "contratos"] });
       setContratoDialogOpen(false);
       setContratoCriadoId(null);
@@ -296,6 +320,7 @@ export default function Creators() {
     },
     onSuccess: (data: any) => {
       toast({ title: "Sync concluído", description: `${data.updated}/${data.total} contrato(s) atualizado(s)` });
+      queryClient.invalidateQueries({ queryKey: ["/api/creators/contratos/todos"] });
       if (selectedCreator) {
         queryClient.invalidateQueries({ queryKey: ["/api/creators", selectedCreator.id, "contratos"] });
       }
@@ -384,6 +409,10 @@ export default function Creators() {
               <Megaphone className="w-4 h-4" />
               Freelancers
             </TabsTrigger>
+            <TabsTrigger value="todos-contratos" className="gap-2">
+              <FileStack className="w-4 h-4" />
+              Todos os Contratos
+            </TabsTrigger>
             <TabsTrigger value="contratos" className="gap-2">
               <FileText className="w-4 h-4" />
               Contratos {selectedCreator ? `- ${selectedCreator.nome}` : ""}
@@ -454,6 +483,150 @@ export default function Creators() {
                         {c.ativo && (
                           <Button variant="ghost" size="sm" onClick={() => setDeleteConfirmId(c.id)}>
                             <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── TAB TODOS OS CONTRATOS ──────────────────────────────────── */}
+        <TabsContent value="todos-contratos" className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por creator, cargo ou cliente..."
+                value={todosSearch}
+                onChange={(e) => setTodosSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select value={todosStatusFilter || "todos"} onValueChange={(v) => setTodosStatusFilter(v === "todos" ? "" : v)}>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder="Todos status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos status</SelectItem>
+                <SelectItem value="rascunho">Rascunho</SelectItem>
+                <SelectItem value="enviado">Enviado</SelectItem>
+                <SelectItem value="assinado">Assinado</SelectItem>
+                <SelectItem value="recusado">Recusado</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1"
+              disabled={syncAssinaturas.isPending}
+              onClick={() => syncAssinaturas.mutate()}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncAssinaturas.isPending ? "animate-spin" : ""}`} />
+              Sync Assinaturas
+            </Button>
+            <span className="text-sm text-muted-foreground ml-auto">
+              {todosContratosFiltrados.length} contrato{todosContratosFiltrados.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {loadingTodosContratos ? (
+            <div className="grid gap-3">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
+            </div>
+          ) : todosContratosFiltrados.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Nenhum contrato encontrado
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="rounded-md border dark:border-zinc-700">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Creator</TableHead>
+                    <TableHead>Cargo</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Valor</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Criado em</TableHead>
+                    <TableHead className="text-right">Acoes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todosContratosFiltrados.map((ct) => (
+                    <TableRow key={ct.id}>
+                      <TableCell>
+                        <button
+                          className="text-left hover:underline"
+                          onClick={() => {
+                            const creator = creators.find((c) => c.id === ct.creator_id);
+                            if (creator) {
+                              setSelectedCreator(creator);
+                              setActiveTab("contratos");
+                            }
+                          }}
+                        >
+                          <span className="font-medium">{ct.creator_nome}</span>
+                          <span className="block text-xs text-muted-foreground">{ct.creator_email}</span>
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-sm">{ct.cargo || "\u2014"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{ct.cliente_nome || "\u2014"}</TableCell>
+                      <TableCell className="text-sm font-medium">{formatCurrency(ct.valor_remuneracao)}</TableCell>
+                      <TableCell>{statusBadge(ct.status)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(ct.criado_em), "dd/MM/yyyy", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => window.open(`/api/creators/contratos/${ct.id}/preview-pdf`, "_blank")}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          PDF
+                        </Button>
+                        {ct.status === "enviado" && ct.assinafy_document_id && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={async () => {
+                              try {
+                                const resp = await apiRequest("GET", `/api/creators/contratos/${ct.id}/signing-url`);
+                                const data = await resp.json();
+                                if (data.url) {
+                                  await navigator.clipboard.writeText(data.url);
+                                  toast({ title: "Link copiado!", description: data.url });
+                                } else {
+                                  toast({ title: "Link nao encontrado", variant: "destructive" });
+                                }
+                              } catch {
+                                toast({ title: "Erro ao buscar link", variant: "destructive" });
+                              }
+                            }}
+                          >
+                            <Link2 className="w-3.5 h-3.5" />
+                            Link
+                          </Button>
+                        )}
+                        {ct.status === "rascunho" && (
+                          <Button
+                            size="sm"
+                            className="gap-1"
+                            disabled={enviarAssinatura.isPending}
+                            onClick={() => enviarAssinatura.mutate(ct.id)}
+                          >
+                            {enviarAssinatura.isPending ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Send className="w-3.5 h-3.5" />
+                            )}
+                            Enviar
                           </Button>
                         )}
                       </TableCell>
