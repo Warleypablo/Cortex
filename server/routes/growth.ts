@@ -2012,8 +2012,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
 
-      // CPS = Custo por Clique de Saída (apenas Meta, pois cliques de saída vêm só do Meta)
-      const cps = cliquesSaida > 0 ? metaInvestimento / cliquesSaida : 0;
+      // CPS = Custo por Sessão (Investimento / Visualizações de Página)
+      const cps = visualizacoesPagina > 0 ? investimento / visualizacoesPagina : 0;
+      // Connect Rate = Visualizações de Página / Cliques de Saída
+      const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
       const contagem = (req.query.contagem as string) || 'contrato';
@@ -2069,6 +2071,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cpm,
         ctr,
         cps,
+        connectRate,
         visualizacoesPagina,
         leads,
         mqls,
