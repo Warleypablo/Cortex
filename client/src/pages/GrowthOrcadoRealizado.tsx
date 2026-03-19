@@ -125,6 +125,7 @@ const DEFAULT_ORCADO_ADS = {
   cliques: 89843,
   cliquesSaida: 8595,
   cpm: 100,
+  visualizacoesPagina: 0,
   taxaConversaoPagina: 0,
   connectRate: 0,
   leads: 0,
@@ -173,6 +174,7 @@ const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   ctr: { segment: 'ads', key: 'ctr' },
   cliques_saida: { segment: 'ads', key: 'cliquesSaida' },
   cps: { segment: 'ads', key: 'cps' },
+  visualizacoes_pagina: { segment: 'ads', key: 'visualizacoesPagina' },
   taxa_conversao_pagina: { segment: 'ads', key: 'taxaConversaoPagina' },
   connect_rate: { segment: 'ads', key: 'connectRate' },
   leads: { segment: 'ads', key: 'leads' },
@@ -423,6 +425,7 @@ export default function GrowthOrcadoRealizado() {
     cpm: number;
     ctr: number;
     cps: number;
+    visualizacoesPagina: number;
     leads: number;
     mqls: number;
     cpl: number;
@@ -588,7 +591,8 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ctr', name: 'CTR', type: 'manual', orcado: ORCADO_ADS.ctr, realizado: data.ctr ?? null, percentual: calcPercentual(ORCADO_ADS.ctr, data.ctr), format: 'percent' },
       { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: ORCADO_ADS.cliquesSaida, realizado: data.cliquesSaida ?? 0, percentual: calcPercentual(ORCADO_ADS.cliquesSaida, data.cliquesSaida), format: 'number' },
       { id: 'cps', name: 'CPS', type: 'formula', orcado: ORCADO_ADS.cps, realizado: data.cps ?? null, percentual: calcPercentual(ORCADO_ADS.cps, data.cps), format: 'currency' },
-      { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.cliquesSaida ?? 0) > 0 ? (data.leads ?? 0) / (data.cliquesSaida ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.cliquesSaida ?? 0) > 0 ? (data.leads ?? 0) / (data.cliquesSaida ?? 1) : 0), format: 'percent' },
+      { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
+      { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0), format: 'percent' },
       { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: (data.leads ?? 0) > 0 ? (data.mqls ?? 0) / (data.leads ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.connectRate, (data.leads ?? 0) > 0 ? (data.mqls ?? 0) / (data.leads ?? 1) : 0), format: 'percent' },
       { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
       { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },
