@@ -2004,7 +2004,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const impressoes = metaImpressoes + googleImpressoes;
       const cliques = metaCliques + googleCliques;
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
-      const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
+      const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
 
       // CPS = Custo por Clique de Saída (apenas Meta, pois cliques de saída vêm só do Meta)
       const cps = cliquesSaida > 0 ? metaInvestimento / cliquesSaida : 0;
