@@ -20,12 +20,12 @@ function requireEnv(name: string): string {
 }
 
 const pool = new Pool({
-  host: requireEnv("DATABASE_HOST"),
-  port: 5432,
-  database: process.env.DATABASE_NAME || "dados_turbo",
-  user: process.env.DATABASE_USER || "postgres",
-  password: requireEnv("DATABASE_PASSWORD"),
-  ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+  host: process.env.DATABASE_HOST || process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432', 10),
+  database: process.env.DATABASE_NAME || process.env.DB_NAME || "dados_turbo",
+  user: process.env.DATABASE_USER || process.env.DB_USER || "postgres",
+  password: process.env.DATABASE_PASSWORD || process.env.DB_PASSWORD || '',
+  ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
 });
 
 async function main() {

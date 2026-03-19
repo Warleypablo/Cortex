@@ -239,7 +239,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
 
   const timeRange = JSON.stringify({ since, until });
   const insights = await fetchAllPages(`${TURBO_ACCOUNT_ID}/insights`, {
-    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,actions,action_values,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions',
+    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions',
     time_range: timeRange,
     level: 'ad',
     time_increment: '1',
@@ -276,19 +276,26 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
       return arr.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
     };
 
+    // Extract outbound_clicks (comes as array from Meta API)
+    const outboundClicks = Array.isArray(row.outbound_clicks)
+      ? row.outbound_clicks.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0)
+      : parseInt(row.outbound_clicks || '0');
+
     await pool.query(`
       INSERT INTO meta_ads.meta_insights_daily (
         account_id, campaign_id, adset_id, ad_id, date_start, date_stop,
         impressions, clicks, spend, reach, frequency, cpm, cpc, ctr,
+        inline_link_clicks, outbound_clicks,
         video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
         conversions, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_daily_account_id_campaign_id_adset_id_ad_id_d_key
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
         reach=EXCLUDED.reach, frequency=EXCLUDED.frequency, cpm=EXCLUDED.cpm,
         cpc=EXCLUDED.cpc, ctr=EXCLUDED.ctr,
+        inline_link_clicks=EXCLUDED.inline_link_clicks, outbound_clicks=EXCLUDED.outbound_clicks,
         video_p25_watched_actions=EXCLUDED.video_p25_watched_actions,
         video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
         video_p75_watched_actions=EXCLUDED.video_p75_watched_actions,
@@ -301,6 +308,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
       parseFloat(row.spend || '0'), parseInt(row.reach || '0'),
       parseFloat(row.frequency || '0'), parseFloat(row.cpm || '0'),
       parseFloat(row.cpc || '0'), parseFloat(row.ctr || '0'),
+      parseInt(row.inline_link_clicks || '0'), outboundClicks,
       getVideoMetric(row.video_p25_watched_actions),
       getVideoMetric(row.video_p50_watched_actions),
       getVideoMetric(row.video_p75_watched_actions),
