@@ -1535,19 +1535,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      // SQL fragments: contrato = conta cada deal; cliente = conta empresas distintas (por company_id)
-      const countNovos = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN d.company_id END)")
+      // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
+      const prodCountExpr = "CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1 ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END";
+      const countNovos = contagem === 'contrato'
+        ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)");
-      const countAcel = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN d.company_id END)")
+      const countAcel = contagem === 'contrato'
+        ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END)");
-      const countImpl = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END)")
+      const countImpl = contagem === 'contrato'
+        ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
       const mqlCondition = sql`(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
-      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
+      const countExpr = contagem === 'contrato'
+        ? sql.raw(`SUM(${prodCountExpr})`)
+        : sql`COUNT(*)`;
 
       // Filtro inbound: apenas deals de fontes inbound
       const inboundFilter = sql`AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')`;
@@ -1710,18 +1713,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      const countNovos = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN d.company_id END)")
+      // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
+      const prodCountExpr = "CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1 ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END";
+      const countNovos = contagem === 'contrato'
+        ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)");
-      const countAcel = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN d.company_id END)")
+      const countAcel = contagem === 'contrato'
+        ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_recorrente, 0) > 0 THEN 1 END)");
-      const countImpl = contagem === 'cliente'
-        ? sql.raw("COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN d.company_id END)")
+      const countImpl = contagem === 'contrato'
+        ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
       const naoMqlCondition = sql`(d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')`;
-      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
+      const countExpr = contagem === 'contrato'
+        ? sql.raw(`SUM(${prodCountExpr})`)
+        : sql`COUNT(*)`;
 
       // Filtro inbound: apenas deals de fontes inbound
       const inboundFilter = sql`AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')`;
@@ -2015,9 +2022,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      const countExpr = contagem === 'cliente' ? sql`COUNT(DISTINCT d.company_id)` : sql`COUNT(*)`;
-      const countMqlExpr = contagem === 'cliente'
-        ? sql`COUNT(DISTINCT CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN d.company_id END)`
+      // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
+      const prodCountExpr = "CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1 ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END";
+      const countExpr = contagem === 'contrato'
+        ? sql.raw(`SUM(${prodCountExpr})`)
+        : sql`COUNT(*)`;
+      const countMqlExpr = contagem === 'contrato'
+        ? sql.raw(`SUM(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN ${prodCountExpr} ELSE 0 END)`)
         : sql`COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END)`;
 
       const leadsResult = await db.execute(sql`
