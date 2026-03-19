@@ -247,10 +247,11 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
 
   let count = 0;
   for (const row of insights) {
-    // Extract lead and purchase actions
+    // Extract lead, purchase, and landing_page_view actions
     let actionsLead = 0;
     let actionsPurchase = 0;
     let actionValuesPurchase = 0;
+    let landingPageViews = 0;
 
     if (row.actions) {
       for (const a of row.actions) {
@@ -259,6 +260,9 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         }
         if (a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase') {
           actionsPurchase += parseInt(a.value || '0');
+        }
+        if (a.action_type === 'landing_page_view') {
+          landingPageViews += parseInt(a.value || '0');
         }
       }
     }
@@ -288,8 +292,8 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         inline_link_clicks, outbound_clicks,
         video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
-        conversions, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW())
+        conversions, landing_page_views, data_importacao
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_daily_account_id_campaign_id_adset_id_ad_id_d_key
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
@@ -300,7 +304,8 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
         video_p75_watched_actions=EXCLUDED.video_p75_watched_actions,
         video_p100_watched_actions=EXCLUDED.video_p100_watched_actions,
-        conversions=EXCLUDED.conversions, data_importacao=NOW()
+        conversions=EXCLUDED.conversions, landing_page_views=EXCLUDED.landing_page_views,
+        data_importacao=NOW()
     `, [
       TURBO_ACCOUNT_ID, row.campaign_id || null, row.adset_id || null, row.ad_id || null,
       row.date_start,
@@ -314,6 +319,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
       getVideoMetric(row.video_p75_watched_actions),
       getVideoMetric(row.video_p100_watched_actions),
       actionsLead + actionsPurchase,
+      landingPageViews,
     ]);
     count++;
   }
@@ -338,6 +344,13 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
   const until = options?.until || today.toISOString().split('T')[0];
 
   console.log(`[MetaSync] Starting full sync (${since} → ${until})...`);
+
+  // Ensure landing_page_views column exists
+  try {
+    await pool.query(`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column may already exist
+  }
 
   // 1. Account
   try {
