@@ -407,6 +407,27 @@ export function registerCreatorsRoutes(app: Express) {
     }
   });
 
+  // GET /api/creators/contratos/todos — Todos os contratos com nome do creator
+  app.get("/api/creators/contratos/todos", async (req, res) => {
+    try {
+      const statusFilter = req.query.status as string | undefined;
+      let query = `
+        SELECT cc.*, cr.nome AS creator_nome, cr.email AS creator_email
+        FROM cortex_core.contratos_creators cc
+        JOIN cortex_core.creators cr ON cr.id = cc.creator_id
+      `;
+      if (statusFilter) {
+        query += ` WHERE cc.status = '${statusFilter.replace(/'/g, "''")}'`;
+      }
+      query += ` ORDER BY cc.criado_em DESC`;
+      const result = await db.execute(sql.raw(query));
+      res.json(result.rows);
+    } catch (error: any) {
+      console.error("[creators] Erro ao listar todos os contratos:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // GET /api/creators/pagamentos — Contratos no fluxo de pagamento
   app.get("/api/creators/pagamentos", async (req, res) => {
     try {
