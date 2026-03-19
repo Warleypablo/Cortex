@@ -910,24 +910,32 @@ export function registerCreatorsRoutes(app: Express) {
       if (!data) return res.status(404).json({ error: "Contrato não encontrado" });
       if (!data.assinafy_document_id) return res.status(400).json({ error: "Contrato não foi enviado para assinatura" });
 
-      const resp = await fetch(`${config.api_url}/documents/${data.assinafy_document_id}/assignments`, {
+      const resp = await fetch(`${config.api_url}/documents/${data.assinafy_document_id}`, {
         method: 'GET',
         headers: { 'X-Api-Key': config.api_key }
       });
 
       if (!resp.ok) {
-        return res.status(resp.status).json({ error: `Erro ao buscar assignments: HTTP ${resp.status}` });
+        return res.status(resp.status).json({ error: `Erro ao buscar documento: HTTP ${resp.status}` });
       }
 
       const result = await resp.json() as any;
-      const assignments = result.data || result || [];
+      const doc = result.data || {};
+      const assignment = doc.assignment || {};
+      const rawSigners = Array.isArray(assignment.signers) ? assignment.signers : [];
+      const items = Array.isArray(assignment.items) ? assignment.items : [];
 
-      const signers = (Array.isArray(assignments) ? assignments : []).map((a: any) => ({
-        name: a.signer?.full_name || a.full_name || '',
-        email: a.signer?.email || a.email || '',
-        url: a.url || a.signing_url || '',
-        status: a.status || '',
-      }));
+      // Build signer list with completion status from items
+      const signers = rawSigners.map((s: any) => {
+        const item = items.find((it: any) => it.signer?.id === s.id);
+        const signed = item?.completed === true || item?.value === 'SIGNED';
+        return {
+          name: s.full_name || '',
+          email: s.email || '',
+          url: '',
+          status: signed ? 'signed' : 'pending',
+        };
+      });
 
       const creatorSigner = signers.find((s: any) => s.email?.toLowerCase() === data.creator_email?.toLowerCase());
 
