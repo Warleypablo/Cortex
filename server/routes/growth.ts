@@ -2039,6 +2039,17 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ? sql.raw(`SUM(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN ${prodCountExpr} ELSE 0 END)`)
         : sql`COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END)`;
 
+      // Se um funil específico está selecionado, não filtrar por UTM (o funil já delimita o escopo)
+      const utmFilter = funilValues.length > 0 && !hasVazio
+        ? sql``
+        : sql`AND (
+            LOWER(d.utm_source) LIKE '%facebook%' OR LOWER(d.utm_source) LIKE '%fb%'
+            OR LOWER(d.utm_source) LIKE '%meta%' OR LOWER(d.utm_source) = 'ig'
+            OR LOWER(d.utm_source) LIKE '%instagram%'
+            OR LOWER(d.utm_source) LIKE '%google%' OR LOWER(d.utm_source) LIKE '%adwords%'
+            OR LOWER(d.utm_source) = 'gads'
+          )`;
+
       const leadsResult = await db.execute(sql`
         SELECT
           ${countExpr} as total_leads,
@@ -2046,13 +2057,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
-          AND (
-            LOWER(d.utm_source) LIKE '%facebook%' OR LOWER(d.utm_source) LIKE '%fb%'
-            OR LOWER(d.utm_source) LIKE '%meta%' OR LOWER(d.utm_source) = 'ig'
-            OR LOWER(d.utm_source) LIKE '%instagram%'
-            OR LOWER(d.utm_source) LIKE '%google%' OR LOWER(d.utm_source) LIKE '%adwords%'
-            OR LOWER(d.utm_source) = 'gads'
-          )
+          ${utmFilter}
           ${funilFilter}
       `);
 
