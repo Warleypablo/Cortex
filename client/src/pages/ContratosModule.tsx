@@ -829,13 +829,21 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
         const res = await fetch(`/api/contratos/bitrix-deal/${formData.id_crm.trim()}`);
         if (!res.ok) {
           setDealInfo(null);
-          setDealError('Deal não encontrado no CRM');
+          const errorData = await res.json().catch(() => null);
+          setDealError(errorData?.message || 'Deal não encontrado no CRM');
+          return;
+        }
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          setDealInfo(null);
+          setDealError('Resposta inesperada do servidor');
           return;
         }
         const data = await res.json();
         setDealInfo(data.deal);
-      } catch {
-        setDealError('Erro ao buscar deal');
+      } catch (err) {
+        console.error('Erro ao buscar deal:', err);
+        setDealError('Erro de conexão ao buscar deal');
       } finally {
         setDealLoading(false);
       }
@@ -2111,13 +2119,21 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
         const res = await fetch(`/api/contratos/bitrix-deal/${formData.id_crm.trim()}`);
         if (!res.ok) {
           setDealInfo(null);
-          setDealError('Deal não encontrado no CRM');
+          const errorData = await res.json().catch(() => null);
+          setDealError(errorData?.message || 'Deal não encontrado no CRM');
+          return;
+        }
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          setDealInfo(null);
+          setDealError('Resposta inesperada do servidor');
           return;
         }
         const data = await res.json();
         setDealInfo(data.deal);
-      } catch {
-        setDealError('Erro ao buscar deal');
+      } catch (err) {
+        console.error('Erro ao buscar deal:', err);
+        setDealError('Erro de conexão ao buscar deal');
       } finally {
         setDealLoading(false);
       }
