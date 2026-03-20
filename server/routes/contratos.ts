@@ -1139,6 +1139,86 @@ Exemplos:
     }
   });
 
+  // ── Templates de Contrato ──────────────────────────────────────
+
+  app.get("/api/contratos/templates", isAuthenticated, async (_req, res) => {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM staging.contrato_templates WHERE ativo = true ORDER BY nome`
+      );
+      res.json({ templates: result.rows });
+    } catch (error: any) {
+      console.error("Error listing templates:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/contratos/templates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(
+        sql`SELECT * FROM staging.contrato_templates WHERE id = ${parseInt(id)}`
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Template não encontrado" });
+      }
+      res.json({ template: result.rows[0] });
+    } catch (error: any) {
+      console.error("Error getting template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/contratos/templates", isAuthenticated, async (req, res) => {
+    try {
+      const { nome, descricao, itens_template } = req.body;
+      const result = await db.execute(
+        sql`INSERT INTO staging.contrato_templates (nome, descricao, itens_template)
+         VALUES (${nome}, ${descricao || null}, ${JSON.stringify(itens_template || [])})
+         RETURNING *`
+      );
+      res.json({ template: result.rows[0] });
+    } catch (error: any) {
+      console.error("Error creating template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/contratos/templates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nome, descricao, itens_template } = req.body;
+      const result = await db.execute(
+        sql`UPDATE staging.contrato_templates
+         SET nome = ${nome}, descricao = ${descricao || null},
+             itens_template = ${JSON.stringify(itens_template || [])},
+             updated_at = NOW()
+         WHERE id = ${parseInt(id)} RETURNING *`
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Template não encontrado" });
+      }
+      res.json({ template: result.rows[0] });
+    } catch (error: any) {
+      console.error("Error updating template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/contratos/templates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.execute(
+        sql`UPDATE staging.contrato_templates SET ativo = false, updated_at = NOW()
+         WHERE id = ${parseInt(id)}`
+      );
+      res.json({ message: "Template desativado" });
+    } catch (error: any) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============================================================================
   // CONTRATOS ROUTES
   // ============================================================================
