@@ -647,27 +647,20 @@ async function ensureContratosTablesExist() {
 export function registerContratosRoutes(app: Express) {
   ensureContratosTablesExist();
 
-  // Helper: move um deal no Bitrix para "Negócio Ganho" (stage WON do pipeline correto)
+  // Helper: move um deal no Bitrix para "Negócio Ganho" (pipeline default, stage WON)
   async function moveBitrixDealToWon(dealId: string | number): Promise<boolean> {
     const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
     if (!webhookUrl) return false;
 
     try {
       const parsedId = typeof dealId === 'string' ? parseInt(dealId) : dealId;
-      // Buscar o deal para saber o CATEGORY_ID (pipeline)
-      const dealRes = await fetch(`${webhookUrl}/crm.deal.get?id=${parsedId}`);
-      if (!dealRes.ok) return false;
-      const dealData = await dealRes.json();
-      if (!dealData.result) return false;
 
-      const categoryId = dealData.result.CATEGORY_ID;
-      // Pipeline default (0) usa 'WON', custom usa 'C{id}:WON'
-      const wonStageId = categoryId === '0' || categoryId === 0 ? 'WON' : `C${categoryId}:WON`;
-
+      // Mover para pipeline default (CATEGORY_ID=0) com stage WON ("Negócio Ganho")
+      // Isso funciona mesmo se o deal está em outro pipeline (Outbound, Inbound, etc.)
       const updateRes = await fetch(`${webhookUrl}/crm.deal.update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: parsedId, fields: { STAGE_ID: wonStageId } }),
+        body: JSON.stringify({ id: parsedId, fields: { CATEGORY_ID: 0, STAGE_ID: 'WON' } }),
       });
       if (!updateRes.ok) return false;
       const updateData = await updateRes.json();
@@ -678,10 +671,10 @@ export function registerContratosRoutes(app: Express) {
         sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parsedId}`
       ).catch(() => {});
 
-      console.log(`[bitrix] Deal ${parsedId} movido para ${wonStageId} (Negócio Ganho)`);
+      console.log(`[bitrix] Deal ${parsedId} movido para pipeline default → Negócio Ganho`);
       return true;
     } catch (err) {
-      console.error(`[bitrix] Erro ao mover deal ${dealId} para WON:`, err);
+      console.error(`[bitrix] Erro ao mover deal ${dealId} para Negócio Ganho:`, err);
       return false;
     }
   }
