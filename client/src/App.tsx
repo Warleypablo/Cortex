@@ -138,6 +138,7 @@ const SolicitacaoFerramentas = lazyWithRetry(() => import("@/pages/SolicitacaoFe
 const Capacity = lazyWithRetry(() => import("@/pages/Capacity"));
 const PortalCliente = PortalClientePage;
 const PortalCreator = lazyWithRetry(() => import("@/pages/PortalCreator"));
+const TestWorkflow = lazyWithRetry(() => import("@/pages/TestWorkflow"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
 // Error boundary to catch silent crashes in the portal.
@@ -382,6 +383,7 @@ function ProtectedRouter() {
       <Route path="/admin/health">{() => <ProtectedRoute path="/admin/health" component={AdminHealth} />}</Route>
       <Route path="/admin/kpi">{() => <ProtectedRoute path="/admin/kpi" component={AdminOverrides} />}</Route>
       <Route path="/admin/uso">{() => <ProtectedRoute path="/admin/uso" component={AdminUsageLog} />}</Route>
+      <Route path="/admin/test-workflow">{() => <ProtectedRoute path="/admin/test-workflow" component={TestWorkflow} />}</Route>
 
       {/* Homepage - Dashboard baseado no perfil do usuário (placed at end to avoid shadowing other routes) */}
       <Route path="/">{() => (
