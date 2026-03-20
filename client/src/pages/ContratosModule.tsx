@@ -2784,6 +2784,48 @@ function ServicosTab() {
   const servicos: Servico[] = servicosData?.servicos || [];
   const planos: PlanoServico[] = planosData?.planos || [];
 
+  // Templates
+  const { data: templatesResp } = useQuery<{ templates: any[] }>({
+    queryKey: ['/api/contratos/templates'],
+  });
+  const templates = templatesResp?.templates || [];
+
+  const [templateDialog, setTemplateDialog] = useState<{ open: boolean; mode: 'create' | 'edit'; data?: any }>({ open: false, mode: 'create' });
+  const [templateFormData, setTemplateFormData] = useState({ nome: '', descricao: '' });
+  const [templateItens, setTemplateItens] = useState<ContratoItem[]>([]);
+
+  const createTemplateMutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest('POST', '/api/contratos/templates', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/templates'] });
+      toast({ title: "Template criado!" });
+      setTemplateDialog({ open: false, mode: 'create' });
+    },
+    onError: () => toast({ title: "Erro ao criar template", variant: "destructive" }),
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({ id, ...data }: any) =>
+      apiRequest('PUT', `/api/contratos/templates/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/templates'] });
+      toast({ title: "Template atualizado!" });
+      setTemplateDialog({ open: false, mode: 'create' });
+    },
+    onError: () => toast({ title: "Erro ao atualizar template", variant: "destructive" }),
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest('DELETE', `/api/contratos/templates/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/templates'] });
+      toast({ title: "Template removido" });
+    },
+    onError: () => toast({ title: "Erro ao remover template", variant: "destructive" }),
+  });
+
   const openCreateServico = () => {
     setServicoForm({ nome: '', descricao: '' });
     setServicoDialog({ open: true, mode: 'create' });
@@ -2966,6 +3008,120 @@ function ServicosTab() {
           })}
         </div>
       )}
+
+      {/* Seção de Templates */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Templates de Contrato</h3>
+          <Button size="sm" onClick={() => {
+            setTemplateFormData({ nome: '', descricao: '' });
+            setTemplateItens([]);
+            setTemplateDialog({ open: true, mode: 'create' });
+          }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Template
+          </Button>
+        </div>
+
+        {templates.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>Nenhum template criado</p>
+              <p className="text-sm">Templates ajudam o comercial a criar contratos mais rápido</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Itens</TableHead>
+                  <TableHead className="w-24">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {templates.map((t: any) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium">{t.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.descricao || '-'}</TableCell>
+                    <TableCell>{t.itens_template?.length || 0} serviço(s)</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => {
+                          setTemplateFormData({ nome: t.nome, descricao: t.descricao || '' });
+                          setTemplateItens(t.itens_template || []);
+                          setTemplateDialog({ open: true, mode: 'edit', data: t });
+                        }}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => deleteTemplateMutation.mutate(t.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
+
+      {/* Template Dialog */}
+      <Dialog open={templateDialog.open} onOpenChange={(open) => { if (!open) setTemplateDialog({ open: false, mode: 'create' }); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{templateDialog.mode === 'edit' ? 'Editar Template' : 'Novo Template'}</DialogTitle>
+            <DialogDescription>
+              {templateDialog.mode === 'edit' ? 'Atualize os dados do template' : 'Crie um template reutilizável para novos contratos'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome do Template</Label>
+              <Input
+                value={templateFormData.nome}
+                onChange={e => setTemplateFormData(prev => ({ ...prev, nome: e.target.value }))}
+                placeholder="Ex: Social Media Básico"
+              />
+            </div>
+            <div>
+              <Label>Descrição (opcional)</Label>
+              <Textarea
+                value={templateFormData.descricao}
+                onChange={e => setTemplateFormData(prev => ({ ...prev, descricao: e.target.value }))}
+                placeholder="Breve descrição do que este template inclui"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateDialog({ open: false, mode: 'create' })}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const payload = {
+                  nome: templateFormData.nome,
+                  descricao: templateFormData.descricao || null,
+                  itens_template: templateItens,
+                };
+                if (templateDialog.mode === 'edit' && templateDialog.data) {
+                  updateTemplateMutation.mutate({ id: templateDialog.data.id, ...payload });
+                } else {
+                  createTemplateMutation.mutate(payload);
+                }
+              }}
+              disabled={!templateFormData.nome.trim()}
+            >
+              {templateDialog.mode === 'edit' ? 'Atualizar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog Serviço */}
       <Dialog open={servicoDialog.open} onOpenChange={(open) => !open && setServicoDialog({ open: false, mode: 'create' })}>
