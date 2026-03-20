@@ -2181,3 +2181,22 @@ export async function initializeCapacityTable(): Promise<void> {
     console.error('[database] Error initializing capacity table:', error);
   }
 }
+
+export async function initializeContratoTemplatesTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS staging.contrato_templates (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(255) NOT NULL,
+        descricao TEXT,
+        itens_template JSONB NOT NULL DEFAULT '[]'::jsonb,
+        ativo BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('[database] Contrato templates table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing contrato templates table:', error);
+  }
+}
