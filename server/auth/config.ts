@@ -20,19 +20,6 @@ export function getCallbackURL(): string {
     return `${renderUrl}/auth/google/callback`;
   }
 
-  const replitDomains = process.env.REPLIT_DOMAINS;
-  if (replitDomains) {
-    const firstDomain = replitDomains.split(',')[0].trim();
-    if (firstDomain) {
-      return `https://${firstDomain}/auth/google/callback`;
-    }
-  }
-
-  const devDomain = process.env.REPLIT_DEV_DOMAIN;
-  if (devDomain) {
-    return `https://${devDomain}/auth/google/callback`;
-  }
-
   return "http://localhost:3000/auth/google/callback";
 }
 
