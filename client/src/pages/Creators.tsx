@@ -1180,54 +1180,16 @@ export default function Creators() {
               <p className="text-xs text-muted-foreground mt-1">Descreva as atribuições que constarão na cláusula do objeto do contrato</p>
             </div>
 
-            {/* Valor e Duração */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Valor (R$) *</Label>
-                <Input
-                  placeholder="2.500,00"
-                  value={contratoForm.valor_remuneracao}
-                  onChange={e => setContratoForm(f => ({ ...f, valor_remuneracao: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label>Prazo</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={contratoForm.unidade_prazo === "dias" ? 365 : 60}
-                    className="flex-1"
-                    value={contratoForm.duracao_meses}
-                    onChange={e => {
-                      const val = parseInt(e.target.value) || 6;
-                      setContratoForm(f => ({
-                        ...f,
-                        duracao_meses: e.target.value,
-                        data_fim: f.data_inicio ? calcDataFim(f.data_inicio, val, f.unidade_prazo) : f.data_fim
-                      }));
-                    }}
-                  />
-                  <Select
-                    value={contratoForm.unidade_prazo}
-                    onValueChange={v => {
-                      const val = parseInt(contratoForm.duracao_meses) || 6;
-                      setContratoForm(f => ({
-                        ...f,
-                        unidade_prazo: v,
-                        data_fim: f.data_inicio ? calcDataFim(f.data_inicio, val, v) : f.data_fim
-                      }));
-                    }}
-                  >
-                    <SelectTrigger className="w-[100px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="meses">Meses</SelectItem>
-                      <SelectItem value="dias">Dias</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+            {/* Valor */}
+            <div>
+              <Label>Valor (R$) *</Label>
+              <Input
+                placeholder="2.500,00"
+                value={contratoForm.valor_remuneracao}
+                onChange={e => setContratoForm(f => ({ ...f, valor_remuneracao: e.target.value }))}
+                required
+              />
+              <p className="text-xs text-muted-foreground mt-1">Prazo fixo: 3 dias para gravação + 3 dias para ajustes</p>
             </div>
 
             {/* Data de Início removida — usa data de assinatura do contrato */}
