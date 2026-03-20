@@ -3458,7 +3458,7 @@ Exemplos:
       
       // Buscar contrato pelo assinafy_document_id
       const contratoResult = await db.execute(sql`
-        SELECT id, status, assinafy_status FROM staging.contratos
+        SELECT id, status, assinafy_status, id_crm FROM staging.contratos
         WHERE assinafy_document_id = ${documentId}
       `);
       
@@ -3539,6 +3539,29 @@ Exemplos:
         `);
         
         console.log(`[assinafy-webhook] Contrato ${contrato.id} atualizado para '${novoStatus}'`);
+
+        // Mover deal no Bitrix para "Negócio Ganho" se id_crm preenchido
+        const idCrm = contrato.id_crm;
+        const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
+        if (idCrm && webhookUrl) {
+          try {
+            const bitrixRes = await fetch(`${webhookUrl}/crm.deal.update`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: parseInt(idCrm), fields: { STAGE_ID: 'WON' } }),
+            });
+            if (bitrixRes.ok) {
+              await db.execute(
+                sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parseInt(idCrm)}`
+              );
+              console.log(`[assinafy-webhook] Bitrix deal ${idCrm} movido para Negócio Ganho`);
+            } else {
+              console.error(`[assinafy-webhook] Erro ao mover deal ${idCrm} no Bitrix:`, await bitrixRes.text());
+            }
+          } catch (bitrixErr) {
+            console.error(`[assinafy-webhook] Erro ao chamar Bitrix API para deal ${idCrm}:`, bitrixErr);
+          }
+        }
 
         // Sincronizar cliente e serviços para cup_clientes/cup_contratos
         await syncClienteFromSignedContract(contrato.id);
