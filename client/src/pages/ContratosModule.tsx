@@ -812,6 +812,37 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
 
   const [itens, setItens] = useState<ContratoItem[]>(contrato?.itens || []);
 
+  const [dealInfo, setDealInfo] = useState<{ title: string; company_name: string; contact_name: string; stage_name: string } | null>(null);
+  const [dealLoading, setDealLoading] = useState(false);
+  const [dealError, setDealError] = useState('');
+
+  useEffect(() => {
+    if (!formData.id_crm || formData.id_crm.trim().length < 1) {
+      setDealInfo(null);
+      setDealError('');
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setDealLoading(true);
+      setDealError('');
+      try {
+        const res = await fetch(`/api/contratos/bitrix-deal/${formData.id_crm.trim()}`);
+        if (!res.ok) {
+          setDealInfo(null);
+          setDealError('Deal não encontrado no CRM');
+          return;
+        }
+        const data = await res.json();
+        setDealInfo(data.deal);
+      } catch {
+        setDealError('Erro ao buscar deal');
+      } finally {
+        setDealLoading(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData.id_crm]);
+
   const { data: proximoNumero } = useQuery<{ proximoNumero: string }>({
     queryKey: ['/api/contratos/proximo-numero'],
     enabled: !contrato,
@@ -1145,6 +1176,16 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                 value={formData.id_crm}
                 onChange={(e) => setFormData({ ...formData, id_crm: e.target.value })}
               />
+              {dealLoading && <p className="text-xs text-muted-foreground animate-pulse">Buscando no CRM...</p>}
+              {dealError && <p className="text-xs text-destructive">{dealError}</p>}
+              {dealInfo && (
+                <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5 dark:bg-green-500/10 space-y-1">
+                  <p className="text-sm font-medium text-foreground">{dealInfo.title}</p>
+                  {dealInfo.company_name && <p className="text-xs text-muted-foreground">Empresa: {dealInfo.company_name}</p>}
+                  {dealInfo.contact_name && <p className="text-xs text-muted-foreground">Contato: {dealInfo.contact_name}</p>}
+                  {dealInfo.stage_name && <p className="text-xs text-muted-foreground">Stage: {dealInfo.stage_name}</p>}
+                </div>
+              )}
             </div>
 
           </div>
@@ -2053,6 +2094,37 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
     }
   }, [initialData]);
 
+  const [dealInfo, setDealInfo] = useState<{ title: string; company_name: string; contact_name: string; stage_name: string } | null>(null);
+  const [dealLoading, setDealLoading] = useState(false);
+  const [dealError, setDealError] = useState('');
+
+  useEffect(() => {
+    if (!formData.id_crm || formData.id_crm.trim().length < 1) {
+      setDealInfo(null);
+      setDealError('');
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setDealLoading(true);
+      setDealError('');
+      try {
+        const res = await fetch(`/api/contratos/bitrix-deal/${formData.id_crm.trim()}`);
+        if (!res.ok) {
+          setDealInfo(null);
+          setDealError('Deal não encontrado no CRM');
+          return;
+        }
+        const data = await res.json();
+        setDealInfo(data.deal);
+      } catch {
+        setDealError('Erro ao buscar deal');
+      } finally {
+        setDealLoading(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData.id_crm]);
+
   const { data: proximoNumero } = useQuery<{ proximoNumero: string }>({
     queryKey: ['/api/contratos/proximo-numero'],
   });
@@ -2562,6 +2634,16 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
                     onChange={(e) => setFormData({ ...formData, id_crm: e.target.value })}
                     placeholder="ID do deal no CRM"
                   />
+                  {dealLoading && <p className="text-xs text-muted-foreground animate-pulse">Buscando no CRM...</p>}
+                  {dealError && <p className="text-xs text-destructive">{dealError}</p>}
+                  {dealInfo && (
+                    <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5 dark:bg-green-500/10 space-y-1">
+                      <p className="text-sm font-medium text-foreground">{dealInfo.title}</p>
+                      {dealInfo.company_name && <p className="text-xs text-muted-foreground">Empresa: {dealInfo.company_name}</p>}
+                      {dealInfo.contact_name && <p className="text-xs text-muted-foreground">Contato: {dealInfo.contact_name}</p>}
+                      {dealInfo.stage_name && <p className="text-xs text-muted-foreground">Stage: {dealInfo.stage_name}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
 
