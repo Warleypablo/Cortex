@@ -78,6 +78,7 @@ import {
   ChevronRight,
   Package,
   Bookmark,
+  Copy,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1375,7 +1376,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
   );
 });
 
-function ContratosTab() {
+function ContratosTab({ onDuplicate }: { onDuplicate?: (data: NovoContratoInitialData) => void }) {
   const [searchInput, setSearchInput] = useState("");
   const deferredSearch = useDeferredValue(searchInput);
   const [statusFilter, setStatusFilter] = useState("todos");
@@ -1479,6 +1480,29 @@ function ContratosTab() {
     setSelectedContrato(null);
     setDialogOpen(true);
   }, []);
+
+  const handleDuplicate = async (contrato: ContratoDoc) => {
+    try {
+      const res = await fetch(`/api/contratos/contratos/${contrato.id}`);
+      const data = await res.json();
+      const full = data.contrato as ContratoDoc;
+      const fullItens = (data.itens || full.itens || []) as ContratoItem[];
+
+      onDuplicate?.({
+        formData: {
+          cliente_id: full.cliente_id,
+          comercial_nome: full.comercial_nome || '',
+          comercial_email: full.comercial_email || '',
+          id_crm: full.id_crm || '',
+          observacoes: full.observacoes || '',
+        },
+        itens: fullItens,
+        source: 'duplicate',
+      });
+    } catch {
+      toast({ title: "Erro ao duplicar contrato", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -1636,6 +1660,17 @@ function ContratosTab() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          title="Duplicar contrato"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicate(contrato);
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           onClick={() => deleteMutation.mutate(contrato.id)}
                           data-testid={`button-delete-contrato-${contrato.id}`}
                           title="Excluir"
@@ -1720,6 +1755,13 @@ function ContratosTab() {
                       Verificar Status
                     </Button>
                   )}
+                  <Button variant="outline" size="sm" onClick={() => {
+                    handleDuplicate(selectedContrato!);
+                    setViewDialogOpen(false);
+                  }}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicar
+                  </Button>
                 </div>
               </DialogHeader>
 
@@ -3376,7 +3418,12 @@ export default function ContratosModule() {
         </TabsContent>
 
         <TabsContent value="contratos" className="mt-0">
-          <ContratosTab />
+          <ContratosTab
+            onDuplicate={(data) => {
+              setNovoContratoInitialData(data);
+              setActiveTab("novo");
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="novo" className="mt-0">
