@@ -443,14 +443,22 @@ app.use((req, res, next) => {
                 const idCrm = (idCrmResult.rows[0] as any)?.id_crm;
                 const bitrixWebhook = process.env.BITRIX_WEBHOOK_URL;
                 if (idCrm && bitrixWebhook) {
-                  const bRes = await fetch(`${bitrixWebhook}/crm.deal.update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: parseInt(idCrm), fields: { STAGE_ID: 'WON' } }),
-                  });
-                  if (bRes.ok) {
-                    await db.execute(sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parseInt(idCrm)}`);
-                    console.log(`[assinafy-poll] Bitrix deal ${idCrm} movido para Negócio Ganho`);
+                  const parsedDealId = parseInt(idCrm);
+                  // Buscar pipeline do deal para montar o stage WON correto
+                  const dealRes = await fetch(`${bitrixWebhook}/crm.deal.get?id=${parsedDealId}`);
+                  if (dealRes.ok) {
+                    const dealData = await dealRes.json();
+                    const catId = dealData.result?.CATEGORY_ID;
+                    const wonStage = catId === '0' || catId === 0 ? 'WON' : `C${catId}:WON`;
+                    const bRes = await fetch(`${bitrixWebhook}/crm.deal.update`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: parsedDealId, fields: { STAGE_ID: wonStage } }),
+                    });
+                    if (bRes.ok) {
+                      await db.execute(sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parsedDealId}`);
+                      console.log(`[assinafy-poll] Bitrix deal ${idCrm} movido para ${wonStage} (Negócio Ganho)`);
+                    }
                   }
                 }
               } catch (bitrixErr) {
