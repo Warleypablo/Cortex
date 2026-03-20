@@ -1,4 +1,4 @@
-import { useState, useMemo, useDeferredValue, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useDeferredValue, useCallback, memo } from "react";
 import { EntregaveisChecklist } from "@/components/EntregaveisChecklist";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -1882,21 +1882,78 @@ function ContratosTab() {
   );
 }
 
-function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
-  const { toast } = useToast();
-  const [formData, setFormData] = useState({
-    numero_contrato: '',
-    cliente_id: null as number | null,
-    comercial_nome: '',
-    comercial_email: '',
-    id_crm: '',
-    status: 'rascunho',
-    observacoes: '',
-  });
+interface NovoContratoInitialData {
+  formData?: {
+    cliente_id?: number | null;
+    comercial_nome?: string;
+    comercial_email?: string;
+    id_crm?: string;
+    observacoes?: string;
+  };
+  itens?: ContratoItem[];
+  source?: 'template' | 'duplicate';
+}
 
-  const [itens, setItens] = useState<ContratoItem[]>([]);
+const defaultFormData = {
+  numero_contrato: '',
+  cliente_id: null as number | null,
+  comercial_nome: '',
+  comercial_email: '',
+  id_crm: '',
+  status: 'rascunho',
+  observacoes: '',
+};
+
+function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
+  onSuccess: () => void;
+  initialData?: NovoContratoInitialData;
+  onConsumeInitialData?: () => void;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState(() => ({
+    ...defaultFormData,
+    ...(initialData?.formData ? {
+      cliente_id: initialData.formData.cliente_id ?? null,
+      comercial_nome: initialData.formData.comercial_nome ?? '',
+      comercial_email: initialData.formData.comercial_email ?? '',
+      id_crm: initialData.formData.id_crm ?? '',
+      observacoes: initialData.formData.observacoes ?? '',
+    } : {}),
+  }));
+
+  const [itens, setItens] = useState<ContratoItem[]>(() => {
+    if (!initialData?.itens) return [];
+    return initialData.itens.map(item => ({
+      ...item,
+      id: undefined,
+      contrato_id: undefined,
+      ...(initialData.source === 'duplicate' ? { data_inicio: null, data_fim: null } : {}),
+    }));
+  });
   const [showAddItem, setShowAddItem] = useState(false);
   const [selectedServicoId, setSelectedServicoId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        ...defaultFormData,
+        ...(initialData.formData ? {
+          cliente_id: initialData.formData.cliente_id ?? null,
+          comercial_nome: initialData.formData.comercial_nome ?? '',
+          comercial_email: initialData.formData.comercial_email ?? '',
+          id_crm: initialData.formData.id_crm ?? '',
+          observacoes: initialData.formData.observacoes ?? '',
+        } : {}),
+      });
+      setItens((initialData.itens || []).map(item => ({
+        ...item,
+        id: undefined,
+        contrato_id: undefined,
+        ...(initialData.source === 'duplicate' ? { data_inicio: null, data_fim: null } : {}),
+      })));
+      onConsumeInitialData?.();
+    }
+  }, [initialData]);
 
   const { data: proximoNumero } = useQuery<{ proximoNumero: string }>({
     queryKey: ['/api/contratos/proximo-numero'],
@@ -2972,6 +3029,7 @@ export default function ContratosModule() {
   useSetPageInfo("Contratos", "Gestão de entidades e contratos");
 
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [novoContratoInitialData, setNovoContratoInitialData] = useState<NovoContratoInitialData>();
 
   return (
     <div className="p-6 space-y-6">
@@ -3036,7 +3094,11 @@ export default function ContratosModule() {
         </TabsContent>
 
         <TabsContent value="novo" className="mt-0">
-          <NovoContratoTab onSuccess={() => setActiveTab("contratos")} />
+          <NovoContratoTab
+            onSuccess={() => setActiveTab("contratos")}
+            initialData={novoContratoInitialData}
+            onConsumeInitialData={() => setNovoContratoInitialData(undefined)}
+          />
         </TabsContent>
 
         <TabsContent value="servicos" className="mt-0">
