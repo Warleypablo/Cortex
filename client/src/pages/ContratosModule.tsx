@@ -76,6 +76,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Package,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1993,6 +1994,12 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
     enabled: !!selectedServicoId,
   });
 
+  const { data: templatesData } = useQuery<{ templates: Array<{ id: number; nome: string; descricao: string | null; itens_template: ContratoItem[] }> }>({
+    queryKey: ['/api/contratos/templates'],
+  });
+
+  const [templateSelected, setTemplateSelected] = useState(!!initialData);
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const data = {
@@ -2134,6 +2141,52 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
 
   return (
     <div className="space-y-6">
+      {!templateSelected ? (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold">Como deseja começar?</h2>
+            <p className="text-sm text-muted-foreground">Escolha um template ou comece do zero</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {/* Card "Em branco" - always first */}
+            <Card
+              className="cursor-pointer hover:border-primary transition-colors"
+              onClick={() => setTemplateSelected(true)}
+            >
+              <CardContent className="pt-6 text-center">
+                <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="font-medium">Em branco</p>
+                <p className="text-xs text-muted-foreground mt-1">Começar do zero</p>
+              </CardContent>
+            </Card>
+
+            {/* Template cards */}
+            {templatesData?.templates?.map(template => (
+              <Card
+                key={template.id}
+                className="cursor-pointer hover:border-primary transition-colors"
+                onClick={() => {
+                  setItens(template.itens_template.map(item => ({
+                    ...item,
+                    id: undefined,
+                    contrato_id: undefined,
+                  })));
+                  setTemplateSelected(true);
+                }}
+              >
+                <CardContent className="pt-6 text-center">
+                  <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="font-medium">{template.nome}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {template.descricao || `${template.itens_template?.length || 0} serviço(s)`}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Dialog de Revisão */}
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -2640,6 +2693,8 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
           </Card>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
