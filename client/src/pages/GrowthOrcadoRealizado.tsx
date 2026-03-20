@@ -946,6 +946,10 @@ export default function GrowthOrcadoRealizado() {
     : revenueFilter === 'pontual' ? 'Faturamento Implantação'
     : 'Faturamento';
 
+  // Breakdown recorrente vs pontual (para exibir no card quando filtro = todos)
+  const fatRecorrenteRealizado = sumByCardFilter(mqlData?.faturamentoAceleracaoTrafego ?? 0, naoMqlData?.faturamentoAceleracaoTrafego ?? 0);
+  const fatPontualRealizado = sumByCardFilter(mqlData?.faturamentoImplantacaoTrafego ?? 0, naoMqlData?.faturamentoImplantacaoTrafego ?? 0);
+
   return (
     <div className="p-6 space-y-6" data-testid="growth-orcado-realizado-page">
       {/* Header */}
@@ -1183,6 +1187,20 @@ export default function GrowthOrcadoRealizado() {
                 {mqlLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : formatValue(faturamentoRealizado, 'currency')}
               </span>
             </div>
+            {revenueFilter === 'todos' && !mqlLoading && (
+              <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-muted-foreground">Recorrente:</span>
+                  <span className="font-semibold text-emerald-500">{formatValue(fatRecorrenteRealizado, 'currency')}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="text-muted-foreground">Pontual:</span>
+                  <span className="font-semibold text-amber-500">{formatValue(fatPontualRealizado, 'currency')}</span>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Progresso</span>
@@ -1194,7 +1212,7 @@ export default function GrowthOrcadoRealizado() {
                 </span>
               </div>
               <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div 
+                <div
                   className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
                   style={{ width: `${getProgressValue(faturamentoPerc)}%` }}
                 />
