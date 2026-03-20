@@ -204,22 +204,27 @@ const ESCOPOS_POR_CARGO: Record<string, { titulo: string; escopo: string }> = {
 // Squads de comunicação - Makers e Pulse; demais são performance
 const SQUADS_COMUNICACAO = ["MAKERS", "PULSE"];
 
-// Resolve cargo composto para líderes de squad com base no setor
-const resolveCargoLiderSquad = (cargo: string, setor: string | null): string => {
+// Overrides individuais: colaboradores que devem receber escopo de comunicação independente do setor
+const OVERRIDE_COMUNICACAO_NOMES = ["ISMAEL CARRIÇO INOCH"];
+
+// Resolve cargo composto para líderes de squad com base no setor (ou override por nome)
+const resolveCargoLiderSquad = (cargo: string, setor: string | null, nome?: string | null): string => {
   const cargoUpper = cargo.toUpperCase().trim();
   if (!cargoUpper.includes("LÍDER DE SQUAD") && !cargoUpper.includes("LIDER DE SQUAD")) return cargo;
   // Se já tem sufixo de comunicação/performance, retorna como está
   if (cargoUpper.includes("COMUNICAÇÃO") || cargoUpper.includes("COMUNICACAO") || cargoUpper.includes("PERFORMANCE")) return cargo;
+  const nomeUpper = (nome || "").toUpperCase().trim();
+  if (OVERRIDE_COMUNICACAO_NOMES.some(n => nomeUpper.includes(n))) return "Líder de Squad - Comunicação";
   const setorUpper = (setor || "").toUpperCase().trim();
   const isComunicacao = SQUADS_COMUNICACAO.some(s => setorUpper.includes(s));
   return isComunicacao ? "Líder de Squad - Comunicação" : "Líder de Squad - Performance";
 };
 
 // Função para obter escopo baseado no cargo
-const getEscopoCargo = (cargo: string | null, setor?: string | null): { titulo: string; escopo: string } => {
+const getEscopoCargo = (cargo: string | null, setor?: string | null, nome?: string | null): { titulo: string; escopo: string } => {
   if (!cargo) return { titulo: "PRESTADOR DE SERVIÇOS", escopo: "prestar serviços conforme acordado entre as partes" };
 
-  const cargoResolvido = resolveCargoLiderSquad(cargo, setor || null);
+  const cargoResolvido = resolveCargoLiderSquad(cargo, setor || null, nome);
   const cargoUpper = cargoResolvido.toUpperCase().trim();
 
   // Busca exata
@@ -912,7 +917,7 @@ export default function ContratosColaboradores() {
     const dataFimDate = new Date(dataInicioDate);
     dataFimDate.setMonth(dataFimDate.getMonth() + 6);
     const dataFim = format(dataFimDate, "dd/MM/yyyy", { locale: ptBR });
-    const { titulo: cargoTitulo, escopo: escopoCargo } = getEscopoCargo(colaborador.cargo, colaborador.setor);
+    const { titulo: cargoTitulo, escopo: escopoCargo } = getEscopoCargo(colaborador.cargo, colaborador.setor, colaborador.nome);
 
     const gerarQualificacaoContratada = (): string => {
       const cnpjLimpo = (colaborador.cnpj || '').replace(/\D/g, '');
@@ -993,7 +998,7 @@ export default function ContratosColaboradores() {
           cnpj: selectedColaborador.cnpj,
           endereco: selectedColaborador.endereco,
           estado: selectedColaborador.estado,
-          cargo: resolveCargoLiderSquad(selectedColaborador.cargo || '', selectedColaborador.setor),
+          cargo: resolveCargoLiderSquad(selectedColaborador.cargo || '', selectedColaborador.setor, selectedColaborador.nome),
           dataAdmissao,
           dataAtual,
           salario: selectedColaborador.salario,
