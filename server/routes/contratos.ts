@@ -1232,19 +1232,54 @@ Exemplos:
   app.get("/api/contratos/bitrix-deal/:dealId", isAuthenticated, async (req, res) => {
     try {
       const { dealId } = req.params;
+      const parsedId = parseInt(dealId);
+      if (isNaN(parsedId)) {
+        return res.status(400).json({ message: "ID inválido" });
+      }
+
+      // Tentar buscar no banco local primeiro
       const result = await db.execute(
         sql`SELECT id, title, company_name, contact_name, stage_name, category_name,
                    valor_recorrente, valor_pontual
             FROM "Bitrix".crm_deal
-            WHERE id = ${parseInt(dealId)}`
+            WHERE id = ${parsedId}`
       );
-      if (result.rows.length === 0) {
+
+      if (result.rows.length > 0) {
+        return res.json({ deal: result.rows[0], source: 'local' });
+      }
+
+      // Fallback: buscar via API REST do Bitrix
+      const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
+      if (!webhookUrl) {
+        return res.status(404).json({ message: "Deal não encontrado no banco local e API Bitrix não configurada" });
+      }
+
+      const bitrixRes = await fetch(`${webhookUrl}/crm.deal.get?id=${parsedId}`);
+      if (!bitrixRes.ok) {
         return res.status(404).json({ message: "Deal não encontrado no CRM" });
       }
-      res.json({ deal: result.rows[0] });
+
+      const bitrixData = await bitrixRes.json();
+      if (!bitrixData.result) {
+        return res.status(404).json({ message: "Deal não encontrado no CRM" });
+      }
+
+      const deal = bitrixData.result;
+      res.json({
+        deal: {
+          id: deal.ID,
+          title: deal.TITLE,
+          company_name: deal.COMPANY_ID ? `Company #${deal.COMPANY_ID}` : null,
+          contact_name: deal.CONTACT_ID ? `Contact #${deal.CONTACT_ID}` : null,
+          stage_name: deal.STAGE_ID,
+          category_name: deal.CATEGORY_ID,
+        },
+        source: 'bitrix_api',
+      });
     } catch (error: any) {
       console.error("Error fetching Bitrix deal:", error);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: "Erro interno ao buscar deal" });
     }
   });
 
