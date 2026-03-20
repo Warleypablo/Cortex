@@ -77,6 +77,7 @@ import {
   ChevronDown,
   ChevronRight,
   Package,
+  Bookmark,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -2131,6 +2132,27 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
 
   const [reviewOpen, setReviewOpen] = useState(false);
 
+  const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDesc, setTemplateDesc] = useState('');
+
+  const saveTemplateMutation = useMutation({
+    mutationFn: async (data: { nome: string; descricao: string | null; itens_template: any[] }) => {
+      const res = await apiRequest('POST', '/api/contratos/templates', data);
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/templates'] });
+      toast({ title: "Template salvo com sucesso!" });
+      setSaveAsTemplateOpen(false);
+      setTemplateName('');
+      setTemplateDesc('');
+    },
+    onError: () => {
+      toast({ title: "Erro ao salvar template", variant: "destructive" });
+    },
+  });
+
   const clienteSelecionado = entidadesData?.entidades.find(e => e.id === formData.cliente_id);
 
   const formatDate = (d: string) => {
@@ -2342,6 +2364,50 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
             >
               {createMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <FileCheck className="h-4 w-4 mr-2" />}
               Confirmar e Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Salvar como Template */}
+      <Dialog open={saveAsTemplateOpen} onOpenChange={setSaveAsTemplateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Salvar como Template</DialogTitle>
+            <DialogDescription>Os serviços atuais serão salvos como template reutilizável.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome do Template</Label>
+              <Input
+                value={templateName}
+                onChange={e => setTemplateName(e.target.value)}
+                placeholder="Ex: Social Media Básico"
+              />
+            </div>
+            <div>
+              <Label>Descrição (opcional)</Label>
+              <Input
+                value={templateDesc}
+                onChange={e => setTemplateDesc(e.target.value)}
+                placeholder="Breve descrição"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveAsTemplateOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                saveTemplateMutation.mutate({
+                  nome: templateName,
+                  descricao: templateDesc || null,
+                  itens_template: itens.map(({ id, contrato_id, ...rest }) => rest),
+                });
+              }}
+              disabled={!templateName.trim() || saveTemplateMutation.isPending}
+            >
+              {saveTemplateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2687,6 +2753,15 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
                 <Button className="w-full" size="lg" onClick={() => setReviewOpen(true)} disabled={!formData.cliente_id} data-testid="button-revisar-contrato">
                   <Eye className="h-4 w-4 mr-2" />
                   Revisar Contrato
+                </Button>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => setSaveAsTemplateOpen(true)}
+                  disabled={itens.length === 0}
+                >
+                  <Bookmark className="mr-2 h-4 w-4" />
+                  Salvar como Template
                 </Button>
               </div>
             </CardContent>
