@@ -654,11 +654,16 @@ export function registerJuridicoRoutes(app: Express) {
   // Squads de comunicação - Makers e Pulse; demais são performance
   const SQUADS_COMUNICACAO = ["MAKERS", "PULSE"];
 
-  // Resolve cargo composto para líderes de squad com base no setor
-  const resolveCargoLiderSquad = (cargo: string, setor: string | null): string => {
+  // Overrides individuais: colaboradores que devem receber escopo de comunicação independente do setor
+  const OVERRIDE_COMUNICACAO_NOMES = ["ISMAEL CARRIÇO INOCH"];
+
+  // Resolve cargo composto para líderes de squad com base no setor (ou override por nome)
+  const resolveCargoLiderSquad = (cargo: string, setor: string | null, nome?: string | null): string => {
     const cargoUpper = cargo.toUpperCase().trim();
     if (!cargoUpper.includes("LÍDER DE SQUAD") && !cargoUpper.includes("LIDER DE SQUAD")) return cargo;
     if (cargoUpper.includes("COMUNICAÇÃO") || cargoUpper.includes("COMUNICACAO") || cargoUpper.includes("PERFORMANCE")) return cargo;
+    const nomeUpper = (nome || "").toUpperCase().trim();
+    if (OVERRIDE_COMUNICACAO_NOMES.some(n => nomeUpper.includes(n))) return "Líder de Squad - Comunicação";
     const setorUpper = (setor || "").toUpperCase().trim();
     const isComunicacao = SQUADS_COMUNICACAO.some(s => setorUpper.includes(s));
     return isComunicacao ? "Líder de Squad - Comunicação" : "Líder de Squad - Performance";
@@ -1232,7 +1237,7 @@ export function registerJuridicoRoutes(app: Express) {
       const patrimonio = (patrimonioResult.rows[0] as any)?.descricao || null;
 
       // Resolve cargo composto para líderes de squad com base no setor
-      const cargoResolvido = resolveCargoLiderSquad(colaborador.cargo || '', colaborador.setor);
+      const cargoResolvido = resolveCargoLiderSquad(colaborador.cargo || '', colaborador.setor, colaborador.nome);
 
       const pdfBuffer = await gerarContratoPDF({
         nome: colaborador.nome,
