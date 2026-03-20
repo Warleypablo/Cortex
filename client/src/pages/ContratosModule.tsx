@@ -1314,7 +1314,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
 
                     <div className="flex justify-end gap-4 text-sm">
                       <span className="text-muted-foreground">
-                        Economia: <span className="text-green-500 font-medium">{formatCurrency(((item.valor_tabela || 0) - (item.valor_negociado || 0)) * item.quantidade)}</span>
+                        Economia: <span className="text-green-500 dark:text-green-400 font-medium">{formatCurrency(((item.valor_tabela || 0) - (item.valor_negociado || 0)) * item.quantidade)}</span>
                       </span>
                       <span className="font-medium">
                         Subtotal: {formatCurrency((item.valor_negociado || 0) * item.quantidade)}
@@ -1484,6 +1484,7 @@ function ContratosTab({ onDuplicate }: { onDuplicate?: (data: NovoContratoInitia
   const handleDuplicate = async (contrato: ContratoDoc) => {
     try {
       const res = await fetch(`/api/contratos/contratos/${contrato.id}`);
+      if (!res.ok) throw new Error('Erro ao buscar contrato');
       const data = await res.json();
       const full = data.contrato as ContratoDoc;
       const fullItens = (data.itens || full.itens || []) as ContratoItem[];
@@ -1606,7 +1607,7 @@ function ContratosTab({ onDuplicate }: { onDuplicate?: (data: NovoContratoInitia
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="font-semibold text-green-600">
+                      <span className="font-semibold text-green-600 dark:text-green-400">
                         {formatCurrency(Number(contrato.valor_negociado) || 0)}
                       </span>
                     </TableCell>
@@ -2339,15 +2340,15 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
               <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Recorrente (mensal)</span>
-                  <span className="font-medium text-green-600">{formatCurrency(totalRecorrente)}</span>
+                  <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(totalRecorrente)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Pontual (único)</span>
-                  <span className="font-medium text-purple-600">{formatCurrency(totalPontual)}</span>
+                  <span className="font-medium text-purple-600 dark:text-purple-400">{formatCurrency(totalPontual)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t font-semibold">
                   <span>Total Geral</span>
-                  <span className="text-orange-600">{formatCurrency(totalRecorrente + totalPontual)}</span>
+                  <span className="text-orange-600 dark:text-orange-400">{formatCurrency(totalRecorrente + totalPontual)}</span>
                 </div>
               </div>
             </div>
@@ -2779,15 +2780,15 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
             <CardContent className="space-y-4">
               <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/10">
                 <p className="text-xs text-muted-foreground mb-1">Recorrente (mensal)</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(totalRecorrente)}</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRecorrente)}</p>
               </div>
               <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10">
                 <p className="text-xs text-muted-foreground mb-1">Pontual (único)</p>
-                <p className="text-2xl font-bold text-purple-600">{formatCurrency(totalPontual)}</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(totalPontual)}</p>
               </div>
               <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
                 <p className="text-xs text-muted-foreground mb-1">Total Geral</p>
-                <p className="text-3xl font-bold text-orange-600">{formatCurrency(totalRecorrente + totalPontual)}</p>
+                <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(totalRecorrente + totalPontual)}</p>
               </div>
 
               <div className="pt-4 space-y-2">
