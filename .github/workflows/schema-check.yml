@@ -1,0 +1,71 @@
+name: Schema Change Detection
+
+on:
+  pull_request:
+    branches: [staging, main]
+    paths:
+      - 'shared/schema.ts'
+      - 'server/db.ts'
+
+jobs:
+  check-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect schema changes
+        run: |
+          echo "## Schema Changes Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if git diff origin/${{ github.base_ref }}...HEAD -- shared/schema.ts | grep -q .; then
+            echo "### shared/schema.ts" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            git diff origin/${{ github.base_ref }}...HEAD -- shared/schema.ts >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if git diff origin/${{ github.base_ref }}...HEAD -- server/db.ts | grep -q .; then
+            echo "### server/db.ts" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            git diff origin/${{ github.base_ref }}...HEAD -- server/db.ts >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> **Review these changes carefully.** Schema changes affect the database." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            const schemaChanged = files.some(f => f.filename === 'shared/schema.ts');
+            const dbChanged = files.some(f => f.filename === 'server/db.ts');
+            if (schemaChanged || dbChanged) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: [
+                  '## Schema Changes Detected',
+                  '',
+                  'This PR modifies database schema files:',
+                  schemaChanged ? '- `shared/schema.ts` — Drizzle ORM schema definitions' : '',
+                  dbChanged ? '- `server/db.ts` — Table initializers (CREATE TABLE IF NOT EXISTS)' : '',
+                  '',
+                  '**Checklist before merge:**',
+                  '- [ ] New tables use `cortex_core` schema',
+                  '- [ ] `CREATE TABLE IF NOT EXISTS` added to `server/db.ts` for new tables',
+                  '- [ ] No destructive changes (DROP TABLE, DROP COLUMN, column type changes)',
+                  '- [ ] Tested `npm run db:push` locally against dev database',
+                  '- [ ] Column names follow existing conventions (snake_case)',
+                ].filter(Boolean).join('\n'),
+              });
+            }

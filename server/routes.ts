@@ -415,6 +415,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Health check (before auth — must be publicly accessible)
+  const healthRouter = (await import('./routes/health')).default;
+  app.use('/api', healthRouter);
+
   // Portal Creator routes (before isAuthenticated — uses own session auth)
   registerPortalCreatorRoutes(app);
 
