@@ -260,254 +260,44 @@ function DashboardTab() {
 
   if (isLoading || !stats) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-24 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-48 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map(i => (
+          <Card key={i}>
+            <CardContent className="pt-6">
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-8 w-16" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
 
-  const statusData = [
-    { key: 'ativos', label: 'Ativos', count: stats.contratos.ativos, color: 'bg-green-500', textColor: 'text-green-500' },
-    { key: 'rascunhos', label: 'Rascunhos', count: stats.contratos.rascunhos, color: 'bg-gray-500', textColor: 'text-gray-500' },
-    { key: 'aguardando', label: 'Aguardando', count: stats.contratos.aguardando, color: 'bg-yellow-500', textColor: 'text-yellow-500' },
-    { key: 'encerrados', label: 'Encerrados', count: stats.contratos.encerrados, color: 'bg-blue-500', textColor: 'text-blue-500' },
-    { key: 'cancelados', label: 'Cancelados', count: stats.contratos.cancelados, color: 'bg-red-500', textColor: 'text-red-500' },
-  ];
-
-  const maxCount = Math.max(...statusData.map(s => s.count), 1);
-
   return (
     <div className="space-y-6">
-      {/* Cards principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Entidades */}
-        <Card className="relative overflow-hidden">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Entidades Ativas</p>
-                <p className="text-4xl font-bold tracking-tight">{stats.entidades.total}</p>
-                <div className="flex items-center gap-3 pt-2">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-blue-500" />
-                    <span className="text-xs text-muted-foreground">{stats.entidades.clientes} clientes</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-purple-500" />
-                    <span className="text-xs text-muted-foreground">{stats.entidades.fornecedores} forn.</span>
-                  </div>
-                </div>
-              </div>
-              <div className="h-14 w-14 rounded-2xl bg-blue-500/10 flex items-center justify-center">
-                <Users className="h-7 w-7 text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Contratos Ativos */}
-        <Card className="relative overflow-hidden">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Contratos Ativos</p>
-                <p className="text-4xl font-bold tracking-tight text-green-600">{stats.contratos.ativos}</p>
-                <div className="pt-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-green-500 rounded-full transition-all"
-                        style={{ width: `${(stats.contratos.ativos / stats.contratos.total) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground">{stats.contratos.total} total</span>
-                  </div>
-                </div>
-              </div>
-              <div className="h-14 w-14 rounded-2xl bg-green-500/10 flex items-center justify-center">
-                <FileCheck className="h-7 w-7 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Valor Total */}
-        <Card className="relative overflow-hidden">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Valor Total Ativos</p>
-                <p className="text-3xl font-bold tracking-tight text-orange-600">{formatCurrency(stats.valorTotalAtivos)}</p>
-                <p className="text-xs text-muted-foreground pt-2">
-                  Soma de todos os contratos ativos
-                </p>
-              </div>
-              <div className="h-14 w-14 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-                <DollarSign className="h-7 w-7 text-orange-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Rascunhos */}
-        <Card className="relative overflow-hidden">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Rascunhos</p>
-                <p className="text-4xl font-bold tracking-tight">{stats.contratos.rascunhos}</p>
-                <p className="text-xs text-muted-foreground pt-2">
-                  Pendentes de assinatura
-                </p>
-              </div>
-              <div className="h-14 w-14 rounded-2xl bg-gray-500/10 flex items-center justify-center">
-                <FileText className="h-7 w-7 text-gray-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Segunda linha - Status e Entidades */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Status dos Contratos com barras visuais */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold">Status dos Contratos</CardTitle>
-              <Badge variant="outline" className="text-xs">
-                {stats.contratos.total} total
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {statusData.map((item) => (
-              <div key={item.key} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-3 w-3 rounded-full ${item.color}`} />
-                    <span className="text-sm font-medium">{item.label}</span>
-                  </div>
-                  <span className={`text-lg font-bold ${item.textColor}`}>{item.count}</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${item.color} rounded-full transition-all duration-500`}
-                    style={{ width: `${(item.count / maxCount) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Tipos de Entidades */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">Tipos de Entidades</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Clientes */}
-            <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <Building2 className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <span className="font-medium">Clientes</span>
-                </div>
-                <span className="text-2xl font-bold text-blue-600">{stats.entidades.clientes}</span>
-              </div>
-              <div className="h-1.5 bg-blue-500/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full"
-                  style={{ width: `${(stats.entidades.clientes / stats.entidades.total) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Fornecedores */}
-            <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <Briefcase className="h-5 w-5 text-purple-500" />
-                  </div>
-                  <span className="font-medium">Fornecedores</span>
-                </div>
-                <span className="text-2xl font-bold text-purple-600">{stats.entidades.fornecedores}</span>
-              </div>
-              <div className="h-1.5 bg-purple-500/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-purple-500 rounded-full"
-                  style={{ width: `${(stats.entidades.fornecedores / stats.entidades.total) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Ambos */}
-            <div className="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-cyan-500" />
-                  </div>
-                  <span className="font-medium">Ambos</span>
-                </div>
-                <span className="text-2xl font-bold text-cyan-600">{stats.entidades.ambos}</span>
-              </div>
-              <div className="h-1.5 bg-cyan-500/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-cyan-500 rounded-full"
-                  style={{ width: `${(stats.entidades.ambos / stats.entidades.total) * 100}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Faturados</p>
-            <p className="text-2xl font-bold text-green-600">{stats.contratos.faturados}</p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Total Contratos</p>
+            <p className="text-2xl font-bold">{stats?.contratos.total ?? 0}</p>
           </CardContent>
         </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Pend. Faturamento</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats.contratos.pendentesFaturamento}</p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Ativos</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats?.contratos.ativos ?? 0}</p>
           </CardContent>
         </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Encerrados</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.contratos.encerrados}</p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Receita Ativa</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats?.valorTotalAtivos ?? 0)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Cancelados</p>
-            <p className="text-2xl font-bold text-red-600">{stats.contratos.cancelados}</p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Rascunhos</p>
+            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats?.contratos.rascunhos ?? 0}</p>
           </CardContent>
         </Card>
       </div>
@@ -823,63 +613,8 @@ function EntidadesTab() {
     setDialogOpen(true);
   }, []);
 
-  // Stats
-  const entidades = data?.entidades || [];
-  const totalClientes = entidades.filter(e => e.eh_cliente).length;
-  const totalFornecedores = entidades.filter(e => e.eh_fornecedor).length;
-
   return (
     <div className="space-y-6">
-      {/* Header com estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <Users className="h-6 w-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{entidades.length}</p>
-              <p className="text-xs text-muted-foreground">Total de Entidades</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{totalClientes}</p>
-              <p className="text-xs text-muted-foreground">Clientes</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-              <Briefcase className="h-6 w-6 text-purple-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-purple-600">{totalFornecedores}</p>
-              <p className="text-xs text-muted-foreground">Fornecedores</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-dashed border-2">
-          <CardContent className="p-0 h-full">
-            <Button 
-              variant="ghost" 
-              className="w-full h-full flex items-center justify-center gap-3 min-h-[80px] rounded-lg"
-              onClick={handleNew}
-              data-testid="button-nova-entidade-card"
-            >
-              <Plus className="h-6 w-6 text-muted-foreground" />
-              <span className="font-medium">Nova Entidade</span>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Barra de pesquisa e filtros */}
       <Card>
         <CardContent className="p-4">
@@ -1743,62 +1478,8 @@ function ContratosTab() {
     setDialogOpen(true);
   }, []);
 
-  // Stats
-  const contratos = data?.contratos || [];
-  const totalAtivos = contratos.filter(c => c.status === 'ativo').length;
-  const totalRascunhos = contratos.filter(c => c.status === 'rascunho').length;
-  const totalValor = contratos.filter(c => c.status === 'ativo').reduce((sum, c) => sum + (Number(c.valor_negociado) || 0), 0);
-
   return (
     <div className="space-y-6">
-      {/* Cards estatísticos */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <FileCheck className="h-6 w-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{totalAtivos}</p>
-              <p className="text-xs text-muted-foreground">Contratos Ativos</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-              <FileText className="h-6 w-6 text-yellow-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-yellow-600">{totalRascunhos}</p>
-              <p className="text-xs text-muted-foreground">Rascunhos</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <DollarSign className="h-6 w-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-blue-600">{formatCurrency(totalValor)}</p>
-              <p className="text-xs text-muted-foreground">Receita Ativa (mensal)</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Briefcase className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{contratos.length}</p>
-              <p className="text-xs text-muted-foreground">Total de Contratos</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Barra de pesquisa e filtros */}
       <Card>
         <CardContent className="p-4">
