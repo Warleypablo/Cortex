@@ -647,6 +647,45 @@ async function ensureContratosTablesExist() {
 export function registerContratosRoutes(app: Express) {
   ensureContratosTablesExist();
 
+  // Helper: move um deal no Bitrix para "Negócio Ganho" (stage WON do pipeline correto)
+  async function moveBitrixDealToWon(dealId: string | number): Promise<boolean> {
+    const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
+    if (!webhookUrl) return false;
+
+    try {
+      const parsedId = typeof dealId === 'string' ? parseInt(dealId) : dealId;
+      // Buscar o deal para saber o CATEGORY_ID (pipeline)
+      const dealRes = await fetch(`${webhookUrl}/crm.deal.get?id=${parsedId}`);
+      if (!dealRes.ok) return false;
+      const dealData = await dealRes.json();
+      if (!dealData.result) return false;
+
+      const categoryId = dealData.result.CATEGORY_ID;
+      // Pipeline default (0) usa 'WON', custom usa 'C{id}:WON'
+      const wonStageId = categoryId === '0' || categoryId === 0 ? 'WON' : `C${categoryId}:WON`;
+
+      const updateRes = await fetch(`${webhookUrl}/crm.deal.update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: parsedId, fields: { STAGE_ID: wonStageId } }),
+      });
+      if (!updateRes.ok) return false;
+      const updateData = await updateRes.json();
+      if (!updateData.result) return false;
+
+      // Atualizar registro local se existir
+      await db.execute(
+        sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parsedId}`
+      ).catch(() => {});
+
+      console.log(`[bitrix] Deal ${parsedId} movido para ${wonStageId} (Negócio Ganho)`);
+      return true;
+    } catch (err) {
+      console.error(`[bitrix] Erro ao mover deal ${dealId} para WON:`, err);
+      return false;
+    }
+  }
+
   // Helper: parseia texto de escopo em linhas individuais de tasks (fallback simples)
   function parseEscopoToTasks(escopo: string): string[] {
     return escopo
@@ -1300,44 +1339,10 @@ Exemplos:
   app.post("/api/contratos/bitrix-deal/:dealId/won", isAuthenticated, async (req, res) => {
     try {
       const { dealId } = req.params;
-      const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
-      if (!webhookUrl) {
-        return res.status(500).json({ message: "BITRIX_WEBHOOK_URL não configurada" });
+      const success = await moveBitrixDealToWon(dealId);
+      if (!success) {
+        return res.status(502).json({ message: "Erro ao mover deal no Bitrix" });
       }
-
-      const dealResult = await db.execute(
-        sql`SELECT id, stage_name FROM "Bitrix".crm_deal WHERE id = ${parseInt(dealId)}`
-      );
-      if (dealResult.rows.length === 0) {
-        return res.status(404).json({ message: "Deal não encontrado" });
-      }
-
-      const response = await fetch(`${webhookUrl}/crm.deal.update`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: parseInt(dealId),
-          fields: { STAGE_ID: 'WON' },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Bitrix API error:", errorText);
-        return res.status(502).json({ message: "Erro ao atualizar deal no Bitrix" });
-      }
-
-      const bitrixResponse = await response.json();
-      if (!bitrixResponse.result) {
-        return res.status(502).json({ message: "Bitrix retornou erro", details: bitrixResponse });
-      }
-
-      await db.execute(
-        sql`UPDATE "Bitrix".crm_deal
-            SET stage_name = 'Negócio Ganho', date_modify = NOW()
-            WHERE id = ${parseInt(dealId)}`
-      );
-
       res.json({ success: true, message: "Deal movido para Negócio Ganho" });
     } catch (error: any) {
       console.error("Error updating Bitrix deal:", error);
@@ -3590,26 +3595,8 @@ Exemplos:
         console.log(`[assinafy-webhook] Contrato ${contrato.id} atualizado para '${novoStatus}'`);
 
         // Mover deal no Bitrix para "Negócio Ganho" se id_crm preenchido
-        const idCrm = contrato.id_crm;
-        const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
-        if (idCrm && webhookUrl) {
-          try {
-            const bitrixRes = await fetch(`${webhookUrl}/crm.deal.update`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: parseInt(idCrm), fields: { STAGE_ID: 'WON' } }),
-            });
-            if (bitrixRes.ok) {
-              await db.execute(
-                sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parseInt(idCrm)}`
-              );
-              console.log(`[assinafy-webhook] Bitrix deal ${idCrm} movido para Negócio Ganho`);
-            } else {
-              console.error(`[assinafy-webhook] Erro ao mover deal ${idCrm} no Bitrix:`, await bitrixRes.text());
-            }
-          } catch (bitrixErr) {
-            console.error(`[assinafy-webhook] Erro ao chamar Bitrix API para deal ${idCrm}:`, bitrixErr);
-          }
+        if (contrato.id_crm) {
+          await moveBitrixDealToWon(contrato.id_crm);
         }
 
         // Sincronizar cliente e serviços para cup_clientes/cup_contratos
@@ -3792,25 +3779,8 @@ Exemplos:
         sql`SELECT id_crm FROM staging.contratos WHERE id = ${contratoId}`
       );
       const idCrm = (idCrmResult.rows[0] as any)?.id_crm;
-      const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
-      if (idCrm && webhookUrl) {
-        try {
-          const bitrixRes = await fetch(`${webhookUrl}/crm.deal.update`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: parseInt(idCrm), fields: { STAGE_ID: 'WON' } }),
-          });
-          if (bitrixRes.ok) {
-            await db.execute(
-              sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parseInt(idCrm)}`
-            );
-            console.log(`[simular-assinatura] Bitrix deal ${idCrm} movido para Negócio Ganho`);
-          } else {
-            console.error(`[simular-assinatura] Erro ao mover deal ${idCrm} no Bitrix:`, await bitrixRes.text());
-          }
-        } catch (bitrixErr) {
-          console.error(`[simular-assinatura] Erro ao chamar Bitrix API para deal ${idCrm}:`, bitrixErr);
-        }
+      if (idCrm) {
+        await moveBitrixDealToWon(idCrm);
       }
 
       // Executar o mesmo sync do fluxo real
