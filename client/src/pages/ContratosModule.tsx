@@ -1275,7 +1275,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className={`grid ${item.modalidade === 'recorrente' ? 'grid-cols-1' : 'grid-cols-3'} gap-3`}>
                       <div className="space-y-1">
                         <Label className="text-xs">Forma de Pagamento</Label>
                         <select
@@ -1289,27 +1289,31 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                           <option value="Transferência">Transferência</option>
                         </select>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Nº Parcelas</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={item.num_parcelas || ''}
-                          onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)}
-                          placeholder="Ex: 12"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Valor Parcela</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          value={item.valor_parcela || ''}
-                          onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)}
-                          placeholder="R$ 0,00"
-                        />
-                      </div>
+                      {item.modalidade !== 'recorrente' && (
+                        <>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nº Parcelas</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={item.num_parcelas || ''}
+                              onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)}
+                              placeholder="Ex: 12"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Valor Parcela</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              value={item.valor_parcela || ''}
+                              onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)}
+                              placeholder="R$ 0,00"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     <div className="flex justify-end gap-4 text-sm">
@@ -2710,7 +2714,7 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
                           <Input type="date" value={item.data_fim || ''} onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)} />
                         </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className={`grid ${item.modalidade === 'recorrente' ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
                         <div className="space-y-2">
                           <Label className="text-xs">Forma de Pagamento</Label>
                           <select
@@ -2724,14 +2728,18 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
                             <option value="Transferência">Transferência</option>
                           </select>
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Nº Parcelas</Label>
-                          <Input type="number" min={1} value={item.num_parcelas || ''} onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)} placeholder="Ex: 12" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Valor Parcela</Label>
-                          <Input type="number" step="0.01" min={0} value={item.valor_parcela || ''} onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)} placeholder="R$ 0,00" />
-                        </div>
+                        {item.modalidade !== 'recorrente' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Nº Parcelas</Label>
+                              <Input type="number" min={1} value={item.num_parcelas || ''} onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)} placeholder="Ex: 12" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Valor Parcela</Label>
+                              <Input type="number" step="0.01" min={0} value={item.valor_parcela || ''} onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)} placeholder="R$ 0,00" />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </Card>
