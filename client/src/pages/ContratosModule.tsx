@@ -138,6 +138,8 @@ interface ContratoItem {
   is_personalizado?: boolean;
   data_inicio?: string | null;
   data_fim?: string | null;
+  data_inicio_cobranca?: string | null;
+  data_fim_cobranca?: string | null;
   forma_pagamento?: string | null;
   num_parcelas?: number | null;
   valor_parcela?: number | null;
@@ -921,6 +923,8 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
       is_personalizado: false,
       data_inicio: null,
       data_fim: null,
+      data_inicio_cobranca: null,
+      data_fim_cobranca: null,
       forma_pagamento: 'Boleto',
       num_parcelas: null,
       valor_parcela: null,
@@ -1256,22 +1260,44 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={item.data_inicio || ''}
-                          onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)}
-                        />
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Prestação de Serviço</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Início</Label>
+                          <Input
+                            type="date"
+                            value={item.data_inicio || ''}
+                            onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Fim</Label>
+                          <Input
+                            type="date"
+                            value={item.data_fim || ''}
+                            onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)}
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={item.data_fim || ''}
-                          onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)}
-                        />
+                      <p className="text-xs font-medium text-muted-foreground">Cobrança</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Início</Label>
+                          <Input
+                            type="date"
+                            value={item.data_inicio_cobranca || ''}
+                            onChange={(e) => updateItem(index, 'data_inicio_cobranca', e.target.value || null)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Fim</Label>
+                          <Input
+                            type="date"
+                            value={item.data_fim_cobranca || ''}
+                            onChange={(e) => updateItem(index, 'data_fim_cobranca', e.target.value || null)}
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -1863,8 +1889,10 @@ function ContratosTab({ onDuplicate }: { onDuplicate?: (data: NovoContratoInitia
                             <TableHead className="font-semibold text-right">Valor Tabela</TableHead>
                             <TableHead className="font-semibold text-right">Valor Negociado</TableHead>
                             <TableHead className="font-semibold text-right">Desconto</TableHead>
-                            <TableHead className="font-semibold text-center">Início</TableHead>
-                            <TableHead className="font-semibold text-center">Fim</TableHead>
+                            <TableHead className="font-semibold text-center">Início Serviço</TableHead>
+                            <TableHead className="font-semibold text-center">Fim Serviço</TableHead>
+                            <TableHead className="font-semibold text-center">Início Cobrança</TableHead>
+                            <TableHead className="font-semibold text-center">Fim Cobrança</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1893,6 +1921,12 @@ function ContratosTab({ onDuplicate }: { onDuplicate?: (data: NovoContratoInitia
                               <TableCell className="text-center text-sm">
                                 {item.data_fim ? new Date(item.data_fim).toLocaleDateString('pt-BR') : '-'}
                               </TableCell>
+                              <TableCell className="text-center text-sm">
+                                {item.data_inicio_cobranca ? new Date(item.data_inicio_cobranca).toLocaleDateString('pt-BR') : '-'}
+                              </TableCell>
+                              <TableCell className="text-center text-sm">
+                                {item.data_fim_cobranca ? new Date(item.data_fim_cobranca).toLocaleDateString('pt-BR') : '-'}
+                              </TableCell>
                             </TableRow>
                           ))}
                           <TableRow className="bg-muted/50 border-t-2">
@@ -1900,7 +1934,7 @@ function ContratosTab({ onDuplicate }: { onDuplicate?: (data: NovoContratoInitia
                             <TableCell className="text-right font-bold text-lg">
                               {formatCurrency(contratoDetail.itens.reduce((acc, i) => acc + (i.valor_negociado * i.quantidade), 0))}
                             </TableCell>
-                            <TableCell colSpan={3}></TableCell>
+                            <TableCell colSpan={5}></TableCell>
                           </TableRow>
                         </TableBody>
                       </Table>
@@ -1976,7 +2010,7 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
       ...item,
       id: undefined,
       contrato_id: undefined,
-      ...(initialData.source === 'duplicate' ? { data_inicio: null, data_fim: null } : {}),
+      ...(initialData.source === 'duplicate' ? { data_inicio: null, data_fim: null, data_inicio_cobranca: null, data_fim_cobranca: null } : {}),
     }));
   });
   const [showAddItem, setShowAddItem] = useState(false);
@@ -1998,7 +2032,7 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
         ...item,
         id: undefined,
         contrato_id: undefined,
-        ...(initialData.source === 'duplicate' ? { data_inicio: null, data_fim: null } : {}),
+        ...(initialData.source === 'duplicate' ? { data_inicio: null, data_fim: null, data_inicio_cobranca: null, data_fim_cobranca: null } : {}),
       })));
       onConsumeInitialData?.();
     }
@@ -2104,6 +2138,8 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
       is_personalizado: false,
       data_inicio: null,
       data_fim: null,
+      data_inicio_cobranca: null,
+      data_fim_cobranca: null,
       forma_pagamento: 'Boleto',
       num_parcelas: null,
       valor_parcela: null,
@@ -2326,10 +2362,14 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
                           )}
                         </div>
                       </div>
-                      {(item.data_inicio || item.data_fim) && (
-                        <div className="flex gap-4 text-xs text-muted-foreground pl-10">
-                          {item.data_inicio && <span>Início: {formatDate(item.data_inicio)}</span>}
-                          {item.data_fim && <span>Fim: {formatDate(item.data_fim)}</span>}
+                      {(item.data_inicio || item.data_fim || item.data_inicio_cobranca || item.data_fim_cobranca) && (
+                        <div className="flex gap-6 text-xs text-muted-foreground pl-10">
+                          {(item.data_inicio || item.data_fim) && (
+                            <span>Serviço: {item.data_inicio ? formatDate(item.data_inicio) : '?'} → {item.data_fim ? formatDate(item.data_fim) : '?'}</span>
+                          )}
+                          {(item.data_inicio_cobranca || item.data_fim_cobranca) && (
+                            <span>Cobrança: {item.data_inicio_cobranca ? formatDate(item.data_inicio_cobranca) : '?'} → {item.data_fim_cobranca ? formatDate(item.data_fim_cobranca) : '?'}</span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2696,7 +2736,7 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
                           />
                         </div>
                       )}
-                      <div className="grid grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label className="text-xs">Valor Tabela</Label>
                           <Input type="number" value={item.valor_tabela || ''} onChange={(e) => updateItem(index, 'valor_tabela', parseFloat(e.target.value) || 0)} disabled={!item.is_personalizado} />
@@ -2705,13 +2745,29 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
                           <Label className="text-xs">Valor Negociado</Label>
                           <Input type="number" value={item.valor_negociado || ''} onChange={(e) => updateItem(index, 'valor_negociado', parseFloat(e.target.value) || 0)} className="border-green-500/50 focus:border-green-500" />
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Data Início</Label>
-                          <Input type="date" value={item.data_inicio || ''} onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)} />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Prestação de Serviço</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Início</Label>
+                            <Input type="date" value={item.data_inicio || ''} onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Fim</Label>
+                            <Input type="date" value={item.data_fim || ''} onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)} />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Data Fim</Label>
-                          <Input type="date" value={item.data_fim || ''} onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)} />
+                        <p className="text-xs font-medium text-muted-foreground">Cobrança</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Início</Label>
+                            <Input type="date" value={item.data_inicio_cobranca || ''} onChange={(e) => updateItem(index, 'data_inicio_cobranca', e.target.value || null)} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Fim</Label>
+                            <Input type="date" value={item.data_fim_cobranca || ''} onChange={(e) => updateItem(index, 'data_fim_cobranca', e.target.value || null)} />
+                          </div>
                         </div>
                       </div>
                       <div className={`grid ${item.modalidade === 'recorrente' ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
