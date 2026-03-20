@@ -648,6 +648,11 @@ export function registerContratosRoutes(app: Express) {
   ensureContratosTablesExist();
 
   // Helper: move um deal no Bitrix para "Negócio Ganho" (pipeline default, stage WON)
+  // Processo em 2 etapas porque Bitrix tem automações entre pipelines:
+  // 1. Primeiro busca o deal para ver em qual pipeline está
+  // 2. Se não está no pipeline default (0), move via WON do pipeline atual
+  //    (a automação do Bitrix transfere para o default automaticamente)
+  // 3. Depois move para WON no pipeline default ("Negócio Ganho")
   async function moveBitrixDealToWon(dealId: string | number): Promise<boolean> {
     const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
     if (!webhookUrl) return false;
@@ -655,12 +660,32 @@ export function registerContratosRoutes(app: Express) {
     try {
       const parsedId = typeof dealId === 'string' ? parseInt(dealId) : dealId;
 
-      // Mover para pipeline default (CATEGORY_ID=0) com stage WON ("Negócio Ganho")
-      // Isso funciona mesmo se o deal está em outro pipeline (Outbound, Inbound, etc.)
+      // Buscar estado atual do deal
+      const getRes = await fetch(`${webhookUrl}/crm.deal.get?id=${parsedId}`);
+      if (!getRes.ok) return false;
+      const getData = await getRes.json();
+      if (!getData.result) return false;
+
+      const currentCategory = getData.result.CATEGORY_ID;
+
+      // Se não está no pipeline default, primeiro mover para lá
+      if (currentCategory !== '0' && currentCategory !== 0) {
+        // Mover para WON do pipeline atual → automação do Bitrix transfere para default
+        const wonStage = `C${currentCategory}:WON`;
+        await fetch(`${webhookUrl}/crm.deal.update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: parsedId, fields: { STAGE_ID: wonStage } }),
+        });
+        // Aguardar automação do Bitrix processar a transferência
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      // Agora mover para WON no pipeline default ("Negócio Ganho")
       const updateRes = await fetch(`${webhookUrl}/crm.deal.update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: parsedId, fields: { CATEGORY_ID: 0, STAGE_ID: 'WON' } }),
+        body: JSON.stringify({ id: parsedId, fields: { STAGE_ID: 'WON' } }),
       });
       if (!updateRes.ok) return false;
       const updateData = await updateRes.json();
@@ -671,7 +696,7 @@ export function registerContratosRoutes(app: Express) {
         sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parsedId}`
       ).catch(() => {});
 
-      console.log(`[bitrix] Deal ${parsedId} movido para pipeline default → Negócio Ganho`);
+      console.log(`[bitrix] Deal ${parsedId} movido para Negócio Ganho (2 etapas)`);
       return true;
     } catch (err) {
       console.error(`[bitrix] Erro ao mover deal ${dealId} para Negócio Ganho:`, err);
