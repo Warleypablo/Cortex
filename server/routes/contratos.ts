@@ -342,6 +342,8 @@ async function ensureContratosTablesExist() {
       DO $$ BEGIN
         ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_inicio DATE;
         ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_fim DATE;
+        ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_inicio_cobranca DATE;
+        ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_fim_cobranca DATE;
       EXCEPTION WHEN others THEN NULL;
       END $$
     `);
@@ -1435,6 +1437,7 @@ Exemplos:
               modalidade, valor_original, valor_negociado, desconto_percentual,
               tipo_desconto, valor_desconto, valor_final, economia, observacoes,
               escopo, is_personalizado, data_inicio, data_fim,
+              data_inicio_cobranca, data_fim_cobranca,
               forma_pagamento, num_parcelas, valor_parcela
             ) VALUES (
               ${contratoId}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
@@ -1445,6 +1448,7 @@ Exemplos:
               ${itemValorNegociado}, ${itemEconomia}, ${item.observacoes || null},
               ${item.escopo || null}, ${item.is_personalizado || false},
               ${item.data_inicio || null}, ${item.data_fim || null},
+              ${item.data_inicio_cobranca || null}, ${item.data_fim_cobranca || null},
               ${item.forma_pagamento || null}, ${item.num_parcelas || null}, ${item.valor_parcela || null}
             )
           `);
@@ -1510,7 +1514,8 @@ Exemplos:
               contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
               modalidade, valor_original, valor_negociado, desconto_percentual,
               tipo_desconto, valor_desconto, valor_final, economia, observacoes,
-              data_inicio, data_fim, forma_pagamento, num_parcelas, valor_parcela
+              data_inicio, data_fim, data_inicio_cobranca, data_fim_cobranca,
+              forma_pagamento, num_parcelas, valor_parcela
             ) VALUES (
               ${parseInt(id)}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
               ${item.valor_unitario || 0}, ${item.valor_total || 0},
@@ -1519,6 +1524,7 @@ Exemplos:
               ${item.tipo_desconto || null}, ${item.valor_desconto || 0},
               ${item.valor_final || 0}, ${item.economia || 0}, ${item.observacoes || null},
               ${item.data_inicio || null}, ${item.data_fim || null},
+              ${item.data_inicio_cobranca || null}, ${item.data_fim_cobranca || null},
               ${item.forma_pagamento || null}, ${item.num_parcelas || null}, ${item.valor_parcela || null}
             )
           `);
