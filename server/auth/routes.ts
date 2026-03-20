@@ -52,16 +52,12 @@ router.get("/auth/debug", (req, res) => {
   }
   const clientID = process.env.GOOGLE_CLIENT_ID;
   const customDomain = process.env.CUSTOM_DOMAIN;
-  const replitDomains = process.env.REPLIT_DOMAINS;
-  const devDomain = process.env.REPLIT_DEV_DOMAIN;
-  
+
   res.json({
     clientIDExists: !!clientID,
     clientIDStart: clientID?.substring(0, 30),
     callbackURL: getCallbackURL(),
-    customDomain: customDomain || null,
-    replitDomains: replitDomains || null,
-    devDomain: devDomain || null
+    customDomain: customDomain || null
   });
 });
 
