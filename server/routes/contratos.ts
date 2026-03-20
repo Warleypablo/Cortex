@@ -1237,49 +1237,63 @@ Exemplos:
         return res.status(400).json({ message: "ID inválido" });
       }
 
-      // Tentar buscar no banco local primeiro
-      const result = await db.execute(
-        sql`SELECT id, title, company_name, contact_name, stage_name, category_name,
-                   valor_recorrente, valor_pontual
-            FROM "Bitrix".crm_deal
-            WHERE id = ${parsedId}`
-      );
-
-      if (result.rows.length > 0) {
-        return res.json({ deal: result.rows[0], source: 'local' });
-      }
-
-      // Fallback: buscar via API REST do Bitrix
       const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
       if (!webhookUrl) {
-        return res.status(404).json({ message: "Deal não encontrado no banco local e API Bitrix não configurada" });
+        return res.status(500).json({ message: "BITRIX_WEBHOOK_URL não configurada" });
       }
 
-      const bitrixRes = await fetch(`${webhookUrl}/crm.deal.get?id=${parsedId}`);
-      if (!bitrixRes.ok) {
-        return res.status(404).json({ message: "Deal não encontrado no CRM" });
+      // Buscar deal direto na API do Bitrix
+      const dealRes = await fetch(`${webhookUrl}/crm.deal.get?id=${parsedId}`);
+      if (!dealRes.ok) {
+        return res.status(404).json({ message: "Deal não encontrado no Bitrix" });
       }
 
-      const bitrixData = await bitrixRes.json();
-      if (!bitrixData.result) {
-        return res.status(404).json({ message: "Deal não encontrado no CRM" });
+      const dealData = await dealRes.json();
+      if (!dealData.result) {
+        return res.status(404).json({ message: "Deal não encontrado no Bitrix" });
       }
 
-      const deal = bitrixData.result;
+      const deal = dealData.result;
+
+      // Buscar nome da empresa se tiver COMPANY_ID
+      let companyName: string | null = null;
+      if (deal.COMPANY_ID && deal.COMPANY_ID !== '0') {
+        try {
+          const compRes = await fetch(`${webhookUrl}/crm.company.get?id=${deal.COMPANY_ID}`);
+          if (compRes.ok) {
+            const compData = await compRes.json();
+            companyName = compData.result?.TITLE || null;
+          }
+        } catch { /* ignora erro ao buscar empresa */ }
+      }
+
+      // Buscar nome do contato se tiver CONTACT_ID
+      let contactName: string | null = null;
+      if (deal.CONTACT_ID && deal.CONTACT_ID !== '0') {
+        try {
+          const contRes = await fetch(`${webhookUrl}/crm.contact.get?id=${deal.CONTACT_ID}`);
+          if (contRes.ok) {
+            const contData = await contRes.json();
+            const c = contData.result;
+            contactName = c ? [c.NAME, c.LAST_NAME].filter(Boolean).join(' ') : null;
+          }
+        } catch { /* ignora erro ao buscar contato */ }
+      }
+
       res.json({
         deal: {
           id: deal.ID,
           title: deal.TITLE,
-          company_name: deal.COMPANY_ID ? `Company #${deal.COMPANY_ID}` : null,
-          contact_name: deal.CONTACT_ID ? `Contact #${deal.CONTACT_ID}` : null,
+          company_name: companyName,
+          contact_name: contactName,
           stage_name: deal.STAGE_ID,
           category_name: deal.CATEGORY_ID,
+          opportunity: deal.OPPORTUNITY,
         },
-        source: 'bitrix_api',
       });
     } catch (error: any) {
       console.error("Error fetching Bitrix deal:", error);
-      res.status(500).json({ message: "Erro interno ao buscar deal" });
+      res.status(500).json({ message: "Erro ao conectar com Bitrix" });
     }
   });
 
