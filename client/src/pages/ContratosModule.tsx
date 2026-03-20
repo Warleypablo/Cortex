@@ -1663,120 +1663,88 @@ function ContratosTab() {
           {contratoDetail && (
             <>
               {/* Header */}
-              <div className="bg-muted/30 p-6 border-b">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-xl bg-primary/20 flex items-center justify-center">
-                      <FileCheck className="h-7 w-7 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Contrato</p>
-                      <h2 className="text-2xl font-bold font-mono">{contratoDetail.numero_contrato}</h2>
-                      {contratoDetail.id_crm && (
-                        <p className="text-sm text-muted-foreground">CRM: {contratoDetail.id_crm}</p>
-                      )}
-                    </div>
+              <DialogHeader className="p-6 pb-4 border-b">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <DialogTitle className="text-xl">Contrato {contratoDetail.numero_contrato}</DialogTitle>
+                    {contratoDetail.id_crm && <p className="text-sm text-muted-foreground">CRM: {contratoDetail.id_crm}</p>}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <Badge
+                    variant="outline"
+                    className={`${statusColors[contratoDetail.status] || 'bg-gray-500/10'} text-base px-4 py-1`}
+                  >
+                    {statusLabels[contratoDetail.status] || contratoDetail.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      window.open(`/api/contratos/${contratoDetail.id}/gerar-pdf`, '_blank');
+                    }}
+                    data-testid="button-gerar-pdf"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Gerar PDF
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => enviarAssinaturaMutation.mutate(contratoDetail.id)}
+                    disabled={enviarAssinaturaMutation.isPending || contratoDetail.status === 'enviado para assinatura' || contratoDetail.status === 'assinado'}
+                    data-testid="button-enviar-assinatura"
+                  >
+                    {enviarAssinaturaMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
+                    Enviar para Assinatura
+                  </Button>
+                  {(contratoDetail.status === 'enviado para assinatura' || contratoDetail.assinafy_document_id) && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        window.open(`/api/contratos/${contratoDetail.id}/gerar-pdf`, '_blank');
-                      }}
-                      data-testid="button-gerar-pdf"
+                      onClick={() => verificarStatusMutation.mutate(contratoDetail.id)}
+                      disabled={verificarStatusMutation.isPending}
+                      data-testid="button-verificar-status"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Gerar PDF
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => enviarAssinaturaMutation.mutate(contratoDetail.id)}
-                      disabled={enviarAssinaturaMutation.isPending || contratoDetail.status === 'enviado para assinatura' || contratoDetail.status === 'assinado'}
-                      data-testid="button-enviar-assinatura"
-                    >
-                      {enviarAssinaturaMutation.isPending ? (
+                      {verificarStatusMutation.isPending ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
-                        <Send className="h-4 w-4 mr-2" />
+                        <RefreshCw className="h-4 w-4 mr-2" />
                       )}
-                      Enviar para Assinatura
+                      Verificar Status
                     </Button>
-                    {(contratoDetail.status === 'enviado para assinatura' || contratoDetail.assinafy_document_id) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => verificarStatusMutation.mutate(contratoDetail.id)}
-                        disabled={verificarStatusMutation.isPending}
-                        data-testid="button-verificar-status"
-                      >
-                        {verificarStatusMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                        )}
-                        Verificar Status
-                      </Button>
-                    )}
-                    <Badge 
-                      variant="outline" 
-                      className={`${statusColors[contratoDetail.status] || 'bg-gray-500/10'} text-base px-4 py-1`}
-                    >
-                      {statusLabels[contratoDetail.status] || contratoDetail.status}
-                    </Badge>
-                  </div>
+                  )}
                 </div>
-              </div>
+              </DialogHeader>
 
               <div className="p-6 space-y-6">
-                {/* Cards de Valores */}
-                <div className="grid grid-cols-3 gap-4">
-                  <Card className="p-4 bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Valor Original</p>
-                        <p className="text-lg font-bold">{formatCurrency(Number(contratoDetail.valor_original) || 0)}</p>
-                      </div>
+                {/* Valores inline */}
+                <div className="flex items-center gap-6 py-3 px-4 bg-muted/30 rounded-lg">
+                  <div>
+                    <span className="text-sm text-muted-foreground">Original</span>
+                    <p className="font-semibold">{formatCurrency(Number(contratoDetail.valor_original) || 0)}</p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-muted-foreground">Negociado</span>
+                    <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(Number(contratoDetail.valor_negociado) || 0)}</p>
+                  </div>
+                  {(Number(contratoDetail.economia) || 0) > 0 && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Economia</span>
+                      <p className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(Number(contratoDetail.economia) || 0)}</p>
                     </div>
-                  </Card>
-                  <Card className="p-4 bg-green-500/5 border-green-500/20">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Valor Negociado</p>
-                        <p className="text-lg font-bold text-green-600">{formatCurrency(Number(contratoDetail.valor_negociado) || 0)}</p>
-                      </div>
-                    </div>
-                  </Card>
-                  <Card className="p-4 bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-orange-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Economia</p>
-                        <p className="text-lg font-bold text-orange-600">
-                          {formatCurrency(Number(contratoDetail.economia) || 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
+                  )}
                 </div>
 
                 {/* Informações principais em duas colunas */}
                 <div className="grid grid-cols-2 gap-6">
                   {/* Cliente */}
                   <Card className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-semibold">Cliente</Label>
-                    </div>
+                    <Label className="text-sm font-semibold mb-3 block">Cliente</Label>
                     <div className="space-y-2">
                       <p className="font-medium text-lg">{contratoDetail.cliente_nome || '-'}</p>
                       {contratoDetail.cliente_cpf_cnpj && (
@@ -1789,10 +1757,7 @@ function ContratosTab() {
 
                   {/* Comercial */}
                   <Card className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-semibold">Comercial Responsável</Label>
-                    </div>
+                    <Label className="text-sm font-semibold mb-3 block">Comercial Responsável</Label>
                     <div className="space-y-2">
                       <p className="font-medium text-lg">{contratoDetail.comercial_nome || '-'}</p>
                       {contratoDetail.comercial_email && (
@@ -1839,10 +1804,7 @@ function ContratosTab() {
                 {/* Itens do Contrato */}
                 {contratoDetail.itens && contratoDetail.itens.length > 0 && (
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Briefcase className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-semibold">Itens do Contrato ({contratoDetail.itens.length})</Label>
-                    </div>
+                    <Label className="text-sm font-semibold mb-3 block">Itens do Contrato ({contratoDetail.itens.length})</Label>
                     <Card className="overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -1900,10 +1862,7 @@ function ContratosTab() {
                 {/* Observações */}
                 {contratoDetail.observacoes && (
                   <Card className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-semibold">Observações</Label>
-                    </div>
+                    <Label className="text-sm font-semibold mb-3 block">Observações</Label>
                     <p className="text-sm whitespace-pre-wrap text-muted-foreground leading-relaxed">
                       {contratoDetail.observacoes}
                     </p>
