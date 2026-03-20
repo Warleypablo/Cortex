@@ -1172,6 +1172,9 @@ Exemplos:
   app.post("/api/contratos/templates", isAuthenticated, async (req, res) => {
     try {
       const { nome, descricao, itens_template } = req.body;
+      if (!nome || typeof nome !== 'string' || !nome.trim()) {
+        return res.status(400).json({ message: "Nome é obrigatório" });
+      }
       const result = await db.execute(
         sql`INSERT INTO staging.contrato_templates (nome, descricao, itens_template)
          VALUES (${nome}, ${descricao || null}, ${JSON.stringify(itens_template || [])})
@@ -1188,6 +1191,9 @@ Exemplos:
     try {
       const { id } = req.params;
       const { nome, descricao, itens_template } = req.body;
+      if (!nome || typeof nome !== 'string' || !nome.trim()) {
+        return res.status(400).json({ message: "Nome é obrigatório" });
+      }
       const result = await db.execute(
         sql`UPDATE staging.contrato_templates
          SET nome = ${nome}, descricao = ${descricao || null},
