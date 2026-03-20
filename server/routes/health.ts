@@ -20,7 +20,7 @@ router.get('/health', async (_req, res) => {
   try {
     const t = Date.now();
     const tables = [
-      'cortex_core.users',
+      'cortex_core.auth_users',
       '"Clickup".cup_clientes',
       '"Clickup".cup_contratos',
     ];
