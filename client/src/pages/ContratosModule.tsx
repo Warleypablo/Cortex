@@ -833,17 +833,11 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
           setDealError(errorData?.message || 'Deal não encontrado no CRM');
           return;
         }
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          setDealInfo(null);
-          setDealError('Resposta inesperada do servidor');
-          return;
-        }
         const data = await res.json();
         setDealInfo(data.deal);
       } catch (err) {
         console.error('Erro ao buscar deal:', err);
-        setDealError('Erro de conexão ao buscar deal');
+        setDealError('Servidor reiniciando — tente novamente em instantes');
       } finally {
         setDealLoading(false);
       }
@@ -2123,17 +2117,11 @@ function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
           setDealError(errorData?.message || 'Deal não encontrado no CRM');
           return;
         }
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          setDealInfo(null);
-          setDealError('Resposta inesperada do servidor');
-          return;
-        }
         const data = await res.json();
         setDealInfo(data.deal);
       } catch (err) {
         console.error('Erro ao buscar deal:', err);
-        setDealError('Erro de conexão ao buscar deal');
+        setDealError('Servidor reiniciando — tente novamente em instantes');
       } finally {
         setDealLoading(false);
       }
