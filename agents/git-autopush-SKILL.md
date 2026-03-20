@@ -10,16 +10,17 @@ description: >
 # Git Auto-Push Skill
 
 After **every code change**, automatically:
-1. Stage all modified files
-2. Generate a commit message based on the diff
-3. Commit and push to the current branch
-4. Add changelog entry to `docs/CHANGELOG.md`
+1. Verify branch safety (NEVER push to `main` or `staging` directly)
+2. Stage modified files
+3. Generate a commit message based on the diff
+4. Commit and push to the feature branch
+5. Add changelog entry to `docs/CHANGELOG.md`
 
 ---
 
 ## Workflow
 
-### Step 1 — Check git context
+### Step 1 — Check git context and branch safety
 
 ```bash
 git -C <project_root> status --short
@@ -27,9 +28,32 @@ git -C <project_root> branch --show-current
 ```
 
 - If the directory is not a git repo → warn the user and skip.
-- Note the current branch name (commit to it, no matter what).
+- Get the current branch name and apply these rules:
 
-### Step 2 — Stage all changes
+**BRANCH SAFETY RULES (MANDATORY):**
+
+| Current branch | Action |
+|----------------|--------|
+| `main` | **STOP.** Do NOT commit. Ask user to create a feature branch first. |
+| `staging` | **STOP.** Do NOT commit. Ask user to create a feature branch first. |
+| `feature/*`, `fix/*`, `refactor/*`, `hotfix/*` | **OK.** Proceed with commit and push. |
+| Any other branch | **OK.** Proceed, but warn user it's not a standard branch name. |
+
+**If on `main` or `staging`, show this message and STOP:**
+
+```
+⛔ Voce esta na branch `<branch>`. Push direto nao e permitido.
+
+Para continuar, crie uma feature branch:
+  git checkout staging && git pull
+  git checkout -b feature/<nome-da-feature>
+
+Depois, eu commito e faço push automaticamente.
+```
+
+**Do NOT commit. Do NOT stash. Do NOT try to work around this.** Wait for the user to switch branches.
+
+### Step 2 — Stage changes
 
 ```bash
 git -C <project_root> add -A
@@ -45,6 +69,8 @@ Run `git diff --cached` to see what changed, then write a commit message followi
 - <bullet summarizing change 1>
 - <bullet summarizing change 2>
 ...
+
+Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
 ```
 
 **Types** (Conventional Commits):
@@ -64,6 +90,7 @@ Run `git diff --cached` to see what changed, then write a commit message followi
 - Scope: the affected module/folder/feature (optional but preferred)
 - Bullets: only include if there are 2+ meaningful changes
 - Never include "Claude made this change" or similar — write as if a human dev wrote it
+- Always include Co-Authored-By as the last line
 
 **Examples:**
 ```
@@ -123,7 +150,26 @@ After a successful push, add an entry to `docs/CHANGELOG.md` documenting what wa
 
 Execute the workflow described in `agents/obsidian-sync-SKILL.md` to update the Obsidian vault with the progress made in this commit. This step is mandatory — never skip it.
 
-### Step 7 — Confirm to the user
+### Step 7 — Suggest PR if ready
+
+After push, check if a PR already exists for this branch:
+
+```bash
+gh pr list --head <current_branch> --state open
+```
+
+- If **no PR exists** and the feature seems complete, suggest:
+  ```
+  📌 Para enviar para staging, crie um PR:
+    gh pr create --base staging --title "<commit subject>" --body "..."
+  ```
+- If **PR already exists**, just note it:
+  ```
+  🔗 PR existente: #<number>
+  ```
+- If the work is clearly in progress (partial feature), do NOT suggest PR yet.
+
+### Step 8 — Confirm to the user
 
 After everything completes, show a brief confirmation:
 
@@ -140,12 +186,14 @@ If anything fails, show the error clearly and suggest a fix.
 
 ## Edge Cases
 
+- **On `main` or `staging`**: STOP. Do not commit. Instruct user to create feature branch. This is the #1 priority check.
 - **Untracked files only** (no modifications): still stage and commit with `chore: add <filenames>`
 - **Nothing to commit**: skip silently, no message needed
 - **Merge conflicts**: do NOT attempt to resolve — warn the user and stop
 - **Detached HEAD**: warn the user and skip the push (commit is still OK if they confirm)
 - **Large binary files**: skip files >10MB from auto-commit and warn the user
 - **.gitignore**: respect it — never force-add ignored files
+- **Push rejected (branch protection)**: This means you're on a protected branch. Show the branch safety message from Step 1.
 
 ---
 
@@ -154,3 +202,4 @@ If anything fails, show the error clearly and suggest a fix.
 - Always infer `<project_root>` from the file(s) being edited in the current task
 - If multiple repos are involved in one task, commit and push each one separately
 - Do not ask for confirmation before committing — just do it and report what happened
+- The `gh` CLI is available for PR operations (installed and authenticated)
