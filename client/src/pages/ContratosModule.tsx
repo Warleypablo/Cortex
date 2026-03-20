@@ -299,7 +299,6 @@ function DashboardTab() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Entidades */}
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-blue-500/20 to-transparent rounded-bl-full" />
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -325,7 +324,6 @@ function DashboardTab() {
 
         {/* Contratos Ativos */}
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-green-500/20 to-transparent rounded-bl-full" />
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -352,7 +350,6 @@ function DashboardTab() {
 
         {/* Valor Total */}
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-orange-500/20 to-transparent rounded-bl-full" />
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -371,7 +368,6 @@ function DashboardTab() {
 
         {/* Rascunhos */}
         <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-gray-500/20 to-transparent rounded-bl-full" />
           <CardContent className="p-6">
             <div className="flex items-start justify-between">
               <div className="space-y-2">
@@ -490,25 +486,25 @@ function DashboardTab() {
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 text-center">
             <p className="text-xs text-muted-foreground mb-1">Faturados</p>
             <p className="text-2xl font-bold text-green-600">{stats.contratos.faturados}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 text-center">
             <p className="text-xs text-muted-foreground mb-1">Pend. Faturamento</p>
             <p className="text-2xl font-bold text-yellow-600">{stats.contratos.pendentesFaturamento}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 text-center">
             <p className="text-xs text-muted-foreground mb-1">Encerrados</p>
             <p className="text-2xl font-bold text-blue-600">{stats.contratos.encerrados}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 text-center">
             <p className="text-xs text-muted-foreground mb-1">Cancelados</p>
             <p className="text-2xl font-bold text-red-600">{stats.contratos.cancelados}</p>
@@ -836,7 +832,7 @@ function EntidadesTab() {
     <div className="space-y-6">
       {/* Header com estatísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
               <Users className="h-6 w-6 text-blue-500" />
@@ -847,7 +843,7 @@ function EntidadesTab() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
               <Building2 className="h-6 w-6 text-green-500" />
@@ -858,7 +854,7 @@ function EntidadesTab() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
               <Briefcase className="h-6 w-6 text-purple-500" />
@@ -1757,7 +1753,7 @@ function ContratosTab() {
     <div className="space-y-6">
       {/* Cards estatísticos */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
               <FileCheck className="h-6 w-6 text-green-500" />
@@ -1768,7 +1764,7 @@ function ContratosTab() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
               <FileText className="h-6 w-6 text-yellow-500" />
@@ -1779,7 +1775,7 @@ function ContratosTab() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
               <DollarSign className="h-6 w-6 text-blue-500" />
@@ -1790,7 +1786,7 @@ function ContratosTab() {
             </div>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+        <Card className="bg-muted/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
               <Briefcase className="h-6 w-6 text-primary" />
@@ -1985,8 +1981,8 @@ function ContratosTab() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
           {contratoDetail && (
             <>
-              {/* Header com gradiente */}
-              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border-b">
+              {/* Header */}
+              <div className="bg-muted/30 p-6 border-b">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
                     <div className="h-14 w-14 rounded-xl bg-primary/20 flex items-center justify-center">
@@ -2602,7 +2598,7 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
       </Dialog>
 
       {/* Header */}
-      <Card className="border-orange-500/20 bg-gradient-to-r from-orange-500/5 to-transparent">
+      <Card className="border-orange-500/20">
         <CardContent className="p-6">
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-orange-500/10 flex items-center justify-center">
@@ -3340,57 +3336,47 @@ export default function ContratosModule() {
   return (
     <div className="p-6 space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <Card className="mb-6 bg-gradient-to-r from-background via-muted/30 to-background border-muted/50">
+        <Card className="mb-6 bg-muted/30 border-muted/50">
           <CardContent className="p-2">
-            <TabsList className="w-full grid grid-cols-5 gap-2 bg-transparent h-auto p-0" data-testid="tabs-contratos">
-              <TabsTrigger 
-                value="dashboard" 
+            <TabsList className="grid w-full grid-cols-5 bg-transparent p-0 h-auto border-b" data-testid="tabs-contratos">
+              <TabsTrigger
+                value="dashboard"
                 data-testid="tab-dashboard"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <FileText className="h-5 w-5" />
-                </div>
+                <FileText className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="entidades" 
+              <TabsTrigger
+                value="entidades"
                 data-testid="tab-entidades"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <Users className="h-5 w-5" />
-                </div>
+                <Users className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Entidades</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="contratos" 
+              <TabsTrigger
+                value="contratos"
                 data-testid="tab-contratos"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <Briefcase className="h-5 w-5" />
-                </div>
+                <Briefcase className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Contratos</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="novo" 
+              <TabsTrigger
+                value="novo"
                 data-testid="tab-novo-contrato"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <Plus className="h-5 w-5" />
-                </div>
+                <Plus className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Novo Contrato</span>
               </TabsTrigger>
               <TabsTrigger
                 value="servicos"
                 data-testid="tab-servicos"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-violet-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <Settings className="h-5 w-5" />
-                </div>
+                <Settings className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Serviços</span>
               </TabsTrigger>
             </TabsList>
