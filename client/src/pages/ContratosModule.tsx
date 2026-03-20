@@ -365,6 +365,10 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.eh_cliente && !formData.eh_fornecedor) {
+      toast({ title: "Selecione pelo menos um tipo: Cliente ou Fornecedor", variant: "destructive" });
+      return;
+    }
     if (entidade) {
       updateMutation.mutate(formData);
     } else {
@@ -427,17 +431,18 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>{formData.tipo_pessoa === 'fisica' ? 'CPF' : 'CNPJ'}</Label>
+              <Label>{formData.tipo_pessoa === 'fisica' ? 'CPF' : 'CNPJ'} <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-cpf-cnpj"
                 value={formData.cpf_cnpj || ''}
                 onChange={(e) => setFormData({ ...formData, cpf_cnpj: e.target.value.replace(/\D/g, '') })}
                 placeholder={formData.tipo_pessoa === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>{formData.tipo_pessoa === 'fisica' ? 'Nome Completo' : 'Razão Social'}</Label>
+              <Label>{formData.tipo_pessoa === 'fisica' ? 'Nome Completo' : 'Razão Social'} <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-nome-razao"
                 value={formData.nome || ''}
@@ -449,105 +454,115 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>E-mail</Label>
+              <Label>E-mail <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-email"
                 type="email"
                 value={formData.email || ''}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>E-mail de Cobrança</Label>
+              <Label>E-mail de Cobrança <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-email-cobranca"
                 type="email"
                 value={formData.email_cobranca || ''}
                 onChange={(e) => setFormData({ ...formData, email_cobranca: e.target.value })}
+                required
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Telefone</Label>
+              <Label>Telefone <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-telefone"
                 value={formData.telefone || ''}
                 onChange={(e) => setFormData({ ...formData, telefone: e.target.value.replace(/\D/g, '') })}
                 placeholder="(00) 00000-0000"
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Telefone de Cobrança</Label>
+              <Label>Telefone de Cobrança <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-telefone-cobranca"
                 value={formData.telefone_cobranca || ''}
                 onChange={(e) => setFormData({ ...formData, telefone_cobranca: e.target.value.replace(/\D/g, '') })}
                 placeholder="(00) 00000-0000"
+                required
               />
             </div>
           </div>
 
           <div className="grid grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>CEP</Label>
+              <Label>CEP <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-cep"
                 value={formData.cep || ''}
                 onChange={(e) => setFormData({ ...formData, cep: e.target.value.replace(/\D/g, '') })}
                 placeholder="00000-000"
+                required
               />
             </div>
 
             <div className="space-y-2 col-span-2">
-              <Label>Endereço</Label>
+              <Label>Endereço <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-endereco"
                 value={formData.endereco || ''}
                 onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Número</Label>
+              <Label>Número <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-numero"
                 value={formData.numero || ''}
                 onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                required
               />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Bairro</Label>
+              <Label>Bairro <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-bairro"
                 value={formData.bairro || ''}
                 onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Cidade</Label>
+              <Label>Cidade <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-cidade"
                 value={formData.cidade || ''}
                 onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Estado</Label>
+              <Label>Estado <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-estado"
                 value={formData.estado || ''}
                 onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
                 maxLength={2}
                 placeholder="UF"
+                required
               />
             </div>
           </div>
