@@ -437,21 +437,37 @@ app.use((req, res, next) => {
                 UPDATE staging.contratos SET status = 'assinado', assinafy_status = 'signed', signature_completed_at = NOW(), data_atualizacao = NOW()
                 WHERE id = ${c.id}
               `);
-              // Mover deal no Bitrix para "Negócio Ganho" (pipeline default)
+              // Mover deal no Bitrix para "Negócio Ganho" (2 etapas: pipeline transfer + WON)
               try {
                 const idCrmResult = await db.execute(sql`SELECT id_crm FROM staging.contratos WHERE id = ${c.id}`);
                 const idCrm = (idCrmResult.rows[0] as any)?.id_crm;
                 const bitrixWebhook = process.env.BITRIX_WEBHOOK_URL;
                 if (idCrm && bitrixWebhook) {
                   const parsedDealId = parseInt(idCrm);
-                  const bRes = await fetch(`${bitrixWebhook}/crm.deal.update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: parsedDealId, fields: { CATEGORY_ID: 0, STAGE_ID: 'WON' } }),
-                  });
-                  if (bRes.ok) {
-                    await db.execute(sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parsedDealId}`);
-                    console.log(`[assinafy-poll] Bitrix deal ${idCrm} movido para pipeline default → Negócio Ganho`);
+                  // Buscar pipeline atual
+                  const getRes = await fetch(`${bitrixWebhook}/crm.deal.get?id=${parsedDealId}`);
+                  if (getRes.ok) {
+                    const getData = await getRes.json();
+                    const catId = getData.result?.CATEGORY_ID;
+                    // Se não está no default, mover via WON do pipeline atual
+                    if (catId !== '0' && catId !== 0) {
+                      await fetch(`${bitrixWebhook}/crm.deal.update`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: parsedDealId, fields: { STAGE_ID: `C${catId}:WON` } }),
+                      });
+                      await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                    // Agora mover para WON no pipeline default
+                    const bRes = await fetch(`${bitrixWebhook}/crm.deal.update`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: parsedDealId, fields: { STAGE_ID: 'WON' } }),
+                    });
+                    if (bRes.ok) {
+                      await db.execute(sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parsedDealId}`);
+                      console.log(`[assinafy-poll] Bitrix deal ${idCrm} movido para Negócio Ganho (2 etapas)`);
+                    }
                   }
                 }
               } catch (bitrixErr) {
