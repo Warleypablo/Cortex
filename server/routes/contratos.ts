@@ -1227,6 +1227,75 @@ Exemplos:
     }
   });
 
+  // ── Bitrix CRM Integration ──────────────────────────────────────
+
+  app.get("/api/contratos/bitrix-deal/:dealId", isAuthenticated, async (req, res) => {
+    try {
+      const { dealId } = req.params;
+      const result = await db.execute(
+        sql`SELECT id, title, company_name, contact_name, stage_name, category_name,
+                   valor_recorrente, valor_pontual
+            FROM "Bitrix".crm_deal
+            WHERE id = ${parseInt(dealId)}`
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Deal não encontrado no CRM" });
+      }
+      res.json({ deal: result.rows[0] });
+    } catch (error: any) {
+      console.error("Error fetching Bitrix deal:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/contratos/bitrix-deal/:dealId/won", isAuthenticated, async (req, res) => {
+    try {
+      const { dealId } = req.params;
+      const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
+      if (!webhookUrl) {
+        return res.status(500).json({ message: "BITRIX_WEBHOOK_URL não configurada" });
+      }
+
+      const dealResult = await db.execute(
+        sql`SELECT id, stage_name FROM "Bitrix".crm_deal WHERE id = ${parseInt(dealId)}`
+      );
+      if (dealResult.rows.length === 0) {
+        return res.status(404).json({ message: "Deal não encontrado" });
+      }
+
+      const response = await fetch(`${webhookUrl}/crm.deal.update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: parseInt(dealId),
+          fields: { STAGE_ID: 'WON' },
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Bitrix API error:", errorText);
+        return res.status(502).json({ message: "Erro ao atualizar deal no Bitrix" });
+      }
+
+      const bitrixResponse = await response.json();
+      if (!bitrixResponse.result) {
+        return res.status(502).json({ message: "Bitrix retornou erro", details: bitrixResponse });
+      }
+
+      await db.execute(
+        sql`UPDATE "Bitrix".crm_deal
+            SET stage_name = 'Negócio Ganho', date_modify = NOW()
+            WHERE id = ${parseInt(dealId)}`
+      );
+
+      res.json({ success: true, message: "Deal movido para Negócio Ganho" });
+    } catch (error: any) {
+      console.error("Error updating Bitrix deal:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============================================================================
   // CONTRATOS ROUTES
   // ============================================================================
