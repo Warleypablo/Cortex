@@ -101,8 +101,10 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
   const valorNum = parseFloat((contrato.valor_remuneracao || '0').replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
   const valorFormatado = valorNum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const valorExtenso = valorPorExtenso(valorNum);
-  const prazoEntrega = contrato.prazo_entrega_dias || 3;
+  const prazoEntrega = 3;
   const prazoExtenso = numeroPorExtenso(prazoEntrega);
+  const prazoAjustes = 3;
+  const prazoAjustesExtenso = numeroPorExtenso(prazoAjustes);
   const clienteNome = contrato.cliente_nome || 'do cliente';
 
   const dataAtual = new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -232,7 +234,7 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
   romanItem('IV – adequação do roteiro às diretrizes da campanha.');
   doc.moveDown(0.3);
 
-  p('5.4. A nova versão do conteúdo deverá ser entregue no prazo máximo de 02 (dois) dias corridos, contados da solicitação de ajustes pela CONTRATANTE.', { spacing: 1 });
+  p(`5.4. A nova versão do conteúdo deverá ser entregue no prazo máximo de ${String(prazoAjustes).padStart(2, '0')} (${prazoAjustesExtenso}) dias corridos, contados da solicitação de ajustes pela CONTRATANTE.`, { spacing: 1 });
 
   // ── CLÁUSULA 6 ──
   heading('CLÁUSULA 6 – DOS PRODUTOS ENVIADOS PARA GRAVAÇÃO');
