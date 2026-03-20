@@ -3787,6 +3787,32 @@ Exemplos:
 
       console.log(`[simular-assinatura] Contrato ${contratoId} marcado como assinado (simulação)`);
 
+      // Mover deal no Bitrix para "Negócio Ganho" se id_crm preenchido
+      const idCrmResult = await db.execute(
+        sql`SELECT id_crm FROM staging.contratos WHERE id = ${contratoId}`
+      );
+      const idCrm = (idCrmResult.rows[0] as any)?.id_crm;
+      const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
+      if (idCrm && webhookUrl) {
+        try {
+          const bitrixRes = await fetch(`${webhookUrl}/crm.deal.update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: parseInt(idCrm), fields: { STAGE_ID: 'WON' } }),
+          });
+          if (bitrixRes.ok) {
+            await db.execute(
+              sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parseInt(idCrm)}`
+            );
+            console.log(`[simular-assinatura] Bitrix deal ${idCrm} movido para Negócio Ganho`);
+          } else {
+            console.error(`[simular-assinatura] Erro ao mover deal ${idCrm} no Bitrix:`, await bitrixRes.text());
+          }
+        } catch (bitrixErr) {
+          console.error(`[simular-assinatura] Erro ao chamar Bitrix API para deal ${idCrm}:`, bitrixErr);
+        }
+      }
+
       // Executar o mesmo sync do fluxo real
       await syncClienteFromSignedContract(contratoId);
 

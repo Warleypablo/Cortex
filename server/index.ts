@@ -437,6 +437,25 @@ app.use((req, res, next) => {
                 UPDATE staging.contratos SET status = 'assinado', assinafy_status = 'signed', signature_completed_at = NOW(), data_atualizacao = NOW()
                 WHERE id = ${c.id}
               `);
+              // Mover deal no Bitrix para "Negócio Ganho"
+              try {
+                const idCrmResult = await db.execute(sql`SELECT id_crm FROM staging.contratos WHERE id = ${c.id}`);
+                const idCrm = (idCrmResult.rows[0] as any)?.id_crm;
+                const bitrixWebhook = process.env.BITRIX_WEBHOOK_URL;
+                if (idCrm && bitrixWebhook) {
+                  const bRes = await fetch(`${bitrixWebhook}/crm.deal.update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: parseInt(idCrm), fields: { STAGE_ID: 'WON' } }),
+                  });
+                  if (bRes.ok) {
+                    await db.execute(sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parseInt(idCrm)}`);
+                    console.log(`[assinafy-poll] Bitrix deal ${idCrm} movido para Negócio Ganho`);
+                  }
+                }
+              } catch (bitrixErr) {
+                console.error(`[assinafy-poll] Erro ao mover deal no Bitrix:`, bitrixErr);
+              }
               updated++;
             } else if (isRecusado) {
               await db.execute(sql`
