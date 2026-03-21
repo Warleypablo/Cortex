@@ -76,6 +76,73 @@ Documentacao completa do banco: `DATABASE.md`
 
 ---
 
+## 🔄 Workflow de Desenvolvimento — OBRIGATÓRIO
+
+Todo desenvolvimento DEVE seguir estas 8 etapas na ordem. Não pular nenhuma.
+
+### Etapa 1: ENTENDER
+- Ler o código existente e entender o contexto antes de qualquer coisa
+- Perguntar ao usuário se algo não está claro
+- **SEMPRE** usar `superpowers:brainstorming` para features novas ou mudanças significativas
+  - Explorar requisitos, perguntar uma pergunta por vez
+  - Propor 2-3 abordagens com trade-offs
+  - Obter aprovação do design antes de implementar
+  - Isso aumenta a assertividade e evita retrabalho
+
+### Etapa 2: PLANEJAR
+- **SEMPRE** criar feature branch (`feature/nome-descritivo`) — nunca commitar direto em staging/main
+- Para mudanças grandes, usar `superpowers:writing-plans` para criar plano de implementação
+- Para mudanças pequenas, plano mental basta mas branch é obrigatória
+
+### Etapa 3: INVESTIGAR
+- **ANTES de escrever código**, investigar o terreno:
+  - API externa? Fazer chamadas reais com curl/fetch primeiro
+  - Banco de dados? Rodar queries reais para validar estrutura
+  - Componente existente? Ler o código atual completamente
+- Nunca assumir comportamento de APIs/sistemas externos — testar primeiro
+- Usar `superpowers:systematic-debugging` quando investigando bugs
+
+### Etapa 4: IMPLEMENTAR
+- Código + testes mínimos para lógica de negócio
+- Arquivos com mais de 500 linhas devem ser avaliados para extração de componentes
+- Usar `superpowers:subagent-driven-development` para tasks independentes em paralelo
+- Dark/light mode obrigatório (ver seção Temas abaixo)
+
+### Etapa 5: TESTAR LOCAL
+- Reiniciar dev server (`npm run dev`) após mudanças no backend
+- Testar no browser antes de considerar pronto
+- Verificar dark mode E light mode
+- **Não é responsabilidade do usuário encontrar bugs básicos**
+
+### Etapa 6: COMMIT
+- Commits granulares — uma mudança lógica por commit
+- Conventional Commits (feat, fix, style, refactor, chore)
+- Nunca commitar direto em staging/main
+
+### Etapa 7: REVIEW
+- Revisar o diff completo antes de push
+- Para features grandes, usar `superpowers:requesting-code-review`
+- Corrigir issues encontrados antes de prosseguir
+
+### Etapa 8: MERGE
+- PR para staging com descrição clara
+- CI deve passar antes de merge
+- Usar `superpowers:finishing-a-development-branch` para fechar a branch
+
+### Superpowers — Quando usar cada um
+
+| Skill | Quando |
+|-------|--------|
+| `brainstorming` | Feature nova, mudança significativa, redesign |
+| `writing-plans` | Implementação com 3+ tasks |
+| `subagent-driven-development` | Executar plano com tasks independentes |
+| `systematic-debugging` | Qualquer bug, erro ou comportamento inesperado |
+| `test-driven-development` | Lógica de negócio crítica |
+| `requesting-code-review` | Antes de merge de feature grande |
+| `finishing-a-development-branch` | Após todos os testes passarem |
+
+---
+
 ## 🎯 Diretrizes de Desenvolvimento
 
 ### Suporte a Temas (Dark/Light Mode)
