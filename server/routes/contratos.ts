@@ -2209,7 +2209,7 @@ Exemplos:
       cnpj: "42.100.292/0001-84",
       socio: "RODRIGO QUEIROZ SANTOS",
       cpf_socio: "141.802.967-05",
-      endereco: "R. Maria de Lourdes García, 228 - Ilha de Santa Maria, Vitória - ES, 29053-310",
+      endereco: "Av. João Batista Parra, 633 - 13° Andar - Enseada do Suá, Vitória - ES, 29052-123",
       telefone: "(27) 99687-7563",
       email: "contato@turbopartners.com.br",
       site: "www.turbopartners.com.br"
@@ -2809,7 +2809,7 @@ Exemplos:
         cnpj: "42.100.292/0001-84",
         socio: "RODRIGO QUEIROZ SANTOS",
         cpf_socio: "141.802.967-05",
-        endereco: "R. Maria de Lourdes García, 228 - Ilha de Santa Maria, Vitória - ES, 29053-310",
+        endereco: "Av. João Batista Parra, 633 - 13° Andar - Enseada do Suá, Vitória - ES, 29052-123",
         telefone: "(27) 99687-7563",
         email: "contato@turbopartners.com.br",
         site: "www.turbopartners.com.br"
