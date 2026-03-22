@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import rateLimit from "express-rate-limit";
@@ -140,6 +140,7 @@ app.use((req, res, next) => {
     initializeChamadosTables(),
     initializeNotasFiscaisTable(),
     initializeCapacityTable(),
+    initializeContratoTemplatesTable(),
   ]);
   
   // Phase 2: Depends on catalogs being ready
@@ -436,6 +437,42 @@ app.use((req, res, next) => {
                 UPDATE staging.contratos SET status = 'assinado', assinafy_status = 'signed', signature_completed_at = NOW(), data_atualizacao = NOW()
                 WHERE id = ${c.id}
               `);
+              // Mover deal no Bitrix para "Negócio Ganho" (2 etapas: pipeline transfer + WON)
+              try {
+                const idCrmResult = await db.execute(sql`SELECT id_crm FROM staging.contratos WHERE id = ${c.id}`);
+                const idCrm = (idCrmResult.rows[0] as any)?.id_crm;
+                const bitrixWebhook = process.env.BITRIX_WEBHOOK_URL;
+                if (idCrm && bitrixWebhook) {
+                  const parsedDealId = parseInt(idCrm);
+                  // Buscar pipeline atual
+                  const getRes = await fetch(`${bitrixWebhook}/crm.deal.get?id=${parsedDealId}`);
+                  if (getRes.ok) {
+                    const getData = await getRes.json();
+                    const catId = getData.result?.CATEGORY_ID;
+                    // Se não está no default, mover via WON do pipeline atual
+                    if (catId !== '0' && catId !== 0) {
+                      await fetch(`${bitrixWebhook}/crm.deal.update`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: parsedDealId, fields: { STAGE_ID: `C${catId}:WON` } }),
+                      });
+                      await new Promise(resolve => setTimeout(resolve, 2000));
+                    }
+                    // Agora mover para WON no pipeline default
+                    const bRes = await fetch(`${bitrixWebhook}/crm.deal.update`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: parsedDealId, fields: { STAGE_ID: 'WON' } }),
+                    });
+                    if (bRes.ok) {
+                      await db.execute(sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parsedDealId}`);
+                      console.log(`[assinafy-poll] Bitrix deal ${idCrm} movido para Negócio Ganho (2 etapas)`);
+                    }
+                  }
+                }
+              } catch (bitrixErr) {
+                console.error(`[assinafy-poll] Erro ao mover deal no Bitrix:`, bitrixErr);
+              }
               updated++;
             } else if (isRecusado) {
               await db.execute(sql`

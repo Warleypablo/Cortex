@@ -1,4 +1,4 @@
-import { useState, useMemo, useDeferredValue, useCallback, memo } from "react";
+import { useState, useEffect, useMemo, useDeferredValue, useCallback, memo } from "react";
 import { EntregaveisChecklist } from "@/components/EntregaveisChecklist";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -76,6 +76,9 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Package,
+  Bookmark,
+  Copy,
 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -135,6 +138,8 @@ interface ContratoItem {
   is_personalizado?: boolean;
   data_inicio?: string | null;
   data_fim?: string | null;
+  data_inicio_cobranca?: string | null;
+  data_fim_cobranca?: string | null;
   forma_pagamento?: string | null;
   num_parcelas?: number | null;
   valor_parcela?: number | null;
@@ -260,258 +265,44 @@ function DashboardTab() {
 
   if (isLoading || !stats) {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-24 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-48 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map(i => (
+          <Card key={i}>
+            <CardContent className="pt-6">
+              <Skeleton className="h-4 w-24 mb-2" />
+              <Skeleton className="h-8 w-16" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
 
-  const statusData = [
-    { key: 'ativos', label: 'Ativos', count: stats.contratos.ativos, color: 'bg-green-500', textColor: 'text-green-500' },
-    { key: 'rascunhos', label: 'Rascunhos', count: stats.contratos.rascunhos, color: 'bg-gray-500', textColor: 'text-gray-500' },
-    { key: 'aguardando', label: 'Aguardando', count: stats.contratos.aguardando, color: 'bg-yellow-500', textColor: 'text-yellow-500' },
-    { key: 'encerrados', label: 'Encerrados', count: stats.contratos.encerrados, color: 'bg-blue-500', textColor: 'text-blue-500' },
-    { key: 'cancelados', label: 'Cancelados', count: stats.contratos.cancelados, color: 'bg-red-500', textColor: 'text-red-500' },
-  ];
-
-  const maxCount = Math.max(...statusData.map(s => s.count), 1);
-
   return (
     <div className="space-y-6">
-      {/* Cards principais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Entidades */}
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-blue-500/20 to-transparent rounded-bl-full" />
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Entidades Ativas</p>
-                <p className="text-4xl font-bold tracking-tight">{stats.entidades.total}</p>
-                <div className="flex items-center gap-3 pt-2">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-blue-500" />
-                    <span className="text-xs text-muted-foreground">{stats.entidades.clientes} clientes</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-2 w-2 rounded-full bg-purple-500" />
-                    <span className="text-xs text-muted-foreground">{stats.entidades.fornecedores} forn.</span>
-                  </div>
-                </div>
-              </div>
-              <div className="h-14 w-14 rounded-2xl bg-blue-500/10 flex items-center justify-center">
-                <Users className="h-7 w-7 text-blue-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Contratos Ativos */}
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-green-500/20 to-transparent rounded-bl-full" />
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Contratos Ativos</p>
-                <p className="text-4xl font-bold tracking-tight text-green-600">{stats.contratos.ativos}</p>
-                <div className="pt-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-green-500 rounded-full transition-all"
-                        style={{ width: `${(stats.contratos.ativos / stats.contratos.total) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-muted-foreground">{stats.contratos.total} total</span>
-                  </div>
-                </div>
-              </div>
-              <div className="h-14 w-14 rounded-2xl bg-green-500/10 flex items-center justify-center">
-                <FileCheck className="h-7 w-7 text-green-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Valor Total */}
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-orange-500/20 to-transparent rounded-bl-full" />
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Valor Total Ativos</p>
-                <p className="text-3xl font-bold tracking-tight text-orange-600">{formatCurrency(stats.valorTotalAtivos)}</p>
-                <p className="text-xs text-muted-foreground pt-2">
-                  Soma de todos os contratos ativos
-                </p>
-              </div>
-              <div className="h-14 w-14 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-                <DollarSign className="h-7 w-7 text-orange-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Rascunhos */}
-        <Card className="relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-gray-500/20 to-transparent rounded-bl-full" />
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Rascunhos</p>
-                <p className="text-4xl font-bold tracking-tight">{stats.contratos.rascunhos}</p>
-                <p className="text-xs text-muted-foreground pt-2">
-                  Pendentes de assinatura
-                </p>
-              </div>
-              <div className="h-14 w-14 rounded-2xl bg-gray-500/10 flex items-center justify-center">
-                <FileText className="h-7 w-7 text-gray-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Segunda linha - Status e Entidades */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Status dos Contratos com barras visuais */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold">Status dos Contratos</CardTitle>
-              <Badge variant="outline" className="text-xs">
-                {stats.contratos.total} total
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {statusData.map((item) => (
-              <div key={item.key} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-3 w-3 rounded-full ${item.color}`} />
-                    <span className="text-sm font-medium">{item.label}</span>
-                  </div>
-                  <span className={`text-lg font-bold ${item.textColor}`}>{item.count}</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${item.color} rounded-full transition-all duration-500`}
-                    style={{ width: `${(item.count / maxCount) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Tipos de Entidades */}
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold">Tipos de Entidades</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Clientes */}
-            <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <Building2 className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <span className="font-medium">Clientes</span>
-                </div>
-                <span className="text-2xl font-bold text-blue-600">{stats.entidades.clientes}</span>
-              </div>
-              <div className="h-1.5 bg-blue-500/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-blue-500 rounded-full"
-                  style={{ width: `${(stats.entidades.clientes / stats.entidades.total) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Fornecedores */}
-            <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <Briefcase className="h-5 w-5 text-purple-500" />
-                  </div>
-                  <span className="font-medium">Fornecedores</span>
-                </div>
-                <span className="text-2xl font-bold text-purple-600">{stats.entidades.fornecedores}</span>
-              </div>
-              <div className="h-1.5 bg-purple-500/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-purple-500 rounded-full"
-                  style={{ width: `${(stats.entidades.fornecedores / stats.entidades.total) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Ambos */}
-            <div className="p-4 rounded-xl bg-cyan-500/5 border border-cyan-500/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                    <Users className="h-5 w-5 text-cyan-500" />
-                  </div>
-                  <span className="font-medium">Ambos</span>
-                </div>
-                <span className="text-2xl font-bold text-cyan-600">{stats.entidades.ambos}</span>
-              </div>
-              <div className="h-1.5 bg-cyan-500/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-cyan-500 rounded-full"
-                  style={{ width: `${(stats.entidades.ambos / stats.entidades.total) * 100}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-          <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Faturados</p>
-            <p className="text-2xl font-bold text-green-600">{stats.contratos.faturados}</p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Total Contratos</p>
+            <p className="text-2xl font-bold">{stats?.contratos.total ?? 0}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
-          <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Pend. Faturamento</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats.contratos.pendentesFaturamento}</p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Ativos</p>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats?.contratos.ativos ?? 0}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-          <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Encerrados</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.contratos.encerrados}</p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Receita Ativa</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats?.valorTotalAtivos ?? 0)}</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-red-500/10 to-red-500/5 border-red-500/20">
-          <CardContent className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Cancelados</p>
-            <p className="text-2xl font-bold text-red-600">{stats.contratos.cancelados}</p>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Rascunhos</p>
+            <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats?.contratos.rascunhos ?? 0}</p>
           </CardContent>
         </Card>
       </div>
@@ -574,6 +365,10 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.eh_cliente && !formData.eh_fornecedor) {
+      toast({ title: "Selecione pelo menos um tipo: Cliente ou Fornecedor", variant: "destructive" });
+      return;
+    }
     if (entidade) {
       updateMutation.mutate(formData);
     } else {
@@ -636,17 +431,18 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>{formData.tipo_pessoa === 'fisica' ? 'CPF' : 'CNPJ'}</Label>
+              <Label>{formData.tipo_pessoa === 'fisica' ? 'CPF' : 'CNPJ'} <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-cpf-cnpj"
                 value={formData.cpf_cnpj || ''}
                 onChange={(e) => setFormData({ ...formData, cpf_cnpj: e.target.value.replace(/\D/g, '') })}
                 placeholder={formData.tipo_pessoa === 'fisica' ? '000.000.000-00' : '00.000.000/0000-00'}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>{formData.tipo_pessoa === 'fisica' ? 'Nome Completo' : 'Razão Social'}</Label>
+              <Label>{formData.tipo_pessoa === 'fisica' ? 'Nome Completo' : 'Razão Social'} <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-nome-razao"
                 value={formData.nome || ''}
@@ -658,105 +454,115 @@ const EntidadeFormDialog = memo(function EntidadeFormDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>E-mail</Label>
+              <Label>E-mail <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-email"
                 type="email"
                 value={formData.email || ''}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>E-mail de Cobrança</Label>
+              <Label>E-mail de Cobrança <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-email-cobranca"
                 type="email"
                 value={formData.email_cobranca || ''}
                 onChange={(e) => setFormData({ ...formData, email_cobranca: e.target.value })}
+                required
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Telefone</Label>
+              <Label>Telefone <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-telefone"
                 value={formData.telefone || ''}
                 onChange={(e) => setFormData({ ...formData, telefone: e.target.value.replace(/\D/g, '') })}
                 placeholder="(00) 00000-0000"
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Telefone de Cobrança</Label>
+              <Label>Telefone de Cobrança <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-telefone-cobranca"
                 value={formData.telefone_cobranca || ''}
                 onChange={(e) => setFormData({ ...formData, telefone_cobranca: e.target.value.replace(/\D/g, '') })}
                 placeholder="(00) 00000-0000"
+                required
               />
             </div>
           </div>
 
           <div className="grid grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>CEP</Label>
+              <Label>CEP <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-cep"
                 value={formData.cep || ''}
                 onChange={(e) => setFormData({ ...formData, cep: e.target.value.replace(/\D/g, '') })}
                 placeholder="00000-000"
+                required
               />
             </div>
 
             <div className="space-y-2 col-span-2">
-              <Label>Endereço</Label>
+              <Label>Endereço <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-endereco"
                 value={formData.endereco || ''}
                 onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Número</Label>
+              <Label>Número <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-numero"
                 value={formData.numero || ''}
                 onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                required
               />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Bairro</Label>
+              <Label>Bairro <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-bairro"
                 value={formData.bairro || ''}
                 onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Cidade</Label>
+              <Label>Cidade <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-cidade"
                 value={formData.cidade || ''}
                 onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
+                required
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Estado</Label>
+              <Label>Estado <span className="text-destructive">*</span></Label>
               <Input
                 data-testid="input-estado"
                 value={formData.estado || ''}
                 onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
                 maxLength={2}
                 placeholder="UF"
+                required
               />
             </div>
           </div>
@@ -827,63 +633,8 @@ function EntidadesTab() {
     setDialogOpen(true);
   }, []);
 
-  // Stats
-  const entidades = data?.entidades || [];
-  const totalClientes = entidades.filter(e => e.eh_cliente).length;
-  const totalFornecedores = entidades.filter(e => e.eh_fornecedor).length;
-
   return (
     <div className="space-y-6">
-      {/* Header com estatísticas */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <Users className="h-6 w-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{entidades.length}</p>
-              <p className="text-xs text-muted-foreground">Total de Entidades</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{totalClientes}</p>
-              <p className="text-xs text-muted-foreground">Clientes</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-500/5 border-purple-500/20">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-              <Briefcase className="h-6 w-6 text-purple-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-purple-600">{totalFornecedores}</p>
-              <p className="text-xs text-muted-foreground">Fornecedores</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-dashed border-2">
-          <CardContent className="p-0 h-full">
-            <Button 
-              variant="ghost" 
-              className="w-full h-full flex items-center justify-center gap-3 min-h-[80px] rounded-lg"
-              onClick={handleNew}
-              data-testid="button-nova-entidade-card"
-            >
-              <Plus className="h-6 w-6 text-muted-foreground" />
-              <span className="font-medium">Nova Entidade</span>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Barra de pesquisa e filtros */}
       <Card>
         <CardContent className="p-4">
@@ -1061,6 +812,39 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
 
   const [itens, setItens] = useState<ContratoItem[]>(contrato?.itens || []);
 
+  const [dealInfo, setDealInfo] = useState<{ title: string; company_name: string; contact_name: string; stage_name: string } | null>(null);
+  const [dealLoading, setDealLoading] = useState(false);
+  const [dealError, setDealError] = useState('');
+
+  useEffect(() => {
+    if (!formData.id_crm || formData.id_crm.trim().length < 1) {
+      setDealInfo(null);
+      setDealError('');
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setDealLoading(true);
+      setDealError('');
+      try {
+        const res = await fetch(`/api/contratos/bitrix-deal/${formData.id_crm.trim()}`);
+        if (!res.ok) {
+          setDealInfo(null);
+          const errorData = await res.json().catch(() => null);
+          setDealError(errorData?.message || 'Deal não encontrado no CRM');
+          return;
+        }
+        const data = await res.json();
+        setDealInfo(data.deal);
+      } catch (err) {
+        console.error('Erro ao buscar deal:', err);
+        setDealError('Servidor reiniciando — tente novamente em instantes');
+      } finally {
+        setDealLoading(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData.id_crm]);
+
   const { data: proximoNumero } = useQuery<{ proximoNumero: string }>({
     queryKey: ['/api/contratos/proximo-numero'],
     enabled: !contrato,
@@ -1187,6 +971,8 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
       is_personalizado: false,
       data_inicio: null,
       data_fim: null,
+      data_inicio_cobranca: null,
+      data_fim_cobranca: null,
       forma_pagamento: 'Boleto',
       num_parcelas: null,
       valor_parcela: null,
@@ -1392,6 +1178,16 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                 value={formData.id_crm}
                 onChange={(e) => setFormData({ ...formData, id_crm: e.target.value })}
               />
+              {dealLoading && <p className="text-xs text-muted-foreground animate-pulse">Buscando no CRM...</p>}
+              {dealError && <p className="text-xs text-destructive">{dealError}</p>}
+              {dealInfo && (
+                <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5 dark:bg-green-500/10 space-y-1">
+                  <p className="text-sm font-medium text-foreground">{dealInfo.title}</p>
+                  {dealInfo.company_name && <p className="text-xs text-muted-foreground">Empresa: {dealInfo.company_name}</p>}
+                  {dealInfo.contact_name && <p className="text-xs text-muted-foreground">Contato: {dealInfo.contact_name}</p>}
+                  {dealInfo.stage_name && <p className="text-xs text-muted-foreground">Stage: {dealInfo.stage_name}</p>}
+                </div>
+              )}
             </div>
 
           </div>
@@ -1522,26 +1318,48 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Data Início</Label>
-                        <Input
-                          type="date"
-                          value={item.data_inicio || ''}
-                          onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)}
-                        />
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Prestação de Serviço</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Início</Label>
+                          <Input
+                            type="date"
+                            value={item.data_inicio || ''}
+                            onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Fim</Label>
+                          <Input
+                            type="date"
+                            value={item.data_fim || ''}
+                            onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)}
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Data Fim</Label>
-                        <Input
-                          type="date"
-                          value={item.data_fim || ''}
-                          onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)}
-                        />
+                      <p className="text-xs font-medium text-muted-foreground">Cobrança</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Início</Label>
+                          <Input
+                            type="date"
+                            value={item.data_inicio_cobranca || ''}
+                            onChange={(e) => updateItem(index, 'data_inicio_cobranca', e.target.value || null)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Fim</Label>
+                          <Input
+                            type="date"
+                            value={item.data_fim_cobranca || ''}
+                            onChange={(e) => updateItem(index, 'data_fim_cobranca', e.target.value || null)}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className={`grid ${item.modalidade === 'recorrente' ? 'grid-cols-1' : 'grid-cols-3'} gap-3`}>
                       <div className="space-y-1">
                         <Label className="text-xs">Forma de Pagamento</Label>
                         <select
@@ -1555,32 +1373,36 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
                           <option value="Transferência">Transferência</option>
                         </select>
                       </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Nº Parcelas</Label>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={item.num_parcelas || ''}
-                          onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)}
-                          placeholder="Ex: 12"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Valor Parcela</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min={0}
-                          value={item.valor_parcela || ''}
-                          onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)}
-                          placeholder="R$ 0,00"
-                        />
-                      </div>
+                      {item.modalidade !== 'recorrente' && (
+                        <>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Nº Parcelas</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={item.num_parcelas || ''}
+                              onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)}
+                              placeholder="Ex: 12"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Valor Parcela</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              value={item.valor_parcela || ''}
+                              onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)}
+                              placeholder="R$ 0,00"
+                            />
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     <div className="flex justify-end gap-4 text-sm">
                       <span className="text-muted-foreground">
-                        Economia: <span className="text-green-500 font-medium">{formatCurrency(((item.valor_tabela || 0) - (item.valor_negociado || 0)) * item.quantidade)}</span>
+                        Economia: <span className="text-green-500 dark:text-green-400 font-medium">{formatCurrency(((item.valor_tabela || 0) - (item.valor_negociado || 0)) * item.quantidade)}</span>
                       </span>
                       <span className="font-medium">
                         Subtotal: {formatCurrency((item.valor_negociado || 0) * item.quantidade)}
@@ -1642,7 +1464,7 @@ const ContratoFormDialog = memo(function ContratoFormDialog({
   );
 });
 
-function ContratosTab() {
+function ContratosTab({ onDuplicate }: { onDuplicate?: (data: NovoContratoInitialData) => void }) {
   const [searchInput, setSearchInput] = useState("");
   const deferredSearch = useDeferredValue(searchInput);
   const [statusFilter, setStatusFilter] = useState("todos");
@@ -1747,62 +1569,32 @@ function ContratosTab() {
     setDialogOpen(true);
   }, []);
 
-  // Stats
-  const contratos = data?.contratos || [];
-  const totalAtivos = contratos.filter(c => c.status === 'ativo').length;
-  const totalRascunhos = contratos.filter(c => c.status === 'rascunho').length;
-  const totalValor = contratos.filter(c => c.status === 'ativo').reduce((sum, c) => sum + (Number(c.valor_negociado) || 0), 0);
+  const handleDuplicate = async (contrato: ContratoDoc) => {
+    try {
+      const res = await fetch(`/api/contratos/contratos/${contrato.id}`);
+      if (!res.ok) throw new Error('Erro ao buscar contrato');
+      const data = await res.json();
+      const full = data.contrato as ContratoDoc;
+      const fullItens = (data.itens || full.itens || []) as ContratoItem[];
+
+      onDuplicate?.({
+        formData: {
+          cliente_id: full.cliente_id,
+          comercial_nome: full.comercial_nome || '',
+          comercial_email: full.comercial_email || '',
+          id_crm: full.id_crm || '',
+          observacoes: full.observacoes || '',
+        },
+        itens: fullItens,
+        source: 'duplicate',
+      });
+    } catch {
+      toast({ title: "Erro ao duplicar contrato", variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* Cards estatísticos */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-green-500/20 flex items-center justify-center">
-              <FileCheck className="h-6 w-6 text-green-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-green-600">{totalAtivos}</p>
-              <p className="text-xs text-muted-foreground">Contratos Ativos</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border-yellow-500/20">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-yellow-500/20 flex items-center justify-center">
-              <FileText className="h-6 w-6 text-yellow-500" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-yellow-600">{totalRascunhos}</p>
-              <p className="text-xs text-muted-foreground">Rascunhos</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <DollarSign className="h-6 w-6 text-blue-500" />
-            </div>
-            <div>
-              <p className="text-lg font-bold text-blue-600">{formatCurrency(totalValor)}</p>
-              <p className="text-xs text-muted-foreground">Receita Ativa (mensal)</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
-              <Briefcase className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{contratos.length}</p>
-              <p className="text-xs text-muted-foreground">Total de Contratos</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Barra de pesquisa e filtros */}
       <Card>
         <CardContent className="p-4">
@@ -1903,7 +1695,7 @@ function ContratosTab() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className="font-semibold text-green-600">
+                      <span className="font-semibold text-green-600 dark:text-green-400">
                         {formatCurrency(Number(contrato.valor_negociado) || 0)}
                       </span>
                     </TableCell>
@@ -1957,6 +1749,17 @@ function ContratosTab() {
                         <Button
                           size="icon"
                           variant="ghost"
+                          title="Duplicar contrato"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDuplicate(contrato);
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
                           onClick={() => deleteMutation.mutate(contrato.id)}
                           data-testid={`button-delete-contrato-${contrato.id}`}
                           title="Excluir"
@@ -1985,121 +1788,96 @@ function ContratosTab() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
           {contratoDetail && (
             <>
-              {/* Header com gradiente */}
-              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-6 border-b">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-xl bg-primary/20 flex items-center justify-center">
-                      <FileCheck className="h-7 w-7 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Contrato</p>
-                      <h2 className="text-2xl font-bold font-mono">{contratoDetail.numero_contrato}</h2>
-                      {contratoDetail.id_crm && (
-                        <p className="text-sm text-muted-foreground">CRM: {contratoDetail.id_crm}</p>
-                      )}
-                    </div>
+              {/* Header */}
+              <DialogHeader className="p-6 pb-4 border-b">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <DialogTitle className="text-xl">Contrato {contratoDetail.numero_contrato}</DialogTitle>
+                    {contratoDetail.id_crm && <p className="text-sm text-muted-foreground">CRM: {contratoDetail.id_crm}</p>}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <Badge
+                    variant="outline"
+                    className={`${statusColors[contratoDetail.status] || 'bg-gray-500/10'} text-base px-4 py-1`}
+                  >
+                    {statusLabels[contratoDetail.status] || contratoDetail.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-2 pt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      window.open(`/api/contratos/${contratoDetail.id}/gerar-pdf`, '_blank');
+                    }}
+                    data-testid="button-gerar-pdf"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Gerar PDF
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => enviarAssinaturaMutation.mutate(contratoDetail.id)}
+                    disabled={enviarAssinaturaMutation.isPending || contratoDetail.status === 'enviado para assinatura' || contratoDetail.status === 'assinado'}
+                    data-testid="button-enviar-assinatura"
+                  >
+                    {enviarAssinaturaMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
+                    Enviar para Assinatura
+                  </Button>
+                  {(contratoDetail.status === 'enviado para assinatura' || contratoDetail.assinafy_document_id) && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        window.open(`/api/contratos/${contratoDetail.id}/gerar-pdf`, '_blank');
-                      }}
-                      data-testid="button-gerar-pdf"
+                      onClick={() => verificarStatusMutation.mutate(contratoDetail.id)}
+                      disabled={verificarStatusMutation.isPending}
+                      data-testid="button-verificar-status"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Gerar PDF
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => enviarAssinaturaMutation.mutate(contratoDetail.id)}
-                      disabled={enviarAssinaturaMutation.isPending || contratoDetail.status === 'enviado para assinatura' || contratoDetail.status === 'assinado'}
-                      data-testid="button-enviar-assinatura"
-                    >
-                      {enviarAssinaturaMutation.isPending ? (
+                      {verificarStatusMutation.isPending ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (
-                        <Send className="h-4 w-4 mr-2" />
+                        <RefreshCw className="h-4 w-4 mr-2" />
                       )}
-                      Enviar para Assinatura
+                      Verificar Status
                     </Button>
-                    {(contratoDetail.status === 'enviado para assinatura' || contratoDetail.assinafy_document_id) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => verificarStatusMutation.mutate(contratoDetail.id)}
-                        disabled={verificarStatusMutation.isPending}
-                        data-testid="button-verificar-status"
-                      >
-                        {verificarStatusMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4 mr-2" />
-                        )}
-                        Verificar Status
-                      </Button>
-                    )}
-                    <Badge 
-                      variant="outline" 
-                      className={`${statusColors[contratoDetail.status] || 'bg-gray-500/10'} text-base px-4 py-1`}
-                    >
-                      {statusLabels[contratoDetail.status] || contratoDetail.status}
-                    </Badge>
-                  </div>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => {
+                    handleDuplicate(selectedContrato!);
+                    setViewDialogOpen(false);
+                  }}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicar
+                  </Button>
                 </div>
-              </div>
+              </DialogHeader>
 
               <div className="p-6 space-y-6">
-                {/* Cards de Valores */}
-                <div className="grid grid-cols-3 gap-4">
-                  <Card className="p-4 bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Valor Original</p>
-                        <p className="text-lg font-bold">{formatCurrency(Number(contratoDetail.valor_original) || 0)}</p>
-                      </div>
+                {/* Valores inline */}
+                <div className="flex items-center gap-6 py-3 px-4 bg-muted/30 rounded-lg">
+                  <div>
+                    <span className="text-sm text-muted-foreground">Original</span>
+                    <p className="font-semibold">{formatCurrency(Number(contratoDetail.valor_original) || 0)}</p>
+                  </div>
+                  <div>
+                    <span className="text-sm text-muted-foreground">Negociado</span>
+                    <p className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(Number(contratoDetail.valor_negociado) || 0)}</p>
+                  </div>
+                  {(Number(contratoDetail.economia) || 0) > 0 && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">Economia</span>
+                      <p className="font-semibold text-orange-600 dark:text-orange-400">{formatCurrency(Number(contratoDetail.economia) || 0)}</p>
                     </div>
-                  </Card>
-                  <Card className="p-4 bg-green-500/5 border-green-500/20">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-green-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Valor Negociado</p>
-                        <p className="text-lg font-bold text-green-600">{formatCurrency(Number(contratoDetail.valor_negociado) || 0)}</p>
-                      </div>
-                    </div>
-                  </Card>
-                  <Card className="p-4 bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                        <DollarSign className="h-5 w-5 text-orange-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Economia</p>
-                        <p className="text-lg font-bold text-orange-600">
-                          {formatCurrency(Number(contratoDetail.economia) || 0)}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
+                  )}
                 </div>
 
                 {/* Informações principais em duas colunas */}
                 <div className="grid grid-cols-2 gap-6">
                   {/* Cliente */}
                   <Card className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-semibold">Cliente</Label>
-                    </div>
+                    <Label className="text-sm font-semibold mb-3 block">Cliente</Label>
                     <div className="space-y-2">
                       <p className="font-medium text-lg">{contratoDetail.cliente_nome || '-'}</p>
                       {contratoDetail.cliente_cpf_cnpj && (
@@ -2112,10 +1890,7 @@ function ContratosTab() {
 
                   {/* Comercial */}
                   <Card className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-semibold">Comercial Responsável</Label>
-                    </div>
+                    <Label className="text-sm font-semibold mb-3 block">Comercial Responsável</Label>
                     <div className="space-y-2">
                       <p className="font-medium text-lg">{contratoDetail.comercial_nome || '-'}</p>
                       {contratoDetail.comercial_email && (
@@ -2162,10 +1937,7 @@ function ContratosTab() {
                 {/* Itens do Contrato */}
                 {contratoDetail.itens && contratoDetail.itens.length > 0 && (
                   <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Briefcase className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-semibold">Itens do Contrato ({contratoDetail.itens.length})</Label>
-                    </div>
+                    <Label className="text-sm font-semibold mb-3 block">Itens do Contrato ({contratoDetail.itens.length})</Label>
                     <Card className="overflow-hidden">
                       <Table>
                         <TableHeader>
@@ -2175,8 +1947,10 @@ function ContratosTab() {
                             <TableHead className="font-semibold text-right">Valor Tabela</TableHead>
                             <TableHead className="font-semibold text-right">Valor Negociado</TableHead>
                             <TableHead className="font-semibold text-right">Desconto</TableHead>
-                            <TableHead className="font-semibold text-center">Início</TableHead>
-                            <TableHead className="font-semibold text-center">Fim</TableHead>
+                            <TableHead className="font-semibold text-center">Início Serviço</TableHead>
+                            <TableHead className="font-semibold text-center">Fim Serviço</TableHead>
+                            <TableHead className="font-semibold text-center">Início Cobrança</TableHead>
+                            <TableHead className="font-semibold text-center">Fim Cobrança</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -2205,6 +1979,12 @@ function ContratosTab() {
                               <TableCell className="text-center text-sm">
                                 {item.data_fim ? new Date(item.data_fim).toLocaleDateString('pt-BR') : '-'}
                               </TableCell>
+                              <TableCell className="text-center text-sm">
+                                {item.data_inicio_cobranca ? new Date(item.data_inicio_cobranca).toLocaleDateString('pt-BR') : '-'}
+                              </TableCell>
+                              <TableCell className="text-center text-sm">
+                                {item.data_fim_cobranca ? new Date(item.data_fim_cobranca).toLocaleDateString('pt-BR') : '-'}
+                              </TableCell>
                             </TableRow>
                           ))}
                           <TableRow className="bg-muted/50 border-t-2">
@@ -2212,7 +1992,7 @@ function ContratosTab() {
                             <TableCell className="text-right font-bold text-lg">
                               {formatCurrency(contratoDetail.itens.reduce((acc, i) => acc + (i.valor_negociado * i.quantidade), 0))}
                             </TableCell>
-                            <TableCell colSpan={3}></TableCell>
+                            <TableCell colSpan={5}></TableCell>
                           </TableRow>
                         </TableBody>
                       </Table>
@@ -2223,10 +2003,7 @@ function ContratosTab() {
                 {/* Observações */}
                 {contratoDetail.observacoes && (
                   <Card className="p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <FileText className="h-4 w-4 text-muted-foreground" />
-                      <Label className="text-sm font-semibold">Observações</Label>
-                    </div>
+                    <Label className="text-sm font-semibold mb-3 block">Observações</Label>
                     <p className="text-sm whitespace-pre-wrap text-muted-foreground leading-relaxed">
                       {contratoDetail.observacoes}
                     </p>
@@ -2246,21 +2023,111 @@ function ContratosTab() {
   );
 }
 
-function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
-  const { toast } = useToast();
-  const [formData, setFormData] = useState({
-    numero_contrato: '',
-    cliente_id: null as number | null,
-    comercial_nome: '',
-    comercial_email: '',
-    id_crm: '',
-    status: 'rascunho',
-    observacoes: '',
-  });
+interface NovoContratoInitialData {
+  formData?: {
+    cliente_id?: number | null;
+    comercial_nome?: string;
+    comercial_email?: string;
+    id_crm?: string;
+    observacoes?: string;
+  };
+  itens?: ContratoItem[];
+  source?: 'template' | 'duplicate';
+}
 
-  const [itens, setItens] = useState<ContratoItem[]>([]);
+const defaultFormData = {
+  numero_contrato: '',
+  cliente_id: null as number | null,
+  comercial_nome: '',
+  comercial_email: '',
+  id_crm: '',
+  status: 'rascunho',
+  observacoes: '',
+};
+
+function NovoContratoTab({ onSuccess, initialData, onConsumeInitialData }: {
+  onSuccess: () => void;
+  initialData?: NovoContratoInitialData;
+  onConsumeInitialData?: () => void;
+}) {
+  const { toast } = useToast();
+  const [formData, setFormData] = useState(() => ({
+    ...defaultFormData,
+    ...(initialData?.formData ? {
+      cliente_id: initialData.formData.cliente_id ?? null,
+      comercial_nome: initialData.formData.comercial_nome ?? '',
+      comercial_email: initialData.formData.comercial_email ?? '',
+      id_crm: initialData.formData.id_crm ?? '',
+      observacoes: initialData.formData.observacoes ?? '',
+    } : {}),
+  }));
+
+  const [itens, setItens] = useState<ContratoItem[]>(() => {
+    if (!initialData?.itens) return [];
+    return initialData.itens.map(item => ({
+      ...item,
+      id: undefined,
+      contrato_id: undefined,
+      ...(initialData.source === 'duplicate' ? { data_inicio: null, data_fim: null, data_inicio_cobranca: null, data_fim_cobranca: null } : {}),
+    }));
+  });
   const [showAddItem, setShowAddItem] = useState(false);
   const [selectedServicoId, setSelectedServicoId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (initialData) {
+      setFormData({
+        ...defaultFormData,
+        ...(initialData.formData ? {
+          cliente_id: initialData.formData.cliente_id ?? null,
+          comercial_nome: initialData.formData.comercial_nome ?? '',
+          comercial_email: initialData.formData.comercial_email ?? '',
+          id_crm: initialData.formData.id_crm ?? '',
+          observacoes: initialData.formData.observacoes ?? '',
+        } : {}),
+      });
+      setItens((initialData.itens || []).map(item => ({
+        ...item,
+        id: undefined,
+        contrato_id: undefined,
+        ...(initialData.source === 'duplicate' ? { data_inicio: null, data_fim: null, data_inicio_cobranca: null, data_fim_cobranca: null } : {}),
+      })));
+      onConsumeInitialData?.();
+    }
+  }, [initialData]);
+
+  const [dealInfo, setDealInfo] = useState<{ title: string; company_name: string; contact_name: string; stage_name: string } | null>(null);
+  const [dealLoading, setDealLoading] = useState(false);
+  const [dealError, setDealError] = useState('');
+
+  useEffect(() => {
+    if (!formData.id_crm || formData.id_crm.trim().length < 1) {
+      setDealInfo(null);
+      setDealError('');
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setDealLoading(true);
+      setDealError('');
+      try {
+        const res = await fetch(`/api/contratos/bitrix-deal/${formData.id_crm.trim()}`);
+        if (!res.ok) {
+          setDealInfo(null);
+          const errorData = await res.json().catch(() => null);
+          setDealError(errorData?.message || 'Deal não encontrado no CRM');
+          return;
+        }
+        const data = await res.json();
+        setDealInfo(data.deal);
+      } catch (err) {
+        console.error('Erro ao buscar deal:', err);
+        setDealError('Servidor reiniciando — tente novamente em instantes');
+      } finally {
+        setDealLoading(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData.id_crm]);
 
   const { data: proximoNumero } = useQuery<{ proximoNumero: string }>({
     queryKey: ['/api/contratos/proximo-numero'],
@@ -2299,6 +2166,12 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
     },
     enabled: !!selectedServicoId,
   });
+
+  const { data: templatesData } = useQuery<{ templates: Array<{ id: number; nome: string; descricao: string | null; itens_template: ContratoItem[] }> }>({
+    queryKey: ['/api/contratos/templates'],
+  });
+
+  const [templateSelected, setTemplateSelected] = useState(!!initialData);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -2356,6 +2229,8 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
       is_personalizado: false,
       data_inicio: null,
       data_fim: null,
+      data_inicio_cobranca: null,
+      data_fim_cobranca: null,
       forma_pagamento: 'Boleto',
       num_parcelas: null,
       valor_parcela: null,
@@ -2431,6 +2306,27 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
 
   const [reviewOpen, setReviewOpen] = useState(false);
 
+  const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDesc, setTemplateDesc] = useState('');
+
+  const saveTemplateMutation = useMutation({
+    mutationFn: async (data: { nome: string; descricao: string | null; itens_template: any[] }) => {
+      const res = await apiRequest('POST', '/api/contratos/templates', data);
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/templates'] });
+      toast({ title: "Template salvo com sucesso!" });
+      setSaveAsTemplateOpen(false);
+      setTemplateName('');
+      setTemplateDesc('');
+    },
+    onError: () => {
+      toast({ title: "Erro ao salvar template", variant: "destructive" });
+    },
+  });
+
   const clienteSelecionado = entidadesData?.entidades.find(e => e.id === formData.cliente_id);
 
   const formatDate = (d: string) => {
@@ -2441,6 +2337,52 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="space-y-6">
+      {!templateSelected ? (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-lg font-semibold">Como deseja começar?</h2>
+            <p className="text-sm text-muted-foreground">Escolha um template ou comece do zero</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {/* Card "Em branco" - always first */}
+            <Card
+              className="cursor-pointer hover:border-primary transition-colors"
+              onClick={() => setTemplateSelected(true)}
+            >
+              <CardContent className="pt-6 text-center">
+                <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="font-medium">Em branco</p>
+                <p className="text-xs text-muted-foreground mt-1">Começar do zero</p>
+              </CardContent>
+            </Card>
+
+            {/* Template cards */}
+            {templatesData?.templates?.map(template => (
+              <Card
+                key={template.id}
+                className="cursor-pointer hover:border-primary transition-colors"
+                onClick={() => {
+                  setItens(template.itens_template.map(item => ({
+                    ...item,
+                    id: undefined,
+                    contrato_id: undefined,
+                  })));
+                  setTemplateSelected(true);
+                }}
+              >
+                <CardContent className="pt-6 text-center">
+                  <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="font-medium">{template.nome}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {template.descricao || `${template.itens_template?.length || 0} serviço(s)`}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Dialog de Revisão */}
       <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -2511,10 +2453,14 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                           )}
                         </div>
                       </div>
-                      {(item.data_inicio || item.data_fim) && (
-                        <div className="flex gap-4 text-xs text-muted-foreground pl-10">
-                          {item.data_inicio && <span>Início: {formatDate(item.data_inicio)}</span>}
-                          {item.data_fim && <span>Fim: {formatDate(item.data_fim)}</span>}
+                      {(item.data_inicio || item.data_fim || item.data_inicio_cobranca || item.data_fim_cobranca) && (
+                        <div className="flex gap-6 text-xs text-muted-foreground pl-10">
+                          {(item.data_inicio || item.data_fim) && (
+                            <span>Serviço: {item.data_inicio ? formatDate(item.data_inicio) : '?'} → {item.data_fim ? formatDate(item.data_fim) : '?'}</span>
+                          )}
+                          {(item.data_inicio_cobranca || item.data_fim_cobranca) && (
+                            <span>Cobrança: {item.data_inicio_cobranca ? formatDate(item.data_inicio_cobranca) : '?'} → {item.data_fim_cobranca ? formatDate(item.data_fim_cobranca) : '?'}</span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2529,15 +2475,15 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
               <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Recorrente (mensal)</span>
-                  <span className="font-medium text-green-600">{formatCurrency(totalRecorrente)}</span>
+                  <span className="font-medium text-green-600 dark:text-green-400">{formatCurrency(totalRecorrente)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Pontual (único)</span>
-                  <span className="font-medium text-purple-600">{formatCurrency(totalPontual)}</span>
+                  <span className="font-medium text-purple-600 dark:text-purple-400">{formatCurrency(totalPontual)}</span>
                 </div>
                 <div className="flex justify-between pt-2 border-t font-semibold">
                   <span>Total Geral</span>
-                  <span className="text-orange-600">{formatCurrency(totalRecorrente + totalPontual)}</span>
+                  <span className="text-orange-600 dark:text-orange-400">{formatCurrency(totalRecorrente + totalPontual)}</span>
                 </div>
               </div>
             </div>
@@ -2601,8 +2547,52 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
         </DialogContent>
       </Dialog>
 
+      {/* Dialog Salvar como Template */}
+      <Dialog open={saveAsTemplateOpen} onOpenChange={setSaveAsTemplateOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Salvar como Template</DialogTitle>
+            <DialogDescription>Os serviços atuais serão salvos como template reutilizável.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome do Template</Label>
+              <Input
+                value={templateName}
+                onChange={e => setTemplateName(e.target.value)}
+                placeholder="Ex: Social Media Básico"
+              />
+            </div>
+            <div>
+              <Label>Descrição (opcional)</Label>
+              <Input
+                value={templateDesc}
+                onChange={e => setTemplateDesc(e.target.value)}
+                placeholder="Breve descrição"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveAsTemplateOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={() => {
+                saveTemplateMutation.mutate({
+                  nome: templateName,
+                  descricao: templateDesc || null,
+                  itens_template: itens.map(({ id, contrato_id, ...rest }) => rest),
+                });
+              }}
+              disabled={!templateName.trim() || saveTemplateMutation.isPending}
+            >
+              {saveTemplateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Header */}
-      <Card className="border-orange-500/20 bg-gradient-to-r from-orange-500/5 to-transparent">
+      <Card className="border-orange-500/20">
         <CardContent className="p-6">
           <div className="flex items-center gap-4">
             <div className="h-14 w-14 rounded-2xl bg-orange-500/10 flex items-center justify-center">
@@ -2648,6 +2638,16 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                     onChange={(e) => setFormData({ ...formData, id_crm: e.target.value })}
                     placeholder="ID do deal no CRM"
                   />
+                  {dealLoading && <p className="text-xs text-muted-foreground animate-pulse">Buscando no CRM...</p>}
+                  {dealError && <p className="text-xs text-destructive">{dealError}</p>}
+                  {dealInfo && (
+                    <div className="p-3 rounded-lg border border-green-500/20 bg-green-500/5 dark:bg-green-500/10 space-y-1">
+                      <p className="text-sm font-medium text-foreground">{dealInfo.title}</p>
+                      {dealInfo.company_name && <p className="text-xs text-muted-foreground">Empresa: {dealInfo.company_name}</p>}
+                      {dealInfo.contact_name && <p className="text-xs text-muted-foreground">Contato: {dealInfo.contact_name}</p>}
+                      {dealInfo.stage_name && <p className="text-xs text-muted-foreground">Stage: {dealInfo.stage_name}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2837,7 +2837,7 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                           />
                         </div>
                       )}
-                      <div className="grid grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label className="text-xs">Valor Tabela</Label>
                           <Input type="number" value={item.valor_tabela || ''} onChange={(e) => updateItem(index, 'valor_tabela', parseFloat(e.target.value) || 0)} disabled={!item.is_personalizado} />
@@ -2846,16 +2846,32 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                           <Label className="text-xs">Valor Negociado</Label>
                           <Input type="number" value={item.valor_negociado || ''} onChange={(e) => updateItem(index, 'valor_negociado', parseFloat(e.target.value) || 0)} className="border-green-500/50 focus:border-green-500" />
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Data Início</Label>
-                          <Input type="date" value={item.data_inicio || ''} onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)} />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Prestação de Serviço</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Início</Label>
+                            <Input type="date" value={item.data_inicio || ''} onChange={(e) => updateItem(index, 'data_inicio', e.target.value || null)} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Fim</Label>
+                            <Input type="date" value={item.data_fim || ''} onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)} />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Data Fim</Label>
-                          <Input type="date" value={item.data_fim || ''} onChange={(e) => updateItem(index, 'data_fim', e.target.value || null)} />
+                        <p className="text-xs font-medium text-muted-foreground">Cobrança</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-xs">Início</Label>
+                            <Input type="date" value={item.data_inicio_cobranca || ''} onChange={(e) => updateItem(index, 'data_inicio_cobranca', e.target.value || null)} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">Fim</Label>
+                            <Input type="date" value={item.data_fim_cobranca || ''} onChange={(e) => updateItem(index, 'data_fim_cobranca', e.target.value || null)} />
+                          </div>
                         </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className={`grid ${item.modalidade === 'recorrente' ? 'grid-cols-1' : 'grid-cols-3'} gap-4`}>
                         <div className="space-y-2">
                           <Label className="text-xs">Forma de Pagamento</Label>
                           <select
@@ -2869,14 +2885,18 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                             <option value="Transferência">Transferência</option>
                           </select>
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Nº Parcelas</Label>
-                          <Input type="number" min={1} value={item.num_parcelas || ''} onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)} placeholder="Ex: 12" />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Valor Parcela</Label>
-                          <Input type="number" step="0.01" min={0} value={item.valor_parcela || ''} onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)} placeholder="R$ 0,00" />
-                        </div>
+                        {item.modalidade !== 'recorrente' && (
+                          <>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Nº Parcelas</Label>
+                              <Input type="number" min={1} value={item.num_parcelas || ''} onChange={(e) => updateItem(index, 'num_parcelas', e.target.value ? Number(e.target.value) : null)} placeholder="Ex: 12" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs">Valor Parcela</Label>
+                              <Input type="number" step="0.01" min={0} value={item.valor_parcela || ''} onChange={(e) => updateItem(index, 'valor_parcela', e.target.value ? Number(e.target.value) : null)} placeholder="R$ 0,00" />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </Card>
@@ -2925,15 +2945,15 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
             <CardContent className="space-y-4">
               <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/10">
                 <p className="text-xs text-muted-foreground mb-1">Recorrente (mensal)</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(totalRecorrente)}</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totalRecorrente)}</p>
               </div>
               <div className="p-4 rounded-xl bg-purple-500/5 border border-purple-500/10">
                 <p className="text-xs text-muted-foreground mb-1">Pontual (único)</p>
-                <p className="text-2xl font-bold text-purple-600">{formatCurrency(totalPontual)}</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{formatCurrency(totalPontual)}</p>
               </div>
               <div className="p-4 rounded-xl bg-orange-500/10 border border-orange-500/20">
                 <p className="text-xs text-muted-foreground mb-1">Total Geral</p>
-                <p className="text-3xl font-bold text-orange-600">{formatCurrency(totalRecorrente + totalPontual)}</p>
+                <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{formatCurrency(totalRecorrente + totalPontual)}</p>
               </div>
 
               <div className="pt-4 space-y-2">
@@ -2942,11 +2962,22 @@ function NovoContratoTab({ onSuccess }: { onSuccess: () => void }) {
                   <Eye className="h-4 w-4 mr-2" />
                   Revisar Contrato
                 </Button>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  onClick={() => setSaveAsTemplateOpen(true)}
+                  disabled={itens.length === 0}
+                >
+                  <Bookmark className="mr-2 h-4 w-4" />
+                  Salvar como Template
+                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -3035,6 +3066,48 @@ function ServicosTab() {
 
   const servicos: Servico[] = servicosData?.servicos || [];
   const planos: PlanoServico[] = planosData?.planos || [];
+
+  // Templates
+  const { data: templatesResp } = useQuery<{ templates: any[] }>({
+    queryKey: ['/api/contratos/templates'],
+  });
+  const templates = templatesResp?.templates || [];
+
+  const [templateDialog, setTemplateDialog] = useState<{ open: boolean; mode: 'create' | 'edit'; data?: any }>({ open: false, mode: 'create' });
+  const [templateFormData, setTemplateFormData] = useState({ nome: '', descricao: '' });
+  const [templateItens, setTemplateItens] = useState<ContratoItem[]>([]);
+
+  const createTemplateMutation = useMutation({
+    mutationFn: (data: any) =>
+      apiRequest('POST', '/api/contratos/templates', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/templates'] });
+      toast({ title: "Template criado!" });
+      setTemplateDialog({ open: false, mode: 'create' });
+    },
+    onError: () => toast({ title: "Erro ao criar template", variant: "destructive" }),
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({ id, ...data }: any) =>
+      apiRequest('PUT', `/api/contratos/templates/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/templates'] });
+      toast({ title: "Template atualizado!" });
+      setTemplateDialog({ open: false, mode: 'create' });
+    },
+    onError: () => toast({ title: "Erro ao atualizar template", variant: "destructive" }),
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest('DELETE', `/api/contratos/templates/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contratos/templates'] });
+      toast({ title: "Template removido" });
+    },
+    onError: () => toast({ title: "Erro ao remover template", variant: "destructive" }),
+  });
 
   const openCreateServico = () => {
     setServicoForm({ nome: '', descricao: '' });
@@ -3219,6 +3292,120 @@ function ServicosTab() {
         </div>
       )}
 
+      {/* Seção de Templates */}
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold">Templates de Contrato</h3>
+          <Button size="sm" onClick={() => {
+            setTemplateFormData({ nome: '', descricao: '' });
+            setTemplateItens([]);
+            setTemplateDialog({ open: true, mode: 'create' });
+          }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Template
+          </Button>
+        </div>
+
+        {templates.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground">
+              <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>Nenhum template criado</p>
+              <p className="text-sm">Templates ajudam o comercial a criar contratos mais rápido</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Itens</TableHead>
+                  <TableHead className="w-24">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {templates.map((t: any) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium">{t.nome}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.descricao || '-'}</TableCell>
+                    <TableCell>{t.itens_template?.length || 0} serviço(s)</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" onClick={() => {
+                          setTemplateFormData({ nome: t.nome, descricao: t.descricao || '' });
+                          setTemplateItens(t.itens_template || []);
+                          setTemplateDialog({ open: true, mode: 'edit', data: t });
+                        }}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => deleteTemplateMutation.mutate(t.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
+
+      {/* Template Dialog */}
+      <Dialog open={templateDialog.open} onOpenChange={(open) => { if (!open) setTemplateDialog({ open: false, mode: 'create' }); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{templateDialog.mode === 'edit' ? 'Editar Template' : 'Novo Template'}</DialogTitle>
+            <DialogDescription>
+              {templateDialog.mode === 'edit' ? 'Atualize os dados do template' : 'Crie um template reutilizável para novos contratos'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome do Template</Label>
+              <Input
+                value={templateFormData.nome}
+                onChange={e => setTemplateFormData(prev => ({ ...prev, nome: e.target.value }))}
+                placeholder="Ex: Social Media Básico"
+              />
+            </div>
+            <div>
+              <Label>Descrição (opcional)</Label>
+              <Textarea
+                value={templateFormData.descricao}
+                onChange={e => setTemplateFormData(prev => ({ ...prev, descricao: e.target.value }))}
+                placeholder="Breve descrição do que este template inclui"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateDialog({ open: false, mode: 'create' })}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const payload = {
+                  nome: templateFormData.nome,
+                  descricao: templateFormData.descricao || null,
+                  itens_template: templateItens,
+                };
+                if (templateDialog.mode === 'edit' && templateDialog.data) {
+                  updateTemplateMutation.mutate({ id: templateDialog.data.id, ...payload });
+                } else {
+                  createTemplateMutation.mutate(payload);
+                }
+              }}
+              disabled={!templateFormData.nome.trim()}
+            >
+              {templateDialog.mode === 'edit' ? 'Atualizar' : 'Criar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog Serviço */}
       <Dialog open={servicoDialog.open} onOpenChange={(open) => !open && setServicoDialog({ open: false, mode: 'create' })}>
         <DialogContent>
@@ -3336,61 +3523,52 @@ export default function ContratosModule() {
   useSetPageInfo("Contratos", "Gestão de entidades e contratos");
 
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [novoContratoInitialData, setNovoContratoInitialData] = useState<NovoContratoInitialData>();
 
   return (
     <div className="p-6 space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <Card className="mb-6 bg-gradient-to-r from-background via-muted/30 to-background border-muted/50">
+        <Card className="mb-6 bg-muted/30 border-muted/50">
           <CardContent className="p-2">
-            <TabsList className="w-full grid grid-cols-5 gap-2 bg-transparent h-auto p-0" data-testid="tabs-contratos">
-              <TabsTrigger 
-                value="dashboard" 
+            <TabsList className="grid w-full grid-cols-5 bg-transparent p-0 h-auto border-b" data-testid="tabs-contratos">
+              <TabsTrigger
+                value="dashboard"
                 data-testid="tab-dashboard"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <FileText className="h-5 w-5" />
-                </div>
+                <FileText className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="entidades" 
+              <TabsTrigger
+                value="entidades"
                 data-testid="tab-entidades"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <Users className="h-5 w-5" />
-                </div>
+                <Users className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Entidades</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="contratos" 
+              <TabsTrigger
+                value="contratos"
                 data-testid="tab-contratos"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <Briefcase className="h-5 w-5" />
-                </div>
+                <Briefcase className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Contratos</span>
               </TabsTrigger>
-              <TabsTrigger 
-                value="novo" 
+              <TabsTrigger
+                value="novo"
                 data-testid="tab-novo-contrato"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-orange-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <Plus className="h-5 w-5" />
-                </div>
+                <Plus className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Novo Contrato</span>
               </TabsTrigger>
               <TabsTrigger
                 value="servicos"
                 data-testid="tab-servicos"
-                className="flex flex-col items-center gap-2 py-4 px-6 rounded-xl data-[state=active]:bg-violet-500 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all duration-200"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3 text-muted-foreground data-[state=active]:text-foreground"
               >
-                <div className="h-10 w-10 rounded-xl bg-current/10 flex items-center justify-center">
-                  <Settings className="h-5 w-5" />
-                </div>
+                <Settings className="h-4 w-4 mr-2" />
                 <span className="font-medium text-sm">Serviços</span>
               </TabsTrigger>
             </TabsList>
@@ -3406,11 +3584,20 @@ export default function ContratosModule() {
         </TabsContent>
 
         <TabsContent value="contratos" className="mt-0">
-          <ContratosTab />
+          <ContratosTab
+            onDuplicate={(data) => {
+              setNovoContratoInitialData(data);
+              setActiveTab("novo");
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="novo" className="mt-0">
-          <NovoContratoTab onSuccess={() => setActiveTab("contratos")} />
+          <NovoContratoTab
+            onSuccess={() => setActiveTab("contratos")}
+            initialData={novoContratoInitialData}
+            onConsumeInitialData={() => setNovoContratoInitialData(undefined)}
+          />
         </TabsContent>
 
         <TabsContent value="servicos" className="mt-0">
