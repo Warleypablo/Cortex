@@ -342,6 +342,8 @@ async function ensureContratosTablesExist() {
       DO $$ BEGIN
         ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_inicio DATE;
         ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_fim DATE;
+        ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_inicio_cobranca DATE;
+        ALTER TABLE staging.contratos_itens ADD COLUMN IF NOT EXISTS data_fim_cobranca DATE;
       EXCEPTION WHEN others THEN NULL;
       END $$
     `);
@@ -644,6 +646,63 @@ async function ensureContratosTablesExist() {
 
 export function registerContratosRoutes(app: Express) {
   ensureContratosTablesExist();
+
+  // Helper: move um deal no Bitrix para "Negócio Ganho" (pipeline default, stage WON)
+  // Processo em 2 etapas porque Bitrix tem automações entre pipelines:
+  // 1. Primeiro busca o deal para ver em qual pipeline está
+  // 2. Se não está no pipeline default (0), move via WON do pipeline atual
+  //    (a automação do Bitrix transfere para o default automaticamente)
+  // 3. Depois move para WON no pipeline default ("Negócio Ganho")
+  async function moveBitrixDealToWon(dealId: string | number): Promise<boolean> {
+    const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
+    if (!webhookUrl) return false;
+
+    try {
+      const parsedId = typeof dealId === 'string' ? parseInt(dealId) : dealId;
+
+      // Buscar estado atual do deal
+      const getRes = await fetch(`${webhookUrl}/crm.deal.get?id=${parsedId}`);
+      if (!getRes.ok) return false;
+      const getData = await getRes.json();
+      if (!getData.result) return false;
+
+      const currentCategory = getData.result.CATEGORY_ID;
+
+      // Se não está no pipeline default, primeiro mover para lá
+      if (currentCategory !== '0' && currentCategory !== 0) {
+        // Mover para WON do pipeline atual → automação do Bitrix transfere para default
+        const wonStage = `C${currentCategory}:WON`;
+        await fetch(`${webhookUrl}/crm.deal.update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: parsedId, fields: { STAGE_ID: wonStage } }),
+        });
+        // Aguardar automação do Bitrix processar a transferência
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      // Agora mover para WON no pipeline default ("Negócio Ganho")
+      const updateRes = await fetch(`${webhookUrl}/crm.deal.update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: parsedId, fields: { STAGE_ID: 'WON' } }),
+      });
+      if (!updateRes.ok) return false;
+      const updateData = await updateRes.json();
+      if (!updateData.result) return false;
+
+      // Atualizar registro local se existir
+      await db.execute(
+        sql`UPDATE "Bitrix".crm_deal SET stage_name = 'Negócio Ganho', date_modify = NOW() WHERE id = ${parsedId}`
+      ).catch(() => {});
+
+      console.log(`[bitrix] Deal ${parsedId} movido para Negócio Ganho (2 etapas)`);
+      return true;
+    } catch (err) {
+      console.error(`[bitrix] Erro ao mover deal ${dealId} para Negócio Ganho:`, err);
+      return false;
+    }
+  }
 
   // Helper: parseia texto de escopo em linhas individuais de tasks (fallback simples)
   function parseEscopoToTasks(escopo: string): string[] {
@@ -1139,6 +1198,176 @@ Exemplos:
     }
   });
 
+  // ── Templates de Contrato ──────────────────────────────────────
+
+  app.get("/api/contratos/templates", isAuthenticated, async (_req, res) => {
+    try {
+      const result = await db.execute(
+        sql`SELECT * FROM staging.contrato_templates WHERE ativo = true ORDER BY nome`
+      );
+      res.json({ templates: result.rows });
+    } catch (error: any) {
+      console.error("Error listing templates:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/contratos/templates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = await db.execute(
+        sql`SELECT * FROM staging.contrato_templates WHERE id = ${parseInt(id)}`
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Template não encontrado" });
+      }
+      res.json({ template: result.rows[0] });
+    } catch (error: any) {
+      console.error("Error getting template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/contratos/templates", isAuthenticated, async (req, res) => {
+    try {
+      const { nome, descricao, itens_template } = req.body;
+      if (!nome || typeof nome !== 'string' || !nome.trim()) {
+        return res.status(400).json({ message: "Nome é obrigatório" });
+      }
+      const result = await db.execute(
+        sql`INSERT INTO staging.contrato_templates (nome, descricao, itens_template)
+         VALUES (${nome}, ${descricao || null}, ${JSON.stringify(itens_template || [])})
+         RETURNING *`
+      );
+      res.json({ template: result.rows[0] });
+    } catch (error: any) {
+      console.error("Error creating template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/contratos/templates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { nome, descricao, itens_template } = req.body;
+      if (!nome || typeof nome !== 'string' || !nome.trim()) {
+        return res.status(400).json({ message: "Nome é obrigatório" });
+      }
+      const result = await db.execute(
+        sql`UPDATE staging.contrato_templates
+         SET nome = ${nome}, descricao = ${descricao || null},
+             itens_template = ${JSON.stringify(itens_template || [])},
+             updated_at = NOW()
+         WHERE id = ${parseInt(id)} RETURNING *`
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Template não encontrado" });
+      }
+      res.json({ template: result.rows[0] });
+    } catch (error: any) {
+      console.error("Error updating template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/contratos/templates/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.execute(
+        sql`UPDATE staging.contrato_templates SET ativo = false, updated_at = NOW()
+         WHERE id = ${parseInt(id)}`
+      );
+      res.json({ message: "Template desativado" });
+    } catch (error: any) {
+      console.error("Error deleting template:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ── Bitrix CRM Integration ──────────────────────────────────────
+
+  app.get("/api/contratos/bitrix-deal/:dealId", isAuthenticated, async (req, res) => {
+    try {
+      const { dealId } = req.params;
+      const parsedId = parseInt(dealId);
+      if (isNaN(parsedId)) {
+        return res.status(400).json({ message: "ID inválido" });
+      }
+
+      const webhookUrl = process.env.BITRIX_WEBHOOK_URL;
+      if (!webhookUrl) {
+        return res.status(500).json({ message: "BITRIX_WEBHOOK_URL não configurada" });
+      }
+
+      // Buscar deal direto na API do Bitrix
+      const dealRes = await fetch(`${webhookUrl}/crm.deal.get?id=${parsedId}`);
+      if (!dealRes.ok) {
+        return res.status(404).json({ message: "Deal não encontrado no Bitrix" });
+      }
+
+      const dealData = await dealRes.json();
+      if (!dealData.result) {
+        return res.status(404).json({ message: "Deal não encontrado no Bitrix" });
+      }
+
+      const deal = dealData.result;
+
+      // Buscar nome da empresa se tiver COMPANY_ID
+      let companyName: string | null = null;
+      if (deal.COMPANY_ID && deal.COMPANY_ID !== '0') {
+        try {
+          const compRes = await fetch(`${webhookUrl}/crm.company.get?id=${deal.COMPANY_ID}`);
+          if (compRes.ok) {
+            const compData = await compRes.json();
+            companyName = compData.result?.TITLE || null;
+          }
+        } catch { /* ignora erro ao buscar empresa */ }
+      }
+
+      // Buscar nome do contato se tiver CONTACT_ID
+      let contactName: string | null = null;
+      if (deal.CONTACT_ID && deal.CONTACT_ID !== '0') {
+        try {
+          const contRes = await fetch(`${webhookUrl}/crm.contact.get?id=${deal.CONTACT_ID}`);
+          if (contRes.ok) {
+            const contData = await contRes.json();
+            const c = contData.result;
+            contactName = c ? [c.NAME, c.LAST_NAME].filter(Boolean).join(' ') : null;
+          }
+        } catch { /* ignora erro ao buscar contato */ }
+      }
+
+      res.json({
+        deal: {
+          id: deal.ID,
+          title: deal.TITLE,
+          company_name: companyName,
+          contact_name: contactName,
+          stage_name: deal.STAGE_ID,
+          category_name: deal.CATEGORY_ID,
+          opportunity: deal.OPPORTUNITY,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching Bitrix deal:", error);
+      res.status(500).json({ message: "Erro ao conectar com Bitrix" });
+    }
+  });
+
+  app.post("/api/contratos/bitrix-deal/:dealId/won", isAuthenticated, async (req, res) => {
+    try {
+      const { dealId } = req.params;
+      const success = await moveBitrixDealToWon(dealId);
+      if (!success) {
+        return res.status(502).json({ message: "Erro ao mover deal no Bitrix" });
+      }
+      res.json({ success: true, message: "Deal movido para Negócio Ganho" });
+    } catch (error: any) {
+      console.error("Error updating Bitrix deal:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ============================================================================
   // CONTRATOS ROUTES
   // ============================================================================
@@ -1349,6 +1578,7 @@ Exemplos:
               modalidade, valor_original, valor_negociado, desconto_percentual,
               tipo_desconto, valor_desconto, valor_final, economia, observacoes,
               escopo, is_personalizado, data_inicio, data_fim,
+              data_inicio_cobranca, data_fim_cobranca,
               forma_pagamento, num_parcelas, valor_parcela
             ) VALUES (
               ${contratoId}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
@@ -1359,6 +1589,7 @@ Exemplos:
               ${itemValorNegociado}, ${itemEconomia}, ${item.observacoes || null},
               ${item.escopo || null}, ${item.is_personalizado || false},
               ${item.data_inicio || null}, ${item.data_fim || null},
+              ${item.data_inicio_cobranca || null}, ${item.data_fim_cobranca || null},
               ${item.forma_pagamento || null}, ${item.num_parcelas || null}, ${item.valor_parcela || null}
             )
           `);
@@ -1424,7 +1655,8 @@ Exemplos:
               contrato_id, plano_servico_id, quantidade, valor_unitario, valor_total,
               modalidade, valor_original, valor_negociado, desconto_percentual,
               tipo_desconto, valor_desconto, valor_final, economia, observacoes,
-              data_inicio, data_fim, forma_pagamento, num_parcelas, valor_parcela
+              data_inicio, data_fim, data_inicio_cobranca, data_fim_cobranca,
+              forma_pagamento, num_parcelas, valor_parcela
             ) VALUES (
               ${parseInt(id)}, ${item.plano_servico_id || null}, ${item.quantidade || 1},
               ${item.valor_unitario || 0}, ${item.valor_total || 0},
@@ -1433,6 +1665,7 @@ Exemplos:
               ${item.tipo_desconto || null}, ${item.valor_desconto || 0},
               ${item.valor_final || 0}, ${item.economia || 0}, ${item.observacoes || null},
               ${item.data_inicio || null}, ${item.data_fim || null},
+              ${item.data_inicio_cobranca || null}, ${item.data_fim_cobranca || null},
               ${item.forma_pagamento || null}, ${item.num_parcelas || null}, ${item.valor_parcela || null}
             )
           `);
@@ -1976,7 +2209,7 @@ Exemplos:
       cnpj: "42.100.292/0001-84",
       socio: "RODRIGO QUEIROZ SANTOS",
       cpf_socio: "141.802.967-05",
-      endereco: "R. Maria de Lourdes García, 228 - Ilha de Santa Maria, Vitória - ES, 29053-310",
+      endereco: "Av. João Batista Parra, 633 - 13° Andar - Enseada do Suá, Vitória - ES, 29052-123",
       telefone: "(27) 99687-7563",
       email: "contato@turbopartners.com.br",
       site: "www.turbopartners.com.br"
@@ -2576,7 +2809,7 @@ Exemplos:
         cnpj: "42.100.292/0001-84",
         socio: "RODRIGO QUEIROZ SANTOS",
         cpf_socio: "141.802.967-05",
-        endereco: "R. Maria de Lourdes García, 228 - Ilha de Santa Maria, Vitória - ES, 29053-310",
+        endereco: "Av. João Batista Parra, 633 - 13° Andar - Enseada do Suá, Vitória - ES, 29052-123",
         telefone: "(27) 99687-7563",
         email: "contato@turbopartners.com.br",
         site: "www.turbopartners.com.br"
@@ -3297,7 +3530,7 @@ Exemplos:
       
       // Buscar contrato pelo assinafy_document_id
       const contratoResult = await db.execute(sql`
-        SELECT id, status, assinafy_status FROM staging.contratos
+        SELECT id, status, assinafy_status, id_crm FROM staging.contratos
         WHERE assinafy_document_id = ${documentId}
       `);
       
@@ -3378,6 +3611,11 @@ Exemplos:
         `);
         
         console.log(`[assinafy-webhook] Contrato ${contrato.id} atualizado para '${novoStatus}'`);
+
+        // Mover deal no Bitrix para "Negócio Ganho" se id_crm preenchido
+        if (contrato.id_crm) {
+          await moveBitrixDealToWon(contrato.id_crm);
+        }
 
         // Sincronizar cliente e serviços para cup_clientes/cup_contratos
         await syncClienteFromSignedContract(contrato.id);
@@ -3553,6 +3791,15 @@ Exemplos:
       `);
 
       console.log(`[simular-assinatura] Contrato ${contratoId} marcado como assinado (simulação)`);
+
+      // Mover deal no Bitrix para "Negócio Ganho" se id_crm preenchido
+      const idCrmResult = await db.execute(
+        sql`SELECT id_crm FROM staging.contratos WHERE id = ${contratoId}`
+      );
+      const idCrm = (idCrmResult.rows[0] as any)?.id_crm;
+      if (idCrm) {
+        await moveBitrixDealToWon(idCrm);
+      }
 
       // Executar o mesmo sync do fluxo real
       await syncClienteFromSignedContract(contratoId);
