@@ -4655,23 +4655,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Churn Consolidado Trimestral - churns agrupados por squad e trimestre
   app.get("/api/churn/consolidado-trimestral", async (req, res) => {
     try {
-      const meses = Math.max(1, Math.min(parseInt(req.query.meses as string) || 12, 60));
+      const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
 
       const result = await db.execute(sql`
         SELECT
           squad,
-          EXTRACT(YEAR FROM ultimo_dia_operacao) AS ano,
-          EXTRACT(QUARTER FROM ultimo_dia_operacao) AS trimestre,
-          'Q' || EXTRACT(QUARTER FROM ultimo_dia_operacao) || ' ' || EXTRACT(YEAR FROM ultimo_dia_operacao) AS label,
+          EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS ano,
+          EXTRACT(QUARTER FROM ultimo_dia_operacao)::int AS trimestre,
+          'Q' || EXTRACT(QUARTER FROM ultimo_dia_operacao)::int || ' ' || EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS label,
           COUNT(*) AS total_churns,
           SUM(COALESCE(valor_r, 0)) AS valor_total
         FROM "Clickup".cup_churn
         WHERE ultimo_dia_operacao IS NOT NULL
           AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
-          AND ultimo_dia_operacao >= (CURRENT_DATE - ${sql.raw(`INTERVAL '${meses} months'`)})
+          AND EXTRACT(YEAR FROM ultimo_dia_operacao) = ${ano}
+          AND ultimo_dia_operacao <= CURRENT_DATE
         GROUP BY squad, ano, trimestre
-        ORDER BY ano DESC, trimestre DESC, valor_total DESC
+        ORDER BY ano, trimestre, valor_total DESC
       `);
 
       res.json(result.rows);
