@@ -67,11 +67,16 @@ export default function TechPerformance() {
     );
     const taxaNoPrazo = totalEntregas > 0 ? Math.round((entregasNoPrazo / totalEntregas) * 100) : 0;
 
+    // Excluir fases finais (deploy, done) do cálculo de gargalo
+    const endStates = ["deploy", "deploy 🚀", "encerrado 🚀", "complete", "completo", "done"];
+    const filteredForGargalo = prazoPorStatus.filter(
+      (p: any) => !endStates.includes((p.status || '').toLowerCase().trim())
+    );
     const gargalo =
-      prazoPorStatus.length > 0
-        ? prazoPorStatus.reduce((max: any, curr: any) =>
+      filteredForGargalo.length > 0
+        ? filteredForGargalo.reduce((max: any, curr: any) =>
             (parseFloat(curr.media_dias) || 0) > (parseFloat(max.media_dias) || 0) ? curr : max,
-            prazoPorStatus[0],
+            filteredForGargalo[0],
           )
         : null;
 
