@@ -178,7 +178,7 @@ export default function TechResponsavel() {
               {tempoDeployData && tempoDeployData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={tempoDeployData}>
-                    <XAxis dataKey="trimestre" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <XAxis dataKey="label" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={35} />
                     <Tooltip
                       contentStyle={{
@@ -187,7 +187,7 @@ export default function TechResponsavel() {
                         borderRadius: "8px",
                         fontSize: "12px",
                       }}
-                      formatter={(value: number) => [`${value} dias`, "Média"]}
+                      formatter={(value: number) => [`${Math.round(value * 10) / 10} dias`, "Média"]}
                     />
                     <Bar dataKey="media_dias" fill="hsl(var(--primary))" opacity={0.6} radius={[4, 4, 0, 0]} />
                   </BarChart>
