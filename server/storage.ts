@@ -7915,11 +7915,22 @@ export class DbStorage implements IStorage {
     const valorTotal = valorAtivos + valorFechados;
     const totalProjetos = projetosEmAndamento + totalFechados;
 
-    // Calcular tempo médio de entrega (diferença entre lancamento e data_criada para projetos fechados)
+    // Calcular tempo médio de entrega (desde "pronto p/ design" até data_entregue)
     const tempoMedioResult = await db.execute(sql`
-      SELECT AVG(lancamento::date - data_criada::date) as tempo_medio
-      FROM "Clickup".cup_projetos_tech_fechados
-      WHERE lancamento IS NOT NULL AND data_criada IS NOT NULL
+      WITH inicio_projetos AS (
+        SELECT
+          p.clickup_task_id,
+          p.data_entregue,
+          MIN(h.data_transicao) AS inicio_design
+        FROM "Clickup".cup_projetos_tech_fechados p
+        JOIN "Clickup".cup_status_history h ON h.clickup_task_id = p.clickup_task_id
+        WHERE p.data_entregue IS NOT NULL
+        AND h.status_novo ILIKE 'pronto p/ design'
+        GROUP BY p.clickup_task_id, p.data_entregue
+      )
+      SELECT AVG(EXTRACT(EPOCH FROM (data_entregue::timestamp - inicio_design)) / 86400) AS tempo_medio
+      FROM inicio_projetos
+      WHERE inicio_design IS NOT NULL
     `);
     const tempoMedioEntrega = parseFloat((tempoMedioResult.rows[0] as any).tempo_medio || '0');
 
@@ -8639,7 +8650,7 @@ export class DbStorage implements IStorage {
           p.clickup_task_id,
           p.responsavel,
           p.data_entregue,
-          MIN(CASE WHEN h.status_novo ILIKE '%design%' THEN h.data_transicao END) AS inicio_design,
+          MIN(CASE WHEN h.status_novo ILIKE 'pronto p/ design' THEN h.data_transicao END) AS inicio_design,
           EXTRACT(YEAR FROM p.data_entregue) AS ano,
           EXTRACT(QUARTER FROM p.data_entregue) AS trimestre
         FROM "Clickup".cup_projetos_tech_fechados p
