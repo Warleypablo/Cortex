@@ -140,4 +140,65 @@ export function registerTechHubRoutes(app: Express, db: any, storage: IStorage) 
       res.status(500).json({ error: 'Failed to fetch deploy time' });
     }
   });
+
+  app.get("/api/tech/responsavel/:nome/kpis", async (req, res) => {
+    try {
+      const nome = decodeURIComponent(req.params.nome);
+
+      // Get active projects for this PO
+      const boardData = await storage.getTechBoard();
+      const allProjects = boardData.filter((p: any) => p.responsavel === nome);
+
+      // Get closed projects for this PO
+      const closedProjects = await storage.getTechProjetosFechados(500);
+      const poClosedProjects = closedProjects.filter((p: any) => p.responsavel === nome);
+
+      // Calculate urgency for active projects
+      const now = new Date();
+      const projetosAtivosList = allProjects.map((p: any) => {
+        const dueDate = p.data_vencimento ? new Date(p.data_vencimento) : null;
+        let urgencia = "no_prazo";
+        if (dueDate) {
+          const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysLeft < 0) urgencia = "atrasado";
+          else if (daysLeft <= 3) urgencia = "em_risco";
+        }
+        return {
+          taskId: p.clickup_task_id,
+          taskName: p.task_name,
+          statusProjeto: p.status_projeto,
+          faseProjeto: p.fase_projeto || p.status_projeto,
+          dataVencimento: p.data_vencimento,
+          urgencia,
+        };
+      });
+
+      const atrasados = projetosAtivosList.filter((p: any) => p.urgencia === "atrasado").length;
+      const projetosAtivos = allProjects.length;
+      const taxaNoPrazo = projetosAtivos > 0 ? Math.round(((projetosAtivos - atrasados) / projetosAtivos) * 100) : 100;
+
+      // Load indicator
+      let carga: "alta" | "media" | "ok" = "ok";
+      if (projetosAtivos > 7) carga = "alta";
+      else if (projetosAtivos >= 4) carga = "media";
+
+      // Deploy time (reuse existing)
+      const deployData = await storage.getTechTempoDeploy(12, nome);
+      const tempoMedioDeploy = deployData.length > 0
+        ? Math.round(deployData.reduce((sum: number, d: any) => sum + parseFloat(d.media_dias || 0), 0) / deployData.length)
+        : 0;
+
+      res.json({
+        projetosAtivos,
+        projetosConcluidos: poClosedProjects.length,
+        tempoMedioDeploy,
+        taxaNoPrazo,
+        carga,
+        projetosAtivosList,
+      });
+    } catch (error) {
+      console.error('Error fetching responsavel KPIs:', error);
+      res.status(500).json({ error: 'Failed to fetch responsavel KPIs' });
+    }
+  });
 }
