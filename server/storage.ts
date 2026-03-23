@@ -8609,7 +8609,8 @@ export class DbStorage implements IStorage {
         EXTRACT(QUARTER FROM data_entregue) AS trimestre,
         'Q' || EXTRACT(QUARTER FROM data_entregue) || ' ' || EXTRACT(YEAR FROM data_entregue) AS label,
         COUNT(*) AS total_entregas,
-        AVG(COALESCE(valor_p, 0) / 100.0) AS valor_medio
+        AVG(COALESCE(valor_p, 0) / 100.0) AS valor_medio,
+        SUM(COALESCE(valor_p, 0)) / 100.0 AS valor_total
       FROM "Clickup".cup_projetos_tech_fechados
       WHERE data_entregue IS NOT NULL
       AND data_entregue >= (CURRENT_DATE - INTERVAL '${safeMeses} months')
