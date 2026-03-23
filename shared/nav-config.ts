@@ -362,7 +362,6 @@ export const NAV_CONFIG = {
       icon: 'MessageSquare',
       items: [
         { title: 'Chat Clientes', url: '/chat-clientes', icon: 'MessageSquare', permissionKey: PERMISSION_KEYS.GENERAL.CHAT_CLIENTES },
-        { title: 'TurboZap', url: '/turbozap', icon: 'Zap', permissionKey: PERMISSION_KEYS.FIN.TURBOZAP },
         { title: 'Chamados', url: '/chamados', icon: 'Ticket', permissionKey: PERMISSION_KEYS.GENERAL.CHAMADOS },
         { title: 'Sugestões', url: '/sugestoes', icon: 'Lightbulb', permissionKey: PERMISSION_KEYS.GENERAL.SUGESTOES },
         { title: 'Solicitação Ferramentas', url: '/solicitacao-ferramentas', icon: 'Wrench', permissionKey: PERMISSION_KEYS.GENERAL.SOLICITACAO_FERRAMENTAS },
