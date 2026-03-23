@@ -4676,30 +4676,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY ano, trimestre, valor_total DESC
       `);
 
-      // MRR ativo atual por squad (base para calcular churn rate)
-      const mrrResult = await db.execute(sql`
+      // MRR base por squad no início de cada trimestre
+      // = ativos atuais + tudo que churou DEPOIS do início desse trimestre
+      const mrrAtualResult = await db.execute(sql`
         SELECT squad, SUM(COALESCE(valor_r, 0)) AS mrr_ativo
         FROM "Clickup".cup_churn
         WHERE squad IS NOT NULL AND status = 'ativo' AND valor_r > 0
         GROUP BY squad
       `);
-      const mrrBySquad: Record<string, number> = {};
-      (mrrResult.rows as any[]).forEach((r: any) => { mrrBySquad[r.squad] = parseFloat(r.mrr_ativo) || 0; });
+      const mrrAtivoBySquad: Record<string, number> = {};
+      (mrrAtualResult.rows as any[]).forEach((r: any) => { mrrAtivoBySquad[r.squad] = parseFloat(r.mrr_ativo) || 0; });
 
-      // Calcular churn rate: valor_churn / (mrr_ativo + valor_churn_acumulado_posterior)
-      // Calcular quantos meses cada trimestre tem até hoje
+      // Churn acumulado por squad após cada trimestre (para reconstruir MRR base)
+      const churnPosteriorResult = await db.execute(sql`
+        SELECT squad,
+          EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS ano,
+          EXTRACT(QUARTER FROM ultimo_dia_operacao)::int AS trimestre,
+          SUM(COALESCE(valor_r, 0)) AS valor_churn_posterior
+        FROM "Clickup".cup_churn
+        WHERE ultimo_dia_operacao IS NOT NULL AND squad IS NOT NULL
+          AND status IN ('cancelado/inativo', 'em cancelamento')
+          AND valor_r > 0
+        GROUP BY squad, ano, trimestre
+        ORDER BY squad, ano, trimestre
+      `);
+
+      // Montar mapa: squad -> { "ano-q" -> churn acumulado posterior }
+      const churnBySquadQ: Record<string, Record<string, number>> = {};
+      (churnPosteriorResult.rows as any[]).forEach((r: any) => {
+        const key = r.squad;
+        if (!churnBySquadQ[key]) churnBySquadQ[key] = {};
+        churnBySquadQ[key][`${r.ano}-${r.trimestre}`] = parseFloat(r.valor_churn_posterior) || 0;
+      });
+
       const now = new Date();
       const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth() + 1; // 1-12
+      const currentMonth = now.getMonth() + 1;
 
       const rows = (churnResult.rows as any[]).map((r: any) => {
-        const mrrAtivo = mrrBySquad[r.squad] || 0;
+        const squad = r.squad;
         const valorChurn = parseFloat(r.valor_total) || 0;
-        const mrrBase = mrrAtivo + valorChurn;
+        const mrrAtivo = mrrAtivoBySquad[squad] || 0;
 
-        // Meses no trimestre (3 para completos, menos para o trimestre atual)
-        const qStart = (r.trimestre - 1) * 3 + 1; // mês inicial do trimestre
-        const qEnd = r.trimestre * 3; // mês final do trimestre
+        // MRR base início trimestre = MRR ativo atual + todo churn desse trimestre em diante
+        const squadChurns = churnBySquadQ[squad] || {};
+        let churnPosterior = 0;
+        for (const [key, val] of Object.entries(squadChurns)) {
+          if (key >= `${r.ano}-${r.trimestre}`) churnPosterior += val;
+        }
+        const mrrBase = mrrAtivo + churnPosterior;
+
+        // Meses no trimestre (3 para completos, menos para o atual)
+        const qStart = (r.trimestre - 1) * 3 + 1;
+        const qEnd = r.trimestre * 3;
         let mesesNoTrimestre = 3;
         if (parseInt(r.ano) === currentYear && qEnd >= currentMonth) {
           mesesNoTrimestre = Math.max(1, currentMonth - qStart + 1);
