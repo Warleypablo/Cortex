@@ -3,7 +3,7 @@ import { useParams, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { usePageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { ArrowLeft, Package, User, DollarSign, Info, Briefcase, Check, ChevronsUpDown, UserPlus, X, Edit, Trash2, History, Lock, BarChart3 } from "lucide-react";
+import { ArrowLeft, Package, User, DollarSign, Info, Briefcase, Check, ChevronsUpDown, UserPlus, X, Edit, Trash2, History, Lock, BarChart3, Wrench, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -65,6 +66,10 @@ interface PatrimonioComResponsavel {
   descricao: string | null;
   senhaAtivo: string | null;
   empresa: string | null;
+  statusPatrimonio: string | null;
+  dataInicioConserto: string | null;
+  dataFimConserto: string | null;
+  notas: string | null;
   colaborador?: Colaborador;
 }
 
@@ -105,6 +110,8 @@ export default function PatrimonioDetail() {
   const { toast } = useToast();
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [notasValue, setNotasValue] = useState("");
+  const [notasChanged, setNotasChanged] = useState(false);
 
   const { data: patrimonio, isLoading, error } = useQuery<PatrimonioComResponsavel>({
     queryKey: ["/api/patrimonio", patrimonioId],
@@ -212,6 +219,21 @@ export default function PatrimonioDetail() {
     },
   });
 
+  const updateStatusNotasMutation = useMutation({
+    mutationFn: async (data: Record<string, string | null>) => {
+      return apiRequest("PATCH", `/api/patrimonio/${patrimonioId}`, data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio", patrimonioId] });
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio"] });
+      qc.invalidateQueries({ queryKey: ["/api/patrimonio", patrimonioId, "historico"] });
+      toast({ title: "Patrimônio atualizado", description: "Alteração salva com sucesso." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deletePatrimonioMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("DELETE", `/api/patrimonio/${patrimonioId}`);
@@ -242,6 +264,13 @@ export default function PatrimonioDetail() {
       setPageInfo("Detalhes do Patrimônio", "Carregando...");
     }
   }, [patrimonio, setPageInfo]);
+
+  useEffect(() => {
+    if (patrimonio) {
+      setNotasValue(patrimonio.notas || "");
+      setNotasChanged(false);
+    }
+  }, [patrimonio]);
 
   const handleSelectResponsavel = (nome: string) => {
     if (nome === patrimonio?.responsavelAtual) {
@@ -522,6 +551,60 @@ export default function PatrimonioDetail() {
               </Card>
 
               <Card>
+                <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                    <Wrench className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle>Status do Patrimônio</CardTitle>
+                    <CardDescription>Estado atual do equipamento</CardDescription>
+                  </div>
+                  <Select
+                    value={patrimonio.statusPatrimonio || "Em Uso"}
+                    onValueChange={(value) => {
+                      updateStatusNotasMutation.mutate({ statusPatrimonio: value });
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Disponível">Disponível</SelectItem>
+                      <SelectItem value="Em Uso">Em Uso</SelectItem>
+                      <SelectItem value="Em Conserto">Em Conserto</SelectItem>
+                      <SelectItem value="Aposentado">Aposentado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className={
+                      patrimonio.statusPatrimonio === "Em Conserto"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300"
+                        : patrimonio.statusPatrimonio === "Disponível"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-300"
+                        : patrimonio.statusPatrimonio === "Aposentado"
+                        ? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-300"
+                        : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300"
+                    }>
+                      {patrimonio.statusPatrimonio || "Em Uso"}
+                    </Badge>
+                    {patrimonio.statusPatrimonio === "Em Conserto" && patrimonio.dataInicioConserto && (
+                      <span className="text-sm text-muted-foreground">
+                        Em conserto desde {new Date(patrimonio.dataInicioConserto).toLocaleDateString("pt-BR")}
+                      </span>
+                    )}
+                    {patrimonio.statusPatrimonio !== "Em Conserto" && patrimonio.dataFimConserto && patrimonio.dataInicioConserto && (
+                      <span className="text-sm text-muted-foreground">
+                        Conserto finalizado em {new Date(patrimonio.dataFimConserto).toLocaleDateString("pt-BR")}
+                        {" "}({Math.ceil((new Date(patrimonio.dataFimConserto).getTime() - new Date(patrimonio.dataInicioConserto).getTime()) / (1000 * 60 * 60 * 24))} dias)
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -561,7 +644,6 @@ export default function PatrimonioDetail() {
                               value={colaborador.nome}
                               onSelect={() => handleSelectResponsavel(colaborador.nome)}
                               data-testid={`option-colaborador-${colaborador.id}`}
-                              className={colaborador.status === "Dispensado" ? "text-muted-foreground" : ""}
                             >
                               <Check
                                 className={cn(
@@ -572,9 +654,6 @@ export default function PatrimonioDetail() {
                                 )}
                               />
                               <span className="flex-1">{colaborador.nome}</span>
-                              {colaborador.status === "Dispensado" && (
-                                <span className="text-xs text-muted-foreground ml-2">(Dispensado)</span>
-                              )}
                             </CommandItem>
                           ))}
                         </CommandGroup>
@@ -659,6 +738,44 @@ export default function PatrimonioDetail() {
               </CardContent>
             </Card>
             </div>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <StickyNote className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <CardTitle>Notas</CardTitle>
+                  <CardDescription>Observações sobre o patrimônio</CardDescription>
+                </div>
+                {notasChanged && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      updateStatusNotasMutation.mutate({ notas: notasValue || null });
+                      setNotasChanged(false);
+                    }}
+                    disabled={updateStatusNotasMutation.isPending}
+                  >
+                    {updateStatusNotasMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : null}
+                    Salvar
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  placeholder="Adicione observações sobre este patrimônio..."
+                  value={notasValue}
+                  onChange={(e) => {
+                    setNotasValue(e.target.value);
+                    setNotasChanged(true);
+                  }}
+                  className="min-h-[100px] resize-y"
+                />
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
