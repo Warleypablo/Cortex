@@ -1,5 +1,49 @@
 import type { Express } from "express";
 import type { IStorage } from "../storage";
+import OpenAI from "openai";
+
+let anthropicClient: any = null;
+let openaiClient: OpenAI | null = null;
+
+function getAIClient(): { type: 'anthropic' | 'openai'; client: any } | null {
+  if (process.env.ANTHROPIC_API_KEY) {
+    if (!anthropicClient) {
+      try {
+        const Anthropic = require("@anthropic-ai/sdk");
+        anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+      } catch { /* not available */ }
+    }
+    if (anthropicClient) return { type: 'anthropic', client: anthropicClient };
+  }
+  if (process.env.OPENAI_API_KEY) {
+    if (!openaiClient) openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    return { type: 'openai', client: openaiClient };
+  }
+  return null;
+}
+
+async function generateSummary(comments: string[], projectName: string): Promise<string> {
+  const ai = getAIClient();
+  if (!ai) return 'Nenhuma API de IA configurada (ANTHROPIC_API_KEY ou OPENAI_API_KEY).';
+
+  const prompt = `Você é um gerente de projetos de tecnologia. Analise os comentários abaixo do projeto "${projectName}" e gere um resumo executivo em 2-3 frases sobre o status atual do projeto. Seja direto, objetivo e em português. Destaque bloqueios, riscos ou próximos passos se houver.\n\nComentários:\n${comments.join('\n')}`;
+
+  if (ai.type === 'anthropic') {
+    const response = await ai.client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    return response.content[0]?.text || 'Não foi possível gerar o resumo.';
+  }
+
+  const response = await ai.client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    max_tokens: 300,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  return response.choices[0]?.message?.content || 'Não foi possível gerar o resumo.';
+}
 
 export function registerTechHubRoutes(app: Express, db: any, storage: IStorage) {
 
@@ -199,6 +243,34 @@ export function registerTechHubRoutes(app: Express, db: any, storage: IStorage) 
     } catch (error) {
       console.error('Error fetching responsavel KPIs:', error);
       res.status(500).json({ error: 'Failed to fetch responsavel KPIs' });
+    }
+  });
+
+  app.get("/api/tech/projeto/:id/resumo-ia", async (req, res) => {
+    try {
+      const taskId = req.params.id;
+      const comments = await storage.getTechProjetoComentarios(taskId);
+
+      if (!comments || comments.length === 0) {
+        return res.json({ resumo: 'Nenhum comentário registrado para gerar resumo.' });
+      }
+
+      // Get project name from board
+      const board = await storage.getTechBoard();
+      const project = board.find((p: any) => p.clickup_task_id === taskId);
+      const projectName = project?.task_name || 'Projeto';
+
+      // Format comments for the AI
+      const formatted = comments.slice(0, 20).map((c: any) => {
+        const date = new Date(c.data).toLocaleDateString('pt-BR');
+        return `[${date}] ${c.autor}: ${c.texto}`;
+      });
+
+      const resumo = await generateSummary(formatted, projectName);
+      res.json({ resumo });
+    } catch (error) {
+      console.error('Error generating AI summary:', error);
+      res.status(500).json({ error: 'Failed to generate summary' });
     }
   });
 }
