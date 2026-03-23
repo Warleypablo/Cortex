@@ -10,9 +10,8 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { Loader2, AlertTriangle, Clock, CheckCircle, ShieldAlert, FolderOpen } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import StatsCard from "@/components/StatsCard";
+import { Loader2, Info } from "lucide-react";
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   PHASE_CONFIG,
   END_STATES,
@@ -122,14 +121,7 @@ export default function TechOverview() {
   const emRiscoCount = useMemo(() => {
     return allBoardProjects.filter((p) => {
       const days = daysUntil(p.data_vencimento);
-      return days !== null && days <= 3 && days > 0;
-    }).length;
-  }, [allBoardProjects]);
-
-  const bloqueiosCount = useMemo(() => {
-    return allBoardProjects.filter((p) => {
-      const tags = Array.isArray(p.tags_ativas) ? p.tags_ativas : [];
-      return tags.some((t: string) => t.toLowerCase().includes("bloqueio"));
+      return days !== null && ((days <= 3 && days > 0) || days < 0);
     }).length;
   }, [allBoardProjects]);
 
@@ -166,7 +158,7 @@ export default function TechOverview() {
     return [...projetosAndamento]
       .filter((p) => p.dataVencimento)
       .sort((a, b) => new Date(a.dataVencimento!).getTime() - new Date(b.dataVencimento!).getTime())
-      .slice(0, 5);
+      .slice(0, 8);
   }, [projetosAndamento]);
 
   // ── Loading state ──────────────────────────────────────────────────
@@ -174,7 +166,7 @@ export default function TechOverview() {
   if (loadingMetricas || loadingBoard) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -184,262 +176,274 @@ export default function TechOverview() {
   return (
     <div className="p-6 space-y-6">
       {/* ── KPI Cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatsCard
-          title="Projetos Ativos"
-          value={String(metricas?.projetosEmAndamento ?? 0)}
-          icon={FolderOpen}
-          variant="default"
-        />
-        <StatsCard
-          title="Em Risco"
-          value={String(emRiscoCount)}
-          icon={AlertTriangle}
-          variant="warning"
-        />
-        <StatsCard
-          title="Tempo Medio"
-          value={`${Math.round(metricas?.tempoMedioEntrega ?? 0)}d`}
-          icon={Clock}
-          variant="info"
-        />
-        <StatsCard
-          title="Taxa No Prazo"
-          value={`${taxaNoPrazo}%`}
-          icon={CheckCircle}
-          variant="success"
-        />
-        <StatsCard
-          title="Bloqueios Ativos"
-          value={String(bloqueiosCount)}
-          icon={ShieldAlert}
-          variant="error"
-        />
-      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-lg border bg-card p-5">
+          <div className="text-3xl font-light text-foreground">
+            {metricas?.projetosEmAndamento ?? 0}
+          </div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+            Projetos Ativos
+          </div>
+        </div>
 
-      {/* ── Charts Row ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Tempo Medio por Fase */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Tempo Medio por Fase</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Media ponderada em dias (excluindo fases finais)
-            </p>
-          </CardHeader>
-          <CardContent>
-            {loadingPrazo ? (
-              <div className="flex items-center justify-center h-48">
-                <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
-              </div>
-            ) : prazoPorStatus && prazoPorStatus.length > 0 ? (
-              (() => {
-                const grouped = groupStatusIntoPhases(prazoPorStatus);
-                const barH = 36;
-                const chartHeight = Math.max(220, grouped.length * barH + 40);
-                return (
-                  <ResponsiveContainer width="100%" height={chartHeight}>
-                    <BarChart
-                      layout="vertical"
-                      data={grouped}
-                      margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
-                      barCategoryGap="20%"
-                    >
-                      <CartesianGrid horizontal={false} strokeDasharray="3 3" opacity={0.1} />
-                      <XAxis
-                        type="number"
-                        tick={{ fontSize: 11, fill: "#9ca3af" }}
-                        tickFormatter={(v: number) => `${Math.round(v)}d`}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        dataKey="label"
-                        type="category"
-                        tick={{ fontSize: 12, fill: "#d1d5db" }}
-                        width={140}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        cursor={{ fill: "rgba(255,255,255,0.04)" }}
-                        formatter={(value: number, _name: string, props: any) => [
-                          `${value} dias (${props.payload.total_transicoes} transicoes)`,
-                          "Media",
-                        ]}
-                        contentStyle={{
-                          backgroundColor: "#18181b",
-                          border: "1px solid #3f3f46",
-                          borderRadius: "8px",
-                          fontSize: "12px",
-                          color: "#e4e4e7",
-                        }}
-                        labelStyle={{ color: "#a1a1aa", fontWeight: 600 }}
-                      />
-                      <Bar dataKey="media_dias" radius={[0, 6, 6, 0]} maxBarSize={24}>
-                        {grouped.map((entry, idx) => (
-                          <Cell key={idx} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                );
-              })()
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">
-                Sem dados de prazo por status
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border bg-card p-5">
+          <div className="text-3xl font-light text-red-500">
+            {emRiscoCount}
+          </div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1 flex items-center gap-1.5">
+            Em Risco
+            <UITooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                Projetos com 3 dias ou menos até o vencimento, ou já vencidos.
+              </TooltipContent>
+            </UITooltip>
+          </div>
+        </div>
 
-        {/* Entregas por Trimestre */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Entregas por Trimestre</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingEntregas ? (
-              <div className="flex items-center justify-center h-48">
-                <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
-              </div>
-            ) : entregasTrimestre && entregasTrimestre.length > 0 ? (
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={entregasTrimestre.map((d) => ({
-                    ...d,
-                    total_entregas: parseInt(String(d.total_entregas || 0)),
-                  }))}
-                  margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-                  <Tooltip
-                    formatter={(value: number) => [`${value} entregas`, "Total"]}
-                    contentStyle={{
-                      backgroundColor: "#18181b",
-                      border: "1px solid #3f3f46",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                      color: "#e4e4e7",
-                    }}
-                  />
-                  <Bar dataKey="total_entregas" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-12">
-                Sem dados de entregas trimestrais
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="rounded-lg border bg-card p-5">
+          <div className="text-3xl font-light text-foreground">
+            {Math.round(metricas?.tempoMedioEntrega ?? 0)}d
+          </div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+            Tempo Medio
+          </div>
+        </div>
+
+        <div className="rounded-lg border bg-card p-5">
+          <div className="text-3xl font-light text-foreground">
+            {taxaNoPrazo}%
+          </div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+            Taxa No Prazo
+          </div>
+        </div>
       </div>
 
       {/* ── Pipeline Snapshot ──────────────────────────────────────── */}
       {pipelineSnapshot.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Pipeline</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Distribuicao dos {pipelineTotal} projetos ativos por fase
-            </p>
-          </CardHeader>
-          <CardContent>
-            {/* Stacked bar */}
-            <div className="flex rounded-lg overflow-hidden h-8">
-              {pipelineSnapshot.map((phase) => {
-                const pct = (phase.count / pipelineTotal) * 100;
-                return (
-                  <div
-                    key={phase.key}
-                    className="relative group flex items-center justify-center text-[10px] font-semibold text-white transition-all hover:brightness-110"
-                    style={{ width: `${pct}%`, backgroundColor: phase.color, minWidth: pct > 3 ? undefined : "24px" }}
-                    title={`${phase.label}: ${phase.count}`}
-                  >
-                    {pct > 8 && phase.count}
-                  </div>
-                );
-              })}
-            </div>
-            {/* Legend */}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
-              {pipelineSnapshot.map((phase) => (
-                <div key={phase.key} className="flex items-center gap-1.5">
-                  <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: phase.color }} />
-                  <span className="text-xs text-muted-foreground">
-                    {phase.label} ({phase.count})
-                  </span>
+        <div>
+          <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+            Pipeline — {pipelineTotal} projetos
+          </h3>
+          <div className="flex rounded-md overflow-hidden h-7">
+            {pipelineSnapshot.map((phase) => {
+              const pct = (phase.count / pipelineTotal) * 100;
+              return (
+                <div
+                  key={phase.key}
+                  className="flex items-center justify-center text-[10px] font-medium text-white/90 transition-all"
+                  style={{
+                    width: `${pct}%`,
+                    backgroundColor: phase.color,
+                    opacity: 0.7,
+                    minWidth: pct > 3 ? undefined : "20px",
+                  }}
+                  title={`${phase.label}: ${phase.count}`}
+                >
+                  {pct > 8 && phase.count}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              );
+            })}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+            {pipelineSnapshot.map((phase) => (
+              <div key={phase.key} className="flex items-center gap-1.5">
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: phase.color, opacity: 0.7 }}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {phase.label} ({phase.count})
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
-      {/* ── Proximos Vencimentos ────────────────────────────────────── */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">Proximos Vencimentos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loadingProjetos ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
+      {/* ── Charts Row ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Prazo por Status */}
+        <div className="rounded-lg border bg-card p-5">
+          <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-4">
+            Prazo por Status
+          </h3>
+          {loadingPrazo ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : proximosVencimentos.length > 0 ? (
-            <div className="space-y-2">
-              {proximosVencimentos.map((projeto) => {
-                const days = daysUntil(projeto.dataVencimento);
-                let borderColor = "border-l-green-500";
-                let textColor = "text-green-600";
-                let badgeBg = "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400";
-
-                if (days !== null && days < 0) {
-                  borderColor = "border-l-red-500";
-                  textColor = "text-red-600";
-                  badgeBg = "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400";
-                } else if (days !== null && days <= 3) {
-                  borderColor = "border-l-amber-500";
-                  textColor = "text-amber-600";
-                  badgeBg = "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400";
-                }
-
-                return (
-                  <div
-                    key={projeto.clickupTaskId}
-                    className={`flex items-center justify-between p-3 rounded-lg border-l-4 ${borderColor} bg-gray-50 dark:bg-zinc-800/50 border border-gray-100 dark:border-zinc-700`}
+          ) : prazoPorStatus && prazoPorStatus.length > 0 ? (
+            (() => {
+              const grouped = groupStatusIntoPhases(prazoPorStatus);
+              const barH = 36;
+              const chartHeight = Math.max(220, grouped.length * barH + 40);
+              return (
+                <ResponsiveContainer width="100%" height={chartHeight}>
+                  <BarChart
+                    layout="vertical"
+                    data={grouped}
+                    margin={{ top: 0, right: 40, left: 0, bottom: 0 }}
+                    barCategoryGap="20%"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {projeto.taskName}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-zinc-400 mt-0.5">
-                        {projeto.responsavel || "Sem responsavel"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 ml-4 shrink-0">
-                      <span className={`text-xs font-medium ${textColor}`}>
-                        {formatDate(projeto.dataVencimento)}
-                      </span>
-                      {projeto.statusProjeto && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeBg}`}>
-                          {projeto.statusProjeto}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      tickFormatter={(v: number) => `${Math.round(v)}d`}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      dataKey="label"
+                      type="category"
+                      tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                      width={140}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+                      formatter={(value: number, _name: string, props: any) => [
+                        `${value} dias (${props.payload.total_transicoes} transicoes)`,
+                        "Media",
+                      ]}
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                        color: "hsl(var(--foreground))",
+                      }}
+                      labelStyle={{ color: "hsl(var(--muted-foreground))", fontWeight: 600 }}
+                    />
+                    <Bar dataKey="media_dias" radius={[0, 4, 4, 0]} maxBarSize={24}>
+                      {grouped.map((entry, idx) => (
+                        <Cell key={idx} fill={entry.color} fillOpacity={0.7} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              );
+            })()
           ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhum projeto com data de vencimento
+            <p className="text-sm text-muted-foreground text-center py-12">
+              Sem dados de prazo por status
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* Entregas por Trimestre */}
+        <div className="rounded-lg border bg-card p-5">
+          <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-4">
+            Entregas por Trimestre
+          </h3>
+          {loadingEntregas ? (
+            <div className="flex items-center justify-center h-48">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : entregasTrimestre && entregasTrimestre.length > 0 ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart
+                data={entregasTrimestre.map((d) => ({
+                  ...d,
+                  total_entregas: parseInt(String(d.total_entregas || 0)),
+                }))}
+                margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+              >
+                <CartesianGrid
+                  vertical={false}
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
+                  opacity={0.5}
+                />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  allowDecimals={false}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  formatter={(value: number) => [`${value} entregas`, "Total"]}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    color: "hsl(var(--foreground))",
+                  }}
+                />
+                <Bar
+                  dataKey="total_entregas"
+                  fill="hsl(var(--primary))"
+                  fillOpacity={0.6}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-12">
+              Sem dados de entregas trimestrais
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Proximos Vencimentos ────────────────────────────────────── */}
+      <div>
+        <h3 className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+          Proximos Vencimentos
+        </h3>
+        {loadingProjetos ? (
+          <div className="flex items-center justify-center h-32">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : proximosVencimentos.length > 0 ? (
+          <div className="divide-y divide-border">
+            {proximosVencimentos.map((projeto) => {
+              const days = daysUntil(projeto.dataVencimento);
+              let dotColor = "bg-green-500";
+              if (days !== null && days < 0) {
+                dotColor = "bg-red-500";
+              } else if (days !== null && days <= 3) {
+                dotColor = "bg-yellow-500";
+              }
+
+              return (
+                <div
+                  key={projeto.clickupTaskId}
+                  className="flex items-center gap-3 py-3"
+                >
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-foreground truncate block">
+                      {projeto.taskName}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {projeto.responsavel || "Sem responsavel"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {formatDate(projeto.dataVencimento)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-8">
+            Nenhum projeto com data de vencimento
+          </p>
+        )}
+      </div>
     </div>
   );
 }
