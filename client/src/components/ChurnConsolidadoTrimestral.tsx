@@ -56,12 +56,13 @@ function getSquadColor(squad: string, index: number): string {
 }
 
 export default function ChurnConsolidadoTrimestral() {
-  const [meses, setMeses] = useState(12);
+  const currentYear = new Date().getFullYear();
+  const [ano, setAno] = useState(currentYear);
 
   const { data, isLoading } = useQuery<ChurnTrimestral[]>({
-    queryKey: ["/api/churn/consolidado-trimestral", meses],
+    queryKey: ["/api/churn/consolidado-trimestral", ano],
     queryFn: async () => {
-      const res = await fetch(`/api/churn/consolidado-trimestral?meses=${meses}`, { credentials: "include" });
+      const res = await fetch(`/api/churn/consolidado-trimestral?ano=${ano}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
@@ -151,20 +152,20 @@ export default function ChurnConsolidadoTrimestral() {
 
   return (
     <div className="space-y-6">
-      {/* Period selector */}
+      {/* Year selector */}
       <div className="flex justify-end">
         <div className="flex rounded-lg border bg-muted/50 overflow-hidden">
-          {[6, 12, 24].map((m) => (
+          {[currentYear - 1, currentYear].map((y) => (
             <button
-              key={m}
-              onClick={() => setMeses(m)}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
-                meses === m
+              key={y}
+              onClick={() => setAno(y)}
+              className={`px-4 py-1.5 text-xs font-medium transition-colors ${
+                ano === y
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {m}m
+              {y}
             </button>
           ))}
         </div>
