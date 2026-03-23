@@ -4652,6 +4652,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Churn Consolidado Trimestral - churns agrupados por squad e trimestre
+  app.get("/api/churn/consolidado-trimestral", async (req, res) => {
+    try {
+      const meses = Math.max(1, Math.min(parseInt(req.query.meses as string) || 12, 60));
+
+      const result = await db.execute(sql`
+        SELECT
+          squad,
+          EXTRACT(YEAR FROM ultimo_dia_operacao) AS ano,
+          EXTRACT(QUARTER FROM ultimo_dia_operacao) AS trimestre,
+          'Q' || EXTRACT(QUARTER FROM ultimo_dia_operacao) || ' ' || EXTRACT(YEAR FROM ultimo_dia_operacao) AS label,
+          COUNT(*) AS total_churns,
+          SUM(COALESCE(valor_r, 0)) AS valor_total
+        FROM "Clickup".cup_churn
+        WHERE ultimo_dia_operacao IS NOT NULL
+          AND squad IS NOT NULL
+          AND status IN ('cancelado/inativo', 'em cancelamento')
+          AND ultimo_dia_operacao >= (CURRENT_DATE - ${sql.raw(`INTERVAL '${meses} months'`)})
+        GROUP BY squad, ano, trimestre
+        ORDER BY ano DESC, trimestre DESC, valor_total DESC
+      `);
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching churn consolidado trimestral:", error);
+      res.status(500).json({ error: "Failed to fetch churn consolidado trimestral" });
+    }
+  });
+
   // Análise IA das mensagens de churn — classifica sentimento, temas e gera insight
   const churnAICache = new Map<string, { result: any; timestamp: number }>();
   const CHURN_AI_CACHE_TTL = 1000 * 60 * 30; // 30 min

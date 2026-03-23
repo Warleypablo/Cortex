@@ -54,6 +54,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import RelatorioSemanalChurn from "./RelatorioSemanalChurn";
+import ChurnConsolidadoTrimestral from "@/components/ChurnConsolidadoTrimestral";
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
@@ -488,7 +489,7 @@ export default function ChurnDetalhamento() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Fechado por padrão, dados principais no hero
   const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
-  const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio">("analise");
+  const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio" | "consolidado">("analise");
   const [crossAnalysisView, setCrossAnalysisView] = useState<"motivo" | "cluster" | "plano">("motivo");
   const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
   const [analysisSubTab, setAnalysisSubTab] = useState<"resumo" | "distribuicao" | "inteligencia">("resumo");
@@ -1878,7 +1879,7 @@ export default function ChurnDetalhamento() {
       </Card>
 
       {/* Tabs de nível superior */}
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio")}>
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio" | "consolidado")}>
         <TabsList>
           <TabsTrigger value="analise" className="gap-2" data-testid="main-tab-analise">
             <BarChart3 className="h-4 w-4" />
@@ -1887,6 +1888,10 @@ export default function ChurnDetalhamento() {
           <TabsTrigger value="contratos" className="gap-2" data-testid="main-tab-contratos">
             <FileText className="h-4 w-4" />
             Contratos
+          </TabsTrigger>
+          <TabsTrigger value="consolidado" className="gap-2" data-testid="main-tab-consolidado">
+            <Target className="h-4 w-4" />
+            Consolidado Trimestral
           </TabsTrigger>
           <TabsTrigger value="relatorio" className="gap-2" data-testid="main-tab-relatorio">
             <CalendarRange className="h-4 w-4" />
@@ -1897,6 +1902,8 @@ export default function ChurnDetalhamento() {
 
       {mainTab === "relatorio" ? (
         <RelatorioSemanalChurn />
+      ) : mainTab === "consolidado" ? (
+        <ChurnConsolidadoTrimestral />
       ) : mainTab === "analise" ? (
       <>
 
