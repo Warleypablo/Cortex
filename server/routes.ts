@@ -1901,6 +1901,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Registrar histórico de notas
+      if (notas !== undefined) {
+        const notaPreview = notas ? (notas.length > 80 ? notas.substring(0, 80) + '...' : notas) : 'removida';
+        await storage.createPatrimonioHistorico({
+          patrimonioId: id,
+          acao: notas ? `Nota adicionada: "${notaPreview}"` : 'Nota removida',
+          usuario: (req as any).user?.displayName || 'Sistema',
+          data: new Date(),
+        });
+      }
+
       res.json(patrimonio);
     } catch (error) {
       console.error("[api] Error updating patrimonio:", error);
