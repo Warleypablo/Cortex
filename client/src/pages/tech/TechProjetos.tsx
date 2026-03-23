@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Loader2, LayoutGrid, List } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import ProjectCard from "@/components/tech/ProjectCard";
 import ProjectDrawer from "@/components/tech/ProjectDrawer";
 
@@ -12,23 +13,35 @@ function getInitials(name: string): string {
   return (name[0] || "?").toUpperCase();
 }
 
-function getCargaInfo(count: number): { label: string; color: string } {
-  if (count > 7) return { label: "Alta", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
-  if (count >= 4) return { label: "Media", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" };
-  return { label: "OK", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" };
+function getLoadDot(count: number): string {
+  if (count > 7) return "bg-red-500";
+  if (count >= 4) return "bg-amber-500";
+  return "bg-emerald-500";
 }
 
-function getStatusColor(status: string) {
-  const s = (status || "").toLowerCase();
-  if (s.includes("design")) return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
-  if (s.includes("dev")) return "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400";
-  if (s.includes("review")) return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
-  if (s.includes("qa")) return "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400";
-  if (s.includes("deploy")) return "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400";
-  if (s.includes("done") || s.includes("closed")) return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
-  if (s.includes("kickoff")) return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-  return "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300";
+function getUrgencyForRow(dueDate: string | null): "overdue" | "risk" | "ok" | "none" {
+  if (!dueDate) return "none";
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diffDays = (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+  if (diffDays < 0) return "overdue";
+  if (diffDays <= 3) return "risk";
+  return "ok";
 }
+
+const URGENCY_DOT_COLOR: Record<string, string> = {
+  overdue: "bg-red-500",
+  risk: "bg-amber-500",
+  ok: "bg-emerald-500",
+  none: "bg-gray-300 dark:bg-zinc-600",
+};
+
+const URGENCY_LABEL: Record<string, string> = {
+  overdue: "Atrasado",
+  risk: "Em risco",
+  ok: "No prazo",
+  none: "—",
+};
 
 function normalizeForDrawer(p: any) {
   return {
@@ -43,6 +56,9 @@ function normalizeForDrawer(p: any) {
   };
 }
 
+const selectClass =
+  "h-8 px-2 text-xs rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring";
+
 // ── Component ──────────────────────────────────────────────────────────
 
 export default function TechProjetos() {
@@ -55,10 +71,10 @@ export default function TechProjetos() {
   const [filterResponsavel, setFilterResponsavel] = useState("");
   const [selectedProject, setSelectedProject] = useState<any>(null);
 
-  // When switching to fechados, force lista view (kanban only shows abertos)
+  // When switching to fechados, force lista view
   const effectiveView = toggle === "fechados" ? "lista" : viewMode;
 
-  // ── Kanban data (board grouped by responsavel) ─────────────────────
+  // ── Kanban data ─────────────────────────────────────────────────────
   const kanbanParams = useMemo(() => {
     const p = new URLSearchParams();
     if (filterStatus) p.set("status", filterStatus);
@@ -77,7 +93,7 @@ export default function TechProjetos() {
     enabled: effectiveView === "kanban",
   });
 
-  // ── Lista data (all projects) ──────────────────────────────────────
+  // ── Lista data ──────────────────────────────────────────────────────
   const { data: projetos = [], isLoading: loadingProjetos } = useQuery({
     queryKey: ["/api/tech/projetos", toggle],
     queryFn: async () => {
@@ -138,83 +154,52 @@ export default function TechProjetos() {
 
   const isLoading = effectiveView === "kanban" ? loadingBoard : loadingProjetos;
 
-  // ── Render ─────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────
 
   return (
     <div className="p-6 h-full flex flex-col">
-      {/* Toolbar */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        {/* Abertos / Fechados */}
-        <div className="flex rounded-lg border border-gray-300 dark:border-zinc-600 overflow-hidden">
+      {/* Toolbar — single row */}
+      <div className="flex items-center gap-2 mb-4">
+        {/* Abertos / Fechados segmented control */}
+        <div className="inline-flex rounded-md border border-input overflow-hidden">
           <button
             onClick={() => setToggle("abertos")}
-            className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`px-3 py-1 text-xs font-medium transition-colors ${
               toggle === "abertos"
-                ? "bg-indigo-600 text-white"
-                : "bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-400"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-muted"
             }`}
           >
             Abertos
           </button>
           <button
             onClick={() => setToggle("fechados")}
-            className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+            className={`px-3 py-1 text-xs font-medium transition-colors ${
               toggle === "fechados"
-                ? "bg-indigo-600 text-white"
-                : "bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-400"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:bg-muted"
             }`}
           >
             Fechados
           </button>
         </div>
 
-        {/* Kanban / Lista toggle */}
-        <div className="flex rounded-lg border border-gray-300 dark:border-zinc-600 overflow-hidden">
-          <button
-            onClick={() => setViewMode("kanban")}
-            disabled={toggle === "fechados"}
-            className={`px-2.5 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              effectiveView === "kanban"
-                ? "bg-indigo-600 text-white"
-                : "bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-400"
-            }`}
-            title="Kanban"
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode("lista")}
-            className={`px-2.5 py-1.5 text-sm font-medium transition-colors ${
-              effectiveView === "lista"
-                ? "bg-indigo-600 text-white"
-                : "bg-white dark:bg-zinc-800 text-gray-600 dark:text-zinc-400"
-            }`}
-            title="Lista"
-          >
-            <List className="w-4 h-4" />
-          </button>
-        </div>
-
         {/* Search */}
         <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <input
             type="text"
             placeholder="Buscar projeto..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 placeholder-gray-400 dark:placeholder-zinc-500"
+            className="w-full h-8 pl-7 pr-3 text-xs rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
           />
         </div>
 
-        {/* Filters (shared) */}
+        {/* Filters */}
         {effectiveView === "kanban" ? (
           <>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
-            >
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass}>
               <option value="">Status</option>
               <option value="kickoff">Kickoff</option>
               <option value="design">Design</option>
@@ -223,22 +208,14 @@ export default function TechProjetos() {
               <option value="qa">QA</option>
               <option value="deploy">Deploy</option>
             </select>
-            <select
-              value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
-            >
+            <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} className={selectClass}>
               <option value="">Tipo</option>
               <option value="feature">Feature</option>
               <option value="melhoria">Melhoria</option>
               <option value="bug">Bug</option>
               <option value="hotfix">Hotfix</option>
             </select>
-            <select
-              value={filterPrioridade}
-              onChange={(e) => setFilterPrioridade(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
-            >
+            <select value={filterPrioridade} onChange={(e) => setFilterPrioridade(e.target.value)} className={selectClass}>
               <option value="">Prioridade</option>
               <option value="urgente">Urgente</option>
               <option value="alta">Alta</option>
@@ -248,31 +225,19 @@ export default function TechProjetos() {
           </>
         ) : (
           <>
-            <select
-              value={filterResponsavel}
-              onChange={(e) => setFilterResponsavel(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
-            >
-              <option value="">Responsavel</option>
+            <select value={filterResponsavel} onChange={(e) => setFilterResponsavel(e.target.value)} className={selectClass}>
+              <option value="">Responsável</option>
               {responsaveis.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
-            >
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className={selectClass}>
               <option value="">Status</option>
               {statuses.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            <select
-              value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="px-3 py-1.5 text-sm rounded-md border border-gray-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300"
-            >
+            <select value={filterTipo} onChange={(e) => setFilterTipo(e.target.value)} className={selectClass}>
               <option value="">Tipo</option>
               {tipos.map((t) => (
                 <option key={t} value={t}>{t}</option>
@@ -281,83 +246,113 @@ export default function TechProjetos() {
           </>
         )}
 
-        <span className="text-sm text-gray-500 dark:text-zinc-400 ml-auto">
-          {totalCount} projetos
-        </span>
+        {/* Right side: count + view toggle */}
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-xs text-muted-foreground">
+            {totalCount} projetos
+          </span>
+
+          {/* Kanban / Lista segmented control */}
+          <div className="inline-flex rounded-md border border-input overflow-hidden">
+            <button
+              onClick={() => setViewMode("kanban")}
+              disabled={toggle === "fechados"}
+              className={`p-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                effectiveView === "kanban"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground hover:bg-muted"
+              }`}
+              title="Kanban"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode("lista")}
+              className={`p-1.5 transition-colors ${
+                effectiveView === "lista"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground hover:bg-muted"
+              }`}
+              title="Lista"
+            >
+              <List className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Content */}
       {isLoading ? (
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
         </div>
       ) : effectiveView === "kanban" ? (
         /* ── Kanban View ──────────────────────────────────────────── */
         <div className="flex-1 overflow-x-auto">
           <div className="flex gap-4 min-w-max pb-4">
-            {filteredColumns.map((col: any) => {
-              const carga = getCargaInfo(col.total);
-              return (
-                <div key={col.responsavel} className="w-72 flex-shrink-0">
-                  {/* Column header */}
-                  <div className="flex items-center gap-2 mb-3 px-1">
-                    <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
-                      {getInitials(col.responsavel)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {col.responsavel}
-                      </p>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-gray-500 dark:text-zinc-400">
-                          {col.total} projetos
-                        </span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${carga.color}`}>
-                          {carga.label}
-                        </span>
-                      </div>
-                    </div>
+            {filteredColumns.map((col: any) => (
+              <div key={col.responsavel} className="w-72 flex-shrink-0">
+                {/* Column header */}
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] font-bold">
+                    {getInitials(col.responsavel)}
                   </div>
-
-                  {/* Cards */}
-                  <div className="space-y-2">
-                    {col.projetos.map((proj: any) => (
-                      <ProjectCard
-                        key={proj.clickup_task_id}
-                        project={proj}
-                        onClick={() => setSelectedProject(proj)}
-                      />
-                    ))}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {col.responsavel}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-block w-2 h-2 rounded-full ${getLoadDot(col.total)}`} />
+                    <span className="text-xs text-muted-foreground">
+                      {col.total}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+
+                {/* Cards container */}
+                <div className="rounded-lg bg-muted/30 p-3 space-y-2 min-h-[100px]">
+                  {col.projetos.map((proj: any) => (
+                    <ProjectCard
+                      key={proj.clickup_task_id}
+                      project={proj}
+                      onClick={() => setSelectedProject(proj)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       ) : filteredProjetos.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-zinc-500 py-8 text-center">
+        <p className="text-sm text-muted-foreground py-8 text-center">
           Nenhum projeto encontrado.
         </p>
       ) : (
         /* ── Lista View ───────────────────────────────────────────── */
         <div className="flex-1 overflow-auto">
           <table className="w-full">
-            <thead className="sticky top-0 bg-gray-50 dark:bg-zinc-900">
-              <tr className="text-xs text-gray-500 dark:text-zinc-400 uppercase">
-                <th className="text-left py-2 px-3 font-medium">Projeto</th>
+            <thead className="sticky top-0 bg-background">
+              <tr className="text-xs text-muted-foreground">
+                <th className="text-left py-2 px-3 font-medium">Nome</th>
                 <th className="text-left py-2 px-3 font-medium">Status</th>
-                <th className="text-left py-2 px-3 font-medium">Responsavel</th>
                 <th className="text-left py-2 px-3 font-medium">Fase</th>
-                <th className="text-left py-2 px-3 font-medium">Vencimento</th>
+                <th className="text-left py-2 px-3 font-medium">Responsável</th>
+                <th className="text-left py-2 px-3 font-medium">
+                  {toggle === "fechados" ? "Entrega" : "Prazo"}
+                </th>
+                <th className="text-left py-2 px-3 font-medium">Urgência</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {filteredProjetos.map((p: any) => {
                 const id = p.clickup_task_id || p.clickupTaskId;
                 const name = p.task_name || p.taskName;
                 const status = p.status_projeto || p.statusProjeto || "";
                 const fase = p.fase_projeto || p.faseProjeto || "";
                 const vencimento = p.data_vencimento || p.dataVencimento;
+                const dateToShow = toggle === "fechados" ? p.lancamento : vencimento;
+                const urgency = getUrgencyForRow(vencimento);
                 const selectedId =
                   selectedProject?.clickup_task_id || selectedProject?.clickupTaskId;
                 const isSelected = selectedId === id;
@@ -366,32 +361,36 @@ export default function TechProjetos() {
                   <tr
                     key={id}
                     onClick={() => setSelectedProject(normalizeForDrawer(p))}
-                    className={`cursor-pointer border-b border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors ${
-                      isSelected
-                        ? "bg-indigo-50 dark:bg-indigo-900/10 border-l-2 border-l-indigo-500"
-                        : ""
+                    className={`cursor-pointer hover:bg-muted/50 transition-colors ${
+                      isSelected ? "bg-primary/5" : ""
                     }`}
                   >
-                    <td className="py-2.5 px-3 text-sm font-medium text-gray-900 dark:text-white truncate max-w-xs">
+                    <td className="py-2.5 px-3 text-sm font-medium text-foreground truncate max-w-xs">
                       {name}
                     </td>
                     <td className="py-2.5 px-3">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${getStatusColor(status)}`}
-                      >
+                      <Badge variant="secondary" className="text-xs">
                         {status}
-                      </span>
+                      </Badge>
                     </td>
-                    <td className="py-2.5 px-3 text-sm text-gray-600 dark:text-zinc-400 truncate max-w-[150px]">
-                      {p.responsavel || "\u2014"}
+                    <td className="py-2.5 px-3 text-xs text-muted-foreground">
+                      {fase || "—"}
                     </td>
-                    <td className="py-2.5 px-3 text-sm text-gray-600 dark:text-zinc-400">
-                      {fase || "\u2014"}
+                    <td className="py-2.5 px-3 text-sm text-muted-foreground truncate max-w-[150px]">
+                      {p.responsavel || "—"}
                     </td>
-                    <td className="py-2.5 px-3 text-sm text-gray-600 dark:text-zinc-400">
-                      {vencimento
-                        ? new Date(vencimento).toLocaleDateString("pt-BR")
-                        : "\u2014"}
+                    <td className="py-2.5 px-3 text-xs text-muted-foreground">
+                      {dateToShow
+                        ? new Date(dateToShow).toLocaleDateString("pt-BR")
+                        : "—"}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-block w-1.5 h-1.5 rounded-full ${URGENCY_DOT_COLOR[urgency]}`} />
+                        <span className="text-xs text-muted-foreground">
+                          {URGENCY_LABEL[urgency]}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );

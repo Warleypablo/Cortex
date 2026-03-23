@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Calendar, Clock, Tag, MessageSquare, AlertTriangle, ChevronDown, ChevronUp, User } from "lucide-react";
+import { Calendar, Clock, Tag, MessageSquare, AlertTriangle, ChevronDown, ChevronUp, User, Sparkles, Loader2 } from "lucide-react";
 import PrazoStatusBar from "./PrazoStatusBar";
 import StatusTimeline from "./StatusTimeline";
 
@@ -53,6 +53,18 @@ export default function ProjectDrawer({ project, open, onClose }: ProjectDrawerP
       return res.json();
     },
     enabled: !!taskId && open,
+  });
+
+  // Fetch AI summary
+  const { data: resumoIA, isLoading: loadingResumoIA } = useQuery<{ resumo: string }>({
+    queryKey: ['/api/tech/projeto', taskId, 'resumo-ia'],
+    queryFn: async () => {
+      const res = await fetch(`/api/tech/projeto/${taskId}/resumo-ia`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      return res.json();
+    },
+    enabled: !!taskId && open && (resumo?.totalComentarios || 0) > 0,
+    staleTime: 5 * 60 * 1000, // cache 5 min
   });
 
   // Fetch full comments (only when expanded)
@@ -144,6 +156,22 @@ export default function ProjectDrawer({ project, open, onClose }: ProjectDrawerP
                 </span>
               )}
             </div>
+
+            {/* AI Summary */}
+            {loadingResumoIA ? (
+              <div className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/50 dark:bg-indigo-950/20 p-3 mb-3 flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-500" />
+                <span className="text-xs text-indigo-600 dark:text-indigo-400">Gerando resumo com IA...</span>
+              </div>
+            ) : resumoIA?.resumo && resumo?.totalComentarios > 0 ? (
+              <div className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/50 dark:bg-indigo-950/20 p-3 mb-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Sparkles className="w-3 h-3 text-indigo-500" />
+                  <span className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Resumo IA</span>
+                </div>
+                <p className="text-xs text-gray-700 dark:text-zinc-300 leading-relaxed">{resumoIA.resumo}</p>
+              </div>
+            ) : null}
 
             {loadingResumo ? (
               <div className="bg-gray-50 dark:bg-zinc-800/50 rounded-lg p-4 animate-pulse">
