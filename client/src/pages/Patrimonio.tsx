@@ -76,6 +76,7 @@ interface PatrimonioDb {
   ativo: string | null;
   marca: string | null;
   estadoConservacao: string | null;
+  statusPatrimonio: string | null;
   responsavelAtual: string | null;
   responsavelId: number | null;
   valorPago: string | null;
@@ -101,6 +102,7 @@ export default function Patrimonio() {
   const [filterEstado, setFilterEstado] = useState<string>("todos");
   const [filterMarca, setFilterMarca] = useState<string>("todos");
   const [filterResponsavel, setFilterResponsavel] = useState<string>("todos");
+  const [filterStatusPatrimonio, setFilterStatusPatrimonio] = useState<string>("todos");
   const [sortField, setSortField] = useState<SortField | "default">("default");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -288,7 +290,15 @@ export default function Patrimonio() {
         result = result.filter(p => p.responsavelAtual === filterResponsavel);
       }
     }
-    
+
+    if (filterStatusPatrimonio !== "todos") {
+      if (filterStatusPatrimonio === "sem_status") {
+        result = result.filter(p => !p.statusPatrimonio);
+      } else {
+        result = result.filter(p => p.statusPatrimonio === filterStatusPatrimonio);
+      }
+    }
+
     result.sort((a, b) => {
       // Ordenação padrão: Notebooks/Computadores primeiro, depois bom estado
       if (sortField === "default") {
@@ -406,6 +416,8 @@ export default function Patrimonio() {
     setFilterTipoBem("todos");
     setFilterEstado("todos");
     setFilterMarca("todos");
+    setFilterResponsavel("todos");
+    setFilterStatusPatrimonio("todos");
     setSearchQuery("");
     setCurrentPage(1);
   };
@@ -681,7 +693,7 @@ export default function Patrimonio() {
     });
   };
 
-  const hasActiveFilters = filterTipoBem !== "todos" || filterEstado !== "todos" || filterMarca !== "todos" || filterResponsavel !== "todos" || searchQuery !== "";
+  const hasActiveFilters = filterTipoBem !== "todos" || filterEstado !== "todos" || filterMarca !== "todos" || filterResponsavel !== "todos" || filterStatusPatrimonio !== "todos" || searchQuery !== "";
 
   if (error) {
     return (
@@ -822,7 +834,7 @@ export default function Patrimonio() {
                       Filtros
                       {hasActiveFilters && (
                         <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                          {[filterTipoBem !== "todos", filterEstado !== "todos", filterMarca !== "todos", filterResponsavel !== "todos"].filter(Boolean).length}
+                          {[filterTipoBem !== "todos", filterEstado !== "todos", filterMarca !== "todos", filterResponsavel !== "todos", filterStatusPatrimonio !== "todos"].filter(Boolean).length}
                         </Badge>
                       )}
                     </Button>
@@ -988,6 +1000,29 @@ export default function Patrimonio() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Status</label>
+                      <Select
+                        value={filterStatusPatrimonio}
+                        onValueChange={(value) => {
+                          setFilterStatusPatrimonio(value);
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          <SelectItem value="Disponível">Disponível</SelectItem>
+                          <SelectItem value="Em Uso">Em Uso</SelectItem>
+                          <SelectItem value="Em Conserto">Em Conserto</SelectItem>
+                          <SelectItem value="Aposentado">Aposentado</SelectItem>
+                          <SelectItem value="sem_status">Sem status</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </CollapsibleContent>
               </Collapsible>
@@ -1063,7 +1098,12 @@ export default function Patrimonio() {
                                 {getSortIcon("estadoConservacao")}
                               </div>
                             </TableHead>
-                            <TableHead 
+                            <TableHead className="min-w-[130px]">
+                              <div className="flex items-center">
+                                Status
+                              </div>
+                            </TableHead>
+                            <TableHead
                               className="min-w-[180px] cursor-pointer select-none hover:bg-muted/70 transition-colors"
                               onClick={() => handleSort("responsavelAtual")}
                               data-testid="header-responsavel"
@@ -1098,7 +1138,7 @@ export default function Patrimonio() {
                         <TableBody>
                           {paginatedPatrimonios.length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                              <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                                 Nenhum patrimônio encontrado.
                               </TableCell>
                             </TableRow>
@@ -1147,6 +1187,19 @@ export default function Patrimonio() {
                                   ) : (
                                     "-"
                                   )}
+                                </TableCell>
+                                <TableCell data-testid={`status-${item.id}`}>
+                                  <Badge variant="outline" className={
+                                    item.statusPatrimonio === "Em Conserto"
+                                      ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300 border-amber-300"
+                                      : item.statusPatrimonio === "Disponível"
+                                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-300"
+                                      : item.statusPatrimonio === "Aposentado"
+                                      ? "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 border-zinc-300"
+                                      : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300"
+                                  }>
+                                    {item.statusPatrimonio || "Em Uso"}
+                                  </Badge>
                                 </TableCell>
                                 <TableCell data-testid={`responsavel-${item.id}`}>
                                   {item.responsavelAtual && item.responsavelId ? (
