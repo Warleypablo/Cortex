@@ -53,9 +53,6 @@ export const PERMISSION_KEYS = {
   // Tech
   TECH: {
     VISAO_GERAL: 'tech.visao_geral',
-    PROJETOS: 'tech.projetos',
-    EVOLUCAO: 'tech.evolucao',
-    FINANCEIRO: 'tech.financeiro',
   },
   // Comercial
   COM: {
@@ -230,9 +227,6 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   // Tech
   '/tech': PERMISSION_KEYS.TECH.VISAO_GERAL,
   '/dashboard/tech': PERMISSION_KEYS.TECH.VISAO_GERAL,
-  '/tech/projetos': PERMISSION_KEYS.TECH.PROJETOS,
-  '/tech/evolucao': PERMISSION_KEYS.TECH.EVOLUCAO,
-  '/tech/financeiro': PERMISSION_KEYS.TECH.FINANCEIRO,
   // Comercial
   '/dashboard/comercial/closers': PERMISSION_KEYS.COM.CLOSERS,
   '/dashboard/comercial/sdrs': PERMISSION_KEYS.COM.SDRS,
@@ -657,10 +651,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',
-  [PERMISSION_KEYS.TECH.VISAO_GERAL]: 'Visão Geral',
-  [PERMISSION_KEYS.TECH.PROJETOS]: 'Projetos',
-  [PERMISSION_KEYS.TECH.EVOLUCAO]: 'Evolução Mensal',
-  [PERMISSION_KEYS.TECH.FINANCEIRO]: 'Análise Financeira',
+  [PERMISSION_KEYS.TECH.VISAO_GERAL]: 'Tech Hub',
   [PERMISSION_KEYS.COM.CLOSERS]: 'Closers',
   [PERMISSION_KEYS.COM.SDRS]: 'SDRs',
   [PERMISSION_KEYS.COM.DET_CLOSERS]: 'Detalhamento Closers',
