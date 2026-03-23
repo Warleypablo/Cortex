@@ -2493,6 +2493,35 @@ export class DbStorage implements IStorage {
       });
     }
 
+    // Se status mudou para Dispensado ou Inativo, desatribuir patrimônios
+    const statusAnterior = currentColaborador.status;
+    const statusNovo = colaborador.status;
+    const statusProvided = 'status' in colaborador && statusNovo !== undefined;
+
+    if (statusProvided && statusAnterior !== statusNovo &&
+        (statusNovo === 'Dispensado' || statusNovo === 'Inativo')) {
+      const patrimoniosDoColab = await db.execute(sql`
+        SELECT id FROM "Inhire".rh_patrimonio WHERE responsavel_id = ${id}
+      `);
+
+      if (patrimoniosDoColab.rows && patrimoniosDoColab.rows.length > 0) {
+        await db.execute(sql`
+          UPDATE "Inhire".rh_patrimonio
+          SET responsavel_atual = NULL, responsavel_id = NULL
+          WHERE responsavel_id = ${id}
+        `);
+
+        for (const p of patrimoniosDoColab.rows as any[]) {
+          await this.createPatrimonioHistorico({
+            patrimonioId: p.id,
+            acao: `Responsável removido automaticamente (${updatedColaborador.nome} — ${statusNovo})`,
+            usuario: criadoPor || 'Sistema',
+            data: new Date(),
+          });
+        }
+      }
+    }
+
     return updatedColaborador;
   }
 
@@ -2737,6 +2766,12 @@ export class DbStorage implements IStorage {
         status: schema.rhPessoal.status,
       })
       .from(schema.rhPessoal)
+      .where(
+        or(
+          eq(schema.rhPessoal.status, 'Ativo'),
+          isNull(schema.rhPessoal.status)
+        )
+      )
       .orderBy(schema.rhPessoal.nome);
 
     return result.map(r => ({ id: r.id, nome: r.nome, email_turbo: r.emailTurbo, status: r.status }));
