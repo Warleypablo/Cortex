@@ -151,10 +151,10 @@ export default function TechResponsavel() {
                   const urg = getUrgenciaStyle(proj.urgencia || "No Prazo");
                   return (
                     <div key={i} className="grid grid-cols-5 gap-4 px-5 py-3 text-sm hover:bg-muted/50 transition-colors">
-                      <span className="font-medium truncate">{proj.nome || proj.name}</span>
-                      <span className="text-muted-foreground truncate">{proj.status}</span>
-                      <span className="text-muted-foreground truncate">{proj.fase || "\u2014"}</span>
-                      <span className="text-muted-foreground">{proj.prazo || "\u2014"}</span>
+                      <span className="font-medium truncate">{proj.taskName}</span>
+                      <span className="text-muted-foreground truncate">{proj.statusProjeto || "\u2014"}</span>
+                      <span className="text-muted-foreground truncate">{proj.faseProjeto || "\u2014"}</span>
+                      <span className="text-muted-foreground">{proj.dataVencimento ? new Date(proj.dataVencimento).toLocaleDateString("pt-BR") : "\u2014"}</span>
                       <span className="flex items-center gap-1.5">
                         <span className={`h-2 w-2 rounded-full ${urg.dot}`} />
                         <span className={urg.text}>{proj.urgencia || "No Prazo"}</span>
