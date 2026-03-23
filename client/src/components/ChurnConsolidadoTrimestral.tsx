@@ -295,11 +295,12 @@ export default function ChurnConsolidadoTrimestral() {
                     const totalSquad = Object.values(row).reduce((s, v) => s + v.valor, 0);
                     const totalCount = Object.values(row).reduce((s, v) => s + v.total, 0);
                     return (
-                      <TableRow key={squad} className={selectedSquad === squad ? "bg-primary/5" : ""}>
-                        <TableCell
-                          className="font-medium whitespace-nowrap cursor-pointer hover:text-primary transition-colors"
-                          onClick={() => setSelectedSquad(selectedSquad === squad ? null : squad)}
-                        >
+                      <TableRow
+                        key={squad}
+                        className={`cursor-pointer hover:bg-muted/50 transition-colors ${selectedSquad === squad ? "bg-primary/10 hover:bg-primary/10" : ""}`}
+                        onClick={() => setSelectedSquad(selectedSquad === squad ? null : squad)}
+                      >
+                        <TableCell className="font-medium whitespace-nowrap">
                           {squad}
                         </TableCell>
                         {tableData.trimestres.map((t) => {
