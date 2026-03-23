@@ -93,10 +93,14 @@ export default function TechPerformance() {
 
   const tempoPorFase = useMemo(() => groupStatusIntoPhases(prazoPorStatus), [prazoPorStatus]);
 
-  // Gargalo = fase com mais tempo médio (usando dados agrupados, que já excluem deploy/done)
+  // Gargalo = fase de trabalho efetivo com mais tempo (exclui estados excepcionais)
   const gargalo = useMemo(() => {
-    if (tempoPorFase.length === 0) return { label: "—", dias: 0 };
-    const max = tempoPorFase.reduce((a, b) => (a.media_dias > b.media_dias ? a : b));
+    const excludeFromGargalo = ["bloqueado", "pendencias", "aguardando"];
+    const workPhases = tempoPorFase.filter(
+      (p) => !excludeFromGargalo.some((ex) => p.label.toLowerCase().includes(ex))
+    );
+    if (workPhases.length === 0) return { label: "—", dias: 0 };
+    const max = workPhases.reduce((a, b) => (a.media_dias > b.media_dias ? a : b));
     return { label: max.label, dias: Math.round(max.media_dias * 10) / 10 };
   }, [tempoPorFase]);
   const maxFaseDias = useMemo(
