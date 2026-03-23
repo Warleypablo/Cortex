@@ -44,6 +44,11 @@ export default function TechPerformance() {
     },
   });
 
+  const { data: boardData = [] } = useQuery<any[]>({
+    queryKey: ["tech-board"],
+    queryFn: () => fetch("/api/tech/board").then((r) => r.json()),
+  });
+
   // ── Computed KPIs ──────────────────────────────────────────────────
 
   const kpis = useMemo(() => {
@@ -56,16 +61,15 @@ export default function TechPerformance() {
     const currentQuarter = entregasData.length > 0 ? entregasData[entregasData.length - 1] : null;
     const entregasTrimestre = currentQuarter ? parseInt(currentQuarter.total_entregas) || 0 : 0;
 
-    // Taxa no prazo — percentage of deploys within target (e.g. <= 30 days)
-    const totalEntregas = entregasData.reduce(
-      (sum: number, d: any) => sum + (parseInt(d.total_entregas) || 0),
-      0,
-    );
-    const entregasNoPrazo = entregasData.reduce(
-      (sum: number, d: any) => sum + (parseInt(d.no_prazo) || 0),
-      0,
-    );
-    const taxaNoPrazo = totalEntregas > 0 ? Math.round((entregasNoPrazo / totalEntregas) * 100) : 0;
+    // Taxa no prazo — projetos ativos não atrasados / total ativos
+    const allProjects = boardData.flatMap((g: any) => g.projetos || []);
+    const totalAtivos = allProjects.length;
+    const now = Date.now();
+    const atrasados = allProjects.filter((p: any) => {
+      if (!p.data_vencimento) return false;
+      return new Date(p.data_vencimento).getTime() < now;
+    }).length;
+    const taxaNoPrazo = totalAtivos > 0 ? Math.round(((totalAtivos - atrasados) / totalAtivos) * 100) : 100;
 
     // Excluir fases finais (deploy, done) do cálculo de gargalo
     const endStates = ["deploy", "deploy 🚀", "encerrado 🚀", "complete", "completo", "done"];
@@ -87,7 +91,7 @@ export default function TechPerformance() {
       gargalo: gargalo?.status || "\u2014",
       gargaloDias: gargalo ? Math.round(parseFloat(gargalo.media_dias) * 10) / 10 : 0,
     };
-  }, [deployData, entregasData, prazoPorStatus]);
+  }, [deployData, entregasData, prazoPorStatus, boardData]);
 
   // ── Tempo por Fase ────────────────────────────────────────────────
 
