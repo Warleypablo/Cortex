@@ -4657,7 +4657,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
 
-      const result = await db.execute(sql`
+      // Churn por squad/trimestre
+      const churnResult = await db.execute(sql`
         SELECT
           squad,
           EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS ano,
@@ -4675,7 +4676,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY ano, trimestre, valor_total DESC
       `);
 
-      res.json(result.rows);
+      // MRR ativo atual por squad (base para calcular churn rate)
+      const mrrResult = await db.execute(sql`
+        SELECT squad, SUM(COALESCE(valor_r, 0)) AS mrr_ativo
+        FROM "Clickup".cup_churn
+        WHERE squad IS NOT NULL AND status = 'ativo' AND valor_r > 0
+        GROUP BY squad
+      `);
+      const mrrBySquad: Record<string, number> = {};
+      (mrrResult.rows as any[]).forEach((r: any) => { mrrBySquad[r.squad] = parseFloat(r.mrr_ativo) || 0; });
+
+      // Calcular churn rate: valor_churn / (mrr_ativo + valor_churn_acumulado_posterior)
+      const rows = (churnResult.rows as any[]).map((r: any) => {
+        const mrrAtivo = mrrBySquad[r.squad] || 0;
+        const valorChurn = parseFloat(r.valor_total) || 0;
+        // MRR base aprox = ativo atual + tudo que churnou depois desse trimestre
+        const mrrBase = mrrAtivo + valorChurn;
+        const churnRate = mrrBase > 0 ? (valorChurn / mrrBase) * 100 : 0;
+        return { ...r, mrr_base: Math.round(mrrBase), churn_rate: Math.round(churnRate * 10) / 10 };
+      });
+
+      res.json(rows);
     } catch (error) {
       console.error("[api] Error fetching churn consolidado trimestral:", error);
       res.status(500).json({ error: "Failed to fetch churn consolidado trimestral" });
