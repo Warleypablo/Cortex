@@ -60,6 +60,7 @@ export default function TechPerformance() {
 
     const currentQuarter = entregasData.length > 0 ? entregasData[entregasData.length - 1] : null;
     const entregasTrimestre = currentQuarter ? parseInt(currentQuarter.total_entregas) || 0 : 0;
+    const valorTrimestre = currentQuarter ? parseFloat(currentQuarter.valor_total) || 0 : 0;
 
     // Taxa no prazo — projetos ativos não atrasados / total ativos
     const allProjects = boardData.flatMap((g: any) => g.projetos || []);
@@ -74,6 +75,7 @@ export default function TechPerformance() {
     return {
       tempoMedioDeploy: Math.round(avgDeploy * 10) / 10,
       entregasTrimestre,
+      valorTrimestre,
       taxaNoPrazo,
     };
   }, [deployData, entregasData, boardData]);
@@ -152,6 +154,11 @@ export default function TechPerformance() {
           <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
             Entregas no Trimestre
           </div>
+          {kpis.valorTrimestre > 0 && (
+            <div className="text-sm font-medium text-emerald-600 dark:text-emerald-400 mt-1">
+              R$ {kpis.valorTrimestre.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </div>
+          )}
         </div>
         <div className="rounded-lg border bg-card p-5">
           <div className="text-3xl font-light">{kpis.taxaNoPrazo}%</div>
@@ -233,6 +240,7 @@ export default function TechPerformance() {
               data={entregasData.map((d: any) => ({
                 ...d,
                 total_entregas: parseInt(d.total_entregas) || 0,
+                valor_total: parseFloat(d.valor_total) || 0,
               }))}
             >
               <CartesianGrid
@@ -262,7 +270,21 @@ export default function TechPerformance() {
                   padding: "12px",
                   boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                 }}
-                formatter={(value: number) => [`${value} entregas`, "Total"]}
+                content={({ active, payload, label }: any) => {
+                  if (!active || !payload?.length) return null;
+                  const d = payload[0]?.payload;
+                  return (
+                    <div className="bg-popover border border-border rounded-lg p-3 text-xs shadow-lg">
+                      <p className="font-medium text-popover-foreground mb-1">{label}</p>
+                      <p className="text-muted-foreground">{d?.total_entregas} projetos</p>
+                      {d?.valor_total > 0 && (
+                        <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                          R$ {d.valor_total.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                        </p>
+                      )}
+                    </div>
+                  );
+                }}
               />
               <Bar
                 dataKey="total_entregas"

@@ -54,6 +54,7 @@ interface EntregaTrimestre {
   label: string;
   total_entregas: number;
   valor_medio: number;
+  valor_total: number;
 }
 
 interface ProjetoEmAndamento {
@@ -349,6 +350,7 @@ export default function TechOverview() {
                 data={entregasTrimestre.map((d) => ({
                   ...d,
                   total_entregas: parseInt(String(d.total_entregas || 0)),
+                  valor_total: parseFloat(String(d.valor_total || 0)),
                 }))}
                 margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
               >
@@ -371,13 +373,20 @@ export default function TechOverview() {
                   tickLine={false}
                 />
                 <Tooltip
-                  formatter={(value: number) => [`${value} entregas`, "Total"]}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                    color: "hsl(var(--foreground))",
+                  content={({ active, payload, label }: any) => {
+                    if (!active || !payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    return (
+                      <div className="bg-card border border-border rounded-lg p-3 text-xs shadow-lg">
+                        <p className="font-medium text-foreground mb-1">{label}</p>
+                        <p className="text-muted-foreground">{d?.total_entregas} projetos</p>
+                        {d?.valor_total > 0 && (
+                          <p className="text-emerald-600 dark:text-emerald-400 font-medium">
+                            R$ {d.valor_total.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                          </p>
+                        )}
+                      </div>
+                    );
                   }}
                 />
                 <Bar
