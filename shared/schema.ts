@@ -399,6 +399,10 @@ export const rhPatrimonio = inhireSchema.table("rh_patrimonio", {
   descricao: text("descricao"),
   email: varchar("email", { length: 200 }),
   empresa: varchar("empresa", { length: 100 }),
+  statusPatrimonio: varchar("status_patrimonio", { length: 50 }),
+  dataInicioConserto: timestamp("data_inicio_conserto"),
+  dataFimConserto: timestamp("data_fim_conserto"),
+  notas: text("notas"),
 });
 
 export const insertPatrimonioSchema = createInsertSchema(rhPatrimonio).partial({
