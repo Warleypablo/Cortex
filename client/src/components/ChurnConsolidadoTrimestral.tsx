@@ -28,6 +28,8 @@ interface ChurnTrimestral {
   label: string;
   total_churns: string;
   valor_total: string;
+  mrr_base: number;
+  churn_rate: number;
 }
 
 const SQUAD_COLORS: Record<string, string> = {
@@ -71,7 +73,7 @@ export default function ChurnConsolidadoTrimestral() {
   // Agrupar por trimestre para o gráfico
   const chartData = useMemo(() => {
     if (!data) return [];
-    const byTrimestre = new Map<string, { label: string; total: number; valor: number; ano: string; trimestre: string }>();
+    const byTrimestre = new Map<string, { label: string; total: number; valor: number; mrrBase: number; ano: string; trimestre: string }>();
 
     data.forEach((d) => {
       const key = `${d.ano}-${d.trimestre}`;
@@ -79,11 +81,13 @@ export default function ChurnConsolidadoTrimestral() {
       if (existing) {
         existing.total += parseInt(d.total_churns);
         existing.valor += parseFloat(d.valor_total);
+        existing.mrrBase += d.mrr_base || 0;
       } else {
         byTrimestre.set(key, {
           label: d.label,
           total: parseInt(d.total_churns),
           valor: parseFloat(d.valor_total),
+          mrrBase: d.mrr_base || 0,
           ano: d.ano,
           trimestre: d.trimestre,
         });
@@ -97,10 +101,10 @@ export default function ChurnConsolidadoTrimestral() {
 
   // Tabela: squad x trimestre
   const tableData = useMemo(() => {
-    if (!data) return { squads: [] as string[], trimestres: [] as string[], matrix: {} as Record<string, Record<string, { total: number; valor: number }>> };
+    if (!data) return { squads: [] as string[], trimestres: [] as string[], matrix: {} as Record<string, Record<string, { total: number; valor: number; churnRate: number }>> };
 
     const trimestres = [...new Set(chartData.map((d) => d.label))];
-    const squadsMap = new Map<string, Record<string, { total: number; valor: number }>>();
+    const squadsMap = new Map<string, Record<string, { total: number; valor: number; churnRate: number }>>();
 
     data.forEach((d) => {
       const squad = d.squad;
@@ -108,6 +112,7 @@ export default function ChurnConsolidadoTrimestral() {
       squadsMap.get(squad)![d.label] = {
         total: parseInt(d.total_churns),
         valor: parseFloat(d.valor_total),
+        churnRate: d.churn_rate || 0,
       };
     });
 
@@ -221,6 +226,11 @@ export default function ChurnConsolidadoTrimestral() {
                         <p className="font-medium text-foreground mb-1">{label}</p>
                         <p className="text-muted-foreground">{d?.total} contratos cancelados</p>
                         <p className="text-red-500 font-medium">{formatCurrency(d?.valor || 0)}</p>
+                        {d?.mrrBase > 0 && (
+                          <p className="text-muted-foreground">
+                            Churn rate: {(d.mrrBase > 0 ? ((d.valor / d.mrrBase) * 100).toFixed(1) : 0)}%
+                          </p>
+                        )}
                       </div>
                     );
                   }}
@@ -268,6 +278,9 @@ export default function ChurnConsolidadoTrimestral() {
                                 <div>
                                   <div className="font-medium">{cell.total}</div>
                                   <div className="text-xs text-red-500">{formatCurrency(cell.valor)}</div>
+                                  <div className={`text-xs font-medium ${cell.churnRate >= 10 ? "text-red-600 dark:text-red-400" : cell.churnRate >= 5 ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}>
+                                    {cell.churnRate}%
+                                  </div>
                                 </div>
                               ) : (
                                 <span className="text-muted-foreground">—</span>
