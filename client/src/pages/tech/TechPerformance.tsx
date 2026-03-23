@@ -97,7 +97,7 @@ export default function TechPerformance() {
 
   // Gargalo = fase de trabalho efetivo com mais tempo (exclui estados excepcionais)
   const gargalo = useMemo(() => {
-    const excludeFromGargalo = ["bloqueado", "pendencias", "aguardando"];
+    const excludeFromGargalo = ["bloqueado", "pendencias", "pendências", "aguardando"];
     const workPhases = tempoPorFase.filter(
       (p) => !excludeFromGargalo.some((ex) => p.label.toLowerCase().includes(ex))
     );
