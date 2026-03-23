@@ -1854,7 +1854,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid patrimonio ID" });
       }
       
-      const { numeroAtivo, ativo, marca, estadoConservacao, descricao, valorPago, valorMercado, senhaAtivo, empresa } = req.body;
+      const { numeroAtivo, ativo, marca, estadoConservacao, descricao, valorPago, valorMercado, senhaAtivo, empresa, statusPatrimonio, notas } = req.body;
 
       const updateData: Record<string, string | null> = {};
       if (numeroAtivo !== undefined) updateData.numeroAtivo = numeroAtivo || null;
@@ -1866,12 +1866,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (valorMercado !== undefined) updateData.valorMercado = valorMercado || null;
       if (senhaAtivo !== undefined) updateData.senhaAtivo = senhaAtivo || null;
       if (empresa !== undefined) updateData.empresa = empresa || null;
-      
+      if (statusPatrimonio !== undefined) updateData.statusPatrimonio = statusPatrimonio || null;
+      if (notas !== undefined) updateData.notas = notas || null;
+
+      // Se status mudou para "Em Conserto", setar data início
+      if (updateData.statusPatrimonio === 'Em Conserto') {
+        const currentPatrimonio = await storage.getPatrimonioById(id);
+        if (currentPatrimonio?.statusPatrimonio !== 'Em Conserto') {
+          updateData.dataInicioConserto = new Date().toISOString();
+          updateData.dataFimConserto = null;
+        }
+      }
+      // Se saiu de "Em Conserto", setar data fim
+      if (updateData.statusPatrimonio && updateData.statusPatrimonio !== 'Em Conserto') {
+        const currentPatrimonio = await storage.getPatrimonioById(id);
+        if (currentPatrimonio?.statusPatrimonio === 'Em Conserto') {
+          updateData.dataFimConserto = new Date().toISOString();
+        }
+      }
+
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ error: "No fields to update" });
       }
-      
+
       const patrimonio = await storage.updatePatrimonio(id, updateData);
+
+      // Registrar histórico de mudança de status
+      if (statusPatrimonio) {
+        await storage.createPatrimonioHistorico({
+          patrimonioId: id,
+          acao: `Status alterado para ${statusPatrimonio}`,
+          usuario: (req as any).user?.displayName || 'Sistema',
+          data: new Date(),
+        });
+      }
+
       res.json(patrimonio);
     } catch (error) {
       console.error("[api] Error updating patrimonio:", error);
