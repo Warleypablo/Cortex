@@ -9738,8 +9738,8 @@ export class DbStorage implements IStorage {
     const resumoResult = await db.execute(sql.raw(`
       SELECT
         COALESCE(SUM(CASE
-          WHEN COALESCE(nao_pago::numeric, 0) <= 0
-          THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0
+          WHEN UPPER(status) IN ('PAGO', 'ACQUITTED')
+          THEN COALESCE(total::numeric, 0) ELSE 0
         END), 0) as total_recebido,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date
@@ -9750,14 +9750,12 @@ export class DbStorage implements IStorage {
           THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as total_inadimplente,
         COUNT(*) as quantidade_parcelas,
-        COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) <= 0 THEN 1 END) as quantidade_recebidas,
+        COUNT(CASE WHEN UPPER(status) IN ('PAGO', 'ACQUITTED') THEN 1 END) as quantidade_recebidas,
         COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date THEN 1 END) as quantidade_pendentes,
         COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date THEN 1 END) as quantidade_inadimplentes
-      FROM "Conta Azul".caz_parcelas
-      WHERE tipo_evento = 'RECEITA'
-        AND data_vencimento >= '${primeiroDia}'
-        AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
-        AND status NOT IN ('RENEGOCIADO', 'PERDIDO')
+      FROM "Conta Azul".caz_receber
+      WHERE data_vencimento::date >= '${primeiroDia}'::date
+        AND data_vencimento::date <= '${ultimoDiaStr}'::date
     `));
 
     const resumoRow = resumoResult.rows[0] as any;
@@ -9768,11 +9766,11 @@ export class DbStorage implements IStorage {
     
     const porDiaResult = await db.execute(sql.raw(`
       SELECT
-        EXTRACT(DAY FROM data_vencimento) as dia,
-        TO_CHAR(data_vencimento, 'YYYY-MM-DD') as data_completa,
+        EXTRACT(DAY FROM data_vencimento::date) as dia,
+        TO_CHAR(data_vencimento::date, 'YYYY-MM-DD') as data_completa,
         COALESCE(SUM(CASE
-          WHEN COALESCE(nao_pago::numeric, 0) <= 0
-          THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0)) ELSE 0
+          WHEN UPPER(status) IN ('PAGO', 'ACQUITTED')
+          THEN COALESCE(total::numeric, 0) ELSE 0
         END), 0) as recebido,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date
@@ -9782,12 +9780,10 @@ export class DbStorage implements IStorage {
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date
           THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as inadimplente
-      FROM "Conta Azul".caz_parcelas
-      WHERE tipo_evento = 'RECEITA'
-        AND data_vencimento >= '${primeiroDia}'
-        AND data_vencimento <= '${ultimoDiaStr} 23:59:59'
-        AND status NOT IN ('RENEGOCIADO', 'PERDIDO')
-      GROUP BY EXTRACT(DAY FROM data_vencimento), TO_CHAR(data_vencimento, 'YYYY-MM-DD')
+      FROM "Conta Azul".caz_receber
+      WHERE data_vencimento::date >= '${primeiroDia}'::date
+        AND data_vencimento::date <= '${ultimoDiaStr}'::date
+      GROUP BY EXTRACT(DAY FROM data_vencimento::date), TO_CHAR(data_vencimento::date, 'YYYY-MM-DD')
       ORDER BY dia
     `));
     
@@ -9878,9 +9874,9 @@ export class DbStorage implements IStorage {
           cup.status as status_clickup,
           cup.responsavel,
           cup.task_id,
-          cup.telefone
+          cup.telefone as telefone_clickup
         FROM "Conta Azul".caz_clientes cc
-        LEFT JOIN "Clickup".cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
+        LEFT JOIN "Clickup".cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
@@ -9894,41 +9890,39 @@ export class DbStorage implements IStorage {
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
         ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
       )
-      SELECT 
-        cp.id,
-        cp.descricao,
-        cp.valor_bruto,
-        COALESCE(cp.valor_pago, 0) as valor_pago,
-        COALESCE(cp.desconto, 0) as desconto,
-        COALESCE(cp.nao_pago, 0) as nao_pago,
-        TO_CHAR(cp.data_vencimento, 'YYYY-MM-DD') as data_vencimento,
-        cp.status,
-        cp.empresa,
-        cp.id_cliente,
-        COALESCE(cli.nome_clickup, cli.nome_caz, 'Cliente Desconhecido') as nome_cliente,
-        cli.cnpj,
+      SELECT
+        cr.id,
+        cr.descricao,
+        COALESCE(cr.total, 0) as valor_bruto,
+        COALESCE(cr.pago, 0) as valor_pago,
+        COALESCE(cr.nao_pago, 0) as nao_pago,
+        TO_CHAR(cr.data_vencimento::date, 'YYYY-MM-DD') as data_vencimento,
+        cr.status,
+        cr.empresa,
+        cr.cliente_id as id_cliente,
+        COALESCE(cli.nome_clickup, cli.nome_caz, cr.cliente_nome, 'Cliente Desconhecido') as nome_cliente,
+        COALESCE(cli.cnpj, cr.cnpj) as cnpj,
         cli.responsavel,
-        cli.status_clickup,
-        cli.telefone,
+        COALESCE(cli.status_clickup, cr.status_clickup) as status_clickup,
+        COALESCE(cli.telefone_clickup, cr.telefone) as telefone,
         cont.squad,
         cont.servico,
         CASE
-          WHEN COALESCE(cp.nao_pago::numeric, 0) <= 0 THEN 'pago'
-          WHEN cp.data_vencimento::date < ${dataHoje}::date AND COALESCE(cp.nao_pago::numeric, 0) > 0 THEN 'inadimplente'
+          WHEN UPPER(cr.status) IN ('PAGO', 'ACQUITTED') THEN 'pago'
+          WHEN cr.data_vencimento::date < ${dataHoje}::date AND COALESCE(cr.nao_pago::numeric, 0) > 0 THEN 'inadimplente'
           ELSE 'pendente'
         END as status_calculado
-      FROM "Conta Azul".caz_parcelas cp
-      LEFT JOIN cliente_info cli ON TRIM(cp.id_cliente::text) = cli.id_cliente
+      FROM "Conta Azul".caz_receber cr
+      LEFT JOIN cliente_info cli ON TRIM(cr.cliente_id::text) = cli.id_cliente
       LEFT JOIN contrato_info cont ON TRIM(cli.task_id::text) = cont.task_id
-      WHERE cp.tipo_evento = 'RECEITA'
-        AND cp.data_vencimento::date = ${data}::date
-      ORDER BY 
+      WHERE cr.data_vencimento::date = ${data}::date
+      ORDER BY
         CASE
-          WHEN UPPER(cp.status) IN ('PAGO', 'ACQUITTED') OR COALESCE(cp.valor_pago::numeric, 0) >= cp.valor_bruto::numeric THEN 1
-          WHEN cp.data_vencimento::date > ${dataHoje}::date THEN 2
+          WHEN UPPER(cr.status) IN ('PAGO', 'ACQUITTED') THEN 1
+          WHEN cr.data_vencimento::date > ${dataHoje}::date THEN 2
           ELSE 3
         END,
-        cp.valor_bruto::numeric DESC
+        cr.total::numeric DESC
     `);
     
     let totalPrevisto = 0;
@@ -9938,15 +9932,13 @@ export class DbStorage implements IStorage {
     
     const parcelas = (result.rows as any[]).map(row => {
       const valorBruto = parseFloat(row.valor_bruto || '0');
-      const valorPagoRaw = parseFloat(row.valor_pago || '0');
-      const desconto = parseFloat(row.desconto || '0');
-      const valorPago = valorPagoRaw - desconto;
+      const valorPago = parseFloat(row.valor_pago || '0');
       const naoPago = parseFloat(row.nao_pago || '0');
       const statusCalc = row.status_calculado as 'pago' | 'pendente' | 'inadimplente';
 
       totalPrevisto += valorBruto;
       if (statusCalc === 'pago') {
-        totalRecebido += valorPago;
+        totalRecebido += valorBruto;
       } else if (statusCalc === 'pendente') {
         totalPendente += naoPago;
       } else {
