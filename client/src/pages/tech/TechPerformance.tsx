@@ -71,27 +71,12 @@ export default function TechPerformance() {
     }).length;
     const taxaNoPrazo = totalAtivos > 0 ? Math.round(((totalAtivos - atrasados) / totalAtivos) * 100) : 100;
 
-    // Excluir fases finais (deploy, done) do cálculo de gargalo
-    const endStates = ["deploy", "deploy 🚀", "encerrado 🚀", "complete", "completo", "done"];
-    const filteredForGargalo = prazoPorStatus.filter(
-      (p: any) => !endStates.includes((p.status || '').toLowerCase().trim())
-    );
-    const gargalo =
-      filteredForGargalo.length > 0
-        ? filteredForGargalo.reduce((max: any, curr: any) =>
-            (parseFloat(curr.media_dias) || 0) > (parseFloat(max.media_dias) || 0) ? curr : max,
-            filteredForGargalo[0],
-          )
-        : null;
-
     return {
       tempoMedioDeploy: Math.round(avgDeploy * 10) / 10,
       entregasTrimestre,
       taxaNoPrazo,
-      gargalo: gargalo?.status || "\u2014",
-      gargaloDias: gargalo ? Math.round(parseFloat(gargalo.media_dias) * 10) / 10 : 0,
     };
-  }, [deployData, entregasData, prazoPorStatus, boardData]);
+  }, [deployData, entregasData, boardData]);
 
   // ── Tempo deploy por tipo ─────────────────────────────────────────
 
@@ -107,6 +92,13 @@ export default function TechPerformance() {
   // ── Tempo por Fase ────────────────────────────────────────────────
 
   const tempoPorFase = useMemo(() => groupStatusIntoPhases(prazoPorStatus), [prazoPorStatus]);
+
+  // Gargalo = fase com mais tempo médio (usando dados agrupados, que já excluem deploy/done)
+  const gargalo = useMemo(() => {
+    if (tempoPorFase.length === 0) return { label: "—", dias: 0 };
+    const max = tempoPorFase.reduce((a, b) => (a.media_dias > b.media_dias ? a : b));
+    return { label: max.label, dias: Math.round(max.media_dias * 10) / 10 };
+  }, [tempoPorFase]);
   const maxFaseDias = useMemo(
     () => Math.max(...tempoPorFase.map((p) => p.media_dias), 1),
     [tempoPorFase],
@@ -164,11 +156,11 @@ export default function TechPerformance() {
           </div>
         </div>
         <div className="rounded-lg border bg-card p-5">
-          <div className="text-3xl font-light">{kpis.gargalo}</div>
+          <div className="text-3xl font-light">{gargalo.label}</div>
           <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
             Gargalo Principal
           </div>
-          <div className="text-xs text-muted-foreground mt-0.5">{kpis.gargaloDias}d media</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{gargalo.dias}d media</div>
         </div>
       </div>
 
