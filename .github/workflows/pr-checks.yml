@@ -6,6 +6,7 @@ on:
 
 jobs:
   validate:
+    if: false # Disabled — GitHub Actions billing issue
     runs-on: ubuntu-latest
 
     steps:

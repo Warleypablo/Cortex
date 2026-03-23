@@ -9,6 +9,7 @@ on:
 
 jobs:
   check-schema:
+    if: false # Disabled — GitHub Actions billing issue
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
