@@ -226,6 +226,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/operacao/onboardings': PERMISSION_KEYS.OPS.ONBOARDINGS,
   // Tech
   '/tech': PERMISSION_KEYS.TECH.VISAO_GERAL,
+  '/tech/responsavel': PERMISSION_KEYS.TECH.VISAO_GERAL,
   '/dashboard/tech': PERMISSION_KEYS.TECH.VISAO_GERAL,
   // Comercial
   '/dashboard/comercial/closers': PERMISSION_KEYS.COM.CLOSERS,
