@@ -75,6 +75,7 @@ const DashboardInadimplencia = lazyWithRetry(() => import("@/pages/DashboardInad
 const DashboardInhire = lazyWithRetry(() => import("@/pages/DashboardInhire"));
 const DashboardRecrutamento = lazyWithRetry(() => import("@/pages/DashboardRecrutamento"));
 const TechHub = lazyWithRetry(() => import("@/pages/TechHub"));
+const TechResponsavel = lazyWithRetry(() => import("@/pages/TechResponsavel"));
 const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
@@ -320,6 +321,7 @@ function ProtectedRouter() {
       
       {/* Tech */}
       <Route path="/tech">{() => <ProtectedRoute path="/tech" component={TechHub} />}</Route>
+      <Route path="/tech/responsavel">{() => <ProtectedRoute path="/tech/responsavel" component={TechResponsavel} />}</Route>
       <Route path="/dashboard/tech">{() => <RedirectTo to="/tech" />}</Route>
       <Route path="/tech/projetos">{() => <RedirectTo to="/tech?section=projetos" />}</Route>
       <Route path="/tech/evolucao">{() => <RedirectTo to="/tech" />}</Route>
