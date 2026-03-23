@@ -93,6 +93,17 @@ export default function TechPerformance() {
     };
   }, [deployData, entregasData, prazoPorStatus, boardData]);
 
+  // ── Tempo deploy por tipo ─────────────────────────────────────────
+
+  const { data: deployPorTipo = [] } = useQuery<any[]>({
+    queryKey: ["/api/tech/tempo-deploy-por-tipo", periodo],
+    queryFn: async () => {
+      const res = await fetch(`/api/tech/tempo-deploy-por-tipo?meses=${periodo}`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
   // ── Tempo por Fase ────────────────────────────────────────────────
 
   const tempoPorFase = useMemo(() => groupStatusIntoPhases(prazoPorStatus), [prazoPorStatus]);
@@ -266,6 +277,36 @@ export default function TechPerformance() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* Tempo de Deploy por Tipo — horizontal bars */}
+      <div className="rounded-lg border bg-card p-5">
+        <div className="text-sm font-medium text-foreground mb-4">Tempo Médio de Deploy por Tipo</div>
+        {deployPorTipo.length > 0 ? (
+          <div className="space-y-3">
+            {deployPorTipo.map((item: any) => {
+              const maxDias = Math.max(...deployPorTipo.map((d: any) => parseFloat(d.media_dias) || 0), 1);
+              const dias = parseFloat(item.media_dias) || 0;
+              const pct = (dias / maxDias) * 100;
+              return (
+                <div key={item.tipo} className="flex items-center gap-3">
+                  <div className="w-36 shrink-0 text-sm text-foreground truncate">{item.tipo}</div>
+                  <div className="flex-1 h-6 rounded bg-muted/40 overflow-hidden">
+                    <div
+                      className="h-full rounded"
+                      style={{ width: `${pct}%`, backgroundColor: "hsl(var(--primary))", opacity: 0.6 }}
+                    />
+                  </div>
+                  <div className="w-20 text-right text-xs text-muted-foreground shrink-0">
+                    {dias}d ({item.total_projetos} proj)
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-12">Sem dados de deploy por tipo</p>
+        )}
       </div>
 
       {/* Tempo Medio por Fase — div-based horizontal bars */}

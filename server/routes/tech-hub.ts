@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { IStorage } from "../storage";
+import { sql } from "drizzle-orm";
 import OpenAI from "openai";
 
 let anthropicClient: any = null;
@@ -243,6 +244,41 @@ export function registerTechHubRoutes(app: Express, db: any, storage: IStorage) 
     } catch (error) {
       console.error('Error fetching responsavel KPIs:', error);
       res.status(500).json({ error: 'Failed to fetch responsavel KPIs' });
+    }
+  });
+
+  app.get("/api/tech/tempo-deploy-por-tipo", async (req, res) => {
+    try {
+      const meses = parseInt(req.query.meses as string) || 12;
+      const safeMeses = Math.max(1, Math.min(Math.floor(meses), 60));
+
+      const result = await db.execute(sql.raw(`
+        WITH deploy_times AS (
+          SELECT
+            p.clickup_task_id,
+            p.tipo,
+            p.data_entregue,
+            MIN(CASE WHEN h.status_novo ILIKE '%design%' THEN h.data_transicao END) AS inicio_design
+          FROM "Clickup".cup_projetos_tech_fechados p
+          JOIN "Clickup".cup_status_history h ON h.clickup_task_id = p.clickup_task_id
+          WHERE p.data_entregue IS NOT NULL
+          AND p.data_entregue >= (CURRENT_DATE - INTERVAL '${safeMeses} months')
+          GROUP BY p.clickup_task_id, p.tipo, p.data_entregue
+        )
+        SELECT
+          COALESCE(tipo, 'Sem tipo') AS tipo,
+          ROUND(AVG(EXTRACT(EPOCH FROM (data_entregue::timestamp - inicio_design)) / 86400)::numeric, 1) AS media_dias,
+          COUNT(*) AS total_projetos
+        FROM deploy_times
+        WHERE inicio_design IS NOT NULL
+        GROUP BY tipo
+        ORDER BY media_dias DESC
+      `));
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error('Error fetching tempo-deploy-por-tipo:', error);
+      res.status(500).json({ error: 'Failed to fetch deploy time by type' });
     }
   });
 
