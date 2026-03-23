@@ -10,7 +10,8 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-import { Loader2 } from "lucide-react";
+import { Loader2, Info } from "lucide-react";
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   PHASE_CONFIG,
   END_STATES,
@@ -189,8 +190,16 @@ export default function TechOverview() {
           <div className="text-3xl font-light text-red-500">
             {emRiscoCount}
           </div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1 flex items-center gap-1.5">
             Em Risco
+            <UITooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3 w-3 text-muted-foreground/60 cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[220px] text-xs">
+                Projetos com 3 dias ou menos até o vencimento, ou já vencidos.
+              </TooltipContent>
+            </UITooltip>
           </div>
         </div>
 
