@@ -2493,6 +2493,35 @@ export class DbStorage implements IStorage {
       });
     }
 
+    // Se status mudou para Dispensado ou Inativo, desatribuir patrimônios
+    const statusAnterior = currentColaborador.status;
+    const statusNovo = colaborador.status;
+    const statusProvided = 'status' in colaborador && statusNovo !== undefined;
+
+    if (statusProvided && statusAnterior !== statusNovo &&
+        (statusNovo === 'Dispensado' || statusNovo === 'Inativo')) {
+      const patrimoniosDoColab = await db.execute(sql`
+        SELECT id FROM "Inhire".rh_patrimonio WHERE responsavel_id = ${id}
+      `);
+
+      if (patrimoniosDoColab.rows && patrimoniosDoColab.rows.length > 0) {
+        await db.execute(sql`
+          UPDATE "Inhire".rh_patrimonio
+          SET responsavel_atual = NULL, responsavel_id = NULL
+          WHERE responsavel_id = ${id}
+        `);
+
+        for (const p of patrimoniosDoColab.rows as any[]) {
+          await this.createPatrimonioHistorico({
+            patrimonioId: p.id,
+            acao: `Responsável removido automaticamente (${updatedColaborador.nome} — ${statusNovo})`,
+            usuario: criadoPor || 'Sistema',
+            data: new Date(),
+          });
+        }
+      }
+    }
+
     return updatedColaborador;
   }
 
@@ -2653,7 +2682,11 @@ export class DbStorage implements IStorage {
         p.valor_mercado as "valorMercado",
         p.valor_venda as "valorVenda",
         p.descricao,
-        p.empresa
+        p.empresa,
+        p.status_patrimonio as "statusPatrimonio",
+        p.data_inicio_conserto as "dataInicioConserto",
+        p.data_fim_conserto as "dataFimConserto",
+        p.notas
       FROM "Inhire".rh_patrimonio p
       LEFT JOIN "Inhire".rh_pessoal c ON (
         p.responsavel_id = c.id
@@ -2682,6 +2715,10 @@ export class DbStorage implements IStorage {
         valorVenda: schema.rhPatrimonio.valorVenda,
         descricao: schema.rhPatrimonio.descricao,
         empresa: schema.rhPatrimonio.empresa,
+        statusPatrimonio: schema.rhPatrimonio.statusPatrimonio,
+        dataInicioConserto: schema.rhPatrimonio.dataInicioConserto,
+        dataFimConserto: schema.rhPatrimonio.dataFimConserto,
+        notas: schema.rhPatrimonio.notas,
         colaborador: schema.rhPessoal,
       })
       .from(schema.rhPatrimonio)
@@ -2716,6 +2753,10 @@ export class DbStorage implements IStorage {
       valorVenda: row.valorVenda,
       descricao: row.descricao,
       empresa: row.empresa,
+      statusPatrimonio: row.statusPatrimonio,
+      dataInicioConserto: row.dataInicioConserto,
+      dataFimConserto: row.dataFimConserto,
+      notas: row.notas,
       email: null,
       colaborador: row.colaborador || undefined,
     };
@@ -2737,6 +2778,12 @@ export class DbStorage implements IStorage {
         status: schema.rhPessoal.status,
       })
       .from(schema.rhPessoal)
+      .where(
+        or(
+          eq(schema.rhPessoal.status, 'Ativo'),
+          isNull(schema.rhPessoal.status)
+        )
+      )
       .orderBy(schema.rhPessoal.nome);
 
     return result.map(r => ({ id: r.id, nome: r.nome, email_turbo: r.emailTurbo, status: r.status }));
@@ -2764,7 +2811,11 @@ export class DbStorage implements IStorage {
         responsavel_atual as "responsavelAtual",
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
-        valor_venda as "valorVenda", descricao, empresa
+        valor_venda as "valorVenda", descricao, empresa,
+        status_patrimonio as "statusPatrimonio",
+        data_inicio_conserto as "dataInicioConserto",
+        data_fim_conserto as "dataFimConserto",
+        notas
       FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
 
@@ -2789,7 +2840,11 @@ export class DbStorage implements IStorage {
         responsavel_atual as "responsavelAtual",
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
-        valor_venda as "valorVenda", descricao, empresa
+        valor_venda as "valorVenda", descricao, empresa,
+        status_patrimonio as "statusPatrimonio",
+        data_inicio_conserto as "dataInicioConserto",
+        data_fim_conserto as "dataFimConserto",
+        notas
       FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
 
@@ -2827,6 +2882,18 @@ export class DbStorage implements IStorage {
     if ('empresa' in data) {
       updates.push(sql`empresa = ${data.empresa}`);
     }
+    if ('statusPatrimonio' in data) {
+      updates.push(sql`status_patrimonio = ${data.statusPatrimonio}`);
+    }
+    if ('notas' in data) {
+      updates.push(sql`notas = ${data.notas}`);
+    }
+    if ('dataInicioConserto' in data) {
+      updates.push(sql`data_inicio_conserto = ${data.dataInicioConserto}`);
+    }
+    if ('dataFimConserto' in data) {
+      updates.push(sql`data_fim_conserto = ${data.dataFimConserto}`);
+    }
 
     if (updates.length === 0) {
       throw new Error("No valid fields to update");
@@ -2841,7 +2908,11 @@ export class DbStorage implements IStorage {
         responsavel_atual as "responsavelAtual",
         responsavel_id as "responsavelId",
         valor_pago as "valorPago", valor_mercado as "valorMercado",
-        valor_venda as "valorVenda", descricao, empresa
+        valor_venda as "valorVenda", descricao, empresa,
+        status_patrimonio as "statusPatrimonio",
+        data_inicio_conserto as "dataInicioConserto",
+        data_fim_conserto as "dataFimConserto",
+        notas
       FROM "Inhire".rh_patrimonio WHERE id = ${id}
     `);
 
