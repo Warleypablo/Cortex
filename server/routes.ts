@@ -4687,13 +4687,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (mrrResult.rows as any[]).forEach((r: any) => { mrrBySquad[r.squad] = parseFloat(r.mrr_ativo) || 0; });
 
       // Calcular churn rate: valor_churn / (mrr_ativo + valor_churn_acumulado_posterior)
+      // Calcular quantos meses cada trimestre tem até hoje
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = now.getMonth() + 1; // 1-12
+
       const rows = (churnResult.rows as any[]).map((r: any) => {
         const mrrAtivo = mrrBySquad[r.squad] || 0;
         const valorChurn = parseFloat(r.valor_total) || 0;
-        // MRR base aprox = ativo atual + tudo que churnou depois desse trimestre
         const mrrBase = mrrAtivo + valorChurn;
-        const churnRate = mrrBase > 0 ? (valorChurn / mrrBase) * 100 : 0;
-        return { ...r, mrr_base: Math.round(mrrBase), churn_rate: Math.round(churnRate * 10) / 10 };
+
+        // Meses no trimestre (3 para completos, menos para o trimestre atual)
+        const qStart = (r.trimestre - 1) * 3 + 1; // mês inicial do trimestre
+        const qEnd = r.trimestre * 3; // mês final do trimestre
+        let mesesNoTrimestre = 3;
+        if (parseInt(r.ano) === currentYear && qEnd >= currentMonth) {
+          mesesNoTrimestre = Math.max(1, currentMonth - qStart + 1);
+        }
+
+        // Churn rate mensal médio = (valor_churn / meses) / mrr_base * 100
+        const churnMensal = valorChurn / mesesNoTrimestre;
+        const churnRate = mrrBase > 0 ? (churnMensal / mrrBase) * 100 : 0;
+        return { ...r, mrr_base: Math.round(mrrBase), churn_rate: Math.round(churnRate * 10) / 10, meses_trimestre: mesesNoTrimestre };
       });
 
       res.json(rows);
