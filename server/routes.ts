@@ -4747,6 +4747,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Churn mensal por squad — detalhamento para drill-down
+  app.get("/api/churn/detalhe-mensal", async (req, res) => {
+    try {
+      const squad = req.query.squad as string;
+      const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
+      if (!squad) return res.status(400).json({ error: "squad is required" });
+
+      const result = await db.execute(sql`
+        SELECT
+          nome,
+          valor_r,
+          status,
+          motivo_cancelamento,
+          data_solicitacao_encerramento,
+          ultimo_dia_operacao,
+          EXTRACT(MONTH FROM ultimo_dia_operacao)::int AS mes,
+          TO_CHAR(ultimo_dia_operacao, 'Mon') AS mes_label
+        FROM "Clickup".cup_churn
+        WHERE squad = ${squad}
+          AND status IN ('cancelado/inativo', 'em cancelamento')
+          AND ultimo_dia_operacao IS NOT NULL
+          AND EXTRACT(YEAR FROM ultimo_dia_operacao) = ${ano}
+          AND ultimo_dia_operacao <= CURRENT_DATE
+        ORDER BY ultimo_dia_operacao DESC
+      `);
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("[api] Error fetching churn detalhe mensal:", error);
+      res.status(500).json({ error: "Failed to fetch churn detail" });
+    }
+  });
+
   // Análise IA das mensagens de churn — classifica sentimento, temas e gera insight
   const churnAICache = new Map<string, { result: any; timestamp: number }>();
   const CHURN_AI_CACHE_TTL = 1000 * 60 * 30; // 30 min

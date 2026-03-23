@@ -57,9 +57,12 @@ function getSquadColor(squad: string, index: number): string {
   return fallback[index % fallback.length];
 }
 
+const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
 export default function ChurnConsolidadoTrimestral() {
   const currentYear = new Date().getFullYear();
   const [ano, setAno] = useState(currentYear);
+  const [selectedSquad, setSelectedSquad] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<ChurnTrimestral[]>({
     queryKey: ["/api/churn/consolidado-trimestral", ano],
@@ -69,6 +72,30 @@ export default function ChurnConsolidadoTrimestral() {
       return res.json();
     },
   });
+
+  const { data: detalheData, isLoading: loadingDetalhe } = useQuery<any[]>({
+    queryKey: ["/api/churn/detalhe-mensal", selectedSquad, ano],
+    queryFn: async () => {
+      const res = await fetch(`/api/churn/detalhe-mensal?squad=${encodeURIComponent(selectedSquad!)}&ano=${ano}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!selectedSquad,
+  });
+
+  const detalheMensal = useMemo(() => {
+    if (!detalheData) return [];
+    const byMonth = new Map<number, { mes: number; label: string; contratos: any[]; total: number; valor: number }>();
+    detalheData.forEach((d: any) => {
+      const mes = d.mes;
+      if (!byMonth.has(mes)) byMonth.set(mes, { mes, label: MONTH_NAMES[mes - 1], contratos: [], total: 0, valor: 0 });
+      const m = byMonth.get(mes)!;
+      m.contratos.push(d);
+      m.total++;
+      m.valor += parseFloat(d.valor_r) || 0;
+    });
+    return Array.from(byMonth.values()).sort((a, b) => a.mes - b.mes);
+  }, [detalheData]);
 
   // Agrupar por trimestre para o gráfico
   const chartData = useMemo(() => {
@@ -268,8 +295,13 @@ export default function ChurnConsolidadoTrimestral() {
                     const totalSquad = Object.values(row).reduce((s, v) => s + v.valor, 0);
                     const totalCount = Object.values(row).reduce((s, v) => s + v.total, 0);
                     return (
-                      <TableRow key={squad}>
-                        <TableCell className="font-medium whitespace-nowrap">{squad}</TableCell>
+                      <TableRow key={squad} className={selectedSquad === squad ? "bg-primary/5" : ""}>
+                        <TableCell
+                          className="font-medium whitespace-nowrap cursor-pointer hover:text-primary transition-colors"
+                          onClick={() => setSelectedSquad(selectedSquad === squad ? null : squad)}
+                        >
+                          {squad}
+                        </TableCell>
                         {tableData.trimestres.map((t) => {
                           const cell = row[t];
                           return (
@@ -321,6 +353,72 @@ export default function ChurnConsolidadoTrimestral() {
           )}
         </CardContent>
       </Card>
+
+      {/* Drill-down: Detalhe mensal do squad selecionado */}
+      {selectedSquad && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">
+              Detalhe Mensal — {selectedSquad} ({ano})
+            </CardTitle>
+            <button
+              onClick={() => setSelectedSquad(null)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Fechar
+            </button>
+          </CardHeader>
+          <CardContent>
+            {loadingDetalhe ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-16 rounded" />)}
+              </div>
+            ) : detalheMensal.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Sem dados</p>
+            ) : (
+              <div className="space-y-4">
+                {detalheMensal.map((m) => (
+                  <div key={m.mes} className="rounded-lg border p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="font-medium">{m.label} {ano}</div>
+                      <div className="flex items-center gap-4 text-sm">
+                        <span className="text-muted-foreground">{m.total} contratos</span>
+                        <span className="text-red-500 font-medium">{formatCurrency(m.valor)}</span>
+                      </div>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30">
+                          <TableHead className="text-xs">Cliente</TableHead>
+                          <TableHead className="text-xs text-right">MRR</TableHead>
+                          <TableHead className="text-xs">Motivo</TableHead>
+                          <TableHead className="text-xs">Último Dia</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {m.contratos.map((c: any, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-sm">{c.nome}</TableCell>
+                            <TableCell className="text-sm text-right text-red-500">
+                              {formatCurrency(parseFloat(c.valor_r) || 0)}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground truncate max-w-[200px]">
+                              {c.motivo_cancelamento || "—"}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                              {c.ultimo_dia_operacao ? new Date(c.ultimo_dia_operacao).toLocaleDateString("pt-BR") : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
