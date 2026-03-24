@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-const GRAPH_API_BASE = "https://graph.facebook.com";
+const GRAPH_API_BASE = "https://graph.instagram.com";
 
 function getConfig() {
   const appId = process.env.META_INSTAGRAM_APP_ID;
@@ -94,8 +94,8 @@ export async function exchangeCodeForToken(code: string): Promise<{
   const shortLivedToken = tokenData.access_token;
   const igUserId = String(tokenData.user_id);
 
-  // Step 2: Exchange for long-lived token via Graph API
-  const longUrl = new URL(`${GRAPH_API_BASE}/${apiVersion}/access_token`);
+  // Step 2: Exchange for long-lived token via Instagram Graph API
+  const longUrl = new URL(`https://graph.instagram.com/access_token`);
   longUrl.searchParams.set("grant_type", "ig_exchange_token");
   longUrl.searchParams.set("client_secret", appSecret);
   longUrl.searchParams.set("access_token", shortLivedToken);
@@ -138,8 +138,8 @@ export async function refreshLongLivedToken(currentToken: string): Promise<{
 }
 
 export async function syncProfile(igUserId: string, accessToken: string) {
-  const profile = await callGraphAPI(`/${igUserId}`, accessToken, {
-    fields: "id,username,name,biography,website,followers_count,follows_count,media_count,profile_picture_url,account_type",
+  const profile = await callGraphAPI(`/me`, accessToken, {
+    fields: "user_id,username,name,biography,website,followers_count,follows_count,media_count,profile_picture_url,account_type",
   });
   return profile;
 }
