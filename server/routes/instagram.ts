@@ -48,19 +48,18 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       const state = Buffer.from(statePayload).toString("base64url");
 
       const scopes = [
-        "instagram_basic",
-        "instagram_manage_insights",
-        "pages_show_list",
-        "pages_read_engagement",
-        "business_management",
+        "instagram_business_basic",
+        "instagram_business_manage_insights",
       ].join(",");
 
-      const authUrl = new URL("https://www.facebook.com/v21.0/dialog/oauth");
+      // Use Instagram Login flow (not Facebook Login)
+      const authUrl = new URL("https://www.instagram.com/oauth/authorize");
       authUrl.searchParams.set("client_id", appId);
       authUrl.searchParams.set("redirect_uri", redirectUri);
       authUrl.searchParams.set("scope", scopes);
       authUrl.searchParams.set("response_type", "code");
       authUrl.searchParams.set("state", state);
+      authUrl.searchParams.set("force_reauth", "true");
 
       return res.redirect(authUrl.toString());
     } catch (err: any) {
@@ -147,11 +146,8 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           tokenExpiresAt: expiresAt,
           accountType: tokenResult.accountType,
           scopes: [
-            "instagram_basic",
-            "instagram_manage_insights",
-            "pages_show_list",
-            "pages_read_engagement",
-            "business_management",
+            "instagram_business_basic",
+            "instagram_business_manage_insights",
           ],
           connectedBy: stateData.userId,
           isActive: true,
