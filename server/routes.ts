@@ -47,6 +47,7 @@ import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
+import { registerInstagramRoutes } from "./routes/instagram";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -421,6 +422,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Portal Creator routes (before isAuthenticated — uses own session auth)
   registerPortalCreatorRoutes(app);
+
+  // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
+  registerInstagramRoutes(app, db, storage);
 
   app.use("/api", isAuthenticated);
 
