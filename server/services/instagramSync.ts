@@ -94,13 +94,16 @@ export async function exchangeCodeForToken(code: string): Promise<{
   const shortLivedToken = tokenData.access_token;
   const igUserId = String(tokenData.user_id);
 
-  // Step 2: Exchange for long-lived token via Instagram Graph API
-  const longUrl = new URL(`https://graph.instagram.com/access_token`);
-  longUrl.searchParams.set("grant_type", "ig_exchange_token");
-  longUrl.searchParams.set("client_secret", appSecret);
-  longUrl.searchParams.set("access_token", shortLivedToken);
-
-  const longRes = await fetch(longUrl.toString());
+  // Step 2: Exchange for long-lived token via Instagram Graph API (POST)
+  const longRes = await fetch("https://graph.instagram.com/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "ig_exchange_token",
+      client_secret: appSecret,
+      access_token: shortLivedToken,
+    }),
+  });
   const longData = await longRes.json();
   if (longData.error) throw new Error(`Long-lived token exchange failed: ${longData.error.message}`);
 
