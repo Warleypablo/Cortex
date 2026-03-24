@@ -14,6 +14,23 @@ export function registerClientesRoutes(app: Express) {
     }
   });
 
+  // GET /api/clientes/lista - Lightweight client list (cnpj + nome) for dropdowns
+  app.get("/api/clientes/lista", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT cnpj, nome
+        FROM "Clickup".cup_clientes
+        WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
+          AND nome IS NOT NULL AND TRIM(nome) != ''
+        ORDER BY nome ASC
+      `);
+      res.json(result.rows);
+    } catch (err: any) {
+      console.error("[Clientes] Error listing:", err.message);
+      res.status(500).json({ error: "Failed to list clients" });
+    }
+  });
+
   app.get("/api/clientes-ltv", async (req, res) => {
     try {
       const result = await db.execute(sql`
