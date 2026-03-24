@@ -11,6 +11,8 @@ import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megapho
 import { cn } from "@/lib/utils";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { startOfMonth, endOfMonth, format, parse } from "date-fns";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Line } from "recharts";
 
 type MetricType = 'manual' | 'formula';
@@ -196,6 +198,11 @@ export default function GrowthOrcadoRealizado() {
   
   const currentMonth = format(new Date(), 'yyyy-MM');
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const hoje = new Date();
+  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(hoje),
+    to: endOfMonth(hoje),
+  });
   const [cardFilter, setCardFilter] = useState<'todos' | 'mql' | 'nao-mql'>('todos');
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
@@ -239,12 +246,18 @@ export default function GrowthOrcadoRealizado() {
   }, [dynamicMonths, currentMonth]);
 
   const dateRange = useMemo(() => {
+    if (customDateRange?.from && customDateRange?.to) {
+      return {
+        startDate: format(customDateRange.from, 'yyyy-MM-dd'),
+        endDate: format(customDateRange.to, 'yyyy-MM-dd'),
+      };
+    }
     const monthDate = parse(selectedMonth, 'yyyy-MM', new Date());
     return {
       startDate: format(startOfMonth(monthDate), 'yyyy-MM-dd'),
       endDate: format(endOfMonth(monthDate), 'yyyy-MM-dd'),
     };
-  }, [selectedMonth]);
+  }, [customDateRange, selectedMonth]);
 
   // Fetch budgets from DB (falls back to defaults)
   const { data: budgetsData } = useQuery<Record<string, any>>({
@@ -1020,18 +1033,19 @@ export default function GrowthOrcadoRealizado() {
               </div>
             </>
           )}
-          <Select value={selectedMonth} onValueChange={(v) => { setSelectedMonth(v); if (isEditing) cancelEditing(); }}>
-            <SelectTrigger className="w-48" data-testid="select-month">
-              <SelectValue placeholder="Selecione o mês" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((month) => (
-                <SelectItem key={month.value} value={month.value}>
-                  {month.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <DateRangePicker
+            value={customDateRange}
+            onChange={(range) => {
+              setCustomDateRange(range);
+              if (range?.from) {
+                const newMonth = format(range.from, 'yyyy-MM');
+                if (newMonth !== selectedMonth) {
+                  setSelectedMonth(newMonth);
+                  if (isEditing) cancelEditing();
+                }
+              }
+            }}
+          />
         </div>
       </div>
 
