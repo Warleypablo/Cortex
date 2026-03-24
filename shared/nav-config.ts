@@ -75,6 +75,7 @@ export const PERMISSION_KEYS = {
     ORCADO_REALIZADO: 'growth.orcado_realizado',
     KEYWORD_PERFORMANCE: 'growth.keyword_performance',
     FUNIL_CONVERSAO: 'growth.funil_conversao',
+    INSTAGRAM: 'growth.instagram',
   },
   // G&G (Pessoas)
   GG: {
@@ -247,6 +248,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/orcado-realizado': PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO,
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
   '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
+  '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
   '/dashboard/recrutamento': PERMISSION_KEYS.GG.RECRUTAMENTO,
@@ -454,6 +456,7 @@ export const NAV_CONFIG = {
         { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Keywords', url: '/growth/keyword-performance', icon: 'Search', permissionKey: PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE },
         { title: 'Funil de Conversão', url: '/growth/funil-conversao', icon: 'Filter', permissionKey: PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO },
+        { title: 'Instagram', url: '/growth/instagram', icon: 'Instagram', permissionKey: PERMISSION_KEYS.GROWTH.INSTAGRAM },
       ],
     },
     {
