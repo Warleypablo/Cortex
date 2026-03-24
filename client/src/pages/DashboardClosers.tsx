@@ -874,68 +874,80 @@ export default function DashboardClosers() {
             </div>
 
             <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl overflow-hidden">
-              <div className="grid grid-cols-12 gap-1 p-3 bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                <div className="col-span-1">#</div>
-                <div className="col-span-3">Closer</div>
-                <div className="col-span-2 text-right">MRR</div>
-                <div className="col-span-2 text-right">Pontual</div>
-                <div className="col-span-2 text-right">Total</div>
-                <div className="col-span-2 text-right">Reuniões</div>
-              </div>
-
-              <div className="divide-y divide-border max-h-[400px] overflow-y-auto">
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="p-3">
-                      <Skeleton className="h-8 bg-muted" />
-                    </div>
-                  ))
-                ) : ranking.length > 0 ? (
-                  ranking.map((closer, index) => (
-                    <motion.div
-                      key={closer.name}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.05 * index }}
-                      className={`grid grid-cols-12 gap-1 p-3 items-center hover:bg-muted/30 transition-colors ${
-                        closer.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(closer.position) : ''
-                      }`}
-                      data-testid={`ranking-row-${index}`}
-                    >
-                      <div className="col-span-1">
-                        {closer.position <= 3 ? (
-                          <div className="w-5 h-5 flex items-center justify-center">
-                            {closer.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
-                            {closer.position === 2 && <Medal className="w-3 h-3 text-gray-300" />}
-                            {closer.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-muted/50 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    <th className="px-2 py-3 text-left w-7">#</th>
+                    <th className="px-2 py-3 text-left">Closer</th>
+                    <th className="px-2 py-3 text-right">MRR</th>
+                    <th className="px-2 py-3 text-right">Pontual</th>
+                    <th className="px-2 py-3 text-center">Conversão</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i}>
+                        <td colSpan={5} className="p-3">
+                          <Skeleton className="h-8 bg-muted" />
+                        </td>
+                      </tr>
+                    ))
+                  ) : ranking.length > 0 ? (
+                    ranking.map((closer, index) => (
+                      <motion.tr
+                        key={closer.name}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.05 * index }}
+                        className={`hover:bg-muted/30 transition-colors ${
+                          closer.position <= 3 ? 'bg-gradient-to-r ' + getPositionGradient(closer.position) : ''
+                        }`}
+                        data-testid={`ranking-row-${index}`}
+                      >
+                        <td className="px-2 py-3 w-7">
+                          {closer.position <= 3 ? (
+                            <div className="w-5 h-5 flex items-center justify-center">
+                              {closer.position === 1 && <Crown className="w-4 h-4 text-yellow-400" />}
+                              {closer.position === 2 && <Medal className="w-3 h-3 text-gray-300" />}
+                              {closer.position === 3 && <Medal className="w-3 h-3 text-amber-600" />}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground font-mono text-xs">{closer.position}</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-3 font-medium text-foreground text-sm max-w-[100px] truncate">
+                          {closer.name}
+                        </td>
+                        <td className="px-2 py-3 text-right font-bold text-emerald-400 text-xs whitespace-nowrap">
+                          {formatCurrencyCompact(closer.mrr)}
+                        </td>
+                        <td className="px-2 py-3 text-right font-semibold text-blue-400 text-xs whitespace-nowrap">
+                          {formatCurrencyCompact(closer.pontual)}
+                        </td>
+                        <td className="px-2 py-3 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <span className="text-muted-foreground text-xs">{closer.negocios}/{closer.reunioes}</span>
+                            <span className={`font-bold text-sm ${
+                              closer.taxa >= 50 ? 'text-emerald-400' :
+                              closer.taxa >= 25 ? 'text-yellow-400' :
+                              'text-rose-400'
+                            }`}>
+                              {closer.taxa.toFixed(0)}%
+                            </span>
                           </div>
-                        ) : (
-                          <span className="text-muted-foreground font-mono text-xs">{closer.position}</span>
-                        )}
-                      </div>
-                      <div className="col-span-3 font-medium text-foreground truncate text-sm">
-                        {closer.name}
-                      </div>
-                      <div className="col-span-2 text-right font-bold text-emerald-400 text-sm">
-                        {formatCurrencyCompact(closer.mrr)}
-                      </div>
-                      <div className="col-span-2 text-right font-semibold text-blue-400 text-sm">
-                        {formatCurrencyCompact(closer.pontual)}
-                      </div>
-                      <div className="col-span-2 text-right font-bold text-foreground text-sm">
-                        {formatCurrencyCompact(closer.total)}
-                      </div>
-                      <div className="col-span-2 text-right text-cyan-400 text-sm">
-                        {closer.reunioes}
-                      </div>
-                    </motion.div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center text-muted-foreground">
-                    Nenhum closer encontrado
-                  </div>
-                )}
-              </div>
+                        </td>
+                      </motion.tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        Nenhum closer encontrado
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
 
           </div>
