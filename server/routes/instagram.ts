@@ -73,7 +73,10 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
    * Receive code from Facebook, exchange for token, save connection to DB
    */
   app.get("/auth/instagram/callback", async (req, res) => {
-    const frontendUrl = process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || "";
+    const customDomain = process.env.CUSTOM_DOMAIN;
+    const frontendUrl = customDomain
+      ? `https://${customDomain}`
+      : process.env.FRONTEND_URL || process.env.RENDER_EXTERNAL_URL || "";
     const frontendPath = "/growth/instagram";
 
     try {
