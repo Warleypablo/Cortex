@@ -94,26 +94,37 @@ export async function exchangeCodeForToken(code: string): Promise<{
   const shortLivedToken = tokenData.access_token;
   const igUserId = String(tokenData.user_id);
 
-  // Step 2: Exchange for long-lived token via Instagram Graph API (GET with version)
-  const longUrl = new URL(`https://graph.instagram.com/${apiVersion}/access_token`);
-  longUrl.searchParams.set("grant_type", "ig_exchange_token");
-  longUrl.searchParams.set("client_secret", appSecret);
-  longUrl.searchParams.set("access_token", shortLivedToken);
+  // Step 2: Try to exchange for long-lived token (graceful fallback)
+  let finalToken = shortLivedToken;
+  let expiresIn = 3600; // default 1 hour for short-lived
 
-  const longRes = await fetch(longUrl.toString());
-  const longData = await longRes.json();
-  if (longData.error) throw new Error(`Long-lived token exchange failed: ${longData.error.message}`);
+  try {
+    const longUrl = new URL(`https://graph.instagram.com/${apiVersion}/access_token`);
+    longUrl.searchParams.set("grant_type", "ig_exchange_token");
+    longUrl.searchParams.set("client_secret", appSecret);
+    longUrl.searchParams.set("access_token", shortLivedToken);
 
-  const longLivedToken = longData.access_token;
-  const expiresIn = longData.expires_in || 5184000;
+    const longRes = await fetch(longUrl.toString());
+    const longData = await longRes.json();
+
+    if (longData.access_token) {
+      finalToken = longData.access_token;
+      expiresIn = longData.expires_in || 5184000;
+      console.log("[Instagram] Long-lived token obtained successfully");
+    } else {
+      console.warn("[Instagram] Long-lived token exchange failed, using short-lived token:", longData.error?.message);
+    }
+  } catch (err) {
+    console.warn("[Instagram] Long-lived token exchange error, using short-lived token:", err);
+  }
 
   // Step 3: Get Instagram profile info
-  const profile = await callGraphAPI(`/${igUserId}`, longLivedToken, {
+  const profile = await callGraphAPI(`/me`, finalToken, {
     fields: "user_id,username,account_type",
   });
 
   return {
-    accessToken: longLivedToken,
+    accessToken: finalToken,
     expiresIn,
     igUserId,
     username: profile.username,
