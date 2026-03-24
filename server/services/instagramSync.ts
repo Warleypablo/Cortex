@@ -74,25 +74,31 @@ export async function exchangeCodeForToken(code: string): Promise<{
 }> {
   const { appId, appSecret, redirectUri, apiVersion } = getConfig();
 
-  // Step 1: Exchange code for short-lived token
-  const tokenUrl = new URL(`${GRAPH_API_BASE}/${apiVersion}/oauth/access_token`);
-  tokenUrl.searchParams.set("client_id", appId);
-  tokenUrl.searchParams.set("client_secret", appSecret);
-  tokenUrl.searchParams.set("redirect_uri", redirectUri);
-  tokenUrl.searchParams.set("code", code);
-
-  const tokenRes = await fetch(tokenUrl.toString());
+  // Step 1: Exchange code for short-lived token (Instagram Login flow)
+  const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: appId,
+      client_secret: appSecret,
+      grant_type: "authorization_code",
+      redirect_uri: redirectUri,
+      code,
+    }),
+  });
   const tokenData = await tokenRes.json();
-  if (tokenData.error) throw new Error(`Token exchange failed: ${tokenData.error.message}`);
+  if (tokenData.error_type || tokenData.error_message) {
+    throw new Error(`Token exchange failed: ${tokenData.error_message || tokenData.error_type}`);
+  }
 
   const shortLivedToken = tokenData.access_token;
+  const igUserId = String(tokenData.user_id);
 
-  // Step 2: Exchange for long-lived token
-  const longUrl = new URL(`${GRAPH_API_BASE}/${apiVersion}/oauth/access_token`);
-  longUrl.searchParams.set("grant_type", "fb_exchange_token");
-  longUrl.searchParams.set("client_id", appId);
+  // Step 2: Exchange for long-lived token via Graph API
+  const longUrl = new URL(`${GRAPH_API_BASE}/${apiVersion}/access_token`);
+  longUrl.searchParams.set("grant_type", "ig_exchange_token");
   longUrl.searchParams.set("client_secret", appSecret);
-  longUrl.searchParams.set("fb_exchange_token", shortLivedToken);
+  longUrl.searchParams.set("access_token", shortLivedToken);
 
   const longRes = await fetch(longUrl.toString());
   const longData = await longRes.json();
@@ -101,21 +107,9 @@ export async function exchangeCodeForToken(code: string): Promise<{
   const longLivedToken = longData.access_token;
   const expiresIn = longData.expires_in || 5184000;
 
-  // Step 3: Get Instagram Business Account ID via Facebook Pages
-  const pagesData = await callGraphAPI("/me/accounts", longLivedToken, {
-    fields: "id,name,instagram_business_account",
-  });
-
-  const page = pagesData.data?.find((p: any) => p.instagram_business_account);
-  if (!page?.instagram_business_account?.id) {
-    throw new Error("No Instagram Business account found linked to any Facebook Page");
-  }
-
-  const igUserId = page.instagram_business_account.id;
-
-  // Step 4: Get Instagram profile info
+  // Step 3: Get Instagram profile info
   const profile = await callGraphAPI(`/${igUserId}`, longLivedToken, {
-    fields: "username,account_type",
+    fields: "user_id,username,account_type",
   });
 
   return {
@@ -123,7 +117,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
     expiresIn,
     igUserId,
     username: profile.username,
-    accountType: profile.account_type,
+    accountType: profile.account_type || "BUSINESS",
   };
 }
 
@@ -131,12 +125,10 @@ export async function refreshLongLivedToken(currentToken: string): Promise<{
   accessToken: string;
   expiresIn: number;
 }> {
-  const { appId, appSecret, apiVersion } = getConfig();
-  const url = new URL(`${GRAPH_API_BASE}/${apiVersion}/oauth/access_token`);
-  url.searchParams.set("grant_type", "fb_exchange_token");
-  url.searchParams.set("client_id", appId);
-  url.searchParams.set("client_secret", appSecret);
-  url.searchParams.set("fb_exchange_token", currentToken);
+  const { apiVersion } = getConfig();
+  const url = new URL(`${GRAPH_API_BASE}/${apiVersion}/refresh_access_token`);
+  url.searchParams.set("grant_type", "ig_refresh_token");
+  url.searchParams.set("access_token", currentToken);
 
   const res = await fetch(url.toString());
   const data = await res.json();
