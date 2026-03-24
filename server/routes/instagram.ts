@@ -160,8 +160,9 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       console.log(`[Instagram OAuth] Connection saved for @${tokenResult.username} (CNPJ: ${stateData.cnpj})`);
       return res.redirect(`${frontendUrl}${frontendPath}?connected=true&username=${tokenResult.username}`);
     } catch (err: any) {
-      console.error("[Instagram OAuth] Callback error:", err);
-      return res.redirect(`${frontendUrl}${frontendPath}?error=token_exchange_failed`);
+      console.error("[Instagram OAuth] Callback error:", err.message || err);
+      const errorMsg = encodeURIComponent(err.message || "token_exchange_failed");
+      return res.redirect(`${frontendUrl}${frontendPath}?error=${errorMsg}`);
     }
   });
 
