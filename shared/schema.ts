@@ -3061,3 +3061,87 @@ export type CapacityComUtilizacao = CapacityOperador & {
   vagas_livres: number;
   utilizacao_pct: number;
 };
+
+// ── Instagram Analytics ─────────────────────────────────────────────────────
+
+export const instagramConnections = cortexCoreSchema.table(
+  "instagram_connections",
+  {
+    id: serial("id").primaryKey(),
+    clienteCnpj: text("cliente_cnpj").notNull(),
+    igUserId: text("ig_user_id").notNull(),
+    username: text("username").notNull(),
+    accessToken: text("access_token").notNull(),
+    tokenExpiresAt: timestamp("token_expires_at"),
+    accountType: text("account_type"),
+    scopes: text("scopes").array(),
+    connectedBy: text("connected_by"),
+    isActive: boolean("is_active").default(true),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_ig_conn_cnpj").on(table.clienteCnpj),
+    index("idx_ig_conn_active").on(table.isActive),
+  ],
+);
+
+export const insertInstagramConnectionSchema = createInsertSchema(instagramConnections)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+export type InstagramConnection = typeof instagramConnections.$inferSelect;
+export type InsertInstagramConnection = z.infer<typeof insertInstagramConnectionSchema>;
+
+export const instagramMetricsSnapshots = cortexCoreSchema.table(
+  "instagram_metrics_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    connectionId: integer("connection_id").notNull(),
+    metricDate: date("metric_date").notNull(),
+    followers: integer("followers"),
+    following: integer("following"),
+    postsCount: integer("posts_count"),
+    reachDay: integer("reach_day"),
+    impressionsDay: integer("impressions_day"),
+    recordedAt: timestamp("recorded_at").defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_ig_metrics_conn_date").on(table.connectionId, table.metricDate),
+  ],
+);
+
+export const insertInstagramMetricsSnapshotSchema = createInsertSchema(instagramMetricsSnapshots)
+  .omit({ id: true, recordedAt: true });
+export type InstagramMetricsSnapshot = typeof instagramMetricsSnapshots.$inferSelect;
+export type InsertInstagramMetricsSnapshot = z.infer<typeof insertInstagramMetricsSnapshotSchema>;
+
+export const instagramPostMetrics = cortexCoreSchema.table(
+  "instagram_post_metrics",
+  {
+    id: serial("id").primaryKey(),
+    connectionId: integer("connection_id").notNull(),
+    igMediaId: text("ig_media_id").notNull(),
+    mediaType: text("media_type"),
+    caption: text("caption"),
+    permalink: text("permalink"),
+    thumbnailUrl: text("thumbnail_url"),
+    postedAt: timestamp("posted_at"),
+    likes: integer("likes").default(0),
+    comments: integer("comments").default(0),
+    saves: integer("saves").default(0),
+    shares: integer("shares").default(0),
+    impressions: integer("impressions").default(0),
+    reach: integer("reach").default(0),
+    plays: integer("plays").default(0),
+    totalInteractions: integer("total_interactions").default(0),
+    lastSyncedAt: timestamp("last_synced_at"),
+  },
+  (table) => [
+    uniqueIndex("uq_ig_post_media_id").on(table.igMediaId),
+    index("idx_ig_post_conn").on(table.connectionId),
+  ],
+);
+
+export const insertInstagramPostMetricSchema = createInsertSchema(instagramPostMetrics)
+  .omit({ id: true });
+export type InstagramPostMetric = typeof instagramPostMetrics.$inferSelect;
+export type InsertInstagramPostMetric = z.infer<typeof insertInstagramPostMetricSchema>;
