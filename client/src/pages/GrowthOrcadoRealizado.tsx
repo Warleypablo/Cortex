@@ -206,7 +206,6 @@ export default function GrowthOrcadoRealizado() {
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
   const [selectedFunis, setSelectedFunis] = useState<string[]>([]);
-  const [canalFilter, setCanalFilter] = useState<'todos' | 'inbound' | 'outbound'>('todos');
   const [selectedFunilMeta, setSelectedFunilMeta] = useState<string>('todos');
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, number>>({});
@@ -1056,35 +1055,6 @@ export default function GrowthOrcadoRealizado() {
       {/* Filtros + Cards de Resumo */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground font-medium mr-1">Canal:</span>
-          {(['todos', 'inbound', 'outbound'] as const).map((filter) => (
-            <button
-              key={filter}
-              onClick={() => {
-                setCanalFilter(filter);
-                if (filter === 'inbound') {
-                  // Inbound = todos os funis com investimento
-                  setSelectedFunis((funis ?? []).filter(f => f !== '(Vazio)'));
-                } else if (filter === 'outbound') {
-                  // Outbound = deals sem funil (vazio)
-                  setSelectedFunis(['(Vazio)']);
-                } else {
-                  setSelectedFunis([]);
-                }
-              }}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-all border",
-                canalFilter === filter
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                  : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
-              )}
-            >
-              {filter === 'todos' ? 'Todos' : filter === 'inbound' ? 'Inbound' : 'Outbound'}
-            </button>
-          ))}
-        </div>
-        <div className="h-5 w-px bg-border" />
-        <div className="flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground font-medium mr-1">Contagem:</span>
           {(['contrato', 'cliente'] as const).map((filter) => (
             <button
@@ -1107,10 +1077,7 @@ export default function GrowthOrcadoRealizado() {
           <MultiSelect
             options={funis ?? []}
             selected={selectedFunis}
-            onChange={(val) => {
-              setSelectedFunis(val);
-              setCanalFilter('todos'); // Reset canal filter when manually changing funis
-            }}
+            onChange={setSelectedFunis}
             placeholder="Todos os funis"
             searchPlaceholder="Buscar funil..."
             className="h-8 w-56 text-xs"
