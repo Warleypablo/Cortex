@@ -1210,6 +1210,59 @@ export default function GrowthOrcadoRealizado() {
 
       {/* Tabelas de Métricas */}
       <div className="space-y-6">
+        {/* Consolidado */}
+        <Card className="border bg-card">
+          <CardHeader className="pb-3 border-b">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-semibold">Consolidado</CardTitle>
+              {(adsLoading || mqlLoading || naoMqlLoading) && (
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40">
+                  <TableHead className="w-[40%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {consolidadoSections.map((section) => (
+                  <>
+                    <TableRow key={`header-${section.title}`} className="bg-muted/30">
+                      <TableCell colSpan={4} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {section.title}
+                      </TableCell>
+                    </TableRow>
+                    {section.metrics.map(m => (
+                      <TableRow key={m.id} className="hover:bg-muted/20">
+                        <TableCell className="text-sm font-medium">{m.name}</TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {renderOrcadoCell(m)}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-medium">
+                          {formatValue(m.realizado, m.format)}
+                        </TableCell>
+                        <TableCell className={cn("text-right text-sm font-semibold",
+                          m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
+                          m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
+                          m.percentual !== null && m.percentual < 80 && "text-red-600 dark:text-red-400"
+                        )}>
+                          {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
         {/* Marketing — Ads */}
         <Card className="border bg-card">
           <CardHeader className="pb-3 border-b">
@@ -1340,58 +1393,6 @@ export default function GrowthOrcadoRealizado() {
         </Card>
         )}
 
-        {/* Consolidado */}
-        <Card className="border bg-card">
-          <CardHeader className="pb-3 border-b">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">Consolidado</CardTitle>
-              {(adsLoading || mqlLoading || naoMqlLoading) && (
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead className="w-[40%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {consolidadoSections.map((section) => (
-                  <>
-                    <TableRow key={`header-${section.title}`} className="bg-muted/30">
-                      <TableCell colSpan={4} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {section.title}
-                      </TableCell>
-                    </TableRow>
-                    {section.metrics.map(m => (
-                      <TableRow key={m.id} className="hover:bg-muted/20">
-                        <TableCell className="text-sm font-medium">{m.name}</TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {renderOrcadoCell(m)}
-                        </TableCell>
-                        <TableCell className="text-right text-sm font-medium">
-                          {formatValue(m.realizado, m.format)}
-                        </TableCell>
-                        <TableCell className={cn("text-right text-sm font-semibold",
-                          m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
-                          m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
-                          m.percentual !== null && m.percentual < 80 && "text-red-600 dark:text-red-400"
-                        )}>
-                          {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
       </div>
 
     </div>
