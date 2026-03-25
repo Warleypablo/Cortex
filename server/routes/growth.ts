@@ -2045,8 +2045,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const nameConditions = realFunilValues.map(v => sql`c.campaign_name ILIKE ${'%[' + v + ']%'}`);
         let nameFilter = sql.join(nameConditions, sql` OR `);
         if (hasVazio) {
-          // Also include campaigns that don't match any known funnel pattern
-          nameFilter = sql`(${nameFilter} OR c.campaign_name NOT SIMILAR TO '%\\[[A-Za-z]+\\]%')`;
+          // Also include campaigns without any [Tag] in their name
+          nameFilter = sql`(${nameFilter} OR c.campaign_name NOT LIKE '%[%]%')`;
         }
         campaignFilter = sql`AND mid.campaign_id IN (
           SELECT DISTINCT c.campaign_id::text
@@ -2054,10 +2054,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           WHERE (${nameFilter})
         )`;
       } else if (hasVazio) {
+        // Only campaigns without any [Tag] in their name
         campaignFilter = sql`AND mid.campaign_id IN (
           SELECT DISTINCT c.campaign_id::text
           FROM meta_ads.meta_campaigns c
-          WHERE c.campaign_name NOT SIMILAR TO '%\\[[A-Za-z]+\\]%'
+          WHERE c.campaign_name NOT LIKE '%[%]%'
         )`;
       }
 
