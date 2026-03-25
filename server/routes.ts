@@ -4479,8 +4479,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // MRR ativo de referência via cup_data_hist — mês a mês
       // Determinar os meses abrangidos pelo período de churn
-      const periodStart = startDate ? new Date(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-      const periodEnd = endDate ? new Date(endDate) : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+      // Parse dates manually to avoid UTC timezone issues (new Date("2026-03-01") is UTC, which shifts to previous day in Brazil)
+      const parseDateLocal = (d: string) => { const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day); };
+      const periodStart = startDate ? parseDateLocal(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const periodEnd = endDate ? parseDateLocal(endDate) : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
 
       // Gerar lista de meses no range (YYYY-MM)
       const mesesNoRange: string[] = [];
