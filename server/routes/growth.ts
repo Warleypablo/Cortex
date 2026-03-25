@@ -1594,18 +1594,17 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
-  // Growth - Orçado x Realizado - Valores distintos de fnl_ngc (funil)
+  // Growth - Orçado x Realizado - Valores distintos de fnl_ngc (funil) com atividade
   app.get("/api/growth/orcado-realizado/funis", async (req, res) => {
     try {
       const result = await db.execute(sql`
         SELECT DISTINCT fnl_ngc
         FROM "Bitrix".crm_deal
         WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
+          AND (COALESCE(valor_recorrente::numeric, 0) > 0 OR COALESCE(valor_pontual::numeric, 0) > 0)
         ORDER BY fnl_ngc
       `);
       const funis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
-      // Add "(Vazio)" option for deals with no funnel assigned
-      funis.unshift("(Vazio)");
       res.json(funis);
     } catch (error) {
       console.error("[api] Error fetching funis:", error);
