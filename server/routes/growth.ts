@@ -1601,7 +1601,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT DISTINCT fnl_ngc
         FROM "Bitrix".crm_deal
         WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
-          AND LOWER(fnl_ngc) NOT IN ('cross sell', 'commerce', 'ecommerce', 'indicação', 'lead')
+          AND LOWER(fnl_ngc) NOT IN ('cross sell', 'commerce', 'indicação', 'lead')
         ORDER BY fnl_ngc
       `);
       const funis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
