@@ -156,6 +156,8 @@ interface ChurnDetalhamentoData {
     churn_por_cluster?: ChurnBreakdownItem[];
     churn_por_plano?: ChurnBreakdownItem[];
     periodo_referencia?: string;
+    mrr_base_por_mes?: Record<string, number>;
+    soma_mrr_bases?: number;
     total_abonado?: number;
     mrr_abonado?: number;
   };
@@ -735,12 +737,15 @@ export default function ChurnDetalhamento() {
 
   // MRR base dinâmico: usa MRR real do período quando disponível
   const mrrBaseReal = data?.metricas?.mrr_ativo_ref ?? 0;
+  // Soma dos MRR bases de cada mês (para média ponderada em ranges multi-mês)
+  const somaMrrBases = data?.metricas?.soma_mrr_bases ?? mrrBaseReal;
 
   const filteredTaxaChurn = useMemo(() => {
-    const mrrBase = mrrBaseReal;
+    // Usar soma dos MRR bases para média ponderada correta em ranges multi-mês
+    const mrrBase = somaMrrBases > 0 ? somaMrrBases : mrrBaseReal;
     const mrrPerdido = filteredMetricas.mrr_perdido;
     return mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
-  }, [filteredMetricas.mrr_perdido, mrrBaseReal]);
+  }, [filteredMetricas.mrr_perdido, somaMrrBases, mrrBaseReal]);
 
   // Meta planejada pro-rateada até hoje (BP 2026) — DINÂMICA baseada no MRR real
   const churnPlanejado = useMemo(() => {
