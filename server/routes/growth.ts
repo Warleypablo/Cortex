@@ -1601,7 +1601,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT DISTINCT fnl_ngc
         FROM "Bitrix".crm_deal
         WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
-          AND (COALESCE(valor_recorrente::numeric, 0) > 0 OR COALESCE(valor_pontual::numeric, 0) > 0)
           AND LOWER(fnl_ngc) NOT IN ('cross sell', 'commerce', 'ecommerce', 'indicação', 'lead')
         ORDER BY fnl_ngc
       `);
