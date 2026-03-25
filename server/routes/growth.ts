@@ -1605,6 +1605,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ORDER BY fnl_ngc
       `);
       const funis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
+      funis.unshift("(Vazio)");
       res.json(funis);
     } catch (error) {
       console.error("[api] Error fetching funis:", error);
