@@ -207,6 +207,7 @@ export default function GrowthOrcadoRealizado() {
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
   const [selectedFunis, setSelectedFunis] = useState<string[]>([]);
+  const [selectedFunilMeta, setSelectedFunilMeta] = useState<string>('todos');
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -261,9 +262,14 @@ export default function GrowthOrcadoRealizado() {
 
   // Fetch budgets from DB (falls back to defaults)
   const { data: budgetsData } = useQuery<Record<string, any>>({
-    queryKey: ['/api/growth/orcado-realizado/budgets', selectedMonth],
+    queryKey: ['/api/growth/orcado-realizado/budgets', dateRange.startDate, dateRange.endDate, selectedFunilMeta],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/budgets?mes=${selectedMonth}`);
+      const params = new URLSearchParams({
+        startDate: format(customDateRange?.from || startOfMonth(parse(selectedMonth, 'yyyy-MM', new Date())), 'yyyy-MM'),
+        endDate: format(customDateRange?.to || endOfMonth(parse(selectedMonth, 'yyyy-MM', new Date())), 'yyyy-MM'),
+        funil: selectedFunilMeta,
+      });
+      const res = await fetch(`/api/growth/orcado-realizado/budgets?${params}`, { credentials: 'include' });
       if (!res.ok) return {};
       return res.json();
     },
@@ -322,7 +328,7 @@ export default function GrowthOrcadoRealizado() {
           fetch('/api/growth/orcado-realizado/budgets', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mes: selectedMonth, segmento, metricas }),
+            body: JSON.stringify({ mes: selectedMonth, segmento, funil: selectedFunilMeta, metricas }),
           })
         )
       );
@@ -342,7 +348,7 @@ export default function GrowthOrcadoRealizado() {
       const res = await fetch('/api/growth/orcado-realizado/budgets/copy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mesOrigem, mesDestino: selectedMonth }),
+        body: JSON.stringify({ mesOrigem, mesDestino: selectedMonth, funil: selectedFunilMeta }),
       });
       if (!res.ok) {
         const err = await res.json();
