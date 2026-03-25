@@ -302,7 +302,7 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
 
   p('__________________________', { align: 'center', spacing: 0.2 });
   p('TURBO PARTNERS LTDA', { bold: true, align: 'center', spacing: 0.1 });
-  p('Roberto Fachetti', { align: 'center', spacing: 3 });
+  p('Rodrigo Queiroz', { align: 'center', spacing: 3 });
 
   p('__________________________', { align: 'center', spacing: 0.2 });
   p(creator.nome, { bold: true, align: 'center' });
@@ -796,7 +796,7 @@ export function registerCreatorsRoutes(app: Express) {
       const signerUrl = `${config.api_url}/accounts/${config.account_id}/signers`;
 
       const sociosResponsaveis = [
-        { nome: "Roberto Fachetti", email: "roberto.fachetti@turbopartners.com.br" }
+        { nome: "Rodrigo Queiroz", email: "rodrigo.queiroz@turbopartners.com.br" }
       ];
 
       const getOrCreateSigner = async (nome: string, email: string): Promise<string> => {
