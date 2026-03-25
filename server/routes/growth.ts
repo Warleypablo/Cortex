@@ -2050,13 +2050,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
         campaignFilter = sql`AND mid.campaign_id IN (
           SELECT DISTINCT c.campaign_id::text
-          FROM meta_ads.campaigns c
+          FROM meta_ads.meta_campaigns c
           WHERE (${nameFilter})
         )`;
       } else if (hasVazio) {
         campaignFilter = sql`AND mid.campaign_id IN (
           SELECT DISTINCT c.campaign_id::text
-          FROM meta_ads.campaigns c
+          FROM meta_ads.meta_campaigns c
           WHERE c.campaign_name NOT SIMILAR TO '%\\[[A-Za-z]+\\]%'
         )`;
       }
