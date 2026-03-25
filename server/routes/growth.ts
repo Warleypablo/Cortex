@@ -1412,15 +1412,85 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   app.get("/api/growth/orcado-realizado/budgets", async (req, res) => {
     try {
       const mes = req.query.mes as string;
-      if (!mes) return res.status(400).json({ error: "mes is required (YYYY-MM)" });
-      const result = await db.execute(sql`
-        SELECT segmento, metricas FROM meta_ads.growth_budgets WHERE mes = ${mes}
-      `);
-      const budgets: Record<string, any> = {};
-      for (const row of result.rows as any[]) {
-        budgets[row.segmento] = row.metricas;
+      const funil = (req.query.funil as string) || 'todos';
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+
+      // Build list of months to query
+      let meses: string[] = [];
+      if (startDate && endDate) {
+        // Generate all YYYY-MM in range
+        const start = new Date(startDate + '-01');
+        const end = new Date(endDate + '-01');
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          meses.push(format(cursor, 'yyyy-MM'));
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+      } else if (mes) {
+        meses = [mes];
+      } else {
+        return res.status(400).json({ error: "mes or startDate+endDate is required (YYYY-MM)" });
       }
-      res.json(budgets);
+
+      const result = await db.execute(sql`
+        SELECT mes, segmento, metricas FROM meta_ads.growth_budgets
+        WHERE mes = ANY(${meses}) AND funil = ${funil}
+      `);
+
+      // Track which months actually had data
+      const mesesComMeta = new Set<string>();
+
+      // Absolute metrics (sum across months)
+      const absoluteKeys = [
+        'reunioesAgendadas', 'reunioesRealizadas', 'novosClientes',
+        'contratosAceleracao', 'contratosImplantacao',
+        'faturamentoAceleracao', 'faturamentoImplantacao',
+        'investimento', 'impressoes', 'cliques', 'cliquesSaida',
+        'visualizacoesPagina', 'leads', 'mqls'
+      ];
+      // Percentage metrics (average across months)
+      const percentKeys = [
+        'percReuniaoAgendada', 'percNoShow', 'taxaVendas',
+        'txContratosRecorrentes', 'txContratosImplantacao',
+        'ctr', 'percMqls', 'connectRate', 'taxaConversaoPagina',
+        'cpm', 'cps', 'cpl', 'cpmql',
+        'ticketMedioAceleracao', 'ticketMedioImplantacao'
+      ];
+
+      // Group rows by segmento, then aggregate
+      const bySegmento: Record<string, any[]> = {};
+      for (const row of result.rows as any[]) {
+        mesesComMeta.add(row.mes);
+        if (!bySegmento[row.segmento]) bySegmento[row.segmento] = [];
+        bySegmento[row.segmento].push(row.metricas);
+      }
+
+      const budgets: Record<string, any> = {};
+      for (const [segmento, metricasList] of Object.entries(bySegmento)) {
+        if (metricasList.length === 1) {
+          budgets[segmento] = metricasList[0];
+        } else {
+          const aggregated: Record<string, number> = {};
+          // Sum absolute metrics
+          for (const key of absoluteKeys) {
+            aggregated[key] = metricasList.reduce((sum, m) => sum + (Number(m[key]) || 0), 0);
+          }
+          // Average percentage metrics
+          for (const key of percentKeys) {
+            const values = metricasList.filter(m => m[key] !== undefined && m[key] !== null);
+            aggregated[key] = values.length > 0
+              ? values.reduce((sum, m) => sum + (Number(m[key]) || 0), 0) / values.length
+              : 0;
+          }
+          budgets[segmento] = aggregated;
+        }
+      }
+
+      res.json({
+        ...budgets,
+        meses_com_meta: Array.from(mesesComMeta).sort()
+      });
     } catch (error) {
       console.error("[api] Error fetching budgets:", error);
       res.status(500).json({ error: "Failed to fetch budgets" });
@@ -1429,14 +1499,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
   app.put("/api/growth/orcado-realizado/budgets", async (req, res) => {
     try {
-      const { mes, segmento, metricas } = req.body;
+      const { mes, segmento, metricas, funil } = req.body;
+      const funilValue = funil || 'todos';
       if (!mes || !segmento || !metricas) {
         return res.status(400).json({ error: "mes, segmento, and metricas are required" });
       }
       await db.execute(sql`
-        INSERT INTO meta_ads.growth_budgets (mes, segmento, metricas)
-        VALUES (${mes}, ${segmento}, ${JSON.stringify(metricas)}::jsonb)
-        ON CONFLICT (mes, segmento) DO UPDATE SET
+        INSERT INTO meta_ads.growth_budgets (mes, segmento, funil, metricas)
+        VALUES (${mes}, ${segmento}, ${funilValue}, ${JSON.stringify(metricas)}::jsonb)
+        ON CONFLICT (mes, segmento, funil) DO UPDATE SET
           metricas = ${JSON.stringify(metricas)}::jsonb,
           updated_at = NOW()
       `);
@@ -1475,7 +1546,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
   app.post("/api/growth/orcado-realizado/budgets/copy", async (req, res) => {
     try {
-      const { mesOrigem, mesDestino } = req.body;
+      const { mesOrigem, mesDestino, funil } = req.body;
+      const funilValue = funil || 'todos';
       if (!mesOrigem || !mesDestino) {
         return res.status(400).json({ error: "mesOrigem and mesDestino are required (YYYY-MM)" });
       }
@@ -1483,21 +1555,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "mesOrigem and mesDestino must be different" });
       }
       const source = await db.execute(sql`
-        SELECT segmento, metricas FROM meta_ads.growth_budgets WHERE mes = ${mesOrigem}
+        SELECT segmento, metricas FROM meta_ads.growth_budgets
+        WHERE mes = ${mesOrigem} AND funil = ${funilValue}
       `);
       if ((source.rows as any[]).length === 0) {
-        return res.status(404).json({ error: `No budgets found for ${mesOrigem}` });
+        return res.status(404).json({ error: `No budgets found for ${mesOrigem} with funil ${funilValue}` });
       }
       for (const row of source.rows as any[]) {
         await db.execute(sql`
-          INSERT INTO meta_ads.growth_budgets (mes, segmento, metricas)
-          VALUES (${mesDestino}, ${row.segmento}, ${JSON.stringify(row.metricas)}::jsonb)
-          ON CONFLICT (mes, segmento) DO UPDATE SET
+          INSERT INTO meta_ads.growth_budgets (mes, segmento, funil, metricas)
+          VALUES (${mesDestino}, ${row.segmento}, ${funilValue}, ${JSON.stringify(row.metricas)}::jsonb)
+          ON CONFLICT (mes, segmento, funil) DO UPDATE SET
             metricas = ${JSON.stringify(row.metricas)}::jsonb,
             updated_at = NOW()
         `);
       }
-      res.json({ copied: (source.rows as any[]).length, from: mesOrigem, to: mesDestino });
+      res.json({ copied: (source.rows as any[]).length, from: mesOrigem, to: mesDestino, funil: funilValue });
     } catch (error) {
       console.error("[api] Error copying budgets:", error);
       res.status(500).json({ error: "Failed to copy budgets" });
