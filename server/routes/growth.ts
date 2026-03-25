@@ -1601,7 +1601,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT DISTINCT fnl_ngc
         FROM "Bitrix".crm_deal
         WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
-          AND (COALESCE(valor_recorrente::numeric, 0) > 0 OR COALESCE(valor_pontual::numeric, 0) > 0)
           AND LOWER(fnl_ngc) NOT IN ('cross sell', 'commerce', 'ecommerce', 'indicação', 'lead')
         ORDER BY fnl_ngc
       `);
@@ -2038,29 +2037,27 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const hasVazio = funilValues.includes('(Vazio)');
       const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
 
-      // Build campaign filter: use campaign IDs from Bitrix leads' UTM data
-      // This is more reliable than matching campaign names with [funil] pattern
+      // Build campaign filter: match campaign names containing [funil] pattern
+      // Campaign naming convention: [TP] [Leads] [ABO] [Odonto] - ...
       let campaignFilter = sql``;
       if (realFunilValues.length > 0) {
-        // Build funnel filter for the subquery
-        let funilSubFilter;
-        if (hasVazio && realFunilValues.length > 0) {
-          funilSubFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
-        } else {
-          funilSubFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+        // Filter by campaign name containing [FunilName] for each selected funnel
+        const nameConditions = realFunilValues.map(v => sql`c.campaign_name ILIKE ${'%[' + v + ']%'}`);
+        let nameFilter = sql.join(nameConditions, sql` OR `);
+        if (hasVazio) {
+          // Also include campaigns that don't match any known funnel pattern
+          nameFilter = sql`(${nameFilter} OR c.campaign_name NOT SIMILAR TO '%\\[[A-Za-z]+\\]%')`;
         }
         campaignFilter = sql`AND mid.campaign_id IN (
-          SELECT DISTINCT d.utm_campaign
-          FROM "Bitrix".crm_deal d
-          WHERE d.utm_campaign IS NOT NULL AND d.utm_campaign <> '' AND d.utm_campaign <> '{{campaign.id}}'
-            ${funilSubFilter}
+          SELECT DISTINCT c.campaign_id::text
+          FROM meta_ads.campaigns c
+          WHERE (${nameFilter})
         )`;
       } else if (hasVazio) {
         campaignFilter = sql`AND mid.campaign_id IN (
-          SELECT DISTINCT d.utm_campaign
-          FROM "Bitrix".crm_deal d
-          WHERE d.utm_campaign IS NOT NULL AND d.utm_campaign <> '' AND d.utm_campaign <> '{{campaign.id}}'
-            AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')
+          SELECT DISTINCT c.campaign_id::text
+          FROM meta_ads.campaigns c
+          WHERE c.campaign_name NOT SIMILAR TO '%\\[[A-Za-z]+\\]%'
         )`;
       }
 
