@@ -393,7 +393,9 @@ export default function GrowthOrcadoRealizado() {
     },
   });
 
-  const funilParam = selectedFunis.length > 0 ? `&funilNgc=${selectedFunis.map(f => encodeURIComponent(f)).join(',')}` : '';
+  // Se todos os funis estão selecionados, tratar como "sem filtro" para não excluir campanhas sem tag
+  const allFunisSelected = funis && selectedFunis.length > 0 && selectedFunis.length >= funis.length;
+  const funilParam = (selectedFunis.length > 0 && !allFunisSelected) ? `&funilNgc=${selectedFunis.map(f => encodeURIComponent(f)).join(',')}` : '';
 
   const { data: mqlData, isLoading: mqlLoading } = useQuery<MQLMetrics>({
     queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis],
