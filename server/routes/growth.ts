@@ -1435,7 +1435,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       const result = await db.execute(sql`
         SELECT mes, segmento, metricas FROM meta_ads.growth_budgets
-        WHERE mes = ANY(${meses}) AND funil = ${funil}
+        WHERE mes IN (${sql.join(meses.map(m => sql`${m}`), sql`, `)}) AND funil = ${funil}
       `);
 
       // Track which months actually had data
