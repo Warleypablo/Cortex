@@ -11,6 +11,35 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
     .catch(() => { /* column may already exist */ });
 
+  // Ensure growth_budgets table exists with funil column
+  db.execute(sql`
+    CREATE TABLE IF NOT EXISTS meta_ads.growth_budgets (
+      id SERIAL PRIMARY KEY,
+      mes VARCHAR(7) NOT NULL,
+      segmento VARCHAR(20) NOT NULL,
+      funil VARCHAR(100) NOT NULL DEFAULT 'todos',
+      metricas JSONB NOT NULL DEFAULT '{}',
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(mes, segmento, funil)
+    )
+  `).then(() => {
+    // Migration: add funil column if table already existed without it
+    return db.execute(sql`ALTER TABLE meta_ads.growth_budgets ADD COLUMN IF NOT EXISTS funil VARCHAR(100) NOT NULL DEFAULT 'todos'`);
+  }).then(() => {
+    // Drop old constraint (may not exist) and ensure new one exists
+    return db.execute(sql`ALTER TABLE meta_ads.growth_budgets DROP CONSTRAINT IF EXISTS growth_budgets_mes_segmento_key`);
+  }).then(() => {
+    return db.execute(sql`
+      DO $$ BEGIN
+        ALTER TABLE meta_ads.growth_budgets ADD CONSTRAINT growth_budgets_mes_segmento_funil_key UNIQUE(mes, segmento, funil);
+      EXCEPTION WHEN duplicate_table THEN
+        -- constraint already exists, ignore
+      END $$
+    `);
+  }).catch((err: any) => {
+    console.log("[growth] growth_budgets migration note:", err?.message || err);
+  });
+
   // Growth - Investment Data (Google Ads + Meta Ads)
   app.get("/api/growth/investimento", async (req, res) => {
     try {
