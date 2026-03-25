@@ -413,6 +413,7 @@ export async function buscarClientesPorVencimento(dataVencimento: string): Promi
     WHERE p.data_vencimento = ${dataVencimento}
       AND p.nao_pago > 0
       AND p.status != 'ACQUITTED'
+      AND COALESCE(p.status_solicitacao_cobranca, '') != 'QUITADO'
       AND p.tipo_evento != 'DESPESA'
       AND cup.telefone IS NOT NULL
     ORDER BY p.id_cliente, p.data_vencimento
