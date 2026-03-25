@@ -1088,156 +1088,124 @@ export default function GrowthOrcadoRealizado() {
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-400 to-blue-600" />
-          <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Investimento</CardTitle>
-            <div className="p-2 rounded-full bg-gradient-to-br from-blue-400/20 to-blue-600/20 group-hover:scale-110 transition-transform duration-300">
-              <Wallet className="w-4 h-4 text-blue-500" />
+        {/* Investimento */}
+        <Card className="border bg-card">
+          <CardContent className="pt-5 pb-4 px-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Investimento</span>
+              <Badge variant="outline" className={cn("text-xs font-mono tabular-nums",
+                investimentoPerc >= 100 ? "text-emerald-600 border-emerald-200 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:bg-emerald-950" :
+                investimentoPerc >= 80 ? "text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:bg-amber-950" :
+                "text-red-600 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-800 dark:bg-red-950"
+              )}>
+                {investimentoPerc.toFixed(1)}%
+              </Badge>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-3xl font-bold tracking-tight">
-                {adsLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : formatValue(investimentoRealizado, 'currency')}
-              </span>
+            <div className="text-2xl font-bold tracking-tight mb-1">
+              {adsLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatValue(investimentoRealizado, 'currency')}
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Progresso</span>
-                <span className={cn(
-                  "font-semibold",
-                  investimentoPerc >= 100 ? "text-emerald-500" : investimentoPerc >= 80 ? "text-amber-500" : "text-red-500"
-                )}>
-                  {investimentoPerc.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
-                  style={{ width: `${getProgressValue(investimentoPerc)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">Meta: {formatValue(investimentoOrcado, 'currency')}</p>
+            <div className="text-xs text-muted-foreground">
+              Meta: {formatValue(investimentoOrcado, 'currency')}
+            </div>
+            <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className={cn("h-full rounded-full transition-all duration-500",
+                investimentoPerc >= 100 ? "bg-emerald-500" : investimentoPerc >= 80 ? "bg-amber-500" : "bg-red-500"
+              )} style={{ width: `${Math.min(investimentoPerc, 100)}%` }} />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-400 to-purple-600" />
-          <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{mqlsLabel}</CardTitle>
-            <div className="p-2 rounded-full bg-gradient-to-br from-purple-400/20 to-purple-600/20 group-hover:scale-110 transition-transform duration-300">
-              <Users className="w-4 h-4 text-purple-500" />
+        {/* Leads Totais */}
+        <Card className="border bg-card">
+          <CardContent className="pt-5 pb-4 px-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{mqlsLabel}</span>
+              <Badge variant="outline" className={cn("text-xs font-mono tabular-nums",
+                mqlsPerc >= 100 ? "text-emerald-600 border-emerald-200 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:bg-emerald-950" :
+                mqlsPerc >= 80 ? "text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:bg-amber-950" :
+                "text-red-600 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-800 dark:bg-red-950"
+              )}>
+                {mqlsPerc.toFixed(1)}%
+              </Badge>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-3xl font-bold tracking-tight">
-                {mqlLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : mqlsRealizado}
-              </span>
+            <div className="text-2xl font-bold tracking-tight mb-1">
+              {mqlLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : mqlsRealizado}
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Progresso</span>
-                <span className={cn(
-                  "font-semibold",
-                  mqlsPerc >= 100 ? "text-emerald-500" : mqlsPerc >= 80 ? "text-amber-500" : "text-red-500"
-                )}>
-                  {mqlsPerc.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all duration-500"
-                  style={{ width: `${getProgressValue(mqlsPerc)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">Meta: {mqlsOrcado.toLocaleString('pt-BR')} leads</p>
+            <div className="text-xs text-muted-foreground">
+              Meta: {mqlsOrcado.toLocaleString('pt-BR')} leads
+            </div>
+            <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className={cn("h-full rounded-full transition-all duration-500",
+                mqlsPerc >= 100 ? "bg-emerald-500" : mqlsPerc >= 80 ? "bg-amber-500" : "bg-red-500"
+              )} style={{ width: `${Math.min(mqlsPerc, 100)}%` }} />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-emerald-600" />
-          <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{clientesLabel}</CardTitle>
-            <div className="p-2 rounded-full bg-gradient-to-br from-emerald-400/20 to-emerald-600/20 group-hover:scale-110 transition-transform duration-300">
-              <UserCheck className="w-4 h-4 text-emerald-500" />
+        {/* Contratos/Clientes */}
+        <Card className="border bg-card">
+          <CardContent className="pt-5 pb-4 px-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{clientesLabel}</span>
+              <Badge variant="outline" className={cn("text-xs font-mono tabular-nums",
+                clientesPerc >= 100 ? "text-emerald-600 border-emerald-200 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:bg-emerald-950" :
+                clientesPerc >= 80 ? "text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:bg-amber-950" :
+                "text-red-600 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-800 dark:bg-red-950"
+              )}>
+                {clientesPerc.toFixed(1)}%
+              </Badge>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-3xl font-bold tracking-tight">
-                {mqlLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : clientesRealizado}
-              </span>
+            <div className="text-2xl font-bold tracking-tight mb-1">
+              {(mqlLoading || naoMqlLoading) ? <Loader2 className="w-5 h-5 animate-spin" /> : clientesRealizado}
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Progresso</span>
-                <span className={cn(
-                  "font-semibold",
-                  clientesPerc >= 100 ? "text-emerald-500" : clientesPerc >= 80 ? "text-amber-500" : "text-red-500"
-                )}>
-                  {clientesPerc.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600 transition-all duration-500"
-                  style={{ width: `${getProgressValue(clientesPerc)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">Meta: {clientesOrcado} {revenueFilter === 'recorrente' ? 'contratos' : revenueFilter === 'pontual' ? 'contratos' : 'clientes'}</p>
+            <div className="text-xs text-muted-foreground">
+              Meta: {clientesOrcado} {revenueFilter === 'recorrente' ? 'contratos' : revenueFilter === 'pontual' ? 'contratos' : 'clientes'}
+            </div>
+            <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className={cn("h-full rounded-full transition-all duration-500",
+                clientesPerc >= 100 ? "bg-emerald-500" : clientesPerc >= 80 ? "bg-amber-500" : "bg-red-500"
+              )} style={{ width: `${Math.min(clientesPerc, 100)}%` }} />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden relative group hover:shadow-lg transition-all duration-300">
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
-          <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{faturamentoLabel}</CardTitle>
-            <div className="p-2 rounded-full bg-gradient-to-br from-amber-400/20 to-orange-500/20 group-hover:scale-110 transition-transform duration-300">
-              <Receipt className="w-4 h-4 text-amber-500" />
+        {/* Faturamento */}
+        <Card className="border bg-card">
+          <CardContent className="pt-5 pb-4 px-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{faturamentoLabel}</span>
+              <Badge variant="outline" className={cn("text-xs font-mono tabular-nums",
+                faturamentoPerc >= 100 ? "text-emerald-600 border-emerald-200 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:bg-emerald-950" :
+                faturamentoPerc >= 80 ? "text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:bg-amber-950" :
+                "text-red-600 border-red-200 bg-red-50 dark:text-red-400 dark:border-red-800 dark:bg-red-950"
+              )}>
+                {faturamentoPerc.toFixed(1)}%
+              </Badge>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-3xl font-bold tracking-tight">
-                {mqlLoading ? <Loader2 className="w-6 h-6 animate-spin" /> : formatValue(faturamentoRealizado, 'currency')}
-              </span>
+            <div className="text-2xl font-bold tracking-tight mb-1">
+              {(mqlLoading || naoMqlLoading) ? <Loader2 className="w-5 h-5 animate-spin" /> : formatValue(faturamentoRealizado, 'currency')}
             </div>
-            {revenueFilter === 'todos' && !mqlLoading && (
-              <div className="flex items-center gap-3 text-xs">
+            <div className="text-xs text-muted-foreground">
+              Meta: {formatValue(faturamentoOrcado, 'currency')}
+            </div>
+            {revenueFilter === 'todos' && !(mqlLoading || naoMqlLoading) && (
+              <div className="flex items-center gap-3 text-xs mt-2">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-muted-foreground">Recorrente:</span>
-                  <span className="font-semibold text-emerald-500">{formatValue(fatRecorrenteRealizado, 'currency')}</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-muted-foreground">Rec:</span>
+                  <span className="font-medium">{formatValue(fatRecorrenteRealizado, 'currency')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="text-muted-foreground">Pontual:</span>
-                  <span className="font-semibold text-amber-500">{formatValue(fatPontualRealizado, 'currency')}</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span className="text-muted-foreground">Pont:</span>
+                  <span className="font-medium">{formatValue(fatPontualRealizado, 'currency')}</span>
                 </div>
               </div>
             )}
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Progresso</span>
-                <span className={cn(
-                  "font-semibold",
-                  faturamentoPerc >= 100 ? "text-emerald-500" : faturamentoPerc >= 80 ? "text-amber-500" : "text-red-500"
-                )}>
-                  {faturamentoPerc.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-amber-400 to-orange-500 transition-all duration-500"
-                  style={{ width: `${getProgressValue(faturamentoPerc)}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">Meta: {formatValue(faturamentoOrcado, 'currency')}</p>
+            <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className={cn("h-full rounded-full transition-all duration-500",
+                faturamentoPerc >= 100 ? "bg-emerald-500" : faturamentoPerc >= 80 ? "bg-amber-500" : "bg-red-500"
+              )} style={{ width: `${Math.min(faturamentoPerc, 100)}%` }} />
             </div>
           </CardContent>
         </Card>
