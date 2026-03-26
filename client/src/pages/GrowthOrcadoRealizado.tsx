@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Pencil, Save, X, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { startOfMonth, endOfMonth, format, parse } from "date-fns";
+import { startOfMonth, endOfMonth, format, parse, differenceInCalendarDays, subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRange } from "react-day-picker";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Line } from "recharts";
@@ -259,6 +259,18 @@ export default function GrowthOrcadoRealizado() {
     };
   }, [customDateRange, selectedMonth]);
 
+  const prevDateRange = useMemo(() => {
+    const start = new Date(dateRange.startDate);
+    const end = new Date(dateRange.endDate + 'T23:59:59');
+    const diffDays = differenceInCalendarDays(end, start);
+    const prevEnd = subDays(start, 1);
+    const prevStart = subDays(prevEnd, diffDays);
+    return {
+      startDate: format(prevStart, 'yyyy-MM-dd'),
+      endDate: format(prevEnd, 'yyyy-MM-dd'),
+    };
+  }, [dateRange]);
+
   // Fetch budgets from DB (falls back to defaults)
   const { data: budgetsData } = useQuery<Record<string, any>>({
     queryKey: ['/api/growth/orcado-realizado/budgets', dateRange.startDate, dateRange.endDate, selectedFunilMeta],
@@ -459,6 +471,37 @@ export default function GrowthOrcadoRealizado() {
     queryFn: async () => {
       const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
       if (!res.ok) throw new Error('Failed to fetch Ads metrics');
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  // Previous period queries for comparison
+  const { data: prevMqlData } = useQuery<MQLMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/mql', prevDateRange.startDate, prevDateRange.endDate, contagemFilter, selectedFunis, 'prev'],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  const { data: prevNaoMqlData } = useQuery<NaoMQLMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/nao-mql', prevDateRange.startDate, prevDateRange.endDate, contagemFilter, selectedFunis, 'prev'],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  const { data: prevAdsData } = useQuery<AdsMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/ads', prevDateRange.startDate, prevDateRange.endDate, contagemFilter, selectedFunis, 'prev'],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      if (!res.ok) return null;
       return res.json();
     },
     staleTime: 0,
@@ -911,6 +954,69 @@ export default function GrowthOrcadoRealizado() {
     return mqlVal + naoMqlVal;
   };
 
+  // Helper para calcular variação vs período anterior
+  const calcVariation = (current: number, previous: number | undefined): { pct: number; isPositive: boolean } | null => {
+    if (previous === undefined || previous === null || previous === 0) return null;
+    const pct = ((current - previous) / previous) * 100;
+    return { pct, isPositive: pct >= 0 };
+  };
+
+  // Helper para obter valor do período anterior por metric ID
+  const getPrevValue = (metricId: string): number | null => {
+    const prevMql = prevMqlData || {} as MQLMetrics;
+    const prevNaoMql = prevNaoMqlData || {} as NaoMQLMetrics;
+    const prevAds_ = prevAdsData || {} as AdsMetrics;
+
+    const map: Record<string, number | undefined> = {
+      // MQL
+      mql_ra_perc: prevMql.percReuniaoAgendada,
+      mql_ra_num: prevMql.reunioesAgendadas,
+      mql_rr_num: prevMql.reunioesRealizadas,
+      mql_noshow: prevMql.percNoShow,
+      mql_taxa_vendas: prevMql.taxaVendas,
+      mql_novos_clientes: prevMql.novosClientes,
+      mql_tx_recorrente: prevMql.txContratosRecorrentes,
+      mql_tx_implantacao: prevMql.txContratosImplantacao,
+      mql_contratos_acel: prevMql.contratosAceleracao,
+      mql_ticket_acel: prevMql.ticketMedioAceleracao,
+      mql_fat_acel: prevMql.faturamentoAceleracao,
+      mql_contratos_impl: prevMql.contratosImplantacao,
+      mql_ticket_impl: prevMql.ticketMedioImplantacao,
+      mql_fat_impl: prevMql.faturamentoImplantacao,
+      // Não-MQL
+      nmql_ra_perc: prevNaoMql.percReuniaoAgendada,
+      nmql_ra_num: prevNaoMql.reunioesAgendadas,
+      nmql_rr_num: prevNaoMql.reunioesRealizadas,
+      nmql_noshow: prevNaoMql.percNoShow,
+      nmql_taxa_vendas: prevNaoMql.taxaVendas,
+      nmql_novos_clientes: prevNaoMql.novosClientes,
+      nmql_tx_recorrente: prevNaoMql.txContratosRecorrentes,
+      nmql_tx_implantacao: prevNaoMql.txContratosImplantacao,
+      nmql_contratos_acel: prevNaoMql.contratosAceleracao,
+      nmql_ticket_acel: prevNaoMql.ticketMedioAceleracao,
+      nmql_fat_acel: prevNaoMql.faturamentoAceleracao,
+      nmql_contratos_impl: prevNaoMql.contratosImplantacao,
+      nmql_ticket_impl: prevNaoMql.ticketMedioImplantacao,
+      nmql_fat_impl: prevNaoMql.faturamentoImplantacao,
+      // Ads
+      investimento: prevAds_.investimento,
+      cpm: prevAds_.cpm,
+      impressoes: prevAds_.impressoes,
+      ctr: prevAds_.ctr,
+      cliques_saida: prevAds_.cliquesSaida,
+      cps: prevAds_.cps,
+      visualizacoes_pagina: prevAds_.visualizacoesPagina,
+      connect_rate: prevAds_.connectRate,
+      leads: prevAds_.leads,
+      mqls: prevAds_.mqls,
+      cpl: prevAds_.cpl,
+      cpmql: prevAds_.cpmql,
+      perc_mqls: prevAds_.percMqls,
+    };
+    const val = map[metricId];
+    return val !== undefined ? val : null;
+  };
+
   // Clientes: reage a cardFilter + revenueFilter
   const clientesRealizado = revenueFilter === 'recorrente'
     ? sumByCardFilter(mqlData?.contratosAceleracao ?? 0, naoMqlData?.contratosAceleracao ?? 0)
@@ -956,6 +1062,28 @@ export default function GrowthOrcadoRealizado() {
   // Breakdown recorrente vs pontual (para exibir no card quando filtro = todos)
   const fatRecorrenteRealizado = sumByCardFilter(mqlData?.faturamentoAceleracaoTrafego ?? 0, naoMqlData?.faturamentoAceleracaoTrafego ?? 0);
   const fatPontualRealizado = sumByCardFilter(mqlData?.faturamentoImplantacaoTrafego ?? 0, naoMqlData?.faturamentoImplantacaoTrafego ?? 0);
+
+  // Previous period values for hero cards
+  const prevInvestimento = prevAdsData?.investimento ?? 0;
+  const prevLeads = prevAdsData?.leads ?? 0;
+  const prevClientes = revenueFilter === 'recorrente'
+    ? sumByCardFilter(prevMqlData?.contratosAceleracao ?? 0, prevNaoMqlData?.contratosAceleracao ?? 0)
+    : revenueFilter === 'pontual'
+    ? sumByCardFilter(prevMqlData?.contratosImplantacao ?? 0, prevNaoMqlData?.contratosImplantacao ?? 0)
+    : sumByCardFilter(prevMqlData?.novosClientes ?? 0, prevNaoMqlData?.novosClientes ?? 0);
+  const prevFaturamento = revenueFilter === 'recorrente'
+    ? sumByCardFilter(prevMqlData?.faturamentoAceleracaoTrafego ?? 0, prevNaoMqlData?.faturamentoAceleracaoTrafego ?? 0)
+    : revenueFilter === 'pontual'
+    ? sumByCardFilter(prevMqlData?.faturamentoImplantacaoTrafego ?? 0, prevNaoMqlData?.faturamentoImplantacaoTrafego ?? 0)
+    : sumByCardFilter(
+        (prevMqlData?.faturamentoAceleracaoTrafego ?? 0) + (prevMqlData?.faturamentoImplantacaoTrafego ?? 0),
+        (prevNaoMqlData?.faturamentoAceleracaoTrafego ?? 0) + (prevNaoMqlData?.faturamentoImplantacaoTrafego ?? 0)
+      );
+
+  const investimentoVar = calcVariation(investimentoRealizado, prevInvestimento);
+  const leadsVar = calcVariation(mqlsRealizado, prevLeads);
+  const clientesVar = calcVariation(clientesRealizado, prevClientes);
+  const faturamentoVar = calcVariation(faturamentoRealizado, prevFaturamento);
 
   return (
     <div className="p-6 space-y-6" data-testid="growth-orcado-realizado-page">
@@ -1106,6 +1234,14 @@ export default function GrowthOrcadoRealizado() {
             <div className="text-xs text-muted-foreground">
               Meta: {formatValue(investimentoOrcado, 'currency')}
             </div>
+            {investimentoVar && (
+              <div className={cn("flex items-center gap-1 text-xs mt-0.5",
+                investimentoVar.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+              )}>
+                {investimentoVar.isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                <span>{investimentoVar.isPositive ? '+' : ''}{investimentoVar.pct.toFixed(1)}% vs anterior</span>
+              </div>
+            )}
             <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
               <div className={cn("h-full rounded-full transition-all duration-500",
                 investimentoPerc >= 100 ? "bg-emerald-500" : investimentoPerc >= 80 ? "bg-amber-500" : "bg-red-500"
@@ -1133,6 +1269,14 @@ export default function GrowthOrcadoRealizado() {
             <div className="text-xs text-muted-foreground">
               Meta: {mqlsOrcado.toLocaleString('pt-BR')} leads
             </div>
+            {leadsVar && (
+              <div className={cn("flex items-center gap-1 text-xs mt-0.5",
+                leadsVar.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+              )}>
+                {leadsVar.isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                <span>{leadsVar.isPositive ? '+' : ''}{leadsVar.pct.toFixed(1)}% vs anterior</span>
+              </div>
+            )}
             <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
               <div className={cn("h-full rounded-full transition-all duration-500",
                 mqlsPerc >= 100 ? "bg-emerald-500" : mqlsPerc >= 80 ? "bg-amber-500" : "bg-red-500"
@@ -1160,6 +1304,14 @@ export default function GrowthOrcadoRealizado() {
             <div className="text-xs text-muted-foreground">
               Meta: {clientesOrcado} {revenueFilter === 'recorrente' ? 'contratos' : revenueFilter === 'pontual' ? 'contratos' : 'clientes'}
             </div>
+            {clientesVar && (
+              <div className={cn("flex items-center gap-1 text-xs mt-0.5",
+                clientesVar.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+              )}>
+                {clientesVar.isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                <span>{clientesVar.isPositive ? '+' : ''}{clientesVar.pct.toFixed(1)}% vs anterior</span>
+              </div>
+            )}
             <div className="mt-3 h-1.5 bg-muted rounded-full overflow-hidden">
               <div className={cn("h-full rounded-full transition-all duration-500",
                 clientesPerc >= 100 ? "bg-emerald-500" : clientesPerc >= 80 ? "bg-amber-500" : "bg-red-500"
@@ -1187,6 +1339,14 @@ export default function GrowthOrcadoRealizado() {
             <div className="text-xs text-muted-foreground">
               Meta: {formatValue(faturamentoOrcado, 'currency')}
             </div>
+            {faturamentoVar && (
+              <div className={cn("flex items-center gap-1 text-xs mt-0.5",
+                faturamentoVar.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+              )}>
+                {faturamentoVar.isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                <span>{faturamentoVar.isPositive ? '+' : ''}{faturamentoVar.pct.toFixed(1)}% vs anterior</span>
+              </div>
+            )}
             {revenueFilter === 'todos' && !(mqlLoading || naoMqlLoading) && (
               <div className="flex items-center gap-3 text-xs mt-2">
                 <div className="flex items-center gap-1.5">
@@ -1226,17 +1386,19 @@ export default function GrowthOrcadoRealizado() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[40%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {consolidadoSections.map((section) => (
                   <>
                     <TableRow key={`header-${section.title}`} className="bg-muted/30">
-                      <TableCell colSpan={4} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <TableCell colSpan={6} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {section.title}
                       </TableCell>
                     </TableRow>
@@ -1249,12 +1411,34 @@ export default function GrowthOrcadoRealizado() {
                         <TableCell className="text-right text-sm font-medium">
                           {formatValue(m.realizado, m.format)}
                         </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {(() => {
+                            const prev = getPrevValue(m.id);
+                            return prev !== null ? formatValue(prev, m.format) : '-';
+                          })()}
+                        </TableCell>
                         <TableCell className={cn("text-right text-sm font-semibold",
                           m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
                           m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
                           m.percentual !== null && m.percentual < 80 && "text-red-600 dark:text-red-400"
                         )}>
                           {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
+                        </TableCell>
+                        <TableCell className={cn("text-right text-sm font-medium",
+                          (() => {
+                            const prev = getPrevValue(m.id);
+                            const curr = typeof m.realizado === 'number' ? m.realizado : 0;
+                            if (prev === null || prev === 0) return '';
+                            return curr >= prev ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                          })()
+                        )}>
+                          {(() => {
+                            const prev = getPrevValue(m.id);
+                            const curr = typeof m.realizado === 'number' ? m.realizado : 0;
+                            if (prev === null || prev === 0) return '-';
+                            const variation = ((curr - prev) / prev) * 100;
+                            return `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`;
+                          })()}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1277,10 +1461,12 @@ export default function GrowthOrcadoRealizado() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[40%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1293,12 +1479,34 @@ export default function GrowthOrcadoRealizado() {
                     <TableCell className="text-right text-sm font-medium">
                       {formatValue(m.realizado, m.format)}
                     </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {(() => {
+                        const prev = getPrevValue(m.id);
+                        return prev !== null ? formatValue(prev, m.format) : '-';
+                      })()}
+                    </TableCell>
                     <TableCell className={cn("text-right text-sm font-semibold",
                       m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
                       m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
                       m.percentual !== null && m.percentual < 80 && "text-red-600 dark:text-red-400"
                     )}>
                       {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
+                    </TableCell>
+                    <TableCell className={cn("text-right text-sm font-medium",
+                      (() => {
+                        const prev = getPrevValue(m.id);
+                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
+                        if (prev === null || prev === 0) return '';
+                        return curr >= prev ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                      })()
+                    )}>
+                      {(() => {
+                        const prev = getPrevValue(m.id);
+                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
+                        if (prev === null || prev === 0) return '-';
+                        const variation = ((curr - prev) / prev) * 100;
+                        return `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`;
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1320,10 +1528,12 @@ export default function GrowthOrcadoRealizado() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[40%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1336,12 +1546,34 @@ export default function GrowthOrcadoRealizado() {
                     <TableCell className="text-right text-sm font-medium">
                       {formatValue(m.realizado, m.format)}
                     </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {(() => {
+                        const prev = getPrevValue(m.id);
+                        return prev !== null ? formatValue(prev, m.format) : '-';
+                      })()}
+                    </TableCell>
                     <TableCell className={cn("text-right text-sm font-semibold",
                       m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
                       m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
                       m.percentual !== null && m.percentual < 80 && "text-red-600 dark:text-red-400"
                     )}>
                       {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
+                    </TableCell>
+                    <TableCell className={cn("text-right text-sm font-medium",
+                      (() => {
+                        const prev = getPrevValue(m.id);
+                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
+                        if (prev === null || prev === 0) return '';
+                        return curr >= prev ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                      })()
+                    )}>
+                      {(() => {
+                        const prev = getPrevValue(m.id);
+                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
+                        if (prev === null || prev === 0) return '-';
+                        const variation = ((curr - prev) / prev) * 100;
+                        return `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`;
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1364,10 +1596,12 @@ export default function GrowthOrcadoRealizado() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[40%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[20%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1380,12 +1614,34 @@ export default function GrowthOrcadoRealizado() {
                     <TableCell className="text-right text-sm font-medium">
                       {formatValue(m.realizado, m.format)}
                     </TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {(() => {
+                        const prev = getPrevValue(m.id);
+                        return prev !== null ? formatValue(prev, m.format) : '-';
+                      })()}
+                    </TableCell>
                     <TableCell className={cn("text-right text-sm font-semibold",
                       m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
                       m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
                       m.percentual !== null && m.percentual < 80 && "text-red-600 dark:text-red-400"
                     )}>
                       {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
+                    </TableCell>
+                    <TableCell className={cn("text-right text-sm font-medium",
+                      (() => {
+                        const prev = getPrevValue(m.id);
+                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
+                        if (prev === null || prev === 0) return '';
+                        return curr >= prev ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                      })()
+                    )}>
+                      {(() => {
+                        const prev = getPrevValue(m.id);
+                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
+                        if (prev === null || prev === 0) return '-';
+                        const variation = ((curr - prev) / prev) * 100;
+                        return `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`;
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}
