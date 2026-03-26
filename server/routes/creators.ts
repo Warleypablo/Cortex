@@ -138,7 +138,7 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
   // ── PREÂMBULO ──
   p('Pelo presente instrumento particular de contrato, entre as partes abaixo qualificadas:', { spacing: 0.8 });
 
-  p('Na qualidade de CONTRATANTE: TURBO PARTNERS LTDA, CNPJ 42.100.292/0001-84, com sede na R Treze de Maio, 9 - Centro, Vitória, ES, na forma de seu contrato social;', { spacing: 0.8 });
+  p('Na qualidade de CONTRATANTE: TURBO PARTNERS LTDA, CNPJ 42.100.292/0001-84, com sede na Avenida João Baptista Parra, 633, Edifício Enseada Office, Sala 1301, Praia do Suá, Vitória, ES, CEP 29052-123, na forma de seu contrato social;', { spacing: 0.8 });
 
   // Monta qualificação da CONTRATADA com dados cadastrais
   const contratadaParts: string[] = [];
