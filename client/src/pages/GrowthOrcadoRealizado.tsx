@@ -206,6 +206,7 @@ export default function GrowthOrcadoRealizado() {
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
   const [selectedFunis, setSelectedFunis] = useState<string[]>([]);
+  const [selectedUtmSource, setSelectedUtmSource] = useState<string>('todos');
   const [selectedFunilMeta, setSelectedFunilMeta] = useState<string>('todos');
   const [compareEnabled, setCompareEnabled] = useState(true);
   const [compareRange, setCompareRange] = useState<DateRange | undefined>(() => {
@@ -416,11 +417,12 @@ export default function GrowthOrcadoRealizado() {
   // Se todos os funis estão selecionados, tratar como "sem filtro" para não excluir campanhas sem tag
   const allFunisSelected = funis && selectedFunis.length > 0 && selectedFunis.length >= funis.length;
   const funilParam = (selectedFunis.length > 0 && !allFunisSelected) ? `&funilNgc=${selectedFunis.map(f => encodeURIComponent(f)).join(',')}` : '';
+  const utmSourceParam = selectedUtmSource !== 'todos' ? `&utmSource=${encodeURIComponent(selectedUtmSource)}` : '';
 
   const { data: mqlData, isLoading: mqlLoading } = useQuery<MQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis],
+    queryKey: ['/api/growth/orcado-realizado/mql', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis, selectedUtmSource],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}${utmSourceParam}`);
       if (!res.ok) throw new Error('Failed to fetch MQL metrics');
       return res.json();
     },
@@ -448,9 +450,9 @@ export default function GrowthOrcadoRealizado() {
   }
 
   const { data: naoMqlData, isLoading: naoMqlLoading } = useQuery<NaoMQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis],
+    queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis, selectedUtmSource],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}${utmSourceParam}`);
       if (!res.ok) throw new Error('Failed to fetch Não-MQL metrics');
       return res.json();
     },
@@ -475,9 +477,9 @@ export default function GrowthOrcadoRealizado() {
   }
 
   const { data: adsData, isLoading: adsLoading } = useQuery<AdsMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/ads', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis],
+    queryKey: ['/api/growth/orcado-realizado/ads', dateRange.startDate, dateRange.endDate, contagemFilter, selectedFunis, selectedUtmSource],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&contagem=${contagemFilter}${funilParam}${utmSourceParam}`);
       if (!res.ok) throw new Error('Failed to fetch Ads metrics');
       return res.json();
     },
@@ -489,7 +491,7 @@ export default function GrowthOrcadoRealizado() {
     queryKey: ['/api/growth/orcado-realizado/mql', prevDateRange?.startDate, prevDateRange?.endDate, contagemFilter, selectedFunis, 'prev'],
     queryFn: async () => {
       if (!prevDateRange) return null;
-      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}${utmSourceParam}`);
       if (!res.ok) return null;
       return res.json();
     },
@@ -501,7 +503,7 @@ export default function GrowthOrcadoRealizado() {
     queryKey: ['/api/growth/orcado-realizado/nao-mql', prevDateRange?.startDate, prevDateRange?.endDate, contagemFilter, selectedFunis, 'prev'],
     queryFn: async () => {
       if (!prevDateRange) return null;
-      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}${utmSourceParam}`);
       if (!res.ok) return null;
       return res.json();
     },
@@ -513,7 +515,7 @@ export default function GrowthOrcadoRealizado() {
     queryKey: ['/api/growth/orcado-realizado/ads', prevDateRange?.startDate, prevDateRange?.endDate, contagemFilter, selectedFunis, 'prev'],
     queryFn: async () => {
       if (!prevDateRange) return null;
-      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}${utmSourceParam}`);
       if (!res.ok) return null;
       return res.json();
     },
@@ -1233,6 +1235,21 @@ export default function GrowthOrcadoRealizado() {
             searchPlaceholder="Buscar funil..."
             className="h-8 w-56 text-xs"
           />
+        </div>
+        <div className="h-5 w-px bg-border" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium mr-1">Fonte:</span>
+          <Select value={selectedUtmSource} onValueChange={setSelectedUtmSource}>
+            <SelectTrigger className="h-8 w-40 text-xs">
+              <SelectValue placeholder="Todas as fontes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todas as fontes</SelectItem>
+              <SelectItem value="facebook">Facebook</SelectItem>
+              <SelectItem value="instagram">Instagram</SelectItem>
+              <SelectItem value="google">Google</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
