@@ -29,8 +29,8 @@ import remarkGfm from "remark-gfm";
 interface Conversa {
   id: number;
   titulo: string;
-  criadoEm: string;
-  atualizadoEm: string;
+  criado_em: string;
+  atualizado_em: string;
 }
 
 interface Mensagem {
@@ -148,16 +148,19 @@ export default function GrowthAI() {
     },
   });
 
+  // Combine DB messages with optimistic ones, filtering out duplicates
   const allMessages: Mensagem[] = [
     ...mensagens,
-    ...optimisticMessages.map((m, i) => ({
-      id: -(i + 1),
-      conversa_id: activeConversaId || 0,
-      role: m.role as "user" | "assistant",
-      conteudo: m.conteudo,
-      tool_calls: null,
-      criado_em: new Date().toISOString(),
-    })),
+    ...optimisticMessages
+      .filter((om) => !mensagens.some((m) => m.role === om.role && m.conteudo === om.conteudo))
+      .map((m, i) => ({
+        id: -(i + 1),
+        conversa_id: activeConversaId || 0,
+        role: m.role as "user" | "assistant",
+        conteudo: m.conteudo,
+        tool_calls: null,
+        criado_em: new Date().toISOString(),
+      })),
   ];
 
   // Auto-scroll
@@ -362,7 +365,7 @@ export default function GrowthAI() {
                       {conversa.titulo || "Nova conversa"}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-zinc-500">
-                      {formatDate(conversa.atualizadoEm || conversa.criadoEm)}
+                      {formatDate(conversa.atualizado_em || conversa.criado_em)}
                     </p>
                   </div>
                   <button
