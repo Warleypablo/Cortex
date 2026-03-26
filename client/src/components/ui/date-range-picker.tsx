@@ -390,9 +390,11 @@ export function DateRangePicker({
                       setCompareActive(e.target.checked);
                       if (!e.target.checked) {
                         setInternalCompareRange(undefined);
+                        if (onCompareChange) onCompareChange(false, undefined);
                       } else if (value?.from && value?.to) {
                         const defaultCompare = COMPARE_PRESETS[0].getValue(value);
                         setInternalCompareRange(defaultCompare);
+                        if (onCompareChange) onCompareChange(true, defaultCompare);
                       }
                     }}
                     className="rounded border-border"
@@ -400,40 +402,59 @@ export function DateRangePicker({
                   <span className="text-sm font-medium">Comparar</span>
                 </label>
                 {compareActive && (
-                  <div className="space-y-2 pl-6">
+                  <div className="space-y-2.5 pl-6">
                     <div className="flex gap-1.5 flex-wrap">
-                      {COMPARE_PRESETS.map((preset) => (
-                        <button
-                          key={preset.label}
-                          onClick={() => {
-                            if (value) {
-                              const range = preset.getValue(value);
-                              setInternalCompareRange(range);
-                            }
-                          }}
-                          className={cn(
-                            "px-2.5 py-1 text-xs rounded-md border transition-colors",
-                            internalCompareRange && value &&
-                              preset.getValue(value)?.from?.getTime() === internalCompareRange.from?.getTime()
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "border-border hover:bg-muted"
-                          )}
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
+                      {COMPARE_PRESETS.map((preset) => {
+                        const presetRange = value ? preset.getValue(value) : undefined;
+                        const isSelected = presetRange && internalCompareRange?.from &&
+                          presetRange.from?.toDateString() === internalCompareRange.from?.toDateString() &&
+                          presetRange.to?.toDateString() === internalCompareRange.to?.toDateString();
+                        return (
+                          <button
+                            key={preset.label}
+                            onClick={() => {
+                              if (value && presetRange) {
+                                setInternalCompareRange(presetRange);
+                                if (onCompareChange) onCompareChange(true, presetRange);
+                              }
+                            }}
+                            className={cn(
+                              "px-2.5 py-1 text-xs rounded-md border transition-colors",
+                              isSelected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border hover:bg-muted"
+                            )}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
                     </div>
-                    {internalCompareRange?.from && internalCompareRange?.to && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="px-2 py-1 bg-muted rounded font-medium">
-                          {format(internalCompareRange.from, "dd/MM/yy")}
-                        </span>
-                        <span>→</span>
-                        <span className="px-2 py-1 bg-muted rounded font-medium">
-                          {format(internalCompareRange.to, "dd/MM/yy")}
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 text-xs">
+                      <input
+                        type="date"
+                        value={internalCompareRange?.from ? format(internalCompareRange.from, 'yyyy-MM-dd') : ''}
+                        onChange={(e) => {
+                          const newFrom = e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined;
+                          const newRange = { from: newFrom, to: internalCompareRange?.to };
+                          setInternalCompareRange(newRange as DateRange);
+                          if (onCompareChange && newFrom && newRange.to) onCompareChange(true, newRange as DateRange);
+                        }}
+                        className="px-2 py-1 bg-muted border border-border rounded text-xs font-medium w-[120px] dark:bg-zinc-800"
+                      />
+                      <span className="text-muted-foreground">→</span>
+                      <input
+                        type="date"
+                        value={internalCompareRange?.to ? format(internalCompareRange.to, 'yyyy-MM-dd') : ''}
+                        onChange={(e) => {
+                          const newTo = e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined;
+                          const newRange = { from: internalCompareRange?.from, to: newTo };
+                          setInternalCompareRange(newRange as DateRange);
+                          if (onCompareChange && newRange.from && newTo) onCompareChange(true, newRange as DateRange);
+                        }}
+                        className="px-2 py-1 bg-muted border border-border rounded text-xs font-medium w-[120px] dark:bg-zinc-800"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
