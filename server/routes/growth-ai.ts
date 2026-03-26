@@ -1,13 +1,13 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { GROWTH_AI_TOOLS, executeGrowthTool } from "../services/growthAiTools";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || "",
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || "",
 });
 
-const MODEL_ID = "claude-sonnet-4-5-20250514";
+const MODEL_ID = "gpt-4o";
 const MAX_TOOL_ITERATIONS = 5;
 
 const SYSTEM_PROMPT = `Você é a Growth AI, analista sênior de Growth Marketing da Turbo Partners.
@@ -211,8 +211,8 @@ export function registerGrowthAiRoutes(app: Express, db: any) {
         ORDER BY criado_em ASC
       `);
 
-      // Build messages for Anthropic API (only user/assistant, no tool messages stored)
-      const apiMessages: Anthropic.MessageParam[] = (
+      // Build messages for OpenAI API (only user/assistant, no tool messages stored)
+      const apiMessages: OpenAI.ChatCompletionMessageParam[] = (
         historyResult.rows as any[]
       ).map((m) => ({
         role: m.role as "user" | "assistant",
@@ -220,77 +220,57 @@ export function registerGrowthAiRoutes(app: Express, db: any) {
       }));
 
       // Tool-use loop
-      let currentMessages = [...apiMessages];
+      let currentMessages: OpenAI.ChatCompletionMessageParam[] = [...apiMessages];
       let finalText = "";
       let allToolCalls: any[] = [];
 
       for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS; iteration++) {
-        const response = await anthropic.messages.create({
+        const response = await openai.chat.completions.create({
           model: MODEL_ID,
           max_tokens: 4096,
-          system: SYSTEM_PROMPT,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            ...currentMessages,
+          ],
           tools: GROWTH_AI_TOOLS,
-          messages: currentMessages,
+          tool_choice: "auto",
         });
 
-        // Check if there are tool_use blocks
-        const toolUseBlocks = response.content.filter(
-          (b) => b.type === "tool_use"
-        );
-        const textBlocks = response.content.filter((b) => b.type === "text");
+        const msg = response.choices[0].message;
 
-        if (toolUseBlocks.length === 0) {
-          // No more tool calls — extract final text
-          finalText = textBlocks.map((b: any) => b.text).join("\n");
-          break;
-        }
+        // If model wants to call tools
+        if (msg.tool_calls && msg.tool_calls.length > 0) {
+          // Add assistant message with tool_calls to conversation
+          currentMessages.push(msg);
 
-        // Execute tool calls
-        const toolResults: Anthropic.ToolResultBlockParam[] = [];
+          // Execute each tool and add results
+          for (const toolCall of msg.tool_calls) {
+            const toolName = toolCall.function.name;
+            const toolArgs = JSON.parse(toolCall.function.arguments);
 
-        for (const block of toolUseBlocks) {
-          if (block.type !== "tool_use") continue;
+            console.log(
+              `[growth-ai] Executing tool: ${toolName}`,
+              JSON.stringify(toolArgs).substring(0, 200)
+            );
 
-          console.log(
-            `[growth-ai] Executing tool: ${block.name}`,
-            JSON.stringify(block.input).substring(0, 200)
-          );
+            const result = await executeGrowthTool(db, toolName, toolArgs);
 
-          const result = await executeGrowthTool(
-            db,
-            block.name,
-            block.input
-          );
+            allToolCalls.push({
+              tool: toolName,
+              input: toolArgs,
+              output: JSON.parse(result),
+            });
 
-          allToolCalls.push({
-            tool: block.name,
-            input: block.input,
-            output: JSON.parse(result),
-          });
-
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: result,
-          });
-        }
-
-        // Add assistant response + tool results to messages for next iteration
-        currentMessages.push({
-          role: "assistant",
-          content: response.content as any,
-        });
-        currentMessages.push({
-          role: "user",
-          content: toolResults,
-        });
-
-        // If response also had text alongside tools, capture it
-        if (
-          response.stop_reason === "end_turn" &&
-          textBlocks.length > 0
-        ) {
-          finalText = textBlocks.map((b: any) => b.text).join("\n");
+            currentMessages.push({
+              role: "tool",
+              tool_call_id: toolCall.id,
+              content: result,
+            });
+          }
+          // Loop continues to get final response...
+        } else {
+          // No tools — final text response
+          finalText = msg.content || "";
           break;
         }
       }
