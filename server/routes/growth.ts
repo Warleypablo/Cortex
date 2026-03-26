@@ -1633,11 +1633,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else if (hasVazio) {
           funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else {
-          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
         }
       }
 
@@ -1811,11 +1811,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else if (hasVazio) {
           funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else {
-          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
         }
       }
 
@@ -2041,8 +2041,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Campaign naming convention: [TP] [Leads] [ABO] [Odonto] - ...
       let campaignFilter = sql``;
       if (realFunilValues.length > 0) {
-        // Filter by campaign name containing [FunilName] for each selected funnel
-        const nameConditions = realFunilValues.map(v => sql`c.campaign_name ILIKE ${'%[' + v + ']%'}`);
+        // Filter by campaign name containing [FunilName] or the funnel name anywhere
+        const nameConditions = realFunilValues.map(v => sql`(c.campaign_name ILIKE ${'%[' + v + ']%'} OR c.campaign_name ILIKE ${'%' + v + '%'})`);
         let nameFilter = sql.join(nameConditions, sql` OR `);
         if (hasVazio) {
           // Also include campaigns without any [Tag] in their name
@@ -2137,11 +2137,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else if (hasVazio) {
           funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else {
-          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
         }
       }
 
