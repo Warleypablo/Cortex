@@ -189,14 +189,24 @@ export function registerTechHubRoutes(app: Express, db: any, storage: IStorage) 
   app.get("/api/tech/responsavel/:nome/kpis", async (req, res) => {
     try {
       const nome = decodeURIComponent(req.params.nome);
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
 
       // Get active projects for this PO
       const boardData = await storage.getTechBoard();
       const allProjects = boardData.filter((p: any) => p.responsavel === nome);
 
-      // Get closed projects for this PO
+      // Get closed projects for this PO (with optional date filter)
       const closedProjects = await storage.getTechProjetosFechados(500);
-      const poClosedProjects = closedProjects.filter((p: any) => p.responsavel === nome);
+      let poClosedProjects = closedProjects.filter((p: any) => p.responsavel === nome);
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        poClosedProjects = poClosedProjects.filter((p: any) => {
+          const d = p.lancamento ? new Date(p.lancamento) : null;
+          return d && d >= start && d <= end;
+        });
+      }
 
       // Calculate urgency for active projects
       const now = new Date();
