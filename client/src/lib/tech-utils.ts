@@ -28,7 +28,7 @@ export const PHASE_CONFIG: { key: string; label: string; color: string; patterns
 ];
 
 // End-state statuses to exclude
-export const END_STATES = ["deploy 🚀", "deploy", "encerrado 🚀", "complete", "completo"];
+export const END_STATES = ["deploy 🚀", "deploy", "encerrado 🚀", "complete", "completo", "deploy com pendências", "deploy com pend", "deplay com ped"];
 
 export function groupStatusIntoPhases(data: PrazoPorStatus[]): PhaseGrouped[] {
   const filtered = data.filter(d => !END_STATES.includes(d.status.toLowerCase().trim()));
