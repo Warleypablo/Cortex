@@ -207,6 +207,16 @@ export default function GrowthOrcadoRealizado() {
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
   const [selectedFunis, setSelectedFunis] = useState<string[]>([]);
   const [selectedFunilMeta, setSelectedFunilMeta] = useState<string>('todos');
+  const [compareEnabled, setCompareEnabled] = useState(true);
+  const [compareRange, setCompareRange] = useState<DateRange | undefined>(() => {
+    // Default: período anterior
+    const from = startOfMonth(hoje);
+    const to = endOfMonth(hoje);
+    const diff = differenceInCalendarDays(to, from);
+    const prevEnd = subDays(from, 1);
+    const prevStart = subDays(prevEnd, diff);
+    return { from: prevStart, to: prevEnd };
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -260,16 +270,14 @@ export default function GrowthOrcadoRealizado() {
   }, [customDateRange, selectedMonth]);
 
   const prevDateRange = useMemo(() => {
-    const start = new Date(dateRange.startDate);
-    const end = new Date(dateRange.endDate + 'T23:59:59');
-    const diffDays = differenceInCalendarDays(end, start);
-    const prevEnd = subDays(start, 1);
-    const prevStart = subDays(prevEnd, diffDays);
+    if (!compareEnabled || !compareRange?.from || !compareRange?.to) {
+      return null;
+    }
     return {
-      startDate: format(prevStart, 'yyyy-MM-dd'),
-      endDate: format(prevEnd, 'yyyy-MM-dd'),
+      startDate: format(compareRange.from, 'yyyy-MM-dd'),
+      endDate: format(compareRange.to, 'yyyy-MM-dd'),
     };
-  }, [dateRange]);
+  }, [compareEnabled, compareRange]);
 
   // Fetch budgets from DB (falls back to defaults)
   const { data: budgetsData } = useQuery<Record<string, any>>({
@@ -476,34 +484,40 @@ export default function GrowthOrcadoRealizado() {
     staleTime: 0,
   });
 
-  // Previous period queries for comparison
+  // Previous period queries for comparison (only when compare is enabled)
   const { data: prevMqlData } = useQuery<MQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/mql', prevDateRange.startDate, prevDateRange.endDate, contagemFilter, selectedFunis, 'prev'],
+    queryKey: ['/api/growth/orcado-realizado/mql', prevDateRange?.startDate, prevDateRange?.endDate, contagemFilter, selectedFunis, 'prev'],
     queryFn: async () => {
+      if (!prevDateRange) return null;
       const res = await fetch(`/api/growth/orcado-realizado/mql?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
       if (!res.ok) return null;
       return res.json();
     },
+    enabled: !!prevDateRange,
     staleTime: 0,
   });
 
   const { data: prevNaoMqlData } = useQuery<NaoMQLMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/nao-mql', prevDateRange.startDate, prevDateRange.endDate, contagemFilter, selectedFunis, 'prev'],
+    queryKey: ['/api/growth/orcado-realizado/nao-mql', prevDateRange?.startDate, prevDateRange?.endDate, contagemFilter, selectedFunis, 'prev'],
     queryFn: async () => {
+      if (!prevDateRange) return null;
       const res = await fetch(`/api/growth/orcado-realizado/nao-mql?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
       if (!res.ok) return null;
       return res.json();
     },
+    enabled: !!prevDateRange,
     staleTime: 0,
   });
 
   const { data: prevAdsData } = useQuery<AdsMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/ads', prevDateRange.startDate, prevDateRange.endDate, contagemFilter, selectedFunis, 'prev'],
+    queryKey: ['/api/growth/orcado-realizado/ads', prevDateRange?.startDate, prevDateRange?.endDate, contagemFilter, selectedFunis, 'prev'],
     queryFn: async () => {
+      if (!prevDateRange) return null;
       const res = await fetch(`/api/growth/orcado-realizado/ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}&contagem=${contagemFilter}${funilParam}`);
       if (!res.ok) return null;
       return res.json();
     },
+    enabled: !!prevDateRange,
     staleTime: 0,
   });
 
@@ -1177,6 +1191,13 @@ export default function GrowthOrcadoRealizado() {
                   if (isEditing) cancelEditing();
                 }
               }
+            }}
+            showCompare
+            compareEnabled={compareEnabled}
+            compareRange={compareRange}
+            onCompareChange={(enabled, range) => {
+              setCompareEnabled(enabled);
+              setCompareRange(range);
             }}
           />
         </div>
