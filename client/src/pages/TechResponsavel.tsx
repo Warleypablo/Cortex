@@ -7,8 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PHASE_CONFIG, groupStatusIntoPhases } from "@/lib/tech-utils";
 
+const PERIOD_OPTIONS = [
+  { value: 3, label: "3M" },
+  { value: 6, label: "6M" },
+  { value: 12, label: "12M" },
+  { value: 24, label: "24M" },
+];
+
 export default function TechResponsavel() {
   const [selectedPO, setSelectedPO] = useState<string>("");
+  const [meses, setMeses] = useState<number>(12);
 
   // Fetch PO list from board
   const { data: boardData } = useQuery<{ responsavel: string; projetos: any[]; total: number }[]>({
@@ -40,15 +48,15 @@ export default function TechResponsavel() {
 
   // Tempo deploy by quarter
   const { data: tempoDeployData } = useQuery<{ media_dias: number; trimestre: string }[]>({
-    queryKey: ["/api/tech/tempo-deploy", selectedPO],
-    queryFn: () => fetch(`/api/tech/tempo-deploy?meses=12&responsavel=${encodeURIComponent(selectedPO)}`).then((r) => r.json()),
+    queryKey: ["/api/tech/tempo-deploy", selectedPO, meses],
+    queryFn: () => fetch(`/api/tech/tempo-deploy?meses=${meses}&responsavel=${encodeURIComponent(selectedPO)}`).then((r) => r.json()),
     enabled: !!selectedPO,
   });
 
   // Prazo por status
   const { data: prazoPorStatusData } = useQuery<{ status: string; media_dias: number; total_transicoes: number }[]>({
-    queryKey: ["/api/tech/prazo-por-status", selectedPO],
-    queryFn: () => fetch(`/api/tech/prazo-por-status?responsavel=${encodeURIComponent(selectedPO)}`).then((r) => r.json()),
+    queryKey: ["/api/tech/prazo-por-status", selectedPO, meses],
+    queryFn: () => fetch(`/api/tech/prazo-por-status?responsavel=${encodeURIComponent(selectedPO)}&meses=${meses}`).then((r) => r.json()),
     enabled: !!selectedPO,
   });
 
@@ -81,16 +89,33 @@ export default function TechResponsavel() {
           </Link>
           <h1 className="text-lg font-medium">Estatísticas por Responsável</h1>
         </div>
-        <Select value={selectedPO} onValueChange={setSelectedPO}>
-          <SelectTrigger className="w-[250px]">
-            <SelectValue placeholder="Selecionar responsável..." />
-          </SelectTrigger>
-          <SelectContent>
-            {poList.map((po) => (
-              <SelectItem key={po} value={po}>{po}</SelectItem>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-0.5">
+            {PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setMeses(opt.value)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  meses === opt.value
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {opt.label}
+              </button>
             ))}
-          </SelectContent>
-        </Select>
+          </div>
+          <Select value={selectedPO} onValueChange={setSelectedPO}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder="Selecionar responsável..." />
+            </SelectTrigger>
+            <SelectContent>
+              {poList.map((po) => (
+                <SelectItem key={po} value={po}>{po}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Content */}
