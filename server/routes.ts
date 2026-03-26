@@ -2148,7 +2148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro de Venda')
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
         ORDER BY mes, squad, responsavel_geral
       `);
@@ -4415,7 +4415,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const motivo = row.motivo_cancelamento || 'Não especificado';
         const isAbonado = row.abonar_churn === 'Sim' ||
           motivo === 'Inadimplente 1º Mês' ||
-          motivo === 'Não começou';
+          motivo === 'Não começou' ||
+          motivo === 'Erro de Venda';
 
         return {
           id: row.task_id,
@@ -5896,6 +5897,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro de Venda')
           AND valor_r > 0
         GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
       `);
