@@ -1604,7 +1604,18 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND LOWER(fnl_ngc) NOT IN ('cross sell', 'commerce', 'indicação', 'lead')
         ORDER BY fnl_ngc
       `);
-      const funis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
+      // Normalize: merge ecommerce/E-commerce/Ecommerce into single "Ecommerce"
+      const ECOMMERCE_VARIANTS = ['ecommerce', 'e-commerce'];
+      const rawFunis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
+      const normalizedSet = new Set<string>();
+      for (const f of rawFunis) {
+        if (ECOMMERCE_VARIANTS.includes(f.toLowerCase())) {
+          normalizedSet.add('Ecommerce');
+        } else {
+          normalizedSet.add(f);
+        }
+      }
+      const funis = Array.from(normalizedSet).sort();
       funis.unshift("(Vazio)");
       res.json(funis);
     } catch (error) {
