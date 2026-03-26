@@ -42,6 +42,7 @@ import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
+import { registerGrowthAiRoutes } from "./routes/growth-ai";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
@@ -7573,6 +7574,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
+
+  // Growth AI Module - registered from separate file
+  registerGrowthAiRoutes(app, db);
 
   // Capacity Module - registered from separate file
   registerCapacityRoutes(app, db);
