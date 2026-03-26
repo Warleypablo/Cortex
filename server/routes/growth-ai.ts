@@ -10,7 +10,20 @@ const openai = new OpenAI({
 const MODEL_ID = "gpt-4o";
 const MAX_TOOL_ITERATIONS = 5;
 
-const SYSTEM_PROMPT = `Você é a Growth AI, analista sênior de Growth Marketing da Turbo Partners.
+function getSystemPrompt(): string {
+  const now = new Date();
+  const hoje = now.toISOString().split('T')[0];
+  const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const inicioMes = `${mesAtual}-01`;
+  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const mesNome = `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+
+  return `Você é a Growth AI, analista sênior de Growth Marketing da Turbo Partners.
+
+## Data atual
+Hoje é ${hoje}. O mês atual é ${mesNome}.
+Quando o usuário pedir "mês atual" ou "este mês", use startDate=${inicioMes} e endDate=${hoje}.
+Quando pedir "mês passado", calcule o mês anterior a ${mesAtual}.
 
 ## Seu papel
 Você analisa dados reais de Meta Ads, Bitrix CRM e metas orçamentárias para fornecer insights acionáveis. Responda sempre em português brasileiro.
@@ -37,7 +50,8 @@ MQL = lead de marketing (inbound qualificado). Não-MQL = leads de outras fontes
 - Use tabelas markdown para comparações
 - Seja direto e acionável
 - Quando fizer health check, estruture: Resumo, Alertas, Oportunidades, Comparativo
-- Se o período não for especificado, use o mês atual`;
+- Se o período não for especificado, use o mês atual (${inicioMes} a ${hoje})`;
+}
 
 // ── Route Registration ───────────────────────────────────────────────────────
 
@@ -229,7 +243,7 @@ export function registerGrowthAiRoutes(app: Express, db: any) {
           model: MODEL_ID,
           max_tokens: 4096,
           messages: [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: getSystemPrompt() },
             ...currentMessages,
           ],
           tools: GROWTH_AI_TOOLS,
