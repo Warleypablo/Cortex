@@ -42,7 +42,7 @@ MQL = lead de marketing (inbound qualificado). Não-MQL = leads de outras fontes
 // ── Route Registration ───────────────────────────────────────────────────────
 
 export function registerGrowthAiRoutes(app: Express, db: any) {
-  // Initialize tables
+  // Initialize tables (chained to ensure conversas exists before mensagens FK)
   db.execute(sql`
     CREATE TABLE IF NOT EXISTS cortex_core.growth_ai_conversas (
       id SERIAL PRIMARY KEY,
@@ -51,11 +51,7 @@ export function registerGrowthAiRoutes(app: Express, db: any) {
       criado_em TIMESTAMP DEFAULT NOW(),
       atualizado_em TIMESTAMP DEFAULT NOW()
     )
-  `).catch((err: any) => {
-    console.log("[growth-ai] growth_ai_conversas table note:", err?.message);
-  });
-
-  db.execute(sql`
+  `).then(() => db.execute(sql`
     CREATE TABLE IF NOT EXISTS cortex_core.growth_ai_mensagens (
       id SERIAL PRIMARY KEY,
       conversa_id INTEGER NOT NULL REFERENCES cortex_core.growth_ai_conversas(id) ON DELETE CASCADE,
@@ -64,8 +60,10 @@ export function registerGrowthAiRoutes(app: Express, db: any) {
       tool_calls JSONB,
       criado_em TIMESTAMP DEFAULT NOW()
     )
-  `).catch((err: any) => {
-    console.log("[growth-ai] growth_ai_mensagens table note:", err?.message);
+  `)).then(() => {
+    console.log("[growth-ai] Tables initialized");
+  }).catch((err: any) => {
+    console.log("[growth-ai] Table init note:", err?.message);
   });
 
   // ── GET /api/growth-ai/conversas ────────────────────────────────────────
