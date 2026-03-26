@@ -667,7 +667,7 @@ export default function GrowthOrcadoRealizado() {
     return [
       { id: 'investimento', name: 'Investimento', type: 'manual', orcado: ORCADO_ADS.investimento, realizado: data.investimento ?? 0, percentual: calcPercentual(ORCADO_ADS.investimento, data.investimento), format: 'currency' },
       { id: 'cpm', name: 'CPM', type: 'formula', orcado: ORCADO_ADS.cpm, realizado: data.cpm ?? null, percentual: calcPercentual(ORCADO_ADS.cpm, data.cpm), format: 'currency' },
-      { id: 'impressoes', name: 'Impressões', type: 'formula', orcado: ORCADO_ADS.impressoes, realizado: data.impressoes ?? 0, percentual: calcPercentual(ORCADO_ADS.impressoes, data.impressoes), format: 'number' },
+      { id: 'impressoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.impressoes, realizado: data.impressoes ?? 0, percentual: calcPercentual(ORCADO_ADS.impressoes, data.impressoes), format: 'number' },
       { id: 'ctr', name: 'CTR', type: 'manual', orcado: ORCADO_ADS.ctr, realizado: data.ctr ?? null, percentual: calcPercentual(ORCADO_ADS.ctr, data.ctr), format: 'percent' },
       { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: ORCADO_ADS.cliquesSaida, realizado: data.cliquesSaida ?? 0, percentual: calcPercentual(ORCADO_ADS.cliquesSaida, data.cliquesSaida), format: 'number' },
       { id: 'cps', name: 'CPS', type: 'formula', orcado: ORCADO_ADS.cps, realizado: data.cps ?? null, percentual: calcPercentual(ORCADO_ADS.cps, data.cps), format: 'currency' },
