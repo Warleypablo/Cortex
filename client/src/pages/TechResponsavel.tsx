@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -6,9 +6,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { PHASE_CONFIG, groupStatusIntoPhases } from "@/lib/tech-utils";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import type { DateRange } from "react-day-picker";
+import { format, subMonths, startOfMonth } from "date-fns";
 
 export default function TechResponsavel() {
   const [selectedPO, setSelectedPO] = useState<string>("");
+  const hoje = new Date();
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(subMonths(hoje, 12)),
+    to: hoje,
+  });
+
+  const dateParams = useMemo(() => {
+    if (dateRange?.from && dateRange?.to) {
+      return {
+        startDate: format(dateRange.from, 'yyyy-MM-dd'),
+        endDate: format(dateRange.to, 'yyyy-MM-dd'),
+      };
+    }
+    return { startDate: format(subMonths(hoje, 12), 'yyyy-MM-dd'), endDate: format(hoje, 'yyyy-MM-dd') };
+  }, [dateRange]);
 
   // Fetch PO list from board
   const { data: boardData } = useQuery<{ responsavel: string; projetos: any[]; total: number }[]>({
@@ -33,22 +51,31 @@ export default function TechResponsavel() {
     carga: string;
     projetosAtivosList: any[];
   }>({
-    queryKey: ["/api/tech/responsavel", selectedPO, "kpis"],
-    queryFn: () => fetch(`/api/tech/responsavel/${encodeURIComponent(selectedPO)}/kpis`).then((r) => r.json()),
+    queryKey: ["/api/tech/responsavel", selectedPO, "kpis", dateParams],
+    queryFn: () => fetch(`/api/tech/responsavel/${encodeURIComponent(selectedPO)}/kpis?startDate=${dateParams.startDate}&endDate=${dateParams.endDate}`).then((r) => r.json()),
     enabled: !!selectedPO,
   });
 
+  // Calculate months from date range for tempo-deploy endpoint
+  const mesesFromRange = useMemo(() => {
+    if (dateRange?.from && dateRange?.to) {
+      const diffMs = dateRange.to.getTime() - dateRange.from.getTime();
+      return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24 * 30)));
+    }
+    return 12;
+  }, [dateRange]);
+
   // Tempo deploy by quarter
   const { data: tempoDeployData } = useQuery<{ media_dias: number; trimestre: string }[]>({
-    queryKey: ["/api/tech/tempo-deploy", selectedPO],
-    queryFn: () => fetch(`/api/tech/tempo-deploy?meses=12&responsavel=${encodeURIComponent(selectedPO)}`).then((r) => r.json()),
+    queryKey: ["/api/tech/tempo-deploy", selectedPO, mesesFromRange],
+    queryFn: () => fetch(`/api/tech/tempo-deploy?meses=${mesesFromRange}&responsavel=${encodeURIComponent(selectedPO)}`).then((r) => r.json()),
     enabled: !!selectedPO,
   });
 
   // Prazo por status
   const { data: prazoPorStatusData } = useQuery<{ status: string; media_dias: number; total_transicoes: number }[]>({
-    queryKey: ["/api/tech/prazo-por-status", selectedPO],
-    queryFn: () => fetch(`/api/tech/prazo-por-status?responsavel=${encodeURIComponent(selectedPO)}`).then((r) => r.json()),
+    queryKey: ["/api/tech/prazo-por-status", selectedPO, mesesFromRange],
+    queryFn: () => fetch(`/api/tech/prazo-por-status?responsavel=${encodeURIComponent(selectedPO)}&meses=${mesesFromRange}`).then((r) => r.json()),
     enabled: !!selectedPO,
   });
 
@@ -81,16 +108,19 @@ export default function TechResponsavel() {
           </Link>
           <h1 className="text-lg font-medium">Estatísticas por Responsável</h1>
         </div>
-        <Select value={selectedPO} onValueChange={setSelectedPO}>
-          <SelectTrigger className="w-[250px]">
-            <SelectValue placeholder="Selecionar responsável..." />
-          </SelectTrigger>
-          <SelectContent>
-            {poList.map((po) => (
-              <SelectItem key={po} value={po}>{po}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-3">
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <Select value={selectedPO} onValueChange={setSelectedPO}>
+            <SelectTrigger className="w-[250px]">
+              <SelectValue placeholder="Selecionar responsável..." />
+            </SelectTrigger>
+            <SelectContent>
+              {poList.map((po) => (
+                <SelectItem key={po} value={po}>{po}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Content */}
