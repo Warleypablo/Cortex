@@ -2065,7 +2065,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
         : [];
       const hasVazio = funilValues.includes('(Vazio)');
-      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
 
       // Build campaign filter: match campaign names containing [funil] pattern
       // Campaign naming convention: [TP] [Leads] [ABO] [Odonto] - ...
