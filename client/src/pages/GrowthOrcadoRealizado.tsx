@@ -1389,8 +1389,8 @@ export default function GrowthOrcadoRealizado() {
                   <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
                   <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1411,18 +1411,18 @@ export default function GrowthOrcadoRealizado() {
                         <TableCell className="text-right text-sm font-medium">
                           {formatValue(m.realizado, m.format)}
                         </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {(() => {
-                            const prev = getPrevValue(m.id);
-                            return prev !== null ? formatValue(prev, m.format) : '-';
-                          })()}
-                        </TableCell>
                         <TableCell className={cn("text-right text-sm font-semibold",
                           m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
                           m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
                           m.percentual !== null && m.percentual < 80 && "text-red-600 dark:text-red-400"
                         )}>
                           {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right text-sm text-muted-foreground">
+                          {(() => {
+                            const prev = getPrevValue(m.id);
+                            return prev !== null ? formatValue(prev, m.format) : '-';
+                          })()}
                         </TableCell>
                         <TableCell className={cn("text-right text-sm font-medium",
                           (() => {
@@ -1464,8 +1464,8 @@ export default function GrowthOrcadoRealizado() {
                   <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
                   <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1531,8 +1531,8 @@ export default function GrowthOrcadoRealizado() {
                   <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
                   <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1599,8 +1599,8 @@ export default function GrowthOrcadoRealizado() {
                   <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
                   <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
                   <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
                 </TableRow>
               </TableHeader>
