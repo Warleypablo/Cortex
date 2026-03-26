@@ -452,6 +452,7 @@ export const NAV_CONFIG = {
         { title: 'Por Plataforma', url: '/growth/performance-plataformas', icon: 'Layers', permissionKey: PERMISSION_KEYS.GROWTH.PLATAFORMA },
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
         { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
+        { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
       ],
     },
     {
