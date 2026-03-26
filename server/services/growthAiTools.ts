@@ -3,108 +3,123 @@ import { sql } from "drizzle-orm";
 // Account ID interno da Turbo Partners
 const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
 
-// ── Tool Definitions (Anthropic format) ─────────────────────────────────────
+// ── Tool Definitions (OpenAI function calling format) ────────────────────────
 
 export const GROWTH_AI_TOOLS: any[] = [
   {
-    name: "getAdsMetrics",
-    description:
-      "Retorna métricas de Meta Ads (investimento, impressões, cliques, CPM, CTR, CPC) do período. Pode agrupar por total, campanha ou dia. Pode filtrar por funil (nome da campanha contém o termo).",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        startDate: { type: "string", description: "Data início YYYY-MM-DD" },
-        endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
-        funil: {
-          type: "string",
-          description:
-            "Filtrar campanhas cujo nome contenha este termo (ex: Comercial, Creators, Ecommerce)",
+    type: "function",
+    function: {
+      name: "getAdsMetrics",
+      description:
+        "Retorna métricas de Meta Ads (investimento, impressões, cliques, CPM, CTR, CPC) do período. Pode agrupar por total, campanha ou dia. Pode filtrar por funil (nome da campanha contém o termo).",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          startDate: { type: "string", description: "Data início YYYY-MM-DD" },
+          endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
+          funil: {
+            type: "string",
+            description:
+              "Filtrar campanhas cujo nome contenha este termo (ex: Comercial, Creators, Ecommerce)",
+          },
+          groupBy: {
+            type: "string",
+            enum: ["total", "campaign", "day"],
+            description: "Agrupar por: total (padrão), campaign ou day",
+          },
         },
-        groupBy: {
-          type: "string",
-          enum: ["total", "campaign", "day"],
-          description: "Agrupar por: total (padrão), campaign ou day",
-        },
+        required: ["startDate", "endDate"],
       },
-      required: ["startDate", "endDate"],
     },
   },
   {
-    name: "getDealsMetrics",
-    description:
-      "Retorna métricas do Bitrix CRM: total de leads, reuniões agendadas, reuniões realizadas, negócios ganhos, faturamento recorrente e pontual. Pode filtrar por funil NGC e por MQL.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        startDate: { type: "string", description: "Data início YYYY-MM-DD" },
-        endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
-        funil: {
-          type: "string",
-          description: "Filtrar por funil NGC do Bitrix (ex: Comercial, Creators, Ecommerce)",
+    type: "function",
+    function: {
+      name: "getDealsMetrics",
+      description:
+        "Retorna métricas do Bitrix CRM: total de leads, reuniões agendadas, reuniões realizadas, negócios ganhos, faturamento recorrente e pontual. Pode filtrar por funil NGC e por MQL.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          startDate: { type: "string", description: "Data início YYYY-MM-DD" },
+          endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
+          funil: {
+            type: "string",
+            description: "Filtrar por funil NGC do Bitrix (ex: Comercial, Creators, Ecommerce)",
+          },
+          mql: {
+            type: "boolean",
+            description: "Se true, filtra apenas leads MQL (inbound qualificado)",
+          },
         },
-        mql: {
-          type: "boolean",
-          description: "Se true, filtra apenas leads MQL (inbound qualificado)",
-        },
+        required: ["startDate", "endDate"],
       },
-      required: ["startDate", "endDate"],
     },
   },
   {
-    name: "getBudgets",
-    description:
-      "Retorna metas orçamentárias (budgets) por mês e segmento (mql, nao_mql, ads). Pode filtrar por funil.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        startDate: { type: "string", description: "Data início YYYY-MM-DD" },
-        endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
-        funil: {
-          type: "string",
-          description: "Filtrar por funil (ex: Comercial, Creators)",
+    type: "function",
+    function: {
+      name: "getBudgets",
+      description:
+        "Retorna metas orçamentárias (budgets) por mês e segmento (mql, nao_mql, ads). Pode filtrar por funil.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          startDate: { type: "string", description: "Data início YYYY-MM-DD" },
+          endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
+          funil: {
+            type: "string",
+            description: "Filtrar por funil (ex: Comercial, Creators)",
+          },
         },
+        required: ["startDate", "endDate"],
       },
-      required: ["startDate", "endDate"],
     },
   },
   {
-    name: "getCampaignRanking",
-    description:
-      "Retorna ranking de campanhas Meta Ads ordenadas por uma métrica específica (spend, cpc, ctr, impressions, clicks, cpm).",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        startDate: { type: "string", description: "Data início YYYY-MM-DD" },
-        endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
-        metric: {
-          type: "string",
-          enum: ["spend", "cpc", "ctr", "impressions", "clicks", "cpm"],
-          description: "Métrica para ordenar o ranking",
+    type: "function",
+    function: {
+      name: "getCampaignRanking",
+      description:
+        "Retorna ranking de campanhas Meta Ads ordenadas por uma métrica específica (spend, cpc, ctr, impressions, clicks, cpm).",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          startDate: { type: "string", description: "Data início YYYY-MM-DD" },
+          endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
+          metric: {
+            type: "string",
+            enum: ["spend", "cpc", "ctr", "impressions", "clicks", "cpm"],
+            description: "Métrica para ordenar o ranking",
+          },
+          order: {
+            type: "string",
+            enum: ["asc", "desc"],
+            description: "Ordem: desc (padrão) ou asc",
+          },
+          limit: {
+            type: "number",
+            description: "Número máximo de resultados (padrão 10)",
+          },
         },
-        order: {
-          type: "string",
-          enum: ["asc", "desc"],
-          description: "Ordem: desc (padrão) ou asc",
-        },
-        limit: {
-          type: "number",
-          description: "Número máximo de resultados (padrão 10)",
-        },
+        required: ["startDate", "endDate", "metric"],
       },
-      required: ["startDate", "endDate", "metric"],
     },
   },
   {
-    name: "getHealthCheck",
-    description:
-      "Visão geral de saúde do Growth: combina ads, deals, top campanhas e comparativo com período anterior. Use para diagnósticos rápidos.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        startDate: { type: "string", description: "Data início YYYY-MM-DD" },
-        endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
+    type: "function",
+    function: {
+      name: "getHealthCheck",
+      description:
+        "Visão geral de saúde do Growth: combina ads, deals, top campanhas e comparativo com período anterior. Use para diagnósticos rápidos.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          startDate: { type: "string", description: "Data início YYYY-MM-DD" },
+          endDate: { type: "string", description: "Data fim YYYY-MM-DD" },
+        },
+        required: ["startDate", "endDate"],
       },
-      required: ["startDate", "endDate"],
     },
   },
 ];
