@@ -6,6 +6,25 @@ import { format } from "date-fns";
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
 
+// Funnel name aliases: normalized name → all DB variations
+const FUNNEL_ALIASES: Record<string, string[]> = {
+  'ecommerce': ['Ecommerce', 'E-commerce', 'ecommerce'],
+};
+
+// Expand funnel values: if a normalized name has aliases, expand to all variants
+function expandFunilValues(values: string[]): string[] {
+  const expanded: string[] = [];
+  for (const v of values) {
+    const aliases = FUNNEL_ALIASES[v.toLowerCase()];
+    if (aliases) {
+      expanded.push(...aliases);
+    } else {
+      expanded.push(v);
+    }
+  }
+  return expanded;
+}
+
 export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Ensure landing_page_views column exists
   db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
@@ -1640,7 +1659,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
       const hasVazio = funilValues.includes('(Vazio)');
-      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
@@ -1818,7 +1837,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
       const hasVazio = funilValues.includes('(Vazio)');
-      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
