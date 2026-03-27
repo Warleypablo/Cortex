@@ -86,6 +86,7 @@ export const PERMISSION_KEYS = {
     PESQUISAS: 'gg.pesquisas',
     PATRIMONIO: 'gg.patrimonio',
     CALENDARIO_FERIAS: 'gg.calendario_ferias',
+    ORGANOGRAMA: 'gg.organograma',
   },
   // Social (Makers)
   SOCIAL: {
@@ -257,6 +258,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/colaboradores/analise': PERMISSION_KEYS.GG.COLABORADORES,
   '/patrimonio': PERMISSION_KEYS.GG.PATRIMONIO,
   '/gg/calendario-ferias': PERMISSION_KEYS.GG.CALENDARIO_FERIAS,
+  '/gg/organograma': PERMISSION_KEYS.GG.ORGANOGRAMA,
   // Jurídico
   '/juridico/clientes': PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES,
   '/juridico/processos': PERMISSION_KEYS.JUR.PROCESSOS,
@@ -483,6 +485,7 @@ export const NAV_CONFIG = {
       { title: 'Pesquisas', url: '/rh/pesquisas', icon: 'BarChart2', permissionKey: PERMISSION_KEYS.GG.PESQUISAS },
       { title: 'Patrimônio', url: '/patrimonio', icon: 'Building2', permissionKey: PERMISSION_KEYS.GG.PATRIMONIO },
       { title: 'Calendário de Férias', url: '/gg/calendario-ferias', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GG.CALENDARIO_FERIAS },
+      { title: 'Organograma', url: '/gg/organograma', icon: 'GitBranch', permissionKey: PERMISSION_KEYS.GG.ORGANOGRAMA },
     ],
   },
 
@@ -672,6 +675,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GG.COLABORADORES]: 'Colaboradores',
   [PERMISSION_KEYS.GG.PATRIMONIO]: 'Patrimônio',
   [PERMISSION_KEYS.GG.CALENDARIO_FERIAS]: 'Calendário de Férias',
+  [PERMISSION_KEYS.GG.ORGANOGRAMA]: 'Organograma',
   [PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES]: 'Clientes Inadimplentes',
   [PERMISSION_KEYS.JUR.PROCESSOS]: 'Processos',
   [PERMISSION_KEYS.COM.CONTRATOS_CLIENTES]: 'Contratos Clientes',

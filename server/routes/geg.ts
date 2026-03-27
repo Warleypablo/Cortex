@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import type { IStorage } from "../storage";
+import { sql } from "drizzle-orm";
 
 export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
   // GEG (Gestão Estratégica de Gente) API routes
@@ -953,6 +954,245 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
     } catch (error) {
       console.error("[api] Error fetching salario por squad:", error);
       res.status(500).json({ error: "Failed to fetch salario por squad" });
+    }
+  });
+
+  // ── Organograma ──────────────────────────────────────────────────────
+  app.get("/api/geg/organograma", async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT nome, setor, squad, cargo
+        FROM "Inhire".rh_pessoal
+        WHERE demissao IS NULL
+        ORDER BY setor, squad, nome
+      `);
+      const rows: Array<{ nome: string; setor: string | null; squad: string | null; cargo: string | null }> = result.rows as any;
+
+      // Helper: strip emojis & trim to normalise squad names
+      const normalizeSquadName = (raw: string | null): string => {
+        if (!raw) return "Sem Squad";
+        return raw
+          .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}\u{2702}-\u{27B0}️]/gu, "")
+          .replace(/\uFE0F/g, "")
+          .trim() || "Sem Squad";
+      };
+
+      // Identify leader by cargo
+      const isLeader = (cargo: string | null): boolean => {
+        if (!cargo) return false;
+        const lower = cargo.toLowerCase();
+        return lower.includes("líder") || lower.includes("lider") || lower.includes("c-level") || lower.includes("head");
+      };
+
+      // ── Build department structure ──
+      interface Member { nome: string; cargo: string }
+      interface Team { name: string; leader: string | null; leaderCargo: string | null; members: Member[] }
+      interface Department { name: string; color: string; teams: Team[] }
+
+      const commerceTeams = new Map<string, Team>();
+      const techSitesMembers: Member[] = [];
+      let techSitesLeader: string | null = null;
+      let techSitesLeaderCargo: string | null = null;
+      const techInternoMembers: Member[] = [];
+      let techInternoLeader: string | null = null;
+      let techInternoLeaderCargo: string | null = null;
+      const growthMembers: Member[] = [];
+      let growthLeader: string | null = null;
+      let growthLeaderCargo: string | null = null;
+      const backofficeMembers: Member[] = [];
+      const comercialVendas: Member[] = [];
+      let comercialVendasLeader: string | null = null;
+      let comercialVendasLeaderCargo: string | null = null;
+      const comercialPreVendas: Member[] = [];
+      let comercialPreVendasLeader: string | null = null;
+      let comercialPreVendasLeaderCargo: string | null = null;
+
+      // Commerce squad name mapping for known squads
+      const knownCommerceSquads = ["Squadra", "Makers", "Pulse", "Selva", "Black Sheep", "Customer Success", "Squad I.A", "CX&CS"];
+
+      for (const row of rows) {
+        const setor = row.setor?.trim() || "";
+        const squad = normalizeSquadName(row.squad);
+        const cargo = row.cargo?.trim() || "Colaborador";
+        const nome = row.nome?.trim() || "";
+        const member: Member = { nome, cargo };
+
+        // Skip CEO / Sócios — handled separately
+        if (setor === "Sócios" || cargo.toLowerCase().includes("ceo")) continue;
+        // Skip inactive squads and generic groups
+        if (squad.toLowerCase().includes("(off)") || squad.toLowerCase().includes("supreme")) continue;
+        if (squad === "Sem Squad" || squad === "Turbo Interno") continue;
+
+        // Tech Sites
+        if (setor === "Tech Sites" || setor === "Tech" && squad === "Tech Sites") {
+          if (isLeader(cargo)) { techSitesLeader = nome; techSitesLeaderCargo = cargo; }
+          else techSitesMembers.push(member);
+          continue;
+        }
+
+        // Tech Interno / Turbo Interno
+        if (setor === "Tech Interno" || setor === "Turbo Interno" || (setor === "Tech" && (squad === "Turbo Interno" || squad === "Tech Interno" || squad === "Tech"))) {
+          if (isLeader(cargo)) { techInternoLeader = nome; techInternoLeaderCargo = cargo; }
+          else techInternoMembers.push(member);
+          continue;
+        }
+
+        // Growth Interno
+        if (setor === "Growth Interno" || setor === "Growth") {
+          if (isLeader(cargo)) { growthLeader = nome; growthLeaderCargo = cargo; }
+          else growthMembers.push(member);
+          continue;
+        }
+
+        // Backoffice
+        if (setor === "Backoffice" || setor === "Back Office") {
+          backofficeMembers.push(member);
+          continue;
+        }
+
+        // Comercial — Pré-Vendas vs Vendas (check cargo FIRST, then squad as fallback)
+        if (cargo.toLowerCase().includes("pré-venda") || cargo.toLowerCase().includes("pre-venda") || cargo.toLowerCase().includes("sdr")) {
+          comercialPreVendas.push(member);
+          continue;
+        }
+
+        if (cargo.toLowerCase().includes("inside sales") || cargo.toLowerCase().includes("closer") || squad === "Vendas") {
+          comercialVendas.push(member);
+          continue;
+        }
+
+        // Skip Tech members inside Commerce setor — they belong to Tech department
+        if (squad.includes("Tech") && setor === "Commerce") {
+          techSitesMembers.push(member);
+          continue;
+        }
+
+        // Commerce (default for "Commerce" setor or known squads)
+        if (setor === "Commerce" || knownCommerceSquads.some(s => squad.includes(s))) {
+          // Map CX&CS to Customer Success
+          let teamName = squad;
+          if (teamName === "CX&CS" || teamName.includes("CS")) teamName = "Customer Success";
+
+          if (!commerceTeams.has(teamName)) {
+            commerceTeams.set(teamName, { name: teamName, leader: null, leaderCargo: null, members: [] });
+          }
+          const team = commerceTeams.get(teamName)!;
+          if (isLeader(cargo)) { team.leader = nome; team.leaderCargo = cargo; }
+          else team.members.push(member);
+          continue;
+        }
+
+        // Fallback: add to backoffice
+        backofficeMembers.push(member);
+      }
+
+      // ── Assemble departments ──
+      const departments: Department[] = [];
+
+      // Commerce
+      if (commerceTeams.size > 0) {
+        // Set default leaders for teams without one detected from cargo
+        const csTeam = commerceTeams.get("Customer Success");
+        if (csTeam && !csTeam.leader) {
+          // Find Maria Dias in members and promote to leader
+          const mariaIdx = csTeam.members.findIndex(m => m.nome.toLowerCase().includes("maria") && m.nome.toLowerCase().includes("dias"));
+          if (mariaIdx >= 0) {
+            csTeam.leader = csTeam.members[mariaIdx].nome;
+            csTeam.leaderCargo = "Líder";
+            csTeam.members.splice(mariaIdx, 1);
+          } else {
+            csTeam.leader = "Maria Dias";
+            csTeam.leaderCargo = "Líder";
+          }
+        }
+
+        const sortOrder = ["Squadra", "Makers", "Pulse", "Selva", "Black Sheep", "Customer Success", "Squad I.A"];
+        const sorted = Array.from(commerceTeams.values()).sort((a, b) => {
+          const ai = sortOrder.indexOf(a.name);
+          const bi = sortOrder.indexOf(b.name);
+          return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        });
+        departments.push({ name: "Commerce", color: "purple", teams: sorted });
+      }
+
+      // Tech — single unified team with Breno as leader
+      const allTechMembers = [...techSitesMembers, ...techInternoMembers];
+      // Remove Breno from members (he's the leader)
+      const techMembersFiltered = allTechMembers.filter(m => !m.nome.toLowerCase().includes("breno"));
+      if (techMembersFiltered.length > 0 || techSitesLeader || techInternoLeader) {
+        departments.push({
+          name: "Tech",
+          color: "blue",
+          teams: [{ name: "Tech", leader: "Breno Carmo", leaderCargo: "Líder", members: techMembersFiltered }],
+        });
+      }
+
+      // Comercial
+      const comercialTeams: Team[] = [];
+      if (comercialPreVendas.length > 0 || comercialPreVendasLeader) {
+        comercialTeams.push({ name: "Pré-Vendas", leader: comercialPreVendasLeader || "Lucas Pereira", leaderCargo: comercialPreVendasLeaderCargo, members: comercialPreVendas });
+      }
+      if (comercialVendas.length > 0 || comercialVendasLeader) {
+        comercialTeams.push({ name: "Vendas", leader: comercialVendasLeader || "João Guarçoni", leaderCargo: comercialVendasLeaderCargo, members: comercialVendas });
+      }
+      if (comercialTeams.length > 0) {
+        departments.push({ name: "Comercial", color: "emerald", teams: comercialTeams });
+      }
+
+      // Growth
+      if (growthMembers.length > 0 || growthLeader) {
+        departments.push({
+          name: "Growth",
+          color: "orange",
+          teams: [{ name: "Growth Interno", leader: growthLeader || "Lucas Pereira", leaderCargo: growthLeaderCargo || "Líder", members: growthMembers }],
+        });
+      }
+
+      // Back Office — split into Controladoria and G&G
+      if (backofficeMembers.length > 0) {
+        const controladoriaMembers: Member[] = [];
+        const gegMembers: Member[] = [];
+
+        for (const m of backofficeMembers) {
+          const cargoLower = m.cargo.toLowerCase();
+          if (cargoLower.includes("g&g") || cargoLower.includes("gente") || cargoLower.includes("rh") || cargoLower.includes("people")) {
+            gegMembers.push(m);
+          } else if (cargoLower.includes("financ") || cargoLower.includes("juríd") || cargoLower.includes("juridic") || cargoLower.includes("dados") || cargoLower.includes("data") || cargoLower.includes("bi")) {
+            // Filter out the leader from members list
+            if (!m.nome.toLowerCase().includes("marlon")) {
+              controladoriaMembers.push(m);
+            }
+          }
+        }
+
+        // Filter out Karol from G&G members (she's the leader)
+        const gegFiltered = gegMembers.filter(m => !m.nome.toLowerCase().includes("karoline") && !m.nome.toLowerCase().includes("karol"));
+
+        const boTeams: Team[] = [
+          {
+            name: "Controladoria",
+            leader: "Marlon Carneiro",
+            leaderCargo: "Líder",
+            members: controladoriaMembers,
+          },
+          {
+            name: "G&G",
+            leader: "Karol Tognere",
+            leaderCargo: "Líder",
+            members: gegFiltered,
+          },
+        ];
+        departments.push({ name: "Back Office", color: "gray", teams: boTeams });
+      }
+
+      res.json({
+        ceo: { nome: "Victor de Souza Peixoto", cargo: "CEO" },
+        departments,
+        totalColaboradores: rows.filter(r => r.setor !== "Sócios").length,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching organograma:", error);
+      res.status(500).json({ error: "Failed to fetch organograma" });
     }
   });
 }
