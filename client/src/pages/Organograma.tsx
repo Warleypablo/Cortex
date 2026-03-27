@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Crown, Users, User, Building2, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Crown, X, Loader2, Search } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -32,243 +33,306 @@ interface OrgData {
   totalColaboradores: number;
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function isInactive(teamName: string) {
+  return /\(OFF\)/i.test(teamName);
+}
+
+function getDeptMemberCount(dept: Department) {
+  return dept.teams.reduce(
+    (sum, t) => sum + t.members.length + (t.leader ? 1 : 0),
+    0,
+  );
+}
+
 // ── Color mapping ─────────────────────────────────────────────────────
 
-const DEPT_COLORS: Record<string, {
-  border: string; headerBg: string; headerText: string; badge: string; accent: string;
-}> = {
+const DEPT_STYLES: Record<
+  string,
+  {
+    border: string;
+    bg: string;
+    text: string;
+    teamBorder: string;
+  }
+> = {
   purple: {
-    border: "border-purple-300 dark:border-purple-700",
-    headerBg: "bg-purple-500 dark:bg-purple-600",
-    headerText: "text-white",
-    badge: "bg-purple-100 text-purple-700 dark:bg-purple-900/60 dark:text-purple-300",
-    accent: "border-purple-300 dark:border-purple-700",
+    border: "border-purple-400 dark:border-purple-600",
+    bg: "bg-purple-50 dark:bg-purple-950/30",
+    text: "text-purple-700 dark:text-purple-300",
+    teamBorder: "border-purple-200 dark:border-purple-800",
   },
   blue: {
-    border: "border-blue-300 dark:border-blue-700",
-    headerBg: "bg-blue-500 dark:bg-blue-600",
-    headerText: "text-white",
-    badge: "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300",
-    accent: "border-blue-300 dark:border-blue-700",
+    border: "border-blue-400 dark:border-blue-600",
+    bg: "bg-blue-50 dark:bg-blue-950/30",
+    text: "text-blue-700 dark:text-blue-300",
+    teamBorder: "border-blue-200 dark:border-blue-800",
   },
   emerald: {
-    border: "border-emerald-300 dark:border-emerald-700",
-    headerBg: "bg-emerald-500 dark:bg-emerald-600",
-    headerText: "text-white",
-    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300",
-    accent: "border-emerald-300 dark:border-emerald-700",
+    border: "border-emerald-400 dark:border-emerald-600",
+    bg: "bg-emerald-50 dark:bg-emerald-950/30",
+    text: "text-emerald-700 dark:text-emerald-300",
+    teamBorder: "border-emerald-200 dark:border-emerald-800",
   },
   orange: {
-    border: "border-orange-300 dark:border-orange-700",
-    headerBg: "bg-orange-500 dark:bg-orange-600",
-    headerText: "text-white",
-    badge: "bg-orange-100 text-orange-700 dark:bg-orange-900/60 dark:text-orange-300",
-    accent: "border-orange-300 dark:border-orange-700",
+    border: "border-orange-400 dark:border-orange-600",
+    bg: "bg-orange-50 dark:bg-orange-950/30",
+    text: "text-orange-700 dark:text-orange-300",
+    teamBorder: "border-orange-200 dark:border-orange-800",
   },
   gray: {
-    border: "border-gray-300 dark:border-zinc-600",
-    headerBg: "bg-gray-500 dark:bg-zinc-600",
-    headerText: "text-white",
-    badge: "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-300",
-    accent: "border-gray-300 dark:border-zinc-600",
+    border: "border-gray-400 dark:border-zinc-500",
+    bg: "bg-gray-50 dark:bg-zinc-900/50",
+    text: "text-gray-700 dark:text-zinc-300",
+    teamBorder: "border-gray-200 dark:border-zinc-700",
   },
 };
 
-// ── Tree building blocks ──────────────────────────────────────────────
+// ── Small components ──────────────────────────────────────────────────
 
-function VLine({ height = "h-6" }: { height?: string }) {
+function VLine({ height = 24 }: { height?: number }) {
   return (
-    <div className="flex justify-center">
-      <div className={cn("w-px bg-gray-300 dark:bg-zinc-600", height)} />
-    </div>
+    <div
+      className="w-px bg-gray-300 dark:bg-zinc-600 shrink-0"
+      style={{ height }}
+    />
   );
 }
-
-/**
- * Horizontal connector line that spans from the center of the first child
- * to the center of the last child. We render it as a single horizontal bar.
- */
-function HConnector() {
-  return (
-    <div className="h-px bg-gray-300 dark:bg-zinc-600 self-stretch" />
-  );
-}
-
-// ── Card components ───────────────────────────────────────────────────
 
 function CeoCard({ ceo }: { ceo: OrgData["ceo"] }) {
   return (
-    <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/40 dark:to-yellow-950/30 border-2 border-amber-300 dark:border-amber-700 rounded-xl px-6 py-4 text-center shadow-lg shadow-amber-100/50 dark:shadow-amber-900/20 min-w-[160px]">
+    <div className="px-6 py-4 rounded-xl border-2 border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-center shadow-lg">
       <div className="flex items-center justify-center gap-2 mb-1">
-        <Crown className="h-5 w-5 text-amber-500" />
-        <span className="font-bold text-lg text-gray-900 dark:text-white">{ceo.nome}</span>
+        <Crown className="h-4 w-4 text-amber-500" />
+        <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wider">
+          {ceo.cargo}
+        </span>
       </div>
-      <span className="text-sm font-medium text-amber-600 dark:text-amber-400">{ceo.cargo}</span>
+      <div className="text-lg font-bold text-gray-900 dark:text-white">
+        {ceo.nome}
+      </div>
     </div>
   );
 }
 
-function DeptCard({ dept, memberCount }: { dept: Department; memberCount: number }) {
-  const colors = DEPT_COLORS[dept.color] || DEPT_COLORS.gray;
+function DeptCard({ dept }: { dept: Department }) {
+  const styles = DEPT_STYLES[dept.color] || DEPT_STYLES.gray;
+  const memberCount = getDeptMemberCount(dept);
+
   return (
-    <div className={cn("rounded-lg border-2 overflow-hidden min-w-[120px] shadow-sm", colors.border)}>
-      <div className={cn("px-4 py-2.5 text-center", colors.headerBg)}>
-        <div className={cn("font-semibold text-sm", colors.headerText)}>{dept.name}</div>
+    <div
+      className={cn(
+        "px-5 py-3 rounded-lg border-2 text-center shadow-sm",
+        styles.border,
+        styles.bg,
+      )}
+    >
+      <div
+        className={cn(
+          "text-xs font-semibold uppercase tracking-wider",
+          styles.text,
+        )}
+      >
+        {dept.name}
       </div>
-      <div className="px-3 py-2 bg-white dark:bg-zinc-900 text-center">
-        <div className="flex items-center justify-center gap-1.5 text-xs text-gray-500 dark:text-zinc-400">
-          <Users className="h-3 w-3" />
-          <span>{memberCount} pessoas</span>
-        </div>
+      <div className="text-xs text-muted-foreground mt-1">
+        {dept.teams.length} equipes &middot; {memberCount} pessoas
       </div>
     </div>
   );
 }
 
-function TeamCard({
+function TeamCardButton({
   team,
   color,
-  isExpanded,
-  onToggle,
+  isSelected,
+  onClick,
 }: {
   team: Team;
   color: string;
-  isExpanded: boolean;
-  onToggle: () => void;
+  isSelected: boolean;
+  onClick: () => void;
 }) {
-  const colors = DEPT_COLORS[color] || DEPT_COLORS.gray;
+  const styles = DEPT_STYLES[color] || DEPT_STYLES.gray;
   const totalMembers = team.members.length + (team.leader ? 1 : 0);
+  const inactive = isInactive(team.name);
 
   return (
-    <div className="flex flex-col items-center">
-      <button
-        onClick={onToggle}
-        className={cn(
-          "rounded-lg border bg-white dark:bg-zinc-900 overflow-hidden min-w-[130px] max-w-[180px] shadow-sm transition-all hover:shadow-md cursor-pointer text-left",
-          colors.accent
-        )}
-      >
-        <div className="px-3 py-2.5">
-          <div className="font-medium text-xs text-gray-900 dark:text-white text-center">{team.name}</div>
-          {team.leader && (
-            <div className="flex items-center justify-center gap-1 mt-1">
-              <Crown className="h-2.5 w-2.5 text-amber-500" />
-              <span className="text-[10px] text-gray-500 dark:text-zinc-400 truncate">{team.leader}</span>
-            </div>
-          )}
-          <div className="flex items-center justify-center gap-1 mt-1.5">
-            <Badge variant="secondary" className={cn("text-[10px] px-1.5 py-0", colors.badge)}>
-              {totalMembers}
-            </Badge>
-            {isExpanded ? (
-              <ChevronUp className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
-            ) : (
-              <ChevronDown className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
-            )}
-          </div>
-        </div>
-      </button>
-
-      {/* Expanded member list */}
-      {isExpanded && (
-        <>
-          <VLine height="h-3" />
-          <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg p-2 max-w-[200px] shadow-sm">
-            {team.leader && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-50 dark:bg-amber-950/30 mb-1">
-                <Crown className="h-3 w-3 text-amber-500 shrink-0" />
-                <span className="text-[11px] font-medium text-gray-900 dark:text-white truncate">{team.leader}</span>
-              </div>
-            )}
-            <div className="flex flex-wrap gap-1 justify-center">
-              {team.members.map((m, i) => (
-                <span
-                  key={`${m.nome}-${i}`}
-                  className="text-[10px] bg-gray-100 dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 px-1.5 py-0.5 rounded truncate max-w-[90px]"
-                  title={`${m.nome} - ${m.cargo}`}
-                >
-                  {m.nome.split(" ").slice(0, 2).join(" ")}
-                </span>
-              ))}
-              {team.members.length === 0 && !team.leader && (
-                <span className="text-[10px] text-gray-400 dark:text-zinc-500">Sem membros</span>
-              )}
-            </div>
-          </div>
-        </>
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full px-3 py-2.5 rounded-lg border text-left transition-all hover:shadow-md cursor-pointer",
+        "bg-white dark:bg-zinc-900",
+        styles.teamBorder,
+        isSelected && "ring-2 ring-primary shadow-md",
+        inactive && "opacity-50",
       )}
-    </div>
+    >
+      <div className="text-sm font-medium truncate text-gray-900 dark:text-white">
+        {team.name}
+      </div>
+      {team.leader && (
+        <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+          {team.leader}
+        </div>
+      )}
+      <div className="flex items-center gap-1.5 mt-1">
+        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+          {totalMembers} membros
+        </Badge>
+        {inactive && (
+          <Badge
+            variant="outline"
+            className="text-[10px] px-1.5 py-0 text-muted-foreground"
+          >
+            Inativo
+          </Badge>
+        )}
+      </div>
+    </button>
   );
 }
 
-// ── Department branch (dept card + its teams below) ───────────────────
+// ── Department column ─────────────────────────────────────────────────
 
-function DepartmentBranch({
+function DepartmentColumn({
   dept,
-  expandedTeam,
-  onToggleTeam,
+  selectedTeamKey,
+  onSelectTeam,
 }: {
   dept: Department;
-  expandedTeam: string | null;
-  onToggleTeam: (teamKey: string) => void;
+  selectedTeamKey: string | null;
+  onSelectTeam: (teamKey: string, dept: Department) => void;
 }) {
-  const memberCount = dept.teams.reduce(
-    (sum, t) => sum + t.members.length + (t.leader ? 1 : 0),
-    0
-  );
+  // For large depts use 2 cols, for small use 1
+  const gridCols = dept.teams.length > 2 ? "grid-cols-2" : "grid-cols-1";
 
   return (
     <div className="flex flex-col items-center">
       <VLine />
-      <DeptCard dept={dept} memberCount={memberCount} />
+      <DeptCard dept={dept} />
+      <VLine height={16} />
+      <div className={cn("grid gap-2 max-w-[280px]", gridCols)}>
+        {dept.teams.map((team) => {
+          const key = `${dept.name}::${team.name}`;
+          return (
+            <TeamCardButton
+              key={key}
+              team={team}
+              color={dept.color}
+              isSelected={selectedTeamKey === key}
+              onClick={() => onSelectTeam(key, dept)}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-      {dept.teams.length > 0 && (
-        <>
-          <VLine />
-          {/* Teams row with horizontal connector */}
-          <div className="flex flex-col items-center">
-            {dept.teams.length > 1 && (
-              <div className="relative w-full flex">
-                {/* Horizontal line across teams */}
-                <div className="absolute top-0 left-0 right-0 flex">
-                  <div className="flex-1" />
-                  {dept.teams.map((_, i) => (
-                    <div key={i} className="flex-1 relative">
-                      {i === 0 && (
-                        <div className="absolute top-0 right-0 left-1/2 h-px bg-gray-300 dark:bg-zinc-600" />
-                      )}
-                      {i === dept.teams.length - 1 && (
-                        <div className="absolute top-0 left-0 right-1/2 h-px bg-gray-300 dark:bg-zinc-600" />
-                      )}
-                      {i > 0 && i < dept.teams.length - 1 && (
-                        <div className="absolute top-0 left-0 right-0 h-px bg-gray-300 dark:bg-zinc-600" />
-                      )}
-                    </div>
-                  ))}
-                  <div className="flex-1" />
+// ── Team detail drawer ────────────────────────────────────────────────
+
+function TeamDrawer({
+  team,
+  deptName,
+  deptColor,
+  onClose,
+}: {
+  team: Team;
+  deptName: string;
+  deptColor: string;
+  onClose: () => void;
+}) {
+  const styles = DEPT_STYLES[deptColor] || DEPT_STYLES.gray;
+  const totalMembers = team.members.length + (team.leader ? 1 : 0);
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/20 dark:bg-black/40 z-40"
+        onClick={onClose}
+      />
+      {/* Drawer */}
+      <div className="fixed inset-y-0 right-0 w-80 bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700 shadow-xl z-50 flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white">
+              {team.name}
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              <span className={styles.text}>{deptName}</span> &middot;{" "}
+              {totalMembers} membros
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-500 dark:text-zinc-400" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <ScrollArea className="flex-1 p-4">
+          {/* Leader */}
+          {team.leader && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 mb-3">
+              <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-amber-700 dark:text-amber-300 font-bold text-xs shrink-0">
+                {getInitials(team.leader)}
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  {team.leader}
+                </div>
+                <div className="text-[11px] text-amber-600 dark:text-amber-400">
+                  {team.leaderCargo || "Líder"}
                 </div>
               </div>
-            )}
-            <div className={cn("flex items-start", dept.teams.length > 1 ? "gap-3" : "gap-0")}>
-              {dept.teams.map((team) => {
-                const teamKey = `${dept.name}::${team.name}`;
-                return (
-                  <div key={team.name} className="flex flex-col items-center">
-                    <VLine height={dept.teams.length > 1 ? "h-0" : "h-0"} />
-                    <TeamCard
-                      team={team}
-                      color={dept.color}
-                      isExpanded={expandedTeam === teamKey}
-                      onToggle={() => onToggleTeam(teamKey)}
-                    />
-                  </div>
-                );
-              })}
+              <Crown className="h-4 w-4 text-amber-500 shrink-0 ml-auto" />
             </div>
+          )}
+
+          {/* Members */}
+          <div className="space-y-1">
+            {team.members.map((m, i) => (
+              <div
+                key={`${m.nome}-${i}`}
+                className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-zinc-300 shrink-0">
+                  {getInitials(m.nome)}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm text-gray-900 dark:text-white truncate">
+                    {m.nome.split(" ").slice(0, 2).join(" ")}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {m.cargo}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {team.members.length === 0 && !team.leader && (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                Sem membros cadastrados
+              </div>
+            )}
           </div>
-        </>
-      )}
-    </div>
+        </ScrollArea>
+      </div>
+    </>
   );
 }
 
@@ -278,14 +342,61 @@ export default function Organograma() {
   usePageTitle("Organograma");
   useSetPageInfo("Organograma", "Estrutura organizacional da Turbo Partners");
 
-  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const [selectedTeamKey, setSelectedTeamKey] = useState<string | null>(null);
+  const [selectedDept, setSelectedDept] = useState<Department | null>(null);
+  const [search, setSearch] = useState("");
 
   const { data, isLoading, error } = useQuery<OrgData>({
     queryKey: ["/api/geg/organograma"],
   });
 
-  const toggleTeam = (teamKey: string) => {
-    setExpandedTeam((prev) => (prev === teamKey ? null : teamKey));
+  // Filtered departments based on search
+  const filteredDepts = useMemo(() => {
+    if (!data) return [];
+    if (!search.trim()) return data.departments;
+
+    const q = search.toLowerCase();
+    return data.departments
+      .map((d) => ({
+        ...d,
+        teams: d.teams.filter(
+          (t) =>
+            t.name.toLowerCase().includes(q) ||
+            t.leader?.toLowerCase().includes(q) ||
+            t.members.some((m) => m.nome.toLowerCase().includes(q)) ||
+            d.name.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((d) => d.teams.length > 0);
+  }, [data, search]);
+
+  // Stats
+  const totalTeams = useMemo(
+    () => (data?.departments ?? []).reduce((s, d) => s + d.teams.length, 0),
+    [data],
+  );
+
+  // Find selected team object
+  const selectedTeam = useMemo(() => {
+    if (!selectedTeamKey || !data) return null;
+    const [deptName, teamName] = selectedTeamKey.split("::");
+    for (const dept of data.departments) {
+      if (dept.name === deptName) {
+        const team = dept.teams.find((t) => t.name === teamName);
+        if (team) return team;
+      }
+    }
+    return null;
+  }, [selectedTeamKey, data]);
+
+  const handleSelectTeam = (teamKey: string, dept: Department) => {
+    if (selectedTeamKey === teamKey) {
+      setSelectedTeamKey(null);
+      setSelectedDept(null);
+    } else {
+      setSelectedTeamKey(teamKey);
+      setSelectedDept(dept);
+    }
   };
 
   if (isLoading) {
@@ -305,70 +416,75 @@ export default function Organograma() {
   }
 
   return (
-    <div className="space-y-6 pb-10">
-      {/* Summary bar */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-zinc-400">
-          <Building2 className="h-4 w-4" />
-          <span>{data.departments.length} departamentos</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-zinc-400">
-          <Users className="h-4 w-4" />
-          <span>{data.totalColaboradores} colaboradores ativos</span>
-        </div>
-      </div>
-
-      {/* Tree */}
-      <div className="overflow-x-auto pb-8">
-        <div className="flex flex-col items-center min-w-fit">
-          {/* CEO */}
-          <CeoCard ceo={data.ceo} />
-
-          {/* Vertical line from CEO */}
-          <VLine />
-
-          {/* Horizontal connector across all departments */}
-          {data.departments.length > 1 && (
-            <div className="relative w-full">
-              <div className="flex">
-                {data.departments.map((_, i) => (
-                  <div key={i} className="flex-1 relative h-px">
-                    {i === 0 && (
-                      <div className="absolute top-0 right-0 left-1/2 h-px bg-gray-300 dark:bg-zinc-600" />
-                    )}
-                    {i === data.departments.length - 1 && (
-                      <div className="absolute top-0 left-0 right-1/2 h-px bg-gray-300 dark:bg-zinc-600" />
-                    )}
-                    {i > 0 && i < data.departments.length - 1 && (
-                      <div className="absolute top-0 left-0 right-0 h-px bg-gray-300 dark:bg-zinc-600" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Department branches */}
-          <div className="flex items-start gap-6">
-            {data.departments.map((dept) => (
-              <DepartmentBranch
-                key={dept.name}
-                dept={dept}
-                expandedTeam={expandedTeam}
-                onToggleTeam={toggleTeam}
-              />
-            ))}
+    <div className="p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+        <div />
+        <div className="flex items-center gap-4">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Buscar equipe ou pessoa..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 w-64"
+            />
+          </div>
+          {/* Stats */}
+          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{data.departments.length} departamentos</span>
+            <span>&middot;</span>
+            <span>{totalTeams} equipes</span>
+            <span>&middot;</span>
+            <span>{data.totalColaboradores} colaboradores</span>
           </div>
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400 dark:text-zinc-500 pt-4 border-t border-gray-100 dark:border-zinc-800">
-        <span className="flex items-center gap-1">
-          <User className="h-3 w-3" />
-          Clique em uma equipe para ver os membros
-        </span>
+      {/* Tree */}
+      <div className="flex flex-col items-center min-h-[calc(100vh-200px)]">
+        {/* Level 1: CEO */}
+        <CeoCard ceo={data.ceo} />
+        <VLine />
+
+        {/* Level 2+3: Departments + Teams */}
+        {filteredDepts.length > 0 ? (
+          <div className="relative flex flex-wrap justify-center gap-6 lg:gap-8 pt-6 w-full">
+            {/* Horizontal connector line */}
+            <div
+              className="absolute top-0 h-px bg-gray-300 dark:bg-zinc-600"
+              style={{ left: "15%", right: "15%" }}
+            />
+            {filteredDepts.map((dept) => (
+              <DepartmentColumn
+                key={dept.name}
+                dept={dept}
+                selectedTeamKey={selectedTeamKey}
+                onSelectTeam={handleSelectTeam}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-muted-foreground mt-8">
+            Nenhum resultado para &ldquo;{search}&rdquo;
+          </div>
+        )}
       </div>
+
+      {/* Drawer */}
+      {selectedTeam && selectedDept && (
+        <TeamDrawer
+          team={selectedTeam}
+          deptName={selectedDept.name}
+          deptColor={selectedDept.color}
+          onClose={() => {
+            setSelectedTeamKey(null);
+            setSelectedDept(null);
+          }}
+        />
+      )}
     </div>
   );
 }
