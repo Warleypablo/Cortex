@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Crown, X, Loader2, Search } from "lucide-react";
+import { Crown, X, Loader2, Search, Expand, Shrink } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -209,30 +209,55 @@ function DepartmentColumn({
   dept,
   selectedTeamKey,
   onSelectTeam,
+  expanded,
 }: {
   dept: Department;
   selectedTeamKey: string | null;
   onSelectTeam: (teamKey: string, dept: Department) => void;
+  expanded: boolean;
 }) {
-  // For large depts use 2 cols, for small use 1
-  const gridCols = dept.teams.length > 2 ? "grid-cols-2" : "grid-cols-1";
+  const styles = DEPT_STYLES[dept.color] || DEPT_STYLES.gray;
+  const gridCols = expanded ? "grid-cols-1" : dept.teams.length > 2 ? "grid-cols-2" : "grid-cols-1";
 
   return (
     <div className="flex flex-col items-center">
       <VLine />
       <DeptCard dept={dept} />
       <VLine height={16} />
-      <div className={cn("grid gap-2 max-w-[280px]", gridCols)}>
+      <div className={cn("grid gap-2", expanded ? "max-w-[320px]" : "max-w-[280px]", gridCols)}>
         {dept.teams.map((team) => {
           const key = `${dept.name}::${team.name}`;
           return (
-            <TeamCardButton
-              key={key}
-              team={team}
-              color={dept.color}
-              isSelected={selectedTeamKey === key}
-              onClick={() => onSelectTeam(key, dept)}
-            />
+            <div key={key} className="flex flex-col">
+              <TeamCardButton
+                team={team}
+                color={dept.color}
+                isSelected={selectedTeamKey === key}
+                onClick={() => onSelectTeam(key, dept)}
+              />
+              {/* Expanded: show members inline below each team */}
+              {expanded && (
+                <div className={cn("mt-1 ml-2 border-l-2 pl-3 pb-2 space-y-0.5", styles.teamBorder)}>
+                  {team.leader && (
+                    <div className="flex items-center gap-2 py-1">
+                      <Crown className="w-3 h-3 text-amber-500 shrink-0" />
+                      <span className="text-xs font-medium truncate">{team.leader.split(' ').slice(0, 2).join(' ')}</span>
+                    </div>
+                  )}
+                  {team.members.map((m) => (
+                    <div key={m.nome} className="flex items-center gap-2 py-0.5">
+                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <span className="text-[8px] font-medium">{getInitials(m.nome)}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[11px] truncate block">{m.nome.split(' ').slice(0, 2).join(' ')}</span>
+                        <span className="text-[9px] text-muted-foreground truncate block">{m.cargo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -345,6 +370,7 @@ export default function Organograma() {
   const [selectedTeamKey, setSelectedTeamKey] = useState<string | null>(null);
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   const { data, isLoading, error } = useQuery<OrgData>({
     queryKey: ["/api/geg/organograma"],
@@ -432,6 +458,19 @@ export default function Organograma() {
               className="pl-8 pr-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 w-64"
             />
           </div>
+          {/* Expand toggle */}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors",
+              expanded
+                ? "bg-primary text-primary-foreground border-primary"
+                : "border-gray-200 dark:border-zinc-700 hover:bg-muted"
+            )}
+          >
+            {expanded ? <Shrink className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
+            {expanded ? "Compacto" : "Expandido"}
+          </button>
           {/* Stats */}
           <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
             <span>{data.departments.length} departamentos</span>
@@ -449,6 +488,13 @@ export default function Organograma() {
         <CeoCard ceo={data.ceo} />
         <VLine />
 
+        {/* Level 1.5: COO */}
+        <div className="px-5 py-3 rounded-xl border-2 border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-center shadow-md">
+          <div className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">COO</div>
+          <div className="text-base font-bold text-gray-900 dark:text-white">Rafael Vilela</div>
+        </div>
+        <VLine />
+
         {/* Level 2+3: Departments + Teams */}
         {filteredDepts.length > 0 ? (
           <div className="relative flex flex-wrap justify-center gap-6 lg:gap-8 pt-6 w-full">
@@ -463,6 +509,7 @@ export default function Organograma() {
                 dept={dept}
                 selectedTeamKey={selectedTeamKey}
                 onSelectTeam={handleSelectTeam}
+                expanded={expanded}
               />
             ))}
           </div>
