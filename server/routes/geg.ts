@@ -1128,28 +1128,40 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         });
       }
 
-      // Back Office
+      // Back Office — split into Controladoria and G&G
       if (backofficeMembers.length > 0) {
-        // Group by broad cargo area
-        const boGroups = new Map<string, Member[]>();
+        const controladoriaMembers: Member[] = [];
+        const gegMembers: Member[] = [];
+
         for (const m of backofficeMembers) {
           const cargoLower = m.cargo.toLowerCase();
-          let group = "Geral";
-          if (cargoLower.includes("financ")) group = "Financeiro";
-          else if (cargoLower.includes("juríd") || cargoLower.includes("juridic")) group = "Jurídico";
-          else if (cargoLower.includes("dados") || cargoLower.includes("data") || cargoLower.includes("bi")) group = "Dados";
-          else if (cargoLower.includes("g&g") || cargoLower.includes("gente") || cargoLower.includes("rh") || cargoLower.includes("people")) group = "G&G";
-          if (!boGroups.has(group)) boGroups.set(group, []);
-          boGroups.get(group)!.push(m);
+          if (cargoLower.includes("g&g") || cargoLower.includes("gente") || cargoLower.includes("rh") || cargoLower.includes("people")) {
+            gegMembers.push(m);
+          } else if (cargoLower.includes("financ") || cargoLower.includes("juríd") || cargoLower.includes("juridic") || cargoLower.includes("dados") || cargoLower.includes("data") || cargoLower.includes("bi")) {
+            // Filter out the leader from members list
+            if (!m.nome.toLowerCase().includes("marlon")) {
+              controladoriaMembers.push(m);
+            }
+          }
         }
-        const boTeams: Team[] = Array.from(boGroups.entries())
-          .filter(([name]) => name !== "Geral")
-          .map(([name, members]) => ({
-            name,
-            leader: null,
-            leaderCargo: null,
-            members,
-          }));
+
+        // Filter out Karol from G&G members (she's the leader)
+        const gegFiltered = gegMembers.filter(m => !m.nome.toLowerCase().includes("karoline") && !m.nome.toLowerCase().includes("karol"));
+
+        const boTeams: Team[] = [
+          {
+            name: "Controladoria",
+            leader: "Marlon Carneiro",
+            leaderCargo: "Líder",
+            members: controladoriaMembers,
+          },
+          {
+            name: "G&G",
+            leader: "Karol Tognere",
+            leaderCargo: "Líder",
+            members: gegFiltered,
+          },
+        ];
         departments.push({ name: "Back Office", color: "gray", teams: boTeams });
       }
 
