@@ -217,18 +217,31 @@ function DepartmentColumn({
   expanded: boolean;
 }) {
   const styles = DEPT_STYLES[dept.color] || DEPT_STYLES.gray;
-  const gridCols = expanded ? "grid-cols-1" : dept.teams.length > 2 ? "grid-cols-2" : "grid-cols-1";
 
   return (
     <div className="flex flex-col items-center">
       <VLine />
       <DeptCard dept={dept} />
       <VLine height={16} />
-      <div className={cn("grid gap-2", expanded ? "max-w-[320px]" : "max-w-[280px]", gridCols)}>
+
+      {/* Teams in horizontal row with connector line */}
+      <div className="relative flex items-start gap-1 pt-4">
+        {/* Horizontal connector line above all teams */}
+        {dept.teams.length > 1 && (
+          <div
+            className="absolute top-0 h-px bg-gray-300 dark:bg-zinc-600"
+            style={{
+              left: `calc(${100 / dept.teams.length / 2}% + 4px)`,
+              right: `calc(${100 / dept.teams.length / 2}% + 4px)`,
+            }}
+          />
+        )}
         {dept.teams.map((team) => {
           const key = `${dept.name}::${team.name}`;
           return (
-            <div key={key} className="flex flex-col">
+            <div key={key} className="flex flex-col items-center" style={{ minWidth: expanded ? 140 : 120 }}>
+              {/* Vertical line from horizontal connector down to team card */}
+              <div className="w-px h-4 bg-gray-300 dark:bg-zinc-600 -mt-4" />
               <TeamCardButton
                 team={team}
                 color={dept.color}
@@ -237,22 +250,19 @@ function DepartmentColumn({
               />
               {/* Expanded: show members inline below each team */}
               {expanded && (
-                <div className={cn("mt-1 ml-2 border-l-2 pl-3 pb-2 space-y-0.5", styles.teamBorder)}>
+                <div className={cn("mt-1 border-l-2 pl-2 pb-1 space-y-0.5 self-stretch", styles.teamBorder)}>
                   {team.leader && (
-                    <div className="flex items-center gap-2 py-1">
+                    <div className="flex items-center gap-1.5 py-0.5">
                       <Crown className="w-3 h-3 text-amber-500 shrink-0" />
-                      <span className="text-xs font-medium truncate">{team.leader.split(' ').slice(0, 2).join(' ')}</span>
+                      <span className="text-[10px] font-medium truncate">{team.leader.split(' ').slice(0, 2).join(' ')}</span>
                     </div>
                   )}
                   {team.members.map((m) => (
-                    <div key={m.nome} className="flex items-center gap-2 py-0.5">
-                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <span className="text-[8px] font-medium">{getInitials(m.nome)}</span>
+                    <div key={m.nome} className="flex items-center gap-1.5 py-0.5">
+                      <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <span className="text-[7px] font-medium">{getInitials(m.nome)}</span>
                       </div>
-                      <div className="min-w-0">
-                        <span className="text-[11px] truncate block">{m.nome.split(' ').slice(0, 2).join(' ')}</span>
-                        <span className="text-[9px] text-muted-foreground truncate block">{m.cargo}</span>
-                      </div>
+                      <span className="text-[10px] truncate">{m.nome.split(' ').slice(0, 2).join(' ')}</span>
                     </div>
                   ))}
                 </div>
@@ -483,7 +493,7 @@ export default function Organograma() {
       </div>
 
       {/* Tree */}
-      <div className="flex flex-col items-center min-h-[calc(100vh-200px)]">
+      <div className="flex flex-col items-center min-h-[calc(100vh-200px)] overflow-x-auto pb-8">
         {/* Level 1: CEO */}
         <CeoCard ceo={data.ceo} />
         <VLine />
@@ -497,7 +507,7 @@ export default function Organograma() {
 
         {/* Level 2+3: Departments + Teams */}
         {filteredDepts.length > 0 ? (
-          <div className="relative flex flex-wrap justify-center gap-6 lg:gap-8 pt-6 w-full">
+          <div className="relative flex justify-center gap-4 lg:gap-6 pt-6 min-w-fit">
             {/* Horizontal connector line */}
             <div
               className="absolute top-0 h-px bg-gray-300 dark:bg-zinc-600"
