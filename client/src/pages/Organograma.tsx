@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Crown, X, Loader2, Search, Expand, Shrink } from "lucide-react";
+import { Crown, X, Loader2, Search, Maximize2, Minimize2, LayoutGrid } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -33,6 +33,16 @@ interface OrgData {
   totalColaboradores: number;
 }
 
+// ── View modes ────────────────────────────────────────────────────────
+
+const VIEW_MODES = [
+  { key: 'compacto', label: 'Compacto', icon: Minimize2 },
+  { key: 'normal', label: 'Normal', icon: LayoutGrid },
+  { key: 'expandido', label: 'Expandido', icon: Maximize2 },
+] as const;
+
+type ViewMode = 'compacto' | 'normal' | 'expandido';
+
 // ── Helpers ───────────────────────────────────────────────────────────
 
 function getInitials(name: string) {
@@ -53,6 +63,16 @@ function getDeptMemberCount(dept: Department) {
     (sum, t) => sum + t.members.length + (t.leader ? 1 : 0),
     0,
   );
+}
+
+function isTeamMatch(team: Team, deptName: string, searchQuery: string): boolean {
+  if (!searchQuery) return true;
+  return (
+    team.name.toLowerCase().includes(searchQuery) ||
+    team.leader?.toLowerCase().includes(searchQuery) ||
+    team.members.some((m) => m.nome.toLowerCase().includes(searchQuery)) ||
+    deptName.toLowerCase().includes(searchQuery)
+  ) as boolean;
 }
 
 // ── Color mapping ─────────────────────────────────────────────────────
@@ -103,7 +123,7 @@ const DEPT_STYLES: Record<
 function VLine({ height = 24 }: { height?: number }) {
   return (
     <div
-      className="w-px bg-gray-300 dark:bg-zinc-600 shrink-0"
+      className="w-0.5 bg-gray-400 dark:bg-zinc-500 shrink-0"
       style={{ height }}
     />
   );
@@ -146,7 +166,7 @@ function DeptCard({ dept }: { dept: Department }) {
         {dept.name}
       </div>
       <div className="text-xs text-muted-foreground mt-1">
-        {dept.teams.length} equipes &middot; {memberCount} pessoas
+        {dept.teams.length} {dept.teams.length === 1 ? 'equipe' : 'equipes'} &middot; {memberCount} {memberCount === 1 ? 'pessoa' : 'pessoas'}
       </div>
     </div>
   );
@@ -157,11 +177,13 @@ function TeamCardButton({
   color,
   isSelected,
   onClick,
+  dimmed,
 }: {
   team: Team;
   color: string;
   isSelected: boolean;
   onClick: () => void;
+  dimmed?: boolean;
 }) {
   const styles = DEPT_STYLES[color] || DEPT_STYLES.gray;
   const totalMembers = team.members.length + (team.leader ? 1 : 0);
@@ -176,19 +198,27 @@ function TeamCardButton({
         styles.teamBorder,
         isSelected && "ring-2 ring-primary shadow-md",
         inactive && "opacity-50",
+        dimmed && "opacity-20",
       )}
     >
       <div className="text-sm font-medium truncate text-gray-900 dark:text-white">
         {team.name}
       </div>
-      {team.leader && (
-        <div className="text-[11px] text-muted-foreground truncate mt-0.5">
-          {team.leader}
-        </div>
-      )}
+      <div className="flex items-center gap-1.5 mt-1">
+        {team.leader ? (
+          <>
+            <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0">
+              <span className="text-[8px] font-bold text-amber-700 dark:text-amber-300">{getInitials(team.leader)}</span>
+            </div>
+            <span className="text-[10px] text-muted-foreground truncate">{team.leader.split(' ').slice(0, 2).join(' ')}</span>
+          </>
+        ) : (
+          <span className="text-[10px] text-muted-foreground italic">Sem líder</span>
+        )}
+      </div>
       <div className="flex items-center gap-1.5 mt-1">
         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-          {totalMembers} membros
+          {totalMembers} {totalMembers === 1 ? 'membro' : 'membros'}
         </Badge>
         {inactive && (
           <Badge
@@ -209,12 +239,14 @@ function DepartmentColumn({
   dept,
   selectedTeamKey,
   onSelectTeam,
-  expanded,
+  viewMode,
+  searchQuery,
 }: {
   dept: Department;
   selectedTeamKey: string | null;
   onSelectTeam: (teamKey: string, dept: Department) => void;
-  expanded: boolean;
+  viewMode: ViewMode;
+  searchQuery: string;
 }) {
   const styles = DEPT_STYLES[dept.color] || DEPT_STYLES.gray;
 
@@ -222,55 +254,62 @@ function DepartmentColumn({
     <div className="flex flex-col items-center">
       <VLine />
       <DeptCard dept={dept} />
-      <VLine height={16} />
 
-      {/* Teams in horizontal row with connector line */}
-      <div className="relative flex items-start gap-1 pt-4">
-        {/* Horizontal connector line above all teams */}
-        {dept.teams.length > 1 && (
-          <div
-            className="absolute top-0 h-px bg-gray-300 dark:bg-zinc-600"
-            style={{
-              left: `calc(${100 / dept.teams.length / 2}% + 4px)`,
-              right: `calc(${100 / dept.teams.length / 2}% + 4px)`,
-            }}
-          />
-        )}
-        {dept.teams.map((team) => {
-          const key = `${dept.name}::${team.name}`;
-          return (
-            <div key={key} className="flex flex-col items-center" style={{ minWidth: expanded ? 140 : 120 }}>
-              {/* Vertical line from horizontal connector down to team card */}
-              <div className="w-px h-4 bg-gray-300 dark:bg-zinc-600 -mt-4" />
-              <TeamCardButton
-                team={team}
-                color={dept.color}
-                isSelected={selectedTeamKey === key}
-                onClick={() => onSelectTeam(key, dept)}
+      {viewMode !== 'compacto' && (
+        <>
+          <VLine height={16} />
+
+          {/* Teams in horizontal row with connector line */}
+          <div className="relative flex items-start gap-1 pt-4">
+            {/* Horizontal connector line above all teams */}
+            {dept.teams.length > 1 && (
+              <div
+                className="absolute top-0 h-0.5 bg-gray-400 dark:bg-zinc-500"
+                style={{
+                  left: `calc(${100 / dept.teams.length / 2}% + 4px)`,
+                  right: `calc(${100 / dept.teams.length / 2}% + 4px)`,
+                }}
               />
-              {/* Expanded: show members inline below each team */}
-              {expanded && (
-                <div className={cn("mt-1 border-l-2 pl-2 pb-1 space-y-0.5 self-stretch", styles.teamBorder)}>
-                  {team.leader && (
-                    <div className="flex items-center gap-1.5 py-0.5">
-                      <Crown className="w-3 h-3 text-amber-500 shrink-0" />
-                      <span className="text-[10px] font-medium truncate">{team.leader.split(' ').slice(0, 2).join(' ')}</span>
+            )}
+            {dept.teams.map((team) => {
+              const key = `${dept.name}::${team.name}`;
+              const matched = isTeamMatch(team, dept.name, searchQuery);
+              return (
+                <div key={key} className="flex flex-col items-center" style={{ minWidth: viewMode === 'expandido' ? 140 : 120 }}>
+                  {/* Vertical line from horizontal connector down to team card */}
+                  <div className="w-0.5 h-4 bg-gray-400 dark:bg-zinc-500 -mt-4" />
+                  <TeamCardButton
+                    team={team}
+                    color={dept.color}
+                    isSelected={selectedTeamKey === key}
+                    onClick={() => onSelectTeam(key, dept)}
+                    dimmed={!!searchQuery && !matched}
+                  />
+                  {/* Expanded: show members inline below each team */}
+                  {viewMode === 'expandido' && (
+                    <div className={cn("mt-1 border-l-2 pl-2 pb-1 space-y-0.5 self-stretch", styles.teamBorder)}>
+                      {team.leader && (
+                        <div className="flex items-center gap-1.5 py-0.5">
+                          <Crown className="w-3 h-3 text-amber-500 shrink-0" />
+                          <span className="text-[10px] font-medium truncate">{team.leader.split(' ').slice(0, 2).join(' ')}</span>
+                        </div>
+                      )}
+                      {team.members.map((m) => (
+                        <div key={m.nome} className="flex items-center gap-1.5 py-0.5">
+                          <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center shrink-0">
+                            <span className="text-[7px] font-medium">{getInitials(m.nome)}</span>
+                          </div>
+                          <span className="text-[10px] truncate">{m.nome.split(' ').slice(0, 2).join(' ')}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
-                  {team.members.map((m) => (
-                    <div key={m.nome} className="flex items-center gap-1.5 py-0.5">
-                      <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <span className="text-[7px] font-medium">{getInitials(m.nome)}</span>
-                      </div>
-                      <span className="text-[10px] truncate">{m.nome.split(' ').slice(0, 2).join(' ')}</span>
-                    </div>
-                  ))}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -308,7 +347,7 @@ function TeamDrawer({
             </h3>
             <p className="text-xs text-muted-foreground">
               <span className={styles.text}>{deptName}</span> &middot;{" "}
-              {totalMembers} membros
+              {totalMembers} {totalMembers === 1 ? 'membro' : 'membros'}
             </p>
           </div>
           <button
@@ -324,18 +363,29 @@ function TeamDrawer({
           {/* Leader */}
           {team.leader && (
             <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 mb-3">
-              <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-amber-700 dark:text-amber-300 font-bold text-xs shrink-0">
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-amber-700 dark:text-amber-300 font-bold text-sm shrink-0">
                 {getInitials(team.leader)}
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {team.leader}
                 </div>
-                <div className="text-[11px] text-amber-600 dark:text-amber-400">
+                <div className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
                   {team.leaderCargo || "Líder"}
                 </div>
               </div>
               <Crown className="h-4 w-4 text-amber-500 shrink-0 ml-auto" />
+            </div>
+          )}
+
+          {!team.leader && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-dashed border-gray-300 dark:border-zinc-600 mb-3">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                <span className="text-xs text-muted-foreground">?</span>
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm text-muted-foreground italic">Sem líder definido</div>
+              </div>
             </div>
           )}
 
@@ -380,31 +430,62 @@ export default function Organograma() {
   const [selectedTeamKey, setSelectedTeamKey] = useState<string | null>(null);
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('orgchart-view') as ViewMode) || 'normal';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('orgchart-view', viewMode);
+  }, [viewMode]);
+
+  // ── Zoom & drag state ─────────────────────────────────────────────
+  const [scale, setScale] = useState(0.85);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+    setScale((s) => Math.min(1.5, Math.max(0.3, s + delta)));
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only start drag on canvas background, not on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="button"]')) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  const fitToScreen = () => {
+    setScale(0.85);
+    setPosition({ x: 0, y: 0 });
+  };
 
   const { data, isLoading, error } = useQuery<OrgData>({
     queryKey: ["/api/geg/organograma"],
   });
 
-  // Filtered departments based on search
-  const filteredDepts = useMemo(() => {
-    if (!data) return [];
-    if (!search.trim()) return data.departments;
+  const searchQuery = search.toLowerCase().trim();
 
-    const q = search.toLowerCase();
-    return data.departments
-      .map((d) => ({
-        ...d,
-        teams: d.teams.filter(
-          (t) =>
-            t.name.toLowerCase().includes(q) ||
-            t.leader?.toLowerCase().includes(q) ||
-            t.members.some((m) => m.nome.toLowerCase().includes(q)) ||
-            d.name.toLowerCase().includes(q),
-        ),
-      }))
-      .filter((d) => d.teams.length > 0);
-  }, [data, search]);
+  // All departments always shown (search just dims non-matching teams)
+  const displayDepts = data?.departments ?? [];
 
   // Stats
   const totalTeams = useMemo(
@@ -452,11 +533,11 @@ export default function Organograma() {
   }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+    <div className="p-6 flex flex-col h-[calc(100vh-64px)]">
+      {/* Header bar */}
+      <div className="flex items-center justify-between gap-4 mb-4 shrink-0">
         <div />
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -468,19 +549,27 @@ export default function Organograma() {
               className="pl-8 pr-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-gray-900 dark:text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 w-64"
             />
           </div>
-          {/* Expand toggle */}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border transition-colors",
-              expanded
-                ? "bg-primary text-primary-foreground border-primary"
-                : "border-gray-200 dark:border-zinc-700 hover:bg-muted"
-            )}
-          >
-            {expanded ? <Shrink className="w-3.5 h-3.5" /> : <Expand className="w-3.5 h-3.5" />}
-            {expanded ? "Compacto" : "Expandido"}
-          </button>
+
+          {/* View mode toggle */}
+          <div className="flex items-center rounded-lg border border-gray-200 dark:border-zinc-700 overflow-hidden">
+            {VIEW_MODES.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => setViewMode(key)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === key
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-muted text-muted-foreground",
+                )}
+                title={label}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            ))}
+          </div>
+
           {/* Stats */}
           <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
             <span>{data.departments.length} departamentos</span>
@@ -492,42 +581,97 @@ export default function Organograma() {
         </div>
       </div>
 
-      {/* Tree */}
-      <div className="flex flex-col items-center min-h-[calc(100vh-200px)] overflow-x-auto pb-8">
-        {/* Level 1: CEO */}
-        <CeoCard ceo={data.ceo} />
-        <VLine />
-
-        {/* Level 1.5: COO */}
-        <div className="px-5 py-3 rounded-xl border-2 border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-center shadow-md">
-          <div className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">COO</div>
-          <div className="text-base font-bold text-gray-900 dark:text-white">Rafael Vilela</div>
-        </div>
-        <VLine />
-
-        {/* Level 2+3: Departments + Teams */}
-        {filteredDepts.length > 0 ? (
-          <div className="relative flex justify-center gap-4 lg:gap-6 pt-6 min-w-fit">
-            {/* Horizontal connector line */}
-            <div
-              className="absolute top-0 h-px bg-gray-300 dark:bg-zinc-600"
-              style={{ left: "15%", right: "15%" }}
-            />
-            {filteredDepts.map((dept) => (
-              <DepartmentColumn
-                key={dept.name}
-                dept={dept}
-                selectedTeamKey={selectedTeamKey}
-                onSelectTeam={handleSelectTeam}
-                expanded={expanded}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-sm text-muted-foreground mt-8">
-            Nenhum resultado para &ldquo;{search}&rdquo;
-          </div>
+      {/* Canvas with zoom/drag */}
+      <div
+        ref={containerRef}
+        className={cn(
+          "relative flex-1 overflow-hidden rounded-xl border bg-muted/10 dark:bg-zinc-950/50",
+          isDragging ? "cursor-grabbing" : "cursor-grab",
         )}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        data-canvas
+      >
+        {/* Subtle dot pattern background */}
+        <div
+          className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06] pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }}
+        />
+
+        <div
+          className="origin-top-left p-8 inline-flex flex-col items-center min-w-full"
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+            transition: isDragging ? 'none' : 'transform 75ms ease-out',
+          }}
+        >
+          {/* Level 1: CEO */}
+          <CeoCard ceo={data.ceo} />
+          <VLine />
+
+          {/* Level 1.5: COO */}
+          <div className="px-5 py-3 rounded-xl border-2 border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-center shadow-md">
+            <div className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">COO</div>
+            <div className="text-base font-bold text-gray-900 dark:text-white">Rafael Vilela</div>
+          </div>
+          <VLine />
+
+          {/* Level 2+3: Departments + Teams */}
+          {displayDepts.length > 0 ? (
+            <div className="relative flex justify-center gap-4 lg:gap-6 pt-6 min-w-fit">
+              {/* Horizontal connector line */}
+              <div
+                className="absolute top-0 h-0.5 bg-gray-400 dark:bg-zinc-500"
+                style={{ left: "15%", right: "15%" }}
+              />
+              {displayDepts.map((dept) => (
+                <DepartmentColumn
+                  key={dept.name}
+                  dept={dept}
+                  selectedTeamKey={selectedTeamKey}
+                  onSelectTeam={handleSelectTeam}
+                  viewMode={viewMode}
+                  searchQuery={searchQuery}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground mt-8">
+              Nenhum departamento encontrado
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Zoom controls - fixed bottom right */}
+      <div className="fixed bottom-6 right-6 flex flex-col gap-1 z-30">
+        <button
+          onClick={() => setScale((s) => Math.min(1.5, s + 0.1))}
+          className="w-9 h-9 rounded-lg bg-card border border-gray-200 dark:border-zinc-700 shadow-md flex items-center justify-center hover:bg-muted text-sm font-bold text-gray-700 dark:text-zinc-300"
+        >
+          +
+        </button>
+        <button
+          onClick={() => setScale((s) => Math.max(0.3, s - 0.1))}
+          className="w-9 h-9 rounded-lg bg-card border border-gray-200 dark:border-zinc-700 shadow-md flex items-center justify-center hover:bg-muted text-sm font-bold text-gray-700 dark:text-zinc-300"
+        >
+          −
+        </button>
+        <button
+          onClick={fitToScreen}
+          className="w-9 h-9 rounded-lg bg-card border border-gray-200 dark:border-zinc-700 shadow-md flex items-center justify-center hover:bg-muted text-gray-700 dark:text-zinc-300"
+          title="Centralizar"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+        <div className="text-center text-[10px] text-muted-foreground mt-1">
+          {Math.round(scale * 100)}%
+        </div>
       </div>
 
       {/* Drawer */}
