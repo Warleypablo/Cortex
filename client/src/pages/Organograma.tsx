@@ -270,7 +270,7 @@ function DepartmentColumn({
           <VLine height={16} />
 
           {/* Teams in horizontal row with connector line */}
-          <div className="relative flex items-start gap-1 pt-4">
+          <div className="relative flex flex-wrap items-start gap-1 pt-4">
             {/* Horizontal connector line above all teams */}
             {dept.teams.length > 1 && (
               <div
@@ -298,7 +298,7 @@ function DepartmentColumn({
                   />
                   {/* Expanded: show members grouped by cargo */}
                   {viewMode === 'expandido' && (
-                    <div className={cn("mt-1 border-l-2 pl-2 pb-1 self-stretch max-h-[300px] overflow-y-auto", styles.teamBorder)} style={{ scrollbarWidth: 'thin' }}>
+                    <div className={cn("mt-1 border-l-2 pl-2 pb-1 self-stretch max-h-[60vh] overflow-y-auto", styles.teamBorder)} style={{ scrollbarWidth: 'thin' }}>
                       {team.leader && (
                         <div className="flex items-center gap-1.5 py-0.5" title={team.leader}>
                           <Crown className="w-3 h-3 text-amber-500 shrink-0" />
@@ -583,9 +583,8 @@ export default function Organograma() {
   return (
     <div className="p-6 flex flex-col h-[calc(100vh-64px)]">
       {/* Header bar */}
-      <div className="flex items-center justify-between gap-4 mb-4 shrink-0">
-        <div />
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-3 mb-4 shrink-0">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -619,7 +618,7 @@ export default function Organograma() {
           </div>
 
           {/* Stats */}
-          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <span>{data.departments.length} departamentos</span>
             <span>&middot;</span>
             <span>{totalTeams} equipes</span>
@@ -633,7 +632,7 @@ export default function Organograma() {
       <div
         ref={containerRef}
         className={cn(
-          "relative flex-1 overflow-hidden rounded-xl border bg-muted/10 dark:bg-zinc-950/50",
+          "relative flex-1 overflow-auto rounded-xl border bg-muted/10 dark:bg-zinc-950/50",
           isDragging ? "cursor-grabbing" : "cursor-grab",
         )}
         onMouseDown={handleMouseDown}
