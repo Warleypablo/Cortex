@@ -1019,6 +1019,8 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
 
         // Skip CEO / Sócios — handled separately
         if (setor === "Sócios" || cargo.toLowerCase().includes("ceo")) continue;
+        // Skip inactive squads
+        if (squad.toLowerCase().includes("(off)") || squad.toLowerCase().includes("supreme")) continue;
 
         // Tech Sites
         if (setor === "Tech Sites" || setor === "Tech" && squad === "Tech Sites") {
