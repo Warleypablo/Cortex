@@ -270,7 +270,7 @@ function DepartmentColumn({
           <VLine height={16} />
 
           {/* Teams in horizontal row with connector line */}
-          <div className="relative flex flex-wrap items-start gap-1 pt-4">
+          <div className="relative flex items-start gap-1 pt-4">
             {/* Horizontal connector line above all teams */}
             {dept.teams.length > 1 && (
               <div
@@ -632,7 +632,7 @@ export default function Organograma() {
       <div
         ref={containerRef}
         className={cn(
-          "relative flex-1 overflow-auto rounded-xl border bg-muted/10 dark:bg-zinc-950/50",
+          "relative flex-1 overflow-hidden rounded-xl border bg-muted/10 dark:bg-zinc-950/50",
           isDragging ? "cursor-grabbing" : "cursor-grab",
         )}
         onMouseDown={handleMouseDown}
