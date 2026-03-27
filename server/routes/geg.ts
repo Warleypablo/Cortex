@@ -1142,12 +1142,14 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
           if (!boGroups.has(group)) boGroups.set(group, []);
           boGroups.get(group)!.push(m);
         }
-        const boTeams: Team[] = Array.from(boGroups.entries()).map(([name, members]) => ({
-          name,
-          leader: null,
-          leaderCargo: null,
-          members,
-        }));
+        const boTeams: Team[] = Array.from(boGroups.entries())
+          .filter(([name]) => name !== "Geral")
+          .map(([name, members]) => ({
+            name,
+            leader: null,
+            leaderCargo: null,
+            members,
+          }));
         departments.push({ name: "Back Office", color: "gray", teams: boTeams });
       }
 
