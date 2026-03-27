@@ -49,10 +49,27 @@ export function registerPortalCreatorRoutes(app: Express) {
   app.patch("/api/portal/creator/me", isCreatorAuth, async (req, res) => {
     try {
       const creator = getCreatorData(req);
-      const { chave_pix, tipo_pix, endereco, cidade, estado, cep } = req.body;
+      const { nome, email, cpf, cnpj, chave_pix, tipo_pix, endereco, cidade, estado, cep } = req.body;
+
+      // Validate email format if provided
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ message: "Email inválido" });
+      }
+      // Validate CPF format (11 digits) if provided
+      if (cpf && !/^\d{11}$/.test(cpf.replace(/\D/g, ''))) {
+        return res.status(400).json({ message: "CPF inválido (11 dígitos)" });
+      }
+      // Validate CNPJ format (14 digits) if provided
+      if (cnpj && !/^\d{14}$/.test(cnpj.replace(/\D/g, ''))) {
+        return res.status(400).json({ message: "CNPJ inválido (14 dígitos)" });
+      }
 
       await db.execute(sql`
         UPDATE cortex_core.creators SET
+          nome = COALESCE(${nome ?? null}, nome),
+          email = COALESCE(${email ?? null}, email),
+          cpf = COALESCE(${cpf ?? null}, cpf),
+          cnpj = COALESCE(${cnpj ?? null}, cnpj),
           chave_pix = COALESCE(${chave_pix ?? null}, chave_pix),
           tipo_pix = COALESCE(${tipo_pix ?? null}, tipo_pix),
           endereco = COALESCE(${endereco ?? null}, endereco),
