@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, subDays, startOfWeek, startOfMonth, endOfMonth, startOfYear, subMonths } from "date-fns";
+import { format, subDays, startOfWeek, startOfMonth, endOfMonth, startOfYear, subMonths, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 
@@ -173,6 +173,44 @@ const PRESET_SECTIONS: PresetSection[] = [
 // Flatten all presets for backwards compatibility
 const DEFAULT_PRESETS: Preset[] = PRESET_SECTIONS.flatMap(section => section.presets);
 
+interface ComparePreset {
+  label: string;
+  getValue: (range: DateRange) => DateRange | undefined;
+}
+
+const COMPARE_PRESETS: ComparePreset[] = [
+  {
+    label: 'Período anterior',
+    getValue: (range: DateRange) => {
+      if (!range.from || !range.to) return undefined;
+      const diff = differenceInCalendarDays(range.to, range.from);
+      const prevEnd = subDays(range.from, 1);
+      const prevStart = subDays(prevEnd, diff);
+      return { from: prevStart, to: prevEnd };
+    },
+  },
+  {
+    label: 'Mês anterior',
+    getValue: (range: DateRange) => {
+      if (!range.from || !range.to) return undefined;
+      const prevMonthStart = startOfMonth(subMonths(range.from, 1));
+      const prevMonthEnd = endOfMonth(subMonths(range.from, 1));
+      return { from: prevMonthStart, to: prevMonthEnd };
+    },
+  },
+  {
+    label: 'Mesmo período ano anterior',
+    getValue: (range: DateRange) => {
+      if (!range.from || !range.to) return undefined;
+      const prevYearFrom = new Date(range.from);
+      prevYearFrom.setFullYear(prevYearFrom.getFullYear() - 1);
+      const prevYearTo = new Date(range.to);
+      prevYearTo.setFullYear(prevYearTo.getFullYear() - 1);
+      return { from: prevYearFrom, to: prevYearTo };
+    },
+  },
+];
+
 interface DateRangePickerProps {
   value: DateRange | undefined;
   onChange: (range: DateRange | undefined) => void;
@@ -183,6 +221,10 @@ interface DateRangePickerProps {
   placeholder?: string;
   numberOfMonths?: number;
   align?: "start" | "center" | "end";
+  compareEnabled?: boolean;
+  compareRange?: DateRange;
+  onCompareChange?: (enabled: boolean, range: DateRange | undefined) => void;
+  showCompare?: boolean;
 }
 
 export function DateRangePicker({
@@ -193,10 +235,24 @@ export function DateRangePicker({
   disabled = false,
   placeholder = "Selecione um período",
   align = "start",
+  compareEnabled,
+  compareRange,
+  onCompareChange,
+  showCompare = false,
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [month, setMonth] = useState<Date>(value?.from || new Date());
+  const [compareActive, setCompareActive] = useState(!!compareEnabled);
+  const [internalCompareRange, setInternalCompareRange] = useState<DateRange | undefined>(compareRange);
+
+  useEffect(() => {
+    setCompareActive(!!compareEnabled);
+  }, [compareEnabled]);
+
+  useEffect(() => {
+    setInternalCompareRange(compareRange);
+  }, [compareRange]);
 
   const displayText = useMemo(() => {
     if (!value?.from) return placeholder;
@@ -213,14 +269,25 @@ export function DateRangePicker({
     if (range.from) {
       setMonth(range.from);
     }
+    if (compareActive && range?.from && range?.to) {
+      const newCompare = COMPARE_PRESETS[0].getValue(range);
+      setInternalCompareRange(newCompare);
+    }
   };
 
   const handleCalendarSelect = (range: DateRange | undefined) => {
     onChange(range);
     setSelectedPreset(null);
+    if (compareActive && range?.from && range?.to) {
+      const newCompare = COMPARE_PRESETS[0].getValue(range);
+      setInternalCompareRange(newCompare);
+    }
   };
 
   const handleApply = () => {
+    if (showCompare && onCompareChange) {
+      onCompareChange(compareActive, compareActive ? internalCompareRange : undefined);
+    }
     setOpen(false);
   };
 
@@ -312,7 +379,87 @@ export function DateRangePicker({
                 day_hidden: "invisible",
               }}
             />
-            
+
+            {showCompare && (
+              <div className="mt-3 pt-3 border-t border-border space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={compareActive}
+                    onChange={(e) => {
+                      setCompareActive(e.target.checked);
+                      if (!e.target.checked) {
+                        setInternalCompareRange(undefined);
+                        if (onCompareChange) onCompareChange(false, undefined);
+                      } else if (value?.from && value?.to) {
+                        const defaultCompare = COMPARE_PRESETS[0].getValue(value);
+                        setInternalCompareRange(defaultCompare);
+                        if (onCompareChange) onCompareChange(true, defaultCompare);
+                      }
+                    }}
+                    className="rounded border-border"
+                  />
+                  <span className="text-sm font-medium">Comparar</span>
+                </label>
+                {compareActive && (
+                  <div className="space-y-2.5 pl-6">
+                    <div className="flex gap-1.5 flex-wrap">
+                      {COMPARE_PRESETS.map((preset) => {
+                        const presetRange = value ? preset.getValue(value) : undefined;
+                        const isSelected = presetRange && internalCompareRange?.from &&
+                          presetRange.from?.toDateString() === internalCompareRange.from?.toDateString() &&
+                          presetRange.to?.toDateString() === internalCompareRange.to?.toDateString();
+                        return (
+                          <button
+                            key={preset.label}
+                            onClick={() => {
+                              if (value && presetRange) {
+                                setInternalCompareRange(presetRange);
+                                if (onCompareChange) onCompareChange(true, presetRange);
+                              }
+                            }}
+                            className={cn(
+                              "px-2.5 py-1 text-xs rounded-md border transition-colors",
+                              isSelected
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "border-border hover:bg-muted"
+                            )}
+                          >
+                            {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <input
+                        type="date"
+                        value={internalCompareRange?.from ? format(internalCompareRange.from, 'yyyy-MM-dd') : ''}
+                        onChange={(e) => {
+                          const newFrom = e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined;
+                          const newRange = { from: newFrom, to: internalCompareRange?.to };
+                          setInternalCompareRange(newRange as DateRange);
+                          if (onCompareChange && newFrom && newRange.to) onCompareChange(true, newRange as DateRange);
+                        }}
+                        className="px-2 py-1 bg-muted border border-border rounded text-xs font-medium w-[120px] dark:bg-zinc-800"
+                      />
+                      <span className="text-muted-foreground">→</span>
+                      <input
+                        type="date"
+                        value={internalCompareRange?.to ? format(internalCompareRange.to, 'yyyy-MM-dd') : ''}
+                        onChange={(e) => {
+                          const newTo = e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined;
+                          const newRange = { from: internalCompareRange?.from, to: newTo };
+                          setInternalCompareRange(newRange as DateRange);
+                          if (onCompareChange && newRange.from && newTo) onCompareChange(true, newRange as DateRange);
+                        }}
+                        className="px-2 py-1 bg-muted border border-border rounded text-xs font-medium w-[120px] dark:bg-zinc-800"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-between mt-4 pt-4 border-t border-border gap-3">
               <div className="flex items-center gap-2 text-sm">
                 <span className="px-3 py-1.5 bg-muted rounded-md font-medium">
@@ -334,5 +481,5 @@ export function DateRangePicker({
   );
 }
 
-export { DEFAULT_PRESETS, PRESET_SECTIONS };
-export type { Preset, PresetSection, DateRangePickerProps };
+export { DEFAULT_PRESETS, PRESET_SECTIONS, COMPARE_PRESETS };
+export type { Preset, PresetSection, DateRangePickerProps, ComparePreset };
