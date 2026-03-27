@@ -662,16 +662,6 @@ export default function Organograma() {
           <CeoCard ceo={data.ceo} />
           <VLine />
 
-          {/* Level 1.5: COO */}
-          <div className="px-5 py-3 rounded-xl border-2 border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-center shadow-md">
-            <div className="w-10 h-10 rounded-full bg-sky-200 dark:bg-sky-800 flex items-center justify-center mx-auto mb-1">
-              <span className="text-base font-bold text-sky-800 dark:text-sky-200">RV</span>
-            </div>
-            <div className="text-[10px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">COO</div>
-            <div className="text-base font-bold text-gray-900 dark:text-white">Rafael Vilela</div>
-          </div>
-          <VLine />
-
           {/* Level 2+3: Departments + Teams */}
           {displayDepts.length > 0 ? (
             <div className="relative flex justify-center gap-4 lg:gap-6 pt-6 min-w-fit">
@@ -681,14 +671,28 @@ export default function Organograma() {
                 style={{ left: "15%", right: "15%" }}
               />
               {displayDepts.map((dept) => (
-                <DepartmentColumn
-                  key={dept.name}
-                  dept={dept}
-                  selectedTeamKey={selectedTeamKey}
-                  onSelectTeam={handleSelectTeam}
-                  viewMode={viewMode}
-                  searchQuery={searchQuery}
-                />
+                <div key={dept.name} className="flex flex-col items-center">
+                  {/* COO card above Commerce only */}
+                  {dept.name === "Commerce" && (
+                    <>
+                      <VLine />
+                      <div className="px-4 py-2 rounded-lg border-2 border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-center shadow-sm mb-0">
+                        <div className="w-8 h-8 rounded-full bg-sky-200 dark:bg-sky-800 flex items-center justify-center mx-auto mb-1">
+                          <span className="text-xs font-bold text-sky-800 dark:text-sky-200">RV</span>
+                        </div>
+                        <div className="text-[9px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">COO</div>
+                        <div className="text-xs font-bold text-gray-900 dark:text-white">Rafael Vilela</div>
+                      </div>
+                    </>
+                  )}
+                  <DepartmentColumn
+                    dept={dept}
+                    selectedTeamKey={selectedTeamKey}
+                    onSelectTeam={handleSelectTeam}
+                    viewMode={viewMode}
+                    searchQuery={searchQuery}
+                  />
+                </div>
               ))}
             </div>
           ) : (
