@@ -122,10 +122,10 @@ const DEFAULT_ORCADO_ADS = {
   investimento: 95500,
   impressoes: 955000,
   ctr: 0.009,
-  cps: 13.07,
   cliques: 89843,
-  cliquesSaida: 8595,
   cpm: 100,
+  videoHook: 0,
+  videoHold: 0,
   visualizacoesPagina: 0,
   taxaConversaoPagina: 0,
   connectRate: 0,
@@ -173,8 +173,8 @@ const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   cpm: { segment: 'ads', key: 'cpm' },
   impressoes: { segment: 'ads', key: 'impressoes' },
   ctr: { segment: 'ads', key: 'ctr' },
-  cliques_saida: { segment: 'ads', key: 'cliquesSaida' },
-  cps: { segment: 'ads', key: 'cps' },
+  video_hook: { segment: 'ads', key: 'videoHook' },
+  video_hold: { segment: 'ads', key: 'videoHold' },
   visualizacoes_pagina: { segment: 'ads', key: 'visualizacoesPagina' },
   taxa_conversao_pagina: { segment: 'ads', key: 'taxaConversaoPagina' },
   connect_rate: { segment: 'ads', key: 'connectRate' },
@@ -464,10 +464,10 @@ export default function GrowthOrcadoRealizado() {
     investimento: number;
     impressoes: number;
     cliques: number;
-    cliquesSaida: number;
     cpm: number;
     ctr: number;
-    cps: number;
+    videoHook: number;
+    videoHold: number;
     connectRate: number;
     visualizacoesPagina: number;
     leads: number;
@@ -668,10 +668,10 @@ export default function GrowthOrcadoRealizado() {
     return [
       { id: 'investimento', name: 'Investimento', type: 'manual', orcado: ORCADO_ADS.investimento, realizado: data.investimento ?? 0, percentual: calcPercentual(ORCADO_ADS.investimento, data.investimento), format: 'currency' },
       { id: 'cpm', name: 'CPM', type: 'formula', orcado: ORCADO_ADS.cpm, realizado: data.cpm ?? null, percentual: calcPercentual(ORCADO_ADS.cpm, data.cpm), format: 'currency' },
+      { id: 'video_hook', name: 'Vídeo Hook', type: 'formula', orcado: ORCADO_ADS.videoHook, realizado: data.videoHook ?? null, percentual: calcPercentual(ORCADO_ADS.videoHook, data.videoHook), format: 'percent' },
+      { id: 'video_hold', name: 'Vídeo Hold', type: 'formula', orcado: ORCADO_ADS.videoHold, realizado: data.videoHold ?? null, percentual: calcPercentual(ORCADO_ADS.videoHold, data.videoHold), format: 'percent' },
       { id: 'impressoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.impressoes, realizado: data.impressoes ?? 0, percentual: calcPercentual(ORCADO_ADS.impressoes, data.impressoes), format: 'number' },
       { id: 'ctr', name: 'CTR', type: 'manual', orcado: ORCADO_ADS.ctr, realizado: data.ctr ?? null, percentual: calcPercentual(ORCADO_ADS.ctr, data.ctr), format: 'percent' },
-      { id: 'cliques_saida', name: 'Cliques de Saída', type: 'formula', orcado: ORCADO_ADS.cliquesSaida, realizado: data.cliquesSaida ?? 0, percentual: calcPercentual(ORCADO_ADS.cliquesSaida, data.cliquesSaida), format: 'number' },
-      { id: 'cps', name: 'CPS', type: 'formula', orcado: ORCADO_ADS.cps, realizado: data.cps ?? null, percentual: calcPercentual(ORCADO_ADS.cps, data.cps), format: 'currency' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0), format: 'percent' },
       { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
@@ -1020,8 +1020,8 @@ export default function GrowthOrcadoRealizado() {
       cpm: prevAds_.cpm,
       impressoes: prevAds_.impressoes,
       ctr: prevAds_.ctr,
-      cliques_saida: prevAds_.cliquesSaida,
-      cps: prevAds_.cps,
+      video_hook: prevAds_.videoHook,
+      video_hold: prevAds_.videoHold,
       visualizacoes_pagina: prevAds_.visualizacoesPagina,
       connect_rate: prevAds_.connectRate,
       leads: prevAds_.leads,
