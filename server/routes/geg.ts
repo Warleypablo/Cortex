@@ -1060,6 +1060,12 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
           continue;
         }
 
+        // Skip Tech members inside Commerce setor — they belong to Tech department
+        if (squad.includes("Tech") && setor === "Commerce") {
+          techSitesMembers.push(member);
+          continue;
+        }
+
         // Commerce (default for "Commerce" setor or known squads)
         if (setor === "Commerce" || knownCommerceSquads.some(s => squad.includes(s))) {
           // Map CX&CS to Customer Success
@@ -1084,6 +1090,21 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
 
       // Commerce
       if (commerceTeams.size > 0) {
+        // Set default leaders for teams without one detected from cargo
+        const csTeam = commerceTeams.get("Customer Success");
+        if (csTeam && !csTeam.leader) {
+          // Find Maria Dias in members and promote to leader
+          const mariaIdx = csTeam.members.findIndex(m => m.nome.toLowerCase().includes("maria") && m.nome.toLowerCase().includes("dias"));
+          if (mariaIdx >= 0) {
+            csTeam.leader = csTeam.members[mariaIdx].nome;
+            csTeam.leaderCargo = "Líder";
+            csTeam.members.splice(mariaIdx, 1);
+          } else {
+            csTeam.leader = "Maria Dias";
+            csTeam.leaderCargo = "Líder";
+          }
+        }
+
         const sortOrder = ["Squadra", "Makers", "Pulse", "Selva", "Black Sheep", "Customer Success", "Squad I.A"];
         const sorted = Array.from(commerceTeams.values()).sort((a, b) => {
           const ai = sortOrder.indexOf(a.name);
@@ -1093,16 +1114,16 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         departments.push({ name: "Commerce", color: "purple", teams: sorted });
       }
 
-      // Tech
-      const techTeams: Team[] = [];
-      if (techSitesMembers.length > 0 || techSitesLeader) {
-        techTeams.push({ name: "Tech Sites", leader: techSitesLeader, leaderCargo: techSitesLeaderCargo, members: techSitesMembers });
-      }
-      if (techInternoMembers.length > 0 || techInternoLeader) {
-        techTeams.push({ name: "Tech Interno", leader: techInternoLeader, leaderCargo: techInternoLeaderCargo, members: techInternoMembers });
-      }
-      if (techTeams.length > 0) {
-        departments.push({ name: "Tech", color: "blue", teams: techTeams });
+      // Tech — single unified team with Breno as leader
+      const allTechMembers = [...techSitesMembers, ...techInternoMembers];
+      // Remove Breno from members (he's the leader)
+      const techMembersFiltered = allTechMembers.filter(m => !m.nome.toLowerCase().includes("breno"));
+      if (techMembersFiltered.length > 0 || techSitesLeader || techInternoLeader) {
+        departments.push({
+          name: "Tech",
+          color: "blue",
+          teams: [{ name: "Tech", leader: "Breno Carmo", leaderCargo: "Líder", members: techMembersFiltered }],
+        });
       }
 
       // Comercial
