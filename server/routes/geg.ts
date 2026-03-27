@@ -1047,7 +1047,7 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
           continue;
         }
 
-        // Comercial — Vendas vs Pré-Vendas
+        // Comercial — Inside Sales vs Pré-Vendas
         if (squad === "Vendas" || cargo.toLowerCase().includes("inside sales") || cargo.toLowerCase().includes("closer")) {
           if (isLeader(cargo)) { comercialVendasLeader = nome; comercialVendasLeaderCargo = cargo; }
           else comercialVendas.push(member);
@@ -1108,10 +1108,10 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       // Comercial
       const comercialTeams: Team[] = [];
       if (comercialPreVendas.length > 0 || comercialPreVendasLeader) {
-        comercialTeams.push({ name: "Pré-Vendas", leader: comercialPreVendasLeader, leaderCargo: comercialPreVendasLeaderCargo, members: comercialPreVendas });
+        comercialTeams.push({ name: "Pré-Vendas", leader: comercialPreVendasLeader || "Lucas Pereira", leaderCargo: comercialPreVendasLeaderCargo, members: comercialPreVendas });
       }
       if (comercialVendas.length > 0 || comercialVendasLeader) {
-        comercialTeams.push({ name: "Vendas", leader: comercialVendasLeader, leaderCargo: comercialVendasLeaderCargo, members: comercialVendas });
+        comercialTeams.push({ name: "Inside Sales", leader: comercialVendasLeader || "João Guarçoni", leaderCargo: comercialVendasLeaderCargo, members: comercialVendas });
       }
       if (comercialTeams.length > 0) {
         departments.push({ name: "Comercial", color: "emerald", teams: comercialTeams });
