@@ -480,7 +480,7 @@ export default function Organograma() {
   });
 
   // ── Zoom & drag state ─────────────────────────────────────────────
-  const [scale, setScale] = useState(0.75);
+  const [scale, setScale] = useState(0.55);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -504,8 +504,8 @@ export default function Organograma() {
   useEffect(() => {
     if (data && containerRef.current && !hasAutocentered) {
       const containerWidth = containerRef.current.clientWidth;
-      setPosition({ x: containerWidth * 0.05, y: 20 });
-      setScale(0.75);
+      setPosition({ x: 0, y: 10 });
+      setScale(0.55);
       setHasAutocentered(true);
     }
   }, [data, hasAutocentered]);
@@ -526,8 +526,8 @@ export default function Organograma() {
 
   const fitToScreen = () => {
     const containerWidth = containerRef.current?.clientWidth ?? 0;
-    setScale(0.75);
-    setPosition({ x: containerWidth * 0.05, y: 20 });
+    setScale(0.55);
+    setPosition({ x: 0, y: 10 });
   };
 
   const searchQuery = search.toLowerCase().trim();
