@@ -67,6 +67,7 @@ const ChatAtendimento = lazyWithRetry(() => import("@/pages/ChatAtendimento"));
 const VisaoGeral = lazyWithRetry(() => import("@/pages/VisaoGeral"));
 const DashboardGeG = lazyWithRetry(() => import("@/pages/DashboardGeG"));
 const CalendarioFerias = lazyWithRetry(() => import("@/pages/CalendarioFerias"));
+const Organograma = lazyWithRetry(() => import("@/pages/Organograma"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
 const ChurnPredicao = lazyWithRetry(() => import("@/pages/ChurnPredicao"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
@@ -317,6 +318,7 @@ function ProtectedRouter() {
       <Route path="/rh/pesquisas">{() => <ProtectedRoute path="/rh/pesquisas" component={PesquisasGG} />}</Route>
       <Route path="/rh/nps/responder">{() => <ProtectedRoute path="/rh/nps/responder" component={NpsPesquisa} />}</Route>
       <Route path="/gg/calendario-ferias">{() => <ProtectedRoute path="/gg/calendario-ferias" component={CalendarioFerias} />}</Route>
+      <Route path="/gg/organograma">{() => <ProtectedRoute path="/gg/organograma" component={Organograma} />}</Route>
 
       {/* Operação */}
       <Route path="/operacao/onboardings">{() => <ProtectedRoute path="/operacao/onboardings" component={OnboardingsClientes} />}</Route>
