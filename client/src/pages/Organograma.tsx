@@ -474,6 +474,11 @@ export default function Organograma() {
     localStorage.setItem('orgchart-view', viewMode);
   }, [viewMode]);
 
+  // ── Data query (must be before any useEffect that references `data`) ──
+  const { data, isLoading, error } = useQuery<OrgData>({
+    queryKey: ["/api/geg/organograma"],
+  });
+
   // ── Zoom & drag state ─────────────────────────────────────────────
   const [scale, setScale] = useState(0.75);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -506,7 +511,6 @@ export default function Organograma() {
   }, [data, hasAutocentered]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only start drag on canvas background, not on interactive elements
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('[role="button"]')) return;
     setIsDragging(true);
@@ -525,10 +529,6 @@ export default function Organograma() {
     setScale(0.75);
     setPosition({ x: containerWidth * 0.05, y: 20 });
   };
-
-  const { data, isLoading, error } = useQuery<OrgData>({
-    queryKey: ["/api/geg/organograma"],
-  });
 
   const searchQuery = search.toLowerCase().trim();
 
