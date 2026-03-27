@@ -285,23 +285,36 @@ function DepartmentColumn({
                     onClick={() => onSelectTeam(key, dept)}
                     dimmed={!!searchQuery && !matched}
                   />
-                  {/* Expanded: show members inline below each team */}
+                  {/* Expanded: show members grouped by cargo */}
                   {viewMode === 'expandido' && (
-                    <div className={cn("mt-1 border-l-2 pl-2 pb-1 space-y-0.5 self-stretch", styles.teamBorder)}>
+                    <div className={cn("mt-1 border-l-2 pl-2 pb-1 self-stretch", styles.teamBorder)}>
                       {team.leader && (
                         <div className="flex items-center gap-1.5 py-0.5">
                           <Crown className="w-3 h-3 text-amber-500 shrink-0" />
                           <span className="text-[10px] font-medium truncate">{team.leader.split(' ').slice(0, 2).join(' ')}</span>
                         </div>
                       )}
-                      {team.members.map((m) => (
-                        <div key={m.nome} className="flex items-center gap-1.5 py-0.5">
-                          <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center shrink-0">
-                            <span className="text-[7px] font-medium">{getInitials(m.nome)}</span>
+                      {(() => {
+                        const grouped: Record<string, Member[]> = {};
+                        for (const m of team.members) {
+                          const c = m.cargo || 'Outros';
+                          if (!grouped[c]) grouped[c] = [];
+                          grouped[c].push(m);
+                        }
+                        return Object.entries(grouped).map(([cargo, members]) => (
+                          <div key={cargo} className="mt-1">
+                            <div className="text-[8px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">{cargo}</div>
+                            {members.map((m) => (
+                              <div key={m.nome} className="flex items-center gap-1.5 py-0.5 pl-1">
+                                <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                  <span className="text-[7px] font-medium">{getInitials(m.nome)}</span>
+                                </div>
+                                <span className="text-[10px] truncate">{m.nome.split(' ').slice(0, 2).join(' ')}</span>
+                              </div>
+                            ))}
                           </div>
-                          <span className="text-[10px] truncate">{m.nome.split(' ').slice(0, 2).join(' ')}</span>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   )}
                 </div>
@@ -389,26 +402,38 @@ function TeamDrawer({
             </div>
           )}
 
-          {/* Members */}
-          <div className="space-y-1">
-            {team.members.map((m, i) => (
-              <div
-                key={`${m.nome}-${i}`}
-                className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-zinc-300 shrink-0">
-                  {getInitials(m.nome)}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm text-gray-900 dark:text-white truncate">
-                    {m.nome.split(" ").slice(0, 2).join(" ")}
+          {/* Members grouped by cargo */}
+          <div className="space-y-3">
+            {(() => {
+              const grouped: Record<string, Member[]> = {};
+              for (const m of team.members) {
+                const c = m.cargo || 'Outros';
+                if (!grouped[c]) grouped[c] = [];
+                grouped[c].push(m);
+              }
+              return Object.entries(grouped).map(([cargo, members]) => (
+                <div key={cargo}>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 px-1">
+                    {cargo} ({members.length})
                   </div>
-                  <div className="text-[11px] text-muted-foreground truncate">
-                    {m.cargo}
+                  <div className="space-y-0.5">
+                    {members.map((m, i) => (
+                      <div
+                        key={`${m.nome}-${i}`}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-zinc-300 shrink-0">
+                          {getInitials(m.nome)}
+                        </div>
+                        <div className="text-sm text-gray-900 dark:text-white truncate">
+                          {m.nome.split(" ").slice(0, 2).join(" ")}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
+              ));
+            })()}
             {team.members.length === 0 && !team.leader && (
               <div className="text-sm text-muted-foreground text-center py-4">
                 Sem membros cadastrados
