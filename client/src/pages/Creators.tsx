@@ -206,11 +206,14 @@ function SignersTooltip({
     return "Pendente";
   };
 
-  // Build the two known signers from contract data
+  // Build known signers from contract data (apenas creator + sócio, cliente não assina)
+  const SOCIO_EMAIL = "rodrigo.queiroz@turbopartners.com.br";
   const parties = [
     { role: "Creator", name: creatorNome, email: creatorEmail },
-    ...(clienteNome ? [{ role: "Cliente", name: clienteNome, email: "" }] : []),
+    { role: "Turbo Partners", name: "Rodrigo Queiroz", email: SOCIO_EMAIL },
   ];
+  // Emails to exclude from "extra signers" (client should not appear)
+  const knownEmails = new Set(parties.map(p => p.email?.toLowerCase()).filter(Boolean));
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -243,9 +246,9 @@ function SignersTooltip({
                 </div>
               );
             })}
-            {/* Show any extra signers from Assinafy not matched to known parties */}
-            {apiSigners && apiSigners
-              .filter((s) => !parties.some((p) => p.email && s.email?.toLowerCase() === p.email.toLowerCase()))
+            {/* Extra signers from Assinafy not in known parties — hidden (only creator + sócio matter) */}
+            {false && apiSigners && apiSigners
+              .filter((s) => !knownEmails.has(s.email?.toLowerCase() || ''))
               .map((s, i) => {
                 const { icon, cls } = statusIcon(s.status);
                 return (
