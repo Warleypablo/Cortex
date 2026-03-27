@@ -1049,16 +1049,14 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
           continue;
         }
 
-        // Comercial — Inside Sales vs Pré-Vendas
-        if (squad === "Vendas" || cargo.toLowerCase().includes("inside sales") || cargo.toLowerCase().includes("closer")) {
-          if (isLeader(cargo)) { comercialVendasLeader = nome; comercialVendasLeaderCargo = cargo; }
-          else comercialVendas.push(member);
+        // Comercial — Pré-Vendas vs Vendas (check cargo FIRST, then squad as fallback)
+        if (cargo.toLowerCase().includes("pré-venda") || cargo.toLowerCase().includes("pre-venda") || cargo.toLowerCase().includes("sdr")) {
+          comercialPreVendas.push(member);
           continue;
         }
 
-        if (cargo.toLowerCase().includes("pré-venda") || cargo.toLowerCase().includes("pre-venda") || cargo.toLowerCase().includes("sdr")) {
-          if (isLeader(cargo)) { comercialPreVendasLeader = nome; comercialPreVendasLeaderCargo = cargo; }
-          else comercialPreVendas.push(member);
+        if (cargo.toLowerCase().includes("inside sales") || cargo.toLowerCase().includes("closer") || squad === "Vendas") {
+          comercialVendas.push(member);
           continue;
         }
 
