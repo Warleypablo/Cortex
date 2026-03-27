@@ -79,6 +79,7 @@ function PortalContent() {
 
   // Perfil form
   const [perfilForm, setPerfilForm] = useState({
+    nome: "", email: "", cpf: "", cnpj: "",
     chave_pix: "", tipo_pix: "", endereco: "", cidade: "", estado: "", cep: "",
   });
   const [perfilDirty, setPerfilDirty] = useState(false);
@@ -140,6 +141,10 @@ function PortalContent() {
 
   function initPerfilForm(c: CreatorUser) {
     setPerfilForm({
+      nome: c.nome || "",
+      email: c.email || "",
+      cpf: c.cpf || "",
+      cnpj: c.cnpj || "",
       chave_pix: c.chave_pix || "",
       tipo_pix: c.tipo_pix || "",
       endereco: c.endereco || "",
@@ -315,23 +320,51 @@ function PortalContent() {
           <div className={`rounded-xl border p-6 space-y-5 ${isDark ? "border-zinc-800 bg-zinc-900" : "border-gray-200 bg-white"}`}>
             <h2 className="text-lg font-semibold">Meu Perfil</h2>
 
-            {/* Read-only fields */}
+            {/* Dados Pessoais */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {([
-                { label: "Nome", value: creator.nome },
-                { label: "Email", value: creator.email },
-                { label: "CPF/CNPJ", value: creator.cnpj || creator.cpf || "—" },
-              ]).map(({ label, value }) => (
-                <div key={label}>
-                  <label className={`text-xs font-medium ${isDark ? "text-white/50" : "text-gray-500"}`}>{label}</label>
-                  <p className="text-sm mt-1">{value}</p>
-                </div>
-              ))}
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}>Nome</label>
+                <input
+                  type="text"
+                  value={perfilForm.nome}
+                  onChange={(e) => { setPerfilForm(f => ({ ...f, nome: e.target.value })); setPerfilDirty(true); }}
+                  className={`w-full rounded-lg px-3 py-2 text-sm border ${isDark ? "bg-zinc-800 border-zinc-700" : "bg-white border-gray-300"}`}
+                />
+              </div>
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}>Email</label>
+                <input
+                  type="email"
+                  value={perfilForm.email}
+                  onChange={(e) => { setPerfilForm(f => ({ ...f, email: e.target.value })); setPerfilDirty(true); }}
+                  className={`w-full rounded-lg px-3 py-2 text-sm border ${isDark ? "bg-zinc-800 border-zinc-700" : "bg-white border-gray-300"}`}
+                />
+              </div>
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}>CPF</label>
+                <input
+                  type="text"
+                  value={perfilForm.cpf}
+                  onChange={(e) => { setPerfilForm(f => ({ ...f, cpf: e.target.value })); setPerfilDirty(true); }}
+                  placeholder="000.000.000-00"
+                  className={`w-full rounded-lg px-3 py-2 text-sm border ${isDark ? "bg-zinc-800 border-zinc-700" : "bg-white border-gray-300"}`}
+                />
+              </div>
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}>CNPJ</label>
+                <input
+                  type="text"
+                  value={perfilForm.cnpj}
+                  onChange={(e) => { setPerfilForm(f => ({ ...f, cnpj: e.target.value })); setPerfilDirty(true); }}
+                  placeholder="00.000.000/0000-00"
+                  className={`w-full rounded-lg px-3 py-2 text-sm border ${isDark ? "bg-zinc-800 border-zinc-700" : "bg-white border-gray-300"}`}
+                />
+              </div>
             </div>
 
             <hr className={isDark ? "border-zinc-800" : "border-gray-200"} />
 
-            {/* Editable fields */}
+            {/* Endereço e PIX */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className={`block text-xs font-medium mb-1 ${isDark ? "text-white/50" : "text-gray-500"}`}>Tipo PIX</label>
