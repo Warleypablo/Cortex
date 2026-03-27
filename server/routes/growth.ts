@@ -1671,6 +1671,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
+      // UTM Source filter
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      let utmSourceFilter = sql``;
+      if (utmSourceParam && utmSourceParam !== 'todos') {
+        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
+      }
+
       // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
       const prodCountExpr = "CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1 ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END";
       const countNovos = contagem === 'contrato'
@@ -1720,6 +1727,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${mqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 2. Reuniões Agendadas = data_reuniao_agendada no período
@@ -1732,6 +1740,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${mqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 3. Reuniões Realizadas = data_fechamento no período + stage >= RR
@@ -1744,6 +1753,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${stagesRrPlus}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 4. Novos Clientes + Faturamento = data_fechamento no período + Negócio Ganho
@@ -1770,6 +1780,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${mqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       const totalMqls = parseInt((totalResult.rows[0] as any).total_mqls) || 0;
@@ -1849,6 +1860,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
+      // UTM Source filter
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      let utmSourceFilter = sql``;
+      if (utmSourceParam && utmSourceParam !== 'todos') {
+        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
+      }
+
       // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
       const prodCountExpr = "CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1 ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END";
       const countNovos = contagem === 'contrato'
@@ -1898,6 +1916,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${naoMqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 2. Reuniões Agendadas = data_reuniao_agendada no período
@@ -1910,6 +1929,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${naoMqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 3. Reuniões Realizadas = data_fechamento no período + stage >= RR
@@ -1922,6 +1942,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${stagesRrPlus}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 4. Novos Clientes + Faturamento = data_fechamento no período + Negócio Ganho
@@ -1948,6 +1969,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${naoMqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       const totalNaoMqls = parseInt((totalResult.rows[0] as any).total_nao_mqls) || 0;
@@ -2195,6 +2217,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             OR LOWER(d.utm_source) = 'gads'
           )`;
 
+      // UTM Source filter for Ads leads
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      let utmSourceFilter = sql``;
+      if (utmSourceParam && utmSourceParam !== 'todos') {
+        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
+      }
+
       const leadsResult = await db.execute(sql`
         SELECT
           ${countExpr} as total_leads,
@@ -2204,6 +2233,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
           ${utmFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       const leadsRow = leadsResult.rows[0] as any;
