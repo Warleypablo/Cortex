@@ -203,6 +203,7 @@ export default function GrowthOrcadoRealizado() {
     to: endOfMonth(hoje),
   });
   const [cardFilter, setCardFilter] = useState<'todos' | 'mql' | 'nao-mql'>('todos');
+  const [activeSection, setActiveSection] = useState<'consolidado' | 'marketing' | 'mql' | 'nao-mql'>('consolidado');
   const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
   const [contagemFilter, setContagemFilter] = useState<'contrato' | 'cliente'>('contrato');
   const [selectedFunis, setSelectedFunis] = useState<string[]>([]);
@@ -1408,9 +1409,33 @@ export default function GrowthOrcadoRealizado() {
         </Card>
       </div>
 
+      {/* Tabs de Seção */}
+      <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 w-fit">
+        {([
+          { key: 'consolidado', label: 'Consolidado' },
+          { key: 'marketing', label: 'Marketing' },
+          { key: 'mql', label: 'Vendas MQL' },
+          { key: 'nao-mql', label: 'Vendas Não-MQL' },
+        ] as const).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveSection(tab.key)}
+            className={cn(
+              "px-4 py-2 rounded-md text-sm font-medium transition-all",
+              activeSection === tab.key
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Tabelas de Métricas */}
       <div className="space-y-6">
         {/* Consolidado */}
+        {activeSection === 'consolidado' && (
         <Card className="border bg-card">
           <CardHeader className="pb-3 border-b">
             <div className="flex items-center justify-between">
@@ -1486,8 +1511,10 @@ export default function GrowthOrcadoRealizado() {
             </Table>
           </CardContent>
         </Card>
+        )}
 
         {/* Marketing — Ads */}
+        {activeSection === 'marketing' && (
         <Card className="border bg-card">
           <CardHeader className="pb-3 border-b">
             <div className="flex items-center justify-between">
@@ -1552,9 +1579,10 @@ export default function GrowthOrcadoRealizado() {
             </Table>
           </CardContent>
         </Card>
+        )}
 
         {/* Vendas — MQL */}
-        {cardFilter !== 'nao-mql' && (
+        {activeSection === 'mql' && cardFilter !== 'nao-mql' && (
         <Card className="border bg-card">
           <CardHeader className="pb-3 border-b">
             <div className="flex items-center justify-between">
@@ -1622,7 +1650,7 @@ export default function GrowthOrcadoRealizado() {
         )}
 
         {/* Vendas — Não-MQL */}
-        {cardFilter !== 'mql' && (
+        {activeSection === 'nao-mql' && cardFilter !== 'mql' && (
         <Card className="border bg-card">
           <CardHeader className="pb-3 border-b">
             <div className="flex items-center justify-between">
