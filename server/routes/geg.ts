@@ -1113,7 +1113,7 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         comercialTeams.push({ name: "Pré-Vendas", leader: comercialPreVendasLeader || "Lucas Pereira", leaderCargo: comercialPreVendasLeaderCargo, members: comercialPreVendas });
       }
       if (comercialVendas.length > 0 || comercialVendasLeader) {
-        comercialTeams.push({ name: "Inside Sales", leader: comercialVendasLeader || "João Guarçoni", leaderCargo: comercialVendasLeaderCargo, members: comercialVendas });
+        comercialTeams.push({ name: "Vendas", leader: comercialVendasLeader || "João Guarçoni", leaderCargo: comercialVendasLeaderCargo, members: comercialVendas });
       }
       if (comercialTeams.length > 0) {
         departments.push({ name: "Comercial", color: "emerald", teams: comercialTeams });
@@ -1124,7 +1124,7 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         departments.push({
           name: "Growth",
           color: "orange",
-          teams: [{ name: "Growth Interno", leader: growthLeader, leaderCargo: growthLeaderCargo, members: growthMembers }],
+          teams: [{ name: "Growth Interno", leader: growthLeader || "Lucas Pereira", leaderCargo: growthLeaderCargo || "Líder", members: growthMembers }],
         });
       }
 
