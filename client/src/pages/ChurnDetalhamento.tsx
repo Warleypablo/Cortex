@@ -156,6 +156,8 @@ interface ChurnDetalhamentoData {
     churn_por_cluster?: ChurnBreakdownItem[];
     churn_por_plano?: ChurnBreakdownItem[];
     periodo_referencia?: string;
+    mrr_base_por_mes?: Record<string, number>;
+    soma_mrr_bases?: number;
     total_abonado?: number;
     mrr_abonado?: number;
   };
@@ -735,12 +737,15 @@ export default function ChurnDetalhamento() {
 
   // MRR base dinâmico: usa MRR real do período quando disponível
   const mrrBaseReal = data?.metricas?.mrr_ativo_ref ?? 0;
+  // Soma dos MRR bases de cada mês (para média ponderada em ranges multi-mês)
+  const somaMrrBases = data?.metricas?.soma_mrr_bases ?? mrrBaseReal;
 
   const filteredTaxaChurn = useMemo(() => {
-    const mrrBase = mrrBaseReal;
+    // Usar soma dos MRR bases para média ponderada correta em ranges multi-mês
+    const mrrBase = somaMrrBases > 0 ? somaMrrBases : mrrBaseReal;
     const mrrPerdido = filteredMetricas.mrr_perdido;
     return mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
-  }, [filteredMetricas.mrr_perdido, mrrBaseReal]);
+  }, [filteredMetricas.mrr_perdido, somaMrrBases, mrrBaseReal]);
 
   // Meta planejada pro-rateada até hoje (BP 2026) — DINÂMICA baseada no MRR real
   const churnPlanejado = useMemo(() => {
@@ -2011,13 +2016,19 @@ export default function ChurnDetalhamento() {
                   )}
                 </div>
                 
-                <div className="flex-1 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 flex flex-col justify-center">
+                <div className="flex-1 p-4 bg-purple-50 dark:bg-purple-950/30 rounded-xl border border-purple-100 dark:border-purple-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">MRR Base Referência</span>
-                    <Target className="h-4 w-4 text-blue-500" />
+                    <span className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase">Churn Total</span>
+                    <Target className="h-4 w-4 text-purple-500" />
                   </div>
-                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(mrrBaseReal)}</div>
-                  <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">MRR ativo real do período</div>
+                  <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(filteredMetricas.mrr_perdido + (data?.metricas?.mrr_abonado ?? 0))}</div>
+                  <div className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
+                    {filteredMetricas.total_churned + (data?.metricas?.total_abonado ?? 0)} contratos (MRR Perdido + Abonado)
+                  </div>
+                  <div className="flex items-center gap-3 text-xs mt-2">
+                    <span className="text-red-500">Perdido: {formatCurrency(filteredMetricas.mrr_perdido)}</span>
+                    <span className="text-amber-500">Abonado: {formatCurrency(data?.metricas?.mrr_abonado ?? 0)}</span>
+                  </div>
                 </div>
               </div>
 

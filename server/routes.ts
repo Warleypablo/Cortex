@@ -42,11 +42,13 @@ import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
+import { registerGrowthAiRoutes } from "./routes/growth-ai";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
+import { registerInstagramRoutes } from "./routes/instagram";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -421,6 +423,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Portal Creator routes (before isAuthenticated — uses own session auth)
   registerPortalCreatorRoutes(app);
+
+  // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
+  registerInstagramRoutes(app, db, storage);
 
   app.use("/api", isAuthenticated);
 
@@ -2145,7 +2150,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
         ORDER BY mes, squad, responsavel_geral
@@ -4580,7 +4585,8 @@ Estruture sua resposta em:
         const motivo = row.motivo_cancelamento || 'Não especificado';
         const isAbonado = row.abonar_churn === 'Sim' ||
           motivo === 'Inadimplente 1º Mês' ||
-          motivo === 'Não começou';
+          motivo === 'Não começou' ||
+          motivo === 'Erro na Venda';
 
         return {
           id: row.task_id,
@@ -4643,51 +4649,75 @@ Estruture sua resposta em:
       const totalAbonado = contratosAbonados.length;
       const mrrAbonado = contratosAbonados.reduce((sum: number, c: any) => sum + c.valorr, 0);
 
-      // MRR ativo de referência via cup_data_hist
-      let refDate: Date;
-      if (startDate) {
-        refDate = new Date(startDate);
-        refDate.setMonth(refDate.getMonth() - 1);
-        refDate.setDate(1);
-      } else {
-        refDate = new Date();
-        refDate.setMonth(refDate.getMonth() - 1);
-        refDate.setDate(1);
+      // MRR ativo de referência via cup_data_hist — mês a mês
+      // Determinar os meses abrangidos pelo período de churn
+      // Parse dates manually to avoid UTC timezone issues (new Date("2026-03-01") is UTC, which shifts to previous day in Brazil)
+      const parseDateLocal = (d: string) => { const [y, m, day] = d.split('-').map(Number); return new Date(y, m - 1, day); };
+      const periodStart = startDate ? parseDateLocal(startDate) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      const periodEnd = endDate ? parseDateLocal(endDate) : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+
+      // Gerar lista de meses no range (YYYY-MM)
+      const mesesNoRange: string[] = [];
+      const cursor = new Date(periodStart.getFullYear(), periodStart.getMonth(), 1);
+      while (cursor <= periodEnd) {
+        mesesNoRange.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
+        cursor.setMonth(cursor.getMonth() + 1);
       }
 
-      const refEndDate = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0);
-      const refDateStr = refEndDate.toISOString().split('T')[0];
+      // Para cada mês no range, buscar MRR base do mês anterior (último snapshot)
+      const mrrBasePorMes: Record<string, { total: number; por_squad: Record<string, number> }> = {};
 
-      const inicioMesRef = new Date(refDate.getFullYear(), refDate.getMonth(), 1);
-      const fimMesRef = new Date(refDate.getFullYear(), refDate.getMonth() + 1, 0, 23, 59, 59);
+      for (const mesKey of mesesNoRange) {
+        const [ano, mes] = mesKey.split('-').map(Number);
+        // Mês anterior = mês de referência para o MRR base
+        const refMonth = mes === 1 ? 12 : mes - 1;
+        const refYear = mes === 1 ? ano - 1 : ano;
+        const inicioRef = new Date(refYear, refMonth - 1, 1);
+        const fimRef = new Date(refYear, refMonth, 0, 23, 59, 59);
 
-      const mrrAtivoResult = await db.execute(sql`
-        WITH ultimo_snapshot AS (
-          SELECT MAX(data_snapshot) as data_ultimo_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE data_snapshot >= ${inicioMesRef}::timestamp
-            AND data_snapshot <= ${fimMesRef}::timestamp
-        )
-        SELECT
-          COALESCE(h.squad, 'Não especificado') as squad,
-          COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
-        FROM ultimo_snapshot us
-        JOIN "Clickup".cup_data_hist h
-          ON h.data_snapshot = us.data_ultimo_snapshot
-          AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
-          AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
-        GROUP BY COALESCE(h.squad, 'Não especificado')
-      `);
+        const mrrResult = await db.execute(sql`
+          WITH ultimo_snapshot AS (
+            SELECT MAX(data_snapshot) as data_ultimo_snapshot
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioRef}::timestamp
+              AND data_snapshot <= ${fimRef}::timestamp
+          )
+          SELECT
+            COALESCE(h.squad, 'Não especificado') as squad,
+            COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
+          FROM ultimo_snapshot us
+          JOIN "Clickup".cup_data_hist h
+            ON h.data_snapshot = us.data_ultimo_snapshot
+            AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
+            AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+          GROUP BY COALESCE(h.squad, 'Não especificado')
+        `);
 
+        const porSquad: Record<string, number> = {};
+        let totalMes = 0;
+        for (const row of mrrResult.rows as any[]) {
+          const squadName = row.squad || 'Não especificado';
+          const mrr = Number(row.mrr_ativo) || 0;
+          porSquad[squadName] = mrr;
+          totalMes += mrr;
+        }
+        mrrBasePorMes[mesKey] = { total: totalMes, por_squad: porSquad };
+      }
+
+      // MRR base agregado = soma dos MRR base de cada mês (para média ponderada)
       const mrrAtivoPorSquad: Record<string, number> = {};
       let mrrAtivoTotal = 0;
 
-      for (const row of mrrAtivoResult.rows as any[]) {
-        const squadName = row.squad || 'Não especificado';
-        const mrr = Number(row.mrr_ativo) || 0;
-        mrrAtivoPorSquad[squadName] = mrr;
-        mrrAtivoTotal += mrr;
+      // Para exibição e cálculo de churn por squad, usar o MRR base do primeiro mês (referência principal)
+      const primeiroMes = mesesNoRange[0];
+      const mrrBasePrimeiro = mrrBasePorMes[primeiroMes] || { total: 0, por_squad: {} };
+      for (const [squad, mrr] of Object.entries(mrrBasePrimeiro.por_squad)) {
+        mrrAtivoPorSquad[squad] = mrr;
       }
+      // MRR ativo total = soma dos MRR base de todos os meses (denominador da média ponderada)
+      const somaMrrBases = Object.values(mrrBasePorMes).reduce((sum, m) => sum + m.total, 0);
+      // MRR ativo ref para o frontend = MRR base do primeiro mês (para display e cálculos de meta mensal)
+      mrrAtivoTotal = mrrBasePrimeiro.total;
 
       // MRR perdido por squad (churn)
       const mrrPerdidoPorSquad: Record<string, number> = {};
@@ -4696,14 +4726,31 @@ Estruture sua resposta em:
         mrrPerdidoPorSquad[squadName] = (mrrPerdidoPorSquad[squadName] || 0) + (contrato as any).valorr;
       }
 
-      const churnPercentualGeral = mrrAtivoTotal > 0 ? (mrrPerdidoChurn / mrrAtivoTotal) * 100 : 0;
+      // Churn percentual = média ponderada: soma MRR perdido / soma MRR bases de cada mês
+      const churnPercentualGeral = somaMrrBases > 0 ? (mrrPerdidoChurn / somaMrrBases) * 100 : 0;
 
-      const allSquadNames = Array.from(new Set([...Object.keys(mrrAtivoPorSquad), ...Object.keys(mrrPerdidoPorSquad)]));
+      // Período de referência (para display)
+      const refEndDate = new Date(
+        (primeiroMes ? parseInt(primeiroMes.split('-')[0]) : periodStart.getFullYear()),
+        (primeiroMes ? parseInt(primeiroMes.split('-')[1]) - 2 : periodStart.getMonth() - 1),
+        1
+      );
+      const refDateStr = new Date(refEndDate.getFullYear(), refEndDate.getMonth() + 1, 0).toISOString().split('T')[0];
+
+      // Soma dos MRR bases por squad (para média ponderada por squad em multi-mês)
+      const somaMrrBasesPorSquad: Record<string, number> = {};
+      for (const mesData of Object.values(mrrBasePorMes)) {
+        for (const [squad, mrr] of Object.entries(mesData.por_squad)) {
+          somaMrrBasesPorSquad[squad] = (somaMrrBasesPorSquad[squad] || 0) + mrr;
+        }
+      }
+
+      const allSquadNames = Array.from(new Set([...Object.keys(mrrAtivoPorSquad), ...Object.keys(mrrPerdidoPorSquad), ...Object.keys(somaMrrBasesPorSquad)]));
       const churnPercentualPorSquad = allSquadNames.map(squadName => ({
         squad: squadName,
         mrr_ativo: mrrAtivoPorSquad[squadName] || 0,
         mrr_perdido: mrrPerdidoPorSquad[squadName] || 0,
-        percentual: (mrrAtivoPorSquad[squadName] || 0) > 0 ? ((mrrPerdidoPorSquad[squadName] || 0) / (mrrAtivoPorSquad[squadName] || 1)) * 100 : 0,
+        percentual: (somaMrrBasesPorSquad[squadName] || 0) > 0 ? ((mrrPerdidoPorSquad[squadName] || 0) / (somaMrrBasesPorSquad[squadName] || 1)) * 100 : 0,
       })).sort((a, b) => b.percentual - a.percentual);
 
       // Retention curve
@@ -4800,6 +4847,11 @@ Estruture sua resposta em:
           churn_por_cluster: churnPorCluster,
           churn_por_plano: churnPorPlano,
           periodo_referencia: refDateStr,
+          // MRR base mês a mês para cálculo correto de churn % em ranges multi-mês
+          mrr_base_por_mes: Object.fromEntries(
+            Object.entries(mrrBasePorMes).map(([mes, data]) => [mes, data.total])
+          ),
+          soma_mrr_bases: somaMrrBases,
           // Churn abonado separado
           total_abonado: totalAbonado,
           mrr_abonado: mrrAbonado,
@@ -6015,6 +6067,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND valor_r > 0
         GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
       `);
@@ -7693,6 +7746,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
+
+  // Growth AI Module - registered from separate file
+  registerGrowthAiRoutes(app, db);
 
   // Capacity Module - registered from separate file
   registerCapacityRoutes(app, db);

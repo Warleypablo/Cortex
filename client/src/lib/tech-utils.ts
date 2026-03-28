@@ -23,13 +23,12 @@ export const PHASE_CONFIG: { key: string; label: string; color: string; patterns
   { key: "dev", label: "Desenvolvimento", color: "#3b82f6", patterns: ["dev", "desenvolvimento", "em progresso", "doing"] },
   { key: "dev_review", label: "Dev Review", color: "#6366f1", patterns: ["dev. review", "dev review", "review final", "qualidade", "configurações & review"] },
   { key: "lancamento", label: "Lançamento", color: "#10b981", patterns: ["pronto para lançar", "telas ok"] },
-  { key: "pendencias", label: "Pendências", color: "#f59e0b", patterns: ["deploy com pend", "deplay com ped"] },
   { key: "bloqueado", label: "Bloqueado / Pausado", color: "#ef4444", patterns: ["bloqueado", "pausado"] },
   { key: "aguardando", label: "Aguardando Externo", color: "#f97316", patterns: ["aguardando externo", "aguardando interno"] },
 ];
 
 // End-state statuses to exclude
-export const END_STATES = ["deploy 🚀", "deploy", "encerrado 🚀", "complete", "completo"];
+export const END_STATES = ["deploy 🚀", "deploy", "encerrado 🚀", "complete", "completo", "deploy com pendências", "deploy com pend", "deplay com ped", "bloqueado", "pausado"];
 
 export function groupStatusIntoPhases(data: PrazoPorStatus[]): PhaseGrouped[] {
   const filtered = data.filter(d => !END_STATES.includes(d.status.toLowerCase().trim()));
