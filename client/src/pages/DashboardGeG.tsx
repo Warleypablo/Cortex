@@ -402,7 +402,8 @@ function UnavailabilityApprovalSection() {
     return `${anos}a ${mesesRestantes}m`;
   };
 
-  const groupedByMonth = approvedRequests.reduce((acc, req) => {
+  const sortedApproved = [...approvedRequests].sort((a, b) => new Date(a.data_inicio).getTime() - new Date(b.data_inicio).getTime());
+  const groupedByMonth = sortedApproved.reduce((acc, req) => {
     const monthKey = format(new Date(req.data_inicio), "MMMM yyyy", { locale: ptBR });
     if (!acc[monthKey]) acc[monthKey] = [];
     acc[monthKey].push(req);

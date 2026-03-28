@@ -67,6 +67,7 @@ const ChatAtendimento = lazyWithRetry(() => import("@/pages/ChatAtendimento"));
 const VisaoGeral = lazyWithRetry(() => import("@/pages/VisaoGeral"));
 const DashboardGeG = lazyWithRetry(() => import("@/pages/DashboardGeG"));
 const CalendarioFerias = lazyWithRetry(() => import("@/pages/CalendarioFerias"));
+const Organograma = lazyWithRetry(() => import("@/pages/Organograma"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
 const ChurnPredicao = lazyWithRetry(() => import("@/pages/ChurnPredicao"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
@@ -80,6 +81,7 @@ const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
+const InstagramConexoes = lazyWithRetry(() => import("@/pages/InstagramConexoes"));
 const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
 const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
 const ContribuicaoOperador = lazyWithRetry(() => import("@/pages/ContribuicaoOperador"));
@@ -99,6 +101,7 @@ const ComercialReunioes = lazyWithRetry(() => import("@/pages/ComercialReunioes"
 const FunilVendas = lazyWithRetry(() => import("@/pages/FunilVendas"));
 const Criativos = lazyWithRetry(() => import("@/pages/Criativos"));
 const GrowthOrcadoRealizado = lazyWithRetry(() => import("@/pages/GrowthOrcadoRealizado"));
+const GrowthAI = lazyWithRetry(() => import("@/pages/GrowthAI"));
 const GrowthVisaoGeral = lazyWithRetry(() => import("@/pages/GrowthVisaoGeral"));
 const PerformancePlataformas = lazyWithRetry(() => import("@/pages/PerformancePlataformas"));
 const KeywordPerformance = lazyWithRetry(() => import("@/pages/KeywordPerformance"));
@@ -315,6 +318,7 @@ function ProtectedRouter() {
       <Route path="/rh/pesquisas">{() => <ProtectedRoute path="/rh/pesquisas" component={PesquisasGG} />}</Route>
       <Route path="/rh/nps/responder">{() => <ProtectedRoute path="/rh/nps/responder" component={NpsPesquisa} />}</Route>
       <Route path="/gg/calendario-ferias">{() => <ProtectedRoute path="/gg/calendario-ferias" component={CalendarioFerias} />}</Route>
+      <Route path="/gg/organograma">{() => <ProtectedRoute path="/gg/organograma" component={Organograma} />}</Route>
 
       {/* Operação */}
       <Route path="/operacao/onboardings">{() => <ProtectedRoute path="/operacao/onboardings" component={OnboardingsClientes} />}</Route>
@@ -346,7 +350,9 @@ function ProtectedRouter() {
       <Route path="/growth/keyword-performance">{() => <ProtectedRoute path="/growth/keyword-performance" component={KeywordPerformance} />}</Route>
       <Route path="/growth/funil-conversao">{() => <ProtectedRoute path="/growth/funil-conversao" component={FunilConversaoGrowth} />}</Route>
       <Route path="/growth/orcado-realizado">{() => <ProtectedRoute path="/growth/orcado-realizado" component={GrowthOrcadoRealizado} />}</Route>
+      <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
+      <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramConexoes} />}</Route>
       
       {/* Social (Makers) */}
       <Route path="/social/creators">{() => <ProtectedRoute path="/social/creators" component={Creators} />}</Route>

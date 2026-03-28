@@ -6,10 +6,58 @@ import { format } from "date-fns";
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
 
+// Funnel name aliases: normalized name → all DB variations
+const FUNNEL_ALIASES: Record<string, string[]> = {
+  'ecommerce': ['Ecommerce', 'E-commerce', 'ecommerce'],
+};
+
+// Expand funnel values: if a normalized name has aliases, expand to all variants
+function expandFunilValues(values: string[]): string[] {
+  const expanded: string[] = [];
+  for (const v of values) {
+    const aliases = FUNNEL_ALIASES[v.toLowerCase()];
+    if (aliases) {
+      expanded.push(...aliases);
+    } else {
+      expanded.push(v);
+    }
+  }
+  return expanded;
+}
+
 export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Ensure landing_page_views column exists
   db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
     .catch(() => { /* column may already exist */ });
+
+  // Ensure growth_budgets table exists with funil column
+  db.execute(sql`
+    CREATE TABLE IF NOT EXISTS meta_ads.growth_budgets (
+      id SERIAL PRIMARY KEY,
+      mes VARCHAR(7) NOT NULL,
+      segmento VARCHAR(20) NOT NULL,
+      funil VARCHAR(100) NOT NULL DEFAULT 'todos',
+      metricas JSONB NOT NULL DEFAULT '{}',
+      updated_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(mes, segmento, funil)
+    )
+  `).then(() => {
+    // Migration: add funil column if table already existed without it
+    return db.execute(sql`ALTER TABLE meta_ads.growth_budgets ADD COLUMN IF NOT EXISTS funil VARCHAR(100) NOT NULL DEFAULT 'todos'`);
+  }).then(() => {
+    // Drop old constraint (may not exist) and ensure new one exists
+    return db.execute(sql`ALTER TABLE meta_ads.growth_budgets DROP CONSTRAINT IF EXISTS growth_budgets_mes_segmento_key`);
+  }).then(() => {
+    return db.execute(sql`
+      DO $$ BEGIN
+        ALTER TABLE meta_ads.growth_budgets ADD CONSTRAINT growth_budgets_mes_segmento_funil_key UNIQUE(mes, segmento, funil);
+      EXCEPTION WHEN duplicate_table THEN
+        -- constraint already exists, ignore
+      END $$
+    `);
+  }).catch((err: any) => {
+    console.log("[growth] growth_budgets migration note:", err?.message || err);
+  });
 
   // Growth - Investment Data (Google Ads + Meta Ads)
   app.get("/api/growth/investimento", async (req, res) => {
@@ -1383,15 +1431,85 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   app.get("/api/growth/orcado-realizado/budgets", async (req, res) => {
     try {
       const mes = req.query.mes as string;
-      if (!mes) return res.status(400).json({ error: "mes is required (YYYY-MM)" });
-      const result = await db.execute(sql`
-        SELECT segmento, metricas FROM meta_ads.growth_budgets WHERE mes = ${mes}
-      `);
-      const budgets: Record<string, any> = {};
-      for (const row of result.rows as any[]) {
-        budgets[row.segmento] = row.metricas;
+      const funil = (req.query.funil as string) || 'todos';
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+
+      // Build list of months to query
+      let meses: string[] = [];
+      if (startDate && endDate) {
+        // Generate all YYYY-MM in range
+        const start = new Date(startDate + '-01');
+        const end = new Date(endDate + '-01');
+        const cursor = new Date(start);
+        while (cursor <= end) {
+          meses.push(format(cursor, 'yyyy-MM'));
+          cursor.setMonth(cursor.getMonth() + 1);
+        }
+      } else if (mes) {
+        meses = [mes];
+      } else {
+        return res.status(400).json({ error: "mes or startDate+endDate is required (YYYY-MM)" });
       }
-      res.json(budgets);
+
+      const result = await db.execute(sql`
+        SELECT mes, segmento, metricas FROM meta_ads.growth_budgets
+        WHERE mes IN (${sql.join(meses.map(m => sql`${m}`), sql`, `)}) AND funil = ${funil}
+      `);
+
+      // Track which months actually had data
+      const mesesComMeta = new Set<string>();
+
+      // Absolute metrics (sum across months)
+      const absoluteKeys = [
+        'reunioesAgendadas', 'reunioesRealizadas', 'novosClientes',
+        'contratosAceleracao', 'contratosImplantacao',
+        'faturamentoAceleracao', 'faturamentoImplantacao',
+        'investimento', 'impressoes', 'cliques', 'cliquesSaida',
+        'visualizacoesPagina', 'leads', 'mqls'
+      ];
+      // Percentage metrics (average across months)
+      const percentKeys = [
+        'percReuniaoAgendada', 'percNoShow', 'taxaVendas',
+        'txContratosRecorrentes', 'txContratosImplantacao',
+        'ctr', 'percMqls', 'connectRate', 'taxaConversaoPagina',
+        'cpm', 'cps', 'cpl', 'cpmql',
+        'ticketMedioAceleracao', 'ticketMedioImplantacao'
+      ];
+
+      // Group rows by segmento, then aggregate
+      const bySegmento: Record<string, any[]> = {};
+      for (const row of result.rows as any[]) {
+        mesesComMeta.add(row.mes);
+        if (!bySegmento[row.segmento]) bySegmento[row.segmento] = [];
+        bySegmento[row.segmento].push(row.metricas);
+      }
+
+      const budgets: Record<string, any> = {};
+      for (const [segmento, metricasList] of Object.entries(bySegmento)) {
+        if (metricasList.length === 1) {
+          budgets[segmento] = metricasList[0];
+        } else {
+          const aggregated: Record<string, number> = {};
+          // Sum absolute metrics
+          for (const key of absoluteKeys) {
+            aggregated[key] = metricasList.reduce((sum, m) => sum + (Number(m[key]) || 0), 0);
+          }
+          // Average percentage metrics
+          for (const key of percentKeys) {
+            const values = metricasList.filter(m => m[key] !== undefined && m[key] !== null);
+            aggregated[key] = values.length > 0
+              ? values.reduce((sum, m) => sum + (Number(m[key]) || 0), 0) / values.length
+              : 0;
+          }
+          budgets[segmento] = aggregated;
+        }
+      }
+
+      res.json({
+        ...budgets,
+        meses_com_meta: Array.from(mesesComMeta).sort()
+      });
     } catch (error) {
       console.error("[api] Error fetching budgets:", error);
       res.status(500).json({ error: "Failed to fetch budgets" });
@@ -1400,14 +1518,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
   app.put("/api/growth/orcado-realizado/budgets", async (req, res) => {
     try {
-      const { mes, segmento, metricas } = req.body;
+      const { mes, segmento, metricas, funil } = req.body;
+      const funilValue = funil || 'todos';
       if (!mes || !segmento || !metricas) {
         return res.status(400).json({ error: "mes, segmento, and metricas are required" });
       }
       await db.execute(sql`
-        INSERT INTO meta_ads.growth_budgets (mes, segmento, metricas)
-        VALUES (${mes}, ${segmento}, ${JSON.stringify(metricas)}::jsonb)
-        ON CONFLICT (mes, segmento) DO UPDATE SET
+        INSERT INTO meta_ads.growth_budgets (mes, segmento, funil, metricas)
+        VALUES (${mes}, ${segmento}, ${funilValue}, ${JSON.stringify(metricas)}::jsonb)
+        ON CONFLICT (mes, segmento, funil) DO UPDATE SET
           metricas = ${JSON.stringify(metricas)}::jsonb,
           updated_at = NOW()
       `);
@@ -1446,7 +1565,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
   app.post("/api/growth/orcado-realizado/budgets/copy", async (req, res) => {
     try {
-      const { mesOrigem, mesDestino } = req.body;
+      const { mesOrigem, mesDestino, funil } = req.body;
+      const funilValue = funil || 'todos';
       if (!mesOrigem || !mesDestino) {
         return res.status(400).json({ error: "mesOrigem and mesDestino are required (YYYY-MM)" });
       }
@@ -1454,21 +1574,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "mesOrigem and mesDestino must be different" });
       }
       const source = await db.execute(sql`
-        SELECT segmento, metricas FROM meta_ads.growth_budgets WHERE mes = ${mesOrigem}
+        SELECT segmento, metricas FROM meta_ads.growth_budgets
+        WHERE mes = ${mesOrigem} AND funil = ${funilValue}
       `);
       if ((source.rows as any[]).length === 0) {
-        return res.status(404).json({ error: `No budgets found for ${mesOrigem}` });
+        return res.status(404).json({ error: `No budgets found for ${mesOrigem} with funil ${funilValue}` });
       }
       for (const row of source.rows as any[]) {
         await db.execute(sql`
-          INSERT INTO meta_ads.growth_budgets (mes, segmento, metricas)
-          VALUES (${mesDestino}, ${row.segmento}, ${JSON.stringify(row.metricas)}::jsonb)
-          ON CONFLICT (mes, segmento) DO UPDATE SET
+          INSERT INTO meta_ads.growth_budgets (mes, segmento, funil, metricas)
+          VALUES (${mesDestino}, ${row.segmento}, ${funilValue}, ${JSON.stringify(row.metricas)}::jsonb)
+          ON CONFLICT (mes, segmento, funil) DO UPDATE SET
             metricas = ${JSON.stringify(row.metricas)}::jsonb,
             updated_at = NOW()
         `);
       }
-      res.json({ copied: (source.rows as any[]).length, from: mesOrigem, to: mesDestino });
+      res.json({ copied: (source.rows as any[]).length, from: mesOrigem, to: mesDestino, funil: funilValue });
     } catch (error) {
       console.error("[api] Error copying budgets:", error);
       res.status(500).json({ error: "Failed to copy budgets" });
@@ -1492,17 +1613,28 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
-  // Growth - Orçado x Realizado - Valores distintos de fnl_ngc (funil)
+  // Growth - Orçado x Realizado - Valores distintos de fnl_ngc (funil) com atividade
   app.get("/api/growth/orcado-realizado/funis", async (req, res) => {
     try {
       const result = await db.execute(sql`
         SELECT DISTINCT fnl_ngc
         FROM "Bitrix".crm_deal
         WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
+          AND LOWER(fnl_ngc) NOT IN ('cross sell', 'commerce', 'indicação', 'lead')
         ORDER BY fnl_ngc
       `);
-      const funis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
-      // Add "(Vazio)" option for deals with no funnel assigned
+      // Normalize: merge ecommerce/E-commerce/Ecommerce into single "Ecommerce"
+      const ECOMMERCE_VARIANTS = ['ecommerce', 'e-commerce'];
+      const rawFunis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
+      const normalizedSet = new Set<string>();
+      for (const f of rawFunis) {
+        if (ECOMMERCE_VARIANTS.includes(f.toLowerCase())) {
+          normalizedSet.add('Ecommerce');
+        } else {
+          normalizedSet.add(f);
+        }
+      }
+      const funis = Array.from(normalizedSet).sort();
       funis.unshift("(Vazio)");
       res.json(funis);
     } catch (error) {
@@ -1527,16 +1659,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
       const hasVazio = funilValues.includes('(Vazio)');
-      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else if (hasVazio) {
           funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else {
-          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
         }
+      }
+
+      // UTM Source filter
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      let utmSourceFilter = sql``;
+      if (utmSourceParam && utmSourceParam !== 'todos') {
+        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
       }
 
       // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
@@ -1588,6 +1727,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${mqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 2. Reuniões Agendadas = data_reuniao_agendada no período
@@ -1600,6 +1740,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${mqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 3. Reuniões Realizadas = data_fechamento no período + stage >= RR
@@ -1612,6 +1753,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${stagesRrPlus}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 4. Novos Clientes + Faturamento = data_fechamento no período + Negócio Ganho
@@ -1638,6 +1780,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${mqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       const totalMqls = parseInt((totalResult.rows[0] as any).total_mqls) || 0;
@@ -1705,16 +1848,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
       const hasVazio = funilValues.includes('(Vazio)');
-      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else if (hasVazio) {
           funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else {
-          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
         }
+      }
+
+      // UTM Source filter
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      let utmSourceFilter = sql``;
+      if (utmSourceParam && utmSourceParam !== 'todos') {
+        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
       }
 
       // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
@@ -1766,6 +1916,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${naoMqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 2. Reuniões Agendadas = data_reuniao_agendada no período
@@ -1778,6 +1929,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${naoMqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 3. Reuniões Realizadas = data_fechamento no período + stage >= RR
@@ -1790,6 +1942,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${stagesRrPlus}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       // 4. Novos Clientes + Faturamento = data_fechamento no período + Negócio Ganho
@@ -1816,6 +1969,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND ${naoMqlCondition}
           ${inboundFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       const totalNaoMqls = parseInt((totalResult.rows[0] as any).total_nao_mqls) || 0;
@@ -1933,31 +2087,30 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
         : [];
       const hasVazio = funilValues.includes('(Vazio)');
-      const realFunilValues = funilValues.filter(v => v !== '(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
 
-      // Build campaign filter: use campaign IDs from Bitrix leads' UTM data
-      // This is more reliable than matching campaign names with [funil] pattern
+      // Build campaign filter: match campaign names containing [funil] pattern
+      // Campaign naming convention: [TP] [Leads] [ABO] [Odonto] - ...
       let campaignFilter = sql``;
       if (realFunilValues.length > 0) {
-        // Build funnel filter for the subquery
-        let funilSubFilter;
-        if (hasVazio && realFunilValues.length > 0) {
-          funilSubFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
-        } else {
-          funilSubFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+        // Filter by campaign name containing [FunilName] or the funnel name anywhere
+        const nameConditions = realFunilValues.map(v => sql`(c.campaign_name ILIKE ${'%[' + v + ']%'} OR c.campaign_name ILIKE ${'%' + v + '%'})`);
+        let nameFilter = sql.join(nameConditions, sql` OR `);
+        if (hasVazio) {
+          // Also include campaigns without any [Tag] in their name
+          nameFilter = sql`(${nameFilter} OR c.campaign_name NOT LIKE '%[%]%')`;
         }
         campaignFilter = sql`AND mid.campaign_id IN (
-          SELECT DISTINCT d.utm_campaign
-          FROM "Bitrix".crm_deal d
-          WHERE d.utm_campaign IS NOT NULL AND d.utm_campaign <> '' AND d.utm_campaign <> '{{campaign.id}}'
-            ${funilSubFilter}
+          SELECT DISTINCT c.campaign_id::text
+          FROM meta_ads.meta_campaigns c
+          WHERE (${nameFilter})
         )`;
       } else if (hasVazio) {
+        // Only campaigns without any [Tag] in their name
         campaignFilter = sql`AND mid.campaign_id IN (
-          SELECT DISTINCT d.utm_campaign
-          FROM "Bitrix".crm_deal d
-          WHERE d.utm_campaign IS NOT NULL AND d.utm_campaign <> '' AND d.utm_campaign <> '{{campaign.id}}'
-            AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')
+          SELECT DISTINCT c.campaign_id::text
+          FROM meta_ads.meta_campaigns c
+          WHERE c.campaign_name NOT LIKE '%[%]%'
         )`;
       }
 
@@ -2036,11 +2189,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let funilFilter = sql``;
       if (funilValues.length > 0) {
         if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)}) OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else if (hasVazio) {
           funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
         } else {
-          funilFilter = sql`AND d.fnl_ngc IN (${sql.join(realFunilValues.map(v => sql`${v}`), sql`, `)})`;
+          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
         }
       }
 
@@ -2064,6 +2217,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             OR LOWER(d.utm_source) = 'gads'
           )`;
 
+      // UTM Source filter for Ads leads
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      let utmSourceFilter = sql``;
+      if (utmSourceParam && utmSourceParam !== 'todos') {
+        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
+      }
+
       const leadsResult = await db.execute(sql`
         SELECT
           ${countExpr} as total_leads,
@@ -2073,6 +2233,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
           ${utmFilter}
           ${funilFilter}
+          ${utmSourceFilter}
       `);
 
       const leadsRow = leadsResult.rows[0] as any;
