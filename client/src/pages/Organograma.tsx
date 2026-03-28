@@ -12,12 +12,14 @@ import { Crown, X, Loader2, Search, Maximize2, Minimize2, LayoutGrid, AlertTrian
 interface Member {
   nome: string;
   cargo: string;
+  foto: string | null;
 }
 
 interface Team {
   name: string;
   leader: string | null;
   leaderCargo: string | null;
+  leaderFoto: string | null;
   members: Member[];
 }
 
@@ -28,7 +30,8 @@ interface Department {
 }
 
 interface OrgData {
-  ceo: { nome: string; cargo: string };
+  ceo: { nome: string; cargo: string; foto: string | null };
+  coo?: { nome: string; cargo: string; foto: string | null };
   departments: Department[];
   totalColaboradores: number;
 }
@@ -129,12 +132,61 @@ function VLine({ height = 24 }: { height?: number }) {
   );
 }
 
+// Dynamic horizontal connector that measures child positions via offsetLeft/offsetWidth
+// (not getBoundingClientRect, which is affected by CSS transforms like scale)
+function DynamicHLine({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
+  const lineRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const line = lineRef.current;
+    if (!container || !line) return;
+
+    const update = () => {
+      const children = Array.from(container.children).filter(
+        (el) => !(el as HTMLElement).dataset.hline
+      ) as HTMLElement[];
+      if (children.length < 2) { line.style.display = 'none'; return; }
+
+      const first = children[0];
+      const last = children[children.length - 1];
+
+      const firstCenter = first.offsetLeft + first.offsetWidth / 2;
+      const lastCenter = last.offsetLeft + last.offsetWidth / 2;
+      const containerWidth = container.offsetWidth;
+
+      line.style.display = 'block';
+      line.style.left = `${firstCenter}px`;
+      line.style.right = `${containerWidth - lastCenter}px`;
+    };
+
+    const frame = requestAnimationFrame(() => requestAnimationFrame(update));
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
+  }, [containerRef]);
+
+  return (
+    <div
+      ref={lineRef}
+      data-hline="true"
+      className="absolute top-0 h-0.5 bg-gray-400 dark:bg-zinc-500"
+      style={{ left: 0, right: 0 }}
+    />
+  );
+}
+
 function CeoCard({ ceo }: { ceo: OrgData["ceo"] }) {
   return (
     <div className="px-6 py-4 rounded-xl border-2 border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-center shadow-lg">
-      <div className="w-12 h-12 rounded-full bg-amber-200 dark:bg-amber-800 flex items-center justify-center mx-auto mb-2">
-        <span className="text-lg font-bold text-amber-800 dark:text-amber-200">{getInitials(ceo.nome)}</span>
-      </div>
+      {ceo.foto ? (
+        <img src={ceo.foto} alt="" className="w-12 h-12 rounded-full mx-auto mb-2 object-cover" referrerPolicy="no-referrer" />
+      ) : (
+        <div className="w-12 h-12 rounded-full bg-amber-200 dark:bg-amber-800 flex items-center justify-center mx-auto mb-2">
+          <span className="text-lg font-bold text-amber-800 dark:text-amber-200">{getInitials(ceo.nome)}</span>
+        </div>
+      )}
       <div className="flex items-center justify-center gap-2 mb-1">
         <Crown className="h-4 w-4 text-amber-500" />
         <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold uppercase tracking-wider">
@@ -214,9 +266,13 @@ function TeamCardButton({
       <div className="flex items-center gap-1.5 mt-1">
         {team.leader ? (
           <>
-            <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0">
-              <span className="text-[8px] font-bold text-amber-700 dark:text-amber-300">{getInitials(team.leader)}</span>
-            </div>
+            {team.leaderFoto ? (
+              <img src={team.leaderFoto} alt="" className="w-5 h-5 rounded-full shrink-0 object-cover" referrerPolicy="no-referrer" />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center shrink-0">
+                <span className="text-[8px] font-bold text-amber-700 dark:text-amber-300">{getInitials(team.leader)}</span>
+              </div>
+            )}
             <span className="text-[10px] text-muted-foreground truncate" title={team.leader}>{(() => { const parts = team.leader!.split(' '); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0]; })()}</span>
           </>
         ) : (
@@ -260,9 +316,10 @@ function DepartmentColumn({
 }) {
   const styles = DEPT_STYLES[dept.color] || DEPT_STYLES.gray;
 
+  const teamsContainerRef = useRef<HTMLDivElement>(null);
+
   return (
     <div className="flex flex-col items-center">
-      <VLine />
       <DeptCard dept={dept} />
 
       {viewMode !== 'compacto' && (
@@ -270,16 +327,10 @@ function DepartmentColumn({
           <VLine height={16} />
 
           {/* Teams in horizontal row with connector line */}
-          <div className="relative flex items-start gap-1 pt-4">
-            {/* Horizontal connector line above all teams */}
+          <div ref={teamsContainerRef} className="relative flex items-start gap-1 pt-4">
+            {/* Dynamic horizontal connector line above all teams */}
             {dept.teams.length > 1 && (
-              <div
-                className="absolute top-0 h-0.5 bg-gray-400 dark:bg-zinc-500"
-                style={{
-                  left: `calc(${100 / dept.teams.length / 2}% + 4px)`,
-                  right: `calc(${100 / dept.teams.length / 2}% + 4px)`,
-                }}
-              />
+              <DynamicHLine containerRef={teamsContainerRef} />
             )}
             {dept.teams.map((team) => {
               const key = `${dept.name}::${team.name}`;
@@ -301,7 +352,11 @@ function DepartmentColumn({
                     <div className={cn("mt-1 border-l-2 pl-2 pb-1 self-stretch max-h-[60vh] overflow-y-auto", styles.teamBorder)} style={{ scrollbarWidth: 'thin' }}>
                       {team.leader && (
                         <div className="flex items-center gap-1.5 py-0.5" title={team.leader}>
-                          <Crown className="w-3 h-3 text-amber-500 shrink-0" />
+                          {team.leaderFoto ? (
+                            <img src={team.leaderFoto} alt="" className="w-4 h-4 rounded-full shrink-0 object-cover" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Crown className="w-3 h-3 text-amber-500 shrink-0" />
+                          )}
                           <span className="text-[10px] font-medium truncate">{(() => { const parts = team.leader!.split(' '); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0]; })()}</span>
                         </div>
                       )}
@@ -317,9 +372,13 @@ function DepartmentColumn({
                             <div className="text-[8px] font-semibold uppercase tracking-wider text-muted-foreground mb-0.5">{cargo}</div>
                             {members.map((m) => (
                               <div key={m.nome} className="flex items-center gap-1.5 py-0.5 pl-1" title={m.nome}>
-                                <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center shrink-0">
-                                  <span className="text-[7px] font-medium">{getInitials(m.nome)}</span>
-                                </div>
+                                {m.foto ? (
+                                  <img src={m.foto} alt="" className="w-4 h-4 rounded-full shrink-0 object-cover" referrerPolicy="no-referrer" />
+                                ) : (
+                                  <div className="w-4 h-4 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                    <span className="text-[7px] font-medium">{getInitials(m.nome)}</span>
+                                  </div>
+                                )}
                                 <span className="text-[10px] truncate">{(() => { const parts = m.nome.split(' '); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0]; })()}</span>
                               </div>
                             ))}
@@ -387,9 +446,13 @@ function TeamDrawer({
           {/* Leader */}
           {team.leader && (
             <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 mb-3">
-              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-amber-700 dark:text-amber-300 font-bold text-sm shrink-0">
-                {getInitials(team.leader)}
-              </div>
+              {team.leaderFoto ? (
+                <img src={team.leaderFoto} alt="" className="w-10 h-10 rounded-full shrink-0 object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-amber-700 dark:text-amber-300 font-bold text-sm shrink-0">
+                  {getInitials(team.leader)}
+                </div>
+              )}
               <div className="min-w-0">
                 <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {team.leader}
@@ -433,9 +496,13 @@ function TeamDrawer({
                         key={`${m.nome}-${i}`}
                         className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
                       >
-                        <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-zinc-300 shrink-0">
-                          {getInitials(m.nome)}
-                        </div>
+                        {m.foto ? (
+                          <img src={m.foto} alt="" className="w-8 h-8 rounded-full shrink-0 object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-xs font-medium text-gray-600 dark:text-zinc-300 shrink-0">
+                            {getInitials(m.nome)}
+                          </div>
+                        )}
                         <div className="text-sm text-gray-900 dark:text-white truncate" title={m.nome}>
                           {(() => { const parts = m.nome.split(' '); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0]; })()}
                         </div>
@@ -486,6 +553,8 @@ export default function Organograma() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [hasAutocentered, setHasAutocentered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const deptsContainerRef = useRef<HTMLDivElement>(null);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
@@ -503,10 +572,25 @@ export default function Organograma() {
   // Auto-center on first load
   useEffect(() => {
     if (data && containerRef.current && !hasAutocentered) {
-      const containerWidth = containerRef.current.clientWidth;
-      setPosition({ x: 0, y: 10 });
-      setScale(0.55);
-      setHasAutocentered(true);
+      const container = containerRef.current;
+      const initialScale = 0.55;
+      setScale(initialScale);
+
+      // Wait for content to render before measuring
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const content = contentRef.current;
+          if (content) {
+            const contentWidth = content.scrollWidth * initialScale;
+            const containerWidth = container.clientWidth;
+            const offsetX = (containerWidth - contentWidth) / 2;
+            setPosition({ x: offsetX, y: 10 });
+          } else {
+            setPosition({ x: 0, y: 10 });
+          }
+          setHasAutocentered(true);
+        });
+      });
     }
   }, [data, hasAutocentered]);
 
@@ -651,6 +735,7 @@ export default function Organograma() {
         />
 
         <div
+          ref={contentRef}
           className="origin-top-left p-8 inline-flex flex-col items-center min-w-full"
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
@@ -663,26 +748,29 @@ export default function Organograma() {
 
           {/* Level 2+3: Departments + Teams */}
           {displayDepts.length > 0 ? (
-            <div className="relative flex justify-center gap-4 lg:gap-6 pt-6 min-w-fit">
-              {/* Horizontal connector line */}
-              <div
-                className="absolute top-0 h-0.5 bg-gray-400 dark:bg-zinc-500"
-                style={{ left: "15%", right: "15%" }}
-              />
+            <div ref={deptsContainerRef} className="relative flex justify-center gap-4 lg:gap-6 pt-6 min-w-fit">
+              {/* Dynamic horizontal connector line */}
+              <DynamicHLine containerRef={deptsContainerRef} />
               {displayDepts.map((dept) => (
                 <div key={dept.name} className="flex flex-col items-center">
-                  {/* COO card above Commerce only */}
-                  {dept.name === "Commerce" && (
+                  {/* Vertical line from horizontal bar down to department */}
+                  {dept.name === "Commerce" ? (
                     <>
                       <VLine />
                       <div className="px-4 py-2 rounded-lg border-2 border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-center shadow-sm mb-0">
-                        <div className="w-8 h-8 rounded-full bg-sky-200 dark:bg-sky-800 flex items-center justify-center mx-auto mb-1">
-                          <span className="text-xs font-bold text-sky-800 dark:text-sky-200">RV</span>
-                        </div>
-                        <div className="text-[9px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">COO</div>
-                        <div className="text-xs font-bold text-gray-900 dark:text-white">Rafael Vilela</div>
+                          {data.coo?.foto ? (
+                          <img src={data.coo.foto} alt="" className="w-8 h-8 rounded-full mx-auto mb-1 object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-sky-200 dark:bg-sky-800 flex items-center justify-center mx-auto mb-1">
+                            <span className="text-xs font-bold text-sky-800 dark:text-sky-200">{getInitials(data.coo?.nome || "RV")}</span>
+                          </div>
+                        )}
+                        <div className="text-[9px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">{data.coo?.cargo || "COO"}</div>
+                        <div className="text-xs font-bold text-gray-900 dark:text-white">{data.coo?.nome || "Rafael Vilela"}</div>
                       </div>
                     </>
+                  ) : (
+                    <VLine />
                   )}
                   <DepartmentColumn
                     dept={dept}
