@@ -75,6 +75,7 @@ export const PERMISSION_KEYS = {
     ORCADO_REALIZADO: 'growth.orcado_realizado',
     KEYWORD_PERFORMANCE: 'growth.keyword_performance',
     FUNIL_CONVERSAO: 'growth.funil_conversao',
+    INSTAGRAM: 'growth.instagram',
   },
   // G&G (Pessoas)
   GG: {
@@ -85,6 +86,7 @@ export const PERMISSION_KEYS = {
     PESQUISAS: 'gg.pesquisas',
     PATRIMONIO: 'gg.patrimonio',
     CALENDARIO_FERIAS: 'gg.calendario_ferias',
+    ORGANOGRAMA: 'gg.organograma',
   },
   // Social (Makers)
   SOCIAL: {
@@ -247,6 +249,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/orcado-realizado': PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO,
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
   '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
+  '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
   '/dashboard/recrutamento': PERMISSION_KEYS.GG.RECRUTAMENTO,
@@ -255,6 +258,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/colaboradores/analise': PERMISSION_KEYS.GG.COLABORADORES,
   '/patrimonio': PERMISSION_KEYS.GG.PATRIMONIO,
   '/gg/calendario-ferias': PERMISSION_KEYS.GG.CALENDARIO_FERIAS,
+  '/gg/organograma': PERMISSION_KEYS.GG.ORGANOGRAMA,
   // Jurídico
   '/juridico/clientes': PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES,
   '/juridico/processos': PERMISSION_KEYS.JUR.PROCESSOS,
@@ -447,13 +451,10 @@ export const NAV_CONFIG = {
       title: 'Growth',
       icon: 'Sparkles',
       items: [
-        { title: 'Visão Geral', url: '/growth/visao-geral', icon: 'Eye', permissionKey: PERMISSION_KEYS.GROWTH.VISAO_GERAL },
-        { title: 'Meta Ads', url: '/dashboard/meta-ads', icon: 'Target', permissionKey: PERMISSION_KEYS.GROWTH.META_ADS },
         { title: 'Por Plataforma', url: '/growth/performance-plataformas', icon: 'Layers', permissionKey: PERMISSION_KEYS.GROWTH.PLATAFORMA },
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
         { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
-        { title: 'Keywords', url: '/growth/keyword-performance', icon: 'Search', permissionKey: PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE },
-        { title: 'Funil de Conversão', url: '/growth/funil-conversao', icon: 'Filter', permissionKey: PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO },
+        { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
       ],
     },
     {
@@ -484,6 +485,7 @@ export const NAV_CONFIG = {
       { title: 'Pesquisas', url: '/rh/pesquisas', icon: 'BarChart2', permissionKey: PERMISSION_KEYS.GG.PESQUISAS },
       { title: 'Patrimônio', url: '/patrimonio', icon: 'Building2', permissionKey: PERMISSION_KEYS.GG.PATRIMONIO },
       { title: 'Calendário de Férias', url: '/gg/calendario-ferias', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GG.CALENDARIO_FERIAS },
+      { title: 'Organograma', url: '/gg/organograma', icon: 'GitBranch', permissionKey: PERMISSION_KEYS.GG.ORGANOGRAMA },
     ],
   },
 
@@ -673,6 +675,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GG.COLABORADORES]: 'Colaboradores',
   [PERMISSION_KEYS.GG.PATRIMONIO]: 'Patrimônio',
   [PERMISSION_KEYS.GG.CALENDARIO_FERIAS]: 'Calendário de Férias',
+  [PERMISSION_KEYS.GG.ORGANOGRAMA]: 'Organograma',
   [PERMISSION_KEYS.JUR.CLIENTES_INADIMPLENTES]: 'Clientes Inadimplentes',
   [PERMISSION_KEYS.JUR.PROCESSOS]: 'Processos',
   [PERMISSION_KEYS.COM.CONTRATOS_CLIENTES]: 'Contratos Clientes',

@@ -558,7 +558,7 @@ export default function Criativos() {
                 <Table>
                   <TableHeader>
                     <TableRow className="sticky top-0 z-50 bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
-                      <SortableHeader column="id" label="AD ID" />
+                      <SortableHeader column="id" label="AD TP" />
                       <SortableHeader column="adName" label="Criativo" />
                       <SortableHeader column="status" label="Status" />
                       <SortableHeader column="investimento" label="Invest." />
