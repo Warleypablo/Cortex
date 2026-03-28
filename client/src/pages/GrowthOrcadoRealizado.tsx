@@ -83,6 +83,25 @@ function calcPercentual(orcado: number | null, realizado: number | null): number
   return (realizado / orcado) * 100;
 }
 
+// Cálculos de inteligência de meta
+function calcDesvioMeta(orcado: number | null, realizado: number | null, propDias: number): number | null {
+  if (orcado === null || realizado === null || orcado === 0 || propDias === 0) return null;
+  const esperado = orcado * propDias;
+  return ((realizado - esperado) / esperado) * 100;
+}
+
+function calcPrevisaoAsIs(realizado: number | null, propDias: number): number | null {
+  if (realizado === null || propDias === 0) return null;
+  return realizado / propDias;
+}
+
+function calcRecalculoMeta(orcado: number | null, realizado: number | null, diasRestantes: number, totalDias: number): number | null {
+  if (orcado === null || realizado === null || diasRestantes <= 0 || totalDias === 0) return null;
+  const falta = orcado - realizado;
+  if (falta <= 0) return 0;
+  return (falta / diasRestantes) * totalDias;
+}
+
 // Valores orçados default (fallback quando não há dados no banco)
 const DEFAULT_ORCADO_MQL = {
   percReuniaoAgendada: 0.30,
@@ -192,8 +211,8 @@ const PERCENT_METRICS = new Set([
 ]);
 
 export default function GrowthOrcadoRealizado() {
-  usePageTitle("Orçado x Realizado");
-  useSetPageInfo("Orçado x Realizado", "Controle de Métricas de Marketing e Vendas");
+  usePageTitle("Gestão de Metas");
+  useSetPageInfo("Gestão de Metas", "Controle de Métricas de Marketing e Vendas");
   
   const currentMonth = format(new Date(), 'yyyy-MM');
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -270,6 +289,20 @@ export default function GrowthOrcadoRealizado() {
       endDate: format(endOfMonth(monthDate), 'yyyy-MM-dd'),
     };
   }, [customDateRange, selectedMonth]);
+
+  // Proporção de dias passados/restantes para cálculos de meta
+  const { propDias, diasRestantes, totalDias } = useMemo(() => {
+    const start = parse(dateRange.startDate, 'yyyy-MM-dd', new Date());
+    const end = endOfMonth(start);
+    const total = differenceInCalendarDays(end, start) + 1;
+    const today = new Date();
+    const elapsed = Math.min(differenceInCalendarDays(today, start) + 1, total);
+    return {
+      propDias: elapsed / total,
+      diasRestantes: Math.max(total - elapsed, 0),
+      totalDias: total,
+    };
+  }, [dateRange.startDate]);
 
   const prevDateRange = useMemo(() => {
     if (!compareEnabled || !compareRange?.from || !compareRange?.to) {
@@ -670,7 +703,6 @@ export default function GrowthOrcadoRealizado() {
       { id: 'cpm', name: 'CPM', type: 'formula', orcado: ORCADO_ADS.cpm, realizado: data.cpm ?? null, percentual: calcPercentual(ORCADO_ADS.cpm, data.cpm), format: 'currency' },
       { id: 'video_hook', name: 'Vídeo Hook', type: 'formula', orcado: ORCADO_ADS.videoHook, realizado: data.videoHook ?? null, percentual: calcPercentual(ORCADO_ADS.videoHook, data.videoHook), format: 'percent' },
       { id: 'video_hold', name: 'Vídeo Hold', type: 'formula', orcado: ORCADO_ADS.videoHold, realizado: data.videoHold ?? null, percentual: calcPercentual(ORCADO_ADS.videoHold, data.videoHold), format: 'percent' },
-      { id: 'impressoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.impressoes, realizado: data.impressoes ?? 0, percentual: calcPercentual(ORCADO_ADS.impressoes, data.impressoes), format: 'number' },
       { id: 'ctr', name: 'CTR', type: 'manual', orcado: ORCADO_ADS.ctr, realizado: data.ctr ?? null, percentual: calcPercentual(ORCADO_ADS.ctr, data.ctr), format: 'percent' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0), format: 'percent' },
@@ -1111,7 +1143,7 @@ export default function GrowthOrcadoRealizado() {
             <Target className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Orçado x Realizado</h1>
+            <h1 className="text-2xl font-bold">Gestão de Metas</h1>
             <p className="text-muted-foreground text-sm">Acompanhamento de metas de marketing e vendas</p>
           </div>
         </div>
@@ -1449,19 +1481,20 @@ export default function GrowthOrcadoRealizado() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
-                  <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Desvio Meta</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Previsão As Is</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Recálculo Meta</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {consolidadoSections.map((section) => (
                   <>
                     <TableRow key={`header-${section.title}`} className="bg-muted/30">
-                      <TableCell colSpan={6} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <TableCell colSpan={7} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {section.title}
                       </TableCell>
                     </TableRow>
@@ -1481,26 +1514,28 @@ export default function GrowthOrcadoRealizado() {
                         )}>
                           {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
                         </TableCell>
-                        <TableCell className="text-right text-sm text-muted-foreground">
-                          {(() => {
-                            const prev = getPrevValue(m.id);
-                            return prev !== null ? formatValue(prev, m.format) : '-';
-                          })()}
-                        </TableCell>
-                        <TableCell className={cn("text-right text-sm font-medium",
+                        <TableCell className={cn("text-right text-sm font-semibold",
                           (() => {
-                            const prev = getPrevValue(m.id);
-                            const curr = typeof m.realizado === 'number' ? m.realizado : 0;
-                            if (prev === null || prev === 0) return '';
-                            return curr >= prev ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                            const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                            if (d === null) return '';
+                            return d >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
                           })()
                         )}>
                           {(() => {
-                            const prev = getPrevValue(m.id);
-                            const curr = typeof m.realizado === 'number' ? m.realizado : 0;
-                            if (prev === null || prev === 0) return '-';
-                            const variation = ((curr - prev) / prev) * 100;
-                            return `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`;
+                            const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                            return d !== null ? `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` : '-';
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-medium">
+                          {(() => {
+                            const p = calcPrevisaoAsIs(typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                            return p !== null ? formatValue(p, m.format) : '-';
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-medium">
+                          {(() => {
+                            const r = calcRecalculoMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, diasRestantes, totalDias);
+                            return r !== null ? formatValue(r, m.format) : '-';
                           })()}
                         </TableCell>
                       </TableRow>
@@ -1526,12 +1561,13 @@ export default function GrowthOrcadoRealizado() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
-                  <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Desvio Meta</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Previsão As Is</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Recálculo Meta</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1544,12 +1580,6 @@ export default function GrowthOrcadoRealizado() {
                     <TableCell className="text-right text-sm font-medium">
                       {formatValue(m.realizado, m.format)}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {(() => {
-                        const prev = getPrevValue(m.id);
-                        return prev !== null ? formatValue(prev, m.format) : '-';
-                      })()}
-                    </TableCell>
                     <TableCell className={cn("text-right text-sm font-semibold",
                       m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
                       m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
@@ -1557,20 +1587,28 @@ export default function GrowthOrcadoRealizado() {
                     )}>
                       {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
                     </TableCell>
-                    <TableCell className={cn("text-right text-sm font-medium",
+                    <TableCell className={cn("text-right text-sm font-semibold",
                       (() => {
-                        const prev = getPrevValue(m.id);
-                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
-                        if (prev === null || prev === 0) return '';
-                        return curr >= prev ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                        const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        if (d === null) return '';
+                        return d >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
                       })()
                     )}>
                       {(() => {
-                        const prev = getPrevValue(m.id);
-                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
-                        if (prev === null || prev === 0) return '-';
-                        const variation = ((curr - prev) / prev) * 100;
-                        return `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`;
+                        const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        return d !== null ? `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {(() => {
+                        const p = calcPrevisaoAsIs(typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        return p !== null ? formatValue(p, m.format) : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {(() => {
+                        const r = calcRecalculoMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, diasRestantes, totalDias);
+                        return r !== null ? formatValue(r, m.format) : '-';
                       })()}
                     </TableCell>
                   </TableRow>
@@ -1594,12 +1632,13 @@ export default function GrowthOrcadoRealizado() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
-                  <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Desvio Meta</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Previsão As Is</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Recálculo Meta</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1612,12 +1651,6 @@ export default function GrowthOrcadoRealizado() {
                     <TableCell className="text-right text-sm font-medium">
                       {formatValue(m.realizado, m.format)}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {(() => {
-                        const prev = getPrevValue(m.id);
-                        return prev !== null ? formatValue(prev, m.format) : '-';
-                      })()}
-                    </TableCell>
                     <TableCell className={cn("text-right text-sm font-semibold",
                       m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
                       m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
@@ -1625,20 +1658,28 @@ export default function GrowthOrcadoRealizado() {
                     )}>
                       {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
                     </TableCell>
-                    <TableCell className={cn("text-right text-sm font-medium",
+                    <TableCell className={cn("text-right text-sm font-semibold",
                       (() => {
-                        const prev = getPrevValue(m.id);
-                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
-                        if (prev === null || prev === 0) return '';
-                        return curr >= prev ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                        const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        if (d === null) return '';
+                        return d >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
                       })()
                     )}>
                       {(() => {
-                        const prev = getPrevValue(m.id);
-                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
-                        if (prev === null || prev === 0) return '-';
-                        const variation = ((curr - prev) / prev) * 100;
-                        return `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`;
+                        const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        return d !== null ? `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {(() => {
+                        const p = calcPrevisaoAsIs(typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        return p !== null ? formatValue(p, m.format) : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {(() => {
+                        const r = calcRecalculoMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, diasRestantes, totalDias);
+                        return r !== null ? formatValue(r, m.format) : '-';
                       })()}
                     </TableCell>
                   </TableRow>
@@ -1662,12 +1703,13 @@ export default function GrowthOrcadoRealizado() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40">
-                  <TableHead className="w-[30%] text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
-                  <TableHead className="text-right w-[15%] text-xs font-semibold uppercase tracking-wide">Anterior</TableHead>
-                  <TableHead className="text-right w-[10%] text-xs font-semibold uppercase tracking-wide">Var %</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Desvio Meta</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Previsão As Is</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Recálculo Meta</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1680,12 +1722,6 @@ export default function GrowthOrcadoRealizado() {
                     <TableCell className="text-right text-sm font-medium">
                       {formatValue(m.realizado, m.format)}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
-                      {(() => {
-                        const prev = getPrevValue(m.id);
-                        return prev !== null ? formatValue(prev, m.format) : '-';
-                      })()}
-                    </TableCell>
                     <TableCell className={cn("text-right text-sm font-semibold",
                       m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
                       m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
@@ -1693,20 +1729,28 @@ export default function GrowthOrcadoRealizado() {
                     )}>
                       {m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}
                     </TableCell>
-                    <TableCell className={cn("text-right text-sm font-medium",
+                    <TableCell className={cn("text-right text-sm font-semibold",
                       (() => {
-                        const prev = getPrevValue(m.id);
-                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
-                        if (prev === null || prev === 0) return '';
-                        return curr >= prev ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                        const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        if (d === null) return '';
+                        return d >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
                       })()
                     )}>
                       {(() => {
-                        const prev = getPrevValue(m.id);
-                        const curr = typeof m.realizado === 'number' ? m.realizado : 0;
-                        if (prev === null || prev === 0) return '-';
-                        const variation = ((curr - prev) / prev) * 100;
-                        return `${variation >= 0 ? '+' : ''}${variation.toFixed(1)}%`;
+                        const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        return d !== null ? `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {(() => {
+                        const p = calcPrevisaoAsIs(typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                        return p !== null ? formatValue(p, m.format) : '-';
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {(() => {
+                        const r = calcRecalculoMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, diasRestantes, totalDias);
+                        return r !== null ? formatValue(r, m.format) : '-';
                       })()}
                     </TableCell>
                   </TableRow>
