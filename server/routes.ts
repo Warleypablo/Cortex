@@ -2116,6 +2116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           FROM snapshots_mensais sm
           JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
           WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
           GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ),
         current_month_data AS (
@@ -2127,6 +2128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as total_contratos
           FROM "Clickup".cup_contratos
           WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
           GROUP BY squad, responsavel
         )
         SELECT * FROM historical_data
@@ -2149,6 +2151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND valor_r > 0
           AND COALESCE(abonar_churn, '') != 'Sim'
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+          AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
         ORDER BY mes, squad, responsavel_geral
       `);
@@ -2161,6 +2164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT squad FROM "Clickup".cup_contratos WHERE squad IS NOT NULL AND squad != ''
         ) combined
         WHERE squad NOT LIKE '%(OFF)%'
+          AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
         ORDER BY squad
       `);
 
@@ -2182,6 +2186,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching evolução mensal:", error);
       res.status(500).json({ error: "Failed to fetch evolução mensal" });
+    }
+  });
+
+  // Gerar insights de IA sobre evolução mensal (SSE streaming)
+  app.post("/api/dashboard/evolucao-mensal/insights", async (req, res) => {
+    try {
+      const numMeses = 6;
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - numMeses);
+      const startDateStr = startDate.toISOString().split('T')[0];
+
+      const HIDDEN_SQUADS_SQL = "('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')";
+
+      const mrrResult = await db.execute(sql`
+        WITH snapshots_mensais AS (
+          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
+            DATE_TRUNC('month', data_snapshot) as mes,
+            data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE DATE(data_snapshot) >= ${startDateStr}::date
+            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
+          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        ),
+        historical_data AS (
+          SELECT
+            TO_CHAR(sm.mes, 'YYYY-MM') as mes,
+            h.squad,
+            COALESCE(SUM(h.valorr), 0) as mrr_total,
+            COUNT(*) as total_contratos
+          FROM snapshots_mensais sm
+          JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
+          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad
+        ),
+        current_month_data AS (
+          SELECT
+            TO_CHAR(DATE_TRUNC('month', CURRENT_DATE), 'YYYY-MM') as mes,
+            squad,
+            COALESCE(SUM(valorr), 0) as mrr_total,
+            COUNT(*) as total_contratos
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
+          GROUP BY squad
+        )
+        SELECT * FROM historical_data
+        UNION ALL
+        SELECT * FROM current_month_data
+        ORDER BY mes, squad
+      `);
+
+      const churnResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
+          squad,
+          COUNT(*) as churns,
+          COALESCE(SUM(valor_r), 0) as mrr_churn
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento >= ${startDateStr}::date
+          AND valor_r > 0
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
+        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad
+        ORDER BY mes, squad
+      `);
+
+      // Montar resumo dos dados para o prompt
+      const meses = Array.from(new Set(mrrResult.rows.map((r: any) => r.mes))).sort();
+      const squads = Array.from(new Set(mrrResult.rows.map((r: any) => r.squad)));
+
+      let dataContext = "## Dados de MRR por Squad e Mês\n\n";
+      for (const mes of meses) {
+        const mrrMes = mrrResult.rows.filter((r: any) => r.mes === mes);
+        const totalMrr = mrrMes.reduce((acc: number, r: any) => acc + Number(r.mrr_total), 0);
+        dataContext += `### ${mes} (MRR Total: R$ ${totalMrr.toLocaleString('pt-BR')})\n`;
+        for (const r of mrrMes as any[]) {
+          dataContext += `- ${r.squad}: R$ ${Number(r.mrr_total).toLocaleString('pt-BR')} (${r.total_contratos} contratos)\n`;
+        }
+        dataContext += "\n";
+      }
+
+      dataContext += "\n## Dados de Churn por Squad e Mês\n\n";
+      for (const mes of meses) {
+        const churnMes = churnResult.rows.filter((r: any) => r.mes === mes);
+        if (churnMes.length === 0) continue;
+        const totalChurn = churnMes.reduce((acc: number, r: any) => acc + Number(r.mrr_churn), 0);
+        const totalChurns = churnMes.reduce((acc: number, r: any) => acc + Number(r.churns), 0);
+        dataContext += `### ${mes} (Churn Total: R$ ${totalChurn.toLocaleString('pt-BR')}, ${totalChurns} contratos)\n`;
+        for (const r of churnMes as any[]) {
+          dataContext += `- ${r.squad}: R$ ${Number(r.mrr_churn).toLocaleString('pt-BR')} (${r.churns} contratos)\n`;
+        }
+        dataContext += "\n";
+      }
+
+      // Taxa de churn por mês (churn / MRR mês anterior)
+      dataContext += "\n## Taxa de Churn Mensal (Churn / MRR Mês Anterior)\n\n";
+      for (let i = 1; i < meses.length; i++) {
+        const mesAnterior = meses[i - 1];
+        const mesAtual = meses[i];
+        const mrrAnterior = mrrResult.rows
+          .filter((r: any) => r.mes === mesAnterior)
+          .reduce((acc: number, r: any) => acc + Number(r.mrr_total), 0);
+        const churnAtual = churnResult.rows
+          .filter((r: any) => r.mes === mesAtual)
+          .reduce((acc: number, r: any) => acc + Number(r.mrr_churn), 0);
+        const taxa = mrrAnterior > 0 ? ((churnAtual / mrrAnterior) * 100).toFixed(1) : "0.0";
+        dataContext += `- ${mesAtual}: ${taxa}% (R$ ${churnAtual.toLocaleString('pt-BR')} / R$ ${mrrAnterior.toLocaleString('pt-BR')})\n`;
+      }
+
+      const systemPrompt = `Você é um analista financeiro e operacional sênior da Turbo Digital, uma agência de marketing digital.
+Sua função é analisar dados de MRR (Monthly Recurring Revenue) e Churn para gerar insights acionáveis.
+
+Regras:
+- Responda em português do Brasil
+- Use markdown para formatar (títulos, negrito, listas)
+- Seja direto e acionável — evite generalidades
+- Valores monetários em R$ com separador de milhares
+- Percentuais com uma casa decimal
+- Compare squads entre si quando relevante
+- Identifique tendências (crescimento, queda, estabilidade)
+- Destaque alertas críticos (churn acima de 5%, quedas bruscas de MRR)
+
+Estruture sua resposta em:
+1. **Visão Geral** — resumo executivo em 2-3 frases
+2. **Tendências de MRR** — análise da evolução, destaque crescimentos e quedas
+3. **Análise de Churn** — squads com maior churn, padrões identificados, taxas preocupantes
+4. **Comparativo entre Squads** — ranking de performance, destaques positivos e negativos
+5. **Recomendações** — 3-5 ações concretas baseadas nos dados`;
+
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+      // SSE streaming
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const stream = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Analise os seguintes dados dos últimos ${numMeses} meses:\n\n${dataContext}` }
+        ],
+        max_tokens: 2048,
+        stream: true,
+      });
+
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (error) {
+      console.error("[api] Error generating insights:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to generate insights" });
+      } else {
+        res.write(`data: ${JSON.stringify({ error: "Erro ao gerar insights" })}\n\n`);
+        res.end();
+      }
     }
   });
 

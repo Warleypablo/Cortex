@@ -961,12 +961,13 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
   app.get("/api/geg/organograma", async (req, res) => {
     try {
       const result = await db.execute(sql`
-        SELECT nome, setor, squad, cargo
-        FROM "Inhire".rh_pessoal
-        WHERE demissao IS NULL
-        ORDER BY setor, squad, nome
+        SELECT r.nome, r.setor, r.squad, r.cargo, r.email_turbo, a.picture as foto
+        FROM "Inhire".rh_pessoal r
+        LEFT JOIN cortex_core.auth_users a ON LOWER(r.email_turbo) = LOWER(a.email)
+        WHERE r.status = 'Ativo'
+        ORDER BY r.setor, r.squad, r.nome
       `);
-      const rows: Array<{ nome: string; setor: string | null; squad: string | null; cargo: string | null }> = result.rows as any;
+      const rows: Array<{ nome: string; setor: string | null; squad: string | null; cargo: string | null; email_turbo: string | null; foto: string | null }> = result.rows as any;
 
       // Helper: strip emojis & trim to normalise squad names
       const normalizeSquadName = (raw: string | null): string => {
@@ -985,27 +986,32 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       };
 
       // ── Build department structure ──
-      interface Member { nome: string; cargo: string }
-      interface Team { name: string; leader: string | null; leaderCargo: string | null; members: Member[] }
+      interface Member { nome: string; cargo: string; foto: string | null }
+      interface Team { name: string; leader: string | null; leaderCargo: string | null; leaderFoto: string | null; members: Member[] }
       interface Department { name: string; color: string; teams: Team[] }
 
       const commerceTeams = new Map<string, Team>();
       const techSitesMembers: Member[] = [];
       let techSitesLeader: string | null = null;
       let techSitesLeaderCargo: string | null = null;
+      let techSitesLeaderFoto: string | null = null;
       const techInternoMembers: Member[] = [];
       let techInternoLeader: string | null = null;
       let techInternoLeaderCargo: string | null = null;
+      let techInternoLeaderFoto: string | null = null;
       const growthMembers: Member[] = [];
       let growthLeader: string | null = null;
       let growthLeaderCargo: string | null = null;
+      let growthLeaderFoto: string | null = null;
       const backofficeMembers: Member[] = [];
       const comercialVendas: Member[] = [];
       let comercialVendasLeader: string | null = null;
       let comercialVendasLeaderCargo: string | null = null;
+      let comercialVendasLeaderFoto: string | null = null;
       const comercialPreVendas: Member[] = [];
       let comercialPreVendasLeader: string | null = null;
       let comercialPreVendasLeaderCargo: string | null = null;
+      let comercialPreVendasLeaderFoto: string | null = null;
 
       // Commerce squad name mapping for known squads
       const knownCommerceSquads = ["Squadra", "Makers", "Pulse", "Selva", "Black Sheep", "Customer Success", "Squad I.A", "CX&CS"];
@@ -1015,38 +1021,40 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         const squad = normalizeSquadName(row.squad);
         const cargo = row.cargo?.trim() || "Colaborador";
         const nome = row.nome?.trim() || "";
-        const member: Member = { nome, cargo };
+        const foto = row.foto || null;
+        const member: Member = { nome, cargo, foto };
 
         // Skip CEO / Sócios — handled separately
         if (setor === "Sócios" || cargo.toLowerCase().includes("ceo")) continue;
         // Skip inactive squads and generic groups
         if (squad.toLowerCase().includes("(off)") || squad.toLowerCase().includes("supreme")) continue;
+
+        // Backoffice — check BEFORE squad filter since they're all "Turbo Interno"
+        if (setor === "Backoffice" || setor === "Back Office") {
+          backofficeMembers.push(member);
+          continue;
+        }
+
+        // Growth Interno — check BEFORE squad filter since they may be "Turbo Interno"
+        if (setor === "Growth Interno" || setor === "Growth") {
+          if (isLeader(cargo)) { growthLeader = nome; growthLeaderCargo = cargo; growthLeaderFoto = foto; }
+          else growthMembers.push(member);
+          continue;
+        }
+
         if (squad === "Sem Squad" || squad === "Turbo Interno") continue;
 
         // Tech Sites
         if (setor === "Tech Sites" || setor === "Tech" && squad === "Tech Sites") {
-          if (isLeader(cargo)) { techSitesLeader = nome; techSitesLeaderCargo = cargo; }
+          if (isLeader(cargo)) { techSitesLeader = nome; techSitesLeaderCargo = cargo; techSitesLeaderFoto = foto; }
           else techSitesMembers.push(member);
           continue;
         }
 
         // Tech Interno / Turbo Interno
         if (setor === "Tech Interno" || setor === "Turbo Interno" || (setor === "Tech" && (squad === "Turbo Interno" || squad === "Tech Interno" || squad === "Tech"))) {
-          if (isLeader(cargo)) { techInternoLeader = nome; techInternoLeaderCargo = cargo; }
+          if (isLeader(cargo)) { techInternoLeader = nome; techInternoLeaderCargo = cargo; techInternoLeaderFoto = foto; }
           else techInternoMembers.push(member);
-          continue;
-        }
-
-        // Growth Interno
-        if (setor === "Growth Interno" || setor === "Growth") {
-          if (isLeader(cargo)) { growthLeader = nome; growthLeaderCargo = cargo; }
-          else growthMembers.push(member);
-          continue;
-        }
-
-        // Backoffice
-        if (setor === "Backoffice" || setor === "Back Office") {
-          backofficeMembers.push(member);
           continue;
         }
 
@@ -1074,10 +1082,10 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
           if (teamName === "CX&CS" || teamName.includes("CS")) teamName = "Customer Success";
 
           if (!commerceTeams.has(teamName)) {
-            commerceTeams.set(teamName, { name: teamName, leader: null, leaderCargo: null, members: [] });
+            commerceTeams.set(teamName, { name: teamName, leader: null, leaderCargo: null, leaderFoto: null, members: [] });
           }
           const team = commerceTeams.get(teamName)!;
-          if (isLeader(cargo)) { team.leader = nome; team.leaderCargo = cargo; }
+          if (isLeader(cargo)) { team.leader = nome; team.leaderCargo = cargo; team.leaderFoto = foto; }
           else team.members.push(member);
           continue;
         }
@@ -1085,6 +1093,13 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         // Fallback: add to backoffice
         backofficeMembers.push(member);
       }
+
+      // Helper to find foto by partial name match
+      const findFoto = (name: string): string | null => {
+        const lower = name.toLowerCase();
+        const row = rows.find(r => r.nome?.toLowerCase().includes(lower));
+        return row?.foto || null;
+      };
 
       // ── Assemble departments ──
       const departments: Department[] = [];
@@ -1099,10 +1114,12 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
           if (mariaIdx >= 0) {
             csTeam.leader = csTeam.members[mariaIdx].nome;
             csTeam.leaderCargo = "Líder";
+            csTeam.leaderFoto = csTeam.members[mariaIdx].foto;
             csTeam.members.splice(mariaIdx, 1);
           } else {
             csTeam.leader = "Maria Dias";
             csTeam.leaderCargo = "Líder";
+            csTeam.leaderFoto = findFoto("maria dias");
           }
         }
 
@@ -1123,17 +1140,17 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         departments.push({
           name: "Tech",
           color: "blue",
-          teams: [{ name: "Tech", leader: "Breno Carmo", leaderCargo: "Líder", members: techMembersFiltered }],
+          teams: [{ name: "Tech", leader: "Breno Carmo", leaderCargo: "Líder", leaderFoto: findFoto("breno"), members: techMembersFiltered }],
         });
       }
 
       // Comercial
       const comercialTeams: Team[] = [];
       if (comercialPreVendas.length > 0 || comercialPreVendasLeader) {
-        comercialTeams.push({ name: "Pré-Vendas", leader: comercialPreVendasLeader || "Lucas Pereira", leaderCargo: comercialPreVendasLeaderCargo, members: comercialPreVendas });
+        comercialTeams.push({ name: "Pré-Vendas", leader: comercialPreVendasLeader || "Lucas Pereira", leaderCargo: comercialPreVendasLeaderCargo, leaderFoto: comercialPreVendasLeaderFoto || findFoto("lucas pereira"), members: comercialPreVendas });
       }
       if (comercialVendas.length > 0 || comercialVendasLeader) {
-        comercialTeams.push({ name: "Vendas", leader: comercialVendasLeader || "João Guarçoni", leaderCargo: comercialVendasLeaderCargo, members: comercialVendas });
+        comercialTeams.push({ name: "Vendas", leader: comercialVendasLeader || "João Guarçoni", leaderCargo: comercialVendasLeaderCargo, leaderFoto: comercialVendasLeaderFoto || findFoto("guarçoni"), members: comercialVendas });
       }
       if (comercialTeams.length > 0) {
         departments.push({ name: "Comercial", color: "emerald", teams: comercialTeams });
@@ -1144,7 +1161,7 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         departments.push({
           name: "Growth",
           color: "orange",
-          teams: [{ name: "Growth Interno", leader: growthLeader || "Lucas Pereira", leaderCargo: growthLeaderCargo || "Líder", members: growthMembers }],
+          teams: [{ name: "Growth Interno", leader: growthLeader || "Lucas Pereira", leaderCargo: growthLeaderCargo || "Líder", leaderFoto: growthLeaderFoto || findFoto("lucas pereira"), members: growthMembers }],
         });
       }
 
@@ -1173,12 +1190,14 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
             name: "Controladoria",
             leader: "Marlon Carneiro",
             leaderCargo: "Líder",
+            leaderFoto: findFoto("marlon"),
             members: controladoriaMembers,
           },
           {
             name: "G&G",
             leader: "Karol Tognere",
             leaderCargo: "Líder",
+            leaderFoto: findFoto("karoline") || findFoto("karol"),
             members: gegFiltered,
           },
         ];
@@ -1186,7 +1205,8 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       res.json({
-        ceo: { nome: "Victor de Souza Peixoto", cargo: "CEO" },
+        ceo: { nome: "Victor de Souza Peixoto", cargo: "CEO", foto: findFoto("victor") || findFoto("peixoto") },
+        coo: { nome: "Rafael Vilela", cargo: "COO", foto: findFoto("rafael vilela") || findFoto("vilela") },
         departments,
         totalColaboradores: rows.filter(r => r.setor !== "Sócios").length,
       });
