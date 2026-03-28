@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -7,7 +7,8 @@ import { formatCurrencyNoDecimals, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TrendingUp, TrendingDown, Sparkles, Loader2, X } from "lucide-react";
 import { HeroMetric } from "@/components/HeroMetric";
 import {
   AreaChart,
@@ -77,6 +78,61 @@ function getSquadColor(squad: string, index: number): string {
   return fallbackColors[index % fallbackColors.length];
 }
 
+function InsightsMarkdown({ content }: { content: string }) {
+  const lines = content.split("\n");
+  const elements: React.ReactNode[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.startsWith("# ")) {
+      elements.push(<h1 key={i} className="text-xl font-bold mt-4 mb-2">{line.slice(2)}</h1>);
+    } else if (line.startsWith("## ")) {
+      elements.push(<h2 key={i} className="text-lg font-semibold mt-4 mb-2">{line.slice(3)}</h2>);
+    } else if (line.startsWith("### ")) {
+      elements.push(<h3 key={i} className="text-base font-semibold mt-3 mb-1">{line.slice(4)}</h3>);
+    } else if (line.startsWith("- ") || line.startsWith("* ")) {
+      elements.push(
+        <li key={i} className="ml-4 list-disc text-zinc-300">
+          <InlineMarkdown text={line.slice(2)} />
+        </li>
+      );
+    } else if (/^\d+\.\s/.test(line)) {
+      const text = line.replace(/^\d+\.\s/, "");
+      elements.push(
+        <li key={i} className="ml-4 list-decimal text-zinc-300">
+          <InlineMarkdown text={text} />
+        </li>
+      );
+    } else if (line.startsWith("---")) {
+      elements.push(<hr key={i} className="border-zinc-800 my-3" />);
+    } else if (line.trim() === "") {
+      elements.push(<br key={i} />);
+    } else {
+      elements.push(
+        <p key={i} className="text-zinc-300 mb-1">
+          <InlineMarkdown text={line} />
+        </p>
+      );
+    }
+  }
+
+  return <>{elements}</>;
+}
+
+function InlineMarkdown({ text }: { text: string }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <strong key={i} className="text-zinc-100 font-semibold">{part.slice(2, -2)}</strong>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
 export default function EvolucaoMensal() {
   usePageTitle("Evolução Mensal");
   useSetPageInfo("Evolução Mensal", "Evolução histórica de MRR por squad e operador");
@@ -96,7 +152,76 @@ export default function EvolucaoMensal() {
   const [operadorSelecionado, setOperadorSelecionado] = useState<string>("todos");
   const [meses, setMeses] = useState<string>("6");
   const [tableMode, setTableMode] = useState<"mrr" | "churn">("mrr");
-  
+
+  // AI Insights state
+  const [insightsOpen, setInsightsOpen] = useState(false);
+  const [insightsContent, setInsightsContent] = useState("");
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const handleGenerateInsights = useCallback(async () => {
+    setInsightsOpen(true);
+    setInsightsContent("");
+    setInsightsLoading(true);
+
+    abortRef.current = new AbortController();
+
+    try {
+      const response = await fetch("/api/dashboard/evolucao-mensal/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortRef.current.signal,
+      });
+
+      if (!response.ok) throw new Error("Erro ao gerar insights");
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) throw new Error("Stream não disponível");
+
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.content) {
+                setInsightsContent(prev => prev + parsed.content);
+              }
+              if (parsed.done) {
+                setInsightsLoading(false);
+              }
+              if (parsed.error) {
+                setInsightsContent(prev => prev + "\n\n**Erro:** " + parsed.error);
+                setInsightsLoading(false);
+              }
+            } catch {}
+          }
+        }
+      }
+      setInsightsLoading(false);
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        setInsightsContent("Erro ao gerar insights. Tente novamente.");
+      }
+      setInsightsLoading(false);
+    }
+  }, []);
+
+  const handleCloseInsights = useCallback(() => {
+    abortRef.current?.abort();
+    setInsightsOpen(false);
+    setInsightsContent("");
+    setInsightsLoading(false);
+  }, []);
+
   const { data, isLoading } = useQuery<EvolucaoMensalResponse>({
     queryKey: [`/api/dashboard/evolucao-mensal?meses=${meses}`],
   });
@@ -406,7 +531,53 @@ export default function EvolucaoMensal() {
             <SelectItem value="24">24 meses</SelectItem>
           </SelectContent>
         </Select>
+
+        <button
+          onClick={handleGenerateInsights}
+          disabled={insightsLoading}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+            "bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500",
+            "text-white shadow-sm hover:shadow-md",
+            "disabled:opacity-50 disabled:cursor-not-allowed"
+          )}
+        >
+          {insightsLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
+          Gerar Insights
+        </button>
       </div>
+
+      {/* Modal de Insights */}
+      <Dialog open={insightsOpen} onOpenChange={(open) => !open && handleCloseInsights()}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col bg-zinc-950 border-zinc-800 text-zinc-100">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-zinc-100">
+              <Sparkles className="h-5 w-5 text-violet-400" />
+              Insights de IA — Evolução Mensal
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+            {insightsLoading && !insightsContent && (
+              <div className="flex items-center gap-3 text-zinc-400 py-8 justify-center">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span>Analisando dados...</span>
+              </div>
+            )}
+            {insightsContent && (
+              <div className="prose prose-invert prose-sm max-w-none prose-headings:text-zinc-100 prose-p:text-zinc-300 prose-li:text-zinc-300 prose-strong:text-zinc-100 prose-hr:border-zinc-800">
+                <InsightsMarkdown content={insightsContent} />
+              </div>
+            )}
+            {insightsLoading && insightsContent && (
+              <span className="inline-block w-2 h-4 bg-violet-400 animate-pulse ml-0.5" />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-2">
         <HeroMetric
