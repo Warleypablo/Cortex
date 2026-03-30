@@ -118,8 +118,8 @@ export async function exchangeCodeForToken(code: string): Promise<{
     console.warn("[Instagram] Long-lived token exchange error, using short-lived token:", err);
   }
 
-  // Step 3: Get Instagram profile info
-  const profile = await callGraphAPI(`/me`, finalToken, {
+  // Step 3: Get Instagram profile info (use user_id, not /me)
+  const profile = await callGraphAPI(`/${igUserId}`, finalToken, {
     fields: "user_id,username,account_type",
   });
 
@@ -149,7 +149,7 @@ export async function refreshLongLivedToken(currentToken: string): Promise<{
 }
 
 export async function syncProfile(igUserId: string, accessToken: string) {
-  const profile = await callGraphAPI(`/me`, accessToken, {
+  const profile = await callGraphAPI(`/${igUserId}`, accessToken, {
     fields: "user_id,username,name,biography,website,followers_count,follows_count,media_count,profile_picture_url,account_type",
   });
   return profile;
