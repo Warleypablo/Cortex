@@ -1235,6 +1235,11 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
 
       res.json({
         ceo: { nome: "Victor de Souza Peixoto", cargo: "CEO", foto: findFoto("peixoto") },
+        socios: [
+          { nome: "Victor de Souza Peixoto", cargo: "CEO", foto: findFoto("peixoto") },
+          { nome: "Rodrigo Queiroz", cargo: "CTO", foto: findFoto("rodrigo queiroz") },
+          { nome: "André Musso", cargo: "C-Level", foto: findFoto("musso") },
+        ],
         coo: { nome: "Rafael Vilela", cargo: "COO", foto: findFoto("vilela") },
         cto: { nome: "Rodrigo Queiroz", cargo: "CTO", foto: findFoto("rodrigo queiroz") },
         cooDepartments,
