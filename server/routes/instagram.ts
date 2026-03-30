@@ -526,20 +526,32 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid connection ID" });
 
-      const days = parseInt(req.query.days as string, 10) || 90;
-      const sinceDate = new Date();
-      sinceDate.setDate(sinceDate.getDate() - days);
-      const sinceDateStr = sinceDate.toISOString().split("T")[0];
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+
+      let sinceDateStr: string;
+      if (startDate) {
+        sinceDateStr = startDate;
+      } else {
+        const days = parseInt(req.query.days as string, 10) || 90;
+        const sinceDate = new Date();
+        sinceDate.setDate(sinceDate.getDate() - days);
+        sinceDateStr = sinceDate.toISOString().split("T")[0];
+      }
+
+      const conditions = [
+        eq(instagramMetricsSnapshots.connectionId, id),
+        gte(instagramMetricsSnapshots.metricDate, sinceDateStr),
+      ];
+
+      if (endDate) {
+        conditions.push(sql`${instagramMetricsSnapshots.metricDate} <= ${endDate}`);
+      }
 
       const rows = await db
         .select()
         .from(instagramMetricsSnapshots)
-        .where(
-          and(
-            eq(instagramMetricsSnapshots.connectionId, id),
-            gte(instagramMetricsSnapshots.metricDate, sinceDateStr),
-          ),
-        )
+        .where(and(...conditions))
         .orderBy(instagramMetricsSnapshots.metricDate);
 
       return res.json(rows);
@@ -559,11 +571,22 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       if (isNaN(id)) return res.status(400).json({ error: "Invalid connection ID" });
 
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+
+      const conditions = [eq(instagramPostMetrics.connectionId, id)];
+
+      if (startDate) {
+        conditions.push(gte(instagramPostMetrics.postedAt, startDate));
+      }
+      if (endDate) {
+        conditions.push(sql`${instagramPostMetrics.postedAt} <= ${endDate}`);
+      }
 
       const rows = await db
         .select()
         .from(instagramPostMetrics)
-        .where(eq(instagramPostMetrics.connectionId, id))
+        .where(and(...conditions))
         .orderBy(desc(instagramPostMetrics.postedAt))
         .limit(limit);
 
