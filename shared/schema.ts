@@ -3168,6 +3168,8 @@ export const instagramMetricsSnapshots = cortexCoreSchema.table(
     savesDay: integer("saves_day").default(0),
     sharesDay: integer("shares_day").default(0),
     profileLinksTaps: integer("profile_links_taps").default(0),
+    profileViews: integer("profile_views"),
+    websiteClicks: integer("website_clicks"),
     recordedAt: timestamp("recorded_at").defaultNow(),
   },
   (table) => [

@@ -372,6 +372,7 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       let accountsEngaged = 0, totalInteractions = 0;
       let likesDay = 0, commentsDay = 0, savesDay = 0, sharesDay = 0;
       let profileLinksTaps = 0;
+      let profileViews = 0, websiteClicks = 0;
       try {
         const insights = await syncInsights(conn.igUserId, token);
         for (const metric of insights) {
@@ -387,6 +388,8 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           if (metric.name === "saves") savesDay = value;
           if (metric.name === "shares") sharesDay = value;
           if (metric.name === "profile_links_taps") profileLinksTaps = value;
+          if (metric.name === "profile_views") profileViews = value;
+          if (metric.name === "website_clicks") websiteClicks = value;
         }
         console.log("[Instagram] Insights extracted: reach=", reachDay, "impressions=", impressionsDay, "views=", viewsDay, "follows=", followsDay, "engaged=", accountsEngaged);
       } catch (insightsErr: any) {
@@ -414,6 +417,8 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           savesDay,
           sharesDay,
           profileLinksTaps,
+          profileViews,
+          websiteClicks,
         })
         .onConflictDoUpdate({
           target: [instagramMetricsSnapshots.connectionId, instagramMetricsSnapshots.metricDate],
@@ -433,6 +438,8 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             savesDay: sql`EXCLUDED.saves_day`,
             sharesDay: sql`EXCLUDED.shares_day`,
             profileLinksTaps: sql`EXCLUDED.profile_links_taps`,
+            profileViews: sql`EXCLUDED.profile_views`,
+            websiteClicks: sql`EXCLUDED.website_clicks`,
             recordedAt: sql`NOW()`,
           },
         });
@@ -579,7 +586,7 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           following: profile.follows_count,
           posts: profile.media_count,
         },
-        metricsSnapshot: { reachDay, impressionsDay },
+        metricsSnapshot: { reachDay, impressionsDay, profileViews, websiteClicks },
         postsUpserted,
       });
     } catch (err: any) {
