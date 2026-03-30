@@ -231,6 +231,8 @@ const DEFAULT_USER_ROUTES = [
   '/growth/performance-plataformas',
   // E-NPS (pesquisa anônima - acesso padrão para todos)
   '/rh/nps/responder',
+  // Organograma
+  '/gg/organograma',
 ];
 
 // Migra permissões antigas automaticamente
