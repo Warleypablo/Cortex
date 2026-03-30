@@ -66,4 +66,7 @@ export const AVAILABLE_METRICS = [
   { key: 'cacUnico', label: 'CAC Único' },
   { key: 'cacContrato', label: 'CAC Contrato' },
   { key: 'leadTime', label: 'Lead Time (dias)' },
+  { key: 'aov', label: 'AOV' },
+  { key: 'percRr', label: 'RR (%)' },
+  { key: 'receita', label: 'Receita' },
 ];
