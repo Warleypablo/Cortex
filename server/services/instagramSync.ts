@@ -75,6 +75,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
   const { appId, appSecret, redirectUri, apiVersion } = getConfig();
 
   // Step 1: Exchange code for short-lived token (Instagram Login flow)
+  console.log("[Instagram] Step 1: Exchanging code for short-lived token...");
   const tokenRes = await fetch("https://api.instagram.com/oauth/access_token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -87,6 +88,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
     }),
   });
   const tokenData = await tokenRes.json();
+  console.log("[Instagram] Step 1 response:", JSON.stringify({ has_token: !!tokenData.access_token, user_id: tokenData.user_id, error: tokenData.error_type || tokenData.error_message || null }));
   if (tokenData.error_type || tokenData.error_message) {
     throw new Error(`Token exchange failed: ${tokenData.error_message || tokenData.error_type}`);
   }
@@ -99,29 +101,36 @@ export async function exchangeCodeForToken(code: string): Promise<{
   let expiresIn = 3600; // default 1 hour for short-lived
 
   try {
-    const longUrl = new URL(`https://graph.instagram.com/${apiVersion}/access_token`);
+    console.log("[Instagram] Step 2: Exchanging for long-lived token...");
+    const longUrl = new URL(`https://graph.instagram.com/access_token`);
     longUrl.searchParams.set("grant_type", "ig_exchange_token");
     longUrl.searchParams.set("client_secret", appSecret);
     longUrl.searchParams.set("access_token", shortLivedToken);
 
     const longRes = await fetch(longUrl.toString());
     const longData = await longRes.json();
+    console.log("[Instagram] Step 2 response:", JSON.stringify({ has_token: !!longData.access_token, expires_in: longData.expires_in, error: longData.error?.message || null }));
 
     if (longData.access_token) {
       finalToken = longData.access_token;
       expiresIn = longData.expires_in || 5184000;
       console.log("[Instagram] Long-lived token obtained successfully");
     } else {
-      console.warn("[Instagram] Long-lived token exchange failed, using short-lived token:", longData.error?.message);
+      console.warn("[Instagram] Long-lived token exchange failed, using short-lived token");
     }
   } catch (err) {
     console.warn("[Instagram] Long-lived token exchange error, using short-lived token:", err);
   }
 
-  // Step 3: Get Instagram profile info (use user_id, not /me)
-  const profile = await callGraphAPI(`/${igUserId}`, finalToken, {
-    fields: "user_id,username,account_type",
-  });
+  // Step 3: Get Instagram profile info
+  console.log("[Instagram] Step 3: Fetching profile for user_id:", igUserId);
+  const profileUrl = `https://graph.instagram.com/${igUserId}?fields=username,account_type&access_token=${finalToken}`;
+  const profileRes = await fetch(profileUrl);
+  const profile = await profileRes.json();
+  console.log("[Instagram] Step 3 response:", JSON.stringify({ username: profile.username, error: profile.error?.message || null, code: profile.error?.code || null }));
+  if (profile.error) {
+    throw new Error(`Graph API error: ${profile.error.message} (code ${profile.error.code})`);
+  }
 
   return {
     accessToken: finalToken,
