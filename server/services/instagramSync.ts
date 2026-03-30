@@ -156,7 +156,7 @@ export async function syncProfile(igUserId: string, accessToken: string) {
 }
 
 export async function syncInsights(igUserId: string, accessToken: string, period: string = "day") {
-  const metrics = "reach,impressions,follower_count";
+  const metrics = "reach,impressions,follower_count,profile_views,website_clicks";
   const insights = await callGraphAPI(`/${igUserId}/insights`, accessToken, {
     metric: metrics,
     period,

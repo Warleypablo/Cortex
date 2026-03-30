@@ -3102,6 +3102,8 @@ export const instagramMetricsSnapshots = cortexCoreSchema.table(
     postsCount: integer("posts_count"),
     reachDay: integer("reach_day"),
     impressionsDay: integer("impressions_day"),
+    profileViews: integer("profile_views"),
+    websiteClicks: integer("website_clicks"),
     recordedAt: timestamp("recorded_at").defaultNow(),
   },
   (table) => [

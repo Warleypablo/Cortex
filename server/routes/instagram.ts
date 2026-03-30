@@ -368,11 +368,15 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       // 2. Sync insights
       let reachDay = 0;
       let impressionsDay = 0;
+      let profileViews = 0;
+      let websiteClicks = 0;
       try {
         const insights = await syncInsights(conn.igUserId, token);
         for (const metric of insights) {
           if (metric.name === "reach") reachDay = metric.values?.[0]?.value || 0;
           if (metric.name === "impressions") impressionsDay = metric.values?.[0]?.value || 0;
+          if (metric.name === "profile_views") profileViews = metric.values?.[0]?.value || 0;
+          if (metric.name === "website_clicks") websiteClicks = metric.values?.[0]?.value || 0;
         }
       } catch (insightsErr: any) {
         console.warn("[Instagram] Insights sync partial failure:", insightsErr.message);
@@ -389,6 +393,8 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           postsCount: profile.media_count || 0,
           reachDay,
           impressionsDay,
+          profileViews,
+          websiteClicks,
         })
         .onConflictDoUpdate({
           target: [instagramMetricsSnapshots.connectionId, instagramMetricsSnapshots.metricDate],
@@ -398,6 +404,8 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             postsCount: sql`EXCLUDED.posts_count`,
             reachDay: sql`EXCLUDED.reach_day`,
             impressionsDay: sql`EXCLUDED.impressions_day`,
+            profileViews: sql`EXCLUDED.profile_views`,
+            websiteClicks: sql`EXCLUDED.website_clicks`,
             recordedAt: sql`NOW()`,
           },
         });
@@ -465,7 +473,7 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           following: profile.follows_count,
           posts: profile.media_count,
         },
-        metricsSnapshot: { reachDay, impressionsDay },
+        metricsSnapshot: { reachDay, impressionsDay, profileViews, websiteClicks },
         postsUpserted,
       });
     } catch (err: any) {

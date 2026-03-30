@@ -57,8 +57,10 @@ interface CriativoData {
   clientesUnicos: number;
   leadTime: number | null;
   aov: number | null;
+  receita: number | null;
   receitaPontual: number;
   receitaRecorrente: number;
+  cacGeral: number | null;
   cacUnico: number | null;
   cacContrato: number | null;
   roas: number | null;
@@ -219,7 +221,18 @@ export default function Criativos() {
     return map;
   }, [compareData]);
 
-  // Colunas expandidas (para mostrar variação)
+  // Grupos de colunas expandidos (sub-métricas)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (group: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(group)) next.delete(group);
+      else next.add(group);
+      return next;
+    });
+  };
+
+  // Colunas expandidas (para mostrar variação de comparação)
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
   const toggleColumn = (col: string) => {
     setExpandedColumns(prev => {
@@ -389,7 +402,12 @@ export default function Criativos() {
       percRa: avg('percRa'),
       percRaMql: avg('percRaMql'),
       percRaNmql: avg('percRaNmql'),
-      percRr: avg('percRr'),
+      percRr: (() => {
+        const mql = avg('percRrMql');
+        const nmql = avg('percRrNmql');
+        if (mql !== null && nmql !== null) return parseFloat(((mql + nmql) / 2).toFixed(2));
+        return mql ?? nmql;
+      })(),
       percRrMql: avg('percRrMql'),
       percRrNmql: avg('percRrNmql'),
       percRrVendas: avg('percRrVendas'),
@@ -398,8 +416,10 @@ export default function Criativos() {
       clientesUnicos: sum('clientesUnicos'),
       leadTime: avg('leadTime'),
       aov: avg('aov'),
+      receita: avg('receita'),
       receitaPontual: avg('receitaPontual'),
       receitaRecorrente: avg('receitaRecorrente'),
+      cacGeral: avg('cacGeral'),
       cacUnico: avg('cacUnico'),
       cacContrato: avg('cacContrato'),
       roas: avg('roas'),
@@ -481,6 +501,36 @@ export default function Criativos() {
             )}
           </TableCell>
         )}
+      </>
+    );
+  };
+
+  // Header agrupável — mostra chevron para expandir sub-colunas
+  const GroupableHeader = ({ group, label, column, children }: { group: string; label: string; column: keyof CriativoData; children: React.ReactNode }) => {
+    const isGroupExpanded = expandedGroups.has(group);
+    return (
+      <>
+        <TableHead
+          className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100"
+          onClick={() => handleSort(column)}
+        >
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); toggleGroup(group); }}
+              className="hover:text-white text-zinc-400"
+            >
+              {isGroupExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            </button>
+            {label}
+            <ArrowUpDown className="w-3 h-3" />
+          </div>
+        </TableHead>
+        {isCompareActive && expandedColumns.has(column) && (
+          <TableHead className="whitespace-nowrap text-xs bg-zinc-800 text-zinc-400 italic">
+            <div className="text-center">Var.</div>
+          </TableHead>
+        )}
+        {isGroupExpanded && children}
       </>
     );
   };
@@ -931,25 +981,33 @@ export default function Criativos() {
                       <SortableHeader column="mql" label="MQL" />
                       <SortableHeader column="cpmql" label="CPMQL" />
                       <SortableHeader column="percMql" label="%MQL" />
-                      <TableHead className="whitespace-nowrap text-xs bg-zinc-900 text-zinc-100">Desc. %</TableHead>
-                      <TableHead className="whitespace-nowrap text-xs bg-zinc-900 text-zinc-100">Desc. MQL %</TableHead>
-                      <TableHead className="whitespace-nowrap text-xs bg-zinc-900 text-zinc-100">Desc. NMQL %</TableHead>
-                      <SortableHeader column="percRa" label="RA %" />
-                      <SortableHeader column="percRaMql" label="RA MQL %" />
-                      <SortableHeader column="percRaNmql" label="RA NMQL %" />
-                      <SortableHeader column="percRr" label="RR %" />
-                      <SortableHeader column="percRrMql" label="RR MQL %" />
-                      <SortableHeader column="percRrNmql" label="RR NMQL %" />
-                      <SortableHeader column="percRrVendas" label="RR→V %" />
-                      <SortableHeader column="percRrMqlVendas" label="RR MQL→V %" />
-                      <SortableHeader column="percRrNmqlVendas" label="RR NMQL→V %" />
+                      <GroupableHeader group="desc" label="Desc. %" column="descartadoPerc">
+                        <SortableHeader column="descartadoMqlPerc" label="Desc. MQL %" />
+                        <SortableHeader column="descartadoNmqlPerc" label="Desc. NMQL %" />
+                      </GroupableHeader>
+                      <GroupableHeader group="ra" label="RA %" column="percRa">
+                        <SortableHeader column="percRaMql" label="RA MQL %" />
+                        <SortableHeader column="percRaNmql" label="RA NMQL %" />
+                      </GroupableHeader>
+                      <GroupableHeader group="rr" label="RR %" column="percRr">
+                        <SortableHeader column="percRrMql" label="RR MQL %" />
+                        <SortableHeader column="percRrNmql" label="RR NMQL %" />
+                      </GroupableHeader>
+                      <GroupableHeader group="rrv" label="RR→V %" column="percRrVendas">
+                        <SortableHeader column="percRrMqlVendas" label="RR MQL→V %" />
+                        <SortableHeader column="percRrNmqlVendas" label="RR NMQL→V %" />
+                      </GroupableHeader>
                       <SortableHeader column="clientesUnicos" label="Neg. ganho" />
                       <SortableHeader column="leadTime" label="Lead Time" />
                       <SortableHeader column="aov" label="AOV" />
-                      <SortableHeader column="receitaPontual" label="Rec. pontual" />
-                      <SortableHeader column="receitaRecorrente" label="Rec. recorrente" />
-                      <SortableHeader column="cacUnico" label="CAC único" />
-                      <SortableHeader column="cacContrato" label="CAC contrato" />
+                      <GroupableHeader group="receita" label="Receita" column="receita">
+                        <SortableHeader column="receitaPontual" label="Rec. pontual" />
+                        <SortableHeader column="receitaRecorrente" label="Rec. recorrente" />
+                      </GroupableHeader>
+                      <GroupableHeader group="cac" label="CAC" column="cacGeral">
+                        <SortableHeader column="cacUnico" label="CAC único" />
+                        <SortableHeader column="cacContrato" label="CAC contrato" />
+                      </GroupableHeader>
                       <SortableHeader column="roas" label="ROAS" />
                     </TableRow>
                   </TableHeader>
@@ -982,25 +1040,21 @@ export default function Criativos() {
                               {avgCell(formatNumber(averages.mql), 'mql')}
                               {avgCell(formatCurrency(averages.cpmql), 'cpmql')}
                               {avgCell(formatPercent(averages.percMql), 'percMql')}
-                              <TableCell className="text-right text-muted-foreground">-</TableCell>
-                              <TableCell className="text-right text-muted-foreground">-</TableCell>
-                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              {avgCell('-', 'descartadoPerc')}
+                              {expandedGroups.has('desc') && <>{avgCell('-', 'descartadoMqlPerc')}{avgCell('-', 'descartadoNmqlPerc')}</>}
                               {avgCell(formatPercent(averages.percRa), 'percRa')}
-                              {avgCell(formatPercent(averages.percRaMql), 'percRaMql')}
-                              {avgCell(formatPercent(averages.percRaNmql), 'percRaNmql')}
+                              {expandedGroups.has('ra') && <>{avgCell(formatPercent(averages.percRaMql), 'percRaMql')}{avgCell(formatPercent(averages.percRaNmql), 'percRaNmql')}</>}
                               {avgCell(formatPercent(averages.percRr), 'percRr')}
-                              {avgCell(formatPercent(averages.percRrMql), 'percRrMql')}
-                              {avgCell(formatPercent(averages.percRrNmql), 'percRrNmql')}
+                              {expandedGroups.has('rr') && <>{avgCell(formatPercent(averages.percRrMql), 'percRrMql')}{avgCell(formatPercent(averages.percRrNmql), 'percRrNmql')}</>}
                               {avgCell(formatPercent(averages.percRrVendas), 'percRrVendas')}
-                              {avgCell(formatPercent(averages.percRrMqlVendas), 'percRrMqlVendas')}
-                              {avgCell(formatPercent(averages.percRrNmqlVendas), 'percRrNmqlVendas')}
+                              {expandedGroups.has('rrv') && <>{avgCell(formatPercent(averages.percRrMqlVendas), 'percRrMqlVendas')}{avgCell(formatPercent(averages.percRrNmqlVendas), 'percRrNmqlVendas')}</>}
                               {avgCell(formatNumber(averages.clientesUnicos), 'clientesUnicos')}
                               {avgCell(averages.leadTime !== null ? `${averages.leadTime}d` : '-', 'leadTime')}
                               {avgCell(formatCurrency(averages.aov), 'aov')}
-                              {avgCell(formatCurrency(averages.receitaPontual), 'receitaPontual')}
-                              {avgCell(formatCurrency(averages.receitaRecorrente), 'receitaRecorrente')}
-                              {avgCell(formatCurrency(averages.cacUnico), 'cacUnico')}
-                              {avgCell(formatCurrency(averages.cacContrato), 'cacContrato')}
+                              {avgCell(formatCurrency(averages.receita), 'receita')}
+                              {expandedGroups.has('receita') && <>{avgCell(formatCurrency(averages.receitaPontual), 'receitaPontual')}{avgCell(formatCurrency(averages.receitaRecorrente), 'receitaRecorrente')}</>}
+                              {avgCell(formatCurrency(averages.cacGeral), 'cacGeral')}
+                              {expandedGroups.has('cac') && <>{avgCell(formatCurrency(averages.cacUnico), 'cacUnico')}{avgCell(formatCurrency(averages.cacContrato), 'cacContrato')}</>}
                               {avgCell(averages.roas !== null ? `${averages.roas}x` : '-', 'roas')}
                             </>
                           );
@@ -1046,25 +1100,57 @@ export default function Criativos() {
                               {renderCell(item.mql, c?.mql ?? null, 'mql', formatNumber)}
                               {renderCell(item.cpmql, c?.cpmql ?? null, 'cpmql', formatCurrency, getCellColor(item.cpmql, 'cpmql'), true)}
                               {renderCell(item.percMql, c?.percMql ?? null, 'percMql', formatPercent, getCellColor(item.percMql, 'percMql'))}
-                              <TableCell className="text-right text-muted-foreground">-</TableCell>
-                              <TableCell className="text-right text-muted-foreground">-</TableCell>
-                              <TableCell className="text-right text-muted-foreground">-</TableCell>
+                              {/* Desc. % (grupo) */}
+                              {renderCell(item.descartadoPerc, c?.descartadoPerc ?? null, 'descartadoPerc', formatPercent)}
+                              {expandedGroups.has('desc') && (
+                                <>
+                                  {renderCell(item.descartadoMqlPerc, c?.descartadoMqlPerc ?? null, 'descartadoMqlPerc', formatPercent)}
+                                  {renderCell(item.descartadoNmqlPerc, c?.descartadoNmqlPerc ?? null, 'descartadoNmqlPerc', formatPercent)}
+                                </>
+                              )}
+                              {/* RA % (grupo) */}
                               {renderCell(item.percRa, c?.percRa ?? null, 'percRa', formatPercent, getCellColor(item.percRa, 'percRa'))}
-                              {renderCell(item.percRaMql, c?.percRaMql ?? null, 'percRaMql', formatPercent, getCellColor(item.percRaMql, 'percRaMql'))}
-                              {renderCell(item.percRaNmql, c?.percRaNmql ?? null, 'percRaNmql', formatPercent, getCellColor(item.percRaNmql, 'percRaNmql'))}
+                              {expandedGroups.has('ra') && (
+                                <>
+                                  {renderCell(item.percRaMql, c?.percRaMql ?? null, 'percRaMql', formatPercent, getCellColor(item.percRaMql, 'percRaMql'))}
+                                  {renderCell(item.percRaNmql, c?.percRaNmql ?? null, 'percRaNmql', formatPercent, getCellColor(item.percRaNmql, 'percRaNmql'))}
+                                </>
+                              )}
+                              {/* RR % (grupo) */}
                               {renderCell(item.percRr, c?.percRr ?? null, 'percRr', formatPercent, getCellColor(item.percRr, 'percRr'))}
-                              {renderCell(item.percRrMql, c?.percRrMql ?? null, 'percRrMql', formatPercent, getCellColor(item.percRrMql, 'percRrMql'))}
-                              {renderCell(item.percRrNmql, c?.percRrNmql ?? null, 'percRrNmql', formatPercent, getCellColor(item.percRrNmql, 'percRrNmql'))}
+                              {expandedGroups.has('rr') && (
+                                <>
+                                  {renderCell(item.percRrMql, c?.percRrMql ?? null, 'percRrMql', formatPercent, getCellColor(item.percRrMql, 'percRrMql'))}
+                                  {renderCell(item.percRrNmql, c?.percRrNmql ?? null, 'percRrNmql', formatPercent, getCellColor(item.percRrNmql, 'percRrNmql'))}
+                                </>
+                              )}
+                              {/* RR→V % (grupo) */}
                               {renderCell(item.percRrVendas, c?.percRrVendas ?? null, 'percRrVendas', formatPercent, getCellColor(item.percRrVendas, 'percRrVendas'))}
-                              {renderCell(item.percRrMqlVendas, c?.percRrMqlVendas ?? null, 'percRrMqlVendas', formatPercent, getCellColor(item.percRrMqlVendas, 'percRrMqlVendas'))}
-                              {renderCell(item.percRrNmqlVendas, c?.percRrNmqlVendas ?? null, 'percRrNmqlVendas', formatPercent, getCellColor(item.percRrNmqlVendas, 'percRrNmqlVendas'))}
+                              {expandedGroups.has('rrv') && (
+                                <>
+                                  {renderCell(item.percRrMqlVendas, c?.percRrMqlVendas ?? null, 'percRrMqlVendas', formatPercent, getCellColor(item.percRrMqlVendas, 'percRrMqlVendas'))}
+                                  {renderCell(item.percRrNmqlVendas, c?.percRrNmqlVendas ?? null, 'percRrNmqlVendas', formatPercent, getCellColor(item.percRrNmqlVendas, 'percRrNmqlVendas'))}
+                                </>
+                              )}
                               {renderCell(item.clientesUnicos, c?.clientesUnicos ?? null, 'clientesUnicos', formatNumber)}
                               {renderCell(item.leadTime, c?.leadTime ?? null, 'leadTime', (v) => v !== null ? `${v}d` : '-')}
                               {renderCell(item.aov, c?.aov ?? null, 'aov', formatCurrency)}
-                              {renderCell(item.receitaPontual || null, c?.receitaPontual || null, 'receitaPontual', formatCurrency)}
-                              {renderCell(item.receitaRecorrente || null, c?.receitaRecorrente || null, 'receitaRecorrente', formatCurrency)}
-                              {renderCell(item.cacUnico, c?.cacUnico ?? null, 'cacUnico', formatCurrency, getCellColor(item.cacUnico, 'cacUnico'), true)}
-                              {renderCell(item.cacContrato, c?.cacContrato ?? null, 'cacContrato', formatCurrency, getCellColor(item.cacContrato, 'cacContrato'), true)}
+                              {/* Receita (grupo) */}
+                              {renderCell(item.receita, c?.receita ?? null, 'receita', formatCurrency)}
+                              {expandedGroups.has('receita') && (
+                                <>
+                                  {renderCell(item.receitaPontual || null, c?.receitaPontual || null, 'receitaPontual', formatCurrency)}
+                                  {renderCell(item.receitaRecorrente || null, c?.receitaRecorrente || null, 'receitaRecorrente', formatCurrency)}
+                                </>
+                              )}
+                              {/* CAC (grupo) */}
+                              {renderCell(item.cacGeral, c?.cacGeral ?? null, 'cacGeral', formatCurrency, '', true)}
+                              {expandedGroups.has('cac') && (
+                                <>
+                                  {renderCell(item.cacUnico, c?.cacUnico ?? null, 'cacUnico', formatCurrency, getCellColor(item.cacUnico, 'cacUnico'), true)}
+                                  {renderCell(item.cacContrato, c?.cacContrato ?? null, 'cacContrato', formatCurrency, getCellColor(item.cacContrato, 'cacContrato'), true)}
+                                </>
+                              )}
                               {renderCell(item.roas, c?.roas ?? null, 'roas', (v) => v !== null ? `${v}x` : '-')}
                             </>
                           );
