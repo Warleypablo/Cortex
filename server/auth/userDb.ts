@@ -233,6 +233,10 @@ const DEFAULT_USER_ROUTES = [
   '/rh/nps/responder',
   // Organograma
   '/gg/organograma',
+  // Solicitação de Ferramentas
+  '/solicitacao-ferramentas',
+  // Instagram Analytics
+  '/growth/instagram',
 ];
 
 // Migra permissões antigas automaticamente
