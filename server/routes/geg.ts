@@ -1024,8 +1024,21 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         const foto = row.foto || null;
         const member: Member = { nome, cargo, foto };
 
-        // Skip CEO / Sócios — handled separately
-        if (setor === "Sócios" || cargo.toLowerCase().includes("ceo")) continue;
+        // Skip CEO / Sócios — handled separately (but keep Rodrigo Queiroz for Tech Interno team)
+        if ((setor === "Sócios" || cargo.toLowerCase().includes("ceo")) && !nome.toLowerCase().includes("rodrigo queiroz")) continue;
+        // Rodrigo Queiroz → Tech Interno team leader (in Commerce)
+        if (nome.toLowerCase().includes("rodrigo queiroz")) {
+          const techInternoTeamName = "Tech Interno";
+          if (!commerceTeams.has(techInternoTeamName)) {
+            commerceTeams.set(techInternoTeamName, { name: techInternoTeamName, leader: null, leaderCargo: null, leaderFoto: null, members: [] });
+          }
+          const tiTeam = commerceTeams.get(techInternoTeamName)!;
+          tiTeam.leader = nome;
+          tiTeam.leaderCargo = cargo;
+          tiTeam.leaderFoto = foto;
+          continue;
+        }
+
         // Skip inactive squads and generic groups
         if (squad.toLowerCase().includes("(off)") || squad.toLowerCase().includes("supreme")) continue;
 
@@ -1077,15 +1090,17 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
 
         // Commerce (default for "Commerce" setor or known squads)
         if (setor === "Commerce" || knownCommerceSquads.some(s => squad.includes(s))) {
-          // Map CX&CS to Customer Success
+          // Map squad names
           let teamName = squad;
           if (teamName === "CX&CS" || teamName.includes("CS")) teamName = "Customer Success";
+          if (teamName === "Squad I.A") teamName = "Tech Interno";
 
           if (!commerceTeams.has(teamName)) {
             commerceTeams.set(teamName, { name: teamName, leader: null, leaderCargo: null, leaderFoto: null, members: [] });
           }
           const team = commerceTeams.get(teamName)!;
-          if (isLeader(cargo)) { team.leader = nome; team.leaderCargo = cargo; team.leaderFoto = foto; }
+          // For Tech Interno, Rodrigo Queiroz is the leader (already set) — others are members
+          if (isLeader(cargo) && teamName !== "Tech Interno") { team.leader = nome; team.leaderCargo = cargo; team.leaderFoto = foto; }
           else team.members.push(member);
           continue;
         }
@@ -1123,7 +1138,18 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
           }
         }
 
-        const sortOrder = ["Squadra", "Makers", "Pulse", "Selva", "Black Sheep", "Customer Success", "Squad I.A"];
+        // Sort Tech Interno members: Caio first, then Thiago
+        const tiTeam = commerceTeams.get("Tech Interno");
+        if (tiTeam) {
+          const memberOrder = ["caio", "thiago"];
+          tiTeam.members.sort((a, b) => {
+            const ai = memberOrder.findIndex(n => a.nome.toLowerCase().includes(n));
+            const bi = memberOrder.findIndex(n => b.nome.toLowerCase().includes(n));
+            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+          });
+        }
+
+        const sortOrder = ["Squadra", "Makers", "Pulse", "Selva", "Black Sheep", "Customer Success", "Tech Interno"];
         const sorted = Array.from(commerceTeams.values()).sort((a, b) => {
           const ai = sortOrder.indexOf(a.name);
           const bi = sortOrder.indexOf(b.name);
