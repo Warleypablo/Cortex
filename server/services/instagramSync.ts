@@ -122,22 +122,31 @@ export async function exchangeCodeForToken(code: string): Promise<{
     console.warn("[Instagram] Long-lived token exchange error, using short-lived token:", err);
   }
 
-  // Step 3: Get Instagram profile info
+  // Step 3: Get Instagram profile info (graceful — don't fail if API rejects)
   console.log("[Instagram] Step 3: Fetching profile for user_id:", igUserId);
-  const profileUrl = `https://graph.instagram.com/${igUserId}?fields=username,account_type&access_token=${finalToken}`;
-  const profileRes = await fetch(profileUrl);
-  const profile = await profileRes.json();
-  console.log("[Instagram] Step 3 response:", JSON.stringify({ username: profile.username, error: profile.error?.message || null, code: profile.error?.code || null }));
-  if (profile.error) {
-    throw new Error(`Graph API error: ${profile.error.message} (code ${profile.error.code})`);
+  let username = igUserId;
+  let accountType = "BUSINESS";
+  try {
+    const profileUrl = `https://graph.instagram.com/${igUserId}?fields=username,account_type&access_token=${finalToken}`;
+    const profileRes = await fetch(profileUrl);
+    const profile = await profileRes.json();
+    console.log("[Instagram] Step 3 response:", JSON.stringify({ username: profile.username, error: profile.error?.message || null, code: profile.error?.code || null }));
+    if (profile.username) {
+      username = profile.username;
+      accountType = profile.account_type || "BUSINESS";
+    } else {
+      console.warn("[Instagram] Profile fetch failed, using user_id as username. App may need Meta App Review for instagram_business_basic permission.");
+    }
+  } catch (err) {
+    console.warn("[Instagram] Profile fetch error, using user_id as username:", err);
   }
 
   return {
     accessToken: finalToken,
     expiresIn,
     igUserId,
-    username: profile.username,
-    accountType: profile.account_type || "BUSINESS",
+    username,
+    accountType,
   };
 }
 
