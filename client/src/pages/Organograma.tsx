@@ -29,9 +29,19 @@ interface Department {
   teams: Team[];
 }
 
+interface CLevel {
+  nome: string;
+  cargo: string;
+  foto: string | null;
+}
+
 interface OrgData {
-  ceo: { nome: string; cargo: string; foto: string | null };
-  coo?: { nome: string; cargo: string; foto: string | null };
+  ceo: CLevel;
+  coo?: CLevel;
+  cto?: CLevel;
+  cooDepartments?: Department[];
+  ctoDepartments?: Department[];
+  ceoDepartments?: Department[];
   departments: Department[];
   totalColaboradores: number;
 }
@@ -113,6 +123,12 @@ const DEPT_STYLES: Record<
     text: "text-orange-700 dark:text-orange-300",
     teamBorder: "border-orange-200 dark:border-orange-800",
   },
+  cyan: {
+    border: "border-cyan-400 dark:border-cyan-600",
+    bg: "bg-cyan-50 dark:bg-cyan-950/30",
+    text: "text-cyan-700 dark:text-cyan-300",
+    teamBorder: "border-cyan-200 dark:border-cyan-800",
+  },
   gray: {
     border: "border-gray-400 dark:border-zinc-500",
     bg: "bg-gray-50 dark:bg-zinc-900/50",
@@ -174,6 +190,32 @@ function DynamicHLine({ containerRef }: { containerRef: React.RefObject<HTMLDivE
       className="absolute top-0 h-0.5 bg-gray-400 dark:bg-zinc-500"
       style={{ left: 0, right: 0 }}
     />
+  );
+}
+
+const CLEVEL_COLORS: Record<string, { border: string; bg: string; text: string; accent: string }> = {
+  sky: { border: "border-sky-400 dark:border-sky-500", bg: "bg-sky-50 dark:bg-sky-950/30", text: "text-sky-600 dark:text-sky-400", accent: "bg-sky-200 dark:bg-sky-800 text-sky-800 dark:text-sky-200" },
+  violet: { border: "border-violet-400 dark:border-violet-500", bg: "bg-violet-50 dark:bg-violet-950/30", text: "text-violet-600 dark:text-violet-400", accent: "bg-violet-200 dark:bg-violet-800 text-violet-800 dark:text-violet-200" },
+};
+
+function CLevelCard({ person, fallbackName, color }: { person?: CLevel | null; color: string }) {
+  const styles = CLEVEL_COLORS[color] || CLEVEL_COLORS.sky;
+  const nome = person?.nome || fallbackName;
+  const cargo = person?.cargo || "C-Level";
+  const foto = person?.foto;
+
+  return (
+    <div className={cn("px-4 py-2 rounded-lg border-2 text-center shadow-sm", styles.border, styles.bg)}>
+      {foto ? (
+        <img src={foto} alt="" className="w-8 h-8 rounded-full mx-auto mb-1 object-cover" referrerPolicy="no-referrer" />
+      ) : (
+        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-1", styles.accent)}>
+          <span className="text-xs font-bold">{getInitials(nome)}</span>
+        </div>
+      )}
+      <div className={cn("text-[9px] font-semibold uppercase tracking-wider", styles.text)}>{cargo}</div>
+      <div className="text-xs font-bold text-gray-900 dark:text-white">{nome}</div>
+    </div>
   );
 }
 
@@ -555,6 +597,8 @@ export default function Organograma() {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const deptsContainerRef = useRef<HTMLDivElement>(null);
+  const cooContainerRef = useRef<HTMLDivElement>(null);
+  const ctoContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -749,41 +793,55 @@ export default function Organograma() {
           <CeoCard ceo={data.ceo} />
           <VLine />
 
-          {/* Level 2+3: Departments + Teams */}
+          {/* Level 2+3: Two groups — COO (left) and CTO (right) */}
           {displayDepts.length > 0 ? (
-            <div ref={deptsContainerRef} className="relative flex justify-center gap-4 lg:gap-6 pt-6 min-w-fit">
+            <div ref={deptsContainerRef} className="relative flex justify-center gap-8 lg:gap-12 pt-6 min-w-fit">
               {/* Dynamic horizontal connector line */}
               <DynamicHLine containerRef={deptsContainerRef} />
-              {displayDepts.map((dept) => (
-                <div key={dept.name} className="flex flex-col items-center">
-                  {/* Vertical line from horizontal bar down to department */}
-                  {dept.name === "Commerce" ? (
-                    <>
-                      <VLine />
-                      <div className="px-4 py-2 rounded-lg border-2 border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-center shadow-sm mb-0">
-                          {data.coo?.foto ? (
-                          <img src={data.coo.foto} alt="" className="w-8 h-8 rounded-full mx-auto mb-1 object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-sky-200 dark:bg-sky-800 flex items-center justify-center mx-auto mb-1">
-                            <span className="text-xs font-bold text-sky-800 dark:text-sky-200">{getInitials(data.coo?.nome || "RV")}</span>
-                          </div>
-                        )}
-                        <div className="text-[9px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">{data.coo?.cargo || "COO"}</div>
-                        <div className="text-xs font-bold text-gray-900 dark:text-white">{data.coo?.nome || "Rafael Vilela"}</div>
+
+              {/* COO Group */}
+              {(data.cooDepartments || []).length > 0 && (
+                <div className="flex flex-col items-center">
+                  <VLine />
+                  <CLevelCard person={data.coo} fallbackName="Rafael Vilela" color="sky" />
+                  <VLine height={16} />
+                  <div ref={cooContainerRef} className="relative flex justify-center gap-3 lg:gap-4 pt-4 min-w-fit">
+                    {(data.cooDepartments || []).length > 1 && <DynamicHLine containerRef={cooContainerRef} />}
+                    {(data.cooDepartments || []).filter(d => displayDepts.some(dd => dd.name === d.name)).map((dept) => (
+                      <div key={dept.name} className="flex flex-col items-center">
+                        <VLine />
+                        <DepartmentColumn dept={dept} selectedTeamKey={selectedTeamKey} onSelectTeam={handleSelectTeam} viewMode={viewMode} searchQuery={searchQuery} />
                       </div>
-                    </>
-                  ) : (
-                    <VLine />
-                  )}
-                  <DepartmentColumn
-                    dept={dept}
-                    selectedTeamKey={selectedTeamKey}
-                    onSelectTeam={handleSelectTeam}
-                    viewMode={viewMode}
-                    searchQuery={searchQuery}
-                  />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* CEO Direct Departments (e.g. Comercial) */}
+              {(data.ceoDepartments || []).filter(d => displayDepts.some(dd => dd.name === d.name)).map((dept) => (
+                <div key={dept.name} className="flex flex-col items-center">
+                  <VLine />
+                  <DepartmentColumn dept={dept} selectedTeamKey={selectedTeamKey} onSelectTeam={handleSelectTeam} viewMode={viewMode} searchQuery={searchQuery} />
                 </div>
               ))}
+
+              {/* CTO Group */}
+              {(data.ctoDepartments || []).length > 0 && (
+                <div className="flex flex-col items-center">
+                  <VLine />
+                  <CLevelCard person={data.cto} fallbackName="Rodrigo Queiroz" color="violet" />
+                  <VLine height={16} />
+                  <div ref={ctoContainerRef} className="relative flex justify-center gap-3 lg:gap-4 pt-4 min-w-fit">
+                    {(data.ctoDepartments || []).length > 1 && <DynamicHLine containerRef={ctoContainerRef} />}
+                    {(data.ctoDepartments || []).filter(d => displayDepts.some(dd => dd.name === d.name)).map((dept) => (
+                      <div key={dept.name} className="flex flex-col items-center">
+                        <VLine />
+                        <DepartmentColumn dept={dept} selectedTeamKey={selectedTeamKey} onSelectTeam={handleSelectTeam} viewMode={viewMode} searchQuery={searchQuery} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-sm text-muted-foreground mt-8">
