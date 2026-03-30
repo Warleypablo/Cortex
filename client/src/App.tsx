@@ -81,7 +81,7 @@ const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
-const InstagramConexoes = lazyWithRetry(() => import("@/pages/InstagramConexoes"));
+const InstagramDashboard = lazyWithRetry(() => import("@/pages/InstagramDashboard"));
 const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
 const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
 const ContribuicaoOperador = lazyWithRetry(() => import("@/pages/ContribuicaoOperador"));
@@ -352,7 +352,7 @@ function ProtectedRouter() {
       <Route path="/growth/orcado-realizado">{() => <ProtectedRoute path="/growth/orcado-realizado" component={GrowthOrcadoRealizado} />}</Route>
       <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
-      <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramConexoes} />}</Route>
+      <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramDashboard} />}</Route>
       
       {/* Social (Makers) */}
       <Route path="/social/creators">{() => <ProtectedRoute path="/social/creators" component={Creators} />}</Route>
