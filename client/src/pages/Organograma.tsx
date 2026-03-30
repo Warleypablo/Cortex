@@ -556,18 +556,21 @@ export default function Organograma() {
   const contentRef = useRef<HTMLDivElement>(null);
   const deptsContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setScale((s) => Math.min(1.5, Math.max(0.3, s + delta)));
-  }, []);
-
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      setScale((s) => Math.min(1.5, Math.max(0.3, s + delta)));
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [data]);
 
   // Auto-center on first load
   useEffect(() => {
