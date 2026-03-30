@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useTheme } from "@/components/ThemeProvider";
@@ -26,6 +26,8 @@ import {
   MousePointerClick,
   TrendingUp,
   ExternalLink,
+  LogOut,
+  RefreshCw,
 } from "lucide-react";
 import { format, subDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -113,6 +115,7 @@ export default function InstagramDashboard() {
 
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const queryClient = useQueryClient();
 
   // Date state
   const [endDate, setEndDate] = useState(() => dateStr(new Date()));
@@ -140,6 +143,30 @@ export default function InstagramDashboard() {
     [connections],
   );
   const connId = activeConnection?.id;
+
+  // --- Disconnect ---
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      if (!connId) return;
+      const res = await fetch(`/api/instagram/connections/${connId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Erro ao desconectar");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/instagram/connections"] });
+    },
+  });
+
+  // --- Sync ---
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      if (!connId) return;
+      const res = await fetch(`/api/instagram/connections/${connId}/sync`, { method: "POST" });
+      if (!res.ok) throw new Error("Erro ao sincronizar");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/instagram/connections"] });
+    },
+  });
 
   // --- Fetch metrics ---
   const { data: metrics, isLoading: loadingMetrics } = useQuery<IgMetric[]>({
@@ -317,6 +344,41 @@ export default function InstagramDashboard() {
               {p.label}
             </button>
           ))}
+        </div>
+
+        <div className="flex gap-2 ml-auto">
+          {connId && (
+            <>
+              <button
+                onClick={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+                className={cn(
+                  "h-9 px-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                  "border border-gray-200 dark:border-zinc-700",
+                  "hover:bg-blue-50 dark:hover:bg-blue-900/30",
+                  "text-gray-700 dark:text-zinc-300",
+                  "disabled:opacity-50",
+                )}
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", syncMutation.isPending && "animate-spin")} />
+                Sync
+              </button>
+              <button
+                onClick={() => { if (confirm("Desconectar o Instagram?")) disconnectMutation.mutate(); }}
+                disabled={disconnectMutation.isPending}
+                className={cn(
+                  "h-9 px-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
+                  "border border-red-200 dark:border-red-800",
+                  "hover:bg-red-50 dark:hover:bg-red-900/30",
+                  "text-red-600 dark:text-red-400",
+                  "disabled:opacity-50",
+                )}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Desconectar
+              </button>
+            </>
+          )}
         </div>
       </div>
 
