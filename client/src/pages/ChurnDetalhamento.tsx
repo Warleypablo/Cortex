@@ -770,11 +770,13 @@ export default function ChurnDetalhamento() {
     const elapsedDays = differenceInCalendarDays(effectiveEnd, periodStart) + 1;
     const safeDays = Math.max(0, Math.min(elapsedDays, totalDaysInMonth));
 
-    // Meta pro-rateada até hoje
-    const mrrPlanejado = (targetMensal / totalDaysInMonth) * safeDays;
+    // Meta pro-rateada até hoje, capped at 8% (meta máxima de churn)
+    const MAX_CHURN_RATE = 0.08;
+    const cappedTargetMensal = mrrBaseReal > 0 ? Math.min(targetMensal, mrrBaseReal * MAX_CHURN_RATE) : targetMensal;
+    const mrrPlanejado = (cappedTargetMensal / totalDaysInMonth) * safeDays;
     const taxaPlanejada = mrrBaseReal > 0 ? (mrrPlanejado / mrrBaseReal) * 100 : 0;
 
-    return { mrrPlanejado, taxaPlanejada, targetMensal };
+    return { mrrPlanejado, taxaPlanejada, targetMensal: cappedTargetMensal };
   }, [dataInicio, dataFim, mrrBaseReal, churnExcessFromPreviousMonths]);
 
   const churnDailyInsights = useMemo(() => {

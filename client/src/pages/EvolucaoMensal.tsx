@@ -321,6 +321,7 @@ export default function EvolucaoMensal() {
     
     const mesesUnicos = Array.from(new Set(mrrData.map(d => d.mes))).sort();
 
+    let previousMrr = 0;
     return mesesUnicos.map(mes => {
       const mrrMes = mrrData.filter(d => d.mes === mes);
       const churnMes = churnData.filter(d => d.mes === mes);
@@ -346,9 +347,11 @@ export default function EvolucaoMensal() {
         .filter(d => squadSelecionado === "todos" || d.squad === squadSelecionado)
         .filter(d => operadorSelecionado === "todos" || d.responsavel === operadorSelecionado)
         .reduce((acc, d) => acc + (Number(d.churns) || 0), 0);
-      
-      const churnRate = totalMrr > 0 ? (churnTotal / totalMrr) * 100 : 0;
-      
+
+      // Taxa de churn usa MRR do mês anterior como base
+      const churnRate = previousMrr > 0 ? (churnTotal / previousMrr) * 100 : 0;
+      previousMrr = totalMrr;
+
       return {
         mes: formatMesLabel(mes),
         mesOriginal: mes,
@@ -425,7 +428,7 @@ export default function EvolucaoMensal() {
                   </div>
                   {!isMRR && currentData && (
                     <div className="text-xs font-medium text-amber-500 dark:text-amber-400 mt-1">
-                      Taxa: {currentData.churnRate.toFixed(1)}% do MRR
+                      Taxa: {currentData.churnRate.toFixed(1)}% do MRR anterior
                     </div>
                   )}
                   {previousValue !== null && (
@@ -759,16 +762,18 @@ export default function EvolucaoMensal() {
                       })
                       .sort((a, b) => {
                         if (tableMode === "churn") {
-                          const avgA = chartData.reduce((acc, row) => {
-                            const mrr = Number(row[a]) || 0;
+                          const avgA = chartData.reduce((acc, row, idx) => {
+                            if (idx === 0) return acc;
+                            const prevMrr = Number(chartData[idx - 1][a]) || 0;
                             const churn = Number(row[`churn_${a}`]) || 0;
-                            return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
-                          }, 0) / chartData.length;
-                          const avgB = chartData.reduce((acc, row) => {
-                            const mrr = Number(row[b]) || 0;
+                            return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
+                          }, 0) / Math.max(chartData.length - 1, 1);
+                          const avgB = chartData.reduce((acc, row, idx) => {
+                            if (idx === 0) return acc;
+                            const prevMrr = Number(chartData[idx - 1][b]) || 0;
                             const churn = Number(row[`churn_${b}`]) || 0;
-                            return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
-                          }, 0) / chartData.length;
+                            return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
+                          }, 0) / Math.max(chartData.length - 1, 1);
                           return avgB - avgA;
                         }
                         const totalA = chartData.reduce((acc, row) => acc + (Number(row[a]) || 0), 0);
@@ -833,10 +838,10 @@ export default function EvolucaoMensal() {
                             </>
                           ) : (
                             <>
-                              {chartData.map((row) => {
-                                const mrr = Number(row[squad]) || 0;
+                              {chartData.map((row, idx) => {
+                                const prevMrr = idx > 0 ? (Number(chartData[idx - 1][squad]) || 0) : 0;
                                 const churn = Number(row[`churn_${squad}`]) || 0;
-                                const rate = mrr > 0 ? (churn / mrr) * 100 : 0;
+                                const rate = prevMrr > 0 ? (churn / prevMrr) * 100 : 0;
 
                                 return (
                                   <td key={row.mes} className="text-right py-3 px-4 font-mono">
@@ -862,12 +867,13 @@ export default function EvolucaoMensal() {
                               })}
                               <td className="text-right py-3 px-4 font-mono font-semibold border-l border-gray-200 dark:border-zinc-700/50">
                                 {(() => {
-                                  const mesesComMrr = chartData.filter(row => (Number(row[squad]) || 0) > 0);
+                                  const mesesComMrr = chartData.filter((_, idx) => idx > 0 && (Number(chartData[idx - 1][squad]) || 0) > 0);
                                   const avgRate = mesesComMrr.length > 0
-                                    ? mesesComMrr.reduce((acc, row) => {
-                                        const mrr = Number(row[squad]) || 0;
+                                    ? chartData.reduce((acc, row, idx) => {
+                                        if (idx === 0) return acc;
+                                        const prevMrr = Number(chartData[idx - 1][squad]) || 0;
                                         const churn = Number(row[`churn_${squad}`]) || 0;
-                                        return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
+                                        return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
                                       }, 0) / mesesComMrr.length
                                     : 0;
                                   return (
@@ -927,12 +933,12 @@ export default function EvolucaoMensal() {
                         </>
                       ) : (
                         <>
-                          {chartData.map((row) => {
-                            const totalMrr = squads
+                          {chartData.map((row, idx) => {
+                            const prevMrr = idx > 0 ? squads
                               .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
-                              .reduce((acc, squad) => acc + (Number(row[squad]) || 0), 0);
+                              .reduce((acc, squad) => acc + (Number(chartData[idx - 1][squad]) || 0), 0) : 0;
                             const totalChurn = Number(row.churn) || 0;
-                            const rate = totalMrr > 0 ? (totalChurn / totalMrr) * 100 : 0;
+                            const rate = prevMrr > 0 ? (totalChurn / prevMrr) * 100 : 0;
                             return (
                               <td key={row.mes} className="text-right py-2 px-4 font-mono font-semibold">
                                 <span className={cn(
@@ -947,19 +953,21 @@ export default function EvolucaoMensal() {
                           })}
                           <td className="text-right py-2 px-4 font-mono font-bold border-l border-gray-200 dark:border-zinc-700/50">
                             {(() => {
-                              const mesesComMrr = chartData.filter(row => {
-                                const totalMrr = squads
+                              const mesesComMrr = chartData.filter((_, idx) => {
+                                if (idx === 0) return false;
+                                const prevMrr = squads
                                   .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
-                                  .reduce((acc, squad) => acc + (Number(row[squad]) || 0), 0);
-                                return totalMrr > 0;
+                                  .reduce((acc, squad) => acc + (Number(chartData[idx - 1][squad]) || 0), 0);
+                                return prevMrr > 0;
                               });
                               const avgRate = mesesComMrr.length > 0
-                                ? mesesComMrr.reduce((acc, row) => {
-                                    const totalMrr = squads
+                                ? chartData.reduce((acc, row, idx) => {
+                                    if (idx === 0) return acc;
+                                    const prevMrr = squads
                                       .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
-                                      .reduce((a, squad) => a + (Number(row[squad]) || 0), 0);
+                                      .reduce((a, squad) => a + (Number(chartData[idx - 1][squad]) || 0), 0);
                                     const totalChurn = Number(row.churn) || 0;
-                                    return acc + (totalMrr > 0 ? (totalChurn / totalMrr) * 100 : 0);
+                                    return acc + (prevMrr > 0 ? (totalChurn / prevMrr) * 100 : 0);
                                   }, 0) / mesesComMrr.length
                                 : 0;
                               return (
@@ -1050,16 +1058,18 @@ export default function EvolucaoMensal() {
                       })
                       .sort((a, b) => {
                         if (tableMode === "churn") {
-                          const avgA = chartData.reduce((acc, row) => {
-                            const mrr = Number(row[a]) || 0;
+                          const avgA = chartData.reduce((acc, row, idx) => {
+                            if (idx === 0) return acc;
+                            const prevMrr = Number(chartData[idx - 1][a]) || 0;
                             const churn = Number(row[`churn_${a}`]) || 0;
-                            return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
-                          }, 0) / chartData.length;
-                          const avgB = chartData.reduce((acc, row) => {
-                            const mrr = Number(row[b]) || 0;
+                            return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
+                          }, 0) / Math.max(chartData.length - 1, 1);
+                          const avgB = chartData.reduce((acc, row, idx) => {
+                            if (idx === 0) return acc;
+                            const prevMrr = Number(chartData[idx - 1][b]) || 0;
                             const churn = Number(row[`churn_${b}`]) || 0;
-                            return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
-                          }, 0) / chartData.length;
+                            return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
+                          }, 0) / Math.max(chartData.length - 1, 1);
                           return avgB - avgA;
                         }
                         const totalA = chartData.reduce((acc, row) => acc + (Number(row[a]) || 0), 0);
