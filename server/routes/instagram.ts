@@ -487,9 +487,9 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             comments,
             saves,
             shares,
-            impressions: postInsights.impressions ?? 0,
+            impressions: postInsights.views ?? postInsights.impressions ?? 0,
             reach: postInsights.reach ?? 0,
-            plays: postInsights.plays ?? 0,
+            plays: postInsights.views ?? postInsights.plays ?? 0,
             totalInteractions: postInsights.total_interactions ?? (likes + comments + saves + shares),
             lastSyncedAt: new Date(),
           })
