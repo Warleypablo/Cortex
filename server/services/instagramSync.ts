@@ -176,7 +176,7 @@ export async function syncProfile(igUserId: string, accessToken: string) {
 
 export async function syncInsights(igUserId: string, accessToken: string, period: string = "day") {
   // Use /me/insights with metric_type=total_value for simple totals
-  const metrics = "reach,impressions,follower_count";
+  const metrics = "reach,follower_count,views";
   console.log("[Instagram] Fetching insights for user:", igUserId);
   try {
     const insights = await callGraphAPI(`/me/insights`, accessToken, {
