@@ -237,6 +237,8 @@ const DEFAULT_USER_ROUTES = [
   '/solicitacao-ferramentas',
   // Instagram Analytics
   '/growth/instagram',
+  // Calendário de Férias / Indisponibilidade
+  '/gg/calendario-ferias',
 ];
 
 // Migra permissões antigas automaticamente
