@@ -409,13 +409,26 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       // 3b. Sync historical daily insights (last 30 days)
       try {
         const historical = await syncInsightsHistorical(conn.igUserId, token, 30);
+
+        // follower_count in time_series is daily delta, not absolute.
+        // Reconstruct absolute values: current total - sum of future deltas
+        const currentFollowers = profile.followers_count || 0;
+        let cumulativeDelta = 0;
+        // Process in reverse (most recent first) to build absolute values
+        const reversedHistory = [...historical].reverse();
+        const absoluteFollowers: Record<string, number> = {};
+        for (const day of reversedHistory) {
+          absoluteFollowers[day.date] = currentFollowers - cumulativeDelta;
+          cumulativeDelta += day.followers; // followers here is daily delta
+        }
+
         for (const day of historical) {
           await db
             .insert(instagramMetricsSnapshots)
             .values({
               connectionId: id,
               metricDate: day.date,
-              followers: day.followers || profile.followers_count || 0,
+              followers: absoluteFollowers[day.date] || currentFollowers,
               following: profile.follows_count || 0,
               postsCount: profile.media_count || 0,
               reachDay: day.reach,
@@ -424,6 +437,7 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             .onConflictDoUpdate({
               target: [instagramMetricsSnapshots.connectionId, instagramMetricsSnapshots.metricDate],
               set: {
+                followers: sql`EXCLUDED.followers`,
                 reachDay: sql`EXCLUDED.reach_day`,
                 impressionsDay: sql`EXCLUDED.impressions_day`,
                 recordedAt: sql`NOW()`,
