@@ -175,7 +175,6 @@ export async function syncProfile(igUserId: string, accessToken: string) {
 }
 
 export async function syncInsights(igUserId: string, accessToken: string, period: string = "day") {
-  // Use /me/insights with metric_type=total_value for simple totals
   const metrics = "reach,follower_count,views";
   console.log("[Instagram] Fetching insights for user:", igUserId);
   try {
@@ -188,18 +187,66 @@ export async function syncInsights(igUserId: string, accessToken: string, period
     return insights.data || [];
   } catch (err: any) {
     console.error("[Instagram] Insights fetch error:", err.message);
-    // Try without metric_type as fallback
-    try {
-      const insights = await callGraphAPI(`/me/insights`, accessToken, {
-        metric: metrics,
-        period,
-      });
-      return insights.data || [];
-    } catch (err2: any) {
-      console.error("[Instagram] Insights fallback also failed:", err2.message);
-      return [];
-    }
+    return [];
   }
+}
+
+// Fetch historical daily insights (reach, views) for a date range
+export async function syncInsightsHistorical(
+  igUserId: string,
+  accessToken: string,
+  sinceDaysAgo: number = 30
+): Promise<Array<{ date: string; reach: number; views: number; followers: number }>> {
+  const results: Array<{ date: string; reach: number; views: number; followers: number }> = [];
+
+  // Instagram API allows max 30 days per request for time_series
+  const now = new Date();
+  const since = new Date(now);
+  since.setDate(since.getDate() - sinceDaysAgo);
+  // Subtract 48h for data lag
+  const until = new Date(now);
+  until.setDate(until.getDate() - 2);
+
+  if (until <= since) return results;
+
+  const sinceTs = Math.floor(since.getTime() / 1000);
+  const untilTs = Math.floor(until.getTime() / 1000);
+
+  console.log("[Instagram] Fetching historical insights:", sinceDaysAgo, "days ago →", until.toISOString().split("T")[0]);
+
+  try {
+    const insights = await callGraphAPI(`/me/insights`, accessToken, {
+      metric: "reach,follower_count,views",
+      period: "day",
+      metric_type: "time_series",
+      since: String(sinceTs),
+      until: String(untilTs),
+    });
+
+    // Build daily map from time_series data
+    const dailyMap: Record<string, { reach: number; views: number; followers: number }> = {};
+
+    for (const metric of insights.data || []) {
+      for (const point of metric.values || []) {
+        const date = point.end_time?.split("T")[0];
+        if (!date) continue;
+        if (!dailyMap[date]) dailyMap[date] = { reach: 0, views: 0, followers: 0 };
+        if (metric.name === "reach") dailyMap[date].reach = point.value || 0;
+        if (metric.name === "views") dailyMap[date].views = point.value || 0;
+        if (metric.name === "follower_count") dailyMap[date].followers = point.value || 0;
+      }
+    }
+
+    for (const [date, data] of Object.entries(dailyMap).sort()) {
+      results.push({ date, ...data });
+    }
+
+    console.log("[Instagram] Historical insights:", results.length, "days of data");
+  } catch (err: any) {
+    console.error("[Instagram] Historical insights error:", err.message);
+  }
+
+  return results;
 }
 
 export async function syncMedia(igUserId: string, accessToken: string, limit: number = 50) {
