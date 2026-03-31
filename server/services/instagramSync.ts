@@ -105,7 +105,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
     console.log("[Instagram] Step 2: Exchanging for long-lived token...");
     const longUrl = new URL(`https://graph.instagram.com/${apiVersion}/access_token`);
     longUrl.searchParams.set("grant_type", "ig_exchange_token");
-    longUrl.searchParams.set("client_secret", mainAppSecret);
+    longUrl.searchParams.set("client_secret", appSecret);
     longUrl.searchParams.set("access_token", shortLivedToken);
 
     const longRes = await fetch(longUrl.toString());
