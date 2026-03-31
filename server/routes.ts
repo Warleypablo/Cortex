@@ -2192,12 +2192,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Gerar insights de IA sobre evolução mensal (SSE streaming)
   app.post("/api/dashboard/evolucao-mensal/insights", async (req, res) => {
     try {
-      const numMeses = 6;
+      const { meses: mesesParam, squad: squadFilter, operador: operadorFilter } = req.body || {};
+      const numMeses = Math.min(Math.max(parseInt(mesesParam) || 6, 1), 36);
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - numMeses);
       const startDateStr = startDate.toISOString().split('T')[0];
-
-      const HIDDEN_SQUADS_SQL = "('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')";
 
       const mrrResult = await db.execute(sql`
         WITH snapshots_mensais AS (
@@ -2213,24 +2212,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           SELECT
             TO_CHAR(sm.mes, 'YYYY-MM') as mes,
             h.squad,
+            h.responsavel,
             COALESCE(SUM(h.valorr), 0) as mrr_total,
             COUNT(*) as total_contratos
           FROM snapshots_mensais sm
           JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
           WHERE h.status IN ('ativo', 'onboarding', 'triagem')
             AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
-          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad
+          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ),
         current_month_data AS (
           SELECT
             TO_CHAR(DATE_TRUNC('month', CURRENT_DATE), 'YYYY-MM') as mes,
             squad,
+            responsavel,
             COALESCE(SUM(valorr), 0) as mrr_total,
             COUNT(*) as total_contratos
           FROM "Clickup".cup_contratos
           WHERE status IN ('ativo', 'onboarding', 'triagem')
             AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
-          GROUP BY squad
+          GROUP BY squad, responsavel
         )
         SELECT * FROM historical_data
         UNION ALL
@@ -2242,6 +2243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT
           TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           squad,
+          responsavel_geral as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0) as mrr_churn
         FROM "Clickup".cup_churn
@@ -2249,19 +2251,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
-        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad
+        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
         ORDER BY mes, squad
       `);
 
+      // Apply squad/operador filters
+      let mrrRows = mrrResult.rows as any[];
+      let churnRows = churnResult.rows as any[];
+      if (squadFilter) {
+        mrrRows = mrrRows.filter((r: any) => r.squad === squadFilter);
+        churnRows = churnRows.filter((r: any) => r.squad === squadFilter);
+      }
+      if (operadorFilter) {
+        mrrRows = mrrRows.filter((r: any) => r.responsavel === operadorFilter);
+        churnRows = churnRows.filter((r: any) => r.responsavel === operadorFilter);
+      }
+
       // Montar resumo dos dados para o prompt
-      const meses = Array.from(new Set(mrrResult.rows.map((r: any) => r.mes))).sort();
-      const squads = Array.from(new Set(mrrResult.rows.map((r: any) => r.squad)));
+      const filterDesc = squadFilter ? `Filtro: Squad ${squadFilter}` : operadorFilter ? `Filtro: Operador ${operadorFilter}` : "Visão geral (todos os squads)";
+      const meses = Array.from(new Set(mrrRows.map((r: any) => r.mes))).sort();
+      const squads = Array.from(new Set(mrrRows.map((r: any) => r.squad)));
 
       let dataContext = "## Dados de MRR por Squad e Mês\n\n";
       for (const mes of meses) {
-        const mrrMes = mrrResult.rows.filter((r: any) => r.mes === mes);
+        const mrrMes = mrrRows.filter((r: any) => r.mes === mes);
         const totalMrr = mrrMes.reduce((acc: number, r: any) => acc + Number(r.mrr_total), 0);
         dataContext += `### ${mes} (MRR Total: R$ ${totalMrr.toLocaleString('pt-BR')})\n`;
         for (const r of mrrMes as any[]) {
@@ -2272,7 +2287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       dataContext += "\n## Dados de Churn por Squad e Mês\n\n";
       for (const mes of meses) {
-        const churnMes = churnResult.rows.filter((r: any) => r.mes === mes);
+        const churnMes = churnRows.filter((r: any) => r.mes === mes);
         if (churnMes.length === 0) continue;
         const totalChurn = churnMes.reduce((acc: number, r: any) => acc + Number(r.mrr_churn), 0);
         const totalChurns = churnMes.reduce((acc: number, r: any) => acc + Number(r.churns), 0);
@@ -2288,10 +2303,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let i = 1; i < meses.length; i++) {
         const mesAnterior = meses[i - 1];
         const mesAtual = meses[i];
-        const mrrAnterior = mrrResult.rows
+        const mrrAnterior = mrrRows
           .filter((r: any) => r.mes === mesAnterior)
           .reduce((acc: number, r: any) => acc + Number(r.mrr_total), 0);
-        const churnAtual = churnResult.rows
+        const churnAtual = churnRows
           .filter((r: any) => r.mes === mesAtual)
           .reduce((acc: number, r: any) => acc + Number(r.mrr_churn), 0);
         const taxa = mrrAnterior > 0 ? ((churnAtual / mrrAnterior) * 100).toFixed(1) : "0.0";
@@ -2329,7 +2344,7 @@ Estruture sua resposta em:
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Analise os seguintes dados dos últimos ${numMeses} meses:\n\n${dataContext}` }
+          { role: "user", content: `Analise os seguintes dados dos últimos ${numMeses} meses.\n${filterDesc}\n\n${dataContext}` }
         ],
         max_tokens: 2048,
         stream: true,
@@ -6289,7 +6304,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável')
       `);
       const churnPorOperadorRows = churnResult.rows as any[];
@@ -6359,7 +6374,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável')
       `);
       const churnAnteriorRows = churnAnteriorResult.rows as any[];
@@ -6513,7 +6528,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
         GROUP BY 1 ORDER BY 1
@@ -6527,7 +6542,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
         GROUP BY 1, 2 ORDER BY 1
