@@ -374,7 +374,7 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           // Support both total_value format and time_series values format
           const value = metric.total_value?.value ?? metric.values?.[0]?.value ?? 0;
           if (metric.name === "reach") reachDay = value;
-          if (metric.name === "impressions") impressionsDay = value;
+          if (metric.name === "views") impressionsDay = value;
         }
         console.log("[Instagram] Insights extracted: reach=", reachDay, "impressions=", impressionsDay);
       } catch (insightsErr: any) {
