@@ -371,9 +371,12 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       try {
         const insights = await syncInsights(conn.igUserId, token);
         for (const metric of insights) {
-          if (metric.name === "reach") reachDay = metric.values?.[0]?.value || 0;
-          if (metric.name === "impressions") impressionsDay = metric.values?.[0]?.value || 0;
+          // Support both total_value format and time_series values format
+          const value = metric.total_value?.value ?? metric.values?.[0]?.value ?? 0;
+          if (metric.name === "reach") reachDay = value;
+          if (metric.name === "impressions") impressionsDay = value;
         }
+        console.log("[Instagram] Insights extracted: reach=", reachDay, "impressions=", impressionsDay);
       } catch (insightsErr: any) {
         console.warn("[Instagram] Insights sync partial failure:", insightsErr.message);
       }
@@ -403,7 +406,13 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
         });
 
       // 4. Sync media
-      const mediaItems = await syncMedia(conn.igUserId, token);
+      let mediaItems: any[] = [];
+      try {
+        mediaItems = await syncMedia(conn.igUserId, token);
+        console.log("[Instagram] Media fetched:", mediaItems.length, "items");
+      } catch (mediaErr: any) {
+        console.error("[Instagram] Media sync error:", mediaErr.message);
+      }
       let postsUpserted = 0;
 
       for (const item of mediaItems) {
