@@ -27,11 +27,9 @@ export async function callGraphAPI(
   params: Record<string, string> = {},
   retries = 3
 ): Promise<any> {
-  const { apiVersion } = getConfig();
-  const proof = makeAppSecretProof(accessToken);
-  const url = new URL(`${GRAPH_API_BASE}/${apiVersion}${endpoint}`);
+  // Instagram API does NOT use version prefix or appsecret_proof
+  const url = new URL(`${GRAPH_API_BASE}${endpoint}`);
   url.searchParams.set("access_token", accessToken);
-  url.searchParams.set("appsecret_proof", proof);
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
