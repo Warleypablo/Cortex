@@ -27,8 +27,8 @@ export async function callGraphAPI(
   params: Record<string, string> = {},
   retries = 3
 ): Promise<any> {
-  // Instagram API does NOT use version prefix or appsecret_proof
-  const url = new URL(`${GRAPH_API_BASE}${endpoint}`);
+  const { apiVersion } = getConfig();
+  const url = new URL(`${GRAPH_API_BASE}/${apiVersion}${endpoint}`);
   url.searchParams.set("access_token", accessToken);
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
@@ -103,7 +103,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
 
   try {
     console.log("[Instagram] Step 2: Exchanging for long-lived token...");
-    const longUrl = new URL(`https://graph.instagram.com/access_token`);
+    const longUrl = new URL(`https://graph.instagram.com/${apiVersion}/access_token`);
     longUrl.searchParams.set("grant_type", "ig_exchange_token");
     longUrl.searchParams.set("client_secret", mainAppSecret);
     longUrl.searchParams.set("access_token", shortLivedToken);
@@ -128,7 +128,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
   let username = igUserId;
   let accountType = "BUSINESS";
   try {
-    const profileUrl = `https://graph.instagram.com/${igUserId}?fields=username,account_type&access_token=${finalToken}`;
+    const profileUrl = `https://graph.instagram.com/${apiVersion}/me?fields=user_id,username,account_type&access_token=${finalToken}`;
     const profileRes = await fetch(profileUrl);
     const profile = await profileRes.json();
     console.log("[Instagram] Step 3 response:", JSON.stringify({ username: profile.username, error: profile.error?.message || null, code: profile.error?.code || null }));
@@ -168,7 +168,7 @@ export async function refreshLongLivedToken(currentToken: string): Promise<{
 }
 
 export async function syncProfile(igUserId: string, accessToken: string) {
-  const profile = await callGraphAPI(`/${igUserId}`, accessToken, {
+  const profile = await callGraphAPI(`/me`, accessToken, {
     fields: "user_id,username,name,biography,website,followers_count,follows_count,media_count,profile_picture_url,account_type",
   });
   return profile;
