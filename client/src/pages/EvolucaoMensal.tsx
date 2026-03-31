@@ -170,6 +170,11 @@ export default function EvolucaoMensal() {
       const response = await fetch("/api/dashboard/evolucao-mensal/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          meses,
+          squad: squadSelecionado !== "todos" ? squadSelecionado : undefined,
+          operador: operadorSelecionado !== "todos" ? operadorSelecionado : undefined,
+        }),
         signal: abortRef.current.signal,
       });
 
@@ -213,7 +218,7 @@ export default function EvolucaoMensal() {
       }
       setInsightsLoading(false);
     }
-  }, []);
+  }, [meses, squadSelecionado, operadorSelecionado]);
 
   const handleCloseInsights = useCallback(() => {
     abortRef.current?.abort();
@@ -372,7 +377,13 @@ export default function EvolucaoMensal() {
 
     const variacaoMrr = penultimo ? ultimo.mrr - penultimo.mrr : 0;
     const churnTotal = aggregatedData.reduce((acc, d) => acc + d.churn, 0);
-    const avgChurnRate = aggregatedData.reduce((acc, d) => acc + d.churnRate, 0) / aggregatedData.length;
+    // Média ponderada: soma_churn / soma_mrr_base * 100
+    let totalChurnSum = 0, totalMrrBaseSum = 0;
+    for (let i = 1; i < aggregatedData.length; i++) {
+      const prevMrr = aggregatedData[i - 1].mrr;
+      if (prevMrr > 0) { totalChurnSum += aggregatedData[i].churn; totalMrrBaseSum += prevMrr; }
+    }
+    const avgChurnRate = totalMrrBaseSum > 0 ? (totalChurnSum / totalMrrBaseSum) * 100 : 0;
 
     return {
       mrrAtual: ultimo.mrr,
@@ -762,18 +773,16 @@ export default function EvolucaoMensal() {
                       })
                       .sort((a, b) => {
                         if (tableMode === "churn") {
-                          const avgA = chartData.reduce((acc, row, idx) => {
-                            if (idx === 0) return acc;
-                            const prevMrr = Number(chartData[idx - 1][a]) || 0;
-                            const churn = Number(row[`churn_${a}`]) || 0;
-                            return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
-                          }, 0) / Math.max(chartData.length - 1, 1);
-                          const avgB = chartData.reduce((acc, row, idx) => {
-                            if (idx === 0) return acc;
-                            const prevMrr = Number(chartData[idx - 1][b]) || 0;
-                            const churn = Number(row[`churn_${b}`]) || 0;
-                            return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
-                          }, 0) / Math.max(chartData.length - 1, 1);
+                          // Média ponderada para sorting
+                          let churnSumA = 0, baseSumA = 0, churnSumB = 0, baseSumB = 0;
+                          for (let idx = 1; idx < chartData.length; idx++) {
+                            const prevA = Number(chartData[idx - 1][a]) || 0;
+                            const prevB = Number(chartData[idx - 1][b]) || 0;
+                            if (prevA > 0) { churnSumA += Number(chartData[idx][`churn_${a}`]) || 0; baseSumA += prevA; }
+                            if (prevB > 0) { churnSumB += Number(chartData[idx][`churn_${b}`]) || 0; baseSumB += prevB; }
+                          }
+                          const avgA = baseSumA > 0 ? (churnSumA / baseSumA) * 100 : 0;
+                          const avgB = baseSumB > 0 ? (churnSumB / baseSumB) * 100 : 0;
                           return avgB - avgA;
                         }
                         const totalA = chartData.reduce((acc, row) => acc + (Number(row[a]) || 0), 0);
@@ -867,15 +876,18 @@ export default function EvolucaoMensal() {
                               })}
                               <td className="text-right py-3 px-4 font-mono font-semibold border-l border-gray-200 dark:border-zinc-700/50">
                                 {(() => {
-                                  const mesesComMrr = chartData.filter((_, idx) => idx > 0 && (Number(chartData[idx - 1][squad]) || 0) > 0);
-                                  const avgRate = mesesComMrr.length > 0
-                                    ? chartData.reduce((acc, row, idx) => {
-                                        if (idx === 0) return acc;
-                                        const prevMrr = Number(chartData[idx - 1][squad]) || 0;
-                                        const churn = Number(row[`churn_${squad}`]) || 0;
-                                        return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
-                                      }, 0) / mesesComMrr.length
-                                    : 0;
+                                  // Média ponderada: soma_churn / soma_mrr_base * 100
+                                  let totalChurnSquad = 0;
+                                  let totalMrrBaseSquad = 0;
+                                  for (let idx = 1; idx < chartData.length; idx++) {
+                                    const prevMrr = Number(chartData[idx - 1][squad]) || 0;
+                                    const churn = Number(chartData[idx][`churn_${squad}`]) || 0;
+                                    if (prevMrr > 0) {
+                                      totalChurnSquad += churn;
+                                      totalMrrBaseSquad += prevMrr;
+                                    }
+                                  }
+                                  const avgRate = totalMrrBaseSquad > 0 ? (totalChurnSquad / totalMrrBaseSquad) * 100 : 0;
                                   return (
                                     <span className={cn(
                                       avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
@@ -953,23 +965,20 @@ export default function EvolucaoMensal() {
                           })}
                           <td className="text-right py-2 px-4 font-mono font-bold border-l border-gray-200 dark:border-zinc-700/50">
                             {(() => {
-                              const mesesComMrr = chartData.filter((_, idx) => {
-                                if (idx === 0) return false;
+                              // Média ponderada: soma_churn / soma_mrr_base * 100
+                              let totalChurnAll = 0;
+                              let totalMrrBaseAll = 0;
+                              for (let idx = 1; idx < chartData.length; idx++) {
                                 const prevMrr = squads
                                   .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
-                                  .reduce((acc, squad) => acc + (Number(chartData[idx - 1][squad]) || 0), 0);
-                                return prevMrr > 0;
-                              });
-                              const avgRate = mesesComMrr.length > 0
-                                ? chartData.reduce((acc, row, idx) => {
-                                    if (idx === 0) return acc;
-                                    const prevMrr = squads
-                                      .filter(s => squadSelecionado === "todos" || s === squadSelecionado)
-                                      .reduce((a, squad) => a + (Number(chartData[idx - 1][squad]) || 0), 0);
-                                    const totalChurn = Number(row.churn) || 0;
-                                    return acc + (prevMrr > 0 ? (totalChurn / prevMrr) * 100 : 0);
-                                  }, 0) / mesesComMrr.length
-                                : 0;
+                                  .reduce((a, squad) => a + (Number(chartData[idx - 1][squad]) || 0), 0);
+                                const churn = Number(chartData[idx].churn) || 0;
+                                if (prevMrr > 0) {
+                                  totalChurnAll += churn;
+                                  totalMrrBaseAll += prevMrr;
+                                }
+                              }
+                              const avgRate = totalMrrBaseAll > 0 ? (totalChurnAll / totalMrrBaseAll) * 100 : 0;
                               return (
                                 <span className={cn(
                                   avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
@@ -1058,18 +1067,16 @@ export default function EvolucaoMensal() {
                       })
                       .sort((a, b) => {
                         if (tableMode === "churn") {
-                          const avgA = chartData.reduce((acc, row, idx) => {
-                            if (idx === 0) return acc;
-                            const prevMrr = Number(chartData[idx - 1][a]) || 0;
-                            const churn = Number(row[`churn_${a}`]) || 0;
-                            return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
-                          }, 0) / Math.max(chartData.length - 1, 1);
-                          const avgB = chartData.reduce((acc, row, idx) => {
-                            if (idx === 0) return acc;
-                            const prevMrr = Number(chartData[idx - 1][b]) || 0;
-                            const churn = Number(row[`churn_${b}`]) || 0;
-                            return acc + (prevMrr > 0 ? (churn / prevMrr) * 100 : 0);
-                          }, 0) / Math.max(chartData.length - 1, 1);
+                          // Média ponderada para sorting
+                          let churnSumA = 0, baseSumA = 0, churnSumB = 0, baseSumB = 0;
+                          for (let idx = 1; idx < chartData.length; idx++) {
+                            const prevA = Number(chartData[idx - 1][a]) || 0;
+                            const prevB = Number(chartData[idx - 1][b]) || 0;
+                            if (prevA > 0) { churnSumA += Number(chartData[idx][`churn_${a}`]) || 0; baseSumA += prevA; }
+                            if (prevB > 0) { churnSumB += Number(chartData[idx][`churn_${b}`]) || 0; baseSumB += prevB; }
+                          }
+                          const avgA = baseSumA > 0 ? (churnSumA / baseSumA) * 100 : 0;
+                          const avgB = baseSumB > 0 ? (churnSumB / baseSumB) * 100 : 0;
                           return avgB - avgA;
                         }
                         const totalA = chartData.reduce((acc, row) => acc + (Number(row[a]) || 0), 0);
@@ -1149,14 +1156,14 @@ export default function EvolucaoMensal() {
                               })}
                               <td className="text-right py-3 px-4 font-mono font-semibold border-l border-gray-200 dark:border-zinc-700/50">
                                 {(() => {
-                                  const mesesComMrr = chartData.filter(row => (Number(row[operador]) || 0) > 0);
-                                  const avgRate = mesesComMrr.length > 0
-                                    ? mesesComMrr.reduce((acc, row) => {
-                                        const mrr = Number(row[operador]) || 0;
-                                        const churn = Number(row[`churn_${operador}`]) || 0;
-                                        return acc + (mrr > 0 ? (churn / mrr) * 100 : 0);
-                                      }, 0) / mesesComMrr.length
-                                    : 0;
+                                  // Média ponderada: soma_churn / soma_mrr_base * 100
+                                  let totalChurnOp = 0, totalMrrBaseOp = 0;
+                                  for (let idx = 1; idx < chartData.length; idx++) {
+                                    const prevMrr = Number(chartData[idx - 1][operador]) || 0;
+                                    const churn = Number(chartData[idx][`churn_${operador}`]) || 0;
+                                    if (prevMrr > 0) { totalChurnOp += churn; totalMrrBaseOp += prevMrr; }
+                                  }
+                                  const avgRate = totalMrrBaseOp > 0 ? (totalChurnOp / totalMrrBaseOp) * 100 : 0;
                                   return (
                                     <span className={cn(
                                       avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
@@ -1234,21 +1241,16 @@ export default function EvolucaoMensal() {
                           })}
                           <td className="text-right py-2 px-4 font-mono font-bold border-l border-gray-200 dark:border-zinc-700/50">
                             {(() => {
-                              const mesesComMrr = chartData.filter(row => {
-                                const totalMrr = operadores
+                              // Média ponderada: soma_churn / soma_mrr_base * 100
+                              let totalChurnFooter = 0, totalMrrBaseFooter = 0;
+                              for (let idx = 1; idx < chartData.length; idx++) {
+                                const prevMrr = operadores
                                   .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
-                                  .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
-                                return totalMrr > 0;
-                              });
-                              const avgRate = mesesComMrr.length > 0
-                                ? mesesComMrr.reduce((acc, row) => {
-                                    const totalMrr = operadores
-                                      .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
-                                      .reduce((a, op) => a + (Number(row[op]) || 0), 0);
-                                    const totalChurn = Number(row.churn) || 0;
-                                    return acc + (totalMrr > 0 ? (totalChurn / totalMrr) * 100 : 0);
-                                  }, 0) / mesesComMrr.length
-                                : 0;
+                                  .reduce((a, op) => a + (Number(chartData[idx - 1][op]) || 0), 0);
+                                const churn = Number(chartData[idx].churn) || 0;
+                                if (prevMrr > 0) { totalChurnFooter += churn; totalMrrBaseFooter += prevMrr; }
+                              }
+                              const avgRate = totalMrrBaseFooter > 0 ? (totalChurnFooter / totalMrrBaseFooter) * 100 : 0;
                               return (
                                 <span className={cn(
                                   avgRate <= 2 ? "text-emerald-600 dark:text-emerald-400" :
