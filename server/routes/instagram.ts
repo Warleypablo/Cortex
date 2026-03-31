@@ -541,11 +541,11 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
 
       const conditions = [
         eq(instagramMetricsSnapshots.connectionId, id),
-        gte(instagramMetricsSnapshots.metricDate, sinceDateStr),
+        sql`${instagramMetricsSnapshots.metricDate} >= ${sinceDateStr}::date`,
       ];
 
       if (endDate) {
-        conditions.push(sql`${instagramMetricsSnapshots.metricDate} <= ${endDate}`);
+        conditions.push(sql`${instagramMetricsSnapshots.metricDate} <= ${endDate}::date`);
       }
 
       const rows = await db
@@ -577,10 +577,10 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       const conditions = [eq(instagramPostMetrics.connectionId, id)];
 
       if (startDate) {
-        conditions.push(gte(instagramPostMetrics.postedAt, startDate));
+        conditions.push(sql`${instagramPostMetrics.postedAt} >= ${startDate}::timestamp`);
       }
       if (endDate) {
-        conditions.push(sql`${instagramPostMetrics.postedAt} <= ${endDate}`);
+        conditions.push(sql`${instagramPostMetrics.postedAt} <= ${endDate}::timestamp`);
       }
 
       const rows = await db
