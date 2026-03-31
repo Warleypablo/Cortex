@@ -260,10 +260,8 @@ export async function syncMedia(igUserId: string, accessToken: string, limit: nu
 }
 
 export async function syncMediaInsights(mediaId: string, accessToken: string, mediaType: string) {
-  let metrics = "impressions,reach,likes,comments,saved,shares,total_interactions";
-  if (mediaType === "VIDEO" || mediaType === "REELS") {
-    metrics += ",plays";
-  }
+  // v22.0+: impressions → views, plays deprecated
+  let metrics = "reach,likes,comments,saved,shares,total_interactions,views";
   try {
     const insights = await callGraphAPI(`/${mediaId}/insights`, accessToken, { metric: metrics }, 0);
     const result: Record<string, number> = {};
