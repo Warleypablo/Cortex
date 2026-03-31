@@ -5,17 +5,20 @@ const GRAPH_API_BASE = "https://graph.instagram.com";
 function getConfig() {
   const appId = process.env.META_INSTAGRAM_APP_ID;
   const appSecret = process.env.META_INSTAGRAM_APP_SECRET;
+  // The main app secret (from App Dashboard > Settings > Basic) is needed for
+  // Graph API calls (appsecret_proof, long-lived token exchange)
+  const mainAppSecret = process.env.META_APP_SECRET || appSecret;
   const redirectUri = process.env.META_INSTAGRAM_REDIRECT_URI;
   const apiVersion = process.env.META_GRAPH_API_VERSION || "v21.0";
   if (!appId || !appSecret || !redirectUri) {
     throw new Error("META_INSTAGRAM_APP_ID, META_INSTAGRAM_APP_SECRET and META_INSTAGRAM_REDIRECT_URI must be set");
   }
-  return { appId, appSecret, redirectUri, apiVersion };
+  return { appId, appSecret, redirectUri, apiVersion, mainAppSecret };
 }
 
 function makeAppSecretProof(accessToken: string): string {
-  const { appSecret } = getConfig();
-  return crypto.createHmac("sha256", appSecret).update(accessToken).digest("hex");
+  const { mainAppSecret } = getConfig();
+  return crypto.createHmac("sha256", mainAppSecret).update(accessToken).digest("hex");
 }
 
 export async function callGraphAPI(
@@ -72,7 +75,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
   username: string;
   accountType: string;
 }> {
-  const { appId, appSecret, redirectUri, apiVersion } = getConfig();
+  const { appId, appSecret, redirectUri, apiVersion, mainAppSecret } = getConfig();
 
   // Step 1: Exchange code for short-lived token (Instagram Login flow)
   console.log("[Instagram] Step 1: Exchanging code for short-lived token...");
@@ -104,7 +107,7 @@ export async function exchangeCodeForToken(code: string): Promise<{
     console.log("[Instagram] Step 2: Exchanging for long-lived token...");
     const longUrl = new URL(`https://graph.instagram.com/access_token`);
     longUrl.searchParams.set("grant_type", "ig_exchange_token");
-    longUrl.searchParams.set("client_secret", appSecret);
+    longUrl.searchParams.set("client_secret", mainAppSecret);
     longUrl.searchParams.set("access_token", shortLivedToken);
 
     const longRes = await fetch(longUrl.toString());
