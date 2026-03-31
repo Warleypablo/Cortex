@@ -175,19 +175,40 @@ export async function syncProfile(igUserId: string, accessToken: string) {
 }
 
 export async function syncInsights(igUserId: string, accessToken: string, period: string = "day") {
+  // Use /me/insights with metric_type=total_value for simple totals
   const metrics = "reach,impressions,follower_count";
-  const insights = await callGraphAPI(`/${igUserId}/insights`, accessToken, {
-    metric: metrics,
-    period,
-  });
-  return insights.data || [];
+  console.log("[Instagram] Fetching insights for user:", igUserId);
+  try {
+    const insights = await callGraphAPI(`/me/insights`, accessToken, {
+      metric: metrics,
+      period,
+      metric_type: "total_value",
+    });
+    console.log("[Instagram] Insights response:", JSON.stringify(insights.data?.map((d: any) => ({ name: d.name, value: d.total_value?.value || d.values?.[0]?.value })) || []));
+    return insights.data || [];
+  } catch (err: any) {
+    console.error("[Instagram] Insights fetch error:", err.message);
+    // Try without metric_type as fallback
+    try {
+      const insights = await callGraphAPI(`/me/insights`, accessToken, {
+        metric: metrics,
+        period,
+      });
+      return insights.data || [];
+    } catch (err2: any) {
+      console.error("[Instagram] Insights fallback also failed:", err2.message);
+      return [];
+    }
+  }
 }
 
 export async function syncMedia(igUserId: string, accessToken: string, limit: number = 50) {
-  const media = await callGraphAPI(`/${igUserId}/media`, accessToken, {
+  console.log("[Instagram] Fetching media for user:", igUserId);
+  const media = await callGraphAPI(`/me/media`, accessToken, {
     fields: "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count",
     limit: String(limit),
   });
+  console.log("[Instagram] Media response: ", media.data?.length || 0, "items");
   return media.data || [];
 }
 
