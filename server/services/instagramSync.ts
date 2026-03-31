@@ -218,7 +218,7 @@ export async function syncMediaInsights(mediaId: string, accessToken: string, me
     metrics += ",plays";
   }
   try {
-    const insights = await callGraphAPI(`/${mediaId}/insights`, accessToken, { metric: metrics });
+    const insights = await callGraphAPI(`/${mediaId}/insights`, accessToken, { metric: metrics }, 0);
     const result: Record<string, number> = {};
     for (const item of insights.data || []) {
       result[item.name] = item.values?.[0]?.value || 0;
