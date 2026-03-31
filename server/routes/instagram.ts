@@ -12,6 +12,7 @@ import {
   exchangeCodeForToken,
   syncProfile,
   syncInsights,
+  syncInsightsHistorical,
   syncMedia,
   syncMediaInsights,
   revokeAccess,
@@ -404,6 +405,35 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             recordedAt: sql`NOW()`,
           },
         });
+
+      // 3b. Sync historical daily insights (last 30 days)
+      try {
+        const historical = await syncInsightsHistorical(conn.igUserId, token, 30);
+        for (const day of historical) {
+          await db
+            .insert(instagramMetricsSnapshots)
+            .values({
+              connectionId: id,
+              metricDate: day.date,
+              followers: day.followers || profile.followers_count || 0,
+              following: profile.follows_count || 0,
+              postsCount: profile.media_count || 0,
+              reachDay: day.reach,
+              impressionsDay: day.views,
+            })
+            .onConflictDoUpdate({
+              target: [instagramMetricsSnapshots.connectionId, instagramMetricsSnapshots.metricDate],
+              set: {
+                reachDay: sql`EXCLUDED.reach_day`,
+                impressionsDay: sql`EXCLUDED.impressions_day`,
+                recordedAt: sql`NOW()`,
+              },
+            });
+        }
+        console.log("[Instagram] Historical snapshots saved:", historical.length, "days");
+      } catch (histErr: any) {
+        console.warn("[Instagram] Historical insights error:", histErr.message);
+      }
 
       // 4. Sync media
       let mediaItems: any[] = [];
