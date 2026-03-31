@@ -416,8 +416,18 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       let postsUpserted = 0;
 
       for (const item of mediaItems) {
-        // 5. Get per-post insights
-        const postInsights = await syncMediaInsights(item.id, token, item.media_type);
+        // 5. Get per-post insights (skip to avoid long sync times — use basic metrics from media endpoint)
+        let postInsights: Record<string, number> = {};
+        try {
+          postInsights = await syncMediaInsights(item.id, token, item.media_type);
+        } catch {
+          // Use basic metrics from media response as fallback
+        }
+
+        const likes = postInsights.likes ?? item.like_count ?? 0;
+        const comments = postInsights.comments ?? item.comments_count ?? 0;
+        const saves = postInsights.saved ?? 0;
+        const shares = postInsights.shares ?? 0;
 
         await db
           .insert(instagramPostMetrics)
@@ -429,14 +439,14 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             permalink: item.permalink,
             thumbnailUrl: item.thumbnail_url || null,
             postedAt: item.timestamp ? new Date(item.timestamp) : null,
-            likes: postInsights.likes ?? item.like_count ?? 0,
-            comments: postInsights.comments ?? item.comments_count ?? 0,
-            saves: postInsights.saved ?? 0,
-            shares: postInsights.shares ?? 0,
+            likes,
+            comments,
+            saves,
+            shares,
             impressions: postInsights.impressions ?? 0,
             reach: postInsights.reach ?? 0,
             plays: postInsights.plays ?? 0,
-            totalInteractions: postInsights.total_interactions ?? 0,
+            totalInteractions: postInsights.total_interactions ?? (likes + comments + saves + shares),
             lastSyncedAt: new Date(),
           })
           .onConflictDoUpdate({
