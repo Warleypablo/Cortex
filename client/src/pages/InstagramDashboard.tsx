@@ -6,7 +6,6 @@ import { useTheme } from "@/components/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { HeroMetric } from "@/components/HeroMetric";
 import {
   ComposedChart,
   Area,
@@ -109,6 +108,70 @@ type SortKey =
   | "reach"
   | "impressions";
 
+// --- Custom tooltip for charts ---
+function ChartTooltip({ active, payload, label }: any) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div
+      style={{
+        backgroundColor: "#1C1C2E",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: "8px",
+        padding: "10px 14px",
+        fontSize: "0.75rem",
+      }}
+    >
+      <p style={{ color: "#A1A1B5", marginBottom: 6, fontWeight: 500 }}>{label}</p>
+      {payload.map((entry: any, i: number) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+          <span
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              backgroundColor: entry.color,
+              display: "inline-block",
+            }}
+          />
+          <span style={{ color: "#A1A1B5" }}>
+            {entry.name === "followers"
+              ? "Seguidores"
+              : entry.name === "reach"
+                ? "Alcance"
+                : entry.name === "impressions"
+                  ? "Impressões"
+                  : entry.name}
+            :
+          </span>
+          <span style={{ color: "#FFFFFF", fontWeight: 600, fontFamily: "monospace" }}>
+            {fmtNum(entry.value)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BarTooltip({ active, payload, label }: any) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div
+      style={{
+        backgroundColor: "#1C1C2E",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: "8px",
+        padding: "10px 14px",
+        fontSize: "0.75rem",
+      }}
+    >
+      <p style={{ color: "#A1A1B5", marginBottom: 4, fontWeight: 500 }}>{label}</p>
+      <p style={{ color: "#FFFFFF", fontWeight: 600, fontFamily: "monospace" }}>
+        {fmtNum(payload[0].value)}
+      </p>
+    </div>
+  );
+}
+
 export default function InstagramDashboard() {
   usePageTitle("Instagram Analytics");
   useSetPageInfo("Instagram Analytics", "Métricas e performance do Instagram da Turbo");
@@ -120,6 +183,7 @@ export default function InstagramDashboard() {
   // Date state
   const [endDate, setEndDate] = useState(() => dateStr(new Date()));
   const [startDate, setStartDate] = useState(() => dateStr(subDays(new Date(), 30)));
+  const [activePreset, setActivePreset] = useState<number>(30);
 
   // Sort state for posts table
   const [sortKey, setSortKey] = useState<SortKey>("totalInteractions");
@@ -273,28 +337,30 @@ export default function InstagramDashboard() {
     const end = new Date();
     setEndDate(dateStr(end));
     setStartDate(dateStr(subDays(end, days)));
+    setActivePreset(days);
   }
 
-  // --- Chart colors ---
-  const chartColors = {
-    followers: isDark ? "#a78bfa" : "#7c3aed",
-    reach: isDark ? "#34d399" : "#059669",
-    impressions: isDark ? "#60a5fa" : "#2563eb",
-    bar: isDark ? "#f472b6" : "#db2777",
-  };
-
   const isLoading = loadingConn || loadingMetrics || loadingPosts;
+
+  // --- Render helpers ---
+  function renderNumCell(n: number) {
+    if (n === 0) return <span style={{ color: "#52526A" }}>—</span>;
+    return fmtNum(n);
+  }
 
   // --- Empty state: no connection ---
   if (!loadingConn && !activeConnection) {
     return (
-      <div className="p-6">
+      <div
+        style={{ backgroundColor: "#0A0A0F", minHeight: "100vh" }}
+        className="p-6"
+      >
         <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <Instagram className="w-16 h-16 text-pink-500 opacity-50" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+          <Instagram style={{ color: "rgba(255,255,255,0.25)" }} className="w-16 h-16" />
+          <h2 style={{ color: "#FFFFFF" }} className="text-xl font-semibold">
             Nenhuma conta Instagram conectada
           </h2>
-          <p className="text-gray-600 dark:text-zinc-400 text-center max-w-md">
+          <p style={{ color: "#A1A1B5" }} className="text-center max-w-md text-sm">
             Para visualizar as métricas, conecte uma conta Instagram Business na página
             de configurações de integrações.
           </p>
@@ -304,184 +370,449 @@ export default function InstagramDashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* ───── 1. Date Picker Row ───── */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-gray-600 dark:text-zinc-400">
-            Data Início
-          </label>
+    <div
+      style={{
+        backgroundColor: "#0A0A0F",
+        minHeight: "100vh",
+        fontFeatureSettings: '"tnum"',
+      }}
+      className="p-6 space-y-6"
+    >
+      {/* Custom scrollbar styles */}
+      <style>{`
+        .ig-dash ::-webkit-scrollbar { width: 6px; height: 6px; }
+        .ig-dash ::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+        .ig-dash ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+        .ig-dash ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+        .ig-dash * { transition: all 0.15s ease; }
+        .ig-dash input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(0.6);
+        }
+      `}</style>
+
+      <div className="ig-dash space-y-6">
+        {/* ───── 1. Date Controls ───── */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Segmented preset control */}
+          <div
+            style={{
+              backgroundColor: "rgba(255,255,255,0.04)",
+              borderRadius: "8px",
+              padding: "3px",
+              display: "inline-flex",
+              gap: "2px",
+            }}
+          >
+            {PRESETS.map((p) => (
+              <button
+                key={p.label}
+                onClick={() => handlePreset(p.days)}
+                style={{
+                  padding: "6px 16px",
+                  borderRadius: "6px",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  letterSpacing: "0.03em",
+                  border: "none",
+                  cursor: "pointer",
+                  backgroundColor:
+                    activePreset === p.days ? "rgba(108,99,255,0.15)" : "transparent",
+                  color: activePreset === p.days ? "#6C63FF" : "#52526A",
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Date inputs */}
           <input
             type="date"
             value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+            onChange={(e) => {
+              setStartDate(e.target.value);
+              setActivePreset(0);
+            }}
+            style={{
+              height: "34px",
+              backgroundColor: "transparent",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: "6px",
+              color: "#A1A1B5",
+              fontSize: "0.8rem",
+              padding: "0 10px",
+              outline: "none",
+            }}
           />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-gray-600 dark:text-zinc-400">
-            Data Fim
-          </label>
+          <span style={{ color: "#52526A", fontSize: "0.75rem" }}>—</span>
           <input
             type="date"
             value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="h-9 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+            onChange={(e) => {
+              setEndDate(e.target.value);
+              setActivePreset(0);
+            }}
+            style={{
+              height: "34px",
+              backgroundColor: "transparent",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: "6px",
+              color: "#A1A1B5",
+              fontSize: "0.8rem",
+              padding: "0 10px",
+              outline: "none",
+            }}
           />
-        </div>
-        <div className="flex gap-1.5">
-          {PRESETS.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => handlePreset(p.days)}
-              className={cn(
-                "h-9 px-3 rounded-lg text-sm font-medium transition-colors",
-                "border border-gray-200 dark:border-zinc-700",
-                "hover:bg-violet-50 dark:hover:bg-violet-900/30",
-                "text-gray-700 dark:text-zinc-300",
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
+
+          <div className="flex items-center gap-3 ml-auto">
+            {connId && (
+              <>
+                <button
+                  onClick={() => syncMutation.mutate()}
+                  disabled={syncMutation.isPending}
+                  title="Sincronizar dados"
+                  style={{
+                    width: "34px",
+                    height: "34px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    backgroundColor: "transparent",
+                    color: "#A1A1B5",
+                    cursor: "pointer",
+                    opacity: syncMutation.isPending ? 0.5 : 1,
+                  }}
+                >
+                  <RefreshCw
+                    className={cn("h-3.5 w-3.5", syncMutation.isPending && "animate-spin")}
+                  />
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm("Desconectar o Instagram?")) disconnectMutation.mutate();
+                  }}
+                  disabled={disconnectMutation.isPending}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#52526A",
+                    fontSize: "0.7rem",
+                    cursor: "pointer",
+                    padding: "4px 8px",
+                    opacity: disconnectMutation.isPending ? 0.5 : 1,
+                  }}
+                >
+                  Desconectar
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="flex gap-2 ml-auto">
-          {connId && (
+        {/* ───── 2. KPI Cards ───── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ gap: "16px" }}>
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                }}
+              >
+                <Skeleton className="h-3 w-20 mb-3" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+                <Skeleton className="h-8 w-28" style={{ backgroundColor: "rgba(255,255,255,0.04)" }} />
+              </div>
+            ))
+          ) : (
             <>
-              <button
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-                className={cn(
-                  "h-9 px-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  "border border-gray-200 dark:border-zinc-700",
-                  "hover:bg-blue-50 dark:hover:bg-blue-900/30",
-                  "text-gray-700 dark:text-zinc-300",
-                  "disabled:opacity-50",
-                )}
+              {/* Seguidores */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  cursor: "default",
+                }}
+                className="group"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 0 0 1px rgba(108,99,255,0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "none";
+                }}
               >
-                <RefreshCw className={cn("h-3.5 w-3.5", syncMutation.isPending && "animate-spin")} />
-                Sync
-              </button>
-              <button
-                onClick={() => { if (confirm("Desconectar o Instagram?")) disconnectMutation.mutate(); }}
-                disabled={disconnectMutation.isPending}
-                className={cn(
-                  "h-9 px-3 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5",
-                  "border border-red-200 dark:border-red-800",
-                  "hover:bg-red-50 dark:hover:bg-red-900/30",
-                  "text-red-600 dark:text-red-400",
-                  "disabled:opacity-50",
-                )}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p
+                      style={{
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        marginBottom: "8px",
+                      }}
+                    >
+                      SEGUIDORES
+                    </p>
+                    <p
+                      style={{
+                        fontSize: "2.2rem",
+                        fontWeight: 700,
+                        color: "#FFFFFF",
+                        fontFamily: "monospace",
+                        lineHeight: 1.1,
+                        fontFeatureSettings: '"tnum"',
+                      }}
+                    >
+                      {fmtNum(heroData.followers)}
+                    </p>
+                    {heroData.followersDelta !== 0 && (
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                          marginTop: "8px",
+                          fontSize: "0.75rem",
+                          fontWeight: 500,
+                          padding: "2px 8px",
+                          borderRadius: "4px",
+                          backgroundColor: heroData.followersDelta >= 0
+                            ? "rgba(16,185,129,0.1)"
+                            : "rgba(244,63,94,0.1)",
+                          color: heroData.followersDelta >= 0 ? "#10B981" : "#F43F5E",
+                        }}
+                      >
+                        {heroData.followersDelta >= 0 ? "↑" : "↓"}{" "}
+                        {heroData.followersDelta >= 0 ? "+" : ""}
+                        {fmtNum(heroData.followersDelta)}
+                      </span>
+                    )}
+                  </div>
+                  <Users style={{ color: "rgba(255,255,255,0.25)", width: 20, height: 20, marginTop: 2 }} />
+                </div>
+              </div>
+
+              {/* Reach Total */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  cursor: "default",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 0 0 1px rgba(108,99,255,0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "none";
+                }}
               >
-                <LogOut className="h-3.5 w-3.5" />
-                Desconectar
-              </button>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p
+                      style={{
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        marginBottom: "8px",
+                      }}
+                    >
+                      REACH TOTAL
+                    </p>
+                    <p
+                      style={{
+                        fontSize: "2.2rem",
+                        fontWeight: 700,
+                        color: "#FFFFFF",
+                        fontFamily: "monospace",
+                        lineHeight: 1.1,
+                        fontFeatureSettings: '"tnum"',
+                      }}
+                    >
+                      {fmtNum(heroData.reach)}
+                    </p>
+                  </div>
+                  <Eye style={{ color: "rgba(255,255,255,0.25)", width: 20, height: 20, marginTop: 2 }} />
+                </div>
+              </div>
+
+              {/* Impressões */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  cursor: "default",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 0 0 1px rgba(108,99,255,0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p
+                      style={{
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        marginBottom: "8px",
+                      }}
+                    >
+                      IMPRESSÕES
+                    </p>
+                    <p
+                      style={{
+                        fontSize: "2.2rem",
+                        fontWeight: 700,
+                        color: "#FFFFFF",
+                        fontFamily: "monospace",
+                        lineHeight: 1.1,
+                        fontFeatureSettings: '"tnum"',
+                      }}
+                    >
+                      {fmtNum(heroData.impressions)}
+                    </p>
+                  </div>
+                  <TrendingUp style={{ color: "rgba(255,255,255,0.25)", width: 20, height: 20, marginTop: 2 }} />
+                </div>
+              </div>
+
+              {/* Engajamento */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  cursor: "default",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 0 0 1px rgba(108,99,255,0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p
+                      style={{
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        marginBottom: "8px",
+                      }}
+                    >
+                      ENGAJAMENTO
+                    </p>
+                    <p
+                      style={{
+                        fontSize: "2.2rem",
+                        fontWeight: 700,
+                        color: "#FFFFFF",
+                        fontFamily: "monospace",
+                        lineHeight: 1.1,
+                        fontFeatureSettings: '"tnum"',
+                      }}
+                    >
+                      {fmtPct(heroData.engagementRate)}
+                    </p>
+                  </div>
+                  <MousePointerClick style={{ color: "rgba(255,255,255,0.25)", width: 20, height: 20, marginTop: 2 }} />
+                </div>
+              </div>
             </>
           )}
         </div>
-      </div>
 
-      {/* ───── 2. Hero Metrics ───── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardContent className="p-5">
-                <Skeleton className="h-4 w-24 mb-3" />
-                <Skeleton className="h-8 w-32" />
-              </CardContent>
-            </Card>
-          ))
-        ) : (
-          <>
-            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <HeroMetric
-                    label="Seguidores"
-                    value={fmtNum(heroData.followers)}
-                    subtitle="Total atual de seguidores"
-                    trend={{
-                      value: `${heroData.followersDelta >= 0 ? "+" : ""}${fmtNum(heroData.followersDelta)} no período`,
-                      isPositive: heroData.followersDelta >= 0,
-                    }}
-                  />
-                  <Users className="w-5 h-5 text-violet-500 mt-1" />
-                </div>
-              </CardContent>
-            </Card>
+        {/* ───── 3. Evolution Chart ───── */}
+        <div style={{ padding: "24px 0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "20px",
+            }}
+          >
+            <div
+              style={{
+                width: "2px",
+                height: "14px",
+                backgroundColor: "#6C63FF",
+                borderRadius: "1px",
+              }}
+            />
+            <h3
+              style={{
+                fontSize: "0.7rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.12em",
+                color: "#52526A",
+                fontWeight: 600,
+              }}
+            >
+              Evolução no Período
+            </h3>
+          </div>
 
-            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <HeroMetric
-                    label="Reach Total"
-                    value={fmtNum(heroData.reach)}
-                    subtitle="Soma de alcance diário no período"
-                  />
-                  <Eye className="w-5 h-5 text-emerald-500 mt-1" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <HeroMetric
-                    label="Impressões Totais"
-                    value={fmtNum(heroData.impressions)}
-                    subtitle="Soma de impressões diárias no período"
-                  />
-                  <TrendingUp className="w-5 h-5 text-blue-500 mt-1" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <HeroMetric
-                    label="Engajamento Médio"
-                    value={fmtPct(heroData.engagementRate)}
-                    subtitle="Média de interações / alcance dos posts"
-                  />
-                  <MousePointerClick className="w-5 h-5 text-pink-500 mt-1" />
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-
-      {/* ───── 3. Evolution Chart ───── */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-        <CardContent className="p-5">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-            Evolução no Período
-          </h3>
           {isLoading ? (
-            <Skeleton className="h-80 w-full rounded-xl" />
+            <Skeleton
+              className="w-full rounded-lg"
+              style={{ height: 320, backgroundColor: "rgba(255,255,255,0.04)" }}
+            />
           ) : evolutionData.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-zinc-500 text-center py-20">
+            <p
+              style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "80px 0" }}
+            >
               Sem dados para o período selecionado.
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={320}>
               <ComposedChart data={evolutionData}>
+                <defs>
+                  <linearGradient id="gradFollowers" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#6C63FF" stopOpacity={0.15} />
+                    <stop offset="100%" stopColor="#6C63FF" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradReach" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#00D4C8" stopOpacity={0.12} />
+                    <stop offset="100%" stopColor="#00D4C8" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke={isDark ? "#3f3f46" : "#e5e7eb"}
+                  strokeDasharray="4 4"
+                  stroke="rgba(255,255,255,0.04)"
+                  vertical={false}
                 />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+                  tick={{ fontSize: 11, fill: "#52526A", fontFamily: "monospace" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
                   yAxisId="left"
-                  tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+                  tick={{ fontSize: 11, fill: "#52526A", fontFamily: "monospace" }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={fmtNum}
@@ -489,141 +820,230 @@ export default function InstagramDashboard() {
                 <YAxis
                   yAxisId="right"
                   orientation="right"
-                  tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+                  tick={{ fontSize: 11, fill: "#52526A", fontFamily: "monospace" }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={fmtNum}
                 />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: isDark ? "#18181b" : "#ffffff",
-                    border: `1px solid ${isDark ? "#3f3f46" : "#e5e7eb"}`,
-                    borderRadius: "0.5rem",
-                    fontSize: 12,
-                  }}
-                  labelStyle={{ color: isDark ? "#e4e4e7" : "#111827" }}
-                  formatter={(value: number, name: string) => [
-                    fmtNum(value),
-                    name === "followers"
-                      ? "Seguidores"
-                      : name === "reach"
-                        ? "Alcance"
-                        : "Impressões",
-                  ]}
-                />
+                <Tooltip content={<ChartTooltip />} />
                 <Area
                   yAxisId="left"
                   type="monotone"
                   dataKey="followers"
-                  fill={chartColors.followers}
-                  fillOpacity={0.15}
-                  stroke={chartColors.followers}
+                  fill="url(#gradFollowers)"
+                  stroke="#6C63FF"
                   strokeWidth={2}
                   name="followers"
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#6C63FF", stroke: "#0A0A0F", strokeWidth: 2 }}
                 />
-                <Line
+                <Area
                   yAxisId="right"
                   type="monotone"
                   dataKey="reach"
-                  stroke={chartColors.reach}
+                  fill="url(#gradReach)"
+                  stroke="#00D4C8"
                   strokeWidth={2}
-                  dot={false}
                   name="reach"
+                  dot={false}
+                  activeDot={{ r: 4, fill: "#00D4C8", stroke: "#0A0A0F", strokeWidth: 2 }}
                 />
                 <Line
                   yAxisId="right"
                   type="monotone"
                   dataKey="impressions"
-                  stroke={chartColors.impressions}
-                  strokeWidth={2}
+                  stroke="#A1A1B5"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 3"
                   dot={false}
                   name="impressions"
+                  activeDot={{ r: 3, fill: "#A1A1B5", stroke: "#0A0A0F", strokeWidth: 2 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* ───── 4. Performance by Type ───── */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-        <CardContent className="p-5">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-            Engajamento Médio por Tipo de Mídia
-          </h3>
+        {/* ───── 4. Performance by Type ───── */}
+        <div style={{ padding: "24px 0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "20px",
+            }}
+          >
+            <div
+              style={{
+                width: "2px",
+                height: "14px",
+                backgroundColor: "#6C63FF",
+                borderRadius: "1px",
+              }}
+            />
+            <h3
+              style={{
+                fontSize: "0.7rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.12em",
+                color: "#52526A",
+                fontWeight: 600,
+              }}
+            >
+              Engajamento por Tipo
+            </h3>
+          </div>
+
           {isLoading ? (
-            <Skeleton className="h-64 w-full rounded-xl" />
+            <Skeleton
+              className="w-full rounded-lg"
+              style={{ height: 260, backgroundColor: "rgba(255,255,255,0.04)" }}
+            />
           ) : perfByType.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-zinc-500 text-center py-16">
+            <p
+              style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "64px 0" }}
+            >
               Sem posts no período selecionado.
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={perfByType} barSize={48}>
+              <BarChart data={perfByType} barSize={56}>
                 <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke={isDark ? "#3f3f46" : "#e5e7eb"}
+                  strokeDasharray="4 4"
+                  stroke="rgba(255,255,255,0.04)"
+                  vertical={false}
                 />
                 <XAxis
                   dataKey="type"
-                  tick={{ fontSize: 12, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+                  tick={{ fontSize: 11, fill: "#52526A" }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+                  tick={{ fontSize: 11, fill: "#52526A", fontFamily: "monospace" }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={fmtNum}
                 />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: isDark ? "#18181b" : "#ffffff",
-                    border: `1px solid ${isDark ? "#3f3f46" : "#e5e7eb"}`,
-                    borderRadius: "0.5rem",
-                    fontSize: 12,
-                  }}
-                  formatter={(value: number) => [fmtNum(value), "Eng. Médio"]}
-                />
+                <Tooltip content={<BarTooltip />} />
                 <Bar
                   dataKey="avgEngagement"
-                  fill={chartColors.bar}
-                  radius={[6, 6, 0, 0]}
+                  fill="#6C63FF"
+                  radius={[4, 4, 0, 0]}
+                  label={{
+                    position: "top",
+                    fill: "#A1A1B5",
+                    fontSize: 11,
+                    fontFamily: "monospace",
+                    formatter: (v: number) => fmtNum(v),
+                  }}
                 />
               </BarChart>
             </ResponsiveContainer>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* ───── 5. Top Posts Table ───── */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-        <CardContent className="p-5">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">
-            Top Posts
-          </h3>
+        {/* ───── 5. Top Posts Table ───── */}
+        <div style={{ padding: "24px 0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "20px",
+            }}
+          >
+            <div
+              style={{
+                width: "2px",
+                height: "14px",
+                backgroundColor: "#6C63FF",
+                borderRadius: "1px",
+              }}
+            />
+            <h3
+              style={{
+                fontSize: "0.7rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.12em",
+                color: "#52526A",
+                fontWeight: 600,
+              }}
+            >
+              Top Posts
+            </h3>
+          </div>
+
           {isLoading ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                <Skeleton
+                  key={i}
+                  className="w-full rounded"
+                  style={{ height: 48, backgroundColor: "rgba(255,255,255,0.04)" }}
+                />
               ))}
             </div>
           ) : sortedPosts.length === 0 ? (
-            <p className="text-sm text-gray-500 dark:text-zinc-500 text-center py-12">
+            <p
+              style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "48px 0" }}
+            >
               Nenhum post encontrado no período.
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-zinc-700">
-                    <th className="text-left py-2 px-2 font-medium text-gray-500 dark:text-zinc-400 w-10">
+                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "8px 8px",
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        width: "40px",
+                        position: "sticky",
+                        top: 0,
+                        backgroundColor: "#0A0A0F",
+                      }}
+                    >
                       {/* thumbnail */}
                     </th>
-                    <th className="text-left py-2 px-2 font-medium text-gray-500 dark:text-zinc-400 min-w-[200px]">
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "8px 8px",
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        minWidth: "200px",
+                        position: "sticky",
+                        top: 0,
+                        backgroundColor: "#0A0A0F",
+                      }}
+                    >
                       Legenda
                     </th>
-                    <th className="text-left py-2 px-2 font-medium text-gray-500 dark:text-zinc-400">
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "8px 8px",
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        position: "sticky",
+                        top: 0,
+                        backgroundColor: "#0A0A0F",
+                      }}
+                    >
                       Tipo
                     </th>
                     {(
@@ -640,98 +1060,235 @@ export default function InstagramDashboard() {
                       <th
                         key={key}
                         onClick={() => handleSort(key)}
-                        className={cn(
-                          "text-right py-2 px-2 font-medium cursor-pointer select-none whitespace-nowrap",
-                          sortKey === key
-                            ? "text-violet-600 dark:text-violet-400"
-                            : "text-gray-500 dark:text-zinc-400",
-                        )}
+                        style={{
+                          textAlign: "right",
+                          padding: "8px 8px",
+                          fontSize: "0.65rem",
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          fontWeight: 500,
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          userSelect: "none",
+                          color: sortKey === key ? "#6C63FF" : "#52526A",
+                          position: "sticky",
+                          top: 0,
+                          backgroundColor: "#0A0A0F",
+                        }}
                       >
                         {label}
                         {sortKey === key && (
-                          <span className="ml-0.5">{sortAsc ? "▲" : "▼"}</span>
+                          <span style={{ marginLeft: "2px" }}>{sortAsc ? "▲" : "▼"}</span>
                         )}
                       </th>
                     ))}
-                    <th className="py-2 px-2 w-8" />
+                    <th
+                      style={{
+                        padding: "8px 8px",
+                        width: "32px",
+                        position: "sticky",
+                        top: 0,
+                        backgroundColor: "#0A0A0F",
+                      }}
+                    />
                   </tr>
                 </thead>
                 <tbody>
                   {sortedPosts.map((post) => (
                     <tr
                       key={post.igMediaId}
-                      className="border-b border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
+                      style={{
+                        borderBottom: "1px solid rgba(255,255,255,0.04)",
+                      }}
+                      className="group"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
                     >
                       {/* Thumbnail */}
-                      <td className="py-2 px-2">
+                      <td style={{ padding: "8px 8px" }}>
                         {post.thumbnailUrl ? (
                           <img
                             src={post.thumbnailUrl}
                             alt=""
-                            className="w-10 h-10 rounded-md object-cover"
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "6px",
+                              objectFit: "cover",
+                            }}
                           />
                         ) : (
-                          <div className="w-10 h-10 rounded-md bg-gray-100 dark:bg-zinc-800 flex items-center justify-center">
-                            <Instagram className="w-4 h-4 text-gray-400 dark:text-zinc-500" />
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "6px",
+                              backgroundColor: "rgba(255,255,255,0.06)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Instagram
+                              style={{ width: 14, height: 14, color: "rgba(255,255,255,0.15)" }}
+                            />
                           </div>
                         )}
                       </td>
                       {/* Caption */}
-                      <td className="py-2 px-2 text-gray-900 dark:text-white">
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          color: "#FFFFFF",
+                          fontSize: "0.85rem",
+                        }}
+                      >
                         <span className="line-clamp-1">
                           {post.caption
                             ? post.caption.length > 60
                               ? post.caption.slice(0, 60) + "..."
                               : post.caption
-                            : "—"}
+                            : <span style={{ color: "#52526A" }}>—</span>}
                         </span>
                       </td>
                       {/* Type badge */}
-                      <td className="py-2 px-2">
+                      <td style={{ padding: "8px 8px" }}>
                         <span
-                          className={cn(
-                            "inline-block text-xs font-medium px-2 py-0.5 rounded-full",
-                            post.mediaType === "VIDEO"
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-                              : post.mediaType === "CAROUSEL_ALBUM"
-                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                                : "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-zinc-300",
-                          )}
+                          style={{
+                            display: "inline-block",
+                            fontSize: "0.6rem",
+                            fontWeight: 500,
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            border:
+                              post.mediaType === "CAROUSEL_ALBUM"
+                                ? "1px solid rgba(108,99,255,0.4)"
+                                : post.mediaType === "VIDEO"
+                                  ? "1px solid rgba(0,212,200,0.4)"
+                                  : "1px solid rgba(255,255,255,0.1)",
+                            color:
+                              post.mediaType === "CAROUSEL_ALBUM"
+                                ? "#6C63FF"
+                                : post.mediaType === "VIDEO"
+                                  ? "#00D4C8"
+                                  : "#A1A1B5",
+                            backgroundColor: "transparent",
+                            letterSpacing: "0.03em",
+                            textTransform: "uppercase",
+                          }}
                         >
                           {MEDIA_LABELS[post.mediaType] || post.mediaType}
                         </span>
                       </td>
                       {/* Numeric columns */}
-                      <td className="py-2 px-2 text-right text-gray-700 dark:text-zinc-300 tabular-nums">
-                        {fmtNum(post.likes)}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.likes)}
                       </td>
-                      <td className="py-2 px-2 text-right text-gray-700 dark:text-zinc-300 tabular-nums">
-                        {fmtNum(post.comments)}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.comments)}
                       </td>
-                      <td className="py-2 px-2 text-right text-gray-700 dark:text-zinc-300 tabular-nums">
-                        {fmtNum(post.saves)}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.saves)}
                       </td>
-                      <td className="py-2 px-2 text-right text-gray-700 dark:text-zinc-300 tabular-nums">
-                        {fmtNum(post.shares)}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.shares)}
                       </td>
-                      <td className="py-2 px-2 text-right text-gray-700 dark:text-zinc-300 tabular-nums">
-                        {fmtNum(post.reach)}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.reach)}
                       </td>
-                      <td className="py-2 px-2 text-right text-gray-700 dark:text-zinc-300 tabular-nums">
-                        {fmtNum(post.impressions)}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.impressions)}
                       </td>
-                      <td className="py-2 px-2 text-right font-semibold text-gray-900 dark:text-white tabular-nums">
-                        {fmtNum(post.totalInteractions)}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          fontWeight: 700,
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.totalInteractions)}
                       </td>
-                      {/* Link */}
-                      <td className="py-2 px-2">
+                      {/* Link — only visible on hover */}
+                      <td style={{ padding: "8px 8px" }}>
                         <a
                           href={post.permalink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-gray-400 hover:text-violet-500 dark:text-zinc-500 dark:hover:text-violet-400 transition-colors"
+                          style={{
+                            color: "#52526A",
+                            opacity: 0,
+                          }}
+                          className="group-hover:!opacity-100"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "#6C63FF";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "#52526A";
+                          }}
                         >
-                          <ExternalLink className="w-4 h-4" />
+                          <ExternalLink style={{ width: 14, height: 14 }} />
                         </a>
                       </td>
                     </tr>
@@ -740,8 +1297,8 @@ export default function InstagramDashboard() {
               </table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
