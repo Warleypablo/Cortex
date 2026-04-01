@@ -34,6 +34,8 @@ import {
   Calendar,
   Zap,
   Hash,
+  BarChart3,
+  Lightbulb,
 } from "lucide-react";
 import { format, subDays, parseISO, getDay, getHours, getISOWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -265,6 +267,9 @@ export default function InstagramDashboard() {
     avgEng: number;
     count: number;
   } | null>(null);
+
+  // Tab navigation state
+  const [activeTab, setActiveTab] = useState<"overview" | "content" | "growth">("overview");
 
   // --- Fetch connection ---
   const {
@@ -1340,6 +1345,44 @@ export default function InstagramDashboard() {
           )}
         </div>
 
+        {/* ───── Tab Navigation ───── */}
+        <div style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", marginBottom: 24 }}>
+          <div style={{ display: "flex", gap: 4 }}>
+            {([
+              { key: "overview" as const, label: "Visão Geral", icon: BarChart3 },
+              { key: "content" as const, label: "Conteúdo", icon: Lightbulb },
+              { key: "growth" as const, label: "Crescimento", icon: TrendingUp },
+            ]).map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                style={{
+                  padding: "12px 20px",
+                  fontSize: "0.8rem",
+                  fontWeight: activeTab === tab.key ? 600 : 400,
+                  color: activeTab === tab.key ? "#fff" : "#52526A",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: activeTab === tab.key ? "2px solid #6C63FF" : "2px solid transparent",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  transition: "all 0.15s ease",
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                }}
+              >
+                <tab.icon size={16} style={{ opacity: activeTab === tab.key ? 1 : 0.4 }} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ───── Tab: Visão Geral ───── */}
+        {activeTab === "overview" && (
+        <>
         {/* ───── 3. Evolution Chart ───── */}
         <div style={{ padding: "24px 0" }}>
           <SectionTitle>Evolução no Período</SectionTitle>
@@ -1432,7 +1475,12 @@ export default function InstagramDashboard() {
             </ResponsiveContainer>
           )}
         </div>
+        </>
+        )}
 
+        {/* ───── Tab: Conteúdo ───── */}
+        {activeTab === "content" && (
+        <>
         {/* ───── 4A. Insights Acionáveis ───── */}
         <div style={{ padding: "24px 0" }}>
           <SectionTitle>Insights Acionáveis</SectionTitle>
@@ -2087,7 +2135,12 @@ export default function InstagramDashboard() {
             </div>
           )}
         </div>
+        </>
+        )}
 
+        {/* ───── Tab: Crescimento ───── */}
+        {activeTab === "growth" && (
+        <>
         {/* ───── 7. Frequência de Publicação ───── */}
         <div style={{ padding: "24px 0" }}>
           <SectionTitle>Frequência de Publicação</SectionTitle>
@@ -2608,7 +2661,12 @@ export default function InstagramDashboard() {
             </div>
           )}
         </div>
-      </div>
+        </>
+        )}
+
+        {/* ───── Tab: Conteúdo (Top Posts) ───── */}
+        {activeTab === "content" && (
+        <>
         {/* ───── 5. Top Posts Table (IMPROVED: engagement rate col + media filter) ───── */}
         <div style={{ padding: "24px 0" }}>
           <div
@@ -3018,6 +3076,9 @@ export default function InstagramDashboard() {
             </div>
           )}
         </div>
+        </>
+        )}
+      </div>
     </div>
   );
 }
