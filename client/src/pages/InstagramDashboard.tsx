@@ -50,6 +50,16 @@ interface IgMetric {
   reachDay: number;
   impressionsDay: number;
   recordedAt: string;
+  followsDay: number;
+  unfollowsDay: number;
+  viewsDay: number;
+  accountsEngaged: number;
+  totalInteractions: number;
+  likesDay: number;
+  commentsDay: number;
+  savesDay: number;
+  sharesDay: number;
+  profileLinksTaps: number;
 }
 
 interface IgPost {
@@ -404,6 +414,40 @@ export default function InstagramDashboard() {
         reach: m.reachDay,
         impressions: m.impressionsDay,
       }));
+  }, [metrics]);
+
+  // --- Detailed metrics for overview grid ---
+  const detailedMetrics = useMemo(() => {
+    if (!metrics?.length) return null;
+
+    const sum = (key: keyof IgMetric) => metrics.reduce((acc, m) => acc + (Number(m[key]) || 0), 0);
+    const last = metrics[metrics.length - 1];
+    const first = metrics[0];
+
+    const totalFollowers = last?.followers || 0;
+    const followsDelta = sum("followsDay");
+    const totalReach = sum("reachDay");
+    const totalViews = sum("viewsDay") || sum("impressionsDay");
+    const totalInteractions = sum("totalInteractions");
+    const totalEngaged = sum("accountsEngaged");
+    const totalLikes = sum("likesDay");
+    const totalComments = sum("commentsDay");
+    const totalSaves = sum("savesDay");
+    const totalShares = sum("sharesDay");
+    const linkTaps = sum("profileLinksTaps");
+
+    const followerGrowthPct = first?.followers > 0 ? ((last.followers - first.followers) / first.followers * 100) : 0;
+    const engagementRate = totalReach > 0 ? (totalInteractions / totalReach * 100) : 0;
+    const reachFrequency = totalReach > 0 ? (totalViews / totalReach) : 0;
+    const ctrReachClicks = totalReach > 0 ? (linkTaps / totalReach * 100) : 0;
+
+    return {
+      totalFollowers, followsDelta, followerGrowthPct,
+      totalViews, totalReach, reachFrequency,
+      engagementRate, totalInteractions, totalEngaged,
+      totalLikes, totalComments, totalSaves, totalShares,
+      linkTaps, ctrReachClicks,
+    };
   }, [metrics]);
 
   // --- Performance by type (IMPROVED: grouped bars for likes, comments, saves, shares) ---
@@ -1475,6 +1519,169 @@ export default function InstagramDashboard() {
             </ResponsiveContainer>
           )}
         </div>
+
+        {/* ───── 3b. Detailed Metrics Grid ───── */}
+        {detailedMetrics && (
+        <div style={{ padding: "24px 0" }}>
+          <SectionTitle>Métricas Detalhadas</SectionTitle>
+
+          {/* Group: SEGUIDORES */}
+          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", fontWeight: 600, marginBottom: 8 }}>
+            Seguidores
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Total de Seguidores
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalFollowers)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Delta de Seguidores
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: detailedMetrics.followsDelta >= 0 ? "#00D4C8" : "#FF6B6B", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {detailedMetrics.followsDelta >= 0 ? "+" : ""}{fmtNum(detailedMetrics.followsDelta)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                % Crescimento
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: detailedMetrics.followerGrowthPct >= 0 ? "#00D4C8" : "#FF6B6B", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {detailedMetrics.followerGrowthPct >= 0 ? "+" : ""}{detailedMetrics.followerGrowthPct.toFixed(1)}%
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Follows no Período
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.followsDelta)}
+              </div>
+            </div>
+          </div>
+
+          {/* Group: ALCANCE E VISUALIZAÇÕES */}
+          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", fontWeight: 600, marginBottom: 8 }}>
+            Alcance e Visualizações
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Alcance Total
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalReach)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Visualizações Totais
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalViews)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Frequência de Alcance
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {detailedMetrics.reachFrequency.toFixed(1)}x
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Cliques no Link Bio
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.linkTaps)}
+              </div>
+            </div>
+          </div>
+
+          {/* Group: ENGAJAMENTO */}
+          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", fontWeight: 600, marginBottom: 8 }}>
+            Engajamento
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                % Engajamento
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {detailedMetrics.engagementRate.toFixed(1)}%
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Interações Totais
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalInteractions)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Contas Engajadas
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalEngaged)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                CTR Alcance &gt; Cliques
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {detailedMetrics.ctrReachClicks.toFixed(1)}%
+              </div>
+            </div>
+          </div>
+
+          {/* Group: DETALHAMENTO DE INTERAÇÕES */}
+          <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", fontWeight: 600, marginBottom: 8 }}>
+            Detalhamento de Interações
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Likes
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalLikes)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Comentários
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalComments)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Salvamentos
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalSaves)}
+              </div>
+            </div>
+            <div style={{ background: "#111118", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: "0.65rem", textTransform: "uppercase", letterSpacing: "0.12em", color: "#52526A", marginBottom: 8 }}>
+                Compartilhamentos
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#fff", fontFamily: "monospace", fontFeatureSettings: '"tnum"' }}>
+                {fmtNum(detailedMetrics.totalShares)}
+              </div>
+            </div>
+          </div>
+        </div>
+        )}
         </>
         )}
 
