@@ -182,9 +182,12 @@ export default function DashboardDFC() {
         if (node.children && node.children.length > 0) {
           node.children.forEach(childId => addNode(childId));
         } else if (node.isLeaf && node.parcelas && node.parcelas.length > 0) {
-          node.parcelas.forEach(parcela => {
-            result.push({ type: 'parcela', parcela, parentNode: node });
-          });
+          const mesesSet = new Set(dfcData.meses);
+          node.parcelas
+            .filter(p => p.valorBruto !== 0 && mesesSet.has(p.mes))
+            .forEach(parcela => {
+              result.push({ type: 'parcela', parcela, parentNode: node });
+            });
         }
       }
     };
