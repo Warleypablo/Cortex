@@ -1481,6 +1481,172 @@ export default function InstagramDashboard() {
         {/* ───── Tab: Conteúdo ───── */}
         {activeTab === "content" && (
         <>
+        {/* ───── 6. Melhores Horários para Postar (Heatmap) ───── */}
+        <div style={{ padding: "24px 0" }}>
+          <SectionTitle>Melhores Horários para Postar</SectionTitle>
+
+          {isLoading ? (
+            <Skeleton
+              className="w-full rounded-lg"
+              style={{ height: 280, backgroundColor: "rgba(255,255,255,0.04)" }}
+            />
+          ) : !heatmapData || heatmapData.cells.every((c) => c.count === 0) ? (
+            <p
+              style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "64px 0" }}
+            >
+              Sem dados de horários de publicação.
+            </p>
+          ) : (
+            <div style={{ position: "relative" }}>
+              <div style={{ display: "flex", gap: "0px" }}>
+                {/* Day labels column */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginRight: "8px", paddingTop: "22px" }}>
+                  {DAY_LABELS_HEATMAP.map((day) => (
+                    <div
+                      key={day}
+                      style={{
+                        height: "32px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "flex-end",
+                        fontSize: "0.65rem",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        minWidth: "28px",
+                      }}
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Grid */}
+                <div>
+                  {/* Hour labels row */}
+                  <div style={{ display: "flex", gap: "2px", marginBottom: "2px" }}>
+                    {Array.from({ length: 24 }).map((_, h) => (
+                      <div
+                        key={h}
+                        style={{
+                          width: "28px",
+                          textAlign: "center",
+                          fontSize: "0.55rem",
+                          color: "#52526A",
+                          fontFamily: "monospace",
+                        }}
+                      >
+                        {h}h
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Heatmap cells */}
+                  {Array.from({ length: 7 }).map((_, rowIdx) => (
+                    <div key={rowIdx} style={{ display: "flex", gap: "2px", marginBottom: "2px" }}>
+                      {Array.from({ length: 24 }).map((_, h) => {
+                        const cell = heatmapData.cells.find(
+                          (c) => c.dayIdx === rowIdx && c.hour === h,
+                        );
+                        const avg = cell?.avgEng ?? 0;
+                        const count = cell?.count ?? 0;
+                        const intensity =
+                          heatmapData.maxAvg > 0 ? avg / heatmapData.maxAvg : 0;
+                        const opacity = count === 0 ? 0 : Math.max(0.15, intensity * 0.8);
+
+                        return (
+                          <div
+                            key={h}
+                            style={{
+                              width: "28px",
+                              height: "32px",
+                              borderRadius: "4px",
+                              backgroundColor:
+                                count === 0
+                                  ? "rgba(255,255,255,0.02)"
+                                  : `rgba(108,99,255,${opacity})`,
+                              cursor: count > 0 ? "pointer" : "default",
+                              border: "1px solid rgba(255,255,255,0.02)",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (count > 0) {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setHeatmapTooltip({
+                                  visible: true,
+                                  x: rect.left + rect.width / 2,
+                                  y: rect.top - 8,
+                                  day: DAY_LABELS_HEATMAP[rowIdx],
+                                  hour: h,
+                                  avgEng: avg,
+                                  count,
+                                });
+                              }
+                            }}
+                            onMouseLeave={() => setHeatmapTooltip(null)}
+                          />
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Heatmap tooltip */}
+              {heatmapTooltip && heatmapTooltip.visible && (
+                <div
+                  style={{
+                    position: "fixed",
+                    left: heatmapTooltip.x,
+                    top: heatmapTooltip.y,
+                    transform: "translate(-50%, -100%)",
+                    backgroundColor: "#1C1C2E",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: "8px",
+                    padding: "8px 12px",
+                    fontSize: "0.7rem",
+                    zIndex: 50,
+                    pointerEvents: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <p style={{ color: "#A1A1B5", marginBottom: 4, fontWeight: 500 }}>
+                    {heatmapTooltip.day}, {heatmapTooltip.hour}h
+                  </p>
+                  <p style={{ color: "#FFFFFF", fontFamily: "monospace", fontWeight: 600 }}>
+                    Eng. médio: {fmtNum(Math.round(heatmapTooltip.avgEng))}
+                  </p>
+                  <p style={{ color: "#52526A", fontSize: "0.6rem" }}>
+                    {heatmapTooltip.count} post{heatmapTooltip.count !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              )}
+
+              {/* Legend */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginTop: "12px",
+                  justifyContent: "flex-end",
+                }}
+              >
+                <span style={{ fontSize: "0.6rem", color: "#52526A" }}>Menos</span>
+                {[0.15, 0.3, 0.5, 0.65, 0.8].map((op) => (
+                  <div
+                    key={op}
+                    style={{
+                      width: "16px",
+                      height: "16px",
+                      borderRadius: "3px",
+                      backgroundColor: `rgba(108,99,255,${op})`,
+                    }}
+                  />
+                ))}
+                <span style={{ fontSize: "0.6rem", color: "#52526A" }}>Mais</span>
+              </div>
+            </div>
+          )}
+        </div>
         {/* ───── 4A. Insights Acionáveis ───── */}
         <div style={{ padding: "24px 0" }}>
           <SectionTitle>Insights Acionáveis</SectionTitle>
@@ -1969,172 +2135,6 @@ export default function InstagramDashboard() {
           )}
         </div>
 
-        {/* ───── 6. Melhores Horários para Postar (Heatmap) ───── */}
-        <div style={{ padding: "24px 0" }}>
-          <SectionTitle>Melhores Horários para Postar</SectionTitle>
-
-          {isLoading ? (
-            <Skeleton
-              className="w-full rounded-lg"
-              style={{ height: 280, backgroundColor: "rgba(255,255,255,0.04)" }}
-            />
-          ) : !heatmapData || heatmapData.cells.every((c) => c.count === 0) ? (
-            <p
-              style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "64px 0" }}
-            >
-              Sem dados de horários de publicação.
-            </p>
-          ) : (
-            <div style={{ position: "relative" }}>
-              <div style={{ display: "flex", gap: "0px" }}>
-                {/* Day labels column */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginRight: "8px", paddingTop: "22px" }}>
-                  {DAY_LABELS_HEATMAP.map((day) => (
-                    <div
-                      key={day}
-                      style={{
-                        height: "32px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "flex-end",
-                        fontSize: "0.65rem",
-                        color: "#52526A",
-                        fontWeight: 500,
-                        minWidth: "28px",
-                      }}
-                    >
-                      {day}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Grid */}
-                <div>
-                  {/* Hour labels row */}
-                  <div style={{ display: "flex", gap: "2px", marginBottom: "2px" }}>
-                    {Array.from({ length: 24 }).map((_, h) => (
-                      <div
-                        key={h}
-                        style={{
-                          width: "28px",
-                          textAlign: "center",
-                          fontSize: "0.55rem",
-                          color: "#52526A",
-                          fontFamily: "monospace",
-                        }}
-                      >
-                        {h}h
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Heatmap cells */}
-                  {Array.from({ length: 7 }).map((_, rowIdx) => (
-                    <div key={rowIdx} style={{ display: "flex", gap: "2px", marginBottom: "2px" }}>
-                      {Array.from({ length: 24 }).map((_, h) => {
-                        const cell = heatmapData.cells.find(
-                          (c) => c.dayIdx === rowIdx && c.hour === h,
-                        );
-                        const avg = cell?.avgEng ?? 0;
-                        const count = cell?.count ?? 0;
-                        const intensity =
-                          heatmapData.maxAvg > 0 ? avg / heatmapData.maxAvg : 0;
-                        const opacity = count === 0 ? 0 : Math.max(0.15, intensity * 0.8);
-
-                        return (
-                          <div
-                            key={h}
-                            style={{
-                              width: "28px",
-                              height: "32px",
-                              borderRadius: "4px",
-                              backgroundColor:
-                                count === 0
-                                  ? "rgba(255,255,255,0.02)"
-                                  : `rgba(108,99,255,${opacity})`,
-                              cursor: count > 0 ? "pointer" : "default",
-                              border: "1px solid rgba(255,255,255,0.02)",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (count > 0) {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                setHeatmapTooltip({
-                                  visible: true,
-                                  x: rect.left + rect.width / 2,
-                                  y: rect.top - 8,
-                                  day: DAY_LABELS_HEATMAP[rowIdx],
-                                  hour: h,
-                                  avgEng: avg,
-                                  count,
-                                });
-                              }
-                            }}
-                            onMouseLeave={() => setHeatmapTooltip(null)}
-                          />
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Heatmap tooltip */}
-              {heatmapTooltip && heatmapTooltip.visible && (
-                <div
-                  style={{
-                    position: "fixed",
-                    left: heatmapTooltip.x,
-                    top: heatmapTooltip.y,
-                    transform: "translate(-50%, -100%)",
-                    backgroundColor: "#1C1C2E",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "8px",
-                    padding: "8px 12px",
-                    fontSize: "0.7rem",
-                    zIndex: 50,
-                    pointerEvents: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <p style={{ color: "#A1A1B5", marginBottom: 4, fontWeight: 500 }}>
-                    {heatmapTooltip.day}, {heatmapTooltip.hour}h
-                  </p>
-                  <p style={{ color: "#FFFFFF", fontFamily: "monospace", fontWeight: 600 }}>
-                    Eng. médio: {fmtNum(Math.round(heatmapTooltip.avgEng))}
-                  </p>
-                  <p style={{ color: "#52526A", fontSize: "0.6rem" }}>
-                    {heatmapTooltip.count} post{heatmapTooltip.count !== 1 ? "s" : ""}
-                  </p>
-                </div>
-              )}
-
-              {/* Legend */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  marginTop: "12px",
-                  justifyContent: "flex-end",
-                }}
-              >
-                <span style={{ fontSize: "0.6rem", color: "#52526A" }}>Menos</span>
-                {[0.15, 0.3, 0.5, 0.65, 0.8].map((op) => (
-                  <div
-                    key={op}
-                    style={{
-                      width: "16px",
-                      height: "16px",
-                      borderRadius: "3px",
-                      backgroundColor: `rgba(108,99,255,${op})`,
-                    }}
-                  />
-                ))}
-                <span style={{ fontSize: "0.6rem", color: "#52526A" }}>Mais</span>
-              </div>
-            </div>
-          )}
-        </div>
         </>
         )}
 
