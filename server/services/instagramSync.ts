@@ -175,20 +175,50 @@ export async function syncProfile(igUserId: string, accessToken: string) {
 }
 
 export async function syncInsights(igUserId: string, accessToken: string, period: string = "day") {
-  const metrics = "reach,follower_count,views,follows_and_unfollows,accounts_engaged,total_interactions,likes,comments,saves,shares,profile_links_taps";
   console.log("[Instagram] Fetching insights for user:", igUserId);
+  const allData: any[] = [];
+
+  // Group 1: Core metrics (known to work)
   try {
-    const insights = await callGraphAPI(`/me/insights`, accessToken, {
-      metric: metrics,
+    const r1 = await callGraphAPI(`/me/insights`, accessToken, {
+      metric: "reach,follower_count,views",
       period,
       metric_type: "total_value",
     });
-    console.log("[Instagram] Insights response:", JSON.stringify(insights.data?.map((d: any) => ({ name: d.name, value: d.total_value?.value || d.values?.[0]?.value })) || []));
-    return insights.data || [];
+    if (r1.data) allData.push(...r1.data);
+    console.log("[Instagram] Core insights:", r1.data?.map((d: any) => d.name) || []);
   } catch (err: any) {
-    console.error("[Instagram] Insights fetch error:", err.message);
-    return [];
+    console.error("[Instagram] Core insights error:", err.message);
   }
+
+  // Group 2: Engagement metrics
+  try {
+    const r2 = await callGraphAPI(`/me/insights`, accessToken, {
+      metric: "accounts_engaged,total_interactions,likes,comments,saves,shares",
+      period,
+      metric_type: "total_value",
+    });
+    if (r2.data) allData.push(...r2.data);
+    console.log("[Instagram] Engagement insights:", r2.data?.map((d: any) => d.name) || []);
+  } catch (err: any) {
+    console.error("[Instagram] Engagement insights error:", err.message);
+  }
+
+  // Group 3: Follows and profile actions
+  try {
+    const r3 = await callGraphAPI(`/me/insights`, accessToken, {
+      metric: "follows_and_unfollows,profile_links_taps",
+      period,
+      metric_type: "total_value",
+    });
+    if (r3.data) allData.push(...r3.data);
+    console.log("[Instagram] Follows/profile insights:", r3.data?.map((d: any) => d.name) || []);
+  } catch (err: any) {
+    console.error("[Instagram] Follows/profile insights error:", err.message);
+  }
+
+  console.log("[Instagram] Total insights collected:", allData.length, "metrics");
+  return allData;
 }
 
 // Fetch historical daily insights (reach, views) for a date range
