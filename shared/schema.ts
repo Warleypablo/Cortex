@@ -1385,6 +1385,31 @@ export const insertInadimplenciaContextoSchema = createInsertSchema(inadimplenci
 export type InadimplenciaContexto = typeof inadimplenciaContextos.$inferSelect;
 export type InsertInadimplenciaContexto = z.infer<typeof insertInadimplenciaContextoSchema>;
 
+// Negativação Pipeline Actions
+export const negativacaoAcoes = pgTable("negativacao_acoes", {
+  id: serial("id").primaryKey(),
+  clienteId: text("cliente_id").notNull(),
+  clienteNome: text("cliente_nome").notNull(),
+  clienteCnpj: text("cliente_cnpj"),
+  etapa: text("etapa").notNull().default("notificacao"),
+  status: text("status").notNull().default("pendente"),
+  valorInadimplente: numeric("valor_inadimplente", { precision: 12, scale: 2 }).default("0"),
+  diasAtraso: integer("dias_atraso").default(0),
+  protocolo: text("protocolo"),
+  responsavel: text("responsavel"),
+  valorAcordado: numeric("valor_acordado", { precision: 12, scale: 2 }),
+  dataAcao: date("data_acao"),
+  dataAcordo: date("data_acordo"),
+  observacoes: text("observacoes"),
+  documentoUrl: text("documento_url"),
+  criadoPor: text("criado_por"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+}, (table) => [
+  index("idx_neg_cliente_id").on(table.clienteId),
+  index("idx_neg_etapa").on(table.etapa),
+]);
+
 // Metric Formatting Rules - Conditional coloring system
 export const metricRulesets = pgTable("metric_rulesets", {
   id: integer("id").primaryKey(),
