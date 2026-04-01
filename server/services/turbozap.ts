@@ -593,6 +593,46 @@ export async function executarEnvioMassa(
           'enviado', ${executadoPor}, ${execucaoId}
         )
       `);
+
+      // Auto-create negativação action when collection reaches legal stages
+      const negativacaoMap: Record<string, string> = {
+        "D+30": "notificacao",
+        "D+40": "protesto",
+        "D+50": "negativacao",
+      };
+      const etapaNeg = negativacaoMap[tipoCobranca];
+      if (etapaNeg) {
+        try {
+          // Check if client already has an action for this etapa
+          const existing = await db.execute(sql`
+            SELECT id FROM cortex_core.negativacao_acoes
+            WHERE cliente_id = ${cliente.id_cliente}
+              AND etapa = ${etapaNeg}
+            LIMIT 1
+          `);
+          if (existing.rows.length === 0) {
+            // Calculate days overdue
+            const diasAtraso = cliente.data_vencimento
+              ? Math.floor((Date.now() - new Date(cliente.data_vencimento).getTime()) / 86400000)
+              : 0;
+            await db.execute(sql`
+              INSERT INTO cortex_core.negativacao_acoes (
+                cliente_id, cliente_nome, cliente_cnpj, etapa, status,
+                valor_inadimplente, dias_atraso, data_acao, criado_por, observacoes
+              ) VALUES (
+                ${cliente.id_cliente}, ${cliente.cliente_nome}, ${cliente.cnpj || ""},
+                ${etapaNeg}, 'pendente',
+                ${Number(cliente.total)}, ${diasAtraso},
+                CURRENT_DATE, 'turbozap-auto',
+                ${"Criado automaticamente via TurboZap (" + tipoCobranca + ")"}
+              )
+            `);
+            console.log(`[TurboZap→Negativação] Cliente ${cliente.cliente_nome} adicionado à etapa ${etapaNeg}`);
+          }
+        } catch (negErr: any) {
+          console.warn(`[TurboZap→Negativação] Erro ao criar ação: ${negErr.message}`);
+        }
+      }
     } else {
       erros++;
       await db.execute(sql`
