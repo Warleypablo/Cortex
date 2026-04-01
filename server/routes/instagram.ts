@@ -367,17 +367,28 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       }
 
       // 2. Sync insights
-      let reachDay = 0;
-      let impressionsDay = 0;
+      let reachDay = 0, impressionsDay = 0, viewsDay = 0;
+      let followsDay = 0, unfollowsDay = 0;
+      let accountsEngaged = 0, totalInteractions = 0;
+      let likesDay = 0, commentsDay = 0, savesDay = 0, sharesDay = 0;
+      let profileLinksTaps = 0;
       try {
         const insights = await syncInsights(conn.igUserId, token);
         for (const metric of insights) {
           // Support both total_value format and time_series values format
           const value = metric.total_value?.value ?? metric.values?.[0]?.value ?? 0;
           if (metric.name === "reach") reachDay = value;
-          if (metric.name === "views") impressionsDay = value;
+          if (metric.name === "views") { viewsDay = value; impressionsDay = value; }
+          if (metric.name === "follows_and_unfollows") followsDay = value;
+          if (metric.name === "accounts_engaged") accountsEngaged = value;
+          if (metric.name === "total_interactions") totalInteractions = value;
+          if (metric.name === "likes") likesDay = value;
+          if (metric.name === "comments") commentsDay = value;
+          if (metric.name === "saves") savesDay = value;
+          if (metric.name === "shares") sharesDay = value;
+          if (metric.name === "profile_links_taps") profileLinksTaps = value;
         }
-        console.log("[Instagram] Insights extracted: reach=", reachDay, "impressions=", impressionsDay);
+        console.log("[Instagram] Insights extracted: reach=", reachDay, "impressions=", impressionsDay, "views=", viewsDay, "follows=", followsDay, "engaged=", accountsEngaged);
       } catch (insightsErr: any) {
         console.warn("[Instagram] Insights sync partial failure:", insightsErr.message);
       }
@@ -393,6 +404,16 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           postsCount: profile.media_count || 0,
           reachDay,
           impressionsDay,
+          followsDay,
+          unfollowsDay,
+          viewsDay,
+          accountsEngaged,
+          totalInteractions,
+          likesDay,
+          commentsDay,
+          savesDay,
+          sharesDay,
+          profileLinksTaps,
         })
         .onConflictDoUpdate({
           target: [instagramMetricsSnapshots.connectionId, instagramMetricsSnapshots.metricDate],
@@ -402,6 +423,16 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             postsCount: sql`EXCLUDED.posts_count`,
             reachDay: sql`EXCLUDED.reach_day`,
             impressionsDay: sql`EXCLUDED.impressions_day`,
+            followsDay: sql`EXCLUDED.follows_day`,
+            unfollowsDay: sql`EXCLUDED.unfollows_day`,
+            viewsDay: sql`EXCLUDED.views_day`,
+            accountsEngaged: sql`EXCLUDED.accounts_engaged`,
+            totalInteractions: sql`EXCLUDED.total_interactions`,
+            likesDay: sql`EXCLUDED.likes_day`,
+            commentsDay: sql`EXCLUDED.comments_day`,
+            savesDay: sql`EXCLUDED.saves_day`,
+            sharesDay: sql`EXCLUDED.shares_day`,
+            profileLinksTaps: sql`EXCLUDED.profile_links_taps`,
             recordedAt: sql`NOW()`,
           },
         });
@@ -433,6 +464,16 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
               postsCount: profile.media_count || 0,
               reachDay: day.reach,
               impressionsDay: day.views,
+              followsDay: day.followsDay,
+              unfollowsDay: day.unfollowsDay,
+              viewsDay: day.views,
+              accountsEngaged: day.accountsEngaged,
+              totalInteractions: day.totalInteractions,
+              likesDay: day.likesDay,
+              commentsDay: day.commentsDay,
+              savesDay: day.savesDay,
+              sharesDay: day.sharesDay,
+              profileLinksTaps: day.profileLinksTaps,
             })
             .onConflictDoUpdate({
               target: [instagramMetricsSnapshots.connectionId, instagramMetricsSnapshots.metricDate],
@@ -440,6 +481,16 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
                 followers: sql`EXCLUDED.followers`,
                 reachDay: sql`EXCLUDED.reach_day`,
                 impressionsDay: sql`EXCLUDED.impressions_day`,
+                followsDay: sql`EXCLUDED.follows_day`,
+                unfollowsDay: sql`EXCLUDED.unfollows_day`,
+                viewsDay: sql`EXCLUDED.views_day`,
+                accountsEngaged: sql`EXCLUDED.accounts_engaged`,
+                totalInteractions: sql`EXCLUDED.total_interactions`,
+                likesDay: sql`EXCLUDED.likes_day`,
+                commentsDay: sql`EXCLUDED.comments_day`,
+                savesDay: sql`EXCLUDED.saves_day`,
+                sharesDay: sql`EXCLUDED.shares_day`,
+                profileLinksTaps: sql`EXCLUDED.profile_links_taps`,
                 recordedAt: sql`NOW()`,
               },
             });
