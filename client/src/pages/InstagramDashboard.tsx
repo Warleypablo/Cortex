@@ -30,6 +30,10 @@ import {
   ExternalLink,
   LogOut,
   RefreshCw,
+  Clock,
+  Calendar,
+  Zap,
+  Hash,
 } from "lucide-react";
 import { format, subDays, parseISO, getDay, getHours, getISOWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -574,6 +578,290 @@ export default function InstagramDashboard() {
       };
     });
   }, [metrics]);
+
+  // --- Actionable Insights ---
+  const actionableInsights = useMemo(() => {
+    if (!posts || posts.length === 0) return null;
+
+    const STOP_WORDS = new Set([
+      "de", "do", "da", "dos", "das", "e", "a", "o", "um", "uma", "que", "no", "na",
+      "nos", "nas", "em", "com", "para", "por", "se", "é", "não", "mais", "como",
+      "seu", "sua", "ou", "ser", "ter", "está", "isso", "mas", "ao", "já", "também",
+      "só", "ele", "ela", "entre", "quando", "muito", "sem", "mesmo", "os", "as",
+      "esse", "essa", "num", "numa", "pelos", "pelas", "qual", "lhe", "até",
+    ]);
+
+    // 1. Best format
+    const formatStats: Record<string, { totalEng: number; count: number }> = {};
+    for (const p of posts) {
+      const key = p.mediaType || "OTHER";
+      if (key !== "CAROUSEL_ALBUM" && key !== "VIDEO") continue;
+      if (!formatStats[key]) formatStats[key] = { totalEng: 0, count: 0 };
+      formatStats[key].totalEng += p.likes + p.comments + p.saves + p.shares;
+      formatStats[key].count += 1;
+    }
+    const carouselAvg = formatStats["CAROUSEL_ALBUM"]
+      ? formatStats["CAROUSEL_ALBUM"].totalEng / formatStats["CAROUSEL_ALBUM"].count
+      : 0;
+    const videoAvg = formatStats["VIDEO"]
+      ? formatStats["VIDEO"].totalEng / formatStats["VIDEO"].count
+      : 0;
+    let bestFormatText = "Dados insuficientes para comparar formatos";
+    let bestFormatDetail = "";
+    if (carouselAvg > 0 && videoAvg > 0) {
+      if (carouselAvg > videoAvg) {
+        const ratio = (carouselAvg / videoAvg).toFixed(1);
+        bestFormatText = `Carrosséis performam ${ratio}x melhor que vídeos`;
+        bestFormatDetail = `Média: ${Math.round(carouselAvg)} vs ${Math.round(videoAvg)} interações`;
+      } else {
+        const ratio = (videoAvg / carouselAvg).toFixed(1);
+        bestFormatText = `Vídeos performam ${ratio}x melhor que carrosséis`;
+        bestFormatDetail = `Média: ${Math.round(videoAvg)} vs ${Math.round(carouselAvg)} interações`;
+      }
+    } else if (carouselAvg > 0) {
+      bestFormatText = "Apenas carrosséis no período";
+      bestFormatDetail = `Média: ${Math.round(carouselAvg)} interações`;
+    } else if (videoAvg > 0) {
+      bestFormatText = "Apenas vídeos no período";
+      bestFormatDetail = `Média: ${Math.round(videoAvg)} interações`;
+    }
+
+    // 2. Best day/time from heatmap
+    let bestDayTime = "Sem dados suficientes";
+    let bestDayTimeDetail = "";
+    if (heatmapData && heatmapData.cells.length > 0) {
+      const best = heatmapData.cells
+        .filter((c) => c.count > 0)
+        .sort((a, b) => b.avgEng - a.avgEng)[0];
+      if (best) {
+        bestDayTime = `${best.day} às ${best.hour}h`;
+        bestDayTimeDetail = `Média de ${Math.round(best.avgEng)} interações (${best.count} post${best.count > 1 ? "s" : ""})`;
+      }
+    }
+
+    // 3. Posting frequency
+    const postsWithDate = posts.filter((p) => p.postedAt).map((p) => parseISO(p.postedAt!));
+    let freqText = "Sem dados suficientes";
+    let freqDetail = "";
+    if (postsWithDate.length >= 2 && frequencyData.length >= 2) {
+      const avgPostsPerWeek =
+        frequencyData.reduce((s, w) => s + w.posts, 0) / frequencyData.length;
+      freqText = `${avgPostsPerWeek.toFixed(1)} posts/semana`;
+
+      // Correlate: do weeks with more posts have better engagement?
+      const medianPosts = [...frequencyData]
+        .sort((a, b) => a.posts - b.posts)[Math.floor(frequencyData.length / 2)].posts;
+      const highWeeks = frequencyData.filter((w) => w.posts > medianPosts);
+      const lowWeeks = frequencyData.filter((w) => w.posts <= medianPosts);
+      const avgEngHigh =
+        highWeeks.length > 0
+          ? highWeeks.reduce((s, w) => s + w.avgEngagement, 0) / highWeeks.length
+          : 0;
+      const avgEngLow =
+        lowWeeks.length > 0
+          ? lowWeeks.reduce((s, w) => s + w.avgEngagement, 0) / lowWeeks.length
+          : 0;
+      if (highWeeks.length > 0 && lowWeeks.length > 0) {
+        if (avgEngHigh > avgEngLow) {
+          freqDetail = `Semanas com mais posts têm engajamento ${((avgEngHigh / avgEngLow - 1) * 100).toFixed(0)}% maior`;
+        } else if (avgEngLow > avgEngHigh) {
+          freqDetail = `Semanas com menos posts têm engajamento ${((avgEngLow / avgEngHigh - 1) * 100).toFixed(0)}% maior`;
+        } else {
+          freqDetail = "Frequência não afeta significativamente o engajamento";
+        }
+      }
+    }
+
+    // 4. Engagement trend: last 10 vs first 10
+    const sortedByDate = [...posts]
+      .filter((p) => p.postedAt)
+      .sort((a, b) => new Date(a.postedAt!).getTime() - new Date(b.postedAt!).getTime());
+    let trendText = "Sem dados suficientes";
+    let trendDetail = "";
+    let trendUp = true;
+    if (sortedByDate.length >= 10) {
+      const first10 = sortedByDate.slice(0, 10);
+      const last10 = sortedByDate.slice(-10);
+      const avgFirst =
+        first10.reduce((s, p) => s + p.likes + p.comments + p.saves + p.shares, 0) / 10;
+      const avgLast =
+        last10.reduce((s, p) => s + p.likes + p.comments + p.saves + p.shares, 0) / 10;
+      if (avgFirst > 0) {
+        const changeRatio = avgLast / avgFirst;
+        trendUp = changeRatio >= 1;
+        if (trendUp) {
+          trendText = `Engajamento subindo ${changeRatio.toFixed(1)}x`;
+          trendDetail = `Últimos 10 posts: ~${Math.round(avgLast)} vs primeiros 10: ~${Math.round(avgFirst)}`;
+        } else {
+          trendText = `Engajamento caindo ${(1 / changeRatio).toFixed(1)}x`;
+          trendDetail = `Últimos 10 posts: ~${Math.round(avgLast)} vs primeiros 10: ~${Math.round(avgFirst)}`;
+        }
+      }
+    } else if (sortedByDate.length >= 4) {
+      const half = Math.floor(sortedByDate.length / 2);
+      const firstHalf = sortedByDate.slice(0, half);
+      const lastHalf = sortedByDate.slice(half);
+      const avgFirst =
+        firstHalf.reduce((s, p) => s + p.likes + p.comments + p.saves + p.shares, 0) /
+        firstHalf.length;
+      const avgLast =
+        lastHalf.reduce((s, p) => s + p.likes + p.comments + p.saves + p.shares, 0) /
+        lastHalf.length;
+      if (avgFirst > 0) {
+        const changeRatio = avgLast / avgFirst;
+        trendUp = changeRatio >= 1;
+        trendText = trendUp
+          ? `Engajamento subindo ${changeRatio.toFixed(1)}x`
+          : `Engajamento caindo ${(1 / changeRatio).toFixed(1)}x`;
+        trendDetail = `Comparação entre metades do período`;
+      }
+    }
+
+    // 5. Best keywords from top 10 posts
+    const topPosts = [...posts]
+      .sort(
+        (a, b) =>
+          b.likes + b.comments + b.saves + b.shares -
+          (a.likes + a.comments + a.saves + a.shares),
+      )
+      .slice(0, 10);
+    const wordFreq: Record<string, number> = {};
+    for (const p of topPosts) {
+      if (!p.caption) continue;
+      const words = p.caption
+        .toLowerCase()
+        .replace(/[^a-záàâãéêíóôõúüç\s#@]/gi, "")
+        .split(/\s+/)
+        .filter((w) => w.length > 2 && !STOP_WORDS.has(w) && !w.startsWith("@"));
+      const unique = new Set(words);
+      for (const w of unique) {
+        wordFreq[w] = (wordFreq[w] || 0) + 1;
+      }
+    }
+    const topKeywords = Object.entries(wordFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([word, count]) => ({ word, count }));
+    const keywordsText =
+      topKeywords.length > 0
+        ? topKeywords.map((k) => k.word).join(", ")
+        : "Sem dados suficientes";
+    const keywordsDetail =
+      topKeywords.length > 0
+        ? `Palavras mais frequentes nos top 10 posts`
+        : "";
+
+    return {
+      bestFormatText,
+      bestFormatDetail,
+      bestDayTime,
+      bestDayTimeDetail,
+      freqText,
+      freqDetail,
+      trendText,
+      trendDetail,
+      trendUp,
+      keywordsText,
+      keywordsDetail,
+    };
+  }, [posts, heatmapData, frequencyData]);
+
+  // --- Performance por Formato (detailed) ---
+  const formatPerformance = useMemo(() => {
+    if (!posts || posts.length === 0) return null;
+
+    const stats: Record<
+      string,
+      {
+        likes: number;
+        comments: number;
+        saves: number;
+        shares: number;
+        reach: number;
+        totalEng: number;
+        totalReach: number;
+        count: number;
+      }
+    > = {};
+
+    for (const p of posts) {
+      const key = p.mediaType || "OTHER";
+      if (key !== "CAROUSEL_ALBUM" && key !== "VIDEO") continue;
+      if (!stats[key])
+        stats[key] = {
+          likes: 0,
+          comments: 0,
+          saves: 0,
+          shares: 0,
+          reach: 0,
+          totalEng: 0,
+          totalReach: 0,
+          count: 0,
+        };
+      stats[key].likes += p.likes;
+      stats[key].comments += p.comments;
+      stats[key].saves += p.saves;
+      stats[key].shares += p.shares;
+      stats[key].reach += p.reach;
+      stats[key].totalEng += p.likes + p.comments + p.saves + p.shares;
+      stats[key].totalReach += p.reach;
+      stats[key].count += 1;
+    }
+
+    const formats = (["CAROUSEL_ALBUM", "VIDEO"] as const)
+      .filter((k) => stats[k])
+      .map((key) => {
+        const s = stats[key];
+        const avgLikes = s.count > 0 ? s.likes / s.count : 0;
+        const avgComments = s.count > 0 ? s.comments / s.count : 0;
+        const avgSaves = s.count > 0 ? s.saves / s.count : 0;
+        const avgShares = s.count > 0 ? s.shares / s.count : 0;
+        const avgReach = s.count > 0 ? s.reach / s.count : 0;
+        const engRate = s.totalReach > 0 ? (s.totalEng / s.totalReach) * 100 : 0;
+        return {
+          key,
+          label: MEDIA_LABELS[key] || key,
+          avgLikes: Math.round(avgLikes),
+          avgComments: Math.round(avgComments),
+          avgSaves: Math.round(avgSaves),
+          avgShares: Math.round(avgShares),
+          avgReach: Math.round(avgReach),
+          engRate: parseFloat(engRate.toFixed(2)),
+          count: s.count,
+        };
+      });
+
+    if (formats.length < 2) return { formats, verdict: null };
+
+    // Determine winner per metric
+    const metrics = [
+      "avgLikes",
+      "avgComments",
+      "avgSaves",
+      "avgShares",
+      "avgReach",
+      "engRate",
+    ] as const;
+    let carouselWins = 0;
+    let videoWins = 0;
+    const carousel = formats.find((f) => f.key === "CAROUSEL_ALBUM");
+    const video = formats.find((f) => f.key === "VIDEO");
+    if (carousel && video) {
+      for (const m of metrics) {
+        if (carousel[m] > video[m]) carouselWins++;
+        else if (video[m] > carousel[m]) videoWins++;
+      }
+    }
+
+    const verdict =
+      carouselWins > videoWins
+        ? `Carrosséis vencem em ${carouselWins} de ${metrics.length} métricas`
+        : videoWins > carouselWins
+          ? `Vídeos vencem em ${videoWins} de ${metrics.length} métricas`
+          : "Empate técnico entre os formatos";
+
+    return { formats, verdict };
+  }, [posts]);
 
   // --- Benchmarks ---
   const benchmarks = useMemo(() => {
@@ -1145,56 +1433,493 @@ export default function InstagramDashboard() {
           )}
         </div>
 
-        {/* ───── 4. Performance by Type (IMPROVED: grouped bars) ───── */}
+        {/* ───── 4A. Insights Acionáveis ───── */}
         <div style={{ padding: "24px 0" }}>
-          <SectionTitle>Engajamento por Tipo</SectionTitle>
+          <SectionTitle>Insights Acionáveis</SectionTitle>
 
           {isLoading ? (
             <Skeleton
               className="w-full rounded-lg"
               style={{ height: 260, backgroundColor: "rgba(255,255,255,0.04)" }}
             />
-          ) : perfByType.length === 0 ? (
+          ) : !actionableInsights ? (
             <p
               style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "64px 0" }}
             >
               Sem posts no período selecionado.
             </p>
           ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={perfByType} barCategoryGap="20%">
-                <CartesianGrid
-                  strokeDasharray="4 4"
-                  stroke="rgba(255,255,255,0.04)"
-                  vertical={false}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: "12px",
+              }}
+            >
+              {/* Best Format */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-start",
+                }}
+              >
+                <Zap
+                  style={{ color: "rgba(255,255,255,0.25)", flexShrink: 0, marginTop: 2 }}
+                  size={16}
                 />
-                <XAxis
-                  dataKey="type"
-                  tick={{ fontSize: 11, fill: "#52526A" }}
-                  axisLine={false}
-                  tickLine={false}
+                <div>
+                  <p
+                    style={{
+                      fontSize: "0.65rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "#52526A",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Melhor Formato
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "1rem",
+                      color: "#FFFFFF",
+                      fontWeight: 700,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {actionableInsights.bestFormatText}
+                  </p>
+                  {actionableInsights.bestFormatDetail && (
+                    <p style={{ fontSize: "0.8rem", color: "#A1A1B5", marginTop: 4 }}>
+                      {actionableInsights.bestFormatDetail}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Best Day/Time */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-start",
+                }}
+              >
+                <Clock
+                  style={{ color: "rgba(255,255,255,0.25)", flexShrink: 0, marginTop: 2 }}
+                  size={16}
                 />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#52526A", fontFamily: "monospace" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={fmtNum}
+                <div>
+                  <p
+                    style={{
+                      fontSize: "0.65rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "#52526A",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Melhor Horário
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "1rem",
+                      color: "#FFFFFF",
+                      fontWeight: 700,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {actionableInsights.bestDayTime}
+                  </p>
+                  {actionableInsights.bestDayTimeDetail && (
+                    <p style={{ fontSize: "0.8rem", color: "#A1A1B5", marginTop: 4 }}>
+                      {actionableInsights.bestDayTimeDetail}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Posting Frequency */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-start",
+                }}
+              >
+                <Calendar
+                  style={{ color: "rgba(255,255,255,0.25)", flexShrink: 0, marginTop: 2 }}
+                  size={16}
                 />
-                <Tooltip content={<BarTooltip />} />
-                <Legend
-                  wrapperStyle={{ fontSize: "0.7rem", color: "#A1A1B5" }}
-                  iconType="circle"
-                  iconSize={8}
+                <div>
+                  <p
+                    style={{
+                      fontSize: "0.65rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "#52526A",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Frequência de Postagem
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "1rem",
+                      color: "#FFFFFF",
+                      fontWeight: 700,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {actionableInsights.freqText}
+                  </p>
+                  {actionableInsights.freqDetail && (
+                    <p style={{ fontSize: "0.8rem", color: "#A1A1B5", marginTop: 4 }}>
+                      {actionableInsights.freqDetail}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Engagement Trend */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-start",
+                }}
+              >
+                <TrendingUp
+                  style={{
+                    color: actionableInsights.trendUp ? "#10B981" : "#F43F5E",
+                    flexShrink: 0,
+                    marginTop: 2,
+                  }}
+                  size={16}
                 />
-                <Bar dataKey="Avg Likes" fill="#6C63FF" radius={[3, 3, 0, 0]} name="Avg Likes" />
-                <Bar dataKey="Avg Coment." fill="#00D4C8" radius={[3, 3, 0, 0]} name="Avg Coment." />
-                <Bar dataKey="Avg Saves" fill="#F59E0B" radius={[3, 3, 0, 0]} name="Avg Saves" />
-                <Bar dataKey="Avg Shares" fill="#A1A1B5" radius={[3, 3, 0, 0]} name="Avg Shares" />
-              </BarChart>
-            </ResponsiveContainer>
+                <div>
+                  <p
+                    style={{
+                      fontSize: "0.65rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "#52526A",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Tendência de Engajamento
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "1rem",
+                      color: actionableInsights.trendUp ? "#10B981" : "#F43F5E",
+                      fontWeight: 700,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {actionableInsights.trendText}
+                  </p>
+                  {actionableInsights.trendDetail && (
+                    <p style={{ fontSize: "0.8rem", color: "#A1A1B5", marginTop: 4 }}>
+                      {actionableInsights.trendDetail}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Top Keywords */}
+              <div
+                style={{
+                  backgroundColor: "#111118",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  display: "flex",
+                  gap: "12px",
+                  alignItems: "flex-start",
+                  gridColumn: "span 2",
+                }}
+              >
+                <Hash
+                  style={{ color: "rgba(255,255,255,0.25)", flexShrink: 0, marginTop: 2 }}
+                  size={16}
+                />
+                <div>
+                  <p
+                    style={{
+                      fontSize: "0.65rem",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "#52526A",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                    }}
+                  >
+                    Temas com Melhor Performance
+                  </p>
+                  <p
+                    style={{
+                      fontSize: "1rem",
+                      color: "#FFFFFF",
+                      fontWeight: 700,
+                      lineHeight: 1.3,
+                    }}
+                  >
+                    {actionableInsights.keywordsText}
+                  </p>
+                  {actionableInsights.keywordsDetail && (
+                    <p style={{ fontSize: "0.8rem", color: "#A1A1B5", marginTop: 4 }}>
+                      {actionableInsights.keywordsDetail}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
+        {/* ───── 4B. Performance por Formato ───── */}
+        <div style={{ padding: "24px 0" }}>
+          <SectionTitle>Performance por Formato</SectionTitle>
+
+          {isLoading ? (
+            <Skeleton
+              className="w-full rounded-lg"
+              style={{ height: 260, backgroundColor: "rgba(255,255,255,0.04)" }}
+            />
+          ) : !formatPerformance || formatPerformance.formats.length === 0 ? (
+            <p
+              style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "64px 0" }}
+            >
+              Sem dados de carrosséis ou vídeos no período.
+            </p>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    formatPerformance.formats.length === 2
+                      ? "repeat(2, 1fr)"
+                      : "1fr",
+                  gap: "12px",
+                }}
+              >
+                {formatPerformance.formats.map((fmt) => {
+                  const other = formatPerformance.formats.find(
+                    (f) => f.key !== fmt.key,
+                  );
+                  const metricRows: {
+                    label: string;
+                    value: number;
+                    otherValue: number | null;
+                    formatted: string;
+                    isPct?: boolean;
+                  }[] = [
+                    {
+                      label: "Avg Likes",
+                      value: fmt.avgLikes,
+                      otherValue: other?.avgLikes ?? null,
+                      formatted: fmtNum(fmt.avgLikes),
+                    },
+                    {
+                      label: "Avg Comentários",
+                      value: fmt.avgComments,
+                      otherValue: other?.avgComments ?? null,
+                      formatted: fmtNum(fmt.avgComments),
+                    },
+                    {
+                      label: "Avg Saves",
+                      value: fmt.avgSaves,
+                      otherValue: other?.avgSaves ?? null,
+                      formatted: fmtNum(fmt.avgSaves),
+                    },
+                    {
+                      label: "Avg Shares",
+                      value: fmt.avgShares,
+                      otherValue: other?.avgShares ?? null,
+                      formatted: fmtNum(fmt.avgShares),
+                    },
+                    {
+                      label: "Avg Alcance",
+                      value: fmt.avgReach,
+                      otherValue: other?.avgReach ?? null,
+                      formatted: fmtNum(fmt.avgReach),
+                    },
+                    {
+                      label: "Taxa Engajamento",
+                      value: fmt.engRate,
+                      otherValue: other?.engRate ?? null,
+                      formatted: `${fmt.engRate}%`,
+                      isPct: true,
+                    },
+                  ];
+
+                  return (
+                    <div
+                      key={fmt.key}
+                      style={{
+                        backgroundColor: "#111118",
+                        border: "1px solid rgba(255,255,255,0.06)",
+                        borderRadius: "8px",
+                        padding: "20px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 16,
+                        }}
+                      >
+                        <h4
+                          style={{
+                            fontSize: "0.95rem",
+                            fontWeight: 700,
+                            color: "#FFFFFF",
+                          }}
+                        >
+                          {fmt.label}
+                        </h4>
+                        <span
+                          style={{
+                            fontSize: "0.7rem",
+                            color: "#A1A1B5",
+                            fontFamily: "monospace",
+                          }}
+                        >
+                          {fmt.count} post{fmt.count !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {metricRows.map((row) => {
+                          const isWinner =
+                            row.otherValue !== null && row.value > row.otherValue;
+                          return (
+                            <div
+                              key={row.label}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "0.8rem",
+                                  color: "#A1A1B5",
+                                }}
+                              >
+                                {row.label}
+                              </span>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 6,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "0.9rem",
+                                    fontWeight: 600,
+                                    color: "#FFFFFF",
+                                    fontFamily: "monospace",
+                                    fontVariantNumeric: "tabular-nums",
+                                  }}
+                                >
+                                  {row.formatted}
+                                </span>
+                                {isWinner && (
+                                  <span
+                                    style={{
+                                      fontSize: "0.6rem",
+                                      fontWeight: 600,
+                                      backgroundColor: "rgba(16,185,129,0.15)",
+                                      color: "#10B981",
+                                      padding: "1px 6px",
+                                      borderRadius: "4px",
+                                      textTransform: "uppercase",
+                                    }}
+                                  >
+                                    melhor
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {formatPerformance.verdict && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    backgroundColor: "#111118",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    borderRadius: "8px",
+                    padding: "14px 20px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  <Zap style={{ color: "#6C63FF", flexShrink: 0 }} size={16} />
+                  <div>
+                    <span
+                      style={{
+                        fontSize: "0.65rem",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        color: "#52526A",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Veredito
+                    </span>
+                    <p
+                      style={{
+                        fontSize: "0.9rem",
+                        color: "#FFFFFF",
+                        fontWeight: 600,
+                        marginTop: 2,
+                      }}
+                    >
+                      {formatPerformance.verdict}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
 
         {/* ───── 6. Melhores Horários para Postar (Heatmap) ───── */}
         <div style={{ padding: "24px 0" }}>
