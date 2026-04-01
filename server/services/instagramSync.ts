@@ -175,7 +175,7 @@ export async function syncProfile(igUserId: string, accessToken: string) {
 }
 
 export async function syncInsights(igUserId: string, accessToken: string, period: string = "day") {
-  const metrics = "reach,follower_count,views";
+  const metrics = "reach,follower_count,views,follows_and_unfollows,accounts_engaged,total_interactions,likes,comments,saves,shares,profile_links_taps";
   console.log("[Instagram] Fetching insights for user:", igUserId);
   try {
     const insights = await callGraphAPI(`/me/insights`, accessToken, {
@@ -196,8 +196,8 @@ export async function syncInsightsHistorical(
   igUserId: string,
   accessToken: string,
   sinceDaysAgo: number = 30
-): Promise<Array<{ date: string; reach: number; views: number; followers: number }>> {
-  const results: Array<{ date: string; reach: number; views: number; followers: number }> = [];
+): Promise<Array<{ date: string; reach: number; views: number; followers: number; followsDay: number; unfollowsDay: number; accountsEngaged: number; totalInteractions: number; likesDay: number; commentsDay: number; savesDay: number; sharesDay: number; profileLinksTaps: number }>> {
+  const results: Array<{ date: string; reach: number; views: number; followers: number; followsDay: number; unfollowsDay: number; accountsEngaged: number; totalInteractions: number; likesDay: number; commentsDay: number; savesDay: number; sharesDay: number; profileLinksTaps: number }> = [];
 
   // Instagram API allows max 30 days per request for time_series
   const now = new Date();
@@ -216,7 +216,7 @@ export async function syncInsightsHistorical(
 
   try {
     const insights = await callGraphAPI(`/me/insights`, accessToken, {
-      metric: "reach,follower_count,views",
+      metric: "reach,follower_count,views,follows_and_unfollows,accounts_engaged,total_interactions,likes,comments,saves,shares,profile_links_taps",
       period: "day",
       metric_type: "time_series",
       since: String(sinceTs),
@@ -224,16 +224,24 @@ export async function syncInsightsHistorical(
     });
 
     // Build daily map from time_series data
-    const dailyMap: Record<string, { reach: number; views: number; followers: number }> = {};
+    const dailyMap: Record<string, { reach: number; views: number; followers: number; followsDay: number; unfollowsDay: number; accountsEngaged: number; totalInteractions: number; likesDay: number; commentsDay: number; savesDay: number; sharesDay: number; profileLinksTaps: number }> = {};
 
     for (const metric of insights.data || []) {
       for (const point of metric.values || []) {
         const date = point.end_time?.split("T")[0];
         if (!date) continue;
-        if (!dailyMap[date]) dailyMap[date] = { reach: 0, views: 0, followers: 0 };
+        if (!dailyMap[date]) dailyMap[date] = { reach: 0, views: 0, followers: 0, followsDay: 0, unfollowsDay: 0, accountsEngaged: 0, totalInteractions: 0, likesDay: 0, commentsDay: 0, savesDay: 0, sharesDay: 0, profileLinksTaps: 0 };
         if (metric.name === "reach") dailyMap[date].reach = point.value || 0;
         if (metric.name === "views") dailyMap[date].views = point.value || 0;
         if (metric.name === "follower_count") dailyMap[date].followers = point.value || 0;
+        if (metric.name === "follows_and_unfollows") dailyMap[date].followsDay = point.value || 0;
+        if (metric.name === "accounts_engaged") dailyMap[date].accountsEngaged = point.value || 0;
+        if (metric.name === "total_interactions") dailyMap[date].totalInteractions = point.value || 0;
+        if (metric.name === "likes") dailyMap[date].likesDay = point.value || 0;
+        if (metric.name === "comments") dailyMap[date].commentsDay = point.value || 0;
+        if (metric.name === "saves") dailyMap[date].savesDay = point.value || 0;
+        if (metric.name === "shares") dailyMap[date].sharesDay = point.value || 0;
+        if (metric.name === "profile_links_taps") dailyMap[date].profileLinksTaps = point.value || 0;
       }
     }
 
