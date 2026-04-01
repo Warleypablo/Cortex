@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
+import turboLogo from "@assets/logo-turbo-branca.svg";
 import { SECTION_THEMES, type SlideSection } from "./SlideLayout";
 
 /* ─────────────── SlideHeader ─────────────── */

@@ -30,8 +30,8 @@ import SlideCapaNovoEscritorio from "./relatorio-mensal/SlideCapaNovoEscritorio"
 import SlideEncerramento from "./relatorio-mensal/SlideEncerramento";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
 import SlideCustom from "./relatorio-mensal/SlideCustom";
-import novaSedeEtapa1 from "@assets/nova-sede-etapa-1.jpeg";
-import novaSedeEtapa2 from "@assets/nova-sede-etapa-2.jpeg";
+import novaSedeEtapa1 from "@assets/placeholder.svg";
+import novaSedeEtapa2 from "@assets/placeholder.svg";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
