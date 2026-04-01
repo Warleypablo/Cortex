@@ -49,6 +49,7 @@ import { registerFavoritesRoutes } from "./routes/favorites";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerNegativacaoRoutes } from "./routes/negativacao";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -7838,6 +7839,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Solicitação de Ferramentas/Cursos - registered from separate file
   registerSolicitacaoFerramentasRoutes(app);
+
+  // Negativação Module
+  registerNegativacaoRoutes(app, db);
 
   // ============================================
   // Sugestões API

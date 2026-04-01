@@ -211,6 +211,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/turbozap': PERMISSION_KEYS.FIN.TURBOZAP,
   '/dashboard/dre': PERMISSION_KEYS.FIN.DRE,
   '/dashboard/notas-fiscais': PERMISSION_KEYS.FIN.NOTAS_FISCAIS,
+  '/financeiro/negativacao': PERMISSION_KEYS.FIN.INADIMPLENCIA,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
@@ -417,6 +418,7 @@ export const NAV_CONFIG = {
         { title: 'Contribuição por Squad', url: '/dashboard/contribuicao-squad', icon: 'Users2', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR },
         { title: 'TurboZap', url: '/turbozap', icon: 'Zap', permissionKey: PERMISSION_KEYS.FIN.TURBOZAP },
         { title: 'Notas Fiscais', url: '/dashboard/notas-fiscais', icon: 'FileText', permissionKey: PERMISSION_KEYS.FIN.NOTAS_FISCAIS },
+        { title: 'Negativacao', url: '/financeiro/negativacao', icon: 'Scale', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
       ],
     },
     {
