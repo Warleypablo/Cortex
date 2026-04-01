@@ -1195,415 +1195,6 @@ export default function InstagramDashboard() {
           )}
         </div>
 
-        {/* ───── 5. Top Posts Table (IMPROVED: engagement rate col + media filter) ───── */}
-        <div style={{ padding: "24px 0" }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              marginBottom: "20px",
-              flexWrap: "wrap",
-            }}
-          >
-            <div
-              style={{
-                width: "2px",
-                height: "14px",
-                backgroundColor: "#6C63FF",
-                borderRadius: "1px",
-              }}
-            />
-            <h3
-              style={{
-                fontSize: "0.7rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.12em",
-                color: "#52526A",
-                fontWeight: 600,
-              }}
-            >
-              Top Posts
-            </h3>
-
-            {/* Media type filter buttons */}
-            <div
-              style={{
-                marginLeft: "16px",
-                backgroundColor: "rgba(255,255,255,0.04)",
-                borderRadius: "6px",
-                padding: "2px",
-                display: "inline-flex",
-                gap: "2px",
-              }}
-            >
-              {(
-                [
-                  ["ALL", "Todos"],
-                  ["CAROUSEL_ALBUM", "Carrossel"],
-                  ["VIDEO", "Vídeo"],
-                ] as [MediaFilter, string][]
-              ).map(([val, label]) => (
-                <button
-                  key={val}
-                  onClick={() => setMediaFilter(val)}
-                  style={{
-                    padding: "4px 12px",
-                    borderRadius: "4px",
-                    fontSize: "0.65rem",
-                    fontWeight: 500,
-                    letterSpacing: "0.03em",
-                    border: "none",
-                    cursor: "pointer",
-                    backgroundColor:
-                      mediaFilter === val ? "rgba(108,99,255,0.15)" : "transparent",
-                    color: mediaFilter === val ? "#6C63FF" : "#52526A",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton
-                  key={i}
-                  className="w-full rounded"
-                  style={{ height: 48, backgroundColor: "rgba(255,255,255,0.04)" }}
-                />
-              ))}
-            </div>
-          ) : sortedPosts.length === 0 ? (
-            <p
-              style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "48px 0" }}
-            >
-              Nenhum post encontrado no período.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "8px 8px",
-                        fontSize: "0.65rem",
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        color: "#52526A",
-                        fontWeight: 500,
-                        width: "40px",
-                        position: "sticky",
-                        top: 0,
-                        backgroundColor: "#0A0A0F",
-                      }}
-                    >
-                      {/* thumbnail */}
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "8px 8px",
-                        fontSize: "0.65rem",
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        color: "#52526A",
-                        fontWeight: 500,
-                        minWidth: "200px",
-                        position: "sticky",
-                        top: 0,
-                        backgroundColor: "#0A0A0F",
-                      }}
-                    >
-                      Legenda
-                    </th>
-                    <th
-                      style={{
-                        textAlign: "left",
-                        padding: "8px 8px",
-                        fontSize: "0.65rem",
-                        letterSpacing: "0.1em",
-                        textTransform: "uppercase",
-                        color: "#52526A",
-                        fontWeight: 500,
-                        position: "sticky",
-                        top: 0,
-                        backgroundColor: "#0A0A0F",
-                      }}
-                    >
-                      Tipo
-                    </th>
-                    {(
-                      [
-                        ["likes", "Likes"],
-                        ["comments", "Coment."],
-                        ["saves", "Saves"],
-                        ["shares", "Shares"],
-                        ["reach", "Alcance"],
-                        ["impressions", "Impr."],
-                        ["totalInteractions", "Total"],
-                        ["engagementRate", "Eng.%"],
-                      ] as [SortKey, string][]
-                    ).map(([key, label]) => (
-                      <th
-                        key={key}
-                        onClick={() => handleSort(key)}
-                        style={{
-                          textAlign: "right",
-                          padding: "8px 8px",
-                          fontSize: "0.65rem",
-                          letterSpacing: "0.1em",
-                          textTransform: "uppercase",
-                          fontWeight: 500,
-                          whiteSpace: "nowrap",
-                          cursor: "pointer",
-                          userSelect: "none",
-                          color: sortKey === key ? "#6C63FF" : "#52526A",
-                          position: "sticky",
-                          top: 0,
-                          backgroundColor: "#0A0A0F",
-                        }}
-                      >
-                        {label}
-                        {sortKey === key && (
-                          <span style={{ marginLeft: "2px" }}>{sortAsc ? "▲" : "▼"}</span>
-                        )}
-                      </th>
-                    ))}
-                    <th
-                      style={{
-                        padding: "8px 8px",
-                        width: "32px",
-                        position: "sticky",
-                        top: 0,
-                        backgroundColor: "#0A0A0F",
-                      }}
-                    />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedPosts.map((post) => (
-                    <tr
-                      key={post.igMediaId}
-                      style={{
-                        borderBottom: "1px solid rgba(255,255,255,0.04)",
-                      }}
-                      className="group"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }}
-                    >
-                      {/* Thumbnail */}
-                      <td style={{ padding: "8px 8px" }}>
-                        {post.thumbnailUrl ? (
-                          <img
-                            src={post.thumbnailUrl}
-                            alt=""
-                            style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: "6px",
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <div
-                            style={{
-                              width: 32,
-                              height: 32,
-                              borderRadius: "6px",
-                              backgroundColor: "rgba(255,255,255,0.06)",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            <Instagram
-                              style={{ width: 14, height: 14, color: "rgba(255,255,255,0.15)" }}
-                            />
-                          </div>
-                        )}
-                      </td>
-                      {/* Caption */}
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          color: "#FFFFFF",
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        <span className="line-clamp-1">
-                          {post.caption
-                            ? post.caption.length > 60
-                              ? post.caption.slice(0, 60) + "..."
-                              : post.caption
-                            : <span style={{ color: "#52526A" }}>—</span>}
-                        </span>
-                      </td>
-                      {/* Type badge */}
-                      <td style={{ padding: "8px 8px" }}>
-                        <span
-                          style={{
-                            display: "inline-block",
-                            fontSize: "0.6rem",
-                            fontWeight: 500,
-                            padding: "2px 8px",
-                            borderRadius: "4px",
-                            border:
-                              post.mediaType === "CAROUSEL_ALBUM"
-                                ? "1px solid rgba(108,99,255,0.4)"
-                                : post.mediaType === "VIDEO"
-                                  ? "1px solid rgba(0,212,200,0.4)"
-                                  : "1px solid rgba(255,255,255,0.1)",
-                            color:
-                              post.mediaType === "CAROUSEL_ALBUM"
-                                ? "#6C63FF"
-                                : post.mediaType === "VIDEO"
-                                  ? "#00D4C8"
-                                  : "#A1A1B5",
-                            backgroundColor: "transparent",
-                            letterSpacing: "0.03em",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {MEDIA_LABELS[post.mediaType] || post.mediaType}
-                        </span>
-                      </td>
-                      {/* Numeric columns */}
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "0.85rem",
-                          color: "#FFFFFF",
-                          fontFeatureSettings: '"tnum"',
-                        }}
-                      >
-                        {renderNumCell(post.likes)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "0.85rem",
-                          color: "#FFFFFF",
-                          fontFeatureSettings: '"tnum"',
-                        }}
-                      >
-                        {renderNumCell(post.comments)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "0.85rem",
-                          color: "#FFFFFF",
-                          fontFeatureSettings: '"tnum"',
-                        }}
-                      >
-                        {renderNumCell(post.saves)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "0.85rem",
-                          color: "#FFFFFF",
-                          fontFeatureSettings: '"tnum"',
-                        }}
-                      >
-                        {renderNumCell(post.shares)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "0.85rem",
-                          color: "#FFFFFF",
-                          fontFeatureSettings: '"tnum"',
-                        }}
-                      >
-                        {renderNumCell(post.reach)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "0.85rem",
-                          color: "#FFFFFF",
-                          fontFeatureSettings: '"tnum"',
-                        }}
-                      >
-                        {renderNumCell(post.impressions)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "0.85rem",
-                          fontWeight: 700,
-                          color: "#FFFFFF",
-                          fontFeatureSettings: '"tnum"',
-                        }}
-                      >
-                        {renderNumCell(post.totalInteractions)}
-                      </td>
-                      {/* Engagement Rate column */}
-                      <td
-                        style={{
-                          padding: "8px 8px",
-                          textAlign: "right",
-                          fontFamily: "monospace",
-                          fontSize: "0.85rem",
-                          color: post.engagementRate > 3 ? "#10B981" : post.engagementRate > 1.5 ? "#F59E0B" : "#F43F5E",
-                          fontFeatureSettings: '"tnum"',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {post.engagementRate > 0 ? `${post.engagementRate.toFixed(1)}%` : <span style={{ color: "#52526A" }}>—</span>}
-                      </td>
-                      {/* Link — only visible on hover */}
-                      <td style={{ padding: "8px 8px" }}>
-                        <a
-                          href={post.permalink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: "#52526A",
-                            opacity: 0,
-                          }}
-                          className="group-hover:!opacity-100"
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = "#6C63FF";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = "#52526A";
-                          }}
-                        >
-                          <ExternalLink style={{ width: 14, height: 14 }} />
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
 
         {/* ───── 6. Melhores Horários para Postar (Heatmap) ───── */}
         <div style={{ padding: "24px 0" }}>
@@ -2293,6 +1884,415 @@ export default function InstagramDashboard() {
           )}
         </div>
       </div>
+        {/* ───── 5. Top Posts Table (IMPROVED: engagement rate col + media filter) ───── */}
+        <div style={{ padding: "24px 0" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginBottom: "20px",
+              flexWrap: "wrap",
+            }}
+          >
+            <div
+              style={{
+                width: "2px",
+                height: "14px",
+                backgroundColor: "#6C63FF",
+                borderRadius: "1px",
+              }}
+            />
+            <h3
+              style={{
+                fontSize: "0.7rem",
+                textTransform: "uppercase",
+                letterSpacing: "0.12em",
+                color: "#52526A",
+                fontWeight: 600,
+              }}
+            >
+              Top Posts
+            </h3>
+
+            {/* Media type filter buttons */}
+            <div
+              style={{
+                marginLeft: "16px",
+                backgroundColor: "rgba(255,255,255,0.04)",
+                borderRadius: "6px",
+                padding: "2px",
+                display: "inline-flex",
+                gap: "2px",
+              }}
+            >
+              {(
+                [
+                  ["ALL", "Todos"],
+                  ["CAROUSEL_ALBUM", "Carrossel"],
+                  ["VIDEO", "Vídeo"],
+                ] as [MediaFilter, string][]
+              ).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setMediaFilter(val)}
+                  style={{
+                    padding: "4px 12px",
+                    borderRadius: "4px",
+                    fontSize: "0.65rem",
+                    fontWeight: 500,
+                    letterSpacing: "0.03em",
+                    border: "none",
+                    cursor: "pointer",
+                    backgroundColor:
+                      mediaFilter === val ? "rgba(108,99,255,0.15)" : "transparent",
+                    color: mediaFilter === val ? "#6C63FF" : "#52526A",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton
+                  key={i}
+                  className="w-full rounded"
+                  style={{ height: 48, backgroundColor: "rgba(255,255,255,0.04)" }}
+                />
+              ))}
+            </div>
+          ) : sortedPosts.length === 0 ? (
+            <p
+              style={{ color: "#52526A", fontSize: "0.85rem", textAlign: "center", padding: "48px 0" }}
+            >
+              Nenhum post encontrado no período.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "8px 8px",
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        width: "40px",
+                        position: "sticky",
+                        top: 0,
+                        backgroundColor: "#0A0A0F",
+                      }}
+                    >
+                      {/* thumbnail */}
+                    </th>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "8px 8px",
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        minWidth: "200px",
+                        position: "sticky",
+                        top: 0,
+                        backgroundColor: "#0A0A0F",
+                      }}
+                    >
+                      Legenda
+                    </th>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "8px 8px",
+                        fontSize: "0.65rem",
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "#52526A",
+                        fontWeight: 500,
+                        position: "sticky",
+                        top: 0,
+                        backgroundColor: "#0A0A0F",
+                      }}
+                    >
+                      Tipo
+                    </th>
+                    {(
+                      [
+                        ["likes", "Likes"],
+                        ["comments", "Coment."],
+                        ["saves", "Saves"],
+                        ["shares", "Shares"],
+                        ["reach", "Alcance"],
+                        ["impressions", "Impr."],
+                        ["totalInteractions", "Total"],
+                        ["engagementRate", "Eng.%"],
+                      ] as [SortKey, string][]
+                    ).map(([key, label]) => (
+                      <th
+                        key={key}
+                        onClick={() => handleSort(key)}
+                        style={{
+                          textAlign: "right",
+                          padding: "8px 8px",
+                          fontSize: "0.65rem",
+                          letterSpacing: "0.1em",
+                          textTransform: "uppercase",
+                          fontWeight: 500,
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                          userSelect: "none",
+                          color: sortKey === key ? "#6C63FF" : "#52526A",
+                          position: "sticky",
+                          top: 0,
+                          backgroundColor: "#0A0A0F",
+                        }}
+                      >
+                        {label}
+                        {sortKey === key && (
+                          <span style={{ marginLeft: "2px" }}>{sortAsc ? "▲" : "▼"}</span>
+                        )}
+                      </th>
+                    ))}
+                    <th
+                      style={{
+                        padding: "8px 8px",
+                        width: "32px",
+                        position: "sticky",
+                        top: 0,
+                        backgroundColor: "#0A0A0F",
+                      }}
+                    />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPosts.map((post) => (
+                    <tr
+                      key={post.igMediaId}
+                      style={{
+                        borderBottom: "1px solid rgba(255,255,255,0.04)",
+                      }}
+                      className="group"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                      }}
+                    >
+                      {/* Thumbnail */}
+                      <td style={{ padding: "8px 8px" }}>
+                        {post.thumbnailUrl ? (
+                          <img
+                            src={post.thumbnailUrl}
+                            alt=""
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "6px",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: "6px",
+                              backgroundColor: "rgba(255,255,255,0.06)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Instagram
+                              style={{ width: 14, height: 14, color: "rgba(255,255,255,0.15)" }}
+                            />
+                          </div>
+                        )}
+                      </td>
+                      {/* Caption */}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          color: "#FFFFFF",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        <span className="line-clamp-1">
+                          {post.caption
+                            ? post.caption.length > 60
+                              ? post.caption.slice(0, 60) + "..."
+                              : post.caption
+                            : <span style={{ color: "#52526A" }}>—</span>}
+                        </span>
+                      </td>
+                      {/* Type badge */}
+                      <td style={{ padding: "8px 8px" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            fontSize: "0.6rem",
+                            fontWeight: 500,
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            border:
+                              post.mediaType === "CAROUSEL_ALBUM"
+                                ? "1px solid rgba(108,99,255,0.4)"
+                                : post.mediaType === "VIDEO"
+                                  ? "1px solid rgba(0,212,200,0.4)"
+                                  : "1px solid rgba(255,255,255,0.1)",
+                            color:
+                              post.mediaType === "CAROUSEL_ALBUM"
+                                ? "#6C63FF"
+                                : post.mediaType === "VIDEO"
+                                  ? "#00D4C8"
+                                  : "#A1A1B5",
+                            backgroundColor: "transparent",
+                            letterSpacing: "0.03em",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {MEDIA_LABELS[post.mediaType] || post.mediaType}
+                        </span>
+                      </td>
+                      {/* Numeric columns */}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.likes)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.comments)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.saves)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.shares)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.reach)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.impressions)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          fontWeight: 700,
+                          color: "#FFFFFF",
+                          fontFeatureSettings: '"tnum"',
+                        }}
+                      >
+                        {renderNumCell(post.totalInteractions)}
+                      </td>
+                      {/* Engagement Rate column */}
+                      <td
+                        style={{
+                          padding: "8px 8px",
+                          textAlign: "right",
+                          fontFamily: "monospace",
+                          fontSize: "0.85rem",
+                          color: post.engagementRate > 3 ? "#10B981" : post.engagementRate > 1.5 ? "#F59E0B" : "#F43F5E",
+                          fontFeatureSettings: '"tnum"',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {post.engagementRate > 0 ? `${post.engagementRate.toFixed(1)}%` : <span style={{ color: "#52526A" }}>—</span>}
+                      </td>
+                      {/* Link — only visible on hover */}
+                      <td style={{ padding: "8px 8px" }}>
+                        <a
+                          href={post.permalink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            color: "#52526A",
+                            opacity: 0,
+                          }}
+                          className="group-hover:!opacity-100"
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "#6C63FF";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "#52526A";
+                          }}
+                        >
+                          <ExternalLink style={{ width: 14, height: 14 }} />
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
     </div>
   );
 }
