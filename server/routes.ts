@@ -50,6 +50,7 @@ import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
+import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 
@@ -7842,6 +7843,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Negativação Module
   registerNegativacaoRoutes(app, db);
+
+  // Predictions Module - Análise Preditiva
+  registerPredictionRoutes(app);
 
   // ============================================
   // Sugestões API
