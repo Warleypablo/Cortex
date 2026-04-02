@@ -88,9 +88,9 @@ export function NrrProjectionTab({ horizonte }: { horizonte: number }) {
 
   const deltaValue = useMemo(() => {
     if (!data || !chartData.length) return "";
-    const lastProj = chartData[chartData.length - 1];
+    const lastProj = chartData[chartData.length - 1] as any;
     if (!lastProj?.simulado || !lastProj?.realista) return "";
-    const delta = lastProj.simulado - lastProj.realista;
+    const delta = (lastProj.simulado as number) - (lastProj.realista as number);
     const sign = delta >= 0 ? "+" : "";
     return `${sign}${delta.toFixed(1)}%`;
   }, [chartData, data]);
