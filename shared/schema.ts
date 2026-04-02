@@ -50,6 +50,37 @@ export const churnRiskScores = cortexCoreSchema.table("churn_risk_scores", {
 export type ChurnRiskScore = typeof churnRiskScores.$inferSelect;
 export type InsertChurnRiskScore = typeof churnRiskScores.$inferInsert;
 
+// ============== PREDICTIONS ==============
+
+export const predictionsCache = cortexCoreSchema.table("predictions_cache", {
+  id: serial("id").primaryKey(),
+  tipo: text("tipo").notNull(),
+  horizonteMeses: integer("horizonte_meses").notNull(),
+  dataReferencia: timestamp("data_referencia").notNull(),
+  dataAlvo: timestamp("data_alvo").notNull(),
+  valorOtimista: decimal("valor_otimista"),
+  valorRealista: decimal("valor_realista"),
+  valorPessimista: decimal("valor_pessimista"),
+  metadata: jsonb("metadata").default({}),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type PredictionCache = typeof predictionsCache.$inferSelect;
+export type InsertPredictionCache = typeof predictionsCache.$inferInsert;
+
+export const predictionsAccuracy = cortexCoreSchema.table("predictions_accuracy", {
+  id: serial("id").primaryKey(),
+  predictionId: integer("prediction_id"),
+  tipo: text("tipo").notNull(),
+  dataAlvo: timestamp("data_alvo").notNull(),
+  valorPrevisto: decimal("valor_previsto"),
+  valorReal: decimal("valor_real"),
+  erroPercentual: decimal("erro_percentual"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type PredictionAccuracy = typeof predictionsAccuracy.$inferSelect;
+
 export const cazClientes = contaAzulSchema.table("caz_clientes", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
@@ -1386,7 +1417,7 @@ export type InadimplenciaContexto = typeof inadimplenciaContextos.$inferSelect;
 export type InsertInadimplenciaContexto = z.infer<typeof insertInadimplenciaContextoSchema>;
 
 // Negativação Pipeline Actions
-export const negativacaoAcoes = pgTable("negativacao_acoes", {
+export const negativacaoAcoes = cortexCoreSchema.table("negativacao_acoes", {
   id: serial("id").primaryKey(),
   clienteId: text("cliente_id").notNull(),
   clienteNome: text("cliente_nome").notNull(),
