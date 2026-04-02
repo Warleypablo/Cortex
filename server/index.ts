@@ -7,9 +7,10 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
+import { runAllForecasts } from "./services/predictiveEngine";
 import rateLimit from "express-rate-limit";
 import path from "path";
 
@@ -141,6 +142,7 @@ app.use((req, res, next) => {
     initializeNotasFiscaisTable(),
     initializeCapacityTable(),
     initializeContratoTemplatesTable(),
+    initializePredictionsTable(),
   ]);
   
   // Phase 2: Depends on catalogs being ready
@@ -521,6 +523,29 @@ app.use((req, res, next) => {
   setTimeout(() => pollAssinafyStatus(), 15000); // 15s após startup
   setInterval(() => pollAssinafyStatus(), ASSINAFY_POLL_INTERVAL);
   console.log(`[assinafy-poll] Scheduled every ${ASSINAFY_POLL_INTERVAL / 60000}min`);
+
+  // Predictive Analytics - run daily at startup + every 24h
+  const PREDICTIONS_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+
+  // Run on startup after a delay (tables need to be initialized)
+  setTimeout(async () => {
+    console.log('[predictions] Running initial forecast calculation...');
+    try {
+      await runAllForecasts();
+    } catch (e) {
+      console.error('[predictions] Initial calculation failed:', e);
+    }
+  }, 30000); // 30s delay for startup
+
+  setInterval(async () => {
+    console.log('[predictions] Running scheduled forecast calculation...');
+    try {
+      await runAllForecasts();
+    } catch (e) {
+      console.error('[predictions] Scheduled calculation failed:', e);
+    }
+  }, PREDICTIONS_INTERVAL);
+  console.log(`[predictions] Scheduled every ${PREDICTIONS_INTERVAL / 3600000}h`);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
