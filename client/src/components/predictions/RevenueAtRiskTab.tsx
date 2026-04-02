@@ -94,10 +94,10 @@ export function RevenueAtRiskTab({ horizonte }: { horizonte: number }) {
     const delta = currentEfetividade - baseEfetividade;
 
     const tiers = { ...data.porTier };
-    const critico = { ...tiers.critico } || { contratos: 0, mrr: 0 };
-    const alto = { ...tiers.alto } || { contratos: 0, mrr: 0 };
-    const moderado = { ...tiers.moderado } || { contratos: 0, mrr: 0 };
-    const baixo = { ...tiers.baixo } || { contratos: 0, mrr: 0 };
+    const critico = tiers.critico ? { ...tiers.critico } : { contratos: 0, mrr: 0 };
+    const alto = tiers.alto ? { ...tiers.alto } : { contratos: 0, mrr: 0 };
+    const moderado = tiers.moderado ? { ...tiers.moderado } : { contratos: 0, mrr: 0 };
+    const baixo = tiers.baixo ? { ...tiers.baixo } : { contratos: 0, mrr: 0 };
 
     if (delta > 0) {
       // Move portion of critical MRR to alto

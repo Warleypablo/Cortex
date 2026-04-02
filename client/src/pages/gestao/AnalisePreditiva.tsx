@@ -9,12 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, TrendingDown, Activity, AlertTriangle, ShieldAlert } from "lucide-react";
 import { AccuracyBadge } from "@/components/predictions/AccuracyBadge";
-// Tab components will be created in subsequent tasks
-// import { MrrForecastTab } from "@/components/predictions/MrrForecastTab";
-// import { ChurnForecastTab } from "@/components/predictions/ChurnForecastTab";
-// import { NrrProjectionTab } from "@/components/predictions/NrrProjectionTab";
-// import { InadimplenciaForecastTab } from "@/components/predictions/InadimplenciaForecastTab";
-// import { RevenueAtRiskTab } from "@/components/predictions/RevenueAtRiskTab";
+import { MrrForecastTab } from "@/components/predictions/MrrForecastTab";
+import { ChurnForecastTab } from "@/components/predictions/ChurnForecastTab";
+import { NrrProjectionTab } from "@/components/predictions/NrrProjectionTab";
+import { InadimplenciaForecastTab } from "@/components/predictions/InadimplenciaForecastTab";
+import { RevenueAtRiskTab } from "@/components/predictions/RevenueAtRiskTab";
 
 function formatCurrencyCompact(value: number): string {
   if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(1)}M`;
@@ -156,44 +155,19 @@ export default function AnalisePreditiva() {
         </TabsList>
 
         <TabsContent value="mrr">
-          {/* <MrrForecastTab horizonte={parseInt(horizonte)} /> */}
-          <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <CardContent className="py-12 text-center text-gray-400 dark:text-zinc-500">
-              MRR Forecast — em desenvolvimento
-            </CardContent>
-          </Card>
+          <MrrForecastTab horizonte={parseInt(horizonte)} />
         </TabsContent>
         <TabsContent value="churn">
-          {/* <ChurnForecastTab horizonte={parseInt(horizonte)} /> */}
-          <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <CardContent className="py-12 text-center text-gray-400 dark:text-zinc-500">
-              Churn Forecast — em desenvolvimento
-            </CardContent>
-          </Card>
+          <ChurnForecastTab horizonte={parseInt(horizonte)} />
         </TabsContent>
         <TabsContent value="nrr">
-          {/* <NrrProjectionTab horizonte={parseInt(horizonte)} /> */}
-          <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <CardContent className="py-12 text-center text-gray-400 dark:text-zinc-500">
-              NRR Projection — em desenvolvimento
-            </CardContent>
-          </Card>
+          <NrrProjectionTab horizonte={parseInt(horizonte)} />
         </TabsContent>
         <TabsContent value="inadimplencia">
-          {/* <InadimplenciaForecastTab horizonte={parseInt(horizonte)} /> */}
-          <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <CardContent className="py-12 text-center text-gray-400 dark:text-zinc-500">
-              Inadimplência Forecast — em desenvolvimento
-            </CardContent>
-          </Card>
+          <InadimplenciaForecastTab horizonte={parseInt(horizonte)} />
         </TabsContent>
         <TabsContent value="risk">
-          {/* <RevenueAtRiskTab horizonte={parseInt(horizonte)} /> */}
-          <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <CardContent className="py-12 text-center text-gray-400 dark:text-zinc-500">
-              Revenue at Risk — em desenvolvimento
-            </CardContent>
-          </Card>
+          <RevenueAtRiskTab horizonte={parseInt(horizonte)} />
         </TabsContent>
       </Tabs>
     </div>
