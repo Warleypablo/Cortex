@@ -2182,6 +2182,52 @@ export async function initializeCapacityTable(): Promise<void> {
   }
 }
 
+export async function initializePredictionsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.predictions_cache (
+        id SERIAL PRIMARY KEY,
+        tipo TEXT NOT NULL,
+        horizonte_meses INTEGER NOT NULL,
+        data_referencia TIMESTAMP NOT NULL,
+        data_alvo TIMESTAMP NOT NULL,
+        valor_otimista DECIMAL,
+        valor_realista DECIMAL,
+        valor_pessimista DECIMAL,
+        metadata JSONB DEFAULT '{}',
+        criado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.predictions_accuracy (
+        id SERIAL PRIMARY KEY,
+        prediction_id INTEGER,
+        tipo TEXT NOT NULL,
+        data_alvo TIMESTAMP NOT NULL,
+        valor_previsto DECIMAL,
+        valor_real DECIMAL,
+        erro_percentual DECIMAL,
+        criado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_predictions_cache_tipo_horizonte
+      ON cortex_core.predictions_cache(tipo, horizonte_meses, data_alvo)
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_predictions_accuracy_tipo
+      ON cortex_core.predictions_accuracy(tipo, data_alvo)
+    `);
+
+    console.log('[database] Predictions tables initialized');
+  } catch (error) {
+    console.error('[database] Error initializing predictions tables:', error);
+  }
+}
+
 export async function initializeContratoTemplatesTable(): Promise<void> {
   try {
     await db.execute(sql`

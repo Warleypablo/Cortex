@@ -55,9 +55,17 @@ interface DfcChatResponse {
   };
 }
 
-type VisibleItem = 
+type FornecedorRow = {
+  fornecedor: string;
+  descricao: string;
+  valuesByMonth: Record<string, number>;
+  parcelaIds: number[];
+};
+
+type VisibleItem =
   | { type: 'node'; node: DfcNode }
-  | { type: 'parcela'; parcela: DfcParcela; parentNode: DfcNode };
+  | { type: 'parcela'; parcela: DfcParcela; parentNode: DfcNode }
+  | { type: 'fornecedor'; fornecedorRow: FornecedorRow; parentNode: DfcNode };
 
 export default function DashboardDFC() {
   usePageTitle("DFC");
@@ -183,11 +191,27 @@ export default function DashboardDFC() {
           node.children.forEach(childId => addNode(childId));
         } else if (node.isLeaf && node.parcelas && node.parcelas.length > 0) {
           const mesesSet = new Set(dfcData.meses);
+          // Group parcelas by fornecedor name, pivot values by month
+          const grouped = new Map<string, FornecedorRow>();
           node.parcelas
             .filter(p => p.valorBruto !== 0 && mesesSet.has(p.mes))
             .forEach(parcela => {
-              result.push({ type: 'parcela', parcela, parentNode: node });
+              const key = parcela.fornecedor || parcela.descricao || `#${parcela.id}`;
+              if (!grouped.has(key)) {
+                grouped.set(key, {
+                  fornecedor: parcela.fornecedor || '',
+                  descricao: parcela.descricao || '',
+                  valuesByMonth: {},
+                  parcelaIds: [],
+                });
+              }
+              const row = grouped.get(key)!;
+              row.valuesByMonth[parcela.mes] = (row.valuesByMonth[parcela.mes] || 0) + parcela.valorBruto;
+              row.parcelaIds.push(parcela.id);
             });
+          grouped.forEach(fornecedorRow => {
+            result.push({ type: 'fornecedor', fornecedorRow, parentNode: node });
+          });
         }
       }
     };
@@ -961,51 +985,49 @@ export default function DashboardDFC() {
                             })}
                           </Fragment>
                         );
-                      } else {
-                        const parcela = item.parcela;
-                        const parentNode = item.parentNode;
-                        const isReceitaParcela = isReceita(parentNode.categoriaId);
-                        
+                      } else if (item.type === 'fornecedor') {
+                        const { fornecedorRow, parentNode } = item;
+                        const isReceitaRow = isReceita(parentNode.categoriaId);
+                        const displayName = fornecedorRow.fornecedor || fornecedorRow.descricao || `#${fornecedorRow.parcelaIds[0]}`;
+
                         return (
-                          <Fragment key={`parcela-row-${parcela.id}-${idx}`}>
-                            {/* Parcela Cell */}
+                          <Fragment key={`fornecedor-row-${displayName}-${parentNode.categoriaId}-${idx}`}>
+                            {/* Fornecedor Name Cell */}
                             <div
                               className={`sticky left-0 z-10 p-2 border-b border-r text-xs ${
-                                isReceitaParcela 
-                                  ? 'bg-emerald-50 dark:bg-emerald-950' 
+                                isReceitaRow
+                                  ? 'bg-emerald-50 dark:bg-emerald-950'
                                   : 'bg-rose-50 dark:bg-rose-950'
                               }`}
                               style={{ paddingLeft: `${(parentNode.nivel + 1) * 20 + 16}px` }}
-                              data-testid={`dfc-row-parcela-${parcela.id}-${parentNode.categoriaId}`}
                             >
                               <div className="flex items-center gap-2">
-                                <div className={`w-1 h-1 rounded-full ${isReceitaParcela ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                                <div className={`w-1 h-1 rounded-full ${isReceitaRow ? 'bg-emerald-400' : 'bg-rose-400'}`} />
                                 <TooltipProvider delayDuration={200}>
                                   <TooltipUI>
                                     <TooltipTrigger asChild>
                                       <span className="text-muted-foreground truncate max-w-[200px] block cursor-default">
-                                        {parcela.fornecedor || parcela.descricao || `#${parcela.id}`}
+                                        {displayName}
                                       </span>
                                     </TooltipTrigger>
                                     <TooltipContent side="top">
-                                      <p className="max-w-[300px]">{parcela.descricao || 'Sem descrição'}</p>
+                                      <p className="max-w-[300px]">{fornecedorRow.descricao || displayName}</p>
                                     </TooltipContent>
                                   </TooltipUI>
                                 </TooltipProvider>
                               </div>
                             </div>
-                            {/* Parcela Value Cells */}
+                            {/* Fornecedor Value Cells (pivoted by month) */}
                             {dfcData.meses.map(mes => {
-                              const valor = parcela.mes === mes ? parcela.valorBruto : 0;
+                              const valor = fornecedorRow.valuesByMonth[mes] || 0;
                               return (
-                                <div 
-                                  key={`parcela-val-${parcela.id}-${mes}-${idx}`}
+                                <div
+                                  key={`fornecedor-val-${displayName}-${mes}-${idx}`}
                                   className={`p-2 border-b text-right text-xs ${
-                                    isReceitaParcela 
-                                      ? 'bg-emerald-50/20 dark:bg-emerald-950/5' 
+                                    isReceitaRow
+                                      ? 'bg-emerald-50/20 dark:bg-emerald-950/5'
                                       : 'bg-rose-50/20 dark:bg-rose-950/5'
                                   }`}
-                                  data-testid={`dfc-cell-parcela-${parcela.id}-${mes}`}
                                 >
                                   {valor !== 0 ? (
                                     <span className="text-muted-foreground tabular-nums">
@@ -1021,6 +1043,8 @@ export default function DashboardDFC() {
                             })}
                           </Fragment>
                         );
+                      } else {
+                        return null;
                       }
                     })}
                     
