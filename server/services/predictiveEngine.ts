@@ -679,3 +679,186 @@ export async function calculateRevenueAtRisk(horizonteMeses: number): Promise<Re
     efetividadeBase: 0.3, // 30% dos contratos críticos retidos com intervenção
   };
 }
+
+// ============== CACHE & ORCHESTRATION ==============
+
+async function clearPredictionsCache(tipo: string, horizonte: number): Promise<void> {
+  await db.execute(sql`
+    DELETE FROM cortex_core.predictions_cache
+    WHERE tipo = ${tipo} AND horizonte_meses = ${horizonte}
+  `);
+}
+
+async function savePrediction(
+  tipo: string,
+  horizonte: number,
+  dataAlvo: string,
+  valores: ForecastPoint,
+  metadata: any = {}
+): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO cortex_core.predictions_cache
+      (tipo, horizonte_meses, data_referencia, data_alvo, valor_otimista, valor_realista, valor_pessimista, metadata)
+    VALUES
+      (${tipo}, ${horizonte}, NOW(), ${dataAlvo + '-01'}::timestamp, ${valores.valorOtimista}, ${valores.valorRealista}, ${valores.valorPessimista}, ${JSON.stringify(metadata)}::jsonb)
+  `);
+}
+
+export async function runAllForecasts(): Promise<{ success: boolean; duration: number; errors: string[] }> {
+  const start = Date.now();
+  const errors: string[] = [];
+  const horizontes = [3, 6, 12];
+
+  for (const h of horizontes) {
+    // MRR Forecast
+    try {
+      await clearPredictionsCache('mrr_forecast', h);
+      const mrr = await calculateMrrForecast(h);
+      for (const p of mrr.projecao) {
+        await savePrediction('mrr_forecast', h, p.dataAlvo, p, {
+          breakdownSquad: mrr.breakdownSquad,
+          churnRateBase: mrr.churnRateBase,
+          ticketMedioBase: mrr.ticketMedioBase,
+          novosContratosBase: mrr.novosContratosBase,
+        });
+      }
+      console.log(`[predictions] MRR forecast (${h}m) OK`);
+    } catch (e: any) {
+      errors.push(`mrr_forecast_${h}m: ${e.message}`);
+      console.error(`[predictions] MRR forecast (${h}m) FAILED:`, e);
+    }
+
+    // Churn Forecast
+    try {
+      await clearPredictionsCache('churn_forecast', h);
+      const churn = await calculateChurnForecast(h);
+      for (const m of churn.mensal) {
+        await savePrediction('churn_forecast', h, m.mes, {
+          dataAlvo: m.mes,
+          valorRealista: m.mrrPerdido,
+          valorOtimista: Math.round(m.mrrPerdido * 0.7),
+          valorPessimista: Math.round(m.mrrPerdido * 1.3),
+        }, { contratos: m.contratos, porTier: m.porTier, topContratos: churn.topContratos, taxasPorTier: churn.taxasPorTier });
+      }
+      console.log(`[predictions] Churn forecast (${h}m) OK`);
+    } catch (e: any) {
+      errors.push(`churn_forecast_${h}m: ${e.message}`);
+      console.error(`[predictions] Churn forecast (${h}m) FAILED:`, e);
+    }
+
+    // NRR Projection
+    try {
+      await clearPredictionsCache('nrr_projection', h);
+      const nrr = await calculateNrrProjection(h);
+      for (const p of nrr.projecao) {
+        await savePrediction('nrr_projection', h, p.dataAlvo, p, {
+          breakdownSquad: nrr.breakdownSquad,
+          taxaExpansaoBase: nrr.taxaExpansaoBase,
+          taxaChurnBase: nrr.taxaChurnBase,
+        });
+      }
+      console.log(`[predictions] NRR projection (${h}m) OK`);
+    } catch (e: any) {
+      errors.push(`nrr_projection_${h}m: ${e.message}`);
+      console.error(`[predictions] NRR projection (${h}m) FAILED:`, e);
+    }
+
+    // Inadimplência Forecast
+    try {
+      await clearPredictionsCache('inadimplencia_forecast', h);
+      const inad = await calculateInadimplenciaForecast(h);
+      for (const m of inad.mensal) {
+        await savePrediction('inadimplencia_forecast', h, m.mes, {
+          dataAlvo: m.mes,
+          valorRealista: m.total,
+          valorOtimista: Math.round(m.total * 0.7),
+          valorPessimista: Math.round(m.total * 1.3),
+        }, { faixas: { faixa_1_30: m.faixa_1_30, faixa_31_60: m.faixa_31_60, faixa_61_90: m.faixa_61_90, faixa_90_plus: m.faixa_90_plus },
+             taxaRecuperacaoBase: inad.taxaRecuperacaoBase, novosInadimplentesBase: inad.novosInadimplentesBase });
+      }
+      console.log(`[predictions] Inadimplencia forecast (${h}m) OK`);
+    } catch (e: any) {
+      errors.push(`inadimplencia_forecast_${h}m: ${e.message}`);
+      console.error(`[predictions] Inadimplencia forecast (${h}m) FAILED:`, e);
+    }
+
+    // Revenue at Risk
+    try {
+      await clearPredictionsCache('revenue_at_risk', h);
+      const risk = await calculateRevenueAtRisk(h);
+      const totalRisk = Object.values(risk.porTier).reduce((sum, t) => sum + t.mrr, 0);
+      await savePrediction('revenue_at_risk', h, new Date().toISOString().slice(0, 7), {
+        dataAlvo: new Date().toISOString().slice(0, 7),
+        valorRealista: totalRisk,
+        valorOtimista: Math.round(totalRisk * 0.7),
+        valorPessimista: Math.round(totalRisk * 1.3),
+      }, { porTier: risk.porTier, evolucao: risk.evolucao, efetividadeBase: risk.efetividadeBase });
+      console.log(`[predictions] Revenue at risk (${h}m) OK`);
+    } catch (e: any) {
+      errors.push(`revenue_at_risk_${h}m: ${e.message}`);
+      console.error(`[predictions] Revenue at risk (${h}m) FAILED:`, e);
+    }
+  }
+
+  const duration = Date.now() - start;
+  console.log(`[predictions] All forecasts completed in ${duration}ms. Errors: ${errors.length}`);
+  return { success: errors.length === 0, duration, errors };
+}
+
+// ============== SUMMARY (for Hero KPIs) ==============
+
+export async function getPredictionSummary(horizonte: number): Promise<PredictionSummary> {
+  const mrrResult = await db.execute(sql`
+    SELECT data_alvo, valor_otimista, valor_realista, valor_pessimista
+    FROM cortex_core.predictions_cache
+    WHERE tipo = 'mrr_forecast' AND horizonte_meses = ${horizonte}
+    ORDER BY data_alvo DESC LIMIT 1
+  `);
+
+  const churnResult = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(valor_realista::numeric), 0) AS mrr_total,
+      COALESCE(SUM((metadata->>'contratos')::numeric), 0) AS contratos_total
+    FROM cortex_core.predictions_cache
+    WHERE tipo = 'churn_forecast' AND horizonte_meses = ${horizonte}
+  `);
+
+  const nrrResult = await db.execute(sql`
+    SELECT valor_realista
+    FROM cortex_core.predictions_cache
+    WHERE tipo = 'nrr_projection' AND horizonte_meses = ${horizonte}
+    ORDER BY data_alvo DESC LIMIT 1
+  `);
+
+  const accuracyResult = await db.execute(sql`
+    SELECT tipo, AVG(ABS(erro_percentual::numeric)) AS erro_medio
+    FROM cortex_core.predictions_accuracy
+    WHERE criado_em >= NOW() - INTERVAL '6 months'
+    GROUP BY tipo
+  `);
+
+  const mrr = mrrResult.rows[0] as any;
+  const churn = churnResult.rows[0] as any;
+  const nrr = nrrResult.rows[0] as any;
+  const acuracia: Record<string, number> = {};
+  for (const r of accuracyResult.rows as any[]) {
+    acuracia[r.tipo] = Math.round(100 - (parseFloat(r.erro_medio) || 0));
+  }
+
+  return {
+    mrrProjetado: {
+      dataAlvo: mrr?.data_alvo?.toISOString?.()?.slice(0, 7) || '',
+      valorOtimista: parseFloat(mrr?.valor_otimista) || 0,
+      valorRealista: parseFloat(mrr?.valor_realista) || 0,
+      valorPessimista: parseFloat(mrr?.valor_pessimista) || 0,
+    },
+    churnProjetado: {
+      contratos: parseInt(churn?.contratos_total) || 0,
+      mrr: parseFloat(churn?.mrr_total) || 0,
+    },
+    nrrProjetado: parseFloat(nrr?.valor_realista) || 100,
+    horizonte,
+    dataCalculo: new Date().toISOString().slice(0, 10),
+    acuracia,
+  };
+}
