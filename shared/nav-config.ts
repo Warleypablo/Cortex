@@ -43,6 +43,7 @@ export const PERMISSION_KEYS = {
     SAUDE_BASE: 'gestao.saude_base',
     BP_PRODUTOS: 'gestao.bp_produtos',
     CAPACITY: 'gestao.capacity',
+    ANALISE_PREDITIVA: 'gestao.analise_preditiva',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -221,6 +222,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/saude-base-ativa': PERMISSION_KEYS.GESTAO.SAUDE_BASE,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
   '/capacity': PERMISSION_KEYS.GESTAO.CAPACITY,
+  '/dashboard/analise-preditiva': PERMISSION_KEYS.GESTAO.ANALISE_PREDITIVA,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   '/contratos': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   // Operação
@@ -433,6 +435,7 @@ export const NAV_CONFIG = {
         { title: 'Saúde da Base', url: '/dashboard/saude-base-ativa', icon: 'HeartPulse', permissionKey: PERMISSION_KEYS.GESTAO.SAUDE_BASE },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
         { title: 'Capacity', url: '/capacity', icon: 'Gauge', permissionKey: PERMISSION_KEYS.GESTAO.CAPACITY },
+        { title: 'Análise Preditiva', url: '/dashboard/analise-preditiva', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_PREDITIVA },
       ],
     },
     {
@@ -654,6 +657,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.ANALISE_SQUADS]: 'Análise de Squads',
   [PERMISSION_KEYS.GESTAO.SAUDE_BASE]: 'Saúde da Base Ativa',
   [PERMISSION_KEYS.GESTAO.BP_PRODUTOS]: 'BP Produtos',
+  [PERMISSION_KEYS.GESTAO.ANALISE_PREDITIVA]: 'Análise Preditiva',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',
