@@ -173,7 +173,7 @@ export async function calculateMrrForecast(horizonteMeses: number): Promise<MrrF
         MAX(data_snapshot) AS last_snapshot
       FROM "Clickup".cup_data_hist
       WHERE data_snapshot >= NOW() - INTERVAL '24 months'
-        AND status IN ('ATIVO', 'EM CANCELAMENTO')
+        AND LOWER(status) IN ('ativo', 'em cancelamento')
       GROUP BY DATE_TRUNC('month', data_snapshot)
     )
     SELECT
@@ -182,7 +182,7 @@ export async function calculateMrrForecast(horizonteMeses: number): Promise<MrrF
     FROM monthly_mrr m
     JOIN "Clickup".cup_data_hist h
       ON h.data_snapshot = m.last_snapshot
-      AND h.status IN ('ATIVO', 'EM CANCELAMENTO')
+      AND LOWER(h.status) IN ('ativo', 'em cancelamento')
     GROUP BY m.mes
     ORDER BY m.mes
   `);
@@ -219,7 +219,7 @@ export async function calculateMrrForecast(horizonteMeses: number): Promise<MrrF
   const squadResult = await db.execute(sql`
     SELECT squad, COALESCE(SUM(valorr::numeric), 0) AS mrr
     FROM "Clickup".cup_contratos
-    WHERE status IN ('ATIVO', 'EM CANCELAMENTO')
+    WHERE LOWER(status) IN ('ativo', 'em cancelamento')
       AND squad IS NOT NULL
     GROUP BY squad
     ORDER BY mrr DESC
@@ -246,7 +246,7 @@ export async function calculateMrrForecast(horizonteMeses: number): Promise<MrrF
       COUNT(DISTINCT CASE
         WHEN data_encerramento >= NOW() - INTERVAL '3 months' THEN id_subtask
       END)::numeric /
-      NULLIF(COUNT(DISTINCT CASE WHEN status IN ('ATIVO', 'EM CANCELAMENTO') THEN id_subtask END)::numeric, 0) / 3 AS churn_rate_mensal
+      NULLIF(COUNT(DISTINCT CASE WHEN LOWER(status) IN ('ativo', 'em cancelamento') THEN id_subtask END)::numeric, 0) / 3 AS churn_rate_mensal
     FROM "Clickup".cup_contratos
   `);
 
@@ -308,7 +308,7 @@ export async function calculateChurnForecast(horizonteMeses: number): Promise<Ch
       s.produto
     FROM cortex_core.churn_risk_scores s
     JOIN "Clickup".cup_contratos c ON c.id_subtask = s.contrato_id
-    WHERE c.status IN ('ATIVO', 'EM CANCELAMENTO')
+    WHERE LOWER(c.status) IN ('ativo', 'em cancelamento')
     ORDER BY s.score DESC
   `);
 
@@ -389,7 +389,7 @@ export async function calculateNrrProjection(horizonteMeses: number): Promise<Nr
         MAX(data_snapshot) AS last_snap
       FROM "Clickup".cup_data_hist
       WHERE data_snapshot >= NOW() - INTERVAL '13 months'
-        AND status IN ('ATIVO', 'EM CANCELAMENTO')
+        AND LOWER(status) IN ('ativo', 'em cancelamento')
       GROUP BY 1
       ORDER BY 1
     ),
@@ -399,7 +399,7 @@ export async function calculateNrrProjection(horizonteMeses: number): Promise<Nr
         COALESCE(SUM(h.valorr::numeric), 0) AS mrr
       FROM monthly m
       JOIN "Clickup".cup_data_hist h ON h.data_snapshot = m.last_snap
-        AND h.status IN ('ATIVO', 'EM CANCELAMENTO')
+        AND LOWER(h.status) IN ('ativo', 'em cancelamento')
       GROUP BY m.mes
       ORDER BY m.mes
     )
@@ -454,7 +454,7 @@ export async function calculateNrrProjection(horizonteMeses: number): Promise<Nr
     WITH current_mrr AS (
       SELECT squad, COALESCE(SUM(valorr::numeric), 0) AS mrr
       FROM "Clickup".cup_contratos
-      WHERE status IN ('ATIVO', 'EM CANCELAMENTO') AND squad IS NOT NULL
+      WHERE LOWER(status) IN ('ativo', 'em cancelamento') AND squad IS NOT NULL
       GROUP BY squad
     ),
     prev_mrr AS (
@@ -464,7 +464,7 @@ export async function calculateNrrProjection(horizonteMeses: number): Promise<Nr
         SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist
         WHERE data_snapshot < DATE_TRUNC('month', NOW())
       )
-      AND h.status IN ('ATIVO', 'EM CANCELAMENTO') AND h.squad IS NOT NULL
+      AND LOWER(h.status) IN ('ativo', 'em cancelamento') AND h.squad IS NOT NULL
       GROUP BY h.squad
     )
     SELECT
@@ -511,7 +511,7 @@ export async function calculateInadimplenciaForecast(horizonteMeses: number): Pr
         SUM(CASE WHEN CURRENT_DATE - data_vencimento::date BETWEEN 61 AND 90 THEN valor_bruto::numeric ELSE 0 END) AS faixa_61_90,
         SUM(CASE WHEN CURRENT_DATE - data_vencimento::date > 90 THEN valor_bruto::numeric ELSE 0 END) AS faixa_90_plus
       FROM "Conta Azul".caz_parcelas
-      WHERE tipo_evento = 'receita'
+      WHERE LOWER(tipo_evento) = 'receita'
         AND data_quitacao IS NULL
         AND data_vencimento < CURRENT_DATE
         AND data_vencimento >= NOW() - INTERVAL '12 months'
@@ -543,7 +543,7 @@ export async function calculateInadimplenciaForecast(horizonteMeses: number): Pr
       COUNT(CASE WHEN data_quitacao IS NOT NULL AND CURRENT_DATE - data_vencimento::date > 90 THEN 1 END)::numeric /
         NULLIF(COUNT(CASE WHEN CURRENT_DATE - data_vencimento::date > 90 THEN 1 END), 0) AS recup_90_plus
     FROM "Conta Azul".caz_parcelas
-    WHERE tipo_evento = 'receita'
+    WHERE LOWER(tipo_evento) = 'receita'
       AND data_vencimento >= NOW() - INTERVAL '6 months'
       AND data_vencimento < CURRENT_DATE
   `);
@@ -637,7 +637,7 @@ export async function calculateRevenueAtRisk(horizonteMeses: number): Promise<Re
       COALESCE(SUM(s.mrr::numeric), 0) AS mrr
     FROM cortex_core.churn_risk_scores s
     JOIN "Clickup".cup_contratos c ON c.id_subtask = s.contrato_id
-    WHERE c.status IN ('ATIVO', 'EM CANCELAMENTO')
+    WHERE LOWER(c.status) IN ('ativo', 'em cancelamento')
     GROUP BY s.tier
   `);
 
