@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { pool } from "../db";
+import { randomBytes } from "crypto";
+import { enviarMensagemWhatsApp } from "../services/turbozap";
 
 const mapClient = (row: any) => ({
   id: row.id,
@@ -29,9 +31,55 @@ const mapCredential = (row: any) => ({
   updatedAt: row.updated_at,
 });
 
+// Emails that can see passwords without approval
+const CREDENTIAL_BYPASS_EMAILS = [
+  "caio.massaroni@turbopartners.com.br",
+  "warley.silva@turbopartners.com.br",
+  "breno.carmo@turbopartners.com.br",
+];
+
+// WhatsApp numbers that receive approval requests
+const CREDENTIAL_APPROVER_NUMBERS = [
+  "557199993135",   // Breno Carmo
+  "5527997823958",  // Warley
+];
+
+function canBypassCredentialApproval(user: any): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  return CREDENTIAL_BYPASS_EMAILS.includes(user.email?.toLowerCase());
+}
+
+function generateToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
 export async function registerAcessosRoutes(app: Express, db: any, storage: IStorage) {
   try {
     await db.execute(sql`ALTER TABLE cortex_core.clients ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'ativo'`);
+  } catch (e) {
+  }
+
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.credential_access_requests (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        token VARCHAR(64) NOT NULL UNIQUE,
+        user_email VARCHAR(255) NOT NULL,
+        user_name VARCHAR(255) NOT NULL,
+        client_id UUID NOT NULL,
+        client_name VARCHAR(255) NOT NULL,
+        credential_id UUID NOT NULL,
+        platform VARCHAR(255) NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pendente',
+        approved_by VARCHAR(255),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_car_token ON cortex_core.credential_access_requests(token)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_car_user_status ON cortex_core.credential_access_requests(user_email, status)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_car_credential ON cortex_core.credential_access_requests(credential_id, status)`);
   } catch (e) {
   }
 
@@ -209,20 +257,39 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         SELECT * FROM cortex_core.credentials WHERE client_id::text = ANY(${idsArray}::text[]) ORDER BY platform
       `);
       
+      const user = req.user as any;
+      const bypass = canBypassCredentialApproval(user);
+
+      // Get approved credential IDs for non-bypass users
+      let approvedIds = new Set<string>();
+      if (!bypass) {
+        const approved = await db.execute(sql`
+          SELECT credential_id::text FROM cortex_core.credential_access_requests
+          WHERE user_email = ${user.email}
+            AND status = 'aprovado'
+            AND updated_at > NOW() - INTERVAL '24 hours'
+        `);
+        approvedIds = new Set(approved.rows.map((r: any) => r.credential_id));
+      }
+
       const credentialsByClientId = new Map<string, any[]>();
       for (const cred of credentialsResult.rows) {
         const clientId = String((cred as any).client_id);
         if (!credentialsByClientId.has(clientId)) {
           credentialsByClientId.set(clientId, []);
         }
-        credentialsByClientId.get(clientId)!.push(mapCredential(cred));
+        const mapped = mapCredential(cred);
+        if (!bypass && !approvedIds.has(mapped.id)) {
+          mapped.password = "••••••••";
+        }
+        credentialsByClientId.get(clientId)!.push(mapped);
       }
-      
+
       const result = clientsResult.rows.map((client: any) => ({
         ...mapClient(client),
         credentials: credentialsByClientId.get(String(client.id)) || []
       }));
-      
+
       res.json(result);
     } catch (error) {
       console.error("[api] Error fetching batch clients:", error);
@@ -285,9 +352,26 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       `);
       
       const client = clientResult.rows[0] as any;
+      const user = req.user as any;
+      const bypass = canBypassCredentialApproval(user);
+
+      let credentials = credentialsResult.rows.map(mapCredential);
+      if (!bypass) {
+        const approved = await db.execute(sql`
+          SELECT credential_id::text FROM cortex_core.credential_access_requests
+          WHERE user_email = ${user.email}
+            AND status = 'aprovado'
+            AND updated_at > NOW() - INTERVAL '24 hours'
+        `);
+        const approvedIds = new Set(approved.rows.map((r: any) => r.credential_id));
+        credentials = credentials.map((cred: any) =>
+          approvedIds.has(cred.id) ? cred : { ...cred, password: "••••••••" }
+        );
+      }
+
       res.json({
         ...mapClient(client),
-        credentials: credentialsResult.rows.map(mapCredential)
+        credentials
       });
     } catch (error) {
       console.error("[api] Error fetching client:", error);
@@ -876,7 +960,32 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const result = await db.execute(sql`
         SELECT * FROM cortex_core.credentials WHERE client_id::text = ${clientId} ORDER BY platform
       `);
-      res.json(result.rows.map(mapCredential));
+
+      const user = req.user as any;
+      const bypass = canBypassCredentialApproval(user);
+
+      if (bypass) {
+        return res.json(result.rows.map(mapCredential));
+      }
+
+      // Get approved credential IDs for this user
+      const approved = await db.execute(sql`
+        SELECT credential_id::text FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND status = 'aprovado'
+          AND updated_at > NOW() - INTERVAL '24 hours'
+      `);
+      const approvedIds = new Set(approved.rows.map((r: any) => r.credential_id));
+
+      const masked = result.rows.map((row: any) => {
+        const cred = mapCredential(row);
+        if (!approvedIds.has(cred.id)) {
+          return { ...cred, password: "••••••••" };
+        }
+        return cred;
+      });
+
+      res.json(masked);
     } catch (error) {
       console.error("[api] Error fetching credentials:", error);
       res.status(500).json({ error: "Failed to fetch credentials" });
@@ -965,6 +1074,202 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
     } catch (error) {
       console.error("[api] Error deleting credential:", error);
       res.status(500).json({ error: "Failed to delete credential" });
+    }
+  });
+
+  // === Credential Access Approval ===
+
+  app.post("/api/acessos/request-access", async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+      if (canBypassCredentialApproval(user)) {
+        return res.json({ status: "approved", bypass: true });
+      }
+
+      const { credentialId, clientId, clientName, platform } = req.body;
+      if (!credentialId || !clientId || !clientName || !platform) {
+        return res.status(400).json({ error: "credentialId, clientId, clientName, and platform are required" });
+      }
+
+      // Check if there's already a pending request for this user + credential
+      const existing = await db.execute(sql`
+        SELECT id, status FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND credential_id::text = ${credentialId}
+          AND status = 'pendente'
+          AND created_at > NOW() - INTERVAL '1 hour'
+        LIMIT 1
+      `);
+
+      if (existing.rows.length > 0) {
+        return res.json({ status: "pending", requestId: (existing.rows[0] as any).id });
+      }
+
+      const token = generateToken();
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.credential_access_requests
+          (token, user_email, user_name, client_id, client_name, credential_id, platform, status)
+        VALUES (${token}, ${user.email}, ${user.name}, ${clientId}::uuid, ${clientName}, ${credentialId}::uuid, ${platform}, 'pendente')
+        RETURNING id
+      `);
+
+      const requestId = (result.rows[0] as any).id;
+      const appUrl = process.env.APP_URL || "https://cortex.turbopartners.com.br";
+
+      const mensagem = [
+        `🔐 *Solicitação de Acesso a Credencial*`,
+        ``,
+        `*Solicitante:* ${user.name} (${user.email})`,
+        `*Cliente:* ${clientName}`,
+        `*Plataforma:* ${platform}`,
+        `*Data:* ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+        ``,
+        `✅ *Aprovar:* ${appUrl}/api/acessos/approve/${token}`,
+        `❌ *Reprovar:* ${appUrl}/api/acessos/reject/${token}`,
+      ].join("\n");
+
+      for (const numero of CREDENTIAL_APPROVER_NUMBERS) {
+        try {
+          console.log(`[acessos] Sending WhatsApp to ${numero}...`);
+          const result = await enviarMensagemWhatsApp(numero, mensagem, "financeiro");
+          if (result.success) {
+            console.log(`[acessos] WhatsApp sent to ${numero}`);
+          } else {
+            console.error(`[acessos] WhatsApp failed for ${numero}: ${result.error}`);
+          }
+        } catch (err) {
+          console.error(`[acessos] WhatsApp error for ${numero}:`, err);
+        }
+      }
+
+      res.json({ status: "pending", requestId });
+    } catch (error) {
+      console.error("[acessos] Error requesting access:", error);
+      res.status(500).json({ error: "Failed to request access" });
+    }
+  });
+
+  app.get("/api/acessos/check-access", async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+      if (canBypassCredentialApproval(user)) {
+        return res.json({ bypass: true, approved: [], pending: [], rejected: [] });
+      }
+
+      const approved = await db.execute(sql`
+        SELECT credential_id::text FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND status = 'aprovado'
+          AND updated_at > NOW() - INTERVAL '24 hours'
+      `);
+
+      const pending = await db.execute(sql`
+        SELECT credential_id::text FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND status = 'pendente'
+          AND created_at > NOW() - INTERVAL '1 hour'
+      `);
+
+      const rejected = await db.execute(sql`
+        SELECT credential_id::text FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND status = 'reprovado'
+          AND updated_at > NOW() - INTERVAL '5 minutes'
+      `);
+
+      res.json({
+        bypass: false,
+        approved: approved.rows.map((r: any) => r.credential_id),
+        pending: pending.rows.map((r: any) => r.credential_id),
+        rejected: rejected.rows.map((r: any) => r.credential_id),
+      });
+    } catch (error) {
+      console.error("[acessos] Error checking access:", error);
+      res.status(500).json({ error: "Failed to check access" });
+    }
+  });
+
+  app.get("/api/acessos/can-bypass", async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+      res.json({ canBypass: canBypassCredentialApproval(user) });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check bypass" });
+    }
+  });
+}
+
+export function registerAcessosPublicRoutes(app: Express) {
+  app.get("/api/acessos/approve/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await pool.query(
+        `UPDATE cortex_core.credential_access_requests
+         SET status = 'aprovado', approved_by = 'link', updated_at = NOW()
+         WHERE token = $1 AND status = 'pendente'
+         RETURNING id, user_name, client_name, platform`,
+        [token]
+      );
+
+      if (result.rows.length === 0) {
+        return res.send(`
+          <html><body style="font-family:sans-serif;text-align:center;padding:60px;">
+            <h2>⚠️ Solicitação não encontrada ou já processada</h2>
+            <p>Esta solicitação já foi aprovada/reprovada ou expirou.</p>
+          </body></html>
+        `);
+      }
+
+      const row = result.rows[0];
+      res.send(`
+        <html><body style="font-family:sans-serif;text-align:center;padding:60px;">
+          <h2>✅ Acesso Aprovado!</h2>
+          <p><strong>${row.user_name}</strong> agora pode ver as credenciais de <strong>${row.platform}</strong> do cliente <strong>${row.client_name}</strong>.</p>
+          <p style="color:#888;margin-top:20px;">Você pode fechar esta página.</p>
+        </body></html>
+      `);
+    } catch (error) {
+      console.error("[acessos] Error approving:", error);
+      res.status(500).send("Erro ao processar aprovação");
+    }
+  });
+
+  app.get("/api/acessos/reject/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await pool.query(
+        `UPDATE cortex_core.credential_access_requests
+         SET status = 'reprovado', approved_by = 'link', updated_at = NOW()
+         WHERE token = $1 AND status = 'pendente'
+         RETURNING id, user_name, client_name, platform`,
+        [token]
+      );
+
+      if (result.rows.length === 0) {
+        return res.send(`
+          <html><body style="font-family:sans-serif;text-align:center;padding:60px;">
+            <h2>⚠️ Solicitação não encontrada ou já processada</h2>
+            <p>Esta solicitação já foi aprovada/reprovada ou expirou.</p>
+          </body></html>
+        `);
+      }
+
+      const row = result.rows[0];
+      res.send(`
+        <html><body style="font-family:sans-serif;text-align:center;padding:60px;">
+          <h2>❌ Acesso Reprovado</h2>
+          <p>O acesso de <strong>${row.user_name}</strong> às credenciais de <strong>${row.platform}</strong> do cliente <strong>${row.client_name}</strong> foi negado.</p>
+          <p style="color:#888;margin-top:20px;">Você pode fechar esta página.</p>
+        </body></html>
+      `);
+    } catch (error) {
+      console.error("[acessos] Error rejecting:", error);
+      res.status(500).send("Erro ao processar reprovação");
     }
   });
 }

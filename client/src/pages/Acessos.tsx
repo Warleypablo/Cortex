@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment, useEffect } from "react";
 import { usePersistentFilters } from "@/hooks/use-persistent-filters";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { Client, Credential, InsertClient, InsertCredential, AccessLog, ClientStatus } from "@shared/schema";
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
@@ -80,6 +80,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ClientWithCredentialCount = Client & { credential_count: number; cazClienteId?: number | null; platforms?: string[] };
 type ClientWithCredentials = Client & { credentials: Credential[] };
@@ -151,6 +152,51 @@ function formatCNPJ(cnpj: string | null | undefined) {
     /^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,
     "$1.$2.$3/$4-$5"
   );
+}
+
+function useCanBypass() {
+  return useQuery<{ canBypass: boolean }>({
+    queryKey: ["/api/acessos/can-bypass"],
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+function useCheckAccess(enabled: boolean) {
+  return useQuery<{
+    bypass: boolean;
+    approved: string[];
+    pending: string[];
+    rejected: string[];
+  }>({
+    queryKey: ["/api/acessos/check-access"],
+    refetchInterval: enabled ? 5000 : false,
+    staleTime: 2000,
+    enabled: enabled || undefined,
+  });
+}
+
+function useRequestAccess() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      credentialId: string;
+      clientId: string;
+      clientName: string;
+      platform: string;
+    }) => {
+      const res = await fetch("/api/acessos/request-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to request access");
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/acessos/check-access"] });
+    },
+  });
 }
 
 function useCreateLog() {
@@ -1189,18 +1235,26 @@ function EditCredentialDialog({
   );
 }
 
-function CredentialRow({ 
-  credential, 
+function CredentialRow({
+  credential,
   clientId,
   clientName,
-  onEdit, 
-  onDelete 
-}: { 
+  onEdit,
+  onDelete,
+  canBypass,
+  isApproved,
+  isPending,
+  onRequestAccess,
+}: {
   credential: Credential;
   clientId: string;
   clientName: string;
   onEdit: () => void;
   onDelete: () => void;
+  canBypass: boolean;
+  isApproved: boolean;
+  isPending: boolean;
+  onRequestAccess: () => void;
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
@@ -1208,6 +1262,10 @@ function CredentialRow({
 
   const handleTogglePassword = () => {
     if (!showPassword) {
+      if (!canBypass && !isApproved) {
+        onRequestAccess();
+        return;
+      }
       createLog.mutate({
         action: "view_password",
         entityType: "credential",
@@ -1221,6 +1279,10 @@ function CredentialRow({
   };
 
   const copyToClipboard = (text: string) => {
+    if (!canBypass && !isApproved) {
+      onRequestAccess();
+      return;
+    }
     navigator.clipboard.writeText(text);
     createLog.mutate({
       action: "copy_password",
@@ -1230,9 +1292,9 @@ function CredentialRow({
       clientId,
       clientName,
     });
-    toast({ 
-      title: "Copiado!", 
-      description: "Senha copiada para a área de transferência" 
+    toast({
+      title: "Copiado!",
+      description: "Senha copiada para a área de transferência"
     });
   };
 
@@ -1276,17 +1338,30 @@ function CredentialRow({
       <TableCell>
         <div className="flex items-center gap-2">
           <span className="font-mono text-sm">
-            {showPassword ? credential.password : "••••••••"}
+            {showPassword && (canBypass || isApproved) ? credential.password : "••••••••"}
           </span>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={handleTogglePassword}
-            data-testid={`button-toggle-password-${credential.id}`}
-          >
-            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </Button>
-          {credential.password && (
+          {isPending ? (
+            <Badge variant="outline" className="text-yellow-600 dark:text-yellow-400 gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Aguardando
+            </Badge>
+          ) : (
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={handleTogglePassword}
+              data-testid={`button-toggle-password-${credential.id}`}
+            >
+              {!canBypass && !isApproved ? (
+                <Lock className="w-4 h-4 text-yellow-500" />
+              ) : showPassword ? (
+                <EyeOff className="w-4 h-4" />
+              ) : (
+                <Eye className="w-4 h-4" />
+              )}
+            </Button>
+          )}
+          {credential.password && (canBypass || isApproved) && (
             <Button
               size="icon"
               variant="ghost"
@@ -1657,6 +1732,32 @@ function ClientCredentialsSection({
   const [deletingCredential, setDeletingCredential] = useState<Credential | null>(null);
   const { toast } = useToast();
   const createLog = useCreateLog();
+  const { data: canBypassData } = useCanBypass();
+  const canBypass = canBypassData?.canBypass ?? false;
+  const [hasPendingRequests, setHasPendingRequests] = useState(false);
+  const { data: accessData } = useCheckAccess(!canBypass);
+  const requestAccess = useRequestAccess();
+  const [sessionApproved, setSessionApproved] = useState<Set<string>>(new Set());
+  const [notifiedRejections, setNotifiedRejections] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (accessData?.approved) {
+      setSessionApproved(prev => {
+        const next = new Set(prev);
+        accessData.approved.forEach((id: string) => next.add(id));
+        return next;
+      });
+    }
+    if (accessData?.rejected) {
+      for (const id of accessData.rejected) {
+        if (!notifiedRejections.has(id)) {
+          toast({ title: "Solicitação reprovada", description: "O acesso à credencial foi negado.", variant: "destructive" });
+          setNotifiedRejections(prev => new Set(prev).add(id));
+        }
+      }
+    }
+    setHasPendingRequests((accessData?.pending?.length ?? 0) > 0);
+  }, [accessData]);
 
   const sortedIds = [...clientIds].sort().join(',');
   const { data: batchData, isLoading } = useQuery<ClientWithCredentials[]>({
@@ -1754,6 +1855,28 @@ function ClientCredentialsSection({
                 clientName={clientName}
                 onEdit={() => setEditingCredential(credential)}
                 onDelete={() => setDeletingCredential(credential)}
+                canBypass={canBypass}
+                isApproved={sessionApproved.has(credential.id)}
+                isPending={accessData?.pending?.includes(credential.id) ?? false}
+                onRequestAccess={() => {
+                  requestAccess.mutate({
+                    credentialId: credential.id,
+                    clientId: primaryClientId,
+                    clientName,
+                    platform: credential.platform,
+                  }, {
+                    onSuccess: (data: any) => {
+                      if (data.status === "approved" && data.bypass) {
+                        setSessionApproved(prev => new Set(prev).add(credential.id));
+                      } else {
+                        toast({
+                          title: "Solicitação enviada",
+                          description: "Aguarde aprovação via WhatsApp. Você será notificado quando aprovado.",
+                        });
+                      }
+                    },
+                  });
+                }}
               />
             ))}
           </TableBody>

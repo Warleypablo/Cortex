@@ -49,6 +49,7 @@ export function configurePassport() {
             '/patrimonio',
             '/ferramentas',
             '/turbozap',
+            '/acessos',
             '/visao-geral',
             '/dashboard/geg',
             '/dashboard/inhire',
