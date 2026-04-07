@@ -257,20 +257,39 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         SELECT * FROM cortex_core.credentials WHERE client_id::text = ANY(${idsArray}::text[]) ORDER BY platform
       `);
       
+      const user = req.user as any;
+      const bypass = canBypassCredentialApproval(user);
+
+      // Get approved credential IDs for non-bypass users
+      let approvedIds = new Set<string>();
+      if (!bypass) {
+        const approved = await db.execute(sql`
+          SELECT credential_id::text FROM cortex_core.credential_access_requests
+          WHERE user_email = ${user.email}
+            AND status = 'aprovado'
+            AND updated_at > NOW() - INTERVAL '24 hours'
+        `);
+        approvedIds = new Set(approved.rows.map((r: any) => r.credential_id));
+      }
+
       const credentialsByClientId = new Map<string, any[]>();
       for (const cred of credentialsResult.rows) {
         const clientId = String((cred as any).client_id);
         if (!credentialsByClientId.has(clientId)) {
           credentialsByClientId.set(clientId, []);
         }
-        credentialsByClientId.get(clientId)!.push(mapCredential(cred));
+        const mapped = mapCredential(cred);
+        if (!bypass && !approvedIds.has(mapped.id)) {
+          mapped.password = "••••••••";
+        }
+        credentialsByClientId.get(clientId)!.push(mapped);
       }
-      
+
       const result = clientsResult.rows.map((client: any) => ({
         ...mapClient(client),
         credentials: credentialsByClientId.get(String(client.id)) || []
       }));
-      
+
       res.json(result);
     } catch (error) {
       console.error("[api] Error fetching batch clients:", error);
@@ -333,9 +352,26 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       `);
       
       const client = clientResult.rows[0] as any;
+      const user = req.user as any;
+      const bypass = canBypassCredentialApproval(user);
+
+      let credentials = credentialsResult.rows.map(mapCredential);
+      if (!bypass) {
+        const approved = await db.execute(sql`
+          SELECT credential_id::text FROM cortex_core.credential_access_requests
+          WHERE user_email = ${user.email}
+            AND status = 'aprovado'
+            AND updated_at > NOW() - INTERVAL '24 hours'
+        `);
+        const approvedIds = new Set(approved.rows.map((r: any) => r.credential_id));
+        credentials = credentials.map(cred =>
+          approvedIds.has(cred.id) ? cred : { ...cred, password: "••••••••" }
+        );
+      }
+
       res.json({
         ...mapClient(client),
-        credentials: credentialsResult.rows.map(mapCredential)
+        credentials
       });
     } catch (error) {
       console.error("[api] Error fetching client:", error);
@@ -924,7 +960,32 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const result = await db.execute(sql`
         SELECT * FROM cortex_core.credentials WHERE client_id::text = ${clientId} ORDER BY platform
       `);
-      res.json(result.rows.map(mapCredential));
+
+      const user = req.user as any;
+      const bypass = canBypassCredentialApproval(user);
+
+      if (bypass) {
+        return res.json(result.rows.map(mapCredential));
+      }
+
+      // Get approved credential IDs for this user
+      const approved = await db.execute(sql`
+        SELECT credential_id::text FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND status = 'aprovado'
+          AND updated_at > NOW() - INTERVAL '24 hours'
+      `);
+      const approvedIds = new Set(approved.rows.map((r: any) => r.credential_id));
+
+      const masked = result.rows.map((row: any) => {
+        const cred = mapCredential(row);
+        if (!approvedIds.has(cred.id)) {
+          return { ...cred, password: "••••••••" };
+        }
+        return cred;
+      });
+
+      res.json(masked);
     } catch (error) {
       console.error("[api] Error fetching credentials:", error);
       res.status(500).json({ error: "Failed to fetch credentials" });
