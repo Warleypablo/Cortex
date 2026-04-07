@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { pool } from "../db";
+import { randomBytes } from "crypto";
+import { enviarMensagemWhatsApp } from "../services/turbozap";
 
 const mapClient = (row: any) => ({
   id: row.id,
@@ -28,6 +30,29 @@ const mapCredential = (row: any) => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
+
+// Emails that can see passwords without approval
+const CREDENTIAL_BYPASS_EMAILS = [
+  "caio.massaroni@turbopartners.com.br",
+  "warley.silva@turbopartners.com.br",
+  "breno.carmo@turbopartners.com.br",
+];
+
+// WhatsApp numbers that receive approval requests
+const CREDENTIAL_APPROVER_NUMBERS = [
+  "557199993135",   // Breno Carmo
+  "5527997823958",  // Warley
+];
+
+function canBypassCredentialApproval(user: any): boolean {
+  if (!user) return false;
+  if (user.role === "admin") return true;
+  return CREDENTIAL_BYPASS_EMAILS.includes(user.email?.toLowerCase());
+}
+
+function generateToken(): string {
+  return randomBytes(32).toString("hex");
+}
 
 export async function registerAcessosRoutes(app: Express, db: any, storage: IStorage) {
   try {
