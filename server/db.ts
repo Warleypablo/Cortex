@@ -697,11 +697,15 @@ export async function initializeSysSchema(): Promise<void> {
         data_aprovacao_lider TIMESTAMP,
         observacao_lider TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT chk_max_days CHECK ((data_fim - data_inicio) <= 7)
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    
+
+    // Remove 7-day constraint if it exists (legacy)
+    try {
+      await pool.query(`ALTER TABLE cortex_core.unavailability_requests DROP CONSTRAINT IF EXISTS chk_max_days`);
+    } catch (e) {}
+
     // Add dual approval columns if they don't exist (for existing databases)
     await db.execute(sql`
       ALTER TABLE cortex_core.unavailability_requests 
