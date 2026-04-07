@@ -89,7 +89,7 @@ async function ensureCreatorsTables() {
 // ── PDF Generation ────────────────────────────────────────────────────────────
 
 export interface ContratoCreatorPDFData {
-  creator: { nome: string; cpf: string | null; cnpj: string | null; email?: string; endereco: string | null; cidade: string | null; estado: string | null; cep: string | null };
+  creator: { nome: string; cpf: string | null; cnpj: string | null; email?: string; endereco: string | null };
   contrato: { cargo: string; descricao_servicos: string; valor_remuneracao: string; duracao_meses: number; data_inicio: string; data_fim: string; qtd_videos?: number; qtd_variacoes_gancho?: number; unidade_prazo?: string; cliente_nome?: string; prazo_entrega_dias?: number };
 }
 
@@ -146,11 +146,7 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
   if (creator.cpf) contratadaParts.push(`CPF ${creator.cpf}`);
   if (creator.cnpj) contratadaParts.push(`CNPJ ${creator.cnpj}`);
   if (creator.endereco) {
-    const endParts = [creator.endereco];
-    if (creator.cidade) endParts.push(creator.cidade);
-    if (creator.estado) endParts.push(creator.estado);
-    if (creator.cep) endParts.push(`CEP ${creator.cep}`);
-    contratadaParts.push(`com endereço em ${endParts.join(', ')}`);
+    contratadaParts.push(`com endereço em ${creator.endereco}`);
   }
   if (creator.email) contratadaParts.push(`e-mail ${creator.email}`);
   p(`${contratadaParts.join(', ')};`, { spacing: 1 });
@@ -535,9 +531,6 @@ export function registerCreatorsRoutes(app: Express) {
       if ((tipo_pessoa === 'fisica' || tipo_pessoa === 'ambos') && !cpf) return res.status(400).json({ error: "CPF é obrigatório para pessoa física" });
       if ((tipo_pessoa === 'juridica' || tipo_pessoa === 'ambos') && !cnpj) return res.status(400).json({ error: "CNPJ é obrigatório para pessoa jurídica" });
       if (!endereco) return res.status(400).json({ error: "Endereço é obrigatório" });
-      if (!cidade) return res.status(400).json({ error: "Cidade é obrigatória" });
-      if (!estado) return res.status(400).json({ error: "UF é obrigatório" });
-      if (!cep) return res.status(400).json({ error: "CEP é obrigatório" });
       if (!tipo_pix) return res.status(400).json({ error: "Tipo PIX é obrigatório" });
       if (!chave_pix) return res.status(400).json({ error: "Chave PIX é obrigatória" });
 
@@ -688,7 +681,7 @@ export function registerCreatorsRoutes(app: Express) {
 
       const row = result.rows[0] as any;
       const pdfBuffer = await gerarContratoCreatorPDF({
-        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco, cidade: row.cidade, estado: row.estado, cep: row.cep },
+        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco },
         contrato: {
           cargo: row.cargo || 'prestador de serviços',
           descricao_servicos: row.descricao_servicos || 'conforme acordado entre as partes',
@@ -752,7 +745,7 @@ export function registerCreatorsRoutes(app: Express) {
       const [FormDataModule] = await Promise.all([import('form-data')]);
 
       const pdfBuffer = await gerarContratoCreatorPDF({
-        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco, cidade: row.cidade, estado: row.estado, cep: row.cep },
+        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco },
         contrato: {
           cargo: row.cargo || 'prestador de serviços',
           descricao_servicos: row.descricao_servicos || 'conforme acordado entre as partes',
