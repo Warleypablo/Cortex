@@ -1,5 +1,5 @@
 /**
- * Standalone NF scanner - processes PDFs from attached_assets/2026/
+ * Standalone NF scanner - processes PDFs from 2026/
  * Usage: npx tsx scripts/scan-nfs.ts
  */
 import path from "path";
@@ -26,7 +26,7 @@ const pool = new Pool({
 async function main() {
   const { extractTextFromPDF, extractValueFromText, extractPrestadorFromFilename } = await import("../server/services/nfExtractor");
 
-  const baseDir = path.join(process.cwd(), "attached_assets", "2026");
+  const baseDir = path.join(process.cwd(), "2026");
   const monthDirs = (await fs.readdir(baseDir, { withFileTypes: true }))
     .filter(d => d.isDirectory() && /^\d{2}\s*-\s*/.test(d.name))
     .sort((a, b) => a.name.localeCompare(b.name));
