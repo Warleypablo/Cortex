@@ -11606,10 +11606,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       if (diffDays < 0) {
         return res.status(400).json({ error: "Data de fim deve ser posterior à data de início" });
       }
-      if (diffDays > 7) {
-        return res.status(400).json({ error: "Período máximo de 7 dias" });
-      }
-      
       const result = await db.execute(sql`
         INSERT INTO cortex_core.unavailability_requests 
         (colaborador_id, colaborador_nome, colaborador_email, data_inicio, data_fim, motivo, data_admissao, status, status_rh, status_lider, squad_nome)
@@ -11713,10 +11709,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       if (diffDays < 0) {
         return res.status(400).json({ error: "Data de fim deve ser posterior à data de início" });
       }
-      if (diffDays > 7) {
-        return res.status(400).json({ error: "Período máximo de 7 dias" });
-      }
-      
       const result = await db.execute(sql`
         UPDATE cortex_core.unavailability_requests 
         SET data_inicio = ${dataInicio}, 
