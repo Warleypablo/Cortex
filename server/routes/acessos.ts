@@ -1083,6 +1083,58 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       res.status(500).json({ error: "Failed to request access" });
     }
   });
+
+  app.get("/api/acessos/check-access", async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+      if (canBypassCredentialApproval(user)) {
+        return res.json({ bypass: true, approved: [], pending: [], rejected: [] });
+      }
+
+      const approved = await db.execute(sql`
+        SELECT credential_id::text FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND status = 'aprovado'
+          AND updated_at > NOW() - INTERVAL '24 hours'
+      `);
+
+      const pending = await db.execute(sql`
+        SELECT credential_id::text FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND status = 'pendente'
+          AND created_at > NOW() - INTERVAL '1 hour'
+      `);
+
+      const rejected = await db.execute(sql`
+        SELECT credential_id::text FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND status = 'reprovado'
+          AND updated_at > NOW() - INTERVAL '5 minutes'
+      `);
+
+      res.json({
+        bypass: false,
+        approved: approved.rows.map((r: any) => r.credential_id),
+        pending: pending.rows.map((r: any) => r.credential_id),
+        rejected: rejected.rows.map((r: any) => r.credential_id),
+      });
+    } catch (error) {
+      console.error("[acessos] Error checking access:", error);
+      res.status(500).json({ error: "Failed to check access" });
+    }
+  });
+
+  app.get("/api/acessos/can-bypass", async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+      res.json({ canBypass: canBypassCredentialApproval(user) });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check bypass" });
+    }
+  });
 }
 
 export function registerAcessosPublicRoutes(app: Express) {
