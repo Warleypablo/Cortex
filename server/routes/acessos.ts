@@ -364,7 +364,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
             AND updated_at > NOW() - INTERVAL '24 hours'
         `);
         const approvedIds = new Set(approved.rows.map((r: any) => r.credential_id));
-        credentials = credentials.map(cred =>
+        credentials = credentials.map((cred: any) =>
           approvedIds.has(cred.id) ? cred : { ...cred, password: "••••••••" }
         );
       }
