@@ -417,9 +417,10 @@ export function registerCreatorsRoutes(app: Express) {
         SELECT cc.*, cr.nome AS creator_nome, cr.email AS creator_email
         FROM cortex_core.contratos_creators cc
         JOIN cortex_core.creators cr ON cr.id = cc.creator_id
+        WHERE cc.status != 'excluido'
       `;
       if (statusFilter) {
-        query += ` WHERE cc.status = '${statusFilter.replace(/'/g, "''")}'`;
+        query += ` AND cc.status = '${statusFilter.replace(/'/g, "''")}'`;
       }
       query += ` ORDER BY cc.criado_em DESC`;
       const result = await db.execute(sql.raw(query));
@@ -610,7 +611,7 @@ export function registerCreatorsRoutes(app: Express) {
     try {
       const creatorId = parseInt(req.params.id);
       const result = await db.execute(sql`
-        SELECT * FROM cortex_core.contratos_creators WHERE creator_id = ${creatorId} ORDER BY criado_em DESC
+        SELECT * FROM cortex_core.contratos_creators WHERE creator_id = ${creatorId} AND status != 'excluido' ORDER BY criado_em DESC
       `);
       res.json(result.rows);
     } catch (error: any) {
@@ -1057,6 +1058,66 @@ export function registerCreatorsRoutes(app: Express) {
       res.json({ token, url: `${baseUrl}/portal/creator?token=${token}` });
     } catch (error: any) {
       console.error("[creators] Erro ao gerar token:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/creators/contratos/:id — Soft delete contrato + excluir no Assinafy
+  app.delete("/api/creators/contratos/:id", async (req, res) => {
+    const contratoId = parseInt(req.params.id);
+
+    try {
+      // Buscar contrato
+      const result = await db.execute(sql`
+        SELECT id, status, assinafy_document_id FROM cortex_core.contratos_creators WHERE id = ${contratoId}
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+
+      const contrato = result.rows[0] as any;
+
+      // Se tem documento no Assinafy, tentar excluir lá
+      if (contrato.assinafy_document_id) {
+        try {
+          const configResult = await db.execute(sql`
+            SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'creators' LIMIT 1
+          `);
+
+          if (configResult.rows.length > 0) {
+            const config = configResult.rows[0] as { api_key: string; api_url: string };
+            const deleteUrl = `${config.api_url}/documents/${contrato.assinafy_document_id}`;
+            console.log(`[creators] Deleting Assinafy document: ${contrato.assinafy_document_id}`);
+
+            const response = await fetch(deleteUrl, {
+              method: "DELETE",
+              headers: { "X-Api-Key": config.api_key },
+            });
+
+            if (response.ok) {
+              console.log(`[creators] Assinafy document deleted successfully`);
+            } else {
+              const errorText = await response.text();
+              console.error(`[creators] Assinafy delete failed (${response.status}): ${errorText}`);
+              // Continue with local soft delete even if Assinafy fails
+            }
+          }
+        } catch (err) {
+          console.error("[creators] Error deleting from Assinafy:", err);
+          // Continue with local soft delete
+        }
+      }
+
+      // Soft delete local
+      await db.execute(sql`
+        UPDATE cortex_core.contratos_creators SET status = 'excluido' WHERE id = ${contratoId}
+      `);
+
+      console.log(`[creators] Contrato ${contratoId} excluído (soft delete)`);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[creators] Erro ao excluir contrato:", error);
       res.status(500).json({ error: error.message });
     }
   });
