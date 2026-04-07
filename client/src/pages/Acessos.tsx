@@ -1732,6 +1732,32 @@ function ClientCredentialsSection({
   const [deletingCredential, setDeletingCredential] = useState<Credential | null>(null);
   const { toast } = useToast();
   const createLog = useCreateLog();
+  const { data: canBypassData } = useCanBypass();
+  const canBypass = canBypassData?.canBypass ?? false;
+  const [hasPendingRequests, setHasPendingRequests] = useState(false);
+  const { data: accessData } = useCheckAccess(!canBypass);
+  const requestAccess = useRequestAccess();
+  const [sessionApproved, setSessionApproved] = useState<Set<string>>(new Set());
+  const [notifiedRejections, setNotifiedRejections] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (accessData?.approved) {
+      setSessionApproved(prev => {
+        const next = new Set(prev);
+        accessData.approved.forEach((id: string) => next.add(id));
+        return next;
+      });
+    }
+    if (accessData?.rejected) {
+      for (const id of accessData.rejected) {
+        if (!notifiedRejections.has(id)) {
+          toast({ title: "Solicitação reprovada", description: "O acesso à credencial foi negado.", variant: "destructive" });
+          setNotifiedRejections(prev => new Set(prev).add(id));
+        }
+      }
+    }
+    setHasPendingRequests((accessData?.pending?.length ?? 0) > 0);
+  }, [accessData]);
 
   const sortedIds = [...clientIds].sort().join(',');
   const { data: batchData, isLoading } = useQuery<ClientWithCredentials[]>({
@@ -1829,6 +1855,28 @@ function ClientCredentialsSection({
                 clientName={clientName}
                 onEdit={() => setEditingCredential(credential)}
                 onDelete={() => setDeletingCredential(credential)}
+                canBypass={canBypass}
+                isApproved={sessionApproved.has(credential.id)}
+                isPending={accessData?.pending?.includes(credential.id) ?? false}
+                onRequestAccess={() => {
+                  requestAccess.mutate({
+                    credentialId: credential.id,
+                    clientId: primaryClientId,
+                    clientName,
+                    platform: credential.platform,
+                  }, {
+                    onSuccess: (data: any) => {
+                      if (data.status === "approved" && data.bypass) {
+                        setSessionApproved(prev => new Set(prev).add(credential.id));
+                      } else {
+                        toast({
+                          title: "Solicitação enviada",
+                          description: "Aguarde aprovação via WhatsApp. Você será notificado quando aprovado.",
+                        });
+                      }
+                    },
+                  });
+                }}
               />
             ))}
           </TableBody>
