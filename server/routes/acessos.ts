@@ -1015,4 +1015,72 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       res.status(500).json({ error: "Failed to delete credential" });
     }
   });
+
+  // === Credential Access Approval ===
+
+  app.post("/api/acessos/request-access", async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!user) return res.status(401).json({ error: "Not authenticated" });
+
+      if (canBypassCredentialApproval(user)) {
+        return res.json({ status: "approved", bypass: true });
+      }
+
+      const { credentialId, clientId, clientName, platform } = req.body;
+      if (!credentialId || !clientId || !clientName || !platform) {
+        return res.status(400).json({ error: "credentialId, clientId, clientName, and platform are required" });
+      }
+
+      // Check if there's already a pending request for this user + credential
+      const existing = await db.execute(sql`
+        SELECT id, status FROM cortex_core.credential_access_requests
+        WHERE user_email = ${user.email}
+          AND credential_id::text = ${credentialId}
+          AND status = 'pendente'
+          AND created_at > NOW() - INTERVAL '1 hour'
+        LIMIT 1
+      `);
+
+      if (existing.rows.length > 0) {
+        return res.json({ status: "pending", requestId: (existing.rows[0] as any).id });
+      }
+
+      const token = generateToken();
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.credential_access_requests
+          (token, user_email, user_name, client_id, client_name, credential_id, platform, status)
+        VALUES (${token}, ${user.email}, ${user.name}, ${clientId}::uuid, ${clientName}, ${credentialId}::uuid, ${platform}, 'pendente')
+        RETURNING id
+      `);
+
+      const requestId = (result.rows[0] as any).id;
+      const appUrl = process.env.APP_URL || "https://cortex.turbopartners.com.br";
+
+      const mensagem = [
+        `🔐 *Solicitação de Acesso a Credencial*`,
+        ``,
+        `*Solicitante:* ${user.name} (${user.email})`,
+        `*Cliente:* ${clientName}`,
+        `*Plataforma:* ${platform}`,
+        `*Data:* ${new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+        ``,
+        `✅ *Aprovar:* ${appUrl}/api/acessos/approve/${token}`,
+        `❌ *Reprovar:* ${appUrl}/api/acessos/reject/${token}`,
+      ].join("\n");
+
+      for (const numero of CREDENTIAL_APPROVER_NUMBERS) {
+        try {
+          await enviarMensagemWhatsApp(numero, mensagem, "financeiro");
+        } catch (err) {
+          console.error(`[acessos] WhatsApp error for ${numero}:`, err);
+        }
+      }
+
+      res.json({ status: "pending", requestId });
+    } catch (error) {
+      console.error("[acessos] Error requesting access:", error);
+      res.status(500).json({ error: "Failed to request access" });
+    }
+  });
 }
