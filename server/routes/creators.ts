@@ -921,14 +921,17 @@ export function registerCreatorsRoutes(app: Express) {
       const rawSigners = Array.isArray(assignment.signers) ? assignment.signers : [];
       const items = Array.isArray(assignment.items) ? assignment.items : [];
 
-      // Build signer list with completion status from items
+      const signingUrls = Array.isArray(assignment.signing_urls) ? assignment.signing_urls : [];
+
+      // Build signer list with completion status and signing URL
       const signers = rawSigners.map((s: any) => {
         const item = items.find((it: any) => it.signer?.id === s.id);
         const signed = item?.completed === true || item?.value === 'SIGNED';
+        const signingEntry = signingUrls.find((su: any) => su.signer_id === s.id);
         return {
           name: s.full_name || '',
           email: s.email || '',
-          url: '',
+          url: signingEntry?.url || '',
           status: signed ? 'signed' : 'pending',
         };
       });
@@ -936,7 +939,7 @@ export function registerCreatorsRoutes(app: Express) {
       const creatorSigner = signers.find((s: any) => s.email?.toLowerCase() === data.creator_email?.toLowerCase());
 
       res.json({
-        url: creatorSigner?.url || signers[0]?.url || '',
+        url: creatorSigner?.url || signers[0]?.url || doc.signing_url || '',
         signers,
       });
     } catch (error: any) {
