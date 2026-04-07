@@ -76,6 +76,7 @@ export const PERMISSION_KEYS = {
     KEYWORD_PERFORMANCE: 'growth.keyword_performance',
     FUNIL_CONVERSAO: 'growth.funil_conversao',
     INSTAGRAM: 'growth.instagram',
+    PLANEJAMENTO_METAS: 'growth.planejamento_metas',
   },
   // G&G (Pessoas)
   GG: {
@@ -247,6 +248,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/criativos': PERMISSION_KEYS.GROWTH.CRIATIVOS,
   '/growth/auto-report': PERMISSION_KEYS.REPORTS.AUTO_REPORT,
   '/growth/orcado-realizado': PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO,
+  '/growth/planejamento-metas': PERMISSION_KEYS.GROWTH.PLANEJAMENTO_METAS,
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
   '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
   '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
@@ -453,7 +455,8 @@ export const NAV_CONFIG = {
       items: [
         { title: 'Por Plataforma', url: '/growth/performance-plataformas', icon: 'Layers', permissionKey: PERMISSION_KEYS.GROWTH.PLATAFORMA },
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
-        { title: 'Gestão de Metas', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
+        { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
+        { title: 'Planejamento de Metas', url: '/growth/planejamento-metas', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.GROWTH.PLANEJAMENTO_METAS },
         { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
       ],
     },

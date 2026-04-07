@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarIcon, Pin, PinOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, subDays, startOfWeek, startOfMonth, endOfMonth, startOfYear, subMonths, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -65,10 +65,24 @@ const PRESET_SECTIONS: PresetSection[] = [
         },
       },
       {
+        label: "Últimos 3 dias",
+        getValue: () => {
+          const today = new Date();
+          return { from: subDays(today, 2), to: today };
+        },
+      },
+      {
         label: "Últimos 7 dias",
         getValue: () => {
           const today = new Date();
           return { from: subDays(today, 6), to: today };
+        },
+      },
+      {
+        label: "Últimos 14 dias",
+        getValue: () => {
+          const today = new Date();
+          return { from: subDays(today, 13), to: today };
         },
       },
       {
@@ -227,6 +241,29 @@ interface DateRangePickerProps {
   showCompare?: boolean;
 }
 
+const PINNED_PRESETS_KEY = 'date-range-picker-pinned-presets';
+
+function getPinnedPresets(): string[] {
+  try {
+    const stored = localStorage.getItem(PINNED_PRESETS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function togglePinnedPreset(label: string): string[] {
+  const pinned = getPinnedPresets();
+  const idx = pinned.indexOf(label);
+  if (idx >= 0) {
+    pinned.splice(idx, 1);
+  } else {
+    pinned.push(label);
+  }
+  localStorage.setItem(PINNED_PRESETS_KEY, JSON.stringify(pinned));
+  return pinned;
+}
+
 export function DateRangePicker({
   value,
   onChange,
@@ -245,6 +282,7 @@ export function DateRangePicker({
   const [month, setMonth] = useState<Date>(value?.from || new Date());
   const [compareActive, setCompareActive] = useState(!!compareEnabled);
   const [internalCompareRange, setInternalCompareRange] = useState<DateRange | undefined>(compareRange);
+  const [pinnedLabels, setPinnedLabels] = useState<string[]>(getPinnedPresets);
 
   useEffect(() => {
     setCompareActive(!!compareEnabled);
@@ -257,9 +295,14 @@ export function DateRangePicker({
   const displayText = useMemo(() => {
     if (!value?.from) return placeholder;
     if (!value.to) {
-      return format(value.from, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
+      return format(value.from, "d MMM yyyy", { locale: ptBR });
     }
-    return `${format(value.from, "d 'de' MMMM 'de' yyyy", { locale: ptBR })} - ${format(value.to, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
+    const fromYear = value.from.getFullYear();
+    const toYear = value.to.getFullYear();
+    if (fromYear === toYear) {
+      return `${format(value.from, "d MMM", { locale: ptBR })} - ${format(value.to, "d MMM yyyy", { locale: ptBR })}`;
+    }
+    return `${format(value.from, "d MMM yyyy", { locale: ptBR })} - ${format(value.to, "d MMM yyyy", { locale: ptBR })}`;
   }, [value, placeholder]);
 
   const handlePresetClick = (preset: Preset) => {
@@ -309,171 +352,195 @@ export function DateRangePicker({
         </Button>
       </PopoverTrigger>
       <PopoverContent className={cn("w-auto p-0 z-[100]", className)} align={align} sideOffset={4}>
-        <div className="flex">
-          <ScrollArea className="border-r border-border h-[400px]">
-            <div className="p-3 w-[140px]">
-              {PRESET_SECTIONS.map((section, idx) => (
-                <div key={section.title} className={cn(idx > 0 && "mt-4")}>
-                  <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
-                    {section.title}
-                  </div>
-                  <div className="space-y-0.5">
-                    {section.presets.map((preset) => (
-                      <button
-                        key={preset.label}
-                        onClick={() => handlePresetClick(preset)}
-                        className={cn(
-                          "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
-                          selectedPreset === preset.label
-                            ? "bg-primary text-primary-foreground font-medium"
-                            : "hover:bg-muted"
-                        )}
-                        data-testid={`preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-          
-          <div className="p-4">
-            <Calendar
-              mode="range"
-              selected={value}
-              onSelect={handleCalendarSelect}
-              numberOfMonths={1}
-              month={month}
-              onMonthChange={setMonth}
-              locale={ptBR}
-              weekStartsOn={0}
-              captionLayout="dropdown-buttons"
-              fromYear={2020}
-              toYear={2030}
-              classNames={{
-                months: "flex flex-col",
-                month: "space-y-3",
-                caption: "flex justify-center pt-1 relative items-center",
-                caption_label: "hidden",
-                caption_dropdowns: "flex gap-2",
-                dropdown: "bg-background border rounded-md px-2 py-1.5 text-sm cursor-pointer hover:bg-muted font-medium",
-                dropdown_month: "",
-                dropdown_year: "",
-                nav: "flex items-center gap-1",
-                nav_button: "h-8 w-8 bg-transparent p-0 hover:bg-muted rounded-md transition-colors",
-                nav_button_previous: "absolute left-0",
-                nav_button_next: "absolute right-0",
-                table: "w-full border-collapse mt-2",
-                head_row: "flex",
-                head_cell: "text-muted-foreground w-10 font-medium text-sm",
-                row: "flex w-full mt-1",
-                cell: "text-center text-sm p-0 relative",
-                day: "h-10 w-10 p-0 font-normal hover:bg-muted rounded-md transition-colors",
-                day_selected: "bg-primary text-primary-foreground hover:bg-primary font-medium",
-                day_today: "bg-accent text-accent-foreground font-semibold",
-                day_outside: "text-muted-foreground opacity-40",
-                day_disabled: "text-muted-foreground opacity-40",
-                day_range_middle: "bg-primary/15 rounded-none",
-                day_hidden: "invisible",
-              }}
-            />
-
-            {showCompare && (
-              <div className="mt-3 pt-3 border-t border-border space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={compareActive}
-                    onChange={(e) => {
-                      setCompareActive(e.target.checked);
-                      if (!e.target.checked) {
-                        setInternalCompareRange(undefined);
-                        if (onCompareChange) onCompareChange(false, undefined);
-                      } else if (value?.from && value?.to) {
-                        const defaultCompare = COMPARE_PRESETS[0].getValue(value);
-                        setInternalCompareRange(defaultCompare);
-                        if (onCompareChange) onCompareChange(true, defaultCompare);
-                      }
-                    }}
-                    className="rounded border-border"
-                  />
-                  <span className="text-sm font-medium">Comparar</span>
-                </label>
-                {compareActive && (
-                  <div className="space-y-2.5 pl-6">
-                    <div className="flex gap-1.5 flex-wrap">
-                      {COMPARE_PRESETS.map((preset) => {
-                        const presetRange = value ? preset.getValue(value) : undefined;
-                        const isSelected = presetRange && internalCompareRange?.from &&
-                          presetRange.from?.toDateString() === internalCompareRange.from?.toDateString() &&
-                          presetRange.to?.toDateString() === internalCompareRange.to?.toDateString();
+        <div className="flex flex-col">
+          <div className="flex">
+            <ScrollArea className="border-r border-border h-[320px]">
+              <div className="p-2 w-[130px]">
+                {pinnedLabels.length > 0 && (
+                  <div className="mb-3 pb-2 border-b border-border">
+                    <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-2">
+                      Fixados
+                    </div>
+                    <div className="space-y-0">
+                      {pinnedLabels.map((label) => {
+                        const preset = DEFAULT_PRESETS.find(p => p.label === label);
+                        if (!preset) return null;
                         return (
-                          <button
-                            key={preset.label}
-                            onClick={() => {
-                              if (value && presetRange) {
-                                setInternalCompareRange(presetRange);
-                                if (onCompareChange) onCompareChange(true, presetRange);
-                              }
-                            }}
-                            className={cn(
-                              "px-2.5 py-1 text-xs rounded-md border transition-colors",
-                              isSelected
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : "border-border hover:bg-muted"
-                            )}
-                          >
-                            {preset.label}
-                          </button>
+                          <div key={`pinned-${label}`} className="flex items-center group">
+                            <button
+                              onClick={() => handlePresetClick(preset)}
+                              className={cn(
+                                "flex-1 text-left px-2 py-1.5 text-xs whitespace-nowrap rounded-md transition-colors",
+                                selectedPreset === label
+                                  ? "bg-primary text-primary-foreground font-medium"
+                                  : "hover:bg-muted"
+                              )}
+                            >
+                              {label}
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPinnedLabels(togglePinnedPreset(label)); }}
+                              className="p-0.5 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mr-1"
+                              title="Desafixar"
+                            >
+                              <PinOff className="h-3 w-3 text-muted-foreground" />
+                            </button>
+                          </div>
                         );
                       })}
                     </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <input
-                        type="date"
-                        value={internalCompareRange?.from ? format(internalCompareRange.from, 'yyyy-MM-dd') : ''}
-                        onChange={(e) => {
-                          const newFrom = e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined;
-                          const newRange = { from: newFrom, to: internalCompareRange?.to };
-                          setInternalCompareRange(newRange as DateRange);
-                          if (onCompareChange && newFrom && newRange.to) onCompareChange(true, newRange as DateRange);
-                        }}
-                        className="px-2 py-1 bg-muted border border-border rounded text-xs font-medium w-[120px] dark:bg-zinc-800"
-                      />
-                      <span className="text-muted-foreground">→</span>
-                      <input
-                        type="date"
-                        value={internalCompareRange?.to ? format(internalCompareRange.to, 'yyyy-MM-dd') : ''}
-                        onChange={(e) => {
-                          const newTo = e.target.value ? new Date(e.target.value + 'T00:00:00') : undefined;
-                          const newRange = { from: internalCompareRange?.from, to: newTo };
-                          setInternalCompareRange(newRange as DateRange);
-                          if (onCompareChange && newRange.from && newTo) onCompareChange(true, newRange as DateRange);
-                        }}
-                        className="px-2 py-1 bg-muted border border-border rounded text-xs font-medium w-[120px] dark:bg-zinc-800"
-                      />
-                    </div>
                   </div>
                 )}
+                {PRESET_SECTIONS.map((section, idx) => (
+                  <div key={section.title} className={cn(idx > 0 && "mt-3")}>
+                    <div className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-2">
+                      {section.title}
+                    </div>
+                    <div className="space-y-0">
+                      {section.presets.map((preset) => (
+                        <div key={preset.label} className="flex items-center group">
+                          <button
+                            onClick={() => handlePresetClick(preset)}
+                            className={cn(
+                              "flex-1 text-left px-2 py-1.5 text-xs whitespace-nowrap rounded-md transition-colors",
+                              selectedPreset === preset.label
+                                ? "bg-primary text-primary-foreground font-medium"
+                                : "hover:bg-muted"
+                            )}
+                            data-testid={`preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            {preset.label}
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setPinnedLabels(togglePinnedPreset(preset.label)); }}
+                            className={cn(
+                              "p-0.5 rounded hover:bg-muted shrink-0 mr-1 transition-opacity",
+                              pinnedLabels.includes(preset.label)
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                            )}
+                            title={pinnedLabels.includes(preset.label) ? "Desafixar" : "Fixar"}
+                          >
+                            <Pin className={cn(
+                              "h-3 w-3",
+                              pinnedLabels.includes(preset.label)
+                                ? "text-primary"
+                                : "text-muted-foreground"
+                            )} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
+            </ScrollArea>
 
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-border gap-3">
-              <div className="flex items-center gap-2 text-sm">
-                <span className="px-3 py-1.5 bg-muted rounded-md font-medium">
-                  {value?.from ? format(value.from, "dd/MM/yy") : "Início"}
-                </span>
-                <span className="text-muted-foreground">→</span>
-                <span className="px-3 py-1.5 bg-muted rounded-md font-medium">
-                  {value?.to ? format(value.to, "dd/MM/yy") : "Fim"}
-                </span>
-              </div>
-              <Button size="sm" className="h-8 px-4" onClick={handleApply} data-testid="button-apply-date-range">
-                Aplicar
-              </Button>
+            <div className="p-3 flex flex-col">
+              <Calendar
+                mode="range"
+                selected={value}
+                onSelect={handleCalendarSelect}
+                numberOfMonths={2}
+                month={month}
+                onMonthChange={setMonth}
+                locale={ptBR}
+                weekStartsOn={0}
+                captionLayout="dropdown-buttons"
+                fromYear={2020}
+                toYear={2030}
+                classNames={{
+                  months: "flex flex-row gap-6",
+                  month: "space-y-2",
+                  caption: "flex justify-center pb-1 relative items-center px-8",
+                  caption_label: "hidden",
+                  caption_dropdowns: "flex gap-2 items-center",
+                  dropdown: "bg-transparent border-none text-[12px] cursor-pointer hover:text-primary font-semibold appearance-none px-0 py-0",
+                  dropdown_month: "",
+                  dropdown_year: "",
+                  nav: "flex items-center",
+                  nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-muted rounded-md transition-colors flex items-center justify-center",
+                  nav_button_previous: "absolute left-0",
+                  nav_button_next: "absolute right-0",
+                  table: "w-full border-collapse mt-1",
+                  head_row: "flex",
+                  head_cell: "text-muted-foreground w-8 font-medium text-[11px]",
+                  row: "flex w-full mt-0.5",
+                  cell: "text-center text-xs p-0 relative",
+                  day: "h-8 w-8 p-0 font-normal hover:bg-muted rounded-md transition-colors text-xs",
+                  day_selected: "bg-primary text-primary-foreground hover:bg-primary font-medium",
+                  day_today: "bg-accent text-accent-foreground font-semibold",
+                  day_outside: "text-muted-foreground opacity-40",
+                  day_disabled: "text-muted-foreground opacity-40",
+                  day_range_middle: "bg-primary/15 rounded-none",
+                  day_hidden: "invisible",
+                }}
+              />
+
+              {showCompare && (
+                <div className="mt-2 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={compareActive}
+                      onChange={(e) => {
+                        setCompareActive(e.target.checked);
+                        if (!e.target.checked) {
+                          setInternalCompareRange(undefined);
+                          if (onCompareChange) onCompareChange(false, undefined);
+                        } else if (value?.from && value?.to) {
+                          const defaultCompare = COMPARE_PRESETS[0].getValue(value);
+                          setInternalCompareRange(defaultCompare);
+                          if (onCompareChange) onCompareChange(true, defaultCompare);
+                        }
+                      }}
+                      className="rounded border-border"
+                    />
+                    <span className="text-xs font-medium">Comparar</span>
+                  </label>
+                  {compareActive && (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={COMPARE_PRESETS.findIndex((p) => {
+                          const pr = value ? p.getValue(value) : undefined;
+                          return pr && internalCompareRange?.from &&
+                            pr.from?.toDateString() === internalCompareRange.from?.toDateString() &&
+                            pr.to?.toDateString() === internalCompareRange.to?.toDateString();
+                        })}
+                        onChange={(e) => {
+                          const idx = parseInt(e.target.value);
+                          if (idx >= 0 && value) {
+                            const newRange = COMPARE_PRESETS[idx].getValue(value);
+                            setInternalCompareRange(newRange);
+                            if (onCompareChange) onCompareChange(true, newRange);
+                          }
+                        }}
+                        className="bg-muted border border-border rounded px-2 py-1 text-[11px] font-medium dark:bg-zinc-800 min-w-[140px]"
+                      >
+                        {COMPARE_PRESETS.map((preset, idx) => (
+                          <option key={preset.label} value={idx}>{preset.label}</option>
+                        ))}
+                      </select>
+                      <span className="px-2 py-1 bg-muted border border-border rounded text-[11px] font-medium min-w-[80px] text-center">
+                        {internalCompareRange?.from ? format(internalCompareRange.from, "dd/MM/yy") : "—"}
+                      </span>
+                      <span className="px-2 py-1 bg-muted border border-border rounded text-[11px] font-medium min-w-[80px] text-center">
+                        {internalCompareRange?.to ? format(internalCompareRange.to, "dd/MM/yy") : "—"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+          </div>
+
+          <div className="flex items-center justify-end px-3 py-2 border-t border-border gap-2">
+            <Button variant="ghost" size="sm" className="h-7 px-3 text-xs" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button size="sm" className="h-7 px-4 text-xs" onClick={handleApply} data-testid="button-apply-date-range">
+              Atualizar
+            </Button>
           </div>
         </div>
       </PopoverContent>

@@ -7359,7 +7359,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // POST create/update ruleset
   app.post("/api/metric-rules", async (req, res) => {
     try {
-      const { metricKey, displayLabel, defaultColor, updatedBy } = req.body;
+      const { metricKey, displayLabel, defaultColor, updatedBy, produto, plataforma } = req.body;
       if (!metricKey || !displayLabel) {
         return res.status(400).json({ error: "metricKey and displayLabel are required" });
       }
@@ -7368,6 +7368,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         displayLabel,
         defaultColor: defaultColor || 'default',
         updatedBy: updatedBy || null,
+        produto: produto || null,
+        plataforma: plataforma || null,
       });
       res.json(ruleset);
     } catch (error) {
@@ -7376,10 +7378,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
-  // DELETE ruleset by key
+  // DELETE ruleset by key (supports context via query params)
   app.delete("/api/metric-rules/:metricKey", async (req, res) => {
     try {
-      await storage.deleteMetricRuleset(req.params.metricKey);
+      const produto = (req.query.produto as string) || null;
+      const plataforma = (req.query.plataforma as string) || null;
+      await storage.deleteMetricRuleset(req.params.metricKey, produto, plataforma);
       res.json({ success: true });
     } catch (error) {
       console.error("[api] Error deleting metric ruleset:", error);
@@ -7448,51 +7452,38 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
-  // POST save complete ruleset with thresholds (bulk save)
+  // POST save complete ruleset with thresholds (bulk save, transactional)
   app.post("/api/metric-rules/:metricKey/save", async (req, res) => {
     try {
-      const { displayLabel, defaultColor, updatedBy, thresholds } = req.body;
+      const { displayLabel, defaultColor, updatedBy, thresholds, produto, plataforma } = req.body;
       const metricKey = req.params.metricKey;
-      
+
       if (!displayLabel) {
         return res.status(400).json({ error: "displayLabel is required" });
       }
-      
-      // Upsert ruleset
-      const ruleset = await storage.upsertMetricRuleset({
-        metricKey,
-        displayLabel,
-        defaultColor: defaultColor || 'default',
-        updatedBy: updatedBy || null,
-      });
-      
-      // Delete all existing thresholds for this ruleset
-      await storage.deleteMetricThresholdsByRuleset(ruleset.id);
-      
-      // Create new thresholds
-      const newThresholds = [];
-      if (thresholds && Array.isArray(thresholds)) {
-        for (let i = 0; i < thresholds.length; i++) {
-          const t = thresholds[i];
-          const threshold = await storage.createMetricThreshold({
-            rulesetId: ruleset.id,
-            minValue: t.minValue !== undefined ? t.minValue : null,
-            maxValue: t.maxValue !== undefined ? t.maxValue : null,
-            color: t.color || 'default',
-            label: t.label || null,
-            sortOrder: i,
-          });
-          newThresholds.push(threshold);
-        }
-      }
-      
-      res.json({
-        ...ruleset,
-        thresholds: newThresholds,
-      });
-    } catch (error) {
-      console.error("[api] Error saving metric ruleset:", error);
-      res.status(500).json({ error: "Failed to save metric ruleset" });
+
+      const result = await storage.saveMetricRulesetWithThresholds(
+        {
+          metricKey,
+          displayLabel,
+          defaultColor: defaultColor || 'default',
+          updatedBy: updatedBy || null,
+          produto: produto || null,
+          plataforma: plataforma || null,
+        },
+        (thresholds || []).map((t: any) => ({
+          minValue: t.minValue !== undefined ? t.minValue : null,
+          maxValue: t.maxValue !== undefined ? t.maxValue : null,
+          color: t.color || 'default',
+          label: t.label || null,
+          sortOrder: t.sortOrder || 0,
+        }))
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[api] Error saving metric ruleset:", error?.message, error?.stack);
+      res.status(500).json({ error: "Failed to save metric ruleset", details: error?.message });
     }
   });
 

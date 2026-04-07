@@ -858,21 +858,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const startDate = req.query.startDate as string || '2025-01-01';
       const endDate = req.query.endDate as string || '2025-12-31';
       const status = req.query.status as string || 'Todos'; // Todos, Ativo, Pausado
-      const plataforma = req.query.plataforma as string || 'Todos'; // Todos, Meta Ads, Google Ads, LinkedIn Ads
+      const plataformaParam = req.query.plataforma as string || 'Todos'; // supports comma-separated
       const campanhaId = req.query.campanhaId as string || ''; // campaign_id filter
       const campanhaIds = req.query.campanhaIds as string || ''; // comma-separated campaign_ids (produto filter)
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
-      
+
       // Validar formato de data
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
         return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
       }
-      
+
+      // Parse plataforma filter (supports comma-separated for multi-select)
+      const plataformas = plataformaParam === 'Todos' ? [] : plataformaParam.split(',').map(p => p.trim());
+
       // Por enquanto só temos dados do Meta Ads
-      // Se plataforma for Google Ads ou LinkedIn Ads, retornar array vazio
-      if (plataforma === 'Google Ads' || plataforma === 'LinkedIn Ads') {
-        console.log("[api] Growth Criativos - Plataforma:", plataforma, "- sem dados disponíveis");
+      // Se nenhuma plataforma selecionada incluir Meta Ads (ou "Todos"), retornar vazio
+      if (plataformas.length > 0 && !plataformas.includes('Meta Ads') && !plataformas.includes('Todos')) {
+        console.log("[api] Growth Criativos - Plataformas:", plataformas, "- sem dados disponíveis");
         return res.json([]);
       }
       
@@ -881,7 +884,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT
           i.ad_id,
           a.ad_name,
-          a.status as ad_status,
+          a.effective_status as ad_status,
           a.created_time,
           a.preview_shareable_link as link,
           a.campaign_id,
@@ -903,7 +906,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
           AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-        GROUP BY i.ad_id, a.ad_name, a.status, a.created_time, a.preview_shareable_link, a.campaign_id, c.campaign_name
+        GROUP BY i.ad_id, a.ad_name, a.effective_status, a.created_time, a.preview_shareable_link, a.campaign_id, c.campaign_name
         ORDER BY SUM(i.spend::numeric) DESC
       `);
       
@@ -914,45 +917,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COUNT(*) as leads,
           SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
           SUM(CASE WHEN NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as nmqls,
-          SUM(CASE WHEN LOWER(stage_name) IN (
-              'reunião marcada', 'rm', 'rm - reunião marcada', 'agendado', 'reunião agendada', 'agendamento direto',
-              'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido'
-              ) THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN LOWER(stage_name) IN (
-              'reunião marcada', 'rm', 'rm - reunião marcada', 'agendado', 'reunião agendada', 'agendamento direto',
-              'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido'
-              ) AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
-          SUM(CASE WHEN LOWER(stage_name) IN (
-              'reunião marcada', 'rm', 'rm - reunião marcada', 'agendado', 'reunião agendada', 'agendamento direto',
-              'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido'
-              ) AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
-          SUM(CASE WHEN LOWER(stage_name) IN (
-              'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido'
-              ) THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN LOWER(stage_name) IN (
-              'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido'
-              ) AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
-          SUM(CASE WHEN LOWER(stage_name) IN (
-              'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido'
-              ) AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN stage_name = 'Negócio Ganho'
               AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_mql,
@@ -971,9 +941,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE utm_content IS NOT NULL
           AND utm_content != ''
           AND created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
         GROUP BY utm_content
       `);
-      
+
       // Criar mapa de deals por ad_id
       const dealsMap = new Map<string, any>();
       for (const row of dealsDataResult.rows as any[]) {
@@ -1012,6 +983,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             AND stage_name = 'Negócio Ganho'
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
           GROUP BY utm_content, COALESCE(company_name, contact_name, title)
         ) sub
         GROUP BY utm_content
@@ -1021,8 +993,39 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         if (row.avg_lead_time) leadTimeMap.set(row.ad_id, parseFloat(row.avg_lead_time));
       }
 
+      // Buscar ads ativos que não têm insights no período (para não ficarem invisíveis)
+      const adsWithInsights = new Set((adsDataResult.rows as any[]).map((r: any) => r.ad_id));
+      const activeAdsNoInsights = await db.execute(sql`
+        SELECT
+          a.ad_id,
+          a.ad_name,
+          a.effective_status as ad_status,
+          a.created_time,
+          a.preview_shareable_link as link,
+          a.campaign_id,
+          c.campaign_name,
+          0 as investimento, 0 as impressions, 0 as clicks, 0 as reach,
+          0 as outbound_clicks, 0 as cpm, 0 as video_plays,
+          0 as video_p25, 0 as video_p50, 0 as video_p75, 0 as video_p100,
+          0 as landing_page_views
+        FROM meta_ads.meta_ads a
+        LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
+        WHERE a.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+          AND a.effective_status IN ('ACTIVE', 'WITH_ISSUES')
+          AND a.ad_id NOT IN (
+            SELECT DISTINCT i.ad_id FROM meta_ads.meta_insights_daily i
+            WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+              AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+          )
+      `);
+      // Mesclar ads ativos sem insights com os que têm insights
+      const allAdsRows = [
+        ...(adsDataResult.rows as any[]),
+        ...(activeAdsNoInsights.rows as any[]),
+      ];
+
       // Combinar dados de ads com deals
-      const criativos = (adsDataResult.rows as any[])
+      const criativos = allAdsRows
         .map(row => {
           const adId = row.ad_id;
           const investimento = parseFloat(row.investimento) || 0;
@@ -1038,8 +1041,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const ctr = impressions > 0 && outboundClicks > 0 ? (outboundClicks / impressions) * 100 : null;
           const cpm = parseFloat(row.cpm) || (impressions > 0 ? (investimento / impressions) * 1000 : null);
 
-          // Vídeo Hook = % de visualizações que passaram 3s (p25 / impressions)
-          const videoHook = impressions > 0 && videoP25 > 0 ? (videoP25 / impressions) * 100 : null;
+          // Vídeo Hook = % de plays que passaram 3s (p25 / video_plays)
+          const videoPlays = parseInt(row.video_plays) || 0;
+          const videoHook = videoPlays > 0 && videoP25 > 0 ? (videoP25 / videoPlays) * 100 : null;
           // Vídeo HOLD = % de quem passou 3s que viu 75% (p75 / p25)
           const videoHold = videoP25 > 0 && videoP75 > 0 ? (videoP75 / videoP25) * 100 : null;
           // Connect rate = landing_page_views / outbound_clicks
@@ -1081,10 +1085,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const contratos = deal.contratos;
           const cacContrato = contratos > 0 ? investimento / contratos : null;
 
-          // Determinar status
+          // Determinar status baseado no effective_status (reflete estado real atual)
           let adStatus = row.ad_status || 'Desconhecido';
-          if (adStatus.toUpperCase() === 'ACTIVE') adStatus = 'Ativo';
-          else if (adStatus.toUpperCase() === 'PAUSED') adStatus = 'Pausado';
+          const upperStatus = adStatus.toUpperCase();
+          if (['ACTIVE', 'WITH_ISSUES'].includes(upperStatus)) adStatus = 'Ativo';
+          else if (['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(upperStatus)) adStatus = 'Pausado';
+          else if (['ARCHIVED', 'DELETED', 'DISAPPROVED'].includes(upperStatus)) adStatus = 'Inativo';
 
           return {
             id: adId,
@@ -1175,19 +1181,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SELECT
             i.ad_id,
             a.campaign_id,
-            a.status as ad_status,
+            a.effective_status as ad_status,
             SUM(i.spend::numeric) as investimento
           FROM meta_ads.meta_insights_daily i
           LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
           WHERE i.date_start >= ${sd}::date AND i.date_start <= ${ed}::date
             AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-          GROUP BY i.ad_id, a.campaign_id, a.status
+          GROUP BY i.ad_id, a.campaign_id, a.effective_status
         `);
 
         // Filtrar por status e campanha em JS
         let adRows = (adsResult.rows as any[]);
         if (status === 'Ativo') adRows = adRows.filter((r: any) => r.ad_status?.toUpperCase() === 'ACTIVE');
-        if (status === 'Pausado') adRows = adRows.filter((r: any) => r.ad_status?.toUpperCase() === 'PAUSED');
+        if (status === 'Pausado') adRows = adRows.filter((r: any) => ['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(r.ad_status?.toUpperCase()));
         if (campanhaId) adRows = adRows.filter((r: any) => String(r.campaign_id) === String(campanhaId));
         if (campanhaIdSet) adRows = adRows.filter((r: any) => campanhaIdSet.has(String(r.campaign_id)));
 
@@ -1205,6 +1211,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           FROM "Bitrix".crm_deal
           WHERE utm_content IS NOT NULL AND utm_content != ''
             AND created_at >= ${sd}::date AND created_at <= ${ed}::date + INTERVAL '1 day'
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
         `);
 
         const d = (dealsResult.rows as any[])[0] || {};
@@ -1228,6 +1235,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             FROM "Bitrix".crm_deal
             WHERE utm_content IS NOT NULL AND utm_content != ''
               AND created_at >= ${sd}::date AND created_at <= ${ed}::date + INTERVAL '1 day'
+              AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
             GROUP BY utm_content
           `);
           const filteredDeals = (allDealsResult.rows as any[]).filter((r: any) => adIdSet.has(String(r.ad_id)));
@@ -1352,12 +1360,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${platformCaseExpr} as platform,
           COUNT(*) as leads,
           SUM(CASE WHEN ${MQL_COND} THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RA_STAGES}) THEN 1 ELSE 0 END) as ra,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RA_STAGES}) AND ${MQL_COND} THEN 1 ELSE 0 END) as ra_mql,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RA_STAGES}) AND ${NMQL_COND} THEN 1 ELSE 0 END) as ra_nmql,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RR_STAGES}) THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RR_STAGES}) AND ${MQL_COND} THEN 1 ELSE 0 END) as rr_mql,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RR_STAGES}) AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as ra,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND ${MQL_COND} THEN 1 ELSE 0 END) as ra_mql,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as ra_nmql,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${MQL_COND} THEN 1 ELSE 0 END) as rr_mql,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${MQL_COND} THEN 1 ELSE 0 END) as vendas_mql,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${NMQL_COND} THEN 1 ELSE 0 END) as vendas_nmql,
@@ -1370,6 +1378,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ELSE 0 END) as contratos
         FROM "Bitrix".crm_deal
         WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
         GROUP BY platform
       `));
 
@@ -1385,6 +1394,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           WHERE stage_name = 'Negócio Ganho'
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
           GROUP BY platform, cliente
         ) sub
         GROUP BY platform
@@ -1705,6 +1715,161 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // Growth - Planejamento de Metas - Copy budgets between Produto×Canal combinations
+  app.post("/api/growth/orcado-realizado/budgets/copy-combination", async (req, res) => {
+    try {
+      const { year, sourceSegmento, sourceFunil, targetSegmento, targetFunil, mode } = req.body;
+      if (!year || !sourceSegmento || !sourceFunil || !targetSegmento || !targetFunil) {
+        return res.status(400).json({ error: "year, sourceSegmento, sourceFunil, targetSegmento, targetFunil are required" });
+      }
+
+      // Percent metric keys (stored as decimals) — used for rates_only mode
+      const RATE_KEYS = new Set([
+        'ctr', 'percMqls', 'taxaConversaoPagina', 'connectRate',
+        'videoHook', 'videoHold', 'videoP75', 'videoP100',
+        'percRa', 'percRaMql', 'percRaNmql',
+        'percRr', 'percRrMql', 'percRrNmql',
+        'percRrVendas', 'percRrMqlVendas', 'percRrNmqlVendas',
+        'percReuniaoAgendada', 'percNoShow', 'taxaVendas',
+        'txContratosRecorrentes', 'txContratosImplantacao',
+        'percPerdaSeguidores', 'percCrescimentoSeguidores',
+        'percVisualizacoesOrganicas', 'percVisualizacoesPagas',
+        'ctrAlcanceVisitas', 'percEngajamento', 'ctrAlcanceCliques', 'ctrVisitasCliques',
+        'ctrImpressoes', 'retencaoMedia', 'taxaEngajamento',
+      ]);
+
+      const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
+
+      // Fetch all 12 months from source
+      const source = await db.execute(sql`
+        SELECT mes, metricas FROM meta_ads.growth_budgets
+        WHERE mes = ANY(${months}) AND segmento = ${sourceSegmento} AND funil = ${sourceFunil}
+        ORDER BY mes
+      `);
+
+      if ((source.rows as any[]).length === 0) {
+        return res.status(404).json({ error: `No budgets found for ${sourceSegmento}/${sourceFunil} in ${year}` });
+      }
+
+      let copiedCount = 0;
+      for (const row of source.rows as any[]) {
+        let metricas = row.metricas;
+
+        // Filter to only rate keys if mode is rates_only
+        if (mode === 'rates_only') {
+          const filtered: Record<string, any> = {};
+          for (const [key, value] of Object.entries(metricas)) {
+            if (RATE_KEYS.has(key)) {
+              filtered[key] = value;
+            }
+          }
+          metricas = filtered;
+        }
+
+        if (Object.keys(metricas).length === 0) continue;
+
+        // For rates_only, merge with existing target metrics (don't overwrite volumes)
+        if (mode === 'rates_only') {
+          const existing = await db.execute(sql`
+            SELECT metricas FROM meta_ads.growth_budgets
+            WHERE mes = ${row.mes} AND segmento = ${targetSegmento} AND funil = ${targetFunil}
+          `);
+          const existingMetricas = (existing.rows as any[])[0]?.metricas || {};
+          metricas = { ...existingMetricas, ...metricas };
+        }
+
+        await db.execute(sql`
+          INSERT INTO meta_ads.growth_budgets (mes, segmento, funil, metricas)
+          VALUES (${row.mes}, ${targetSegmento}, ${targetFunil}, ${JSON.stringify(metricas)}::jsonb)
+          ON CONFLICT (mes, segmento, funil) DO UPDATE SET
+            metricas = ${JSON.stringify(metricas)}::jsonb,
+            updated_at = NOW()
+        `);
+        copiedCount++;
+      }
+
+      res.json({
+        copied: copiedCount,
+        mode: mode || 'all',
+        from: `${sourceSegmento}/${sourceFunil}`,
+        to: `${targetSegmento}/${targetFunil}`,
+      });
+    } catch (error) {
+      console.error("[api] Error copying combination budgets:", error);
+      res.status(500).json({ error: "Failed to copy combination budgets" });
+    }
+  });
+
+  // Growth - Planejamento de Metas - Fetch all 12 months of budgets for a year
+  app.get("/api/growth/orcado-realizado/budgets/year", async (req, res) => {
+    try {
+      const year = (req.query.year as string) || new Date().getFullYear().toString();
+      const funil = (req.query.funil as string) || 'todos';
+
+      const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, '0')}`);
+
+      const result = await db.execute(sql`
+        SELECT mes, segmento, metricas FROM meta_ads.growth_budgets
+        WHERE mes = ANY(${sql.raw(`ARRAY[${months.map(m => `'${m}'`).join(',')}]`)}) AND funil = ${funil}
+        ORDER BY mes, segmento
+      `);
+
+      const byMonth: Record<string, Record<string, any>> = {};
+      for (const month of months) {
+        byMonth[month] = {};
+      }
+      for (const row of result.rows as any[]) {
+        if (!byMonth[row.mes]) byMonth[row.mes] = {};
+        byMonth[row.mes][row.segmento] = row.metricas;
+      }
+
+      res.json(byMonth);
+    } catch (error) {
+      console.error("[api] Error fetching year budgets:", error);
+      res.status(500).json({ error: "Failed to fetch year budgets" });
+    }
+  });
+
+  // Growth - Planejamento de Metas - Bulk set a metric value across multiple months
+  app.post("/api/growth/orcado-realizado/budgets/bulk-set", async (req, res) => {
+    try {
+      const { year, segment, key, value, months, funil } = req.body;
+      const funilValue = funil || 'todos';
+
+      if (!year || !segment || !key || value === undefined || !months || !Array.isArray(months)) {
+        return res.status(400).json({ error: "year, segment, key, value, and months[] are required" });
+      }
+
+      let updated = 0;
+      for (const month of months) {
+        const mes = `${year}-${String(month).padStart(2, '0')}`;
+
+        // Fetch existing metricas for this month/segment or start empty
+        const existing = await db.execute(sql`
+          SELECT metricas FROM meta_ads.growth_budgets
+          WHERE mes = ${mes} AND segmento = ${segment} AND funil = ${funilValue}
+        `);
+
+        const currentMetricas = (existing.rows as any[])[0]?.metricas || {};
+        currentMetricas[key] = value;
+
+        await db.execute(sql`
+          INSERT INTO meta_ads.growth_budgets (mes, segmento, funil, metricas)
+          VALUES (${mes}, ${segment}, ${funilValue}, ${JSON.stringify(currentMetricas)}::jsonb)
+          ON CONFLICT (mes, segmento, funil) DO UPDATE SET
+            metricas = ${JSON.stringify(currentMetricas)}::jsonb,
+            updated_at = NOW()
+        `);
+        updated++;
+      }
+
+      res.json({ updated, segment, key, value });
+    } catch (error) {
+      console.error("[api] Error bulk-setting budgets:", error);
+      res.status(500).json({ error: "Failed to bulk-set budgets" });
+    }
+  });
+
   // Growth - Orçado x Realizado - Categorias distintas de crm_deal
   app.get("/api/growth/orcado-realizado/categories", async (req, res) => {
     try {
@@ -1780,11 +1945,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      // UTM Source filter
+      // UTM Source filter (supports comma-separated values for multi-platform)
       const utmSourceParam = req.query.utmSource as string | undefined;
       let utmSourceFilter = sql``;
       if (utmSourceParam && utmSourceParam !== 'todos') {
-        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
+        const utmValues = utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+        if (utmValues.length === 1) {
+          utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
+        } else if (utmValues.length > 1) {
+          utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
+        }
       }
 
       // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
@@ -1827,9 +1997,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       ];
       const stagesRrPlus = sql`LOWER(d.stage_name) IN (${sql.join(STAGES_RR_PLUS.map(s => sql`${s.toLowerCase()}`), sql`, `)})`;
 
-      // 1. Total MQLs = leads criados no período
+      // 1. Total MQLs = leads criados no período (sempre COUNT, não depende de contagem)
       const totalResult = await db.execute(sql`
-        SELECT ${countExpr} as total_mqls
+        SELECT COUNT(*) as total_mqls
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at < (${endDate}::date + INTERVAL '1 day')
@@ -1839,9 +2009,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${utmSourceFilter}
       `);
 
-      // 2. Reuniões Agendadas = data_reuniao_agendada no período
+      // 2. Reuniões Agendadas = data_reuniao_agendada no período (sempre COUNT, não depende de contagem)
       const raResult = await db.execute(sql`
-        SELECT ${countExpr} as reunioes_agendadas_mql
+        SELECT COUNT(*) as reunioes_agendadas_mql
         FROM "Bitrix".crm_deal d
         WHERE d.data_reuniao_agendada IS NOT NULL
           AND d.data_reuniao_agendada::date >= ${startDate}::date
@@ -1852,14 +2022,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${utmSourceFilter}
       `);
 
-      // 3. Reuniões Realizadas = data_fechamento no período + stage >= RR
+      // 3. Reuniões Realizadas = data_reuniao_realizada no período (sempre COUNT, não depende de contagem)
       const rrResult = await db.execute(sql`
-        SELECT ${countExpr} as reunioes_realizadas_mql
+        SELECT COUNT(*) as reunioes_realizadas_mql
         FROM "Bitrix".crm_deal d
-        WHERE d.data_fechamento >= ${startDate}::date
-          AND d.data_fechamento <= ${endDate}::date
+        WHERE d.data_reuniao_realizada IS NOT NULL
+          AND d.data_reuniao_realizada::date >= ${startDate}::date
+          AND d.data_reuniao_realizada::date <= ${endDate}::date
           AND ${mqlCondition}
-          AND ${stagesRrPlus}
           ${inboundFilter}
           ${funilFilter}
           ${utmSourceFilter}
@@ -1882,7 +2052,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%'
             OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%'
             OR LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads'
-          ) THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_trafego
+          ) THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_trafego,
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as deals_ganhos,
+          ${sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN ${prodCountExpr} ELSE 0 END)`)} as contratos_ganhos
         FROM "Bitrix".crm_deal d
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
@@ -1903,6 +2075,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const faturamentoImplantacao = parseFloat(vRow.faturamento_implantacao_mql) || 0;
       const faturamentoAceleracaoTrafego = parseFloat(vRow.faturamento_aceleracao_trafego) || 0;
       const faturamentoImplantacaoTrafego = parseFloat(vRow.faturamento_implantacao_trafego) || 0;
+      const dealsGanhos = parseInt(vRow.deals_ganhos) || 0;
+      const contratosGanhos = parseInt(vRow.contratos_ganhos) || 0;
 
       // Calcular taxas
       const percReuniaoAgendada = totalMqls > 0 ? reunioesAgendadas / totalMqls : 0;
@@ -1933,7 +2107,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         txContratosRecorrentes,
         txContratosImplantacao,
         ticketMedioAceleracao,
-        ticketMedioImplantacao
+        ticketMedioImplantacao,
+
+        // Contagens fixas (sempre retorna ambos, independente do toggle contagem)
+        dealsGanhos,
+        contratosGanhos,
       });
     } catch (error) {
       console.error("[api] Error fetching MQL metrics:", error);
@@ -1969,11 +2147,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      // UTM Source filter
+      // UTM Source filter (supports comma-separated values for multi-platform)
       const utmSourceParam = req.query.utmSource as string | undefined;
       let utmSourceFilter = sql``;
       if (utmSourceParam && utmSourceParam !== 'todos') {
-        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
+        const utmValues = utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+        if (utmValues.length === 1) {
+          utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
+        } else if (utmValues.length > 1) {
+          utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
+        }
       }
 
       // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
@@ -2016,9 +2199,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       ];
       const stagesRrPlus = sql`LOWER(d.stage_name) IN (${sql.join(STAGES_RR_PLUS.map(s => sql`${s.toLowerCase()}`), sql`, `)})`;
 
-      // 1. Total Não-MQLs = leads criados no período
+      // 1. Total Não-MQLs = leads criados no período (sempre COUNT, não depende de contagem)
       const totalResult = await db.execute(sql`
-        SELECT ${countExpr} as total_nao_mqls
+        SELECT COUNT(*) as total_nao_mqls
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at < (${endDate}::date + INTERVAL '1 day')
@@ -2028,9 +2211,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${utmSourceFilter}
       `);
 
-      // 2. Reuniões Agendadas = data_reuniao_agendada no período
+      // 2. Reuniões Agendadas = data_reuniao_agendada no período (sempre COUNT, não depende de contagem)
       const raResult = await db.execute(sql`
-        SELECT ${countExpr} as reunioes_agendadas
+        SELECT COUNT(*) as reunioes_agendadas
         FROM "Bitrix".crm_deal d
         WHERE d.data_reuniao_agendada IS NOT NULL
           AND d.data_reuniao_agendada::date >= ${startDate}::date
@@ -2041,14 +2224,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${utmSourceFilter}
       `);
 
-      // 3. Reuniões Realizadas = data_fechamento no período + stage >= RR
+      // 3. Reuniões Realizadas = data_reuniao_realizada no período (sempre COUNT, não depende de contagem)
       const rrResult = await db.execute(sql`
-        SELECT ${countExpr} as reunioes_realizadas
+        SELECT COUNT(*) as reunioes_realizadas
         FROM "Bitrix".crm_deal d
-        WHERE d.data_fechamento >= ${startDate}::date
-          AND d.data_fechamento <= ${endDate}::date
+        WHERE d.data_reuniao_realizada IS NOT NULL
+          AND d.data_reuniao_realizada::date >= ${startDate}::date
+          AND d.data_reuniao_realizada::date <= ${endDate}::date
           AND ${naoMqlCondition}
-          AND ${stagesRrPlus}
           ${inboundFilter}
           ${funilFilter}
           ${utmSourceFilter}
@@ -2071,7 +2254,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             LOWER(utm_source) LIKE '%facebook%' OR LOWER(utm_source) LIKE '%fb%' OR LOWER(utm_source) LIKE '%meta%'
             OR LOWER(utm_source) = 'ig' OR LOWER(utm_source) LIKE '%instagram%'
             OR LOWER(utm_source) LIKE '%google%' OR LOWER(utm_source) LIKE '%adwords%' OR LOWER(utm_source) = 'gads'
-          ) THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_trafego
+          ) THEN valor_pontual ELSE 0 END), 0) as faturamento_implantacao_trafego,
+          COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as deals_ganhos,
+          ${sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN ${prodCountExpr} ELSE 0 END)`)} as contratos_ganhos
         FROM "Bitrix".crm_deal d
         WHERE d.data_fechamento >= ${startDate}::date
           AND d.data_fechamento <= ${endDate}::date
@@ -2092,6 +2277,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const faturamentoImplantacao = parseFloat(vRow.faturamento_implantacao) || 0;
       const faturamentoAceleracaoTrafego = parseFloat(vRow.faturamento_aceleracao_trafego) || 0;
       const faturamentoImplantacaoTrafego = parseFloat(vRow.faturamento_implantacao_trafego) || 0;
+      const dealsGanhos = parseInt(vRow.deals_ganhos) || 0;
+      const contratosGanhos = parseInt(vRow.contratos_ganhos) || 0;
 
       // Calcular taxas
       const percReuniaoAgendada = totalNaoMqls > 0 ? reunioesAgendadas / totalNaoMqls : 0;
@@ -2122,7 +2309,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         txContratosRecorrentes,
         txContratosImplantacao,
         ticketMedioAceleracao,
-        ticketMedioImplantacao
+        ticketMedioImplantacao,
+
+        // Contagens fixas (sempre retorna ambos, independente do toggle contagem)
+        dealsGanhos,
+        contratosGanhos,
       });
     } catch (error) {
       console.error("[api] Error fetching Não-MQL metrics:", error);
@@ -2142,26 +2333,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       const result = await db.execute(sql`
         SELECT
-          EXTRACT(ISOYEAR FROM d.data_fechamento::date)::int as ano,
-          EXTRACT(WEEK FROM d.data_fechamento::date)::int as semana_num,
-          TO_CHAR(MIN(d.data_fechamento::date), 'Mon') as mes_label,
+          EXTRACT(ISOYEAR FROM d.data_reuniao_realizada::date)::int as ano,
+          EXTRACT(WEEK FROM d.data_reuniao_realizada::date)::int as semana_num,
+          TO_CHAR(MIN(d.data_reuniao_realizada::date), 'Mon') as mes_label,
           COUNT(CASE WHEN (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
-            AND LOWER(stage_name) IN ('reunião realizada', 'rr - reunião realizada',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido') THEN 1 END) as rr_mql,
+            THEN 1 END) as rr_mql,
           COUNT(CASE WHEN (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
-            AND LOWER(stage_name) IN ('reunião realizada', 'rr - reunião realizada',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido') THEN 1 END) as rr_nao_mql,
-          COUNT(CASE WHEN LOWER(stage_name) IN ('reunião realizada', 'rr - reunião realizada',
-              'confecção de proposta', 'em negociação', 'aguardado os dados',
-              'aguardando assinatura', 'subir/ajustar cobrança',
-              'proposta enviada', 'negócio ganho', 'negócio perdido') THEN 1 END) as rr_total
+            THEN 1 END) as rr_nao_mql,
+          COUNT(*) as rr_total
         FROM "Bitrix".crm_deal d
-        WHERE d.data_fechamento >= ${startDate}::date
-          AND d.data_fechamento <= ${endDate}::date
+        WHERE d.data_reuniao_realizada IS NOT NULL
+          AND d.data_reuniao_realizada::date >= ${startDate}::date
+          AND d.data_reuniao_realizada::date <= ${endDate}::date
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
         GROUP BY 1, 2
         ORDER BY 1, 2
       `);
@@ -2229,7 +2413,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(SUM(mid.spend), 0) as investimento,
           COALESCE(SUM(mid.impressions), 0) as impressoes,
           COALESCE(SUM(mid.clicks), 0) as cliques,
-          COALESCE(SUM(mid.inline_link_clicks), 0) as cliques_saida,
+          COALESCE(SUM(mid.outbound_clicks), 0) as cliques_saida,
           COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina
         FROM meta_ads.meta_insights_daily mid
         WHERE mid.date_start >= ${startDate}::date
@@ -2306,17 +2490,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
-      const prodCountExpr = "CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1 ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END";
-      const countExpr = contagem === 'contrato'
-        ? sql.raw(`SUM(${prodCountExpr})`)
-        : sql`COUNT(*)`;
-      const countMqlExpr = contagem === 'contrato'
-        ? sql.raw(`SUM(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN ${prodCountExpr} ELSE 0 END)`)
-        : sql`COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END)`;
+      // Leads e MQLs em Ads são sempre COUNT (não dependem de contagem contrato/cliente)
 
       // Se um funil específico está selecionado, não filtrar por UTM (o funil já delimita o escopo)
-      const utmFilter = funilValues.length > 0 && !hasVazio
+      const utmFilter = funilValues.length > 0
         ? sql``
         : sql`AND (
             LOWER(d.utm_source) LIKE '%facebook%' OR LOWER(d.utm_source) LIKE '%fb%'
@@ -2326,20 +2503,26 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             OR LOWER(d.utm_source) = 'gads'
           )`;
 
-      // UTM Source filter for Ads leads
+      // UTM Source filter for Ads leads (supports comma-separated values for multi-platform)
       const utmSourceParam = req.query.utmSource as string | undefined;
       let utmSourceFilter = sql``;
       if (utmSourceParam && utmSourceParam !== 'todos') {
-        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmSourceParam.toLowerCase() + '%'}`;
+        const utmValues = utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+        if (utmValues.length === 1) {
+          utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
+        } else if (utmValues.length > 1) {
+          utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
+        }
       }
 
       const leadsResult = await db.execute(sql`
         SELECT
-          ${countExpr} as total_leads,
-          ${countMqlExpr} as total_mqls
+          COUNT(*) as total_leads,
+          COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as total_mqls
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
           ${utmFilter}
           ${funilFilter}
           ${utmSourceFilter}
@@ -2419,6 +2602,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(AVG(mid.frequency), 0) as frequencia,
           COALESCE(SUM(mid.video_p25_watched_actions), 0) as video_p25,
           COALESCE(SUM(mid.video_p50_watched_actions), 0) as video_p50,
+          COALESCE(SUM(mid.video_p75_watched_actions), 0) as video_p75,
           COALESCE(SUM(mid.video_play_actions), 0) as video_plays
         FROM meta_ads.meta_insights_daily mid
         WHERE mid.date_start >= ${startDate}::date
@@ -2436,15 +2620,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const frequencia = parseFloat(row.frequencia) || 0;
       const videoPlays = parseInt(row.video_plays) || 0;
       const videoP25 = parseInt(row.video_p25) || 0;
-      const videoP50 = parseInt(row.video_p50) || 0;
+      const videoP75 = parseInt(row.video_p75) || 0;
 
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = outbound_clicks / impressions
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
       const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
-      // Vídeo Hook/Hold = média (p25 ou p50 / plays) — proporção de quem assistiu
+      // Vídeo Hook = p25 / plays; Vídeo Hold = p75 / p25 (retenção condicional)
       const videoHook = videoPlays > 0 ? (videoP25 / videoPlays) : null;
-      const videoHold = videoPlays > 0 ? (videoP50 / videoPlays) : null;
+      const videoHold = videoP25 > 0 ? (videoP75 / videoP25) : null;
 
       res.json({
         investimento,
@@ -2695,12 +2879,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ${platformCaseExpr} as platform,
           COUNT(*) as leads,
           SUM(CASE WHEN ${MQL_COND} THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RA_STAGES}) THEN 1 ELSE 0 END) as ra,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RA_STAGES}) AND ${MQL_COND} THEN 1 ELSE 0 END) as ra_mql,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RA_STAGES}) AND ${NMQL_COND} THEN 1 ELSE 0 END) as ra_nmql,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RR_STAGES}) THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RR_STAGES}) AND ${MQL_COND} THEN 1 ELSE 0 END) as rr_mql,
-          SUM(CASE WHEN LOWER(stage_name) IN (${RR_STAGES}) AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as ra,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND ${MQL_COND} THEN 1 ELSE 0 END) as ra_mql,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as ra_nmql,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${MQL_COND} THEN 1 ELSE 0 END) as rr_mql,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${MQL_COND} THEN 1 ELSE 0 END) as vendas_mql,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${NMQL_COND} THEN 1 ELSE 0 END) as vendas_nmql,
@@ -2713,6 +2897,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ELSE 0 END) as contratos
         FROM "Bitrix".crm_deal
         WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
         GROUP BY platform
       `));
 
@@ -2727,6 +2912,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           WHERE stage_name = 'Negócio Ganho'
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
           GROUP BY platform, cliente
         ) sub
         GROUP BY platform
@@ -2769,9 +2955,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           percRa: leads > 0 ? ra / leads : 0,
           percRaMql: mqls > 0 ? raMql / mqls : 0,
           percRaNmql: (leads - mqls) > 0 ? raNmql / (leads - mqls) : 0,
-          percRr: ra > 0 ? rr / ra : 0,
-          percRrMql: raMql > 0 ? rrMql / raMql : 0,
-          percRrNmql: raNmql > 0 ? rrNmql / raNmql : 0,
+          percRr: leads > 0 ? rr / leads : 0,
+          percRrMql: mqls > 0 ? rrMql / mqls : 0,
+          percRrNmql: (leads - mqls) > 0 ? rrNmql / (leads - mqls) : 0,
           percRrVendas: rr > 0 ? vendas / rr : 0,
           percRrMqlVendas: rrMql > 0 ? vendasMql / rrMql : 0,
           percRrNmqlVendas: rrNmql > 0 ? vendasNmql / rrNmql : 0,
@@ -2827,6 +3013,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_reuniao_realizada IS NOT NULL
           AND d.data_reuniao_realizada::date >= ${startDate}::date
           AND d.data_reuniao_realizada::date <= ${endDate}::date
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
         GROUP BY 1, 2, u.nome, u.id
         ORDER BY 1, 2, u.nome
       `);
@@ -2917,16 +3104,25 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT
           COUNT(*) as leads,
           SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado', 'Reunião Agendada',
-                                        'Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho')
-                   AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho')
-                   AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL
+                   AND data_reuniao_agendada::date >= ${startDate}::date
+                   AND data_reuniao_agendada::date <= ${endDate}::date
+                   THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL
+                   AND data_reuniao_realizada::date >= ${startDate}::date
+                   AND data_reuniao_realizada::date <= ${endDate}::date
+                   THEN 1 ELSE 0 END) as rr,
           SUM(CASE WHEN stage_name = 'Negócio Ganho'
+                   AND data_fechamento >= ${startDate}::date
+                   AND data_fechamento <= ${endDate}::date
+                   THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho'
+                   AND data_fechamento >= ${startDate}::date
+                   AND data_fechamento <= ${endDate}::date
                    THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_vendas
         FROM "Bitrix".crm_deal
         WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
           ${utmFilter}
           ${campaignFilter}
       `);
@@ -2963,14 +3159,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           TO_CHAR(created_at, 'YYYY-MM') as month,
           COUNT(*) as leads,
           SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado', 'Reunião Agendada',
-                                        'Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho')
-                   AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho')
-                   AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas
+          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL
+                   AND data_reuniao_agendada::date >= ${startDate}::date
+                   AND data_reuniao_agendada::date <= ${endDate}::date
+                   THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL
+                   AND data_reuniao_realizada::date >= ${startDate}::date
+                   AND data_reuniao_realizada::date <= ${endDate}::date
+                   THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN stage_name = 'Negócio Ganho'
+                   AND data_fechamento >= ${startDate}::date
+                   AND data_fechamento <= ${endDate}::date
+                   THEN 1 ELSE 0 END) as vendas
         FROM "Bitrix".crm_deal
         WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
           ${utmFilter}
           ${campaignFilter}
         GROUP BY TO_CHAR(created_at, 'YYYY-MM')
