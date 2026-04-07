@@ -5044,11 +5044,6 @@ function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, 
       toast({ title: "Erro", description: "Data de fim deve ser posterior à data de início.", variant: "destructive" });
       return;
     }
-    if (diffDays > 7) {
-      toast({ title: "Erro", description: "Período máximo permitido é de 7 dias.", variant: "destructive" });
-      return;
-    }
-
     createMutation.mutate({
       colaboradorId: parseInt(colaboradorId),
       colaboradorNome,
@@ -5094,7 +5089,7 @@ function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, 
         <Card className="p-4 mb-6 bg-muted/50" data-testid="form-indisponibilidade">
           <h3 className="font-medium mb-4">Solicitar Período de Indisponibilidade</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Você pode solicitar até 7 dias de indisponibilidade. O pedido será enviado para alinhamento com o G&G.
+            Solicite o período de indisponibilidade desejado. O pedido será enviado para alinhamento com o G&G.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
