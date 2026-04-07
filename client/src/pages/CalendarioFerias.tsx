@@ -277,11 +277,6 @@ export default function CalendarioFerias() {
       toast({ title: "Erro", description: "Data de fim deve ser posterior à data de início", variant: "destructive" });
       return;
     }
-    if (diffDays > 7) {
-      toast({ title: "Erro", description: "Período máximo de 7 dias", variant: "destructive" });
-      return;
-    }
-
     createMutation.mutate({
       colaboradorId: colaborador.id,
       colaboradorNome: colaborador.nome,
@@ -820,16 +815,11 @@ export default function CalendarioFerias() {
                   value={novaDataFim}
                   onChange={(e) => setNovaDataFim(e.target.value)}
                   min={novaDataInicio}
-                  max={novaDataInicio ? format(addDays(parseISO(novaDataInicio), 7), 'yyyy-MM-dd') : undefined}
                   disabled={!novaDataInicio}
                   data-testid="input-data-fim"
                 />
               </div>
             </div>
-            
-            <p className="text-xs text-muted-foreground">
-              Período máximo: 7 dias
-            </p>
             
             <div className="space-y-2">
               <Label htmlFor="motivo">Motivo (opcional)</Label>
@@ -939,16 +929,11 @@ export default function CalendarioFerias() {
                   value={editDataFim}
                   onChange={(e) => setEditDataFim(e.target.value)}
                   min={editDataInicio}
-                  max={editDataInicio ? format(addDays(parseISO(editDataInicio), 7), 'yyyy-MM-dd') : undefined}
                   data-testid="input-edit-data-fim"
                 />
               </div>
             </div>
-            
-            <p className="text-xs text-muted-foreground">
-              Período máximo: 7 dias
-            </p>
-            
+
             <div className="space-y-2">
               <Label htmlFor="editMotivo">Motivo (opcional)</Label>
               <Textarea
