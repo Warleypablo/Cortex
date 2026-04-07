@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Pencil, Save, X, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
 import { startOfMonth, endOfMonth, format, parse, differenceInCalendarDays, subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRange } from "react-day-picker";
@@ -402,6 +403,10 @@ export default function GrowthOrcadoRealizado() {
           {PERCENT_METRICS.has(metric.id) && <span className="text-xs text-muted-foreground">%</span>}
         </div>
       );
+    }
+    // For Tier 3 metrics with no budget, show "—" instead of 0
+    if (TIER3_METRIC_IDS.has(metric.id) && (metric.orcado === 0 || metric.orcado === null)) {
+      return '—';
     }
     return formatValue(metric.orcado, metric.format);
   };
