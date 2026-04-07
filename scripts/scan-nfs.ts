@@ -1,5 +1,5 @@
 /**
- * Standalone NF scanner - processes PDFs from attached_assets/2026/
+ * Standalone NF scanner - processes PDFs from 2026/
  * Usage: npx tsx scripts/scan-nfs.ts
  */
 import path from "path";
@@ -8,25 +8,14 @@ import { Pool } from "pg";
 import { config } from 'dotenv';
 config({ path: '.env' });
 
-function requireEnv(name: string): string {
-  const val = process.env[name];
-  if (!val) throw new Error(`Environment variable ${name} is required. Check your .env file.`);
-  return val;
-}
-
 const pool = new Pool({
-  host: requireEnv("DATABASE_HOST"),
-  port: 5432,
-  database: process.env.DATABASE_NAME || "dados_turbo",
-  user: process.env.DATABASE_USER || "postgres",
-  password: requireEnv("DATABASE_PASSWORD"),
-  ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+  connectionString: process.env.DATABASE_URL,
 });
 
 async function main() {
   const { extractTextFromPDF, extractValueFromText, extractPrestadorFromFilename } = await import("../server/services/nfExtractor");
 
-  const baseDir = path.join(process.cwd(), "attached_assets", "2026");
+  const baseDir = path.join(process.cwd(), "2026");
   const monthDirs = (await fs.readdir(baseDir, { withFileTypes: true }))
     .filter(d => d.isDirectory() && /^\d{2}\s*-\s*/.test(d.name))
     .sort((a, b) => a.name.localeCompare(b.name));
