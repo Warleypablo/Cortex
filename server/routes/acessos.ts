@@ -1132,7 +1132,13 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
 
       for (const numero of CREDENTIAL_APPROVER_NUMBERS) {
         try {
-          await enviarMensagemWhatsApp(numero, mensagem, "financeiro");
+          console.log(`[acessos] Sending WhatsApp to ${numero}...`);
+          const result = await enviarMensagemWhatsApp(numero, mensagem, "financeiro");
+          if (result.success) {
+            console.log(`[acessos] WhatsApp sent to ${numero}`);
+          } else {
+            console.error(`[acessos] WhatsApp failed for ${numero}: ${result.error}`);
+          }
         } catch (err) {
           console.error(`[acessos] WhatsApp error for ${numero}:`, err);
         }
