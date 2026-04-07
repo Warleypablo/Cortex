@@ -291,7 +291,7 @@ export default function Creators() {
   const [editingCreator, setEditingCreator] = useState<Creator | null>(null);
   const [creatorForm, setCreatorForm] = useState({
     tipo_pessoa: "" as "" | "fisica" | "juridica" | "ambos",
-    nome: "", cpf: "", cnpj: "", email: "", endereco: "", cidade: "", estado: "", cep: "",
+    nome: "", cpf: "", cnpj: "", email: "", endereco: "",
     chave_pix: "", tipo_pix: "", observacoes: ""
   });
 
@@ -475,7 +475,7 @@ export default function Creators() {
 
   function resetCreatorForm() {
     setEditingCreator(null);
-    setCreatorForm({ tipo_pessoa: "", nome: "", cpf: "", cnpj: "", email: "", endereco: "", cidade: "", estado: "", cep: "", chave_pix: "", tipo_pix: "", observacoes: "" });
+    setCreatorForm({ tipo_pessoa: "", nome: "", cpf: "", cnpj: "", email: "", endereco: "", chave_pix: "", tipo_pix: "", observacoes: "" });
   }
 
   function resetContratoForm() {
@@ -522,8 +522,7 @@ export default function Creators() {
     setCreatorForm({
       tipo_pessoa: (creator.tipo_pessoa || "fisica") as "" | "fisica" | "juridica" | "ambos",
       nome: creator.nome, cpf: creator.cpf || "", cnpj: creator.cnpj || "",
-      email: creator.email, endereco: creator.endereco || "", cidade: creator.cidade || "",
-      estado: creator.estado || "", cep: creator.cep || "", chave_pix: creator.chave_pix || "",
+      email: creator.email, endereco: creator.endereco || "", chave_pix: creator.chave_pix || "",
       tipo_pix: creator.tipo_pix || "", observacoes: creator.observacoes || ""
     });
     setCreatorDialogOpen(true);
@@ -597,7 +596,7 @@ export default function Creators() {
                     <TableHead>Nome</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>CPF/CNPJ</TableHead>
-                    <TableHead>Cidade/UF</TableHead>
+                    <TableHead>Endereço</TableHead>
                     <TableHead>PIX</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
@@ -612,7 +611,7 @@ export default function Creators() {
                       <TableCell className="font-medium">{c.nome}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{c.email}</TableCell>
                       <TableCell className="text-sm">{c.cnpj || c.cpf || "—"}</TableCell>
-                      <TableCell className="text-sm">{[c.cidade, c.estado].filter(Boolean).join("/") || "—"}</TableCell>
+                      <TableCell className="text-sm max-w-[200px] truncate" title={c.endereco || ""}>{c.endereco || "—"}</TableCell>
                       <TableCell className="text-sm">{c.chave_pix ? `${c.tipo_pix || "PIX"}: ${c.chave_pix.substring(0, 20)}...` : "—"}</TableCell>
                       <TableCell className="text-right space-x-1" onClick={e => e.stopPropagation()}>
                         <Button variant="ghost" size="sm" onClick={() => gerarPortalLink(c.id)} disabled={generatingLink === c.id} title="Gerar Link Portal">
@@ -991,22 +990,8 @@ export default function Creators() {
                 </div>
               )}
               <div>
-                <Label>Endereço *</Label>
-                <Input value={creatorForm.endereco} onChange={e => setCreatorForm(f => ({ ...f, endereco: e.target.value }))} required />
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <Label>Cidade *</Label>
-                  <Input value={creatorForm.cidade} onChange={e => setCreatorForm(f => ({ ...f, cidade: e.target.value }))} required />
-                </div>
-                <div>
-                  <Label>UF *</Label>
-                  <Input maxLength={2} value={creatorForm.estado} onChange={e => setCreatorForm(f => ({ ...f, estado: e.target.value.toUpperCase() }))} required />
-                </div>
-                <div>
-                  <Label>CEP *</Label>
-                  <Input value={creatorForm.cep} onChange={e => setCreatorForm(f => ({ ...f, cep: e.target.value }))} required />
-                </div>
+                <Label>Endereço completo *</Label>
+                <Input placeholder="Rua, número, bairro, cidade/UF, CEP" value={creatorForm.endereco} onChange={e => setCreatorForm(f => ({ ...f, endereco: e.target.value }))} required />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
