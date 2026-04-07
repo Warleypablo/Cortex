@@ -1084,3 +1084,73 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
     }
   });
 }
+
+export function registerAcessosPublicRoutes(app: Express) {
+  app.get("/api/acessos/approve/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await pool.query(
+        `UPDATE cortex_core.credential_access_requests
+         SET status = 'aprovado', approved_by = 'link', updated_at = NOW()
+         WHERE token = $1 AND status = 'pendente'
+         RETURNING id, user_name, client_name, platform`,
+        [token]
+      );
+
+      if (result.rows.length === 0) {
+        return res.send(`
+          <html><body style="font-family:sans-serif;text-align:center;padding:60px;">
+            <h2>⚠️ Solicitação não encontrada ou já processada</h2>
+            <p>Esta solicitação já foi aprovada/reprovada ou expirou.</p>
+          </body></html>
+        `);
+      }
+
+      const row = result.rows[0];
+      res.send(`
+        <html><body style="font-family:sans-serif;text-align:center;padding:60px;">
+          <h2>✅ Acesso Aprovado!</h2>
+          <p><strong>${row.user_name}</strong> agora pode ver as credenciais de <strong>${row.platform}</strong> do cliente <strong>${row.client_name}</strong>.</p>
+          <p style="color:#888;margin-top:20px;">Você pode fechar esta página.</p>
+        </body></html>
+      `);
+    } catch (error) {
+      console.error("[acessos] Error approving:", error);
+      res.status(500).send("Erro ao processar aprovação");
+    }
+  });
+
+  app.get("/api/acessos/reject/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const result = await pool.query(
+        `UPDATE cortex_core.credential_access_requests
+         SET status = 'reprovado', approved_by = 'link', updated_at = NOW()
+         WHERE token = $1 AND status = 'pendente'
+         RETURNING id, user_name, client_name, platform`,
+        [token]
+      );
+
+      if (result.rows.length === 0) {
+        return res.send(`
+          <html><body style="font-family:sans-serif;text-align:center;padding:60px;">
+            <h2>⚠️ Solicitação não encontrada ou já processada</h2>
+            <p>Esta solicitação já foi aprovada/reprovada ou expirou.</p>
+          </body></html>
+        `);
+      }
+
+      const row = result.rows[0];
+      res.send(`
+        <html><body style="font-family:sans-serif;text-align:center;padding:60px;">
+          <h2>❌ Acesso Reprovado</h2>
+          <p>O acesso de <strong>${row.user_name}</strong> às credenciais de <strong>${row.platform}</strong> do cliente <strong>${row.client_name}</strong> foi negado.</p>
+          <p style="color:#888;margin-top:20px;">Você pode fechar esta página.</p>
+        </body></html>
+      `);
+    } catch (error) {
+      console.error("[acessos] Error rejecting:", error);
+      res.status(500).send("Erro ao processar reprovação");
+    }
+  });
+}
