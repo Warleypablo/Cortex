@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -9,13 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
+import { MetricFormattingSheet } from "@/components/MetricFormattingSheet";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { Search, X, ArrowUpDown, TrendingUp, TrendingDown, Rocket, ExternalLink, Loader2, Settings, Plus, Trash2, ChevronRight, ChevronDown } from "lucide-react";
+import { Search, X, ArrowUpDown, TrendingUp, TrendingDown, Rocket, ExternalLink, Loader2, Settings, ChevronRight, ChevronDown } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
-import { getMetricColor, getColorClasses, COLOR_TOKENS, AVAILABLE_METRICS, type MetricColor } from "@/lib/metricFormatting";
+import { getMetricColor, getColorClasses, getBenchmarkColor, CRIATIVOS_BENCHMARK_MAP } from "@/lib/metricFormatting";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { MetricRulesetWithThresholds } from "@shared/schema";
 import type { DateRange } from "react-day-picker";
@@ -111,20 +110,13 @@ export default function Criativos() {
   const [compareRange, setCompareRange] = useState<DateRange | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("Todos");
-  const [plataformaFilter, setPlataformaFilter] = useState("Todos");
-  const [produtoFilter, setProdutoFilter] = useState("");
+  const [selectedPlataformas, setSelectedPlataformas] = useState<string[]>([]);
+  const [selectedProdutos, setSelectedProdutos] = useState<string[]>([]);
   const [campanhaFilters, setCampanhaFilters] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'investimento', direction: 'desc' });
 
   const { toast } = useToast();
   const [configOpen, setConfigOpen] = useState(false);
-  const [editingMetric, setEditingMetric] = useState<string | null>(null);
-  const [editThresholds, setEditThresholds] = useState<Array<{
-    minValue: string;
-    maxValue: string;
-    color: MetricColor;
-    label: string;
-  }>>([]);
 
   const startDate = format(dateRange.from, 'yyyy-MM-dd');
   const endDate = format(dateRange.to, 'yyyy-MM-dd');
@@ -161,11 +153,13 @@ export default function Criativos() {
     return Array.from(prodSet).sort();
   }, [campanhas]);
 
-  // Campanhas filtradas por produto selecionado
+  // Campanhas filtradas por produto(s) selecionado(s)
   const campanhasFiltradas = useMemo(() => {
-    if (!produtoFilter) return campanhas;
-    return campanhas.filter(c => c.name.includes(`[${produtoFilter}]`));
-  }, [campanhas, produtoFilter]);
+    if (selectedProdutos.length === 0) return campanhas;
+    return campanhas.filter(c =>
+      selectedProdutos.some(p => c.name.includes(`[${p}]`))
+    );
+  }, [campanhas, selectedProdutos]);
 
   // Mapear nomes de campanhas selecionadas para IDs
   const selectedCampaignIds = useMemo(() => {
@@ -178,14 +172,17 @@ export default function Criativos() {
   // IDs de campanhas ativas (por seleção manual ou produto)
   const activeCampaignIds = useMemo(() => {
     if (selectedCampaignIds.length > 0) return selectedCampaignIds;
-    if (produtoFilter) return campanhasFiltradas.map(c => c.id);
+    if (selectedProdutos.length > 0) return campanhasFiltradas.map(c => c.id);
     return [];
-  }, [selectedCampaignIds, produtoFilter, campanhasFiltradas]);
+  }, [selectedCampaignIds, selectedProdutos, campanhasFiltradas]);
 
   const { data: criativos = [], isLoading } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos', startDate, endDate, statusFilter, plataformaFilter, selectedCampaignIds, produtoFilter],
+    queryKey: ['/api/growth/criativos', startDate, endDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
-      const params = new URLSearchParams({ startDate, endDate, status: statusFilter, plataforma: plataformaFilter });
+      const params = new URLSearchParams({ startDate, endDate, status: statusFilter });
+      if (selectedPlataformas.length > 0) {
+        params.append('plataforma', selectedPlataformas.join(','));
+      }
       if (activeCampaignIds.length > 0) {
         params.append('campanhaIds', activeCampaignIds.join(','));
       }
@@ -200,10 +197,13 @@ export default function Criativos() {
   const compareEndDate = compareEnabled && compareRange?.to ? format(compareRange.to, 'yyyy-MM-dd') : '';
 
   const { data: compareData = [] } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos/compare', compareStartDate, compareEndDate, statusFilter, plataformaFilter, selectedCampaignIds, produtoFilter],
+    queryKey: ['/api/growth/criativos/compare', compareStartDate, compareEndDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
       if (!compareStartDate || !compareEndDate) return [];
-      const params = new URLSearchParams({ startDate: compareStartDate, endDate: compareEndDate, status: statusFilter, plataforma: plataformaFilter });
+      const params = new URLSearchParams({ startDate: compareStartDate, endDate: compareEndDate, status: statusFilter });
+      if (selectedPlataformas.length > 0) {
+        params.append('plataforma', selectedPlataformas.join(','));
+      }
       if (activeCampaignIds.length > 0) {
         params.append('campanhaIds', activeCampaignIds.join(','));
       }
@@ -245,7 +245,7 @@ export default function Criativos() {
 
   // KPIs com comparação
   const { data: kpisData, isLoading: kpisLoading } = useQuery<{ current: KpiData; compare: KpiData | null }>({
-    queryKey: ['/api/growth/criativos/kpis', startDate, endDate, compareEnabled, compareRange?.from, compareRange?.to, statusFilter, selectedCampaignIds, produtoFilter],
+    queryKey: ['/api/growth/criativos/kpis', startDate, endDate, compareEnabled, compareRange?.from, compareRange?.to, statusFilter, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
       const params = new URLSearchParams({ startDate, endDate, status: statusFilter });
       if (activeCampaignIds.length > 0) {
@@ -265,66 +265,97 @@ export default function Criativos() {
     queryKey: ['/api/metric-rules'],
   });
 
+  // Fetch benchmarks from Gestão de Metas for the selected month
+  const benchmarkMonth = format(dateRange.from, 'yyyy-MM');
+  const { data: benchmarkData } = useQuery<Record<string, any>>({
+    queryKey: ['/api/growth/orcado-realizado/budgets', benchmarkMonth, 'benchmarks'],
+    queryFn: async () => {
+      const params = new URLSearchParams({ startDate: benchmarkMonth, endDate: benchmarkMonth, funil: 'todos' });
+      const res = await fetch(`/api/growth/orcado-realizado/budgets?${params}`, { credentials: 'include' });
+      if (!res.ok) return {};
+      return res.json();
+    },
+  });
+
   const saveRulesMutation = useMutation({
-    mutationFn: async (data: { metricKey: string; displayLabel: string; thresholds: any[] }) => {
+    mutationFn: async (data: { metricKey: string; displayLabel: string; thresholds: any[]; produto?: string | null; plataforma?: string | null }) => {
       return apiRequest('POST', `/api/metric-rules/${data.metricKey}/save`, {
         displayLabel: data.displayLabel,
         defaultColor: 'default',
-        thresholds: data.thresholds,
+        thresholds: data.thresholds.map(t => ({
+          minValue: t.minValue ? parseFloat(t.minValue) : null,
+          maxValue: t.maxValue ? parseFloat(t.maxValue) : null,
+          color: t.color,
+          label: t.label || null,
+        })),
+        produto: data.produto || null,
+        plataforma: data.plataforma || null,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/metric-rules'] });
       toast({ title: 'Regras salvas com sucesso' });
-      setEditingMetric(null);
     },
-    onError: () => {
-      toast({ title: 'Erro ao salvar regras', variant: 'destructive' });
+    onError: (error: Error) => {
+      let description = 'Tente novamente ou verifique os logs do servidor.';
+      try {
+        const body = JSON.parse(error.message.replace(/^\d+:\s*/, ''));
+        if (body.details) description = body.details;
+        else if (body.error) description = body.error;
+      } catch {
+        if (error.message) description = error.message;
+      }
+      toast({ title: 'Erro ao salvar regras', description, variant: 'destructive' });
     },
   });
 
-  const handleEditMetric = (metricKey: string) => {
-    const existing = metricRules.find(r => r.metricKey === metricKey);
-    if (existing) {
-      setEditThresholds(existing.thresholds.map(t => ({
-        minValue: t.minValue?.toString() ?? '',
-        maxValue: t.maxValue?.toString() ?? '',
-        color: (t.color as MetricColor) || 'default',
-        label: t.label || '',
-      })));
-    } else {
-      setEditThresholds([]);
+  const rulesetLookup = useMemo(() => {
+    const map = new Map<string, MetricRulesetWithThresholds>();
+    for (const r of metricRules) {
+      const key = `${r.metricKey}|${r.produto || ''}|${r.plataforma || ''}`;
+      map.set(key, r);
     }
-    setEditingMetric(metricKey);
-  };
+    return map;
+  }, [metricRules]);
 
-  const handleAddThreshold = () => {
-    setEditThresholds([...editThresholds, { minValue: '', maxValue: '', color: 'green', label: '' }]);
-  };
+  const findRulesetForContext = useCallback((metricKey: string, produto: string, plataforma: string) => {
+    // Exact match first
+    const exact = rulesetLookup.get(`${metricKey}|${produto}|${plataforma}`);
+    if (exact) return exact;
+    // Platform-only fallback
+    if (produto) {
+      const platformOnly = rulesetLookup.get(`${metricKey}||${plataforma}`);
+      if (platformOnly) return platformOnly;
+    }
+    // Global fallback
+    return rulesetLookup.get(`${metricKey}||`);
+  }, [rulesetLookup]);
 
-  const handleRemoveThreshold = (index: number) => {
-    setEditThresholds(editThresholds.filter((_, i) => i !== index));
-  };
+  const getCellColor = useCallback((value: number | null, metricKey: string) => {
+    if (value === null) return '';
 
-  const handleSaveMetric = () => {
-    if (!editingMetric) return;
-    const metricInfo = AVAILABLE_METRICS.find(m => m.key === editingMetric);
-    saveRulesMutation.mutate({
-      metricKey: editingMetric,
-      displayLabel: metricInfo?.label || editingMetric,
-      thresholds: editThresholds.map(t => ({
-        minValue: t.minValue ? parseFloat(t.minValue) : null,
-        maxValue: t.maxValue ? parseFloat(t.maxValue) : null,
-        color: t.color,
-        label: t.label || null,
-      })),
-    });
-  };
+    // 1. Try context-aware ruleset (exact → platform-only → global)
+    // When multiple selected, use empty string (global fallback)
+    const currentProduto = selectedProdutos.length === 1 ? selectedProdutos[0] : '';
+    const currentPlataforma = selectedPlataformas.length === 1 ? selectedPlataformas[0] : '';
+    const ruleset = findRulesetForContext(metricKey, currentProduto, currentPlataforma);
 
-  const getCellColor = (value: number | null, metricKey: string) => {
-    const color = getMetricColor(value, metricRules, metricKey);
-    return getColorClasses(color);
-  };
+    if (ruleset && ruleset.thresholds.length > 0) {
+      const color = getMetricColor(value, [ruleset], metricKey);
+      if (color !== 'default') return getColorClasses(color);
+    }
+
+    // 2. Fallback to benchmark-based color
+    const mapping = CRIATIVOS_BENCHMARK_MAP[metricKey];
+    if (mapping && benchmarkData) {
+      const benchmarkValue = benchmarkData[mapping.budgetSegment]?.[mapping.budgetKey];
+      if (benchmarkValue != null && benchmarkValue !== 0) {
+        const color = getBenchmarkColor(value, benchmarkValue, mapping.lowerIsBetter);
+        return getColorClasses(color);
+      }
+    }
+    return '';
+  }, [findRulesetForContext, selectedProdutos, selectedPlataformas, benchmarkData]);
 
   const filteredData = useMemo(() => {
     let result = [...criativos];
@@ -546,31 +577,24 @@ export default function Criativos() {
   const aovVar = kpis && kpisCompare ? calcVariation(kpis.aov, kpisCompare.aov) : null;
 
   return (
-    <div className="flex flex-col h-full overflow-auto">
-      <div className="flex items-center justify-between p-4 border-b bg-card sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-purple-500/10">
-            <Rocket className="w-6 h-6 text-purple-600" />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground font-medium">Ad name:</span>
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-card sticky top-0 z-20">
+        <div className="flex items-center gap-2 flex-nowrap min-w-0">
+          <div className="flex items-center gap-1 shrink-0">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input
                 placeholder="Buscar criativo..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 w-[200px]"
+                className="pl-8 w-[140px] h-8 text-xs"
                 data-testid="input-search"
               />
               {searchTerm && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6"
+                  className="absolute right-0.5 top-1/2 transform -translate-y-1/2 h-5 w-5"
                   onClick={() => setSearchTerm("")}
                 >
                   <X className="w-3 h-3" />
@@ -579,10 +603,10 @@ export default function Criativos() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground font-medium">Status:</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[11px] text-muted-foreground font-medium">Status:</span>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[120px]" data-testid="select-status">
+              <SelectTrigger className="w-[80px] h-8 text-xs" data-testid="select-status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -593,50 +617,44 @@ export default function Criativos() {
             </Select>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground font-medium">Plataforma:</span>
-            <Select value={plataformaFilter} onValueChange={setPlataformaFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-plataforma">
-                <SelectValue placeholder="Plataforma" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todas Plataformas</SelectItem>
-                <SelectItem value="Meta Ads">Meta Ads</SelectItem>
-                <SelectItem value="Google Ads">Google Ads</SelectItem>
-                <SelectItem value="LinkedIn Ads">LinkedIn Ads</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[11px] text-muted-foreground font-medium">Plataforma:</span>
+            <MultiSelect
+              options={[
+                { value: 'Meta Ads', label: 'Meta Ads' },
+                { value: 'Google Ads', label: 'Google Ads' },
+                { value: 'LinkedIn Ads', label: 'LinkedIn Ads' },
+              ]}
+              selected={selectedPlataformas}
+              onChange={setSelectedPlataformas}
+              placeholder="Todas"
+              className="h-8 w-[120px] text-xs"
+            />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground font-medium">Produto:</span>
-            <Select value={produtoFilter || "todos"} onValueChange={(v) => {
-              setProdutoFilter(v === "todos" ? "" : v);
-              setCampanhaFilters([]); // Limpar campanhas ao mudar produto
-            }}>
-              <SelectTrigger className="w-[160px]" data-testid="select-produto">
-                <SelectValue placeholder="Produto" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos Produtos</SelectItem>
-                {produtos.map((prod) => (
-                  <SelectItem key={prod} value={prod}>
-                    {prod}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[11px] text-muted-foreground font-medium">Produto:</span>
+            <MultiSelect
+              options={produtos.map(p => ({ value: p, label: p }))}
+              selected={selectedProdutos}
+              onChange={(v) => {
+                setSelectedProdutos(v);
+                setCampanhaFilters([]);
+              }}
+              placeholder="Todos"
+              className="h-8 w-[120px] text-xs"
+            />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground font-medium">Campanha:</span>
+          <div className="flex items-center gap-1 shrink-0">
+            <span className="text-[11px] text-muted-foreground font-medium">Campanha:</span>
             <MultiSelect
               options={campanhasFiltradas.map(c => c.name)}
               selected={campanhaFilters}
               onChange={setCampanhaFilters}
-              placeholder="Todas Campanhas"
+              placeholder="Todas"
               searchPlaceholder="Buscar campanha..."
-              className="h-9 w-[220px] text-xs"
+              className="h-8 w-[140px] text-xs"
             />
           </div>
 
@@ -656,16 +674,20 @@ export default function Criativos() {
               setCompareRange(range);
             }}
           />
+
+          <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-metrics">
+            <Settings className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 p-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 px-4 py-2">
         {/* Investimento */}
         <Card className="border bg-card">
-          <CardContent className="pt-5 pb-4 px-5">
+          <CardContent className="pt-3 pb-2 px-4">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Investimento</span>
-            <div className="text-2xl font-bold tracking-tight mt-2 mb-1">
+            <div className="text-lg font-bold tracking-tight mt-1">
               {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(kpis?.investimento ?? null)}
             </div>
             {investimentoVar && (
@@ -681,9 +703,9 @@ export default function Criativos() {
 
         {/* % MQL */}
         <Card className="border bg-card">
-          <CardContent className="pt-5 pb-4 px-5">
+          <CardContent className="pt-3 pb-2 px-4">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">% MQL</span>
-            <div className="text-2xl font-bold tracking-tight mt-2 mb-1">
+            <div className="text-lg font-bold tracking-tight mt-1">
               {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : `${kpis?.percMql?.toFixed(1) ?? '0'}%`}
             </div>
             {percMqlVar && (
@@ -699,9 +721,9 @@ export default function Criativos() {
 
         {/* CPMQL */}
         <Card className="border bg-card">
-          <CardContent className="pt-5 pb-4 px-5">
+          <CardContent className="pt-3 pb-2 px-4">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">CPMQL</span>
-            <div className="text-2xl font-bold tracking-tight mt-2 mb-1">
+            <div className="text-lg font-bold tracking-tight mt-1">
               {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(kpis?.cpmql ?? null)}
             </div>
             {cpmqlVar && (
@@ -717,9 +739,9 @@ export default function Criativos() {
 
         {/* NEGÓCIOS GANHOS */}
         <Card className="border bg-card">
-          <CardContent className="pt-5 pb-4 px-5">
+          <CardContent className="pt-3 pb-2 px-4">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negócios Ganhos</span>
-            <div className="text-2xl font-bold tracking-tight mt-2 mb-1">
+            <div className="text-lg font-bold tracking-tight mt-1">
               {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatNumber(kpis?.vendas ?? null)}
             </div>
             {vendasVar && (
@@ -735,9 +757,9 @@ export default function Criativos() {
 
         {/* AOV */}
         <Card className="border bg-card">
-          <CardContent className="pt-5 pb-4 px-5">
+          <CardContent className="pt-3 pb-2 px-4">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">AOV</span>
-            <div className="text-2xl font-bold tracking-tight mt-2 mb-1">
+            <div className="text-lg font-bold tracking-tight mt-1">
               {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(kpis?.aov ?? null)}
             </div>
             {aovVar && (
@@ -753,9 +775,9 @@ export default function Criativos() {
 
         {/* CAC */}
         <Card className="border bg-card">
-          <CardContent className="pt-5 pb-4 px-5">
+          <CardContent className="pt-3 pb-2 px-4">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">CAC</span>
-            <div className="text-2xl font-bold tracking-tight mt-2 mb-1">
+            <div className="text-lg font-bold tracking-tight mt-1">
               {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(kpis?.cac ?? null)}
             </div>
             {cacVar && (
@@ -774,169 +796,16 @@ export default function Criativos() {
         <Card className="h-full">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg">Performance por Criativo</CardTitle>
+              <CardTitle className="text-lg sr-only">Performance por Criativo</CardTitle>
               <div className="flex items-center gap-2">
-                <Badge variant="outline">{filteredData.length} criativos</Badge>
-                <Sheet open={configOpen} onOpenChange={setConfigOpen}>
-                  <SheetTrigger asChild>
-                    <Button variant="outline" size="sm" data-testid="button-config-metrics">
-                      <Settings className="w-4 h-4 mr-1" />
-                      Formatação
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent className="w-[500px] sm:max-w-[500px] overflow-y-auto">
-                    <SheetHeader>
-                      <SheetTitle>Configurar Formatação de Métricas</SheetTitle>
-                    </SheetHeader>
-
-                    {editingMetric === null ? (
-                      <div className="mt-4 space-y-2">
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Defina faixas de valores e cores para destacar métricas importantes.
-                        </p>
-                        {AVAILABLE_METRICS.map(metric => {
-                          const existingRules = metricRules.find(r => r.metricKey === metric.key);
-                          return (
-                            <div
-                              key={metric.key}
-                              className="flex items-center justify-between p-3 border rounded-lg hover-elevate cursor-pointer"
-                              onClick={() => handleEditMetric(metric.key)}
-                              data-testid={`button-edit-metric-${metric.key}`}
-                            >
-                              <div>
-                                <span className="font-medium">{metric.label}</span>
-                                {existingRules && existingRules.thresholds.length > 0 && (
-                                  <span className="ml-2 text-xs text-muted-foreground">
-                                    ({existingRules.thresholds.length} regras)
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex gap-1">
-                                {existingRules?.thresholds.map((t, idx) => (
-                                  <div
-                                    key={idx}
-                                    className={`w-3 h-3 rounded-full ${COLOR_TOKENS[t.color as MetricColor]?.bg || ''}`}
-                                    style={{ backgroundColor: COLOR_TOKENS[t.color as MetricColor]?.bg ? undefined : '#888' }}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="mt-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <Button variant="ghost" size="sm" onClick={() => setEditingMetric(null)}>
-                            ← Voltar
-                          </Button>
-                          <span className="font-medium">
-                            {AVAILABLE_METRICS.find(m => m.key === editingMetric)?.label}
-                          </span>
-                        </div>
-
-                        <p className="text-sm text-muted-foreground">
-                          As regras são avaliadas na ordem. A primeira faixa que corresponder ao valor será usada.
-                        </p>
-
-                        <div className="space-y-3">
-                          {editThresholds.map((threshold, idx) => (
-                            <div key={idx} className="p-3 border rounded-lg space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium">Regra {idx + 1}</span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleRemoveThreshold(idx)}
-                                  data-testid={`button-remove-threshold-${idx}`}
-                                >
-                                  <Trash2 className="w-4 h-4 text-destructive" />
-                                </Button>
-                              </div>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <Label className="text-xs">Mínimo</Label>
-                                  <Input
-                                    type="number"
-                                    placeholder="Sem limite"
-                                    value={threshold.minValue}
-                                    onChange={(e) => {
-                                      const newThresholds = [...editThresholds];
-                                      newThresholds[idx].minValue = e.target.value;
-                                      setEditThresholds(newThresholds);
-                                    }}
-                                    data-testid={`input-min-${idx}`}
-                                  />
-                                </div>
-                                <div>
-                                  <Label className="text-xs">Máximo</Label>
-                                  <Input
-                                    type="number"
-                                    placeholder="Sem limite"
-                                    value={threshold.maxValue}
-                                    onChange={(e) => {
-                                      const newThresholds = [...editThresholds];
-                                      newThresholds[idx].maxValue = e.target.value;
-                                      setEditThresholds(newThresholds);
-                                    }}
-                                    data-testid={`input-max-${idx}`}
-                                  />
-                                </div>
-                              </div>
-                              <div>
-                                <Label className="text-xs">Cor</Label>
-                                <Select
-                                  value={threshold.color}
-                                  onValueChange={(value) => {
-                                    const newThresholds = [...editThresholds];
-                                    newThresholds[idx].color = value as MetricColor;
-                                    setEditThresholds(newThresholds);
-                                  }}
-                                >
-                                  <SelectTrigger data-testid={`select-color-${idx}`}>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {Object.entries(COLOR_TOKENS).map(([key, val]) => (
-                                      <SelectItem key={key} value={key}>
-                                        <div className="flex items-center gap-2">
-                                          <div className={`w-3 h-3 rounded-full ${val.bg || 'bg-gray-400'}`} />
-                                          {val.label}
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={handleAddThreshold}
-                          data-testid="button-add-threshold"
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Adicionar Faixa
-                        </Button>
-
-                        <Button
-                          className="w-full"
-                          onClick={handleSaveMetric}
-                          disabled={saveRulesMutation.isPending}
-                          data-testid="button-save-metric-rules"
-                        >
-                          {saveRulesMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-1" />
-                          ) : null}
-                          Salvar Regras
-                        </Button>
-                      </div>
-                    )}
-                  </SheetContent>
-                </Sheet>
+                <MetricFormattingSheet
+                  open={configOpen}
+                  onOpenChange={setConfigOpen}
+                  metricRules={metricRules}
+                  produtos={produtos}
+                  onSave={(data) => saveRulesMutation.mutate(data)}
+                  isSaving={saveRulesMutation.isPending}
+                />
               </div>
             </div>
           </CardHeader>
@@ -946,10 +815,10 @@ export default function Criativos() {
                 <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div className="relative h-[calc(100vh-380px)] overflow-auto">
+              <div className="relative max-h-[calc(100vh-260px)] overflow-auto [&>div]:!overflow-visible [&>div]:!static [&>div]:!w-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow className="sticky top-0 z-50 bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
+                  <TableHeader className="sticky top-0 z-50">
+                    <TableRow className="bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
                       <TableHead className="text-xs bg-zinc-900 text-zinc-100 sticky left-0 z-10">Link</TableHead>
                       <TableHead
                         className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[52px] z-10"
@@ -1010,20 +879,18 @@ export default function Criativos() {
                       </GroupableHeader>
                       <SortableHeader column="roas" label="ROAS" />
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {/* Linha de médias */}
+                    {/* Linha de médias dentro do thead para sticky funcionar */}
                     {averages && (
-                      <TableRow className="bg-zinc-800/50 dark:bg-zinc-800/50 border-b-2 border-zinc-700 font-semibold text-xs">
-                        <TableCell className="sticky left-0 z-10 bg-zinc-800" />
-                        <TableCell className="text-muted-foreground sticky left-[52px] z-10 bg-zinc-800">Média</TableCell>
-                        <TableCell className="sticky left-[220px] z-10 bg-zinc-800" />
-                        <TableCell className="sticky left-[470px] z-10 bg-zinc-800 border-r border-zinc-700" />
+                      <TableRow className="bg-zinc-800 dark:bg-zinc-800 border-b-2 border-zinc-700 font-semibold text-xs [&>th]:bg-zinc-800 dark:[&>th]:bg-zinc-800 [&>th]:font-semibold">
+                        <TableHead className="sticky left-0 z-10 bg-zinc-800" />
+                        <TableHead className="text-muted-foreground sticky left-[52px] z-10 bg-zinc-800">Média</TableHead>
+                        <TableHead className="sticky left-[220px] z-10 bg-zinc-800" />
+                        <TableHead className="sticky left-[470px] z-10 bg-zinc-800 border-r border-zinc-700" />
                         {(() => {
                           const avgCell = (val: string, col: string) => (
                             <>
-                              <TableCell className="text-right">{val}</TableCell>
-                              {isCompareActive && expandedColumns.has(col) && <TableCell className="bg-zinc-800/30" />}
+                              <TableHead className="text-right text-xs font-semibold">{val}</TableHead>
+                              {isCompareActive && expandedColumns.has(col) && <TableHead className="bg-zinc-800/30" />}
                             </>
                           );
                           return (
@@ -1061,6 +928,8 @@ export default function Criativos() {
                         })()}
                       </TableRow>
                     )}
+                  </TableHeader>
+                  <TableBody>
                     {filteredData.map((item) => (
                       <TableRow key={item.id} data-testid={`row-criativo-${item.id}`}>
                         <TableCell className="sticky left-0 z-10 bg-card">
@@ -1169,6 +1038,9 @@ export default function Criativos() {
               </div>
             )}
           </CardContent>
+          <div className="px-4 py-2 border-t border-border">
+            <Badge variant="outline">{filteredData.length} criativos</Badge>
+          </div>
         </Card>
       </div>
     </div>

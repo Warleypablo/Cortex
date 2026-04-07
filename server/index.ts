@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import { runAllForecasts } from "./services/predictiveEngine";
@@ -143,8 +143,12 @@ app.use((req, res, next) => {
     initializeCapacityTable(),
     initializeContratoTemplatesTable(),
     initializePredictionsTable(),
+    initializeMetricRulesetsTables(),
   ]);
-  
+
+  // Phase 1.5: Migrations that depend on tables existing
+  await migrateMetricRulesetsContext();
+
   // Phase 2: Depends on catalogs being ready
   await initializeSysSchema();
   
