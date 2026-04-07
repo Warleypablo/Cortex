@@ -11858,7 +11858,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const fs = await import("fs/promises");
       const path = await import("path");
 
-      const baseDir = path.default.join(process.cwd(), "attached_assets", "2026");
+      const baseDir = path.default.join(process.cwd(), "2026");
       const monthDirs = (await fs.default.readdir(baseDir, { withFileTypes: true }))
         .filter(d => d.isDirectory() && /^\d{2}\s*-\s*/.test(d.name))
         .sort((a, b) => a.name.localeCompare(b.name));
