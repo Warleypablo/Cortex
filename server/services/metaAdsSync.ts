@@ -56,12 +56,12 @@ async function fetchMetaApi(endpoint: string, params: Record<string, string> = {
 /**
  * Fetch all pages from a paginated Meta API endpoint
  */
-async function fetchAllPages(endpoint: string, params: Record<string, string> = {}): Promise<any[]> {
+async function fetchAllPages(endpoint: string, params: Record<string, string> = {}, pageLimit = 200): Promise<any[]> {
   const allData: any[] = [];
   let url: string | null = null;
 
   // First request
-  const firstPage = await fetchMetaApi(endpoint, { ...params, limit: '200' });
+  const firstPage = await fetchMetaApi(endpoint, { ...params, limit: String(pageLimit) });
   allData.push(...(firstPage.data || []));
 
   url = firstPage.paging?.next || null;
@@ -178,7 +178,7 @@ async function syncAdsAndCreatives(pool: Pool): Promise<{ ads: number; creatives
   console.log('[MetaSync] Syncing ads + creatives...');
   const ads = await fetchAllPages(`${TURBO_ACCOUNT_ID}/ads`, {
     fields: 'id,name,adset_id,campaign_id,status,configured_status,effective_status,creative{id,name,title,body,thumbnail_url,image_url,call_to_action_type,object_type,status},created_time,updated_time,preview_shareable_link',
-  });
+  }, 50);
 
   const creativeIds = new Set<string>();
   let creativeCount = 0;
@@ -239,7 +239,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
 
   const timeRange = JSON.stringify({ since, until });
   const insights = await fetchAllPages(`${TURBO_ACCOUNT_ID}/insights`, {
-    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions',
+    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions',
     time_range: timeRange,
     level: 'ad',
     time_increment: '1',
@@ -290,16 +290,17 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         account_id, campaign_id, adset_id, ad_id, date_start, date_stop,
         impressions, clicks, spend, reach, frequency, cpm, cpc, ctr,
         inline_link_clicks, outbound_clicks,
-        video_p25_watched_actions, video_p50_watched_actions,
+        video_play_actions, video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
         conversions, landing_page_views, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_daily_account_id_campaign_id_adset_id_ad_id_d_key
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
         reach=EXCLUDED.reach, frequency=EXCLUDED.frequency, cpm=EXCLUDED.cpm,
         cpc=EXCLUDED.cpc, ctr=EXCLUDED.ctr,
         inline_link_clicks=EXCLUDED.inline_link_clicks, outbound_clicks=EXCLUDED.outbound_clicks,
+        video_play_actions=EXCLUDED.video_play_actions,
         video_p25_watched_actions=EXCLUDED.video_p25_watched_actions,
         video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
         video_p75_watched_actions=EXCLUDED.video_p75_watched_actions,
@@ -314,6 +315,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
       parseFloat(row.frequency || '0'), parseFloat(row.cpm || '0'),
       parseFloat(row.cpc || '0'), parseFloat(row.ctr || '0'),
       parseInt(row.inline_link_clicks || '0'), outboundClicks,
+      getVideoMetric(row.video_play_actions),
       getVideoMetric(row.video_p25_watched_actions),
       getVideoMetric(row.video_p50_watched_actions),
       getVideoMetric(row.video_p75_watched_actions),

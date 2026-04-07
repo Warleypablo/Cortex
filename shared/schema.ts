@@ -1388,11 +1388,13 @@ export type InsertInadimplenciaContexto = z.infer<typeof insertInadimplenciaCont
 // Metric Formatting Rules - Conditional coloring system
 export const metricRulesets = pgTable("metric_rulesets", {
   id: integer("id").primaryKey(),
-  metricKey: varchar("metric_key", { length: 50 }).notNull().unique(),
+  metricKey: varchar("metric_key", { length: 50 }).notNull(),
   displayLabel: varchar("display_label", { length: 100 }).notNull(),
   defaultColor: varchar("default_color", { length: 20 }).default("default"),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedBy: varchar("updated_by", { length: 100 }),
+  produto: varchar("produto", { length: 100 }),
+  plataforma: varchar("plataforma", { length: 50 }),
 });
 
 export const metricThresholds = pgTable("metric_thresholds", {

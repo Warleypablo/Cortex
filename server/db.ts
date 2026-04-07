@@ -2200,3 +2200,57 @@ export async function initializeContratoTemplatesTable(): Promise<void> {
     console.error('[database] Error initializing contrato templates table:', error);
   }
 }
+
+export async function initializeMetricRulesetsTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS metric_rulesets (
+        id SERIAL PRIMARY KEY,
+        metric_key VARCHAR(50) NOT NULL,
+        display_label VARCHAR(100) NOT NULL,
+        default_color VARCHAR(20) DEFAULT 'default',
+        updated_at TIMESTAMP DEFAULT NOW(),
+        updated_by VARCHAR(100),
+        produto VARCHAR(100),
+        plataforma VARCHAR(50)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS metric_thresholds (
+        id SERIAL PRIMARY KEY,
+        ruleset_id INTEGER NOT NULL REFERENCES metric_rulesets(id) ON DELETE CASCADE,
+        min_value DECIMAL(15,4),
+        max_value DECIMAL(15,4),
+        color VARCHAR(20) NOT NULL,
+        label VARCHAR(100),
+        sort_order INTEGER DEFAULT 0
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS metric_rulesets_context_unique
+        ON metric_rulesets (metric_key, COALESCE(produto, ''), COALESCE(plataforma, ''))
+    `);
+    console.log('[database] Metric rulesets tables initialized');
+  } catch (error) {
+    console.error('[database] Error initializing metric rulesets tables:', error);
+  }
+}
+
+export async function migrateMetricRulesetsContext(): Promise<void> {
+  try {
+    // Add produto and plataforma columns
+    await db.execute(sql`ALTER TABLE metric_rulesets ADD COLUMN IF NOT EXISTS produto VARCHAR(100)`);
+    await db.execute(sql`ALTER TABLE metric_rulesets ADD COLUMN IF NOT EXISTS plataforma VARCHAR(50)`);
+
+    // Replace old unique constraint with composite one
+    await db.execute(sql`ALTER TABLE metric_rulesets DROP CONSTRAINT IF EXISTS metric_rulesets_metric_key_key`);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS metric_rulesets_context_unique
+        ON metric_rulesets (metric_key, COALESCE(produto, ''), COALESCE(plataforma, ''))
+    `);
+
+    console.log('[database] metric_rulesets context migration complete');
+  } catch (error) {
+    console.error('[database] Error migrating metric_rulesets:', error);
+  }
+}
