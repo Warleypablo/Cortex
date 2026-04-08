@@ -24,7 +24,6 @@ import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
 import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
-import SlideEncerramento from "./relatorio-mensal/SlideEncerramento";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
 import SlideCustom from "./relatorio-mensal/SlideCustom";
 
@@ -33,10 +32,10 @@ const FIXED_SLIDE_NAMES = [
   "KRs", "Capa Comercial", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Turbo Metrics", "Ranking Squads", "Squad Details",
   "Capa Tech", "Area Tech",
-  "Vamos com Turbo!", "Frase", "Q&A"
+  "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 18
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 17
 
 type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
 
@@ -253,9 +252,8 @@ export default function RelatorioMensal() {
       case 12: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
       case 13: return <SlideCapaTech />;
       case 14: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 15: return <SlideEncerramento />;
-      case 16: return <SlideFraseEncerramento />;
-      case 17: return <SlideQRCode />;
+      case 15: return <SlideFraseEncerramento />;
+      case 16: return <SlideQRCode />;
       default: return null;
     }
   };
