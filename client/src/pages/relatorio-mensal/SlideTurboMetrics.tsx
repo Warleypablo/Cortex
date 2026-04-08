@@ -124,19 +124,20 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
         </SecondaryCard>
 
         {/* Base */}
-        <SecondaryCard className="p-3 flex flex-col justify-center">
-          <div className="flex items-center gap-1.5 mb-2">
+        <SecondaryCard className="p-3 flex flex-col items-center justify-center text-center">
+          <div className="flex items-center gap-1.5 mb-3">
             <Users className="h-3.5 w-3.5 text-blue-400" />
             <p className="text-xs text-zinc-500 uppercase tracking-wide">Base</p>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center gap-8">
             <div>
               <p className="text-xs text-zinc-500">Clientes</p>
-              <p className="text-xl font-black">{metrics.clientesAtivos}</p>
+              <p className="text-3xl font-black">{metrics.clientesAtivos}</p>
             </div>
+            <div className="w-px h-10 bg-white/10" />
             <div>
               <p className="text-xs text-zinc-500">Contratos</p>
-              <p className="text-xl font-black">{metrics.contratosAtivos}</p>
+              <p className="text-3xl font-black">{metrics.contratosAtivos}</p>
             </div>
           </div>
         </SecondaryCard>
