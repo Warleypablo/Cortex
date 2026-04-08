@@ -21,6 +21,24 @@ function fmtK(v: number): string {
   return `${Math.round(v)}`;
 }
 
+function BarValueLabel({ x, y, width, height, value }: any) {
+  if (!value || value <= 0 || height < 16) return null;
+  return (
+    <text x={x + width / 2} y={y + height / 2} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+      {fmtK(value)}
+    </text>
+  );
+}
+
+function StackTopLabel({ x, y, width, value }: any) {
+  if (!value || value <= 0) return null;
+  return (
+    <text x={x + width / 2} y={y - 6} fill="white" textAnchor="middle" fontSize={11} fontWeight="bold">
+      {fmtK(value)}
+    </text>
+  );
+}
+
 function ChartTooltipContent({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -101,7 +119,7 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
             </div>
             <div className="flex-1 min-h-0">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={series} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                <BarChart data={series} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                   <XAxis
                     dataKey="label"
@@ -117,8 +135,8 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
                     width={45}
                   />
                   <Tooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="vendasMrr" name="MRR" stackId="vendas" radius={[0, 0, 0, 0]} barSize={28} fill="#34d399" fillOpacity={0.8} />
-                  <Bar dataKey="vendasPontual" name="Pontual" stackId="vendas" radius={[4, 4, 0, 0]} barSize={28} fill="#a855f7" fillOpacity={0.7} />
+                  <Bar dataKey="vendasMrr" name="MRR" stackId="vendas" radius={[0, 0, 0, 0]} barSize={32} fill="#34d399" fillOpacity={0.8} label={<BarValueLabel />} />
+                  <Bar dataKey="vendasPontual" name="Pontual" stackId="vendas" radius={[4, 4, 0, 0]} barSize={32} fill="#a855f7" fillOpacity={0.7} label={<BarValueLabel />} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
