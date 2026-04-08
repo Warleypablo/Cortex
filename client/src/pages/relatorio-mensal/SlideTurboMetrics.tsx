@@ -27,6 +27,12 @@ function fmtK(v: number): string {
   return `${Math.round(v)}`;
 }
 
+function fmtBarLabel(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000).toFixed(0)}k`;
+  if (v >= 1_000) return `${Math.round(v / 1_000)}k`;
+  return `${Math.round(v)}`;
+}
+
 function makeBarLabel(data: any[], dataKey: string) {
   return ({ x, y, width, height, index }: any) => {
     if (index == null || height < 16) return null;
@@ -34,7 +40,7 @@ function makeBarLabel(data: any[], dataKey: string) {
     if (val <= 0) return null;
     return (
       <text x={x + width / 2} y={y + height / 2} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
-        {fmtK(val)}
+        {fmtBarLabel(val)}
       </text>
     );
   };
