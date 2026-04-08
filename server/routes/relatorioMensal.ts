@@ -52,9 +52,9 @@ export function registerRelatorioMensalRoutes(app: Express, db: any) {
         const mrrResult = await db.execute(sql`
           SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
           FROM "Clickup".cup_data_hist
-          WHERE snapshot_date = (
-            SELECT MAX(snapshot_date) FROM "Clickup".cup_data_hist
-            WHERE snapshot_date >= ${mesInicio}::date AND snapshot_date < ${mesFim}::date
+          WHERE data_snapshot = (
+            SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${mesInicio}::date AND data_snapshot <= ${mesFim}::date
           )
           AND status IN ('ativo', 'onboarding', 'triagem')
         `);
@@ -69,9 +69,9 @@ export function registerRelatorioMensalRoutes(app: Express, db: any) {
       const mrrPrevResult = await db.execute(sql`
         SELECT COALESCE(SUM(valorr::numeric), 0) as mrr
         FROM "Clickup".cup_data_hist
-        WHERE snapshot_date = (
-          SELECT MAX(snapshot_date) FROM "Clickup".cup_data_hist
-          WHERE snapshot_date >= ${prevMesInicio}::date AND snapshot_date < ${mesInicio}::date
+        WHERE data_snapshot = (
+          SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= ${prevMesInicio}::date AND data_snapshot <= ${mesInicio}::date
         )
         AND status IN ('ativo', 'onboarding', 'triagem')
       `);
@@ -151,10 +151,13 @@ export function registerRelatorioMensalRoutes(app: Express, db: any) {
 
       // ===== 7. Churn Receita =====
       const churnResult = await db.execute(sql`
-        SELECT COALESCE(SUM(valorr::numeric), 0) as churn_mrr
-        FROM "Clickup".cup_contratos
-        WHERE data_solicitacao_encerramento >= ${mesInicio}::date
+        SELECT COALESCE(SUM(valor_r), 0) as churn_mrr
+        FROM "Clickup".cup_churn
+        WHERE data_solicitacao_encerramento IS NOT NULL
+          AND data_solicitacao_encerramento >= ${mesInicio}::date
           AND data_solicitacao_encerramento < ${mesFim}::date
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       `);
       const churnMrr = parseFloat((churnResult.rows[0] as any)?.churn_mrr || "0");
 
