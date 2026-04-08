@@ -380,7 +380,10 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           const value = metric.total_value?.value ?? metric.values?.[0]?.value ?? 0;
           if (metric.name === "reach") reachDay = value;
           if (metric.name === "views") { viewsDay = value; impressionsDay = value; }
-          if (metric.name === "follows_and_unfollows") followsDay = value;
+          if (metric.name === "follows_and_unfollows") {
+            if (value >= 0) { followsDay = value; unfollowsDay = 0; }
+            else { followsDay = 0; unfollowsDay = Math.abs(value); }
+          }
           if (metric.name === "accounts_engaged") accountsEngaged = value;
           if (metric.name === "total_interactions") totalInteractions = value;
           if (metric.name === "likes") likesDay = value;
