@@ -2099,17 +2099,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDateStr = startDate.toISOString().split('T')[0];
       
       // Buscar evolução de MRR por mês
-      // Para meses anteriores: usa snapshots históricos (cup_data_hist)
+      // Para meses anteriores: usa snapshot do dia 1 do mês seguinte (estado final do mês)
+      // Fallback: último snapshot dentro do mês se dia 1 não existir
       // Para o mês atual: usa dados ao vivo (cup_contratos) para evitar valores incompletos
       const mrrResult = await db.execute(sql`
-        WITH snapshots_mensais AS (
-          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
-            DATE_TRUNC('month', data_snapshot) as mes,
-            data_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE DATE(data_snapshot) >= ${startDateStr}::date
-            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
-          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        WITH meses_range AS (
+          SELECT generate_series(
+            DATE_TRUNC('month', ${startDateStr}::date),
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month',
+            INTERVAL '1 month'
+          )::date as mes
+        ),
+        snapshots_mensais AS (
+          SELECT
+            mr.mes,
+            COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (mr.mes + INTERVAL '1 month')::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE DATE_TRUNC('month', data_snapshot) = mr.mes)
+            ) as data_snapshot
+          FROM meses_range mr
         ),
         historical_data AS (
           SELECT
@@ -2120,7 +2128,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as total_contratos
           FROM snapshots_mensais sm
           JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          WHERE sm.data_snapshot IS NOT NULL
+            AND h.status IN ('ativo', 'onboarding', 'triagem')
             AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
           GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ),
@@ -2204,14 +2213,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDateStr = startDate.toISOString().split('T')[0];
 
       const mrrResult = await db.execute(sql`
-        WITH snapshots_mensais AS (
-          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
-            DATE_TRUNC('month', data_snapshot) as mes,
-            data_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE DATE(data_snapshot) >= ${startDateStr}::date
-            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
-          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        WITH meses_range AS (
+          SELECT generate_series(
+            DATE_TRUNC('month', ${startDateStr}::date),
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month',
+            INTERVAL '1 month'
+          )::date as mes
+        ),
+        snapshots_mensais AS (
+          SELECT
+            mr.mes,
+            COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (mr.mes + INTERVAL '1 month')::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE DATE_TRUNC('month', data_snapshot) = mr.mes)
+            ) as data_snapshot
+          FROM meses_range mr
         ),
         historical_data AS (
           SELECT
@@ -2222,7 +2238,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as total_contratos
           FROM snapshots_mensais sm
           JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          WHERE sm.data_snapshot IS NOT NULL
+            AND h.status IN ('ativo', 'onboarding', 'triagem')
             AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
           GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ),

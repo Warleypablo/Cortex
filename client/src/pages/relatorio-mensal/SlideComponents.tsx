@@ -74,7 +74,7 @@ interface PrimaryCardProps {
 export function PrimaryCard({ children, borderColor, className = "" }: PrimaryCardProps) {
   return (
     <div
-      className={`bg-white/[0.04] border-2 rounded-2xl p-6 shadow-lg shadow-black/20 ${className}`}
+      className={`bg-white/[0.04] border-2 rounded-2xl p-6 shadow-lg shadow-black/20 transition-all duration-300 ease-out ${className}`}
       style={{ borderColor: borderColor ? `${borderColor}30` : "rgba(255,255,255,0.08)" }}
     >
       {children}
@@ -93,7 +93,7 @@ interface SecondaryCardProps {
 export function SecondaryCard({ children, className = "", borderColor }: SecondaryCardProps) {
   return (
     <div
-      className={`bg-white/[0.04] border border-white/[0.08] rounded-xl shadow-lg shadow-black/20 ${className}`}
+      className={`bg-white/[0.04] border border-white/[0.08] rounded-xl shadow-lg shadow-black/20 p-4 transition-all duration-300 ease-out ${className}`}
       style={borderColor ? { borderColor: `${borderColor}25` } : undefined}
     >
       {children}
@@ -134,16 +134,28 @@ export function SectionCover({ icon: Icon, title, subtitle, section }: SectionCo
     <div className="flex flex-col items-center gap-6">
       <img src={turboLogo} alt="Turbo Partners" className="h-10 object-contain opacity-50" />
 
-      {/* Icon with glow */}
-      <div
-        className="p-5 rounded-2xl bg-white/10"
-        style={{ boxShadow: `0 0 50px ${theme.glow1}40, 0 0 100px ${theme.glow1}15` }}
-      >
-        <Icon className="h-16 w-16" style={{ color: theme.accent }} />
+      {/* Icon with animated glow */}
+      <div className="relative">
+        <div
+          className="absolute inset-0 rounded-2xl animate-pulse"
+          style={{ boxShadow: `0 0 60px ${theme.glow1}50, 0 0 120px ${theme.glow1}20`, opacity: 0.6 }}
+        />
+        <div
+          className="relative p-6 rounded-2xl bg-white/10"
+          style={{ boxShadow: `0 0 50px ${theme.glow1}40, 0 0 100px ${theme.glow1}15` }}
+        >
+          <Icon className="h-20 w-20" style={{ color: theme.accent }} />
+        </div>
       </div>
 
-      <h1 className="text-5xl font-black tracking-tight">{title}</h1>
+      <h1 className="text-6xl font-black tracking-tight">{title}</h1>
       <p className="text-lg text-zinc-400">{subtitle}</p>
+
+      {/* Decorative line below subtitle */}
+      <div
+        className="h-px w-48"
+        style={{ background: `linear-gradient(to right, transparent, ${theme.accent}66, transparent)` }}
+      />
 
       {/* Diagonal stripe */}
       <div
@@ -191,7 +203,7 @@ export function ProgressBar({ label, current, target, unit = "BRL", color }: Pro
       </div>
       <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
         <div
-          className="h-full rounded-full"
+          className="h-full rounded-full transition-[width] duration-700 ease-out"
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>

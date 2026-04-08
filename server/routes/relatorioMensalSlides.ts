@@ -314,12 +314,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND d.data_fechamento < ${dataEnd}
         `),
 
-        // 9. MRR ativo + Ticket Médio ao final do mês de dados (snapshot histórico)
+        // 9. MRR ativo + Ticket Médio ao final do mês de dados (snapshot do dia 1 do mês seguinte)
         db.execute(sql`
           WITH ultimo_snapshot AS (
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`}
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
+            ) as snap
           )
           SELECT
             COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_ativo,
@@ -335,9 +336,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // 10. Clientes totais + Contratos totais ao final do mês de dados
         db.execute(sql`
           WITH ultimo_snapshot AS (
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`}
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
+            ) as snap
           )
           SELECT
             COUNT(DISTINCT h.id_task)::int as clientes_totais,
@@ -357,6 +359,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
               AND data_solicitacao_encerramento >= ${dataStart}
               AND data_solicitacao_encerramento < ${dataEnd}
               AND COALESCE(abonar_churn, '') != 'Sim'
+              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           ),
           pausados_data AS (
             SELECT
@@ -406,6 +409,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         `),
 
         // 13c. Indicações (source = RECOMMENDATION no mês de dados)
@@ -437,6 +441,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 14. Série mensal Receita x Churn (últimos 12 meses até mesDados, cross-year)
+        // Para cada mês, pega snapshot do dia 1 do mês seguinte (estado final do mês)
+        // Fallback: MAX(data_snapshot) dentro do mês se dia 1 não existir
         db.execute(sql`
           WITH date_range AS (
             SELECT
@@ -445,12 +451,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ),
           monthly_snapshots AS (
             SELECT
-              TO_CHAR(data_snapshot, 'YYYY-MM') as month,
-              MAX(data_snapshot) as last_snapshot
-            FROM "Clickup".cup_data_hist, date_range dr
-            WHERE data_snapshot >= dr.range_start
-              AND data_snapshot < dr.range_end
-            GROUP BY TO_CHAR(data_snapshot, 'YYYY-MM')
+              TO_CHAR(m.month_start, 'YYYY-MM') as month,
+              COALESCE(
+                (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (m.month_start + INTERVAL '1 month')::date LIMIT 1),
+                (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(m.month_start, 'YYYY-MM'))
+              ) as last_snapshot
+            FROM date_range dr,
+              generate_series(dr.range_start, dr.range_end - INTERVAL '1 day', INTERVAL '1 month') as m(month_start)
           ),
           mrr_mensal AS (
             SELECT
@@ -458,7 +465,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
               COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr
             FROM monthly_snapshots ms
             JOIN "Clickup".cup_data_hist h ON h.data_snapshot = ms.last_snapshot
-            WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            WHERE ms.last_snapshot IS NOT NULL
+              AND h.status IN ('ativo', 'onboarding', 'triagem')
               AND h.valorr IS NOT NULL
             GROUP BY ms.month
           ),
@@ -471,6 +479,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
               AND data_solicitacao_encerramento >= dr.range_start
               AND data_solicitacao_encerramento < dr.range_end
               AND COALESCE(abonar_churn, '') != 'Sim'
+              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM')
           )
           SELECT
@@ -482,12 +491,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY m.month
         `),
 
-        // 15. Ranking Squads por MRR (snapshot do final do mês de dados)
+        // 15. Ranking Squads por MRR (snapshot do dia 1 do mês seguinte)
         db.execute(sql`
           WITH ultimo_snapshot AS (
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`}
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
+            ) as snap
           )
           SELECT
             h.squad,
@@ -516,21 +526,23 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
             AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             AND squad IS NOT NULL
             AND TRIM(squad) != ''
           GROUP BY squad
         `),
 
-        // 17. MRR do mês anterior por squad (para evolução)
+        // 17. MRR do mês anterior por squad (snapshot do dia 1 do mês de dados = final do mês anterior)
         db.execute(sql`
           WITH ultimo_snapshot_ant AS (
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${
-              mesDados === 1
-                ? `${anoDados - 1}-12`
-                : `${anoDados}-${String(mesDados - 1).padStart(2, '0')}`
-            }
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataStart}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${
+                mesDados === 1
+                  ? `${anoDados - 1}-12`
+                  : `${anoDados}-${String(mesDados - 1).padStart(2, '0')}`
+              })
+            ) as snap
           )
           SELECT
             h.squad,
@@ -547,13 +559,14 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // 17b. MRR total do mês anterior (para meta de churn = 8% do MRR ativo)
         db.execute(sql`
           WITH ultimo_snapshot_ant AS (
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${
-              mesDados === 1
-                ? `${anoDados - 1}-12`
-                : `${anoDados}-${String(mesDados - 1).padStart(2, '0')}`
-            }
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataStart}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${
+                mesDados === 1
+                  ? `${anoDados - 1}-12`
+                  : `${anoDados}-${String(mesDados - 1).padStart(2, '0')}`
+              })
+            ) as snap
           )
           SELECT
             COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_total
@@ -656,6 +669,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) >= ${quarterStartMonth}
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) <= ${mesDados}
             AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           GROUP BY EXTRACT(MONTH FROM data_solicitacao_encerramento)
         `),
 

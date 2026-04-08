@@ -133,7 +133,7 @@ export default function SlideTurboCommerce({ ano, mes, okrObjectives, mrrAtivo, 
                       style={{ width: `${progressPct}%`, opacity: 0.85 }}
                     />
                   </div>
-                  <p className="text-[10px] text-zinc-500 mt-1 text-right">{Math.round(progressPct)}%</p>
+                  <p className="text-xs text-zinc-500 mt-1 text-right">{Math.round(progressPct)}%</p>
                 </div>
               )}
               {item.subLabel && (
