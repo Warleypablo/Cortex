@@ -27,6 +27,15 @@ function fmtK(v: number): string {
   return `${Math.round(v)}`;
 }
 
+function BarValueLabel({ x, y, width, height, value }: any) {
+  if (!value || value <= 0 || height < 16) return null;
+  return (
+    <text x={x + width / 2} y={y + height / 2} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+      {fmtK(value)}
+    </text>
+  );
+}
+
 function ChartTooltipContent({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -236,12 +245,12 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
                 width={40}
               />
               <Tooltip content={<ChartTooltipContent />} />
-              <Bar yAxisId="left" dataKey="mrr" name="MRR" stackId="a" radius={[0, 0, 0, 0]} barSize={32}>
+              <Bar yAxisId="left" dataKey="mrr" name="MRR" stackId="a" radius={[0, 0, 0, 0]} barSize={32} label={<BarValueLabel />}>
                 {chartData.map((entry, i) => (
                   <Cell key={i} fill={entry.hasData ? "#34d399" : "transparent"} fillOpacity={0.7} />
                 ))}
               </Bar>
-              <Bar yAxisId="left" dataKey="churnBrl" name="Churn" stackId="a" radius={[4, 4, 0, 0]} barSize={32}>
+              <Bar yAxisId="left" dataKey="churnBrl" name="Churn" stackId="a" radius={[4, 4, 0, 0]} barSize={32} label={<BarValueLabel />}>
                 {chartData.map((entry, i) => (
                   <Cell key={i} fill={entry.hasData ? "#f97316" : "transparent"} fillOpacity={0.5} stroke={entry.hasData ? "#f97316" : "transparent"} strokeWidth={1.5} />
                 ))}
