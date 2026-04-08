@@ -22,10 +22,11 @@ function fmtK(v: number): string {
 }
 
 function BarValueLabel({ x, y, width, height, value }: any) {
-  if (!value || value <= 0 || height < 16) return null;
+  const segmentValue = Array.isArray(value) ? value[1] - value[0] : value;
+  if (!segmentValue || segmentValue <= 0 || height < 16) return null;
   return (
     <text x={x + width / 2} y={y + height / 2} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
-      {fmtK(value)}
+      {fmtK(segmentValue)}
     </text>
   );
 }
