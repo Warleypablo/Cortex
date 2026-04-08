@@ -27,15 +27,17 @@ function fmtK(v: number): string {
   return `${Math.round(v)}`;
 }
 
-function BarValueLabel({ x, y, width, height, value }: any) {
-  // In stacked bars, value can be [start, end] array — extract the segment value
-  const segmentValue = Array.isArray(value) ? value[1] - value[0] : value;
-  if (!segmentValue || segmentValue <= 0 || height < 16) return null;
-  return (
-    <text x={x + width / 2} y={y + height / 2} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
-      {fmtK(segmentValue)}
-    </text>
-  );
+function makeBarLabel(data: any[], dataKey: string) {
+  return ({ x, y, width, height, index }: any) => {
+    if (index == null || height < 16) return null;
+    const val = data[index]?.[dataKey] || 0;
+    if (val <= 0) return null;
+    return (
+      <text x={x + width / 2} y={y + height / 2} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight="bold">
+        {fmtK(val)}
+      </text>
+    );
+  };
 }
 
 function ChartTooltipContent({ active, payload, label }: any) {
@@ -247,12 +249,12 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
                 width={40}
               />
               <Tooltip content={<ChartTooltipContent />} />
-              <Bar yAxisId="left" dataKey="mrr" name="MRR" stackId="a" radius={[0, 0, 0, 0]} barSize={32} label={<BarValueLabel />}>
+              <Bar yAxisId="left" dataKey="mrr" name="MRR" stackId="a" radius={[0, 0, 0, 0]} barSize={32} label={makeBarLabel(chartData, "mrr")}>
                 {chartData.map((entry, i) => (
                   <Cell key={i} fill={entry.hasData ? "#34d399" : "transparent"} fillOpacity={0.7} />
                 ))}
               </Bar>
-              <Bar yAxisId="left" dataKey="churnBrl" name="Churn" stackId="a" radius={[4, 4, 0, 0]} barSize={32} label={<BarValueLabel />}>
+              <Bar yAxisId="left" dataKey="churnBrl" name="Churn" stackId="a" radius={[4, 4, 0, 0]} barSize={32} label={makeBarLabel(chartData, "churnBrl")}>
                 {chartData.map((entry, i) => (
                   <Cell key={i} fill={entry.hasData ? "#f97316" : "transparent"} fillOpacity={0.5} stroke={entry.hasData ? "#f97316" : "transparent"} strokeWidth={1.5} />
                 ))}
