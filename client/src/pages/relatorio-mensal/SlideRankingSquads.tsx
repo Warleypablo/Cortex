@@ -1,5 +1,6 @@
 import type { SquadRanking } from "./types";
 import SlideLayout from "./SlideLayout";
+import { Crown } from "lucide-react";
 
 interface Props {
   ranking: SquadRanking[];
@@ -35,6 +36,14 @@ const SQUAD_COLORS: Record<string, string> = {
 };
 
 const DEFAULT_COLOR = "#71717a";
+
+const MEDAL_COLORS: Record<number, { ring: string; text: string }> = {
+  1: { ring: "#f59e0b", text: "text-amber-400" },
+  2: { ring: "#a1a1aa", text: "text-zinc-300" },
+  3: { ring: "#f97316", text: "text-orange-400" },
+  4: { ring: "#71717a", text: "text-zinc-400" },
+  5: { ring: "#71717a", text: "text-zinc-400" },
+};
 
 /** Extract emoji prefix and base name from squad name like "🪖 Selva" */
 function parseSquadName(raw: string): { emoji: string; name: string } {
@@ -104,8 +113,13 @@ export default function SlideRankingSquads({ ranking }: Props) {
           const eSize = emojiSize[squad.posicao] || 26;
           const isFirst = squad.posicao === 1;
 
+          const medal = MEDAL_COLORS[squad.posicao] || { ring: "#71717a", text: "text-zinc-400" };
+
           return (
             <div key={squad.squad} className="flex flex-col items-center" style={{ width: 140 }}>
+              {/* Crown for 1st place */}
+              {isFirst && <Crown className="text-amber-400 mb-2" style={{ width: 36, height: 36 }} />}
+
               {/* Squad emoji circle */}
               <div
                 className="rounded-full flex items-center justify-center shadow-xl mb-2"
@@ -140,7 +154,7 @@ export default function SlideRankingSquads({ ranking }: Props) {
                   background: `linear-gradient(to top, ${color}, ${color}99)`,
                 }}
               >
-                <span className={`font-black text-white/95 ${isFirst ? "text-6xl" : "text-5xl"}`}>
+                <span className={`font-black ${medal.text} ${isFirst ? "text-6xl" : "text-5xl"}`}>
                   {squad.posicao}°
                 </span>
                 <span className="text-xs text-white/70 mt-1">
