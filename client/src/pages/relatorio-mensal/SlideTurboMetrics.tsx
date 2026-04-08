@@ -77,30 +77,30 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
         gradientColor="#06b6d4"
       />
 
-      {/* Top row: 5 compact cards */}
-      <div className="grid grid-cols-5 gap-3 mb-3 shrink-0">
+      {/* Top row: 4 compact cards */}
+      <div className="grid grid-cols-4 gap-3 mb-3 shrink-0">
         {/* Faturamento */}
         <SecondaryCard className="p-3 flex flex-col justify-center">
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1.5">Faturamento Mes</p>
+          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1.5">Faturamento Mes</p>
           <div className="space-y-1">
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-[10px] text-zinc-400">Fixo:</span>
-              <span className="text-xs font-bold text-emerald-400">{fmtBRL(metrics.mrrAtivo)}</span>
+              <span className="text-xs text-zinc-400">Fixo:</span>
+              <span className="text-sm font-bold text-emerald-400">{fmtBRL(metrics.mrrAtivo)}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-amber-500" />
-              <span className="text-[10px] text-zinc-400">Variavel:</span>
-              <span className="text-xs font-bold text-amber-400">{fmtBRL(faturamentoVariavel)}</span>
+              <span className="text-xs text-zinc-400">Variavel:</span>
+              <span className="text-sm font-bold text-amber-400">{fmtBRL(faturamentoVariavel)}</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-purple-500" />
-              <span className="text-[10px] text-zinc-400">Pont:</span>
-              <span className="text-xs font-bold text-purple-400">{fmtBRL(faturamentoPontual)}</span>
+              <span className="text-xs text-zinc-400">Pont:</span>
+              <span className="text-sm font-bold text-purple-400">{fmtBRL(faturamentoPontual)}</span>
             </div>
           </div>
           <div className="mt-1.5 bg-cyan-500/10 rounded px-2 py-0.5 inline-block">
-            <span className="text-xs font-bold text-cyan-400">Total: {fmtBRL(faturamentoTotal)}</span>
+            <span className="text-sm font-bold text-cyan-400">Total: {fmtBRL(faturamentoTotal)}</span>
           </div>
         </SecondaryCard>
 
@@ -108,101 +108,97 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
         <SecondaryCard className="p-3 flex flex-col justify-center">
           <div className="flex items-center gap-1.5 mb-2">
             <Users className="h-3.5 w-3.5 text-blue-400" />
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Base</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Base</p>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <p className="text-[10px] text-zinc-500">Clientes</p>
+              <p className="text-xs text-zinc-500">Clientes</p>
               <p className="text-xl font-black">{metrics.clientesAtivos}</p>
             </div>
             <div>
-              <p className="text-[10px] text-zinc-500">Contratos</p>
+              <p className="text-xs text-zinc-500">Contratos</p>
               <p className="text-xl font-black">{metrics.contratosAtivos}</p>
             </div>
           </div>
         </SecondaryCard>
 
-        {/* MRR Add / Cancel / Pausado */}
+        {/* MRR Add / Cancel / Pausado + Cross-sell */}
         <SecondaryCard className="p-3 flex flex-col justify-center">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 <TrendingUp className="h-3 w-3 text-emerald-400" />
-                <span className="text-[10px] text-emerald-400 font-bold">Adicionado</span>
+                <span className="text-xs text-emerald-400 font-bold">Adicionado</span>
               </div>
-              <span className="text-xs font-bold text-emerald-400">{fmtBRL(metrics.mrrAdicionado)}</span>
+              <span className="text-sm font-bold text-emerald-400">{fmtBRL(metrics.mrrAdicionado)}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 <TrendingDown className="h-3 w-3 text-red-400" />
-                <span className="text-[10px] text-red-400 font-bold">Cancelados</span>
+                <span className="text-xs text-red-400 font-bold">Cancelados</span>
               </div>
-              <span className="text-xs font-bold text-red-400">{fmtBRL(metrics.churnMrr)}</span>
+              <span className="text-sm font-bold text-red-400">{fmtBRL(metrics.churnMrr)}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1">
                 <Pause className="h-3 w-3 text-amber-400" />
-                <span className="text-[10px] text-amber-400 font-bold">Pausados</span>
+                <span className="text-xs text-amber-400 font-bold">Pausados</span>
               </div>
-              <span className="text-xs font-bold text-amber-400">{fmtBRL(metrics.pausadosMrr)}</span>
+              <span className="text-sm font-bold text-amber-400">{fmtBRL(metrics.pausadosMrr)}</span>
+            </div>
+          </div>
+          <div className="border-t border-white/[0.06] pt-1.5 mt-1.5 space-y-0.5">
+            <div className="flex items-center gap-1 mb-0.5">
+              <Handshake className="h-3 w-3 text-purple-400" />
+              <span className="text-xs text-purple-400 font-bold">Cross-sell</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-zinc-400">Rec:</span>
+              <span className="text-sm font-bold text-emerald-400">{fmtBRL(metrics.crosssellMrr)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-zinc-400">Pont:</span>
+              <span className="text-sm font-bold text-purple-400">{fmtBRL(metrics.crosssellPontual)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-zinc-400">Total:</span>
+              <span className="text-sm font-bold text-cyan-400">{fmtBRL(crosssellTotal)}</span>
             </div>
           </div>
         </SecondaryCard>
 
-        {/* Ticket Medio */}
+        {/* Ticket Medio + Retencoes */}
         <SecondaryCard className="p-3 flex flex-col justify-center">
           <div className="flex items-center gap-1.5 mb-2">
             <CreditCard className="h-3.5 w-3.5 text-zinc-400" />
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Ticket Medio</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Ticket Medio</p>
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-400">Contrato:</span>
-              <span className="text-xs font-bold">{fmtBRL(metrics.ticketMedioContrato)}</span>
+              <span className="text-xs text-zinc-400">Contrato:</span>
+              <span className="text-sm font-bold">{fmtBRL(metrics.ticketMedioContrato)}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-zinc-400">Cliente:</span>
-              <span className="text-xs font-bold">{fmtBRL(metrics.ticketMedioCliente)}</span>
+              <span className="text-xs text-zinc-400">Cliente:</span>
+              <span className="text-sm font-bold">{fmtBRL(metrics.ticketMedioCliente)}</span>
             </div>
           </div>
-        </SecondaryCard>
-
-        {/* CXCS */}
-        <SecondaryCard className="p-3 flex flex-col justify-center">
-          <div className="flex items-center gap-1.5 mb-1.5">
-            <Handshake className="h-3.5 w-3.5 text-purple-400" />
-            <p className="text-[10px] text-purple-400 font-bold uppercase tracking-wide">CXCS</p>
-          </div>
-          <div className="space-y-0.5">
+          <div className="border-t border-white/[0.06] pt-1.5 mt-1.5 space-y-0.5">
             <div className="flex justify-between">
-              <span className="text-[10px] text-zinc-400">Solicit.:</span>
-              <span className="text-[10px] font-bold text-red-400">
+              <span className="text-xs text-zinc-400">Solicit.:</span>
+              <span className="text-xs font-bold text-red-400">
                 {metrics.retencoesSolicitacoesCount} ({fmtBRL(metrics.retencoesSolicitacoesValor)})
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[10px] text-zinc-400">Retido:</span>
-              <span className="text-[10px] font-bold text-emerald-400">
+              <span className="text-xs text-zinc-400">Retido:</span>
+              <span className="text-xs font-bold text-emerald-400">
                 {metrics.retencoesCount} ({retencaoPct}%)
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[10px] text-zinc-400">Vl Retido:</span>
-              <span className="text-[10px] font-bold text-emerald-400">{fmtBRL(metrics.retencoesValor)}</span>
-            </div>
-            <div className="border-t border-white/[0.06] pt-0.5 mt-0.5 space-y-0.5">
-              <div className="flex justify-between">
-                <span className="text-[10px] text-zinc-400">Cross Rec:</span>
-                <span className="text-[10px] font-bold text-emerald-400">{fmtBRL(metrics.crosssellMrr)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[10px] text-zinc-400">Cross Pont:</span>
-                <span className="text-[10px] font-bold text-purple-400">{fmtBRL(metrics.crosssellPontual)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[10px] text-zinc-400">Total:</span>
-                <span className="text-[10px] font-bold text-cyan-400">{fmtBRL(crosssellTotal)}</span>
-              </div>
+              <span className="text-xs text-zinc-400">Vl Retido:</span>
+              <span className="text-xs font-bold text-emerald-400">{fmtBRL(metrics.retencoesValor)}</span>
             </div>
           </div>
         </SecondaryCard>
@@ -267,7 +263,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
         {/* MRR Ativo + Meta Churn */}
         <div className="col-span-2 flex flex-col gap-3">
           <SecondaryCard className="flex-1 flex flex-col p-3 overflow-hidden">
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-0.5">MRR Ativo — {mesLabel}</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">MRR Ativo — {mesLabel}</p>
             <p className="text-xl font-black text-emerald-400 mb-2">{fmtFull(metrics.mrrAtivo)}</p>
             {(() => {
               const mrrData = chartData.filter(d => d.hasData && d.mrr > 0);
@@ -288,14 +284,14 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
                         >
                           {barH >= 30 && (
                             <span
-                              className="text-[6px] font-bold text-white/80 whitespace-nowrap"
+                              className="text-[8px] font-bold text-white/80 whitespace-nowrap"
                               style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                             >
                               {fmtBRL(d.mrr)}
                             </span>
                           )}
                         </div>
-                        <span className="text-[7px] text-zinc-500 mt-0.5 leading-none">{d.label}</span>
+                        <span className="text-[9px] text-zinc-500 mt-0.5 leading-none">{d.label}</span>
                       </div>
                     );
                   })}
@@ -307,15 +303,15 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
           <SecondaryCard className="flex-1 flex flex-col justify-center p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Target className="h-3.5 w-3.5 text-red-400" />
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Meta Churn Max.</p>
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Meta Churn Max.</p>
             </div>
             <p className="text-2xl font-black text-red-400">{fmtFull(metrics.churnMetaMensal)}</p>
             <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[10px] text-zinc-500">Realizado:</span>
-              <span className={`text-xs font-bold ${metrics.churnMrr > metrics.churnMetaMensal ? "text-red-400" : "text-emerald-400"}`}>
+              <span className="text-xs text-zinc-500">Realizado:</span>
+              <span className={`text-sm font-bold ${metrics.churnMrr > metrics.churnMetaMensal ? "text-red-400" : "text-emerald-400"}`}>
                 {fmtFull(metrics.churnMrr)}
               </span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${
                 metrics.churnMrr > metrics.churnMetaMensal
                   ? "bg-red-500/15 text-red-400"
                   : "bg-emerald-500/15 text-emerald-400"
