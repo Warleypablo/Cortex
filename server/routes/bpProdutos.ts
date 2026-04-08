@@ -123,6 +123,8 @@ export function registerBpProdutosRoutes(app: Express) {
         FROM "Clickup".cup_churn
         WHERE status IN ('cancelado/inativo', 'em cancelamento')
           AND ultimo_dia_operacao >= '2025-11-01'
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY 1, 2
         ORDER BY 1, 2
       `);
