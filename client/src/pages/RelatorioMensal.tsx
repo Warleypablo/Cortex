@@ -13,7 +13,6 @@ import SlideQRCode from "./relatorio-mensal/SlideQRCode";
 import SlideNovosAniversariantes from "./relatorio-mensal/SlideNovosAniversariantes";
 import SlideAniversarioEmpresa from "./relatorio-mensal/SlideAniversarioEmpresa";
 import SlideKRs from "./relatorio-mensal/SlideKRs";
-import SlideTurboCommerce from "./relatorio-mensal/SlideTurboCommerce";
 import SlideCapaCommerce from "./relatorio-mensal/SlideCapaCommerce";
 import SlideCapaComercial from "./relatorio-mensal/SlideCapaComercial";
 import SlideCapaTech from "./relatorio-mensal/SlideCapaTech";
@@ -32,12 +31,12 @@ import SlideCustom from "./relatorio-mensal/SlideCustom";
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
   "KRs", "Capa Comercial", "Ranking Closers",
-  "Ranking SDRs", "Contratos", "Capa Commerce", "Turbo Metrics", "Commerce", "Ranking Squads", "Squad Details",
+  "Ranking SDRs", "Contratos", "Capa Commerce", "Turbo Metrics", "Ranking Squads", "Squad Details",
   "Capa Tech", "Area Tech",
   "Vamos com Turbo!", "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 19
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 18
 
 type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
 
@@ -128,8 +127,6 @@ export default function RelatorioMensal() {
   const presentationScale = useSlideScale(presentationRef, isPresentationMode);
   // Reserve ~60px for navigation dots below the slide
   const editorScale = useSlideScale(slideAreaRef, !isPresentationMode, 60);
-
-  const [ano, mes] = selectedMonth.split("-").map(Number);
 
   const { data, isLoading, error } = useRelatorioMensal(selectedMonth);
   const { customSlides, createSlide, deleteSlide } = useCustomSlides(selectedMonth);
@@ -252,14 +249,13 @@ export default function RelatorioMensal() {
       case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
       case 9: return <SlideCapaCommerce />;
       case 10: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 11: return <SlideTurboCommerce ano={ano} mes={mes} okrObjectives={data.okrObjectives} mrrAtivo={data.turboMetrics.mrrAtivo} pontualCommerceQtr={data.turboMetrics.pontualCommerceQtr} />;
-      case 12: return <SlideRankingSquads ranking={data.rankingSquads} />;
-      case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
-      case 14: return <SlideCapaTech />;
-      case 15: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 16: return <SlideEncerramento />;
-      case 17: return <SlideFraseEncerramento />;
-      case 18: return <SlideQRCode />;
+      case 11: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 12: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
+      case 13: return <SlideCapaTech />;
+      case 14: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 15: return <SlideEncerramento />;
+      case 16: return <SlideFraseEncerramento />;
+      case 17: return <SlideQRCode />;
       default: return null;
     }
   };
