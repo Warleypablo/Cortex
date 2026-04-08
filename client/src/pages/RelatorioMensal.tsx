@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
 import { ChevronLeft, ChevronRight, Download, Loader2, Minimize, Play, Plus, Trash2, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,23 +25,19 @@ import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
 import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
-import SlideNovaSede from "./relatorio-mensal/SlideNovaSede";
-import SlideCapaNovoEscritorio from "./relatorio-mensal/SlideCapaNovoEscritorio";
 import SlideEncerramento from "./relatorio-mensal/SlideEncerramento";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
 import SlideCustom from "./relatorio-mensal/SlideCustom";
-import novaSedeEtapa1 from "@assets/placeholder.svg";
-import novaSedeEtapa2 from "@assets/placeholder.svg";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
   "KRs", "Capa Comercial", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Turbo Metrics", "Commerce", "Ranking Squads", "Squad Details",
-  "Capa Tech", "Area Tech", "Capa Novo Escritório", "Sede Gazeta 1ª Etapa", "Sede Gazeta 2ª Etapa",
+  "Capa Tech", "Area Tech",
   "Vamos com Turbo!", "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 22
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 19
 
 type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
 
@@ -82,6 +78,37 @@ function buildSlotArray(customSlides: CustomSlide[]): SlotEntry[] {
   return slots;
 }
 
+// Base design resolution for slides (16:9 aspect ratio)
+const SLIDE_BASE_W = 1280;
+const SLIDE_BASE_H = 720;
+
+function useSlideScale(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  enabled: boolean,
+  reservedHeight = 0,
+) {
+  const [scale, setScale] = useState(1);
+
+  useLayoutEffect(() => {
+    if (!enabled) { setScale(1); return; }
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      const vw = el.clientWidth;
+      const vh = el.clientHeight - reservedHeight;
+      setScale(Math.min(vw / SLIDE_BASE_W, vh / SLIDE_BASE_H));
+    };
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [containerRef, enabled, reservedHeight]);
+
+  return scale;
+}
+
 export default function RelatorioMensal() {
   const [selectedMonth, setSelectedMonth] = useState(getDefaultMonth);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -94,8 +121,13 @@ export default function RelatorioMensal() {
   const [newImageUrl, setNewImageUrl] = useState("");
   const slideRef = useRef<HTMLDivElement>(null);
   const presentationRef = useRef<HTMLDivElement>(null);
+  const slideAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const monthOptions = getMonthOptions();
+
+  const presentationScale = useSlideScale(presentationRef, isPresentationMode);
+  // Reserve ~60px for navigation dots below the slide
+  const editorScale = useSlideScale(slideAreaRef, !isPresentationMode, 60);
 
   const [ano, mes] = selectedMonth.split("-").map(Number);
 
@@ -225,12 +257,9 @@ export default function RelatorioMensal() {
       case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
       case 14: return <SlideCapaTech />;
       case 15: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 16: return <SlideCapaNovoEscritorio />;
-      case 17: return <SlideNovaSede imageSrc={novaSedeEtapa1} titulo="Nova Sede Gazeta — 1ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída Takeat - 15/03) • Até 71 posições" />;
-      case 18: return <SlideNovaSede imageSrc={novaSedeEtapa2} titulo="Nova Sede Gazeta — 2ª Etapa" subtitulo="Organização de espaços Fonte Hub (com saída AEP - 01/05) • 98 posições" />;
-      case 19: return <SlideEncerramento />;
-      case 20: return <SlideFraseEncerramento />;
-      case 21: return <SlideQRCode />;
+      case 16: return <SlideEncerramento />;
+      case 17: return <SlideFraseEncerramento />;
+      case 18: return <SlideQRCode />;
       default: return null;
     }
   };
@@ -280,7 +309,7 @@ export default function RelatorioMensal() {
     return (
       <div
         ref={presentationRef}
-        className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center cursor-pointer"
+        className="fixed inset-0 z-50 bg-black flex items-center justify-center cursor-pointer"
         onClick={(e) => {
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
           const x = e.clientX - rect.left;
@@ -291,11 +320,19 @@ export default function RelatorioMensal() {
           }
         }}
       >
-        <div ref={slideRef} className="w-full h-full">
+        <div
+          ref={slideRef}
+          style={{
+            width: SLIDE_BASE_W,
+            height: SLIDE_BASE_H,
+            transform: `scale(${presentationScale})`,
+            transformOrigin: "center center",
+          }}
+        >
           {renderSlide()}
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 opacity-0 hover:opacity-100 transition-opacity duration-300">
+        <div className="absolute bottom-0 left-0 right-0 opacity-0 hover:opacity-100 transition-opacity duration-300 z-10">
           <div className="flex items-center justify-center gap-3 py-3 bg-gradient-to-t from-black/80 to-transparent">
             <div className="flex items-center gap-1.5">
               {slots.map((slot, i) => (
@@ -370,7 +407,7 @@ export default function RelatorioMensal() {
       </div>
 
       {/* Slide area */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4 min-h-0 relative">
+      <div ref={slideAreaRef} className="flex-1 flex flex-col items-center justify-center p-4 min-h-0 relative">
         {isLoading ? (
           <div className="flex items-center gap-3 text-muted-foreground">
             <Loader2 className="h-6 w-6 animate-spin" />
@@ -383,7 +420,13 @@ export default function RelatorioMensal() {
             {/* Slide container */}
             <div
               ref={slideRef}
-              className="w-full max-w-5xl aspect-[16/9] rounded-xl overflow-hidden shadow-2xl border border-zinc-800 relative"
+              className="rounded-xl overflow-hidden shadow-2xl border border-zinc-800 relative"
+              style={{
+                width: SLIDE_BASE_W,
+                height: SLIDE_BASE_H,
+                transform: `scale(${editorScale})`,
+                transformOrigin: "center center",
+              }}
             >
               {renderSlide()}
             </div>
