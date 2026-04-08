@@ -359,6 +359,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
               AND data_solicitacao_encerramento >= ${dataStart}
               AND data_solicitacao_encerramento < ${dataEnd}
               AND COALESCE(abonar_churn, '') != 'Sim'
+              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           ),
           pausados_data AS (
             SELECT
@@ -477,6 +478,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
               AND data_solicitacao_encerramento >= dr.range_start
               AND data_solicitacao_encerramento < dr.range_end
               AND COALESCE(abonar_churn, '') != 'Sim'
+              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM')
           )
           SELECT
@@ -523,6 +525,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
             AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             AND squad IS NOT NULL
             AND TRIM(squad) != ''
           GROUP BY squad
@@ -665,6 +668,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) >= ${quarterStartMonth}
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) <= ${mesDados}
             AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           GROUP BY EXTRACT(MONTH FROM data_solicitacao_encerramento)
         `),
 
