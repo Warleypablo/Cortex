@@ -1166,6 +1166,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const compareStartDate = req.query.compareStartDate as string || '';
       const compareEndDate = req.query.compareEndDate as string || '';
       const status = req.query.status as string || 'Todos';
+      const plataformaParam = req.query.plataforma as string || 'Todos';
       const campanhaId = req.query.campanhaId as string || '';
       const campanhaIds = req.query.campanhaIds as string || '';
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
@@ -1173,6 +1174,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
         return res.status(400).json({ error: "Invalid date format" });
+      }
+
+      // Se plataformas selecionadas não incluem Meta Ads, retornar zeros
+      const plataformas = plataformaParam === 'Todos' ? [] : plataformaParam.split(',').map(p => p.trim());
+      if (plataformas.length > 0 && !plataformas.includes('Meta Ads') && !plataformas.includes('Todos')) {
+        const emptyKpis = { investimento: 0, percMql: 0, cpmql: 0, vendas: 0, cac: 0, aov: 0 };
+        return res.json({ current: emptyKpis, compare: null });
       }
 
       const fetchKpis = async (sd: string, ed: string) => {
@@ -1198,11 +1206,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         if (campanhaIdSet) adRows = adRows.filter((r: any) => campanhaIdSet.has(String(r.campaign_id)));
 
         const totalInvestimento = adRows.reduce((s: number, r: any) => s + (parseFloat(r.investimento) || 0), 0);
-        const adIdList = adRows.map((r: any) => String(r.ad_id));
+        const adIdSet = new Set(adRows.map((r: any) => String(r.ad_id)));
 
-        // Query CRM para leads, MQLs, vendas — filtrando por ad_ids dos anúncios
-        const dealsResult = await db.execute(sql`
+        // Query CRM para leads, MQLs, vendas — sempre filtrando por ad_ids do Meta Ads
+        const allDealsResult = await db.execute(sql`
           SELECT
+            utm_content as ad_id,
             COUNT(*) as leads,
             SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
             COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho'
@@ -1212,38 +1221,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           WHERE utm_content IS NOT NULL AND utm_content != ''
             AND created_at >= ${sd}::date AND created_at <= ${ed}::date + INTERVAL '1 day'
             AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          GROUP BY utm_content
         `);
-
-        const d = (dealsResult.rows as any[])[0] || {};
-        let totalLeads = parseInt(d.leads) || 0;
-        let totalMqls = parseInt(d.mqls) || 0;
-        let totalVendas = parseInt(d.clientes_unicos) || 0;
-        let totalReceita = parseFloat(d.receita_total) || 0;
-
-        // Se tem filtro ativo (status ou campanha), filtrar deals pelos ad_ids correspondentes
-        if ((status !== 'Todos' || campanhaId || campanhaIdSet) && adIdList.length > 0) {
-          // Filtrar deals em JS usando o set de ad_ids
-          const adIdSet = new Set(adIdList);
-          const allDealsResult = await db.execute(sql`
-            SELECT
-              utm_content as ad_id,
-              COUNT(*) as leads,
-              SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-              COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho'
-                  THEN COALESCE(company_name, contact_name, title) END) as clientes_unicos,
-              SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as receita_total
-            FROM "Bitrix".crm_deal
-            WHERE utm_content IS NOT NULL AND utm_content != ''
-              AND created_at >= ${sd}::date AND created_at <= ${ed}::date + INTERVAL '1 day'
-              AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-            GROUP BY utm_content
-          `);
-          const filteredDeals = (allDealsResult.rows as any[]).filter((r: any) => adIdSet.has(String(r.ad_id)));
-          totalLeads = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.leads) || 0), 0);
-          totalMqls = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.mqls) || 0), 0);
-          totalVendas = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.clientes_unicos) || 0), 0);
-          totalReceita = filteredDeals.reduce((s: number, r: any) => s + (parseFloat(r.receita_total) || 0), 0);
-        }
+        const filteredDeals = (allDealsResult.rows as any[]).filter((r: any) => adIdSet.has(String(r.ad_id)));
+        const totalLeads = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.leads) || 0), 0);
+        const totalMqls = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.mqls) || 0), 0);
+        const totalVendas = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.clientes_unicos) || 0), 0);
+        const totalReceita = filteredDeals.reduce((s: number, r: any) => s + (parseFloat(r.receita_total) || 0), 0);
 
         const percMql = totalLeads > 0 ? parseFloat(((totalMqls / totalLeads) * 100).toFixed(1)) : 0;
         const cpmql = totalMqls > 0 ? Math.round(totalInvestimento / totalMqls) : 0;
@@ -2751,11 +2735,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
       const connectionId = (connections.rows[0] as any).id;
 
-      // Snapshots for the period
+      // Snapshots for the period (all relevant columns)
       const snapshotsResult = await db.execute(sql`
         SELECT metric_date, followers, reach_day, impressions_day,
+               COALESCE(follows_day, 0) as follows_day,
+               COALESCE(unfollows_day, 0) as unfollows_day,
+               COALESCE(total_interactions, 0) as total_interactions,
+               COALESCE(profile_links_taps, 0) as profile_links_taps,
                COALESCE(profile_views, 0) as profile_views,
-               COALESCE(website_clicks, 0) as website_clicks
+               COALESCE(website_clicks, 0) as website_clicks,
+               COALESCE(accounts_engaged, 0) as accounts_engaged
         FROM cortex_core.instagram_metrics_snapshots
         WHERE connection_id = ${connectionId}
           AND metric_date >= ${startDate}::date
@@ -2765,13 +2754,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       const snapshots = snapshotsResult.rows as any[];
 
-      // Follower deltas
+      // Follower deltas from follows_day (net value from Instagram API follows_and_unfollows)
+      // Positive = more follows than unfollows, negative = more unfollows
       let comecaramSeguir = 0;
       let deixaramSeguir = 0;
-      for (let i = 1; i < snapshots.length; i++) {
-        const delta = (parseInt(snapshots[i].followers) || 0) - (parseInt(snapshots[i - 1].followers) || 0);
-        if (delta > 0) comecaramSeguir += delta;
-        if (delta < 0) deixaramSeguir += Math.abs(delta);
+      for (const snap of snapshots) {
+        const fd = parseInt(snap.follows_day) || 0;
+        if (fd > 0) comecaramSeguir += fd;
+        if (fd < 0) deixaramSeguir += Math.abs(fd);
+      }
+      // Fallback: if follows_day is all zeros, infer from follower count diffs
+      if (comecaramSeguir === 0 && deixaramSeguir === 0 && snapshots.length > 1) {
+        for (let i = 1; i < snapshots.length; i++) {
+          const delta = (parseInt(snapshots[i].followers) || 0) - (parseInt(snapshots[i - 1].followers) || 0);
+          if (delta > 0) comecaramSeguir += delta;
+          if (delta < 0) deixaramSeguir += Math.abs(delta);
+        }
       }
 
       const firstFollowers = snapshots.length > 0 ? (parseInt(snapshots[0].followers) || 0) : 0;
@@ -2784,10 +2782,17 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Aggregate metrics from snapshots
       const visualizacoesTotais = snapshots.reduce((s, r) => s + (parseInt(r.impressions_day) || 0), 0);
       const alcanceTotal = snapshots.reduce((s, r) => s + (parseInt(r.reach_day) || 0), 0);
-      const visitasPerfil = snapshots.reduce((s, r) => s + (parseInt(r.profile_views) || 0), 0);
-      const cliquesLinkBio = snapshots.reduce((s, r) => s + (parseInt(r.website_clicks) || 0), 0);
+      // profile_views is deprecated in IG API v22+, use accounts_engaged as proxy
+      const visitasPerfil = snapshots.reduce((s, r) => s + (parseInt(r.profile_views) || parseInt(r.accounts_engaged) || 0), 0);
+      // profile_links_taps is the current API field; website_clicks is legacy fallback
+      const cliquesLinkBio = snapshots.reduce((s, r) => s + (parseInt(r.profile_links_taps) || parseInt(r.website_clicks) || 0), 0);
+      // Use account-level total_interactions from snapshots (more accurate than post-level)
+      const interacoes = snapshots.reduce((s, r) => s + (parseInt(r.total_interactions) || 0), 0);
 
-      // Get paid impressions/reach from Meta Ads (Instagram campaigns)
+      // Get paid impressions/reach from Meta Ads
+      // TODO: Currently sums ALL Meta Ads platforms (Facebook + Instagram + Audience Network).
+      // To isolate Instagram-only, add publisher_platform column to meta_insights_daily
+      // and update metaAdsSync to use breakdowns: 'publisher_platform'.
       let visualizacoesPagas = 0;
       let alcancePago = 0;
       try {
@@ -2812,16 +2817,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const percVisualizacoesOrganicas = visualizacoesTotais > 0 ? visualizacoesOrganicas / visualizacoesTotais : 0;
       const percVisualizacoesPagas = visualizacoesTotais > 0 ? visualizacoesPagas / visualizacoesTotais : 0;
       const frequenciaAlcance = alcanceTotal > 0 ? visualizacoesTotais / alcanceTotal : 0;
-
-      // Post interactions for the period
-      const interacoesResult = await db.execute(sql`
-        SELECT COALESCE(SUM(total_interactions), 0) as total_interacoes
-        FROM cortex_core.instagram_post_metrics
-        WHERE connection_id = ${connectionId}
-          AND posted_at >= ${startDate}::date
-          AND posted_at <= ${endDate}::date + INTERVAL '1 day'
-      `);
-      const interacoes = parseInt((interacoesResult.rows[0] as any).total_interacoes) || 0;
 
       const ctrAlcanceVisitas = alcanceTotal > 0 ? visitasPerfil / alcanceTotal : 0;
       const percEngajamento = alcanceTotal > 0 ? interacoes / alcanceTotal : 0;

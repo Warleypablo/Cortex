@@ -264,7 +264,11 @@ export async function syncInsightsHistorical(
         if (metric.name === "reach") dailyMap[date].reach = point.value || 0;
         if (metric.name === "views") dailyMap[date].views = point.value || 0;
         if (metric.name === "follower_count") dailyMap[date].followers = point.value || 0;
-        if (metric.name === "follows_and_unfollows") dailyMap[date].followsDay = point.value || 0;
+        if (metric.name === "follows_and_unfollows") {
+          const val = point.value || 0;
+          if (val >= 0) { dailyMap[date].followsDay = val; dailyMap[date].unfollowsDay = 0; }
+          else { dailyMap[date].followsDay = 0; dailyMap[date].unfollowsDay = Math.abs(val); }
+        }
         if (metric.name === "accounts_engaged") dailyMap[date].accountsEngaged = point.value || 0;
         if (metric.name === "total_interactions") dailyMap[date].totalInteractions = point.value || 0;
         if (metric.name === "likes") dailyMap[date].likesDay = point.value || 0;
