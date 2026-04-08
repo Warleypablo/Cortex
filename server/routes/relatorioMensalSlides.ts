@@ -409,6 +409,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         `),
 
         // 13c. Indicações (source = RECOMMENDATION no mês de dados)
