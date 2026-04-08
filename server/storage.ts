@@ -292,14 +292,18 @@ export interface IStorage {
 
   // Metric Formatting Rules
   getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]>;
-  getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null>;
+  getMetricRuleset(metricKey: string, produto?: string | null, plataforma?: string | null): Promise<import("@shared/schema").MetricRulesetWithThresholds | null>;
   upsertMetricRuleset(data: import("@shared/schema").InsertMetricRuleset): Promise<import("@shared/schema").MetricRuleset>;
-  deleteMetricRuleset(metricKey: string): Promise<void>;
+  deleteMetricRuleset(metricKey: string, produto?: string | null, plataforma?: string | null): Promise<void>;
   createMetricThreshold(data: import("@shared/schema").InsertMetricThreshold): Promise<import("@shared/schema").MetricThreshold>;
   updateMetricThreshold(id: number, data: Partial<import("@shared/schema").InsertMetricThreshold>): Promise<import("@shared/schema").MetricThreshold>;
   deleteMetricThreshold(id: number): Promise<void>;
   deleteMetricThresholdsByRuleset(rulesetId: number): Promise<void>;
-  
+  saveMetricRulesetWithThresholds(
+    rulesetData: import("@shared/schema").InsertMetricRuleset,
+    thresholds: Omit<import("@shared/schema").InsertMetricThreshold, 'rulesetId'>[]
+  ): Promise<import("@shared/schema").MetricRulesetWithThresholds>;
+
   // Telefones (Linhas Telefônicas)
   getTelefones(): Promise<import("@shared/schema").Telefone[]>;
   getTelefoneById(id: number): Promise<import("@shared/schema").Telefone | undefined>;
@@ -1129,13 +1133,13 @@ export class MemStorage implements IStorage {
   async getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]> {
     throw new Error("Not implemented in MemStorage");
   }
-  async getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null> {
+  async getMetricRuleset(_metricKey: string, _produto?: string | null, _plataforma?: string | null): Promise<import("@shared/schema").MetricRulesetWithThresholds | null> {
     throw new Error("Not implemented in MemStorage");
   }
-  async upsertMetricRuleset(data: import("@shared/schema").InsertMetricRuleset): Promise<import("@shared/schema").MetricRuleset> {
+  async upsertMetricRuleset(_data: import("@shared/schema").InsertMetricRuleset): Promise<import("@shared/schema").MetricRuleset> {
     throw new Error("Not implemented in MemStorage");
   }
-  async deleteMetricRuleset(metricKey: string): Promise<void> {
+  async deleteMetricRuleset(_metricKey: string, _produto?: string | null, _plataforma?: string | null): Promise<void> {
     throw new Error("Not implemented in MemStorage");
   }
   async createMetricThreshold(data: import("@shared/schema").InsertMetricThreshold): Promise<import("@shared/schema").MetricThreshold> {
@@ -1148,6 +1152,12 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
   async deleteMetricThresholdsByRuleset(rulesetId: number): Promise<void> {
+    throw new Error("Not implemented in MemStorage");
+  }
+  async saveMetricRulesetWithThresholds(
+    _rulesetData: import("@shared/schema").InsertMetricRuleset,
+    _thresholds: Omit<import("@shared/schema").InsertMetricThreshold, 'rulesetId'>[]
+  ): Promise<import("@shared/schema").MetricRulesetWithThresholds> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -10234,49 +10244,56 @@ export class DbStorage implements IStorage {
 
   // Metric Formatting Rules - DbStorage implementations
   async getMetricRulesets(): Promise<import("@shared/schema").MetricRulesetWithThresholds[]> {
-    const rulesetsResult = await db.execute(sql`
-      SELECT id, metric_key, display_label, default_color, updated_at, updated_by
-      FROM metric_rulesets
-      ORDER BY display_label
+    const result = await db.execute(sql`
+      SELECT r.id, r.metric_key, r.display_label, r.default_color, r.updated_at, r.updated_by, r.produto, r.plataforma,
+             t.id AS t_id, t.min_value, t.max_value, t.color AS t_color, t.label AS t_label, t.sort_order
+      FROM metric_rulesets r
+      LEFT JOIN metric_thresholds t ON t.ruleset_id = r.id
+      ORDER BY r.display_label, t.sort_order
     `);
 
-    const rulesets: import("@shared/schema").MetricRulesetWithThresholds[] = [];
+    const map = new Map<number, import("@shared/schema").MetricRulesetWithThresholds>();
 
-    for (const row of rulesetsResult.rows as any[]) {
-      const thresholdsResult = await db.execute(sql`
-        SELECT id, ruleset_id, min_value, max_value, color, label, sort_order
-        FROM metric_thresholds
-        WHERE ruleset_id = ${row.id}
-        ORDER BY sort_order
-      `);
-      
-      rulesets.push({
-        id: row.id,
-        metricKey: row.metric_key,
-        displayLabel: row.display_label,
-        defaultColor: row.default_color,
-        updatedAt: row.updated_at,
-        updatedBy: row.updated_by,
-        thresholds: (thresholdsResult.rows as any[]).map(t => ({
-          id: t.id,
-          rulesetId: t.ruleset_id,
-          minValue: t.min_value,
-          maxValue: t.max_value,
-          color: t.color,
-          label: t.label,
-          sortOrder: t.sort_order,
-        })),
-      });
+    for (const row of result.rows as any[]) {
+      if (!map.has(row.id)) {
+        map.set(row.id, {
+          id: row.id,
+          metricKey: row.metric_key,
+          displayLabel: row.display_label,
+          defaultColor: row.default_color,
+          updatedAt: row.updated_at,
+          updatedBy: row.updated_by,
+          produto: row.produto || null,
+          plataforma: row.plataforma || null,
+          thresholds: [],
+        });
+      }
+      if (row.t_id !== null) {
+        map.get(row.id)!.thresholds.push({
+          id: row.t_id,
+          rulesetId: row.id,
+          minValue: row.min_value,
+          maxValue: row.max_value,
+          color: row.t_color,
+          label: row.t_label,
+          sortOrder: row.sort_order,
+        });
+      }
     }
-    
-    return rulesets;
+
+    return Array.from(map.values());
   }
 
-  async getMetricRuleset(metricKey: string): Promise<import("@shared/schema").MetricRulesetWithThresholds | null> {
+  async getMetricRuleset(metricKey: string, produto?: string | null, plataforma?: string | null): Promise<import("@shared/schema").MetricRulesetWithThresholds | null> {
+    const produtoVal = produto || null;
+    const plataformaVal = plataforma || null;
+
     const rulesetResult = await db.execute(sql`
-      SELECT id, metric_key, display_label, default_color, updated_at, updated_by
+      SELECT id, metric_key, display_label, default_color, updated_at, updated_by, produto, plataforma
       FROM metric_rulesets
       WHERE metric_key = ${metricKey}
+        AND produto IS NOT DISTINCT FROM ${produtoVal}
+        AND plataforma IS NOT DISTINCT FROM ${plataformaVal}
     `);
 
     if (!rulesetResult.rows.length) return null;
@@ -10289,7 +10306,7 @@ export class DbStorage implements IStorage {
       WHERE ruleset_id = ${row.id}
       ORDER BY sort_order
     `);
-    
+
     return {
       id: row.id,
       metricKey: row.metric_key,
@@ -10297,6 +10314,8 @@ export class DbStorage implements IStorage {
       defaultColor: row.default_color,
       updatedAt: row.updated_at,
       updatedBy: row.updated_by,
+      produto: row.produto || null,
+      plataforma: row.plataforma || null,
       thresholds: (thresholdsResult.rows as any[]).map(t => ({
         id: t.id,
         rulesetId: t.ruleset_id,
@@ -10310,17 +10329,37 @@ export class DbStorage implements IStorage {
   }
 
   async upsertMetricRuleset(data: import("@shared/schema").InsertMetricRuleset): Promise<import("@shared/schema").MetricRuleset> {
-    const result = await db.execute(sql`
-      INSERT INTO metric_rulesets (metric_key, display_label, default_color, updated_by, updated_at)
-      VALUES (${data.metricKey}, ${data.displayLabel}, ${data.defaultColor || 'default'}, NULLIF(${data.updatedBy || ''}, ''), NOW())
-      ON CONFLICT (metric_key) DO UPDATE SET
-        display_label = EXCLUDED.display_label,
-        default_color = EXCLUDED.default_color,
-        updated_by = EXCLUDED.updated_by,
-        updated_at = NOW()
-      RETURNING id, metric_key, display_label, default_color, updated_at, updated_by
+    const produtoVal = data.produto || null;
+    const plataformaVal = data.plataforma || null;
+
+    // NULL-safe check for existing record
+    const existing = await db.execute(sql`
+      SELECT id FROM metric_rulesets
+      WHERE metric_key = ${data.metricKey}
+        AND produto IS NOT DISTINCT FROM ${produtoVal}
+        AND plataforma IS NOT DISTINCT FROM ${plataformaVal}
     `);
-    
+
+    let result;
+    if (existing.rows.length > 0) {
+      const existingId = (existing.rows[0] as any).id;
+      result = await db.execute(sql`
+        UPDATE metric_rulesets
+        SET display_label = ${data.displayLabel},
+            default_color = ${data.defaultColor || 'default'},
+            updated_by = NULLIF(${data.updatedBy || ''}, ''),
+            updated_at = NOW()
+        WHERE id = ${existingId}
+        RETURNING id, metric_key, display_label, default_color, updated_at, updated_by, produto, plataforma
+      `);
+    } else {
+      result = await db.execute(sql`
+        INSERT INTO metric_rulesets (metric_key, display_label, default_color, updated_by, updated_at, produto, plataforma)
+        VALUES (${data.metricKey}, ${data.displayLabel}, ${data.defaultColor || 'default'}, NULLIF(${data.updatedBy || ''}, ''), NOW(), ${produtoVal}, ${plataformaVal})
+        RETURNING id, metric_key, display_label, default_color, updated_at, updated_by, produto, plataforma
+      `);
+    }
+
     const row = result.rows[0] as any;
     return {
       id: row.id,
@@ -10329,12 +10368,20 @@ export class DbStorage implements IStorage {
       defaultColor: row.default_color,
       updatedAt: row.updated_at,
       updatedBy: row.updated_by,
+      produto: row.produto || null,
+      plataforma: row.plataforma || null,
     };
   }
 
-  async deleteMetricRuleset(metricKey: string): Promise<void> {
+  async deleteMetricRuleset(metricKey: string, produto?: string | null, plataforma?: string | null): Promise<void> {
+    const produtoVal = produto || null;
+    const plataformaVal = plataforma || null;
+
     const rulesetResult = await db.execute(sql`
-      SELECT id FROM metric_rulesets WHERE metric_key = ${metricKey}
+      SELECT id FROM metric_rulesets
+      WHERE metric_key = ${metricKey}
+        AND produto IS NOT DISTINCT FROM ${produtoVal}
+        AND plataforma IS NOT DISTINCT FROM ${plataformaVal}
     `);
 
     if (rulesetResult.rows.length > 0) {
@@ -10410,6 +10457,90 @@ export class DbStorage implements IStorage {
 
   async deleteMetricThresholdsByRuleset(rulesetId: number): Promise<void> {
     await db.execute(sql`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`);
+  }
+
+  async saveMetricRulesetWithThresholds(
+    rulesetData: import("@shared/schema").InsertMetricRuleset,
+    thresholds: Omit<import("@shared/schema").InsertMetricThreshold, 'rulesetId'>[]
+  ): Promise<import("@shared/schema").MetricRulesetWithThresholds> {
+    const produtoVal = rulesetData.produto || null;
+    const plataformaVal = rulesetData.plataforma || null;
+
+    return await db.transaction(async (tx: any) => {
+      // Upsert ruleset
+      const existing = await tx.execute(sql`
+        SELECT id FROM metric_rulesets
+        WHERE metric_key = ${rulesetData.metricKey}
+          AND produto IS NOT DISTINCT FROM ${produtoVal}
+          AND plataforma IS NOT DISTINCT FROM ${plataformaVal}
+      `);
+
+      let rulesetResult;
+      if (existing.rows.length > 0) {
+        const existingId = (existing.rows[0] as any).id;
+        rulesetResult = await tx.execute(sql`
+          UPDATE metric_rulesets
+          SET display_label = ${rulesetData.displayLabel},
+              default_color = ${rulesetData.defaultColor || 'default'},
+              updated_by = NULLIF(${rulesetData.updatedBy || ''}, ''),
+              updated_at = NOW()
+          WHERE id = ${existingId}
+          RETURNING id, metric_key, display_label, default_color, updated_at, updated_by, produto, plataforma
+        `);
+      } else {
+        rulesetResult = await tx.execute(sql`
+          INSERT INTO metric_rulesets (metric_key, display_label, default_color, updated_by, updated_at, produto, plataforma)
+          VALUES (${rulesetData.metricKey}, ${rulesetData.displayLabel}, ${rulesetData.defaultColor || 'default'}, NULLIF(${rulesetData.updatedBy || ''}, ''), NOW(), ${produtoVal}, ${plataformaVal})
+          RETURNING id, metric_key, display_label, default_color, updated_at, updated_by, produto, plataforma
+        `);
+      }
+
+      const row = rulesetResult.rows[0] as any;
+      const rulesetId = row.id;
+
+      // Delete old thresholds
+      await tx.execute(sql`DELETE FROM metric_thresholds WHERE ruleset_id = ${rulesetId}`);
+
+      // Bulk insert new thresholds
+      const newThresholds: import("@shared/schema").MetricThreshold[] = [];
+      if (thresholds.length > 0) {
+        const values = thresholds.map((t, i) => {
+          const minVal = t.minValue !== null && t.minValue !== undefined ? t.minValue : null;
+          const maxVal = t.maxValue !== null && t.maxValue !== undefined ? t.maxValue : null;
+          return sql`(${rulesetId}, ${minVal}, ${maxVal}, ${t.color || 'default'}, NULLIF(${t.label || ''}, ''), ${i})`;
+        });
+
+        const insertResult = await tx.execute(sql`
+          INSERT INTO metric_thresholds (ruleset_id, min_value, max_value, color, label, sort_order)
+          VALUES ${sql.join(values, sql`, `)}
+          RETURNING id, ruleset_id, min_value, max_value, color, label, sort_order
+        `);
+
+        for (const t of insertResult.rows as any[]) {
+          newThresholds.push({
+            id: t.id,
+            rulesetId: t.ruleset_id,
+            minValue: t.min_value,
+            maxValue: t.max_value,
+            color: t.color,
+            label: t.label,
+            sortOrder: t.sort_order,
+          });
+        }
+      }
+
+      return {
+        id: rulesetId,
+        metricKey: row.metric_key,
+        displayLabel: row.display_label,
+        defaultColor: row.default_color,
+        updatedAt: row.updated_at,
+        updatedBy: row.updated_by,
+        produto: row.produto || null,
+        plataforma: row.plataforma || null,
+        thresholds: newThresholds,
+      };
+    });
   }
 
   async searchAllEntities(query: string): Promise<import("@shared/schema").SearchResult[]> {
