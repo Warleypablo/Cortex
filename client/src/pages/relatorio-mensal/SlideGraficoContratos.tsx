@@ -55,11 +55,11 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
       <div className="bg-white/[0.04] border border-white/[0.08] shadow-lg shadow-black/20 rounded-2xl px-5 py-3 mb-3">
         <div className="flex items-end justify-between mb-2">
           <div>
-            <p className="text-[10px] text-zinc-500 mb-0.5">Total de Contratos</p>
+            <p className="text-xs text-zinc-500 mb-0.5">Total de Contratos</p>
             <p className="text-3xl font-black">{dados.numContratos}</p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] text-zinc-500 mb-0.5">Receita Total</p>
+            <p className="text-xs text-zinc-500 mb-0.5">Receita Total</p>
             <p className="text-3xl font-black text-cyan-400">{formatBRL(total)}</p>
           </div>
         </div>
@@ -72,11 +72,11 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
         <div className="flex items-center justify-between mt-1.5">
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-            <span className="text-[10px] text-zinc-400">Recorrente {pctRecorrente.toFixed(0)}%</span>
+            <span className="text-xs text-zinc-400">Recorrente {pctRecorrente.toFixed(0)}%</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-            <span className="text-[10px] text-zinc-400">Pontual {pctPontual.toFixed(0)}%</span>
+            <span className="text-xs text-zinc-400">Pontual {pctPontual.toFixed(0)}%</span>
           </div>
         </div>
       </div>
@@ -87,15 +87,15 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
         {series.length > 0 && (
           <div className="col-span-3 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-3 flex flex-col">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Vendas por Mês</p>
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Vendas por Mês</p>
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1">
                   <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
-                  <span className="text-[9px] text-zinc-500">MRR</span>
+                  <span className="text-xs text-zinc-500">MRR</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-2.5 h-2.5 rounded-sm bg-purple-500" />
-                  <span className="text-[9px] text-zinc-500">Pontual</span>
+                  <span className="text-xs text-zinc-500">Pontual</span>
                 </div>
               </div>
             </div>
@@ -131,7 +131,7 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
           <div className="flex-1 bg-white/[0.03] border border-emerald-500/15 rounded-2xl p-3 flex flex-col">
             <div className="flex items-center gap-1.5 mb-2">
               <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
-              <h3 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Recorrente (MRR)</h3>
+              <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Recorrente (MRR)</h3>
             </div>
             <div className="space-y-1.5 flex-1 flex flex-col justify-center">
               <MetricCard icon={FileText} label="Contratos" value={dados.contratosRecorrente.toString()} />
@@ -144,7 +144,7 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
           <div className="flex-1 bg-white/[0.03] border border-purple-500/15 rounded-2xl p-3 flex flex-col">
             <div className="flex items-center gap-1.5 mb-2">
               <Zap className="h-3.5 w-3.5 text-purple-400" />
-              <h3 className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">Pontual</h3>
+              <h3 className="text-xs font-bold text-purple-400 uppercase tracking-wider">Pontual</h3>
             </div>
             <div className="space-y-1.5 flex-1 flex flex-col justify-center">
               <MetricCard icon={FileText} label="Contratos" value={dados.contratosPontual.toString()} />
