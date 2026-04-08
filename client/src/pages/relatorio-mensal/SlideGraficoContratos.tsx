@@ -1,8 +1,8 @@
-import { BarChart3, TrendingUp, Zap, FileText, DollarSign, Receipt } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import { BarChart3, TrendingUp, Zap } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import type { ContratosMes } from "./types";
 import SlideLayout from "./SlideLayout";
-import { SlideHeader, MetricCard } from "./SlideComponents";
+import { SlideHeader } from "./SlideComponents";
 
 interface Props {
   dados: ContratosMes;
@@ -145,30 +145,48 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
         )}
 
         {/* Metrics cards */}
-        <div className={`${series.length > 0 ? "col-span-2" : "col-span-2"} flex flex-col gap-3`}>
+        <div className={`${series.length > 0 ? "col-span-2" : "col-span-2"} flex flex-col gap-2`}>
           {/* Recorrente */}
-          <div className="flex-1 bg-white/[0.03] border border-emerald-500/15 rounded-2xl p-3 flex flex-col">
+          <div className="flex-1 bg-white/[0.03] border border-emerald-500/15 rounded-xl p-3 flex flex-col justify-center">
             <div className="flex items-center gap-1.5 mb-2">
               <TrendingUp className="h-3.5 w-3.5 text-emerald-400" />
               <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Recorrente (MRR)</h3>
             </div>
-            <div className="space-y-1.5 flex-1 flex flex-col justify-center">
-              <MetricCard icon={FileText} label="Contratos" value={dados.contratosRecorrente.toString()} />
-              <MetricCard icon={DollarSign} label="Receita" value={formatBRL(dados.receitaRecorrente)} accent="text-emerald-400" />
-              <MetricCard icon={Receipt} label="Ticket Medio" value={formatBRL(dados.tmRecorrente)} />
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Contratos</span>
+                <span className="text-sm font-bold">{dados.contratosRecorrente}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Receita</span>
+                <span className="text-sm font-bold text-emerald-400">{formatBRL(dados.receitaRecorrente)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Ticket Medio</span>
+                <span className="text-sm font-bold">{formatBRL(dados.tmRecorrente)}</span>
+              </div>
             </div>
           </div>
 
           {/* Pontual */}
-          <div className="flex-1 bg-white/[0.03] border border-purple-500/15 rounded-2xl p-3 flex flex-col">
+          <div className="flex-1 bg-white/[0.03] border border-purple-500/15 rounded-xl p-3 flex flex-col justify-center">
             <div className="flex items-center gap-1.5 mb-2">
               <Zap className="h-3.5 w-3.5 text-purple-400" />
               <h3 className="text-xs font-bold text-purple-400 uppercase tracking-wider">Pontual</h3>
             </div>
-            <div className="space-y-1.5 flex-1 flex flex-col justify-center">
-              <MetricCard icon={FileText} label="Contratos" value={dados.contratosPontual.toString()} />
-              <MetricCard icon={DollarSign} label="Receita" value={formatBRL(dados.receitaPontual)} accent="text-purple-400" />
-              <MetricCard icon={Receipt} label="Ticket Medio" value={formatBRL(dados.tmPontual)} />
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Contratos</span>
+                <span className="text-sm font-bold">{dados.contratosPontual}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Receita</span>
+                <span className="text-sm font-bold text-purple-400">{formatBRL(dados.receitaPontual)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Ticket Medio</span>
+                <span className="text-sm font-bold">{formatBRL(dados.tmPontual)}</span>
+              </div>
             </div>
           </div>
         </div>

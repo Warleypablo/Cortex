@@ -322,6 +322,7 @@ export default function RelatorioMensal() {
       >
         <div
           ref={slideRef}
+          className="overflow-hidden"
           style={{
             width: SLIDE_BASE_W,
             height: SLIDE_BASE_H,
