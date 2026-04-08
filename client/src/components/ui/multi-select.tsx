@@ -12,8 +12,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
+type OptionItem = string | { value: string; label: string };
+
+function normalizeOption(opt: OptionItem): { value: string; label: string } {
+  return typeof opt === 'string' ? { value: opt, label: opt } : opt;
+}
+
 interface MultiSelectProps {
-  options: string[];
+  options: OptionItem[];
   selected: string[];
   onChange: (selected: string[]) => void;
   placeholder?: string;
@@ -33,15 +39,13 @@ export function MultiSelect({
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  
-  console.log("[MultiSelect RENDER] placeholder:", placeholder, "selected:", selected, "length:", selected.length);
+
+  const normalizedOptions = options.map(normalizeOption);
 
   const handleToggle = (value: string) => {
-    console.log("[MultiSelect] handleToggle called with:", value);
     const newSelected = selected.includes(value)
       ? selected.filter((item) => item !== value)
       : [...selected, value];
-    console.log("[MultiSelect] calling onChange with:", newSelected);
     onChange(newSelected);
   };
 
@@ -55,9 +59,14 @@ export function MultiSelect({
     onChange([]);
   };
 
-  const filteredOptions = options.filter((option) =>
-    option.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredOptions = normalizedOptions.filter((opt) =>
+    opt.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const getLabelForValue = (value: string): string => {
+    const found = normalizedOptions.find(o => o.value === value);
+    return found ? found.label : value;
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -72,29 +81,41 @@ export function MultiSelect({
           )}
           data-testid="button-multi-select-trigger"
         >
-          <div className="flex flex-wrap gap-1 flex-1">
+          <div className="flex flex-nowrap gap-1 flex-1 overflow-hidden">
             {selected.length === 0 ? (
               <span className="text-muted-foreground">{placeholder}</span>
-            ) : (
-              selected.map((value) => (
-                <Badge
-                  key={value}
-                  variant="secondary"
-                  className="mr-1"
-                  data-testid={`badge-selected-${value}`}
+            ) : selected.length === 1 ? (
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0 max-w-[calc(100%-20px)] truncate shrink"
+                data-testid={`badge-selected-${selected[0]}`}
+              >
+                <span className="truncate">{getLabelForValue(selected[0])}</span>
+                <span
+                  className="ml-1 rounded-full outline-none hover:bg-accent cursor-pointer inline-flex items-center justify-center shrink-0"
+                  onMouseDown={(e) => handleRemove(selected[0], e)}
+                  data-testid={`button-remove-${selected[0]}`}
+                  role="button"
+                  aria-label={`Remove ${getLabelForValue(selected[0])}`}
                 >
-                  {value}
-                  <span
-                    className="ml-1 rounded-full outline-none hover:bg-accent cursor-pointer inline-flex items-center justify-center"
-                    onMouseDown={(e) => handleRemove(value, e)}
-                    data-testid={`button-remove-${value}`}
-                    role="button"
-                    aria-label={`Remove ${value}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </span>
-                </Badge>
-              ))
+                  <X className="h-2.5 w-2.5" />
+                </span>
+              </Badge>
+            ) : (
+              <Badge
+                variant="secondary"
+                className="text-[10px] px-1.5 py-0 shrink-0"
+              >
+                {selected.length} selecionados
+                <span
+                  className="ml-1 rounded-full outline-none hover:bg-accent cursor-pointer inline-flex items-center justify-center"
+                  onMouseDown={handleClearAll}
+                  role="button"
+                  aria-label="Clear all"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </span>
+              </Badge>
             )}
           </div>
           <div className="flex items-center gap-1 ml-2">
@@ -134,25 +155,25 @@ export function MultiSelect({
               </div>
             ) : (
               <div className="p-2">
-                {filteredOptions.map((option) => (
+                {filteredOptions.map((opt) => (
                   <div
-                    key={option}
+                    key={opt.value}
                     className="flex items-center space-x-2 rounded-md p-2 hover-elevate active-elevate-2 cursor-pointer"
-                    data-testid={`option-${option}`}
+                    data-testid={`option-${opt.value}`}
                   >
                     <Checkbox
-                      checked={selected.includes(option)}
-                      data-testid={`checkbox-${option}`}
-                      onCheckedChange={() => handleToggle(option)}
+                      checked={selected.includes(opt.value)}
+                      data-testid={`checkbox-${opt.value}`}
+                      onCheckedChange={() => handleToggle(opt.value)}
                     />
-                    <span 
+                    <span
                       className="flex-1 text-sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleToggle(option);
+                        handleToggle(opt.value);
                       }}
                     >
-                      {option}
+                      {opt.label}
                     </span>
                   </div>
                 ))}
