@@ -180,10 +180,16 @@ export default function RelatorioMensal() {
 
   const enterPresentation = useCallback(() => {
     setIsPresentationMode(true);
-    presentationRef.current?.requestFullscreen?.().catch(() => {
-      // Fullscreen not available, still show presentation mode
-    });
   }, []);
+
+  // Request fullscreen after presentation mode div is mounted
+  useEffect(() => {
+    if (isPresentationMode && presentationRef.current) {
+      presentationRef.current.requestFullscreen?.().catch(() => {
+        // Fullscreen not available, still show presentation mode
+      });
+    }
+  }, [isPresentationMode]);
 
   const exitPresentation = useCallback(() => {
     setIsPresentationMode(false);
