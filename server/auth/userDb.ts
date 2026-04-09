@@ -272,6 +272,11 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
     migratedRoutes.push('/rh/nps/responder');
   }
 
+  // Auto-adicionar /growth/instagram para todos os usuários
+  if (!migratedRoutes.includes('/growth/instagram')) {
+    migratedRoutes.push('/growth/instagram');
+  }
+
   // Migrar Contratos Freelancers de Jurídico → Social
   const oldCreatorsKeys = ['/juridico/creators', 'jur.contratos_creators'];
   const newCreatorsKey = 'social.contratos_creators';
