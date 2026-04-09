@@ -36,6 +36,7 @@ const CREDENTIAL_BYPASS_EMAILS = [
   "caio.massaroni@turbopartners.com.br",
   "warley.silva@turbopartners.com.br",
   "breno.carmo@turbopartners.com.br",
+  "joao.araujo@turbopartners.com.br",
 ];
 
 // WhatsApp numbers that receive approval requests
