@@ -4932,6 +4932,8 @@ Estruture sua resposta em:
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND EXTRACT(YEAR FROM ultimo_dia_operacao) = ${ano}
           AND ultimo_dia_operacao <= CURRENT_DATE
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY squad, ano, trimestre
         ORDER BY ano, trimestre, valor_total DESC
       `);
@@ -4957,6 +4959,8 @@ Estruture sua resposta em:
         WHERE ultimo_dia_operacao IS NOT NULL AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND valor_r > 0
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY squad, ano, trimestre
         ORDER BY squad, ano, trimestre
       `);
@@ -5030,6 +5034,8 @@ Estruture sua resposta em:
           AND ultimo_dia_operacao IS NOT NULL
           AND EXTRACT(YEAR FROM ultimo_dia_operacao) = ${ano}
           AND ultimo_dia_operacao <= CURRENT_DATE
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         ORDER BY ultimo_dia_operacao DESC
       `);
 
@@ -5351,6 +5357,17 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
       // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
 
+      // Helper compartilhado: aplica fuzzy match do squadFilter (mesma lógica do código antigo)
+      const matchesSquadFilter = (sq: string): boolean => {
+        if (!squadFilter) return true;
+        const stripPrefix = (s: string) => s.replace(/^[^a-zA-Z]+/, '');
+        return (
+          sq === squadFilter ||
+          sq.toLowerCase().includes(stripPrefix(squadFilter).toLowerCase()) ||
+          squadFilter.toLowerCase().includes(stripPrefix(sq).toLowerCase())
+        );
+      };
+
       // Helper para normalizar datas do Postgres em UTC midnight (evita TZ drift)
       const parseDbDate = (raw: any): Date | null => {
         if (!raw) return null;
@@ -5400,7 +5417,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const pagamentosResult = await db.execute(sql`
         SELECT
           REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo,
-          caz.nome AS cliente_nome,
+          MAX(caz.nome) AS cliente_nome,
           TO_CHAR(p.data_quitacao, 'YYYY-MM') AS mes,
           SUM(p.valor_pago::numeric) AS total_pago_mes
         FROM "Conta Azul".caz_parcelas p
@@ -5409,7 +5426,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND p.status = 'QUITADO'
           AND p.valor_pago::numeric > 0
           AND caz.cnpj IS NOT NULL AND TRIM(caz.cnpj) != ''
-        GROUP BY cnpj_limpo, caz.nome, TO_CHAR(p.data_quitacao, 'YYYY-MM')
+        GROUP BY cnpj_limpo, TO_CHAR(p.data_quitacao, 'YYYY-MM')
         ORDER BY cnpj_limpo, mes
       `);
 
@@ -5464,7 +5481,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // ──── Rodar simulação para cada cliente ─────────────────────────────────
       const hojeSim = new Date();
-      const mesAtualYYYYMM = `${hojeSim.getFullYear()}-${String(hojeSim.getMonth() + 1).padStart(2, '0')}`;
+      const mesAtualYYYYMM = `${hojeSim.getUTCFullYear()}-${String(hojeSim.getUTCMonth() + 1).padStart(2, '0')}`;
 
       for (const cliente of Array.from(clientesMap.values())) {
         // Cliente sem contratos é ignorado (decisão #6)
@@ -5501,15 +5518,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         for (const contrato of cliente.contratos) {
           const sqNorm = contrato.squad;
 
-          // Aplica filtro de squad (mesma fuzzy lógica que existia)
-          if (squadFilter) {
-            const stripPrefix = (s: string) => s.replace(/^[^a-zA-Z]+/, '');
-            const matches =
-              sqNorm === squadFilter ||
-              sqNorm.toLowerCase().includes(stripPrefix(squadFilter).toLowerCase()) ||
-              squadFilter.toLowerCase().includes(stripPrefix(sqNorm).toLowerCase());
-            if (!matches) continue;
-          }
+          if (!matchesSquadFilter(sqNorm)) continue;
 
           squadsSet.add(sqNorm);
 
@@ -5823,15 +5832,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         for (const contrato of cliente.contratos) {
           const sq = contrato.squad;
 
-          // Aplica filtro de squad se necessário
-          if (squadFilter) {
-            const stripPrefix = (s: string) => s.replace(/^[^a-zA-Z]+/, '');
-            const matches =
-              sq === squadFilter ||
-              sq.toLowerCase().includes(stripPrefix(squadFilter).toLowerCase()) ||
-              squadFilter.toLowerCase().includes(stripPrefix(sq).toLowerCase());
-            if (!matches) continue;
-          }
+          if (!matchesSquadFilter(sq)) continue;
 
           if (!squadSummaryMap.has(sq)) {
             squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
@@ -5870,6 +5871,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         for (const contrato of cliente.contratos) {
           const sq = contrato.squad;
           if (/\bOFF\b/i.test(sq)) continue;
+          if (!matchesSquadFilter(sq)) continue;
 
           for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
             if (!mes.startsWith(`${ano}-`)) continue;
@@ -6303,6 +6305,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND valor_r > 0
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
         ORDER BY mes, squad
@@ -6644,7 +6647,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND c.valor_r > 0
           AND COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squad}
           AND COALESCE(c.abonar_churn, '') != 'Sim'
-          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         ORDER BY c.data_solicitacao_encerramento DESC, c.valor_r::numeric DESC
       `);
 
