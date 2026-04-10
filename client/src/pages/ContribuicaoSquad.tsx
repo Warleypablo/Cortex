@@ -35,6 +35,7 @@ interface DespesasMensais {
   [mes: string]: {
     salarios: number;
     freelancers: number;
+    ifood: number;
   };
 }
 
@@ -55,6 +56,7 @@ interface DespesasPorSquadMensais {
     [mes: string]: {
       salarios: number;
       freelancers: number;
+      ifood: number;
     };
   };
 }
@@ -160,11 +162,11 @@ export default function ContribuicaoSquad() {
     const totalGeral = bulkData.resumoPorSquad.reduce((s, sq) => s + sq.receitaTotal, 0);
 
     return bulkData.resumoPorSquad.map((sq) => {
-      // Despesa REAL do squad (sem rateio) — soma anual de salários + freelas atribuídos
+      // Despesa REAL do squad (sem rateio) — soma anual de salários + freelas + iFood atribuídos
       let despesaSquad = 0;
       for (const m of monthlyResults) {
         const desp = bulkData.despesasPorSquadMensais?.[sq.squad]?.[m.mes];
-        if (desp) despesaSquad += desp.salarios + desp.freelancers;
+        if (desp) despesaSquad += desp.salarios + desp.freelancers + desp.ifood;
       }
       const resultadoLiquido = sq.receitaTotal - despesaSquad;
       return {
@@ -181,10 +183,10 @@ export default function ContribuicaoSquad() {
   const tableData = useMemo(() => {
     if (squadRanking.length === 0 || monthlyResults.length === 0) return null;
 
-    // Despesa total por mês (salários + freelancers)
+    // Despesa total por mês (salários + freelancers + iFood)
     const despesaTotalPorMes = monthlyResults.map((m) => {
       const desp = bulkData?.despesasMensais?.[m.mes];
-      return (desp?.salarios || 0) + (desp?.freelancers || 0);
+      return (desp?.salarios || 0) + (desp?.freelancers || 0) + (desp?.ifood || 0);
     });
 
     // Receita total por mês
@@ -195,16 +197,17 @@ export default function ContribuicaoSquad() {
     // Componentes de despesa por mês (absolutos, sem rateio)
     const salariosPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.salarios || 0);
     const freelancersPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.freelancers || 0);
+    const ifoodPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.ifood || 0);
 
     // Despesa REAL por squad por mês (lookup direto, sem rateio)
     const despesaSquadMes = (sq: typeof squadRanking[0], mesIdx: number) => {
       const mesKey = monthlyResults[mesIdx].mes;
       const desp = bulkData?.despesasPorSquadMensais?.[sq.squad]?.[mesKey];
-      return (desp?.salarios || 0) + (desp?.freelancers || 0);
+      return (desp?.salarios || 0) + (desp?.freelancers || 0) + (desp?.ifood || 0);
     };
 
-    // Componente específico (salarios | freelancers) por squad por mês
-    const despesaComponenteSquadMes = (sq: typeof squadRanking[0], mesIdx: number, tipo: 'salarios' | 'freelancers') => {
+    // Componente específico (salarios | freelancers | ifood) por squad por mês
+    const despesaComponenteSquadMes = (sq: typeof squadRanking[0], mesIdx: number, tipo: 'salarios' | 'freelancers' | 'ifood') => {
       const mesKey = monthlyResults[mesIdx].mes;
       return bulkData?.despesasPorSquadMensais?.[sq.squad]?.[mesKey]?.[tipo] || 0;
     };
@@ -222,6 +225,7 @@ export default function ContribuicaoSquad() {
       despesaComponenteSquadMes,
       salariosPorMes,
       freelancersPorMes,
+      ifoodPorMes,
       totalReceita,
       totalDespesa,
       totalMargem,
@@ -291,7 +295,7 @@ export default function ContribuicaoSquad() {
       {(() => {
         const heroItems = tableData ? [
           { label: "Receita Total", value: formatCurrencyNoDecimals(tableData.totalReceita), subtitle: "Receita bruta acumulada no ano" },
-          { label: "Total Despesas", value: formatCurrencyNoDecimals(tableData.totalDespesa), subtitle: "Despesas rateadas (salários + freelancers)" },
+          { label: "Total Despesas", value: formatCurrencyNoDecimals(tableData.totalDespesa), subtitle: "Despesas atribuídas (salários + freelancers + iFood)" },
           { label: "Margem", value: `${tableData.totalMargemPct.toFixed(1)}%`, subtitle: "Margem de contribuição consolidada" },
         ] : [];
         const skeletons = Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-12 w-40 rounded" />);
@@ -470,6 +474,7 @@ export default function ContribuicaoSquad() {
                                   {([
                                     { label: "Salários", tipo: 'salarios' as const, expandable: true },
                                     { label: "Freelancers", tipo: 'freelancers' as const, expandable: false },
+                                    { label: "iFood", tipo: 'ifood' as const, expandable: false },
                                   ] as const).map(({ label, tipo, expandable }) => {
                                     const total = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaComponenteSquadMes(sq, i, tipo), 0);
                                     const salKey = `${sq.squad}__${label}`;
@@ -657,6 +662,7 @@ export default function ContribuicaoSquad() {
                         {[
                           { label: "Salários", data: tableData.salariosPorMes, expandable: true },
                           { label: "Freelancers", data: tableData.freelancersPorMes, expandable: false },
+                          { label: "iFood", data: tableData.ifoodPorMes, expandable: false },
                         ].map(({ label, data, expandable }) => {
                           const total = data.reduce((acc, v) => acc + v, 0);
                           const salKey = `__total____${label}`;
