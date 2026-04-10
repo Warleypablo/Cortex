@@ -5789,32 +5789,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
       }
 
-      // Detalhes individuais de salários — query separada sem filtro de squad
-      const salDetalhesResult = await db.execute(sql`
-        WITH salarios_normalizados AS (
-          SELECT
-            rp.id,
-            rp.nome as colaborador_nome,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
-            CASE
-              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
-              WHEN rp.salario::text LIKE '%,%' THEN
-                NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
-              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
-                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
-              ELSE
-                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
-            END as salario
-          FROM "Inhire".rh_pessoal rp
-        )
-        SELECT id, colaborador_nome, salario, squad
-        FROM salarios_normalizados
-        WHERE status_norm = 'ativo'
-          AND salario IS NOT NULL AND salario > 0
-        ORDER BY squad, salario DESC
-      `);
-
+      // Detalhes individuais de salários — agregados a partir de salariosPorColab (Task 1)
       // Normalizar nome de squad removendo emojis/símbolos para match
       const stripEmoji = (s: string) =>
         s.replace(/[^\p{L}\p{N}\s.&+]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -5827,14 +5802,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // Fallback: match parcial (um nome contém o outro) para squads como "Black" vs "Black Sheep"
       const findRevenueSquad = (normKey: string): string | null => {
-        // 1. Match exato
         if (revenueSquadMap.has(normKey)) return revenueSquadMap.get(normKey)!;
-        // 2. Match parcial: revenue contém HR ou HR contém revenue
         let bestMatch: string | null = null;
         let bestLen = 0;
         for (const [revNorm, revName] of revenueSquadMap) {
           if (normKey.startsWith(revNorm) || revNorm.startsWith(normKey)) {
-            // Preferir o match mais longo (mais específico)
             const matchLen = Math.min(normKey.length, revNorm.length);
             if (matchLen > bestLen) {
               bestLen = matchLen;
@@ -5845,18 +5817,20 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return bestMatch;
       };
 
-      const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
-      const seen = new Set<number>();
-      for (const row of salDetalhesResult.rows as any[]) {
-        const id = Number(row.id);
-        if (seen.has(id)) continue;
-        seen.add(id);
-        const rawSquad = row.squad || 'Sem Squad';
-        const normKey = stripEmoji(rawSquad);
-        // Casar com o nome do squad da receita, fallback pro raw
-        const matchedSquad = findRevenueSquad(normKey) || rawSquad;
+      const salariosDetalhesPorSquad: Record<string, { nome: string; porMes: number[]; total: number }[]> = {};
+      for (const colab of salariosPorColab.values()) {
+        const normKey = stripEmoji(colab.squad);
+        const matchedSquad = findRevenueSquad(normKey) || colab.squad;
         if (!salariosDetalhesPorSquad[matchedSquad]) salariosDetalhesPorSquad[matchedSquad] = [];
-        salariosDetalhesPorSquad[matchedSquad].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
+        salariosDetalhesPorSquad[matchedSquad].push({
+          nome: colab.nome,
+          porMes: colab.porMes,
+          total: colab.total,
+        });
+      }
+      // Ordenar por total desc dentro de cada squad
+      for (const sq of Object.keys(salariosDetalhesPorSquad)) {
+        salariosDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
       }
 
       res.json({
