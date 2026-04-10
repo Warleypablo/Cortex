@@ -87,4 +87,47 @@ describe('simulateCliente', () => {
     expect(pontual.recebido_por_mes.get('2026-06')).toBeUndefined();
     expect(pontual.saldo_devedor).toBe(0);
   });
+
+  it('recorrente + pontual: recorrente fixo, sobra alimenta pontual', () => {
+    const recorrente = makeContrato({
+      id_subtask: 'rec-1',
+      tipo: 'recorrente',
+      valor: 2000,
+      servico: 'Performance',
+      squad: 'Squadra',
+      data_inicio: new Date('2025-01-01'),
+    });
+    const pontual = makeContrato({
+      id_subtask: 'pon-1',
+      tipo: 'pontual',
+      valor: 15000,
+      servico: 'Ecommerce',
+      squad: 'Tech',
+      data_inicio: new Date('2025-09-22'),
+    });
+    const cliente = makeCliente([recorrente, pontual], {
+      '2025-09': 5512,  // recorrente + parte do ecommerce
+      '2025-10': 5512,
+      '2025-11': 1967,  // só recorrente (cliente pagou menos que esperado)
+      '2025-12': 1967,
+      '2026-01': 1967,
+      '2026-02': 1997,
+      '2026-03': 1997,
+    });
+
+    simulateCliente(cliente, '2026-03');
+
+    // Recorrente conta cheio mesmo quando cliente pagou menos (decisão #5)
+    expect(recorrente.recebido_por_mes.get('2025-09')).toBe(2000);
+    expect(recorrente.recebido_por_mes.get('2025-11')).toBe(2000);
+    expect(recorrente.recebido_por_mes.get('2026-03')).toBe(2000);
+
+    // Pontual recebe sobra (2 meses com sobra = 3512 cada)
+    expect(pontual.recebido_por_mes.get('2025-09')).toBe(3512);
+    expect(pontual.recebido_por_mes.get('2025-10')).toBe(3512);
+    expect(pontual.recebido_por_mes.get('2025-11')).toBeUndefined();
+
+    // Saldo após 2 meses de sobra: 15000 - 7024 = 7976
+    expect(pontual.saldo_devedor).toBe(7976);
+  });
 });
