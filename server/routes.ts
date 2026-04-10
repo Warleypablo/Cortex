@@ -5816,13 +5816,28 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         freelaTotal += valor;
       }
 
+      // Contagem GLOBAL de colaboradores ativos por mês (qualquer salário > 0 no mês)
+      // Usado para iFood total (despesasMensais), inclui colaboradores em squads não-mapeados
+      const IFOOD_POR_COLAB_MES = 400;
+      const colabsAtivosGlobalPorMes = new Map<string, Set<number>>();
+      for (const [colabId, colab] of Array.from(salariosPorColab.entries())) {
+        for (let i = 0; i < 12; i++) {
+          if ((colab.porMes[i] || 0) === 0) continue;
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+          if (!colabsAtivosGlobalPorMes.has(mesKey)) colabsAtivosGlobalPorMes.set(mesKey, new Set());
+          colabsAtivosGlobalPorMes.get(mesKey)!.add(colabId);
+        }
+      }
+
       // Montar objeto de despesas mensais
-      const despesasMensais: Record<string, { salarios: number; freelancers: number }> = {};
+      const despesasMensais: Record<string, { salarios: number; freelancers: number; ifood: number }> = {};
       for (let m = 0; m < 12; m++) {
         const mesKey = `${ano}-${String(m + 1).padStart(2, '0')}`;
+        const colabsAtivosNoMes = colabsAtivosGlobalPorMes.get(mesKey)?.size || 0;
         despesasMensais[mesKey] = {
           salarios: salariosPorMesMap.get(mesKey) || 0,
           freelancers: freelaPorMes.get(mesKey) || 0,
+          ifood: colabsAtivosNoMes * IFOOD_POR_COLAB_MES,
         };
       }
 
@@ -5893,7 +5908,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // ──── Agregação de salários por (squad de receita, mês) ────────────
       const salariosPorSquadMes = new Map<string, Map<string, number>>();
-      for (const colab of Array.from(salariosPorColab.values())) {
+      // Set de colaboradores ativos por (squad, mes) — usado pra calcular iFood por squad
+      const colabsAtivosPorSquadMes = new Map<string, Map<string, Set<number>>>();
+      for (const [colabId, colab] of Array.from(salariosPorColab.entries())) {
         const normKey = stripEmoji(colab.squad);
         const matchedSquad = findRevenueSquad(normKey);
         if (!matchedSquad) continue; // squad RH não casa com squad de receita → fora da tabela visível
@@ -5904,8 +5921,16 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
 
           if (!salariosPorSquadMes.has(matchedSquad)) salariosPorSquadMes.set(matchedSquad, new Map());
-          const inner = salariosPorSquadMes.get(matchedSquad)!;
-          inner.set(mesKey, (inner.get(mesKey) || 0) + valor);
+          salariosPorSquadMes.get(matchedSquad)!.set(
+            mesKey,
+            (salariosPorSquadMes.get(matchedSquad)!.get(mesKey) || 0) + valor
+          );
+
+          if (!colabsAtivosPorSquadMes.has(matchedSquad)) colabsAtivosPorSquadMes.set(matchedSquad, new Map());
+          if (!colabsAtivosPorSquadMes.get(matchedSquad)!.has(mesKey)) {
+            colabsAtivosPorSquadMes.get(matchedSquad)!.set(mesKey, new Set());
+          }
+          colabsAtivosPorSquadMes.get(matchedSquad)!.get(mesKey)!.add(colabId);
         }
       }
 
@@ -5971,7 +5996,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       }
 
       // ──── Montar despesasPorSquadMensais ───────────────────────────────
-      const despesasPorSquadMensais: Record<string, Record<string, { salarios: number; freelancers: number }>> = {};
+      const despesasPorSquadMensais: Record<string, Record<string, { salarios: number; freelancers: number; ifood: number }>> = {};
       const todosSquadsDespesa = new Set<string>([
         ...Array.from(salariosPorSquadMes.keys()),
         ...Array.from(freelaPorSquadMes.keys()),
@@ -5982,8 +6007,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
           const sal = salariosPorSquadMes.get(squad)?.get(mesKey) || 0;
           const fre = freelaPorSquadMes.get(squad)?.get(mesKey) || 0;
-          if (sal === 0 && fre === 0) continue;
-          despesasPorSquadMensais[squad][mesKey] = { salarios: sal, freelancers: fre };
+          const colabsCount = colabsAtivosPorSquadMes.get(squad)?.get(mesKey)?.size || 0;
+          const ifood = colabsCount * IFOOD_POR_COLAB_MES;
+          if (sal === 0 && fre === 0 && ifood === 0) continue;
+          despesasPorSquadMensais[squad][mesKey] = { salarios: sal, freelancers: fre, ifood };
         }
       }
 
