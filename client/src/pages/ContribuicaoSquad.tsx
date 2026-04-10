@@ -498,11 +498,11 @@ export default function ContribuicaoSquad() {
                                             </td>
                                             {monthlyResults.map((_, i) => (
                                               <td key={i} className="py-0.5 px-2 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
-                                                {colab.salario > 0 ? formatCurrencyNoDecimals(colab.salario) : "-"}
+                                                {colab.porMes[i] > 0 ? formatCurrencyNoDecimals(colab.porMes[i]) : "-"}
                                               </td>
                                             ))}
                                             <td className="py-0.5 px-3 text-right text-[10px] font-medium text-red-400/50 dark:text-red-400/35">
-                                              {formatCurrencyNoDecimals(colab.salario)}
+                                              {formatCurrencyNoDecimals(colab.total)}
                                             </td>
                                             <td />
                                           </tr>
@@ -675,18 +675,18 @@ export default function ContribuicaoSquad() {
                                 </td>
                                 <td />
                               </tr>
-                              {isExpanded && Object.values(bulkData?.salariosDetalhesPorSquad || {}).flat().sort((a, b) => b.salario - a.salario).map((colab, idx) => (
+                              {isExpanded && Object.values(bulkData?.salariosDetalhesPorSquad || {}).flat().sort((a, b) => b.total - a.total).map((colab, idx) => (
                                 <tr key={`${colab.nome}-${idx}`} className="border-b border-border/10 bg-muted">
                                   <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 font-medium sticky left-0 z-10 bg-muted truncate max-w-[160px]" title={colab.nome}>
                                     {colab.nome}
                                   </td>
                                   {monthlyResults.map((_, i) => (
                                     <td key={i} className="py-0.5 px-2 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
-                                      {colab.salario > 0 ? formatCurrencyNoDecimals(colab.salario) : "-"}
+                                      {colab.porMes[i] > 0 ? formatCurrencyNoDecimals(colab.porMes[i]) : "-"}
                                     </td>
                                   ))}
                                   <td className="py-0.5 px-3 text-right text-[10px] font-medium text-red-400/50 dark:text-red-400/35">
-                                    {formatCurrencyNoDecimals(colab.salario)}
+                                    {formatCurrencyNoDecimals(colab.total)}
                                   </td>
                                   <td />
                                 </tr>
