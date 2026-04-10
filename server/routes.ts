@@ -5572,60 +5572,117 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         });
       }
       
-      // ──── DESPESAS: Salários, CXCS, Freelancers ────────────────────────────
-      // Salários ativos do squad (rh_pessoal)
+      // ──── DESPESAS: Salários proporcionais por admissão/demissão ────────────
+      // Warning para colaboradores sem data de admissão (não entram no cálculo)
+      const semAdmissaoResult = await db.execute(sql`
+        SELECT COUNT(*)::int AS qtd
+        FROM "Inhire".rh_pessoal
+        WHERE admissao IS NULL AND LOWER(TRIM(status)) = 'ativo'
+      `);
+      const qtdSemAdmissao = Number((semAdmissaoResult.rows[0] as any)?.qtd) || 0;
+      if (qtdSemAdmissao > 0) {
+        console.warn(
+          `[contribuicao-squad] ${qtdSemAdmissao} colaborador(es) ativo(s) sem data de admissão — não entram no cálculo proporcional.`
+        );
+      }
+
+      // Query única: salário proporcional por (colaborador × mês) usando datas de admissão/demissão
       const salarioResult = await db.execute(sql`
-        WITH salarios_normalizados AS (
+        WITH meses AS (
+          SELECT generate_series(
+            ${dataInicio}::date,
+            (${dataInicio}::date + INTERVAL '11 months')::date,
+            INTERVAL '1 month'
+          )::date AS mes_inicio
+        ),
+        meses_calc AS (
+          SELECT
+            mes_inicio,
+            (mes_inicio + INTERVAL '1 month - 1 day')::date AS mes_fim,
+            EXTRACT(DAY FROM (mes_inicio + INTERVAL '1 month - 1 day'))::int AS dias_no_mes
+          FROM meses
+        ),
+        colaboradores AS (
           SELECT
             rp.id,
-            rp.nome as colaborador_nome,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
+            rp.nome AS colaborador_nome,
+            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') AS squad,
+            rp.admissao,
+            rp.demissao,
             CASE
               WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
               WHEN rp.salario::text LIKE '%,%' THEN
                 NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
-              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
+              WHEN rp.salario::text ~ '\.[0-9]{1,2}$' THEN
                 NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
               ELSE
                 NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
-            END as salario
+            END AS salario
           FROM "Inhire".rh_pessoal rp
+          WHERE rp.admissao IS NOT NULL
+            -- Safety net: zumbis (dispensado com demissao NULL) seriam contados indefinidamente.
+            -- Aceitar registro se: tem demissao (real) OU status atual = ativo.
+            AND (rp.demissao IS NOT NULL OR LOWER(TRIM(COALESCE(rp.status, ''))) = 'ativo')
         )
-        SELECT id, colaborador_nome, salario, squad
-        FROM salarios_normalizados
-        WHERE status_norm = 'ativo'
-          AND salario IS NOT NULL AND salario > 0
+        SELECT
+          c.id,
+          c.colaborador_nome,
+          c.squad,
+          TO_CHAR(m.mes_inicio, 'YYYY-MM') AS mes,
+          ROUND(
+            c.salario
+            * (LEAST(m.mes_fim, COALESCE(c.demissao, m.mes_fim))::date
+               - GREATEST(m.mes_inicio, c.admissao)::date + 1)::numeric
+            / m.dias_no_mes,
+            2
+          ) AS salario_proporcional
+        FROM colaboradores c
+        CROSS JOIN meses_calc m
+        WHERE c.salario IS NOT NULL
+          AND c.salario > 0
+          -- Despesa só conta meses já realizados (passado + mês atual).
+          -- Meses futuros ainda não foram pagos, então não viram despesa.
+          AND m.mes_inicio <= DATE_TRUNC('month', CURRENT_DATE)
+          AND LEAST(m.mes_fim, COALESCE(c.demissao, m.mes_fim))
+              >= GREATEST(m.mes_inicio, c.admissao)
           AND (
             ${squadFilter}::text IS NULL
-            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squadFilter}
-            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter || ''}, '^[^a-zA-Z]+', '', 'g')
-            OR ${squadFilter || ''} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+            OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squadFilter}
+            OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad')
+               ILIKE '%' || REGEXP_REPLACE(${squadFilter || ''}, '^[^a-zA-Z]+', '', 'g')
+            OR ${squadFilter || ''}
+               ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
           )
-        ORDER BY squad, colaborador_nome
+        ORDER BY c.squad, c.colaborador_nome, mes
       `);
 
-      let salarioTotal = 0;
-      const salariosPorColab = new Map<number, { nome: string; salario: number; squad: string }>();
+      // Agregar por colaborador (para detalhe) e por mês (para despesasMensais.salarios)
+      type ColabAgg = { nome: string; squad: string; porMes: number[]; total: number };
+      const salariosPorColab = new Map<number, ColabAgg>();
+      const salariosPorMesMap = new Map<string, number>();
+
       for (const row of salarioResult.rows as any[]) {
         const id = Number(row.id);
-        if (!salariosPorColab.has(id)) {
-          const sal = Number(row.salario) || 0;
-          const sq = row.squad || 'Sem Squad';
-          salariosPorColab.set(id, { nome: row.colaborador_nome, salario: sal, squad: sq });
-          salarioTotal += sal;
-        }
-      }
+        const mes = row.mes as string;
+        const valor = Number(row.salario_proporcional) || 0;
 
-      // CXCS (média salarial dos CXCS ativos)
-      const cxcsResult = await db.execute(sql`
-        SELECT AVG(salario::numeric) as media_cxcs
-        FROM "Inhire".rh_pessoal
-        WHERE UPPER(TRIM(cargo)) = 'CXCS'
-          AND UPPER(TRIM(status)) = 'ATIVO'
-          AND salario IS NOT NULL AND salario::numeric > 0
-      `);
-      const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
+        salariosPorMesMap.set(mes, (salariosPorMesMap.get(mes) || 0) + valor);
+
+        if (!salariosPorColab.has(id)) {
+          salariosPorColab.set(id, {
+            nome: row.colaborador_nome,
+            squad: row.squad || 'Sem Squad',
+            porMes: new Array(12).fill(0),
+            total: 0,
+          });
+        }
+        const entry = salariosPorColab.get(id)!;
+        // Assume calendar-year window (dataInicio = ${ano}-01-01). If the window
+        // ever becomes rolling/multi-year, this index calculation will collide.
+        const monthIdx = parseInt(mes.split('-')[1]) - 1;
+        entry.porMes[monthIdx] = valor;
+        entry.total += valor;
+      }
 
       // Freelancers agrupados por mês
       const freelaResult = await db.execute(sql`
@@ -5681,12 +5738,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       }
 
       // Montar objeto de despesas mensais
-      const despesasMensais: Record<string, { salarios: number; cxcs: number; freelancers: number }> = {};
+      const despesasMensais: Record<string, { salarios: number; freelancers: number }> = {};
       for (let m = 0; m < 12; m++) {
         const mesKey = `${ano}-${String(m + 1).padStart(2, '0')}`;
         despesasMensais[mesKey] = {
-          salarios: salarioTotal,
-          cxcs: mediaCxcs,
+          salarios: salariosPorMesMap.get(mesKey) || 0,
           freelancers: freelaPorMes.get(mesKey) || 0,
         };
       }
@@ -5741,32 +5797,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
       }
 
-      // Detalhes individuais de salários — query separada sem filtro de squad
-      const salDetalhesResult = await db.execute(sql`
-        WITH salarios_normalizados AS (
-          SELECT
-            rp.id,
-            rp.nome as colaborador_nome,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
-            CASE
-              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
-              WHEN rp.salario::text LIKE '%,%' THEN
-                NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
-              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
-                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
-              ELSE
-                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
-            END as salario
-          FROM "Inhire".rh_pessoal rp
-        )
-        SELECT id, colaborador_nome, salario, squad
-        FROM salarios_normalizados
-        WHERE status_norm = 'ativo'
-          AND salario IS NOT NULL AND salario > 0
-        ORDER BY squad, salario DESC
-      `);
-
+      // Detalhes individuais de salários — agregados a partir de salariosPorColab (Task 1)
       // Normalizar nome de squad removendo emojis/símbolos para match
       const stripEmoji = (s: string) =>
         s.replace(/[^\p{L}\p{N}\s.&+]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -5779,14 +5810,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // Fallback: match parcial (um nome contém o outro) para squads como "Black" vs "Black Sheep"
       const findRevenueSquad = (normKey: string): string | null => {
-        // 1. Match exato
         if (revenueSquadMap.has(normKey)) return revenueSquadMap.get(normKey)!;
-        // 2. Match parcial: revenue contém HR ou HR contém revenue
         let bestMatch: string | null = null;
         let bestLen = 0;
         for (const [revNorm, revName] of revenueSquadMap) {
           if (normKey.startsWith(revNorm) || revNorm.startsWith(normKey)) {
-            // Preferir o match mais longo (mais específico)
             const matchLen = Math.min(normKey.length, revNorm.length);
             if (matchLen > bestLen) {
               bestLen = matchLen;
@@ -5797,18 +5825,20 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return bestMatch;
       };
 
-      const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
-      const seen = new Set<number>();
-      for (const row of salDetalhesResult.rows as any[]) {
-        const id = Number(row.id);
-        if (seen.has(id)) continue;
-        seen.add(id);
-        const rawSquad = row.squad || 'Sem Squad';
-        const normKey = stripEmoji(rawSquad);
-        // Casar com o nome do squad da receita, fallback pro raw
-        const matchedSquad = findRevenueSquad(normKey) || rawSquad;
+      const salariosDetalhesPorSquad: Record<string, { nome: string; porMes: number[]; total: number }[]> = {};
+      for (const colab of salariosPorColab.values()) {
+        const normKey = stripEmoji(colab.squad);
+        const matchedSquad = findRevenueSquad(normKey) || colab.squad;
         if (!salariosDetalhesPorSquad[matchedSquad]) salariosDetalhesPorSquad[matchedSquad] = [];
-        salariosDetalhesPorSquad[matchedSquad].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
+        salariosDetalhesPorSquad[matchedSquad].push({
+          nome: colab.nome,
+          porMes: colab.porMes,
+          total: colab.total,
+        });
+      }
+      // Ordenar por total desc dentro de cada squad
+      for (const sq of Object.keys(salariosDetalhesPorSquad)) {
+        salariosDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
       }
 
       res.json({
