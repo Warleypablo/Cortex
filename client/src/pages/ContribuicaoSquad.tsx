@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { HeroMetric } from "@/components/HeroMetric";
 
@@ -71,8 +70,6 @@ export default function ContribuicaoSquad() {
   const hoje = new Date();
   const [anoSelecionado, setAnoSelecionado] = useState(hoje.getFullYear());
   const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
-  const [taxaImposto, setTaxaImposto] = useState(18);
-  const taxaDecimal = taxaImposto / 100;
   const [collapsedSquads, setCollapsedSquads] = useState<Set<string> | "all">("all");
   const [expandedDespesas, setExpandedDespesas] = useState<Set<string>>(new Set());
   const [expandedSalarios, setExpandedSalarios] = useState<Set<string>>(new Set());
@@ -288,18 +285,6 @@ export default function ContribuicaoSquad() {
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              step={0.5}
-              value={taxaImposto}
-              onChange={(e) => setTaxaImposto(Number(e.target.value) || 0)}
-              className="w-[70px] h-9 text-sm text-center"
-              title="Alíquota de imposto (%)"
-            />
-          </div>
         </div>
       </div>
 
