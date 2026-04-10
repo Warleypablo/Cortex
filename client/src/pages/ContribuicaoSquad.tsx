@@ -50,6 +50,15 @@ interface ReceitaDetalhe {
   total: number;
 }
 
+interface DespesasPorSquadMensais {
+  [squad: string]: {
+    [mes: string]: {
+      salarios: number;
+      freelancers: number;
+    };
+  };
+}
+
 interface BulkResponse {
   ano: number;
   squad: string;
@@ -57,6 +66,7 @@ interface BulkResponse {
   meses: MonthlyData[];
   resumoPorSquad?: SquadResumo[];
   despesasMensais?: DespesasMensais;
+  despesasPorSquadMensais?: DespesasPorSquadMensais;
   salariosDetalhesPorSquad?: Record<string, SalarioDetalhe[]>;
   receitasDetalhesPorSquad?: Record<string, ReceitaDetalhe[]>;
 }
@@ -144,26 +154,23 @@ export default function ContribuicaoSquad() {
     });
   };
 
-  // Ranking de squads com rateio proporcional de despesas
+  // Ranking de squads com despesa real por squad (sem rateio)
   const squadRanking = useMemo(() => {
     if (!bulkData?.resumoPorSquad) return [];
     const totalGeral = bulkData.resumoPorSquad.reduce((s, sq) => s + sq.receitaTotal, 0);
 
-    // Total de despesas anuais
-    let totalDespAnual = 0;
-    for (const m of monthlyResults) {
-      const desp = bulkData.despesasMensais?.[m.mes];
-      totalDespAnual += (desp?.salarios || 0) + (desp?.freelancers || 0);
-    }
-
     return bulkData.resumoPorSquad.map((sq) => {
-      const proporcao = totalGeral > 0 ? sq.receitaTotal / totalGeral : 0;
-      const despesaRateada = totalDespAnual * proporcao;
+      // Despesa REAL do squad (sem rateio) — soma anual de salários + freelas atribuídos
+      let despesaSquad = 0;
+      for (const m of monthlyResults) {
+        const desp = bulkData.despesasPorSquadMensais?.[sq.squad]?.[m.mes];
+        if (desp) despesaSquad += desp.salarios + desp.freelancers;
+      }
       return {
         ...sq,
-        contribuicaoPct: totalGeral > 0 ? proporcao * 100 : 0,
-        despesaRateada,
-        resultadoLiquido: sq.receitaTotal - despesaRateada,
+        contribuicaoPct: totalGeral > 0 ? (sq.receitaTotal / totalGeral) * 100 : 0,
+        despesaRateada: despesaSquad, // nome legado, mas agora é despesa REAL
+        resultadoLiquido: sq.receitaTotal - despesaSquad,
       };
     });
   }, [bulkData, monthlyResults]);
@@ -187,18 +194,17 @@ export default function ContribuicaoSquad() {
     const salariosPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.salarios || 0);
     const freelancersPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.freelancers || 0);
 
-    // Despesa rateada por squad por mês
+    // Despesa REAL por squad por mês (lookup direto, sem rateio)
     const despesaSquadMes = (sq: typeof squadRanking[0], mesIdx: number) => {
-      const receitaMes = receitaTotalPorMes[mesIdx];
-      const proporcao = receitaMes > 0 ? (sq.porMes[mesIdx] || 0) / receitaMes : 0;
-      return despesaTotalPorMes[mesIdx] * proporcao;
+      const mesKey = monthlyResults[mesIdx].mes;
+      const desp = bulkData?.despesasPorSquadMensais?.[sq.squad]?.[mesKey];
+      return (desp?.salarios || 0) + (desp?.freelancers || 0);
     };
 
-    // Componente de despesa rateado por squad por mês
-    const despesaComponenteSquadMes = (sq: typeof squadRanking[0], mesIdx: number, componente: number[]) => {
-      const receitaMes = receitaTotalPorMes[mesIdx];
-      const proporcao = receitaMes > 0 ? (sq.porMes[mesIdx] || 0) / receitaMes : 0;
-      return componente[mesIdx] * proporcao;
+    // Componente específico (salarios | freelancers) por squad por mês
+    const despesaComponenteSquadMes = (sq: typeof squadRanking[0], mesIdx: number, tipo: 'salarios' | 'freelancers') => {
+      const mesKey = monthlyResults[mesIdx].mes;
+      return bulkData?.despesasPorSquadMensais?.[sq.squad]?.[mesKey]?.[tipo] || 0;
     };
 
     // Totais gerais
@@ -459,11 +465,11 @@ export default function ContribuicaoSquad() {
                               </tr>
                               {expandedDespesas.has(sq.squad) && (
                                 <>
-                                  {[
-                                    { label: "Salários", data: tableData.salariosPorMes, expandable: true },
-                                    { label: "Freelancers", data: tableData.freelancersPorMes, expandable: false },
-                                  ].map(({ label, data, expandable }) => {
-                                    const total = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaComponenteSquadMes(sq, i, data), 0);
+                                  {([
+                                    { label: "Salários", tipo: 'salarios' as const, expandable: true },
+                                    { label: "Freelancers", tipo: 'freelancers' as const, expandable: false },
+                                  ] as const).map(({ label, tipo, expandable }) => {
+                                    const total = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaComponenteSquadMes(sq, i, tipo), 0);
                                     const salKey = `${sq.squad}__${label}`;
                                     const isExpanded = expandable && expandedSalarios.has(salKey);
                                     return (
@@ -479,7 +485,7 @@ export default function ContribuicaoSquad() {
                                             </span>
                                           </td>
                                           {monthlyResults.map((_, i) => {
-                                            const val = tableData.despesaComponenteSquadMes(sq, i, data);
+                                            const val = tableData.despesaComponenteSquadMes(sq, i, tipo);
                                             return (
                                               <td key={i} className="py-1 px-2 text-right text-[11px] text-red-400/70 dark:text-red-400/50">
                                                 {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
