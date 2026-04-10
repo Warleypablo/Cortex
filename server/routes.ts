@@ -5620,6 +5620,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             END AS salario
           FROM "Inhire".rh_pessoal rp
           WHERE rp.admissao IS NOT NULL
+            -- Safety net: zumbis (dispensado com demissao NULL) seriam contados indefinidamente.
+            -- Aceitar registro se: tem demissao (real) OU status atual = ativo.
+            AND (rp.demissao IS NOT NULL OR LOWER(TRIM(COALESCE(rp.status, ''))) = 'ativo')
         )
         SELECT
           c.id,
@@ -5671,6 +5674,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           });
         }
         const entry = salariosPorColab.get(id)!;
+        // Assume calendar-year window (dataInicio = ${ano}-01-01). If the window
+        // ever becomes rolling/multi-year, this index calculation will collide.
         const monthIdx = parseInt(mes.split('-')[1]) - 1;
         entry.porMes[monthIdx] = valor;
         entry.total += valor;
