@@ -42,4 +42,22 @@ describe('simulateCliente', () => {
     expect(recorrente.recebido_por_mes.get('2026-02')).toBe(2000);
     expect(recorrente.recebido_por_mes.get('2026-03')).toBe(2000);
   });
+
+  it('pontual à vista: 1 pagamento que cobre valorp completo', () => {
+    const pontual = makeContrato({
+      tipo: 'pontual',
+      valor: 5000,
+      servico: 'Landing Page',
+      squad: 'Tech',
+    });
+    const cliente = makeCliente([pontual], {
+      '2026-02': 5000,
+    });
+
+    simulateCliente(cliente, '2026-03');
+
+    expect(pontual.recebido_por_mes.get('2026-02')).toBe(5000);
+    expect(pontual.recebido_por_mes.get('2026-03')).toBeUndefined();
+    expect(pontual.saldo_devedor).toBe(0);
+  });
 });
