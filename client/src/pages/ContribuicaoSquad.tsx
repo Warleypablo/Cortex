@@ -152,12 +152,8 @@ export default function ContribuicaoSquad() {
     // Total de despesas anuais
     let totalDespAnual = 0;
     for (const m of monthlyResults) {
-      const receitaMes = bulkData.resumoPorSquad.reduce((acc, sq) => {
-        const idx = monthlyResults.indexOf(m);
-        return acc + (sq.porMes[idx] || 0);
-      }, 0);
       const desp = bulkData.despesasMensais?.[m.mes];
-      totalDespAnual += receitaMes * taxaDecimal + (desp?.salarios || 0) + (desp?.cxcs || 0) + (desp?.freelancers || 0);
+      totalDespAnual += (desp?.salarios || 0) + (desp?.freelancers || 0);
     }
 
     return bulkData.resumoPorSquad.map((sq) => {
@@ -170,17 +166,16 @@ export default function ContribuicaoSquad() {
         resultadoLiquido: sq.receitaTotal - despesaRateada,
       };
     });
-  }, [bulkData, monthlyResults, taxaDecimal]);
+  }, [bulkData, monthlyResults]);
 
   // Dados computados para a tabela
   const tableData = useMemo(() => {
     if (squadRanking.length === 0 || monthlyResults.length === 0) return null;
 
-    // Despesa total por mês (impostos + salários + cxcs + freelancers)
-    const despesaTotalPorMes = monthlyResults.map((m, i) => {
-      const receitaMes = squadRanking.reduce((acc, sq) => acc + (sq.porMes[i] || 0), 0);
+    // Despesa total por mês (salários + freelancers)
+    const despesaTotalPorMes = monthlyResults.map((m) => {
       const desp = bulkData?.despesasMensais?.[m.mes];
-      return receitaMes * taxaDecimal + (desp?.salarios || 0) + (desp?.cxcs || 0) + (desp?.freelancers || 0);
+      return (desp?.salarios || 0) + (desp?.freelancers || 0);
     });
 
     // Receita total por mês
@@ -189,9 +184,7 @@ export default function ContribuicaoSquad() {
     );
 
     // Componentes de despesa por mês (absolutos, sem rateio)
-    const impostosPorMes = monthlyResults.map((_, i) => receitaTotalPorMes[i] * taxaDecimal);
     const salariosPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.salarios || 0);
-    const cxcsPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.cxcs || 0);
     const freelancersPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.freelancers || 0);
 
     // Despesa rateada por squad por mês
@@ -219,16 +212,14 @@ export default function ContribuicaoSquad() {
       receitaTotalPorMes,
       despesaSquadMes,
       despesaComponenteSquadMes,
-      impostosPorMes,
       salariosPorMes,
-      cxcsPorMes,
       freelancersPorMes,
       totalReceita,
       totalDespesa,
       totalMargem,
       totalMargemPct,
     };
-  }, [squadRanking, monthlyResults, bulkData, taxaDecimal]);
+  }, [squadRanking, monthlyResults, bulkData]);
 
   const formatMesLabel = (label: string) => {
     return label.charAt(0).toUpperCase() + label.slice(1, 3);
@@ -292,7 +283,7 @@ export default function ContribuicaoSquad() {
       {(() => {
         const heroItems = tableData ? [
           { label: "Receita Total", value: formatCurrencyNoDecimals(tableData.totalReceita), subtitle: "Receita bruta acumulada no ano" },
-          { label: "Total Despesas", value: formatCurrencyNoDecimals(tableData.totalDespesa), subtitle: "Despesas rateadas (impostos + salários + CXCs + freelancers)" },
+          { label: "Total Despesas", value: formatCurrencyNoDecimals(tableData.totalDespesa), subtitle: "Despesas rateadas (salários + freelancers)" },
           { label: "Margem", value: `${tableData.totalMargemPct.toFixed(1)}%`, subtitle: "Margem de contribuição consolidada" },
         ] : [];
         const skeletons = Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-12 w-40 rounded" />);
@@ -469,9 +460,7 @@ export default function ContribuicaoSquad() {
                               {expandedDespesas.has(sq.squad) && (
                                 <>
                                   {[
-                                    { label: "Impostos", data: tableData.impostosPorMes, expandable: false },
                                     { label: "Salários", data: tableData.salariosPorMes, expandable: true },
-                                    { label: "CXCs", data: tableData.cxcsPorMes, expandable: false },
                                     { label: "Freelancers", data: tableData.freelancersPorMes, expandable: false },
                                   ].map(({ label, data, expandable }) => {
                                     const total = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaComponenteSquadMes(sq, i, data), 0);
@@ -658,9 +647,7 @@ export default function ContribuicaoSquad() {
                     {expandedDespesas.has("__total__") && (
                       <>
                         {[
-                          { label: "Impostos", data: tableData.impostosPorMes, expandable: false },
                           { label: "Salários", data: tableData.salariosPorMes, expandable: true },
-                          { label: "CXCs", data: tableData.cxcsPorMes, expandable: false },
                           { label: "Freelancers", data: tableData.freelancersPorMes, expandable: false },
                         ].map(({ label, data, expandable }) => {
                           const total = data.reduce((acc, v) => acc + v, 0);
