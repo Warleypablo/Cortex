@@ -40,6 +40,45 @@ function makeBarLabel(data: any[], dataKey: string) {
   };
 }
 
+// Label combinado para a barra do topo: segmento interno (pontual) + total acima da stack
+function makeTopBarCombinedLabel(data: any[]) {
+  return ({ x, y, width, height, index }: any) => {
+    if (index == null) return null;
+    const d = data[index] || {};
+    const pontual = d.vendasPontual || 0;
+    const total = (d.vendasMrr || 0) + pontual;
+    return (
+      <g>
+        {total > 0 && (
+          <text
+            x={x + width / 2}
+            y={y - 6}
+            fill="#f4f4f5"
+            textAnchor="middle"
+            fontSize={12}
+            fontWeight="bold"
+          >
+            {fmtBarLabel(total)}
+          </text>
+        )}
+        {pontual > 0 && height >= 16 && (
+          <text
+            x={x + width / 2}
+            y={y + height / 2}
+            fill="white"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={11}
+            fontWeight="bold"
+          >
+            {fmtBarLabel(pontual)}
+          </text>
+        )}
+      </g>
+    );
+  };
+}
+
 function ChartTooltipContent({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
@@ -137,7 +176,7 @@ export default function SlideGraficoContratos({ dados, mesLabel }: Props) {
                   />
                   <Tooltip content={<ChartTooltipContent />} />
                   <Bar dataKey="vendasMrr" name="MRR" stackId="vendas" radius={[0, 0, 0, 0]} barSize={32} fill="#34d399" fillOpacity={0.8} label={makeBarLabel(series, "vendasMrr")} />
-                  <Bar dataKey="vendasPontual" name="Pontual" stackId="vendas" radius={[4, 4, 0, 0]} barSize={32} fill="#a855f7" fillOpacity={0.7} label={makeBarLabel(series, "vendasPontual")} />
+                  <Bar dataKey="vendasPontual" name="Pontual" stackId="vendas" radius={[4, 4, 0, 0]} barSize={32} fill="#a855f7" fillOpacity={0.7} label={makeTopBarCombinedLabel(series)} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

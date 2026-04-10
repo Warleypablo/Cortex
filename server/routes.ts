@@ -5347,10 +5347,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const dataInicio = `${ano}-01-01`;
       const dataFim = `${ano}-12-31 23:59:59`;
       
-      // Query única para todo o ano com agregação por mês
+      // Query: valorr do contrato por squad, condicionado ao cliente ter pago no mês (sem rateio)
       const result = await db.execute(sql`
         WITH cnpj_normalizado AS (
-          SELECT 
+          SELECT
             ids,
             nome,
             REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
@@ -5358,61 +5358,56 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
         ),
         cup_cnpj_normalizado AS (
-          SELECT 
+          SELECT
             task_id,
             REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
           FROM "Clickup".cup_clientes
           WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
         ),
-        contrato_todos AS (
+        contratos AS (
           SELECT DISTINCT
             cc.cnpj_limpo,
             ct.squad,
             ct.servico,
             ct.id_subtask,
-            COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
+            COALESCE(ct.valorr::numeric, 0) as valor_contrato
           FROM cup_cnpj_normalizado cc
           INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
           WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
+            AND COALESCE(ct.valorr::numeric, 0) > 0
         ),
-        contrato_com_peso AS (
-          SELECT
-            cnpj_limpo,
-            squad,
-            servico,
-            id_subtask,
-            CASE
-              WHEN SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo) > 0
-              THEN valor_contrato / SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo)
-              ELSE 1.0 / COUNT(*) OVER (PARTITION BY cnpj_limpo)
-            END as peso
-          FROM contrato_todos
+        cnpj_pagou_no_mes AS (
+          SELECT DISTINCT
+            TO_CHAR(p.data_quitacao, 'YYYY-MM') as mes,
+            caz.cnpj_limpo,
+            caz.nome as cliente_nome
+          FROM "Conta Azul".caz_parcelas p
+          INNER JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+          WHERE p.status = 'QUITADO'
+            AND p.tipo_evento = 'RECEITA'
+            AND p.data_quitacao >= ${dataInicio}::date
+            AND p.data_quitacao <= ${dataFim}::timestamp
+            AND p.valor_pago::numeric > 0
         )
         SELECT
-          TO_CHAR(p.data_quitacao, 'YYYY-MM') as mes,
-          COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
-          COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
-          COALESCE(caz.nome, 'Cliente não identificado') as cliente_nome,
-          COALESCE(cu.servico, 'Serviço não identificado') as servico_nome,
-          COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
-          p.id as parcela_id,
-          (p.valor_pago::numeric * COALESCE(cu.peso, 1)) as valor,
-          p.data_quitacao,
-          p.url_cobranca
-        FROM "Conta Azul".caz_parcelas p
-        LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        LEFT JOIN contrato_com_peso cu ON caz.cnpj_limpo = cu.cnpj_limpo
-        WHERE p.status = 'QUITADO'
-          AND p.tipo_evento = 'RECEITA'
-          AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFim}::timestamp
-          AND p.valor_pago::numeric > 0
-          AND (
-            ${squadFilter}::text IS NULL 
-            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') = ${squadFilter}
-            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter}, '^[^a-zA-Z]+', '', 'g')
-            OR ${squadFilter} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
-          )
+          pm.mes,
+          'SEM_CATEGORIA' as categoria_id,
+          'Sem Categoria' as categoria_nome,
+          COALESCE(pm.cliente_nome, 'Cliente não identificado') as cliente_nome,
+          COALESCE(c.servico, 'Serviço não identificado') as servico_nome,
+          COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') as squad,
+          NULL as parcela_id,
+          COALESCE(c.valor_contrato, 0) as valor,
+          NULL as data_quitacao,
+          NULL as url_cobranca
+        FROM cnpj_pagou_no_mes pm
+        LEFT JOIN contratos c ON pm.cnpj_limpo = c.cnpj_limpo
+        WHERE (
+          ${squadFilter}::text IS NULL
+          OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squadFilter}
+          OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter}, '^[^a-zA-Z]+', '', 'g')
+          OR ${squadFilter} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+        )
         ORDER BY mes, categoria_id, cliente_nome, servico_nome
       `);
       
@@ -5723,6 +5718,29 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }))
         .sort((a, b) => b.receitaTotal - a.receitaTotal);
 
+      // Detalhes de receita por squad -> cliente -> mês
+      const receitasDetalhesPorSquad: Record<string, { cliente: string; porMes: number[]; total: number }[]> = {};
+      for (const row of result.rows as any[]) {
+        const sq = row.squad || 'Sem Squad';
+        if (/\bOFF\b/i.test(sq)) continue;
+        const cliente = row.cliente_nome || 'Cliente não identificado';
+        const monthIdx = parseInt(row.mes.split('-')[1]) - 1;
+        const valor = Number(row.valor) || 0;
+
+        if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
+        let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === cliente);
+        if (!entry) {
+          entry = { cliente, porMes: new Array(12).fill(0), total: 0 };
+          receitasDetalhesPorSquad[sq].push(entry);
+        }
+        entry.porMes[monthIdx] += valor;
+        entry.total += valor;
+      }
+      // Ordenar clientes por total desc dentro de cada squad
+      for (const sq of Object.keys(receitasDetalhesPorSquad)) {
+        receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
+      }
+
       // Detalhes individuais de salários — query separada sem filtro de squad
       const salDetalhesResult = await db.execute(sql`
         WITH salarios_normalizados AS (
@@ -5801,6 +5819,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         resumoPorSquad,
         despesasMensais,
         salariosDetalhesPorSquad,
+        receitasDetalhesPorSquad,
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
@@ -5867,7 +5886,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             cc.cnpj_limpo,
             ct.squad,
             ct.id_subtask,
-            COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
+            COALESCE(ct.valorr::numeric, 0) as valor_contrato
           FROM cup_cnpj_normalizado cc
           INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
           WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''

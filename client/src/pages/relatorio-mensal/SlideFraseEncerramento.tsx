@@ -1,4 +1,4 @@
-import fotoEncerramento from "@assets/placeholder.svg";
+import fotoEncerramento from "@assets/slide-qa-bg.png";
 import SlideLayout from "./SlideLayout";
 
 export default function SlideFraseEncerramento() {
