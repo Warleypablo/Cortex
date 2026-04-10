@@ -5640,6 +5640,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         CROSS JOIN meses_calc m
         WHERE c.salario IS NOT NULL
           AND c.salario > 0
+          -- Despesa só conta meses já realizados (passado + mês atual).
+          -- Meses futuros ainda não foram pagos, então não viram despesa.
+          AND m.mes_inicio <= DATE_TRUNC('month', CURRENT_DATE)
           AND LEAST(m.mes_fim, COALESCE(c.demissao, m.mes_fim))
               >= GREATEST(m.mes_inicio, c.admissao)
           AND (
