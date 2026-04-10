@@ -53,6 +53,7 @@ import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
+import { simulateCliente, ContratoSim, ClienteSim } from "./contribuicaoSquad/simulator";
 
 const gpturboOpenAI = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -5347,75 +5348,135 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const dataInicio = `${ano}-01-01`;
       const dataFim = `${ano}-12-31 23:59:59`;
       
-      // Query: valorr do contrato por squad, condicionado ao cliente ter pago no mês (sem rateio)
-      const result = await db.execute(sql`
-        WITH cnpj_normalizado AS (
+      // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
+      // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
+
+      // Helper para normalizar datas do Postgres em UTC midnight (evita TZ drift)
+      const parseDbDate = (raw: any): Date | null => {
+        if (!raw) return null;
+        if (raw instanceof Date) {
+          return new Date(Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()));
+        }
+        const s = String(raw);
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) {
+          return new Date(Date.UTC(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3])));
+        }
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      };
+
+      const FALLBACK_DATA_INICIO = new Date(Date.UTC(1900, 0, 1));
+
+      // Query 1: contratos relevantes (sem filtro de ano nem squad — JS aplica)
+      const contratosResult = await db.execute(sql`
+        WITH cnpj_norm AS (
           SELECT
-            ids,
-            nome,
-            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-          FROM "Conta Azul".caz_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
-        ),
-        cup_cnpj_normalizado AS (
-          SELECT
-            task_id,
-            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-          FROM "Clickup".cup_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
-        ),
-        contratos AS (
-          SELECT DISTINCT
-            cc.cnpj_limpo,
-            ct.squad,
-            ct.servico,
-            ct.id_subtask,
-            COALESCE(ct.valorr::numeric, 0) as valor_contrato
-          FROM cup_cnpj_normalizado cc
-          INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
-          WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-            AND COALESCE(ct.valorr::numeric, 0) > 0
-        ),
-        cnpj_pagou_no_mes AS (
-          SELECT DISTINCT
-            TO_CHAR(p.data_quitacao, 'YYYY-MM') as mes,
-            caz.cnpj_limpo,
-            caz.nome as cliente_nome
-          FROM "Conta Azul".caz_parcelas p
-          INNER JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-          WHERE p.status = 'QUITADO'
-            AND p.tipo_evento = 'RECEITA'
-            AND p.data_quitacao >= ${dataInicio}::date
-            AND p.data_quitacao <= ${dataFim}::timestamp
-            AND p.valor_pago::numeric > 0
+            cl.task_id,
+            REPLACE(REPLACE(REPLACE(COALESCE(cl.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo
+          FROM "Clickup".cup_clientes cl
+          WHERE cl.cnpj IS NOT NULL AND TRIM(cl.cnpj) != ''
         )
         SELECT
-          pm.mes,
-          'SEM_CATEGORIA' as categoria_id,
-          'Sem Categoria' as categoria_nome,
-          COALESCE(pm.cliente_nome, 'Cliente não identificado') as cliente_nome,
-          COALESCE(c.servico, 'Serviço não identificado') as servico_nome,
-          COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') as squad,
-          NULL as parcela_id,
-          COALESCE(c.valor_contrato, 0) as valor,
-          NULL as data_quitacao,
-          NULL as url_cobranca
-        FROM cnpj_pagou_no_mes pm
-        LEFT JOIN contratos c ON pm.cnpj_limpo = c.cnpj_limpo
-        WHERE (
-          ${squadFilter}::text IS NULL
-          OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squadFilter}
-          OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter}, '^[^a-zA-Z]+', '', 'g')
-          OR ${squadFilter} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
-        )
-        ORDER BY mes, categoria_id, cliente_nome, servico_nome
+          cn.cnpj_limpo,
+          ct.id_subtask,
+          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') AS squad,
+          COALESCE(ct.servico, 'Serviço não identificado') AS servico,
+          CASE
+            WHEN COALESCE(ct.valorr::numeric, 0) > 0 THEN 'recorrente'
+            WHEN COALESCE(ct.valorp::numeric, 0) > 0 THEN 'pontual'
+          END AS tipo,
+          GREATEST(COALESCE(ct.valorr::numeric, 0), COALESCE(ct.valorp::numeric, 0)) AS valor,
+          ct.data_inicio,
+          COALESCE(ct.data_solicitacao_encerramento, ct.data_encerramento) AS data_fim,
+          COALESCE(ct.status, '') AS status
+        FROM cnpj_norm cn
+        INNER JOIN "Clickup".cup_contratos ct ON cn.task_id = ct.id_task
+        WHERE (COALESCE(ct.valorr::numeric, 0) > 0 OR COALESCE(ct.valorp::numeric, 0) > 0)
+          AND ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
       `);
-      
-      // Processar dados agrupados por mês
+
+      // Query 2: pagamentos cronológicos (histórico inteiro, todos os clientes)
+      const pagamentosResult = await db.execute(sql`
+        SELECT
+          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo,
+          caz.nome AS cliente_nome,
+          TO_CHAR(p.data_quitacao, 'YYYY-MM') AS mes,
+          SUM(p.valor_pago::numeric) AS total_pago_mes
+        FROM "Conta Azul".caz_parcelas p
+        INNER JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        WHERE p.tipo_evento = 'RECEITA'
+          AND p.status = 'QUITADO'
+          AND p.valor_pago::numeric > 0
+          AND caz.cnpj IS NOT NULL AND TRIM(caz.cnpj) != ''
+        GROUP BY cnpj_limpo, caz.nome, TO_CHAR(p.data_quitacao, 'YYYY-MM')
+        ORDER BY cnpj_limpo, mes
+      `);
+
+      // ──── Montar Map<cnpj, ClienteSim> ─────────────────────────────────────
+      const clientesMap = new Map<string, ClienteSim>();
+
+      // Primeiro: criar entrada por cliente a partir dos pagamentos
+      for (const row of pagamentosResult.rows as any[]) {
+        const cnpj = row.cnpj_limpo;
+        if (!cnpj) continue;
+        let cliente = clientesMap.get(cnpj);
+        if (!cliente) {
+          cliente = {
+            cnpj,
+            cliente_nome: row.cliente_nome || 'Cliente não identificado',
+            contratos: [],
+            pagamentos_por_mes: new Map(),
+          };
+          clientesMap.set(cnpj, cliente);
+        }
+        const mes = row.mes as string;
+        const valor = Number(row.total_pago_mes) || 0;
+        cliente.pagamentos_por_mes.set(mes, (cliente.pagamentos_por_mes.get(mes) || 0) + valor);
+      }
+
+      // Depois: anexar contratos a cada cliente que tem pagamentos
+      for (const row of contratosResult.rows as any[]) {
+        const cnpj = row.cnpj_limpo;
+        if (!cnpj) continue;
+        const cliente = clientesMap.get(cnpj);
+        if (!cliente) continue; // cliente sem pagamento — ignorar
+        if (!row.tipo) continue; // contrato sem valor — pulado pela CASE da query
+
+        const dataInicioParsed = parseDbDate(row.data_inicio) || FALLBACK_DATA_INICIO;
+        const dataFimParsed = parseDbDate(row.data_fim);
+
+        const contrato: ContratoSim = {
+          id_subtask: row.id_subtask,
+          cnpj,
+          squad: row.squad || 'Sem Squad',
+          servico: row.servico || 'Serviço não identificado',
+          tipo: row.tipo as 'recorrente' | 'pontual',
+          valor: Number(row.valor) || 0,
+          data_inicio: dataInicioParsed,
+          data_fim: dataFimParsed,
+          status: row.status || '',
+          saldo_devedor: 0,
+          recebido_por_mes: new Map(),
+        };
+        cliente.contratos.push(contrato);
+      }
+
+      // ──── Rodar simulação para cada cliente ─────────────────────────────────
+      const hojeSim = new Date();
+      const mesAtualYYYYMM = `${hojeSim.getFullYear()}-${String(hojeSim.getMonth() + 1).padStart(2, '0')}`;
+
+      for (const cliente of Array.from(clientesMap.values())) {
+        // Cliente sem contratos é ignorado (decisão #6)
+        if (cliente.contratos.length === 0) continue;
+        simulateCliente(cliente, mesAtualYYYYMM);
+      }
+
+      // ──── Agregar resultados em estruturas legacy (mesesMap) ───────────────
       type ParcelaInfo = {
-        id: string;
+        id: string | null;
         valor: number;
-        dataQuitacao: string;
+        dataQuitacao: string | null;
         linkNfse: string | null;
         numNfse: string | null;
         urlCobranca: string | null;
@@ -5423,74 +5484,83 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         servicoNome: string;
         squad: string;
       };
-      
       type ServicoInfo = { valor: number; squad: string; parcelas: ParcelaInfo[] };
       type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
       type CategoriaInfo = { nome: string; valorTotal: number; clientes: Map<string, ClienteInfo> };
-      type MesData = { 
-        categorias: Map<string, CategoriaInfo>; 
+      type MesData = {
+        categorias: Map<string, CategoriaInfo>;
         receitaTotal: number;
         totalParcelas: number;
       };
-      
+
       const mesesMap = new Map<string, MesData>();
       const squadsSet = new Set<string>();
-      
-      for (const row of result.rows as any[]) {
-        const mes = row.mes;
-        const categoriaNome = row.categoria_nome || 'Sem Categoria';
-        const clienteNome = row.cliente_nome;
-        const servicoNome = row.servico_nome;
-        const squadNome = row.squad;
-        const valor = Number(row.valor) || 0;
 
-        squadsSet.add(squadNome);
+      // Iterar contratos simulados, somando recebido_por_mes nos meses do ano selecionado
+      for (const cliente of Array.from(clientesMap.values())) {
+        for (const contrato of cliente.contratos) {
+          const sqNorm = contrato.squad;
 
-        if (!mesesMap.has(mes)) {
-          mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
+          // Aplica filtro de squad (mesma fuzzy lógica que existia)
+          if (squadFilter) {
+            const stripPrefix = (s: string) => s.replace(/^[^a-zA-Z]+/, '');
+            const matches =
+              sqNorm === squadFilter ||
+              sqNorm.toLowerCase().includes(stripPrefix(squadFilter).toLowerCase()) ||
+              squadFilter.toLowerCase().includes(stripPrefix(sqNorm).toLowerCase());
+            if (!matches) continue;
+          }
+
+          squadsSet.add(sqNorm);
+
+          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
+            // Filtrar só meses do ano selecionado
+            if (!mes.startsWith(`${ano}-`)) continue;
+            if (valor <= 0) continue;
+
+            if (!mesesMap.has(mes)) {
+              mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
+            }
+            const mesData = mesesMap.get(mes)!;
+            mesData.receitaTotal += valor;
+            mesData.totalParcelas += 1;
+
+            const categoriaNome = 'Sem Categoria';
+            if (!mesData.categorias.has(categoriaNome)) {
+              mesData.categorias.set(categoriaNome, {
+                nome: categoriaNome,
+                valorTotal: 0,
+                clientes: new Map(),
+              });
+            }
+            const cat = mesData.categorias.get(categoriaNome)!;
+            cat.valorTotal += valor;
+
+            if (!cat.clientes.has(cliente.cliente_nome)) {
+              cat.clientes.set(cliente.cliente_nome, { valorTotal: 0, servicos: new Map() });
+            }
+            const cli = cat.clientes.get(cliente.cliente_nome)!;
+            cli.valorTotal += valor;
+
+            const chaveServico = `${contrato.servico}|${sqNorm}`;
+            if (!cli.servicos.has(chaveServico)) {
+              cli.servicos.set(chaveServico, { valor: 0, squad: sqNorm, parcelas: [] });
+            }
+            const srv = cli.servicos.get(chaveServico)!;
+            srv.valor += valor;
+            srv.parcelas.push({
+              id: contrato.id_subtask,
+              valor,
+              dataQuitacao: null,
+              linkNfse: null,
+              numNfse: null,
+              urlCobranca: null,
+              clienteNome: cliente.cliente_nome,
+              servicoNome: contrato.servico,
+              squad: sqNorm,
+            });
+          }
         }
-
-        const mesData = mesesMap.get(mes)!;
-        mesData.receitaTotal += valor;
-        mesData.totalParcelas += 1;
-
-        // Agrupar por categoria_nome (não UUID) para unificar categorias com mesmo nome
-        if (!mesData.categorias.has(categoriaNome)) {
-          mesData.categorias.set(categoriaNome, {
-            nome: categoriaNome,
-            valorTotal: 0,
-            clientes: new Map()
-          });
-        }
-
-        const cat = mesData.categorias.get(categoriaNome)!;
-        cat.valorTotal += valor;
-        
-        if (!cat.clientes.has(clienteNome)) {
-          cat.clientes.set(clienteNome, { valorTotal: 0, servicos: new Map() });
-        }
-        
-        const cliente = cat.clientes.get(clienteNome)!;
-        cliente.valorTotal += valor;
-        
-        const chaveServico = `${servicoNome}|${squadNome}`;
-        if (!cliente.servicos.has(chaveServico)) {
-          cliente.servicos.set(chaveServico, { valor: 0, squad: squadNome, parcelas: [] });
-        }
-        
-        const servico = cliente.servicos.get(chaveServico)!;
-        servico.valor += valor;
-        servico.parcelas.push({
-          id: row.parcela_id,
-          valor,
-          dataQuitacao: row.data_quitacao,
-          linkNfse: null,
-          numNfse: null,
-          urlCobranca: row.url_cobranca,
-          clienteNome,
-          servicoNome,
-          squad: squadNome
-        });
       }
       
       // Converter para formato de resposta
