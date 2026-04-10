@@ -130,4 +130,54 @@ describe('simulateCliente', () => {
     // Saldo após 2 meses de sobra: 15000 - 7024 = 7976
     expect(pontual.saldo_devedor).toBe(7976);
   });
+
+  it('Creators 4 entregas: FIFO consome um contrato por mês', () => {
+    const e1 = makeContrato({
+      id_subtask: 'e1', tipo: 'pontual', valor: 6799,
+      servico: '1ª Entrega - Creators', squad: 'Makers',
+      data_inicio: new Date('2025-08-01'),
+    });
+    const e2 = makeContrato({
+      id_subtask: 'e2', tipo: 'pontual', valor: 6799,
+      servico: '2ª Entrega - Creators', squad: 'Makers',
+      data_inicio: new Date('2025-08-02'),
+    });
+    const e3 = makeContrato({
+      id_subtask: 'e3', tipo: 'pontual', valor: 6799,
+      servico: '3ª Entrega - Creators', squad: 'Makers',
+      data_inicio: new Date('2025-08-03'),
+    });
+    const e4 = makeContrato({
+      id_subtask: 'e4', tipo: 'pontual', valor: 6799,
+      servico: '4ª Entrega - Creators', squad: 'Makers',
+      data_inicio: new Date('2025-08-04'),
+    });
+    const cliente = makeCliente([e1, e2, e3, e4], {
+      '2025-09': 6799,
+      '2025-10': 6799,
+      '2025-11': 6799,
+      '2025-12': 6799,
+      '2026-01': 6799, // depois de tudo zerado — não deve atribuir nada
+    });
+
+    simulateCliente(cliente, '2026-01');
+
+    // FIFO por data_inicio: e1 primeiro (2025-08-01), depois e2, e3, e4
+    expect(e1.recebido_por_mes.get('2025-09')).toBe(6799);
+    expect(e1.saldo_devedor).toBe(0);
+    expect(e2.recebido_por_mes.get('2025-10')).toBe(6799);
+    expect(e2.saldo_devedor).toBe(0);
+    expect(e3.recebido_por_mes.get('2025-11')).toBe(6799);
+    expect(e3.saldo_devedor).toBe(0);
+    expect(e4.recebido_por_mes.get('2025-12')).toBe(6799);
+    expect(e4.saldo_devedor).toBe(0);
+
+    // Mês 2026-01: tudo zerado, nada recebe
+    expect(e1.recebido_por_mes.get('2026-01')).toBeUndefined();
+    expect(e4.recebido_por_mes.get('2026-01')).toBeUndefined();
+
+    // Nenhum contrato pego por outro mês fora do esperado
+    expect(e1.recebido_por_mes.get('2025-10')).toBeUndefined();
+    expect(e2.recebido_por_mes.get('2025-09')).toBeUndefined();
+  });
 });
