@@ -5865,6 +5865,65 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }))
         .sort((a, b) => b.receitaTotal - a.receitaTotal);
 
+      // ──── Helpers para mapear squad RH → squad de Receita ───────────────
+      // Usado para atribuir despesas (salários, freelancers) ao squad correto.
+      const stripEmoji = (s: string) =>
+        s.replace(/[^\p{L}\p{N}\s.&+]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+      const revenueSquadMap = new Map<string, string>();
+      for (const s of resumoPorSquad) {
+        revenueSquadMap.set(stripEmoji(s.squad), s.squad);
+      }
+
+      const findRevenueSquad = (normKey: string): string | null => {
+        if (revenueSquadMap.has(normKey)) return revenueSquadMap.get(normKey)!;
+        let bestMatch: string | null = null;
+        let bestLen = 0;
+        for (const [revNorm, revName] of Array.from(revenueSquadMap)) {
+          if (normKey.startsWith(revNorm) || revNorm.startsWith(normKey)) {
+            const matchLen = Math.min(normKey.length, revNorm.length);
+            if (matchLen > bestLen) {
+              bestLen = matchLen;
+              bestMatch = revName;
+            }
+          }
+        }
+        return bestMatch;
+      };
+
+      // ──── Agregação de salários por (squad de receita, mês) ────────────
+      const salariosPorSquadMes = new Map<string, Map<string, number>>();
+      for (const colab of Array.from(salariosPorColab.values())) {
+        const normKey = stripEmoji(colab.squad);
+        const matchedSquad = findRevenueSquad(normKey);
+        if (!matchedSquad) continue; // squad RH não casa com squad de receita → fora da tabela visível
+
+        for (let i = 0; i < 12; i++) {
+          const valor = colab.porMes[i] || 0;
+          if (valor === 0) continue;
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+
+          if (!salariosPorSquadMes.has(matchedSquad)) salariosPorSquadMes.set(matchedSquad, new Map());
+          const inner = salariosPorSquadMes.get(matchedSquad)!;
+          inner.set(mesKey, (inner.get(mesKey) || 0) + valor);
+        }
+      }
+
+      // ──── Agregação de freelancers por (squad de receita, mês) ─────────
+      const freelaPorSquadMes = new Map<string, Map<string, number>>();
+      for (const row of freelaResult.rows as any[]) {
+        const mes = row.mes as string;
+        const valor = Number(row.valor) || 0;
+        const rawSquad = row.squad || 'Sem Squad';
+        const normKey = stripEmoji(rawSquad);
+        const matchedSquad = findRevenueSquad(normKey);
+        if (!matchedSquad) continue; // freela sem match → fora da tabela visível
+
+        if (!freelaPorSquadMes.has(matchedSquad)) freelaPorSquadMes.set(matchedSquad, new Map());
+        const inner = freelaPorSquadMes.get(matchedSquad)!;
+        inner.set(mes, (inner.get(mes) || 0) + valor);
+      }
+
       // ──── Detalhes de receita por squad → cliente → mês ─────────────────
       const receitasDetalhesPorSquad: Record<string, { cliente: string; porMes: number[]; total: number }[]> = {};
       for (const cliente of Array.from(clientesMap.values())) {
@@ -5894,34 +5953,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
       }
 
-      // Detalhes individuais de salários — agregados a partir de salariosPorColab (Task 1)
-      // Normalizar nome de squad removendo emojis/símbolos para match
-      const stripEmoji = (s: string) =>
-        s.replace(/[^\p{L}\p{N}\s.&+]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
-
-      // Mapa: nome normalizado → nome original da receita
-      const revenueSquadMap = new Map<string, string>();
-      for (const s of resumoPorSquad) {
-        revenueSquadMap.set(stripEmoji(s.squad), s.squad);
-      }
-
-      // Fallback: match parcial (um nome contém o outro) para squads como "Black" vs "Black Sheep"
-      const findRevenueSquad = (normKey: string): string | null => {
-        if (revenueSquadMap.has(normKey)) return revenueSquadMap.get(normKey)!;
-        let bestMatch: string | null = null;
-        let bestLen = 0;
-        for (const [revNorm, revName] of revenueSquadMap) {
-          if (normKey.startsWith(revNorm) || revNorm.startsWith(normKey)) {
-            const matchLen = Math.min(normKey.length, revNorm.length);
-            if (matchLen > bestLen) {
-              bestLen = matchLen;
-              bestMatch = revName;
-            }
-          }
-        }
-        return bestMatch;
-      };
-
+      // Detalhes individuais de salários — agregados a partir de salariosPorColab
       const salariosDetalhesPorSquad: Record<string, { nome: string; porMes: number[]; total: number }[]> = {};
       for (const colab of salariosPorColab.values()) {
         const normKey = stripEmoji(colab.squad);
@@ -5938,6 +5970,23 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         salariosDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
       }
 
+      // ──── Montar despesasPorSquadMensais ───────────────────────────────
+      const despesasPorSquadMensais: Record<string, Record<string, { salarios: number; freelancers: number }>> = {};
+      const todosSquadsDespesa = new Set<string>([
+        ...Array.from(salariosPorSquadMes.keys()),
+        ...Array.from(freelaPorSquadMes.keys()),
+      ]);
+      for (const squad of Array.from(todosSquadsDespesa)) {
+        despesasPorSquadMensais[squad] = {};
+        for (let i = 0; i < 12; i++) {
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+          const sal = salariosPorSquadMes.get(squad)?.get(mesKey) || 0;
+          const fre = freelaPorSquadMes.get(squad)?.get(mesKey) || 0;
+          if (sal === 0 && fre === 0) continue;
+          despesasPorSquadMensais[squad][mesKey] = { salarios: sal, freelancers: fre };
+        }
+      }
+
       res.json({
         ano,
         squad: squadFilter || 'todos',
@@ -5945,6 +5994,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         meses: monthlyData,
         resumoPorSquad,
         despesasMensais,
+        despesasPorSquadMensais,
         salariosDetalhesPorSquad,
         receitasDetalhesPorSquad,
       });
