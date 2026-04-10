@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { MetricFormattingSheet } from "@/components/MetricFormattingSheet";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Search, X, ArrowUpDown, TrendingUp, TrendingDown, Rocket, ExternalLink, Loader2, Settings, ChevronRight, ChevronDown } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
@@ -77,6 +76,7 @@ interface KpiData {
   vendas: number;
   cac: number;
   aov: number;
+  reunioesAgendadas: number;
 }
 
 type SortConfig = {
@@ -177,7 +177,7 @@ export default function Criativos() {
   }, [selectedCampaignIds, selectedProdutos, campanhasFiltradas]);
 
   const { data: criativos = [], isLoading } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos', startDate, endDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
+    queryKey: ['/api/growth/criativos', startDate, endDate, statusFilter, selectedPlataformas, activeCampaignIds],
     queryFn: async () => {
       const params = new URLSearchParams({ startDate, endDate, status: statusFilter });
       if (selectedPlataformas.length > 0) {
@@ -197,7 +197,7 @@ export default function Criativos() {
   const compareEndDate = compareEnabled && compareRange?.to ? format(compareRange.to, 'yyyy-MM-dd') : '';
 
   const { data: compareData = [] } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos/compare', compareStartDate, compareEndDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
+    queryKey: ['/api/growth/criativos/compare', compareStartDate, compareEndDate, statusFilter, selectedPlataformas, activeCampaignIds],
     queryFn: async () => {
       if (!compareStartDate || !compareEndDate) return [];
       const params = new URLSearchParams({ startDate: compareStartDate, endDate: compareEndDate, status: statusFilter });
@@ -245,9 +245,12 @@ export default function Criativos() {
 
   // KPIs com comparação
   const { data: kpisData, isLoading: kpisLoading } = useQuery<{ current: KpiData; compare: KpiData | null }>({
-    queryKey: ['/api/growth/criativos/kpis', startDate, endDate, compareEnabled, compareRange?.from, compareRange?.to, statusFilter, selectedCampaignIds, selectedProdutos],
+    queryKey: ['/api/growth/criativos/kpis', startDate, endDate, compareEnabled, compareRange?.from, compareRange?.to, statusFilter, selectedPlataformas, activeCampaignIds],
     queryFn: async () => {
       const params = new URLSearchParams({ startDate, endDate, status: statusFilter });
+      if (selectedPlataformas.length > 0) {
+        params.append('plataforma', selectedPlataformas.join(','));
+      }
       if (activeCampaignIds.length > 0) {
         params.append('campanhaIds', activeCampaignIds.join(','));
       }
@@ -433,12 +436,7 @@ export default function Criativos() {
       percRa: avg('percRa'),
       percRaMql: avg('percRaMql'),
       percRaNmql: avg('percRaNmql'),
-      percRr: (() => {
-        const mql = avg('percRrMql');
-        const nmql = avg('percRrNmql');
-        if (mql !== null && nmql !== null) return parseFloat(((mql + nmql) / 2).toFixed(2));
-        return mql ?? nmql;
-      })(),
+      percRr: avg('percRr'),
       percRrMql: avg('percRrMql'),
       percRrNmql: avg('percRrNmql'),
       percRrVendas: avg('percRrVendas'),
@@ -447,13 +445,13 @@ export default function Criativos() {
       clientesUnicos: sum('clientesUnicos'),
       leadTime: avg('leadTime'),
       aov: avg('aov'),
-      receita: avg('receita'),
-      receitaPontual: avg('receitaPontual'),
-      receitaRecorrente: avg('receitaRecorrente'),
+      receita: sum('receita'),
+      receitaPontual: sum('receitaPontual'),
+      receitaRecorrente: sum('receitaRecorrente'),
       cacGeral: avg('cacGeral'),
       cacUnico: avg('cacUnico'),
       cacContrato: avg('cacContrato'),
-      roas: avg('roas'),
+      roas: totalInvest > 0 ? parseFloat((sum('receita') / totalInvest).toFixed(2)) : null,
     };
   }, [filteredData]);
 
@@ -572,6 +570,7 @@ export default function Criativos() {
   const investimentoVar = kpis && kpisCompare ? calcVariation(kpis.investimento, kpisCompare.investimento) : null;
   const percMqlVar = kpis && kpisCompare ? calcVariation(kpis.percMql, kpisCompare.percMql) : null;
   const cpmqlVar = kpis && kpisCompare ? calcVariation(kpis.cpmql, kpisCompare.cpmql, true) : null;
+  const reunioesAgendadasVar = kpis && kpisCompare ? calcVariation(kpis.reunioesAgendadas, kpisCompare.reunioesAgendadas) : null;
   const vendasVar = kpis && kpisCompare ? calcVariation(kpis.vendas, kpisCompare.vendas) : null;
   const cacVar = kpis && kpisCompare ? calcVariation(kpis.cac, kpisCompare.cac, true) : null;
   const aovVar = kpis && kpisCompare ? calcVariation(kpis.aov, kpisCompare.aov) : null;
@@ -719,19 +718,19 @@ export default function Criativos() {
           </CardContent>
         </Card>
 
-        {/* CPMQL */}
+        {/* REUNIÕES AGENDADAS */}
         <Card className="border bg-card">
           <CardContent className="pt-3 pb-2 px-4">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">CPMQL</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reuniões Agendadas</span>
             <div className="text-lg font-bold tracking-tight mt-1">
-              {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatCurrency(kpis?.cpmql ?? null)}
+              {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatNumber(kpis?.reunioesAgendadas ?? null)}
             </div>
-            {cpmqlVar && (
+            {reunioesAgendadasVar && (
               <div className={cn("flex items-center gap-1 text-xs",
-                cpmqlVar.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                reunioesAgendadasVar.isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
               )}>
-                {cpmqlVar.isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                <span>{cpmqlVar.pct > 0 ? '+' : ''}{cpmqlVar.pct.toFixed(1)}% vs anterior</span>
+                {reunioesAgendadasVar.isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                <span>{reunioesAgendadasVar.pct > 0 ? '+' : ''}{reunioesAgendadasVar.pct.toFixed(1)}% vs anterior</span>
               </div>
             )}
           </CardContent>
@@ -798,14 +797,6 @@ export default function Criativos() {
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-lg sr-only">Performance por Criativo</CardTitle>
               <div className="flex items-center gap-2">
-                <MetricFormattingSheet
-                  open={configOpen}
-                  onOpenChange={setConfigOpen}
-                  metricRules={metricRules}
-                  produtos={produtos}
-                  onSave={(data) => saveRulesMutation.mutate(data)}
-                  isSaving={saveRulesMutation.isPending}
-                />
               </div>
             </div>
           </CardHeader>
@@ -1013,7 +1004,7 @@ export default function Criativos() {
                                 </>
                               )}
                               {/* CAC (grupo) */}
-                              {renderCell(item.cacGeral, c?.cacGeral ?? null, 'cacGeral', formatCurrency, '', true)}
+                              {renderCell(item.cacGeral, c?.cacGeral ?? null, 'cacGeral', formatCurrency, getCellColor(item.cacGeral, 'cacGeral'), true)}
                               {expandedGroups.has('cac') && (
                                 <>
                                   {renderCell(item.cacUnico, c?.cacUnico ?? null, 'cacUnico', formatCurrency, getCellColor(item.cacUnico, 'cacUnico'), true)}
