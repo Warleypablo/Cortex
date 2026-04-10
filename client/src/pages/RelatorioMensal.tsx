@@ -21,21 +21,25 @@ import SlideRankingSDRs from "./relatorio-mensal/SlideRankingSDRs";
 import SlideGraficoContratos from "./relatorio-mensal/SlideGraficoContratos";
 
 import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
+import SlidePontual from "./relatorio-mensal/SlidePontual";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
 import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
+import SlideTopicosDiscussao from "./relatorio-mensal/SlideTopicosDiscussao";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
 import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
   "KRs", "Capa Comercial", "Ranking Closers",
-  "Ranking SDRs", "Contratos", "Capa Commerce", "Turbo Metrics", "Ranking Squads", "Squad Details",
+  "Ranking SDRs", "Contratos", "Capa Commerce", "Squad Details", "Ranking Squads", "Turbo Commerce",
+  "Pontual",
   "Capa Tech", "Area Tech",
+  "Tópicos",
   "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 17
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 19
 
 type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
 
@@ -253,13 +257,15 @@ export default function RelatorioMensal() {
       case 7: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
       case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
       case 9: return <SlideCapaCommerce />;
-      case 10: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 10: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
       case 11: return <SlideRankingSquads ranking={data.rankingSquads} />;
-      case 12: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
-      case 13: return <SlideCapaTech />;
-      case 14: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 15: return <SlideFraseEncerramento />;
-      case 16: return <SlideQRCode />;
+      case 12: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 13: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
+      case 14: return <SlideCapaTech />;
+      case 15: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 16: return <SlideTopicosDiscussao />;
+      case 17: return <SlideFraseEncerramento />;
+      case 18: return <SlideQRCode />;
       default: return null;
     }
   };

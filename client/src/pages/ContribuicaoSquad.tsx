@@ -45,6 +45,12 @@ interface SalarioDetalhe {
   salario: number;
 }
 
+interface ReceitaDetalhe {
+  cliente: string;
+  porMes: number[];
+  total: number;
+}
+
 interface BulkResponse {
   ano: number;
   squad: string;
@@ -53,6 +59,7 @@ interface BulkResponse {
   resumoPorSquad?: SquadResumo[];
   despesasMensais?: DespesasMensais;
   salariosDetalhesPorSquad?: Record<string, SalarioDetalhe[]>;
+  receitasDetalhesPorSquad?: Record<string, ReceitaDetalhe[]>;
 }
 
 const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
@@ -69,9 +76,18 @@ export default function ContribuicaoSquad() {
   const [collapsedSquads, setCollapsedSquads] = useState<Set<string> | "all">("all");
   const [expandedDespesas, setExpandedDespesas] = useState<Set<string>>(new Set());
   const [expandedSalarios, setExpandedSalarios] = useState<Set<string>>(new Set());
+  const [expandedReceitas, setExpandedReceitas] = useState<Set<string>>(new Set());
 
   const toggleDespesasExpand = (key: string) => {
     setExpandedDespesas(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleReceitasExpand = (key: string) => {
+    setExpandedReceitas(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
@@ -413,9 +429,10 @@ export default function ContribuicaoSquad() {
 
                           {!isCollapsed && (
                             <>
-                              {/* Receita */}
-                              <tr className="border-b border-border/30">
-                                <td className="py-1.5 px-3 pl-9 text-xs text-emerald-600 dark:text-emerald-400 sticky left-0 z-10 bg-background">
+                              {/* Receita (expandível) */}
+                              <tr className="border-b border-border/30 cursor-pointer hover:bg-muted/30" onClick={() => toggleReceitasExpand(sq.squad)}>
+                                <td className="py-1.5 px-3 pl-7 text-xs text-emerald-600 dark:text-emerald-400 sticky left-0 z-10 bg-background flex items-center gap-1">
+                                  {expandedReceitas.has(sq.squad) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                                   Receita
                                 </td>
                                 {sq.porMes.map((val, i) => (
@@ -428,6 +445,22 @@ export default function ContribuicaoSquad() {
                                 </td>
                                 <td />
                               </tr>
+                              {expandedReceitas.has(sq.squad) && (bulkData?.receitasDetalhesPorSquad?.[sq.squad] || []).map((cliente, idx) => (
+                                <tr key={`${cliente.cliente}-${idx}`} className="border-b border-border/10">
+                                  <td className="py-0.5 px-3 pl-12 text-[10px] text-emerald-500/70 dark:text-emerald-400/50 sticky left-0 z-10 bg-background truncate max-w-[200px]" title={cliente.cliente}>
+                                    {cliente.cliente}
+                                  </td>
+                                  {monthlyResults.map((_, i) => (
+                                    <td key={i} className="py-0.5 px-2 text-right text-[10px] text-emerald-500/70 dark:text-emerald-400/50">
+                                      {cliente.porMes[i] > 0 ? formatCurrencyNoDecimals(cliente.porMes[i]) : "-"}
+                                    </td>
+                                  ))}
+                                  <td className="py-0.5 px-3 text-right text-[10px] font-medium text-emerald-500/70 dark:text-emerald-400/50">
+                                    {formatCurrencyNoDecimals(cliente.total)}
+                                  </td>
+                                  <td />
+                                </tr>
+                              ))}
 
                               {/* Despesas (expandível) */}
                               <tr className="border-b border-border/30 cursor-pointer hover:bg-muted/30" onClick={() => toggleDespesasExpand(sq.squad)}>
@@ -572,9 +605,10 @@ export default function ContribuicaoSquad() {
                       <td className="py-2.5 px-3" />
                       <td className="py-2.5 px-3 text-right text-xs font-bold text-muted-foreground">100%</td>
                     </tr>
-                    {/* Total Receita */}
-                    <tr className="border-b border-border/30 bg-muted">
-                      <td className="py-1.5 px-3 pl-9 text-xs text-emerald-600 dark:text-emerald-400 font-medium sticky left-0 z-10 bg-muted">
+                    {/* Total Receita (expandível) */}
+                    <tr className="border-b border-border/30 bg-muted cursor-pointer hover:bg-muted/80" onClick={() => toggleReceitasExpand("__total__")}>
+                      <td className="py-1.5 px-3 pl-7 text-xs text-emerald-600 dark:text-emerald-400 font-medium sticky left-0 z-10 bg-muted flex items-center gap-1">
+                        {expandedReceitas.has("__total__") ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                         Receita
                       </td>
                       {tableData.receitaTotalPorMes.map((val, i) => (
@@ -587,6 +621,39 @@ export default function ContribuicaoSquad() {
                       </td>
                       <td />
                     </tr>
+                    {expandedReceitas.has("__total__") && (() => {
+                      // Agregar todos os clientes de todos os squads com porMes somados
+                      const clienteMap = new Map<string, { porMes: number[]; total: number }>();
+                      for (const clientes of Object.values(bulkData?.receitasDetalhesPorSquad || {})) {
+                        for (const c of clientes) {
+                          const existing = clienteMap.get(c.cliente);
+                          if (existing) {
+                            c.porMes.forEach((v, i) => { existing.porMes[i] += v; });
+                            existing.total += c.total;
+                          } else {
+                            clienteMap.set(c.cliente, { porMes: [...c.porMes], total: c.total });
+                          }
+                        }
+                      }
+                      return Array.from(clienteMap.entries())
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .map(([cliente, data], idx) => (
+                          <tr key={`${cliente}-${idx}`} className="border-b border-border/10 bg-muted">
+                            <td className="py-0.5 px-3 pl-12 text-[10px] text-emerald-500/70 dark:text-emerald-400/50 font-medium sticky left-0 z-10 bg-muted truncate max-w-[200px]" title={cliente}>
+                              {cliente}
+                            </td>
+                            {monthlyResults.map((_, i) => (
+                              <td key={i} className="py-0.5 px-2 text-right text-[10px] text-emerald-500/70 dark:text-emerald-400/50">
+                                {data.porMes[i] > 0 ? formatCurrencyNoDecimals(data.porMes[i]) : "-"}
+                              </td>
+                            ))}
+                            <td className="py-0.5 px-3 text-right text-[10px] font-medium text-emerald-500/70 dark:text-emerald-400/50">
+                              {formatCurrencyNoDecimals(data.total)}
+                            </td>
+                            <td />
+                          </tr>
+                        ));
+                    })()}
                     {/* Total Despesas (expandível) */}
                     <tr className="border-b border-border/30 bg-muted cursor-pointer hover:bg-muted/80" onClick={() => toggleDespesasExpand("__total__")}>
                       <td className="py-1.5 px-3 pl-7 text-xs text-red-500 dark:text-red-400 font-medium sticky left-0 z-10 bg-muted flex items-center gap-1">

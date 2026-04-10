@@ -48,14 +48,35 @@ function makeBarLabel(data: any[], dataKey: string) {
 
 function ChartTooltipContent({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
+  const data = payload[0]?.payload;
+  if (!data) return null;
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs">
-      <p className="font-bold text-white mb-1">{label}</p>
-      {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.color }}>
-          {p.name}: {p.dataKey === "churnPct" ? `${p.value}%` : fmtBRL(p.value)}
-        </p>
-      ))}
+    <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs min-w-[160px]">
+      <p className="font-bold text-white mb-1.5">{label}</p>
+      <div className="border-b border-zinc-700 pb-1 mb-1.5">
+        <div className="flex justify-between items-center gap-3">
+          <span className="text-zinc-400">Total:</span>
+          <span className="font-bold text-cyan-400 text-sm">{fmtBRL(data.total)}</span>
+        </div>
+      </div>
+      <div className="space-y-0.5">
+        <div className="flex justify-between gap-3">
+          <span className="text-emerald-400">MRR:</span>
+          <span className="text-emerald-400">{fmtBRL(data.mrr)}</span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span className="text-purple-400">Pontual:</span>
+          <span className="text-purple-400">{fmtBRL(data.pontual)}</span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span className="text-pink-400">Churn:</span>
+          <span className="text-pink-400">{fmtBRL(data.churnBrl)}</span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span className="text-pink-400">Churn %:</span>
+          <span className="text-pink-400">{data.churnPct}%</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -78,12 +99,16 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
       const [y, m] = s.month.split("-").map(Number);
       return y === reportYear && m === i + 1;
     });
+    const mrr = found?.mrr || 0;
+    const pontual = found?.pontual || 0;
     return {
       label,
-      mrr: found?.mrr || 0,
+      mrr,
+      pontual,
       churnBrl: found?.churnBrl || 0,
       churnPct: found?.churnPct || 0,
-      hasData: !!found,
+      total: mrr + pontual,
+      hasData: !!found && (mrr > 0 || pontual > 0),
     };
   });
 
@@ -204,21 +229,24 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
             </div>
           </div>
           <div className="border-t border-white/[0.06] pt-1.5 mt-1.5 space-y-0.5">
-            <div className="flex justify-between">
-              <span className="text-xs text-zinc-400">Solicit.:</span>
-              <span className="text-xs font-bold text-red-400">
-                {metrics.retencoesSolicitacoesCount} ({fmtBRL(metrics.retencoesSolicitacoesValor)})
-              </span>
+            <div className="flex items-center gap-1 mb-0.5">
+              <span className="text-xs text-emerald-400 font-bold">Vl Retido CXCS</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-zinc-400">Retido:</span>
-              <span className="text-xs font-bold text-emerald-400">
-                {metrics.retencoesCount} ({retencaoPct}%)
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-zinc-400">Vl Retido:</span>
-              <span className="text-xs font-bold text-emerald-400">{fmtBRL(metrics.retencoesValor)}</span>
+            {[
+              { nome: "Palha Nordestina", valor: 2497 },
+              { nome: "Mosh", valor: 1997 },
+              { nome: "Artesanal Chef", valor: 2997 },
+              { nome: "Sim Cervejaria", valor: 3997 },
+              { nome: "Monvitta", valor: 17487 },
+            ].map(c => (
+              <div key={c.nome} className="flex justify-between">
+                <span className="text-[10px] text-zinc-400 truncate max-w-[110px]" title={c.nome}>{c.nome}</span>
+                <span className="text-[11px] font-bold text-emerald-400">{fmtBRL(c.valor)}</span>
+              </div>
+            ))}
+            <div className="flex justify-between border-t border-white/[0.06] pt-0.5 mt-0.5">
+              <span className="text-[10px] text-zinc-500 font-bold">Total:</span>
+              <span className="text-xs font-bold text-emerald-400">{fmtBRL(2497 + 1997 + 2997 + 3997 + 17487)}</span>
             </div>
           </div>
         </SecondaryCard>
@@ -226,8 +254,8 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
 
       {/* Bottom: Chart + MRR/Churn info */}
       <div className="flex-1 grid grid-cols-7 gap-3 min-h-0">
-        {/* Chart: Receita x Churn */}
-        <ChartCard title="Receita x Churn" className="col-span-5">
+        {/* Chart: Faturamento x Churn */}
+        <ChartCard title="Faturamento x Churn" className="col-span-5">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
@@ -258,12 +286,12 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
               <Tooltip content={<ChartTooltipContent />} />
               <Bar yAxisId="left" dataKey="mrr" name="MRR" stackId="a" radius={[0, 0, 0, 0]} barSize={32} label={makeBarLabel(chartData, "mrr")}>
                 {chartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.hasData ? "#34d399" : "transparent"} fillOpacity={0.7} />
+                  <Cell key={i} fill={entry.mrr > 0 ? "#34d399" : "transparent"} fillOpacity={0.7} />
                 ))}
               </Bar>
-              <Bar yAxisId="left" dataKey="churnBrl" name="Churn" stackId="a" radius={[4, 4, 0, 0]} barSize={32} label={makeBarLabel(chartData, "churnBrl")}>
+              <Bar yAxisId="left" dataKey="pontual" name="Pontual" stackId="a" radius={[4, 4, 0, 0]} barSize={32} label={makeBarLabel(chartData, "pontual")}>
                 {chartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.hasData ? "#f97316" : "transparent"} fillOpacity={0.5} stroke={entry.hasData ? "#f97316" : "transparent"} strokeWidth={1.5} />
+                  <Cell key={i} fill={entry.pontual > 0 ? "#a855f7" : "transparent"} fillOpacity={0.7} />
                 ))}
               </Bar>
               <Line
