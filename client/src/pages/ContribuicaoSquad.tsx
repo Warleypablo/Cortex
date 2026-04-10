@@ -166,11 +166,13 @@ export default function ContribuicaoSquad() {
         const desp = bulkData.despesasPorSquadMensais?.[sq.squad]?.[m.mes];
         if (desp) despesaSquad += desp.salarios + desp.freelancers;
       }
+      const resultadoLiquido = sq.receitaTotal - despesaSquad;
       return {
         ...sq,
-        contribuicaoPct: totalGeral > 0 ? (sq.receitaTotal / totalGeral) * 100 : 0,
+        // Margem de contribuição = (receita - despesa) / receita do squad
+        contribuicaoPct: sq.receitaTotal > 0 ? (resultadoLiquido / sq.receitaTotal) * 100 : 0,
         despesaRateada: despesaSquad, // nome legado, mas agora é despesa REAL
-        resultadoLiquido: sq.receitaTotal - despesaSquad,
+        resultadoLiquido,
       };
     });
   }, [bulkData, monthlyResults]);
