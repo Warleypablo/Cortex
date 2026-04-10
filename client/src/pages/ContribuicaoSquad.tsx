@@ -35,14 +35,14 @@ interface SquadResumo {
 interface DespesasMensais {
   [mes: string]: {
     salarios: number;
-    cxcs: number;
     freelancers: number;
   };
 }
 
 interface SalarioDetalhe {
   nome: string;
-  salario: number;
+  porMes: number[];
+  total: number;
 }
 
 interface ReceitaDetalhe {
