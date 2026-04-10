@@ -1179,7 +1179,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Se plataformas selecionadas não incluem Meta Ads, retornar zeros
       const plataformas = plataformaParam === 'Todos' ? [] : plataformaParam.split(',').map(p => p.trim());
       if (plataformas.length > 0 && !plataformas.includes('Meta Ads') && !plataformas.includes('Todos')) {
-        const emptyKpis = { investimento: 0, percMql: 0, cpmql: 0, vendas: 0, cac: 0, aov: 0, reunioesAgendadas: 0 };
+        const emptyKpis = { investimento: 0, percMql: 0, cpmql: 0, vendas: 0, cac: 0, aov: 0 };
         return res.json({ current: emptyKpis, compare: null });
       }
 
@@ -1214,7 +1214,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             utm_content as ad_id,
             COUNT(*) as leads,
             SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-            SUM(CASE WHEN data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as rm,
             COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho'
                 THEN COALESCE(company_name, contact_name, title) END) as clientes_unicos,
             SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as receita_total
@@ -1227,7 +1226,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const filteredDeals = (allDealsResult.rows as any[]).filter((r: any) => adIdSet.has(String(r.ad_id)));
         const totalLeads = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.leads) || 0), 0);
         const totalMqls = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.mqls) || 0), 0);
-        const totalRm = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.rm) || 0), 0);
         const totalVendas = filteredDeals.reduce((s: number, r: any) => s + (parseInt(r.clientes_unicos) || 0), 0);
         const totalReceita = filteredDeals.reduce((s: number, r: any) => s + (parseFloat(r.receita_total) || 0), 0);
 
@@ -1243,7 +1241,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           vendas: totalVendas,
           cac,
           aov,
-          reunioesAgendadas: totalRm,
         };
       };
 
