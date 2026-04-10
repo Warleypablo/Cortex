@@ -5817,21 +5817,41 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         };
       }
 
-      // Agregar resumo por squad a partir dos dados brutos
+      // ──── Agregar resumo por squad a partir dos contratos simulados ──────
       const squadSummaryMap = new Map<string, { total: number; porMes: number[]; contratos: Set<string> }>();
-      for (const row of result.rows as any[]) {
-        const sq = row.squad || 'Sem Squad';
-        if (!squadSummaryMap.has(sq)) {
-          squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
+      for (const cliente of Array.from(clientesMap.values())) {
+        for (const contrato of cliente.contratos) {
+          const sq = contrato.squad;
+
+          // Aplica filtro de squad se necessário
+          if (squadFilter) {
+            const stripPrefix = (s: string) => s.replace(/^[^a-zA-Z]+/, '');
+            const matches =
+              sq === squadFilter ||
+              sq.toLowerCase().includes(stripPrefix(squadFilter).toLowerCase()) ||
+              squadFilter.toLowerCase().includes(stripPrefix(sq).toLowerCase());
+            if (!matches) continue;
+          }
+
+          if (!squadSummaryMap.has(sq)) {
+            squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
+          }
+          const entry = squadSummaryMap.get(sq)!;
+
+          let teveValorNoAno = false;
+          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
+            if (!mes.startsWith(`${ano}-`)) continue;
+            if (valor <= 0) continue;
+            const monthIdx = parseInt(mes.split('-')[1]) - 1;
+            entry.total += valor;
+            entry.porMes[monthIdx] += valor;
+            teveValorNoAno = true;
+          }
+
+          if (teveValorNoAno) {
+            entry.contratos.add(`${cliente.cliente_nome}|${contrato.servico}|${sq}`);
+          }
         }
-        const entry = squadSummaryMap.get(sq)!;
-        const monthIdx = parseInt(row.mes.split('-')[1]) - 1;
-        const valor = Number(row.valor) || 0;
-        entry.total += valor;
-        entry.porMes[monthIdx] += valor;
-        // Usar combinação cliente+serviço+squad como identificador de contrato
-        const contratoKey = `${row.cliente_nome}|${row.servico_nome}|${sq}`;
-        entry.contratos.add(contratoKey);
       }
 
       const resumoPorSquad = Array.from(squadSummaryMap.entries())
@@ -5844,23 +5864,28 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }))
         .sort((a, b) => b.receitaTotal - a.receitaTotal);
 
-      // Detalhes de receita por squad -> cliente -> mês
+      // ──── Detalhes de receita por squad → cliente → mês ─────────────────
       const receitasDetalhesPorSquad: Record<string, { cliente: string; porMes: number[]; total: number }[]> = {};
-      for (const row of result.rows as any[]) {
-        const sq = row.squad || 'Sem Squad';
-        if (/\bOFF\b/i.test(sq)) continue;
-        const cliente = row.cliente_nome || 'Cliente não identificado';
-        const monthIdx = parseInt(row.mes.split('-')[1]) - 1;
-        const valor = Number(row.valor) || 0;
+      for (const cliente of Array.from(clientesMap.values())) {
+        for (const contrato of cliente.contratos) {
+          const sq = contrato.squad;
+          if (/\bOFF\b/i.test(sq)) continue;
 
-        if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
-        let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === cliente);
-        if (!entry) {
-          entry = { cliente, porMes: new Array(12).fill(0), total: 0 };
-          receitasDetalhesPorSquad[sq].push(entry);
+          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
+            if (!mes.startsWith(`${ano}-`)) continue;
+            if (valor <= 0) continue;
+            const monthIdx = parseInt(mes.split('-')[1]) - 1;
+
+            if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
+            let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === cliente.cliente_nome);
+            if (!entry) {
+              entry = { cliente: cliente.cliente_nome, porMes: new Array(12).fill(0), total: 0 };
+              receitasDetalhesPorSquad[sq].push(entry);
+            }
+            entry.porMes[monthIdx] += valor;
+            entry.total += valor;
+          }
         }
-        entry.porMes[monthIdx] += valor;
-        entry.total += valor;
       }
       // Ordenar clientes por total desc dentro de cada squad
       for (const sq of Object.keys(receitasDetalhesPorSquad)) {
