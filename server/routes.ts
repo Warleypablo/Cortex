@@ -5676,16 +5676,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         entry.total += valor;
       }
 
-      // CXCS (média salarial dos CXCS ativos)
-      const cxcsResult = await db.execute(sql`
-        SELECT AVG(salario::numeric) as media_cxcs
-        FROM "Inhire".rh_pessoal
-        WHERE UPPER(TRIM(cargo)) = 'CXCS'
-          AND UPPER(TRIM(status)) = 'ATIVO'
-          AND salario IS NOT NULL AND salario::numeric > 0
-      `);
-      const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
-
       // Freelancers agrupados por mês
       const freelaResult = await db.execute(sql`
         WITH best_match AS (
@@ -5740,12 +5730,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       }
 
       // Montar objeto de despesas mensais
-      const despesasMensais: Record<string, { salarios: number; cxcs: number; freelancers: number }> = {};
+      const despesasMensais: Record<string, { salarios: number; freelancers: number }> = {};
       for (let m = 0; m < 12; m++) {
         const mesKey = `${ano}-${String(m + 1).padStart(2, '0')}`;
         despesasMensais[mesKey] = {
-          salarios: salarioTotal,
-          cxcs: mediaCxcs,
+          salarios: salariosPorMesMap.get(mesKey) || 0,
           freelancers: freelaPorMes.get(mesKey) || 0,
         };
       }
