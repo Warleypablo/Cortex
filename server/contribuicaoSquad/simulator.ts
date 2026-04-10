@@ -27,6 +27,11 @@ export interface ClienteSim {
 
 const STATUS_RECORRENTE_INATIVO = new Set(['Cancelado', 'Encerrado', 'Pausado']);
 
+// Tolerância de meio centavo para evitar saldo "fantasma" por imprecisão de float.
+// Valores reais têm centavos (R$ 1.967,50), e somas/subtrações repetidas geram
+// resíduos como 1517.9999999999998 que manteriam pontuais "vivos" indefinidamente.
+const EPSILON = 0.005;
+
 /** Retorna true se o contrato está ativo no mês YYYY-MM informado. */
 export function contratoAtivoEm(c: ContratoSim, mesYYYYMM: string): boolean {
   const [ano, mes] = mesYYYYMM.split('-').map(Number);
@@ -89,10 +94,10 @@ export function simulateCliente(cliente: ClienteSim, mesAtualYYYYMM: string): vo
 
     // 3b. Sobra alimenta pontuais em FIFO por data_inicio
     let sobra = Math.max(0, totalPago - somaRecorrentes);
-    if (sobra <= 0) continue;
+    if (sobra <= EPSILON) continue;
 
     const pontuaisFila = ativos
-      .filter(c => c.tipo === 'pontual' && c.saldo_devedor > 0)
+      .filter(c => c.tipo === 'pontual' && c.saldo_devedor > EPSILON)
       .sort((a, b) => a.data_inicio.getTime() - b.data_inicio.getTime());
 
     for (const p of pontuaisFila) {
@@ -101,7 +106,7 @@ export function simulateCliente(cliente: ClienteSim, mesAtualYYYYMM: string): vo
       p.recebido_por_mes.set(mes, atual + atribuir);
       p.saldo_devedor -= atribuir;
       sobra -= atribuir;
-      if (sobra <= 0) break;
+      if (sobra <= EPSILON) break;
     }
     // sobra residual (overpayment) é ignorada
   }
