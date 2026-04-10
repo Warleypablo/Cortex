@@ -22,7 +22,7 @@ Este design corrige os dois problemas em uma única passagem.
 | # | Pergunta | Decisão |
 |---|----------|---------|
 | 1 | Como tratar admissão/demissão no meio do mês? | **Proporcional por dias corridos** (`dias_ativos / dias_no_mes`). |
-| 2 | Como definir se colaborador estava ativo no mês? | **Só datas** — `admissao <= fim_mes AND (demissao IS NULL OR demissao >= inicio_mes)`. Ignora `status` para preservar histórico fiel. |
+| 2 | Como definir se colaborador estava ativo no mês? | **Só datas, com safety net** — `admissao <= fim_mes AND (demissao IS NULL OR demissao >= inicio_mes)`. Para defender contra dados sujos (dispensados sem `demissao`), aceita registro apenas se `demissao IS NOT NULL OR status='ativo'`. Validação em produção encontrou 4 zumbis. |
 | 3 | Como remover Impostos/CXCs? | **Remover totalmente** — UI, estado, cálculo, query. Sem feature flag. |
 | 4 | Considerar promoções/mudanças de salário no ano? | **Não** — usa salário atual de `rh_pessoal.salario`. Limitação documentada. |
 | 5 | Como tratar mudanças de squad no ano? | **Não reconstrói** — usa squad atual de `rh_pessoal.squad`. Limitação documentada. |
