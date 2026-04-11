@@ -25,7 +25,16 @@ export interface ClienteSim {
   pagamentos_por_mes: Map<string, number>; // 'YYYY-MM' -> SUM(valor_pago)
 }
 
-const STATUS_RECORRENTE_INATIVO = new Set(['Cancelado', 'Encerrado', 'Pausado']);
+// Status (normalizados: lowercase + trim) que indicam contrato recorrente inativo.
+// Pontuais ignoram status — usam apenas data_fim.
+const STATUS_RECORRENTE_INATIVO = new Set([
+  'cancelado/inativo',
+  'em cancelamento',
+  'cancelado',
+  'encerrado',
+  'pausado',
+  'não usar',
+]);
 
 // Tolerância de meio centavo para evitar saldo "fantasma" por imprecisão de float.
 // Valores reais têm centavos (R$ 1.967,50), e somas/subtrações repetidas geram
@@ -40,7 +49,10 @@ export function contratoAtivoEm(c: ContratoSim, mesYYYYMM: string): boolean {
 
   if (c.data_inicio > fimMes) return false;
   if (c.data_fim && c.data_fim < inicioMes) return false;
-  if (c.tipo === 'recorrente' && STATUS_RECORRENTE_INATIVO.has(c.status)) return false;
+  if (c.tipo === 'recorrente') {
+    const statusNorm = (c.status || '').toLowerCase().trim();
+    if (STATUS_RECORRENTE_INATIVO.has(statusNorm)) return false;
+  }
 
   return true;
 }

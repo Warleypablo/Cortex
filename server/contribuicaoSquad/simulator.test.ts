@@ -180,4 +180,53 @@ describe('simulateCliente', () => {
     expect(e1.recebido_por_mes.get('2025-10')).toBeUndefined();
     expect(e2.recebido_por_mes.get('2025-09')).toBeUndefined();
   });
+
+  it('recorrente cancelado/inativo não compete por sobra (status filter robusto)', () => {
+    // Caso real BioPelle: Squadra cancelado com status "cancelado/inativo" estava
+    // engolindo o pagamento do mês e deixando Tech com migalhas.
+    const squadra = makeContrato({
+      id_subtask: 'sq',
+      tipo: 'recorrente',
+      valor: 2997,
+      servico: 'Performance',
+      squad: 'Squadra',
+      data_inicio: new Date('2026-01-07'),
+      status: 'cancelado/inativo', // ← status real do banco
+    });
+    const tech = makeContrato({
+      id_subtask: 'tech',
+      tipo: 'pontual',
+      valor: 1997,
+      servico: 'Sustentação',
+      squad: 'Tech',
+      data_inicio: new Date('2026-02-25'),
+    });
+    const cliente = makeCliente([squadra, tech], {
+      '2026-03': 3054.88,
+    });
+
+    simulateCliente(cliente, '2026-03');
+
+    // Squadra está filtrado por status → não recebe nada
+    expect(squadra.recebido_por_mes.get('2026-03')).toBeUndefined();
+
+    // Tech recebe MIN(1997, 3054.88) = 1997 cheio (sem Squadra engolir)
+    expect(tech.recebido_por_mes.get('2026-03')).toBe(1997);
+    expect(tech.saldo_devedor).toBe(0);
+  });
+
+  it('status inativo aceita variações case e trim', () => {
+    // Diferentes variações reais do banco: 'Cancelado', 'PAUSADO', ' pausado '
+    const casos = ['Cancelado', 'PAUSADO', ' pausado ', 'Em Cancelamento', 'Não Usar'];
+    for (const status of casos) {
+      const rec = makeContrato({
+        tipo: 'recorrente',
+        valor: 1000,
+        status,
+      });
+      const cli = makeCliente([rec], { '2026-01': 1000 });
+      simulateCliente(cli, '2026-01');
+      expect(rec.recebido_por_mes.get('2026-01')).toBeUndefined();
+    }
+  });
 });
