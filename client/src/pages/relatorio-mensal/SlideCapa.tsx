@@ -1,4 +1,4 @@
-import turboLogo from "@assets/logo-turbo-branca.svg";
+import turboLogo from "@assets/logo-preta.png";
 import SlideLayout from "./SlideLayout";
 
 interface Props {

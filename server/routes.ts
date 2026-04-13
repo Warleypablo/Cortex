@@ -53,6 +53,7 @@ import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
+import { simulateCliente, ContratoSim, ClienteSim } from "./contribuicaoSquad/simulator";
 
 const gpturboOpenAI = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -2099,17 +2100,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDateStr = startDate.toISOString().split('T')[0];
       
       // Buscar evolução de MRR por mês
-      // Para meses anteriores: usa snapshots históricos (cup_data_hist)
+      // Para meses anteriores: usa snapshot do dia 1 do mês seguinte (estado final do mês)
+      // Fallback: último snapshot dentro do mês se dia 1 não existir
       // Para o mês atual: usa dados ao vivo (cup_contratos) para evitar valores incompletos
       const mrrResult = await db.execute(sql`
-        WITH snapshots_mensais AS (
-          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
-            DATE_TRUNC('month', data_snapshot) as mes,
-            data_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE DATE(data_snapshot) >= ${startDateStr}::date
-            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
-          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        WITH meses_range AS (
+          SELECT generate_series(
+            DATE_TRUNC('month', ${startDateStr}::date),
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month',
+            INTERVAL '1 month'
+          )::date as mes
+        ),
+        snapshots_mensais AS (
+          SELECT
+            mr.mes,
+            COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (mr.mes + INTERVAL '1 month')::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE DATE_TRUNC('month', data_snapshot) = mr.mes)
+            ) as data_snapshot
+          FROM meses_range mr
         ),
         historical_data AS (
           SELECT
@@ -2120,7 +2129,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as total_contratos
           FROM snapshots_mensais sm
           JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          WHERE sm.data_snapshot IS NOT NULL
+            AND h.status IN ('ativo', 'onboarding', 'triagem')
             AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
           GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ),
@@ -2204,14 +2214,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDateStr = startDate.toISOString().split('T')[0];
 
       const mrrResult = await db.execute(sql`
-        WITH snapshots_mensais AS (
-          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
-            DATE_TRUNC('month', data_snapshot) as mes,
-            data_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE DATE(data_snapshot) >= ${startDateStr}::date
-            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
-          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        WITH meses_range AS (
+          SELECT generate_series(
+            DATE_TRUNC('month', ${startDateStr}::date),
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month',
+            INTERVAL '1 month'
+          )::date as mes
+        ),
+        snapshots_mensais AS (
+          SELECT
+            mr.mes,
+            COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (mr.mes + INTERVAL '1 month')::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE DATE_TRUNC('month', data_snapshot) = mr.mes)
+            ) as data_snapshot
+          FROM meses_range mr
         ),
         historical_data AS (
           SELECT
@@ -2222,7 +2239,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as total_contratos
           FROM snapshots_mensais sm
           JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          WHERE sm.data_snapshot IS NOT NULL
+            AND h.status IN ('ativo', 'onboarding', 'triagem')
             AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
           GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ),
@@ -4914,6 +4932,8 @@ Estruture sua resposta em:
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND EXTRACT(YEAR FROM ultimo_dia_operacao) = ${ano}
           AND ultimo_dia_operacao <= CURRENT_DATE
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY squad, ano, trimestre
         ORDER BY ano, trimestre, valor_total DESC
       `);
@@ -4939,6 +4959,8 @@ Estruture sua resposta em:
         WHERE ultimo_dia_operacao IS NOT NULL AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND valor_r > 0
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY squad, ano, trimestre
         ORDER BY squad, ano, trimestre
       `);
@@ -5012,6 +5034,8 @@ Estruture sua resposta em:
           AND ultimo_dia_operacao IS NOT NULL
           AND EXTRACT(YEAR FROM ultimo_dia_operacao) = ${ano}
           AND ultimo_dia_operacao <= CURRENT_DATE
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         ORDER BY ultimo_dia_operacao DESC
       `);
 
@@ -5330,80 +5354,146 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const dataInicio = `${ano}-01-01`;
       const dataFim = `${ano}-12-31 23:59:59`;
       
-      // Query única para todo o ano com agregação por mês
-      const result = await db.execute(sql`
-        WITH cnpj_normalizado AS (
-          SELECT 
-            ids,
-            nome,
-            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-          FROM "Conta Azul".caz_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
-        ),
-        cup_cnpj_normalizado AS (
-          SELECT 
-            task_id,
-            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-          FROM "Clickup".cup_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
-        ),
-        contrato_todos AS (
-          SELECT DISTINCT
-            cc.cnpj_limpo,
-            ct.squad,
-            ct.servico,
-            ct.id_subtask,
-            COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
-          FROM cup_cnpj_normalizado cc
-          INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
-          WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-        ),
-        contrato_com_peso AS (
+      // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
+      // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
+
+      // Helper compartilhado: aplica fuzzy match do squadFilter (mesma lógica do código antigo)
+      const matchesSquadFilter = (sq: string): boolean => {
+        if (!squadFilter) return true;
+        const stripPrefix = (s: string) => s.replace(/^[^a-zA-Z]+/, '');
+        return (
+          sq === squadFilter ||
+          sq.toLowerCase().includes(stripPrefix(squadFilter).toLowerCase()) ||
+          squadFilter.toLowerCase().includes(stripPrefix(sq).toLowerCase())
+        );
+      };
+
+      // Helper para normalizar datas do Postgres em UTC midnight (evita TZ drift)
+      const parseDbDate = (raw: any): Date | null => {
+        if (!raw) return null;
+        if (raw instanceof Date) {
+          return new Date(Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()));
+        }
+        const s = String(raw);
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) {
+          return new Date(Date.UTC(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3])));
+        }
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      };
+
+      const FALLBACK_DATA_INICIO = new Date(Date.UTC(1900, 0, 1));
+
+      // Query 1: contratos relevantes (sem filtro de ano nem squad — JS aplica)
+      const contratosResult = await db.execute(sql`
+        WITH cnpj_norm AS (
           SELECT
-            cnpj_limpo,
-            squad,
-            servico,
-            id_subtask,
-            CASE
-              WHEN SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo) > 0
-              THEN valor_contrato / SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo)
-              ELSE 1.0 / COUNT(*) OVER (PARTITION BY cnpj_limpo)
-            END as peso
-          FROM contrato_todos
+            cl.task_id,
+            REPLACE(REPLACE(REPLACE(COALESCE(cl.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo
+          FROM "Clickup".cup_clientes cl
+          WHERE cl.cnpj IS NOT NULL AND TRIM(cl.cnpj) != ''
         )
         SELECT
-          TO_CHAR(p.data_quitacao, 'YYYY-MM') as mes,
-          COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
-          COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
-          COALESCE(caz.nome, 'Cliente não identificado') as cliente_nome,
-          COALESCE(cu.servico, 'Serviço não identificado') as servico_nome,
-          COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
-          p.id as parcela_id,
-          (p.valor_pago::numeric * COALESCE(cu.peso, 1)) as valor,
-          p.data_quitacao,
-          p.url_cobranca
-        FROM "Conta Azul".caz_parcelas p
-        LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        LEFT JOIN contrato_com_peso cu ON caz.cnpj_limpo = cu.cnpj_limpo
-        WHERE p.status = 'QUITADO'
-          AND p.tipo_evento = 'RECEITA'
-          AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFim}::timestamp
-          AND p.valor_pago::numeric > 0
-          AND (
-            ${squadFilter}::text IS NULL 
-            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') = ${squadFilter}
-            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter}, '^[^a-zA-Z]+', '', 'g')
-            OR ${squadFilter} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
-          )
-        ORDER BY mes, categoria_id, cliente_nome, servico_nome
+          cn.cnpj_limpo,
+          ct.id_subtask,
+          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') AS squad,
+          COALESCE(ct.servico, 'Serviço não identificado') AS servico,
+          CASE
+            WHEN COALESCE(ct.valorr::numeric, 0) > 0 THEN 'recorrente'
+            WHEN COALESCE(ct.valorp::numeric, 0) > 0 THEN 'pontual'
+          END AS tipo,
+          GREATEST(COALESCE(ct.valorr::numeric, 0), COALESCE(ct.valorp::numeric, 0)) AS valor,
+          ct.data_inicio,
+          COALESCE(ct.data_solicitacao_encerramento, ct.data_encerramento) AS data_fim,
+          COALESCE(ct.status, '') AS status
+        FROM cnpj_norm cn
+        INNER JOIN "Clickup".cup_contratos ct ON cn.task_id = ct.id_task
+        WHERE (COALESCE(ct.valorr::numeric, 0) > 0 OR COALESCE(ct.valorp::numeric, 0) > 0)
+          AND ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
       `);
-      
-      // Processar dados agrupados por mês
+
+      // Query 2: pagamentos cronológicos (histórico inteiro, todos os clientes)
+      const pagamentosResult = await db.execute(sql`
+        SELECT
+          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo,
+          MAX(caz.nome) AS cliente_nome,
+          TO_CHAR(p.data_quitacao, 'YYYY-MM') AS mes,
+          SUM(p.valor_pago::numeric) AS total_pago_mes
+        FROM "Conta Azul".caz_parcelas p
+        INNER JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
+        WHERE p.tipo_evento = 'RECEITA'
+          AND p.status = 'QUITADO'
+          AND p.valor_pago::numeric > 0
+          AND caz.cnpj IS NOT NULL AND TRIM(caz.cnpj) != ''
+        GROUP BY cnpj_limpo, TO_CHAR(p.data_quitacao, 'YYYY-MM')
+        ORDER BY cnpj_limpo, mes
+      `);
+
+      // ──── Montar Map<cnpj, ClienteSim> ─────────────────────────────────────
+      const clientesMap = new Map<string, ClienteSim>();
+
+      // Primeiro: criar entrada por cliente a partir dos pagamentos
+      for (const row of pagamentosResult.rows as any[]) {
+        const cnpj = row.cnpj_limpo;
+        if (!cnpj) continue;
+        let cliente = clientesMap.get(cnpj);
+        if (!cliente) {
+          cliente = {
+            cnpj,
+            cliente_nome: row.cliente_nome || 'Cliente não identificado',
+            contratos: [],
+            pagamentos_por_mes: new Map(),
+          };
+          clientesMap.set(cnpj, cliente);
+        }
+        const mes = row.mes as string;
+        const valor = Number(row.total_pago_mes) || 0;
+        cliente.pagamentos_por_mes.set(mes, (cliente.pagamentos_por_mes.get(mes) || 0) + valor);
+      }
+
+      // Depois: anexar contratos a cada cliente que tem pagamentos
+      for (const row of contratosResult.rows as any[]) {
+        const cnpj = row.cnpj_limpo;
+        if (!cnpj) continue;
+        const cliente = clientesMap.get(cnpj);
+        if (!cliente) continue; // cliente sem pagamento — ignorar
+        if (!row.tipo) continue; // contrato sem valor — pulado pela CASE da query
+
+        const dataInicioParsed = parseDbDate(row.data_inicio) || FALLBACK_DATA_INICIO;
+        const dataFimParsed = parseDbDate(row.data_fim);
+
+        const contrato: ContratoSim = {
+          id_subtask: row.id_subtask,
+          cnpj,
+          squad: row.squad || 'Sem Squad',
+          servico: row.servico || 'Serviço não identificado',
+          tipo: row.tipo as 'recorrente' | 'pontual',
+          valor: Number(row.valor) || 0,
+          data_inicio: dataInicioParsed,
+          data_fim: dataFimParsed,
+          status: row.status || '',
+          saldo_devedor: 0,
+          recebido_por_mes: new Map(),
+        };
+        cliente.contratos.push(contrato);
+      }
+
+      // ──── Rodar simulação para cada cliente ─────────────────────────────────
+      const hojeSim = new Date();
+      const mesAtualYYYYMM = `${hojeSim.getUTCFullYear()}-${String(hojeSim.getUTCMonth() + 1).padStart(2, '0')}`;
+
+      for (const cliente of Array.from(clientesMap.values())) {
+        // Cliente sem contratos é ignorado (decisão #6)
+        if (cliente.contratos.length === 0) continue;
+        simulateCliente(cliente, mesAtualYYYYMM);
+      }
+
+      // ──── Agregar resultados em estruturas legacy (mesesMap) ───────────────
       type ParcelaInfo = {
-        id: string;
+        id: string | null;
         valor: number;
-        dataQuitacao: string;
+        dataQuitacao: string | null;
         linkNfse: string | null;
         numNfse: string | null;
         urlCobranca: string | null;
@@ -5411,74 +5501,75 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         servicoNome: string;
         squad: string;
       };
-      
       type ServicoInfo = { valor: number; squad: string; parcelas: ParcelaInfo[] };
       type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
       type CategoriaInfo = { nome: string; valorTotal: number; clientes: Map<string, ClienteInfo> };
-      type MesData = { 
-        categorias: Map<string, CategoriaInfo>; 
+      type MesData = {
+        categorias: Map<string, CategoriaInfo>;
         receitaTotal: number;
         totalParcelas: number;
       };
-      
+
       const mesesMap = new Map<string, MesData>();
       const squadsSet = new Set<string>();
-      
-      for (const row of result.rows as any[]) {
-        const mes = row.mes;
-        const categoriaNome = row.categoria_nome || 'Sem Categoria';
-        const clienteNome = row.cliente_nome;
-        const servicoNome = row.servico_nome;
-        const squadNome = row.squad;
-        const valor = Number(row.valor) || 0;
 
-        squadsSet.add(squadNome);
+      // Iterar contratos simulados, somando recebido_por_mes nos meses do ano selecionado
+      for (const cliente of Array.from(clientesMap.values())) {
+        for (const contrato of cliente.contratos) {
+          const sqNorm = contrato.squad;
 
-        if (!mesesMap.has(mes)) {
-          mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
+          if (!matchesSquadFilter(sqNorm)) continue;
+
+          squadsSet.add(sqNorm);
+
+          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
+            // Filtrar só meses do ano selecionado
+            if (!mes.startsWith(`${ano}-`)) continue;
+            if (valor <= 0) continue;
+
+            if (!mesesMap.has(mes)) {
+              mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
+            }
+            const mesData = mesesMap.get(mes)!;
+            mesData.receitaTotal += valor;
+            mesData.totalParcelas += 1;
+
+            const categoriaNome = 'Sem Categoria';
+            if (!mesData.categorias.has(categoriaNome)) {
+              mesData.categorias.set(categoriaNome, {
+                nome: categoriaNome,
+                valorTotal: 0,
+                clientes: new Map(),
+              });
+            }
+            const cat = mesData.categorias.get(categoriaNome)!;
+            cat.valorTotal += valor;
+
+            if (!cat.clientes.has(cliente.cliente_nome)) {
+              cat.clientes.set(cliente.cliente_nome, { valorTotal: 0, servicos: new Map() });
+            }
+            const cli = cat.clientes.get(cliente.cliente_nome)!;
+            cli.valorTotal += valor;
+
+            const chaveServico = `${contrato.servico}|${sqNorm}`;
+            if (!cli.servicos.has(chaveServico)) {
+              cli.servicos.set(chaveServico, { valor: 0, squad: sqNorm, parcelas: [] });
+            }
+            const srv = cli.servicos.get(chaveServico)!;
+            srv.valor += valor;
+            srv.parcelas.push({
+              id: contrato.id_subtask,
+              valor,
+              dataQuitacao: null,
+              linkNfse: null,
+              numNfse: null,
+              urlCobranca: null,
+              clienteNome: cliente.cliente_nome,
+              servicoNome: contrato.servico,
+              squad: sqNorm,
+            });
+          }
         }
-
-        const mesData = mesesMap.get(mes)!;
-        mesData.receitaTotal += valor;
-        mesData.totalParcelas += 1;
-
-        // Agrupar por categoria_nome (não UUID) para unificar categorias com mesmo nome
-        if (!mesData.categorias.has(categoriaNome)) {
-          mesData.categorias.set(categoriaNome, {
-            nome: categoriaNome,
-            valorTotal: 0,
-            clientes: new Map()
-          });
-        }
-
-        const cat = mesData.categorias.get(categoriaNome)!;
-        cat.valorTotal += valor;
-        
-        if (!cat.clientes.has(clienteNome)) {
-          cat.clientes.set(clienteNome, { valorTotal: 0, servicos: new Map() });
-        }
-        
-        const cliente = cat.clientes.get(clienteNome)!;
-        cliente.valorTotal += valor;
-        
-        const chaveServico = `${servicoNome}|${squadNome}`;
-        if (!cliente.servicos.has(chaveServico)) {
-          cliente.servicos.set(chaveServico, { valor: 0, squad: squadNome, parcelas: [] });
-        }
-        
-        const servico = cliente.servicos.get(chaveServico)!;
-        servico.valor += valor;
-        servico.parcelas.push({
-          id: row.parcela_id,
-          valor,
-          dataQuitacao: row.data_quitacao,
-          linkNfse: null,
-          numNfse: null,
-          urlCobranca: row.url_cobranca,
-          clienteNome,
-          servicoNome,
-          squad: squadNome
-        });
       }
       
       // Converter para formato de resposta
@@ -5560,60 +5651,117 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         });
       }
       
-      // ──── DESPESAS: Salários, CXCS, Freelancers ────────────────────────────
-      // Salários ativos do squad (rh_pessoal)
+      // ──── DESPESAS: Salários proporcionais por admissão/demissão ────────────
+      // Warning para colaboradores sem data de admissão (não entram no cálculo)
+      const semAdmissaoResult = await db.execute(sql`
+        SELECT COUNT(*)::int AS qtd
+        FROM "Inhire".rh_pessoal
+        WHERE admissao IS NULL AND LOWER(TRIM(status)) = 'ativo'
+      `);
+      const qtdSemAdmissao = Number((semAdmissaoResult.rows[0] as any)?.qtd) || 0;
+      if (qtdSemAdmissao > 0) {
+        console.warn(
+          `[contribuicao-squad] ${qtdSemAdmissao} colaborador(es) ativo(s) sem data de admissão — não entram no cálculo proporcional.`
+        );
+      }
+
+      // Query única: salário proporcional por (colaborador × mês) usando datas de admissão/demissão
       const salarioResult = await db.execute(sql`
-        WITH salarios_normalizados AS (
+        WITH meses AS (
+          SELECT generate_series(
+            ${dataInicio}::date,
+            (${dataInicio}::date + INTERVAL '11 months')::date,
+            INTERVAL '1 month'
+          )::date AS mes_inicio
+        ),
+        meses_calc AS (
+          SELECT
+            mes_inicio,
+            (mes_inicio + INTERVAL '1 month - 1 day')::date AS mes_fim,
+            EXTRACT(DAY FROM (mes_inicio + INTERVAL '1 month - 1 day'))::int AS dias_no_mes
+          FROM meses
+        ),
+        colaboradores AS (
           SELECT
             rp.id,
-            rp.nome as colaborador_nome,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
+            rp.nome AS colaborador_nome,
+            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') AS squad,
+            rp.admissao,
+            rp.demissao,
             CASE
               WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
               WHEN rp.salario::text LIKE '%,%' THEN
                 NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
-              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
+              WHEN rp.salario::text ~ '\.[0-9]{1,2}$' THEN
                 NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
               ELSE
                 NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
-            END as salario
+            END AS salario
           FROM "Inhire".rh_pessoal rp
+          WHERE rp.admissao IS NOT NULL
+            -- Safety net: zumbis (dispensado com demissao NULL) seriam contados indefinidamente.
+            -- Aceitar registro se: tem demissao (real) OU status atual = ativo.
+            AND (rp.demissao IS NOT NULL OR LOWER(TRIM(COALESCE(rp.status, ''))) = 'ativo')
         )
-        SELECT id, colaborador_nome, salario, squad
-        FROM salarios_normalizados
-        WHERE status_norm = 'ativo'
-          AND salario IS NOT NULL AND salario > 0
+        SELECT
+          c.id,
+          c.colaborador_nome,
+          c.squad,
+          TO_CHAR(m.mes_inicio, 'YYYY-MM') AS mes,
+          ROUND(
+            c.salario
+            * (LEAST(m.mes_fim, COALESCE(c.demissao, m.mes_fim))::date
+               - GREATEST(m.mes_inicio, c.admissao)::date + 1)::numeric
+            / m.dias_no_mes,
+            2
+          ) AS salario_proporcional
+        FROM colaboradores c
+        CROSS JOIN meses_calc m
+        WHERE c.salario IS NOT NULL
+          AND c.salario > 0
+          -- Despesa só conta meses já realizados (passado + mês atual).
+          -- Meses futuros ainda não foram pagos, então não viram despesa.
+          AND m.mes_inicio <= DATE_TRUNC('month', CURRENT_DATE)
+          AND LEAST(m.mes_fim, COALESCE(c.demissao, m.mes_fim))
+              >= GREATEST(m.mes_inicio, c.admissao)
           AND (
             ${squadFilter}::text IS NULL
-            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squadFilter}
-            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter || ''}, '^[^a-zA-Z]+', '', 'g')
-            OR ${squadFilter || ''} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+            OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squadFilter}
+            OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad')
+               ILIKE '%' || REGEXP_REPLACE(${squadFilter || ''}, '^[^a-zA-Z]+', '', 'g')
+            OR ${squadFilter || ''}
+               ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
           )
-        ORDER BY squad, colaborador_nome
+        ORDER BY c.squad, c.colaborador_nome, mes
       `);
 
-      let salarioTotal = 0;
-      const salariosPorColab = new Map<number, { nome: string; salario: number; squad: string }>();
+      // Agregar por colaborador (para detalhe) e por mês (para despesasMensais.salarios)
+      type ColabAgg = { nome: string; squad: string; porMes: number[]; total: number };
+      const salariosPorColab = new Map<number, ColabAgg>();
+      const salariosPorMesMap = new Map<string, number>();
+
       for (const row of salarioResult.rows as any[]) {
         const id = Number(row.id);
-        if (!salariosPorColab.has(id)) {
-          const sal = Number(row.salario) || 0;
-          const sq = row.squad || 'Sem Squad';
-          salariosPorColab.set(id, { nome: row.colaborador_nome, salario: sal, squad: sq });
-          salarioTotal += sal;
-        }
-      }
+        const mes = row.mes as string;
+        const valor = Number(row.salario_proporcional) || 0;
 
-      // CXCS (média salarial dos CXCS ativos)
-      const cxcsResult = await db.execute(sql`
-        SELECT AVG(salario::numeric) as media_cxcs
-        FROM "Inhire".rh_pessoal
-        WHERE UPPER(TRIM(cargo)) = 'CXCS'
-          AND UPPER(TRIM(status)) = 'ATIVO'
-          AND salario IS NOT NULL AND salario::numeric > 0
-      `);
-      const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
+        salariosPorMesMap.set(mes, (salariosPorMesMap.get(mes) || 0) + valor);
+
+        if (!salariosPorColab.has(id)) {
+          salariosPorColab.set(id, {
+            nome: row.colaborador_nome,
+            squad: row.squad || 'Sem Squad',
+            porMes: new Array(12).fill(0),
+            total: 0,
+          });
+        }
+        const entry = salariosPorColab.get(id)!;
+        // Assume calendar-year window (dataInicio = ${ano}-01-01). If the window
+        // ever becomes rolling/multi-year, this index calculation will collide.
+        const monthIdx = parseInt(mes.split('-')[1]) - 1;
+        entry.porMes[monthIdx] = valor;
+        entry.total += valor;
+      }
 
       // Freelancers agrupados por mês
       const freelaResult = await db.execute(sql`
@@ -5668,32 +5816,58 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         freelaTotal += valor;
       }
 
+      // Contagem GLOBAL de colaboradores ativos por mês (qualquer salário > 0 no mês)
+      // Usado para iFood total (despesasMensais), inclui colaboradores em squads não-mapeados
+      const IFOOD_POR_COLAB_MES = 400;
+      const colabsAtivosGlobalPorMes = new Map<string, Set<number>>();
+      for (const [colabId, colab] of Array.from(salariosPorColab.entries())) {
+        for (let i = 0; i < 12; i++) {
+          if ((colab.porMes[i] || 0) === 0) continue;
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+          if (!colabsAtivosGlobalPorMes.has(mesKey)) colabsAtivosGlobalPorMes.set(mesKey, new Set());
+          colabsAtivosGlobalPorMes.get(mesKey)!.add(colabId);
+        }
+      }
+
       // Montar objeto de despesas mensais
-      const despesasMensais: Record<string, { salarios: number; cxcs: number; freelancers: number }> = {};
+      const despesasMensais: Record<string, { salarios: number; freelancers: number; ifood: number }> = {};
       for (let m = 0; m < 12; m++) {
         const mesKey = `${ano}-${String(m + 1).padStart(2, '0')}`;
+        const colabsAtivosNoMes = colabsAtivosGlobalPorMes.get(mesKey)?.size || 0;
         despesasMensais[mesKey] = {
-          salarios: salarioTotal,
-          cxcs: mediaCxcs,
+          salarios: salariosPorMesMap.get(mesKey) || 0,
           freelancers: freelaPorMes.get(mesKey) || 0,
+          ifood: colabsAtivosNoMes * IFOOD_POR_COLAB_MES,
         };
       }
 
-      // Agregar resumo por squad a partir dos dados brutos
+      // ──── Agregar resumo por squad a partir dos contratos simulados ──────
       const squadSummaryMap = new Map<string, { total: number; porMes: number[]; contratos: Set<string> }>();
-      for (const row of result.rows as any[]) {
-        const sq = row.squad || 'Sem Squad';
-        if (!squadSummaryMap.has(sq)) {
-          squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
+      for (const cliente of Array.from(clientesMap.values())) {
+        for (const contrato of cliente.contratos) {
+          const sq = contrato.squad;
+
+          if (!matchesSquadFilter(sq)) continue;
+
+          if (!squadSummaryMap.has(sq)) {
+            squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
+          }
+          const entry = squadSummaryMap.get(sq)!;
+
+          let teveValorNoAno = false;
+          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
+            if (!mes.startsWith(`${ano}-`)) continue;
+            if (valor <= 0) continue;
+            const monthIdx = parseInt(mes.split('-')[1]) - 1;
+            entry.total += valor;
+            entry.porMes[monthIdx] += valor;
+            teveValorNoAno = true;
+          }
+
+          if (teveValorNoAno) {
+            entry.contratos.add(`${cliente.cliente_nome}|${contrato.servico}|${sq}`);
+          }
         }
-        const entry = squadSummaryMap.get(sq)!;
-        const monthIdx = parseInt(row.mes.split('-')[1]) - 1;
-        const valor = Number(row.valor) || 0;
-        entry.total += valor;
-        entry.porMes[monthIdx] += valor;
-        // Usar combinação cliente+serviço+squad como identificador de contrato
-        const contratoKey = `${row.cliente_nome}|${row.servico_nome}|${sq}`;
-        entry.contratos.add(contratoKey);
       }
 
       const resumoPorSquad = Array.from(squadSummaryMap.entries())
@@ -5706,52 +5880,22 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }))
         .sort((a, b) => b.receitaTotal - a.receitaTotal);
 
-      // Detalhes individuais de salários — query separada sem filtro de squad
-      const salDetalhesResult = await db.execute(sql`
-        WITH salarios_normalizados AS (
-          SELECT
-            rp.id,
-            rp.nome as colaborador_nome,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
-            CASE
-              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
-              WHEN rp.salario::text LIKE '%,%' THEN
-                NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
-              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
-                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
-              ELSE
-                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
-            END as salario
-          FROM "Inhire".rh_pessoal rp
-        )
-        SELECT id, colaborador_nome, salario, squad
-        FROM salarios_normalizados
-        WHERE status_norm = 'ativo'
-          AND salario IS NOT NULL AND salario > 0
-        ORDER BY squad, salario DESC
-      `);
-
-      // Normalizar nome de squad removendo emojis/símbolos para match
+      // ──── Helpers para mapear squad RH → squad de Receita ───────────────
+      // Usado para atribuir despesas (salários, freelancers) ao squad correto.
       const stripEmoji = (s: string) =>
         s.replace(/[^\p{L}\p{N}\s.&+]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-      // Mapa: nome normalizado → nome original da receita
       const revenueSquadMap = new Map<string, string>();
       for (const s of resumoPorSquad) {
         revenueSquadMap.set(stripEmoji(s.squad), s.squad);
       }
 
-      // Fallback: match parcial (um nome contém o outro) para squads como "Black" vs "Black Sheep"
       const findRevenueSquad = (normKey: string): string | null => {
-        // 1. Match exato
         if (revenueSquadMap.has(normKey)) return revenueSquadMap.get(normKey)!;
-        // 2. Match parcial: revenue contém HR ou HR contém revenue
         let bestMatch: string | null = null;
         let bestLen = 0;
-        for (const [revNorm, revName] of revenueSquadMap) {
+        for (const [revNorm, revName] of Array.from(revenueSquadMap)) {
           if (normKey.startsWith(revNorm) || revNorm.startsWith(normKey)) {
-            // Preferir o match mais longo (mais específico)
             const matchLen = Math.min(normKey.length, revNorm.length);
             if (matchLen > bestLen) {
               bestLen = matchLen;
@@ -5762,18 +5906,112 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return bestMatch;
       };
 
-      const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
-      const seen = new Set<number>();
-      for (const row of salDetalhesResult.rows as any[]) {
-        const id = Number(row.id);
-        if (seen.has(id)) continue;
-        seen.add(id);
+      // ──── Agregação de salários por (squad de receita, mês) ────────────
+      const salariosPorSquadMes = new Map<string, Map<string, number>>();
+      // Set de colaboradores ativos por (squad, mes) — usado pra calcular iFood por squad
+      const colabsAtivosPorSquadMes = new Map<string, Map<string, Set<number>>>();
+      for (const [colabId, colab] of Array.from(salariosPorColab.entries())) {
+        const normKey = stripEmoji(colab.squad);
+        const matchedSquad = findRevenueSquad(normKey);
+        if (!matchedSquad) continue; // squad RH não casa com squad de receita → fora da tabela visível
+
+        for (let i = 0; i < 12; i++) {
+          const valor = colab.porMes[i] || 0;
+          if (valor === 0) continue;
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+
+          if (!salariosPorSquadMes.has(matchedSquad)) salariosPorSquadMes.set(matchedSquad, new Map());
+          salariosPorSquadMes.get(matchedSquad)!.set(
+            mesKey,
+            (salariosPorSquadMes.get(matchedSquad)!.get(mesKey) || 0) + valor
+          );
+
+          if (!colabsAtivosPorSquadMes.has(matchedSquad)) colabsAtivosPorSquadMes.set(matchedSquad, new Map());
+          if (!colabsAtivosPorSquadMes.get(matchedSquad)!.has(mesKey)) {
+            colabsAtivosPorSquadMes.get(matchedSquad)!.set(mesKey, new Set());
+          }
+          colabsAtivosPorSquadMes.get(matchedSquad)!.get(mesKey)!.add(colabId);
+        }
+      }
+
+      // ──── Agregação de freelancers por (squad de receita, mês) ─────────
+      const freelaPorSquadMes = new Map<string, Map<string, number>>();
+      for (const row of freelaResult.rows as any[]) {
+        const mes = row.mes as string;
+        const valor = Number(row.valor) || 0;
         const rawSquad = row.squad || 'Sem Squad';
         const normKey = stripEmoji(rawSquad);
-        // Casar com o nome do squad da receita, fallback pro raw
-        const matchedSquad = findRevenueSquad(normKey) || rawSquad;
+        const matchedSquad = findRevenueSquad(normKey);
+        if (!matchedSquad) continue; // freela sem match → fora da tabela visível
+
+        if (!freelaPorSquadMes.has(matchedSquad)) freelaPorSquadMes.set(matchedSquad, new Map());
+        const inner = freelaPorSquadMes.get(matchedSquad)!;
+        inner.set(mes, (inner.get(mes) || 0) + valor);
+      }
+
+      // ──── Detalhes de receita por squad → cliente → mês ─────────────────
+      const receitasDetalhesPorSquad: Record<string, { cliente: string; porMes: number[]; total: number }[]> = {};
+      for (const cliente of Array.from(clientesMap.values())) {
+        for (const contrato of cliente.contratos) {
+          const sq = contrato.squad;
+          if (/\bOFF\b/i.test(sq)) continue;
+          if (!matchesSquadFilter(sq)) continue;
+
+          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
+            if (!mes.startsWith(`${ano}-`)) continue;
+            if (valor <= 0) continue;
+            const monthIdx = parseInt(mes.split('-')[1]) - 1;
+
+            if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
+            let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === cliente.cliente_nome);
+            if (!entry) {
+              entry = { cliente: cliente.cliente_nome, porMes: new Array(12).fill(0), total: 0 };
+              receitasDetalhesPorSquad[sq].push(entry);
+            }
+            entry.porMes[monthIdx] += valor;
+            entry.total += valor;
+          }
+        }
+      }
+      // Ordenar clientes por total desc dentro de cada squad
+      for (const sq of Object.keys(receitasDetalhesPorSquad)) {
+        receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
+      }
+
+      // Detalhes individuais de salários — agregados a partir de salariosPorColab
+      const salariosDetalhesPorSquad: Record<string, { nome: string; porMes: number[]; total: number }[]> = {};
+      for (const colab of salariosPorColab.values()) {
+        const normKey = stripEmoji(colab.squad);
+        const matchedSquad = findRevenueSquad(normKey) || colab.squad;
         if (!salariosDetalhesPorSquad[matchedSquad]) salariosDetalhesPorSquad[matchedSquad] = [];
-        salariosDetalhesPorSquad[matchedSquad].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
+        salariosDetalhesPorSquad[matchedSquad].push({
+          nome: colab.nome,
+          porMes: colab.porMes,
+          total: colab.total,
+        });
+      }
+      // Ordenar por total desc dentro de cada squad
+      for (const sq of Object.keys(salariosDetalhesPorSquad)) {
+        salariosDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
+      }
+
+      // ──── Montar despesasPorSquadMensais ───────────────────────────────
+      const despesasPorSquadMensais: Record<string, Record<string, { salarios: number; freelancers: number; ifood: number }>> = {};
+      const todosSquadsDespesa = new Set<string>([
+        ...Array.from(salariosPorSquadMes.keys()),
+        ...Array.from(freelaPorSquadMes.keys()),
+      ]);
+      for (const squad of Array.from(todosSquadsDespesa)) {
+        despesasPorSquadMensais[squad] = {};
+        for (let i = 0; i < 12; i++) {
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+          const sal = salariosPorSquadMes.get(squad)?.get(mesKey) || 0;
+          const fre = freelaPorSquadMes.get(squad)?.get(mesKey) || 0;
+          const colabsCount = colabsAtivosPorSquadMes.get(squad)?.get(mesKey)?.size || 0;
+          const ifood = colabsCount * IFOOD_POR_COLAB_MES;
+          if (sal === 0 && fre === 0 && ifood === 0) continue;
+          despesasPorSquadMensais[squad][mesKey] = { salarios: sal, freelancers: fre, ifood };
+        }
       }
 
       res.json({
@@ -5783,7 +6021,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         meses: monthlyData,
         resumoPorSquad,
         despesasMensais,
+        despesasPorSquadMensais,
         salariosDetalhesPorSquad,
+        receitasDetalhesPorSquad,
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
@@ -5850,7 +6090,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             cc.cnpj_limpo,
             ct.squad,
             ct.id_subtask,
-            COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
+            COALESCE(ct.valorr::numeric, 0) as valor_contrato
           FROM cup_cnpj_normalizado cc
           INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
           WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
@@ -6142,6 +6382,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND valor_r > 0
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
         ORDER BY mes, squad
@@ -6483,7 +6724,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND c.valor_r > 0
           AND COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squad}
           AND COALESCE(c.abonar_churn, '') != 'Sim'
-          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         ORDER BY c.data_solicitacao_encerramento DESC, c.valor_r::numeric DESC
       `);
 

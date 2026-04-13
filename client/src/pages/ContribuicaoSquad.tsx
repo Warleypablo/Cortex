@@ -7,7 +7,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Input } from "@/components/ui/input";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { HeroMetric } from "@/components/HeroMetric";
 
@@ -35,14 +34,31 @@ interface SquadResumo {
 interface DespesasMensais {
   [mes: string]: {
     salarios: number;
-    cxcs: number;
     freelancers: number;
+    ifood: number;
   };
 }
 
 interface SalarioDetalhe {
   nome: string;
-  salario: number;
+  porMes: number[];
+  total: number;
+}
+
+interface ReceitaDetalhe {
+  cliente: string;
+  porMes: number[];
+  total: number;
+}
+
+interface DespesasPorSquadMensais {
+  [squad: string]: {
+    [mes: string]: {
+      salarios: number;
+      freelancers: number;
+      ifood: number;
+    };
+  };
 }
 
 interface BulkResponse {
@@ -52,7 +68,9 @@ interface BulkResponse {
   meses: MonthlyData[];
   resumoPorSquad?: SquadResumo[];
   despesasMensais?: DespesasMensais;
+  despesasPorSquadMensais?: DespesasPorSquadMensais;
   salariosDetalhesPorSquad?: Record<string, SalarioDetalhe[]>;
+  receitasDetalhesPorSquad?: Record<string, ReceitaDetalhe[]>;
 }
 
 const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
@@ -64,14 +82,21 @@ export default function ContribuicaoSquad() {
   const hoje = new Date();
   const [anoSelecionado, setAnoSelecionado] = useState(hoje.getFullYear());
   const [squadSelecionado, setSquadSelecionado] = useState<string>("todos");
-  const [taxaImposto, setTaxaImposto] = useState(18);
-  const taxaDecimal = taxaImposto / 100;
   const [collapsedSquads, setCollapsedSquads] = useState<Set<string> | "all">("all");
   const [expandedDespesas, setExpandedDespesas] = useState<Set<string>>(new Set());
   const [expandedSalarios, setExpandedSalarios] = useState<Set<string>>(new Set());
+  const [expandedReceitas, setExpandedReceitas] = useState<Set<string>>(new Set());
 
   const toggleDespesasExpand = (key: string) => {
     setExpandedDespesas(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleReceitasExpand = (key: string) => {
+    setExpandedReceitas(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
@@ -131,43 +156,37 @@ export default function ContribuicaoSquad() {
     });
   };
 
-  // Ranking de squads com rateio proporcional de despesas
+  // Ranking de squads com despesa real por squad (sem rateio)
   const squadRanking = useMemo(() => {
     if (!bulkData?.resumoPorSquad) return [];
     const totalGeral = bulkData.resumoPorSquad.reduce((s, sq) => s + sq.receitaTotal, 0);
 
-    // Total de despesas anuais
-    let totalDespAnual = 0;
-    for (const m of monthlyResults) {
-      const receitaMes = bulkData.resumoPorSquad.reduce((acc, sq) => {
-        const idx = monthlyResults.indexOf(m);
-        return acc + (sq.porMes[idx] || 0);
-      }, 0);
-      const desp = bulkData.despesasMensais?.[m.mes];
-      totalDespAnual += receitaMes * taxaDecimal + (desp?.salarios || 0) + (desp?.cxcs || 0) + (desp?.freelancers || 0);
-    }
-
     return bulkData.resumoPorSquad.map((sq) => {
-      const proporcao = totalGeral > 0 ? sq.receitaTotal / totalGeral : 0;
-      const despesaRateada = totalDespAnual * proporcao;
+      // Despesa REAL do squad (sem rateio) — soma anual de salários + freelas + iFood atribuídos
+      let despesaSquad = 0;
+      for (const m of monthlyResults) {
+        const desp = bulkData.despesasPorSquadMensais?.[sq.squad]?.[m.mes];
+        if (desp) despesaSquad += desp.salarios + desp.freelancers + desp.ifood;
+      }
+      const resultadoLiquido = sq.receitaTotal - despesaSquad;
       return {
         ...sq,
-        contribuicaoPct: totalGeral > 0 ? proporcao * 100 : 0,
-        despesaRateada,
-        resultadoLiquido: sq.receitaTotal - despesaRateada,
+        // Margem de contribuição = (receita - despesa) / receita do squad
+        contribuicaoPct: sq.receitaTotal > 0 ? (resultadoLiquido / sq.receitaTotal) * 100 : 0,
+        despesaRateada: despesaSquad, // nome legado, mas agora é despesa REAL
+        resultadoLiquido,
       };
     });
-  }, [bulkData, monthlyResults, taxaDecimal]);
+  }, [bulkData, monthlyResults]);
 
   // Dados computados para a tabela
   const tableData = useMemo(() => {
     if (squadRanking.length === 0 || monthlyResults.length === 0) return null;
 
-    // Despesa total por mês (impostos + salários + cxcs + freelancers)
-    const despesaTotalPorMes = monthlyResults.map((m, i) => {
-      const receitaMes = squadRanking.reduce((acc, sq) => acc + (sq.porMes[i] || 0), 0);
+    // Despesa total por mês (salários + freelancers + iFood)
+    const despesaTotalPorMes = monthlyResults.map((m) => {
       const desp = bulkData?.despesasMensais?.[m.mes];
-      return receitaMes * taxaDecimal + (desp?.salarios || 0) + (desp?.cxcs || 0) + (desp?.freelancers || 0);
+      return (desp?.salarios || 0) + (desp?.freelancers || 0) + (desp?.ifood || 0);
     });
 
     // Receita total por mês
@@ -176,23 +195,21 @@ export default function ContribuicaoSquad() {
     );
 
     // Componentes de despesa por mês (absolutos, sem rateio)
-    const impostosPorMes = monthlyResults.map((_, i) => receitaTotalPorMes[i] * taxaDecimal);
     const salariosPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.salarios || 0);
-    const cxcsPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.cxcs || 0);
     const freelancersPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.freelancers || 0);
+    const ifoodPorMes = monthlyResults.map((m) => bulkData?.despesasMensais?.[m.mes]?.ifood || 0);
 
-    // Despesa rateada por squad por mês
+    // Despesa REAL por squad por mês (lookup direto, sem rateio)
     const despesaSquadMes = (sq: typeof squadRanking[0], mesIdx: number) => {
-      const receitaMes = receitaTotalPorMes[mesIdx];
-      const proporcao = receitaMes > 0 ? (sq.porMes[mesIdx] || 0) / receitaMes : 0;
-      return despesaTotalPorMes[mesIdx] * proporcao;
+      const mesKey = monthlyResults[mesIdx].mes;
+      const desp = bulkData?.despesasPorSquadMensais?.[sq.squad]?.[mesKey];
+      return (desp?.salarios || 0) + (desp?.freelancers || 0) + (desp?.ifood || 0);
     };
 
-    // Componente de despesa rateado por squad por mês
-    const despesaComponenteSquadMes = (sq: typeof squadRanking[0], mesIdx: number, componente: number[]) => {
-      const receitaMes = receitaTotalPorMes[mesIdx];
-      const proporcao = receitaMes > 0 ? (sq.porMes[mesIdx] || 0) / receitaMes : 0;
-      return componente[mesIdx] * proporcao;
+    // Componente específico (salarios | freelancers | ifood) por squad por mês
+    const despesaComponenteSquadMes = (sq: typeof squadRanking[0], mesIdx: number, tipo: 'salarios' | 'freelancers' | 'ifood') => {
+      const mesKey = monthlyResults[mesIdx].mes;
+      return bulkData?.despesasPorSquadMensais?.[sq.squad]?.[mesKey]?.[tipo] || 0;
     };
 
     // Totais gerais
@@ -206,16 +223,15 @@ export default function ContribuicaoSquad() {
       receitaTotalPorMes,
       despesaSquadMes,
       despesaComponenteSquadMes,
-      impostosPorMes,
       salariosPorMes,
-      cxcsPorMes,
       freelancersPorMes,
+      ifoodPorMes,
       totalReceita,
       totalDespesa,
       totalMargem,
       totalMargemPct,
     };
-  }, [squadRanking, monthlyResults, bulkData, taxaDecimal]);
+  }, [squadRanking, monthlyResults, bulkData]);
 
   const formatMesLabel = (label: string) => {
     return label.charAt(0).toUpperCase() + label.slice(1, 3);
@@ -272,18 +288,6 @@ export default function ContribuicaoSquad() {
             </SelectContent>
           </Select>
 
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              step={0.5}
-              value={taxaImposto}
-              onChange={(e) => setTaxaImposto(Number(e.target.value) || 0)}
-              className="w-[70px] h-9 text-sm text-center"
-              title="Alíquota de imposto (%)"
-            />
-          </div>
         </div>
       </div>
 
@@ -291,7 +295,7 @@ export default function ContribuicaoSquad() {
       {(() => {
         const heroItems = tableData ? [
           { label: "Receita Total", value: formatCurrencyNoDecimals(tableData.totalReceita), subtitle: "Receita bruta acumulada no ano" },
-          { label: "Total Despesas", value: formatCurrencyNoDecimals(tableData.totalDespesa), subtitle: "Despesas rateadas (impostos + salários + CXCs + freelancers)" },
+          { label: "Total Despesas", value: formatCurrencyNoDecimals(tableData.totalDespesa), subtitle: "Despesas atribuídas (salários + freelancers + iFood)" },
           { label: "Margem", value: `${tableData.totalMargemPct.toFixed(1)}%`, subtitle: "Margem de contribuição consolidada" },
         ] : [];
         const skeletons = Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-12 w-40 rounded" />);
@@ -413,9 +417,10 @@ export default function ContribuicaoSquad() {
 
                           {!isCollapsed && (
                             <>
-                              {/* Receita */}
-                              <tr className="border-b border-border/30">
-                                <td className="py-1.5 px-3 pl-9 text-xs text-emerald-600 dark:text-emerald-400 sticky left-0 z-10 bg-background">
+                              {/* Receita (expandível) */}
+                              <tr className="border-b border-border/30 cursor-pointer hover:bg-muted/30" onClick={() => toggleReceitasExpand(sq.squad)}>
+                                <td className="py-1.5 px-3 pl-7 text-xs text-emerald-600 dark:text-emerald-400 sticky left-0 z-10 bg-background flex items-center gap-1">
+                                  {expandedReceitas.has(sq.squad) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                                   Receita
                                 </td>
                                 {sq.porMes.map((val, i) => (
@@ -428,6 +433,22 @@ export default function ContribuicaoSquad() {
                                 </td>
                                 <td />
                               </tr>
+                              {expandedReceitas.has(sq.squad) && (bulkData?.receitasDetalhesPorSquad?.[sq.squad] || []).map((cliente, idx) => (
+                                <tr key={`${cliente.cliente}-${idx}`} className="border-b border-border/10">
+                                  <td className="py-0.5 px-3 pl-12 text-[10px] text-emerald-500/70 dark:text-emerald-400/50 sticky left-0 z-10 bg-background truncate max-w-[200px]" title={cliente.cliente}>
+                                    {cliente.cliente}
+                                  </td>
+                                  {monthlyResults.map((_, i) => (
+                                    <td key={i} className="py-0.5 px-2 text-right text-[10px] text-emerald-500/70 dark:text-emerald-400/50">
+                                      {cliente.porMes[i] > 0 ? formatCurrencyNoDecimals(cliente.porMes[i]) : "-"}
+                                    </td>
+                                  ))}
+                                  <td className="py-0.5 px-3 text-right text-[10px] font-medium text-emerald-500/70 dark:text-emerald-400/50">
+                                    {formatCurrencyNoDecimals(cliente.total)}
+                                  </td>
+                                  <td />
+                                </tr>
+                              ))}
 
                               {/* Despesas (expandível) */}
                               <tr className="border-b border-border/30 cursor-pointer hover:bg-muted/30" onClick={() => toggleDespesasExpand(sq.squad)}>
@@ -450,13 +471,12 @@ export default function ContribuicaoSquad() {
                               </tr>
                               {expandedDespesas.has(sq.squad) && (
                                 <>
-                                  {[
-                                    { label: "Impostos", data: tableData.impostosPorMes, expandable: false },
-                                    { label: "Salários", data: tableData.salariosPorMes, expandable: true },
-                                    { label: "CXCs", data: tableData.cxcsPorMes, expandable: false },
-                                    { label: "Freelancers", data: tableData.freelancersPorMes, expandable: false },
-                                  ].map(({ label, data, expandable }) => {
-                                    const total = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaComponenteSquadMes(sq, i, data), 0);
+                                  {([
+                                    { label: "Salários", tipo: 'salarios' as const, expandable: true },
+                                    { label: "Freelancers", tipo: 'freelancers' as const, expandable: false },
+                                    { label: "iFood", tipo: 'ifood' as const, expandable: false },
+                                  ] as const).map(({ label, tipo, expandable }) => {
+                                    const total = monthlyResults.reduce((acc, _, i) => acc + tableData.despesaComponenteSquadMes(sq, i, tipo), 0);
                                     const salKey = `${sq.squad}__${label}`;
                                     const isExpanded = expandable && expandedSalarios.has(salKey);
                                     return (
@@ -472,7 +492,7 @@ export default function ContribuicaoSquad() {
                                             </span>
                                           </td>
                                           {monthlyResults.map((_, i) => {
-                                            const val = tableData.despesaComponenteSquadMes(sq, i, data);
+                                            const val = tableData.despesaComponenteSquadMes(sq, i, tipo);
                                             return (
                                               <td key={i} className="py-1 px-2 text-right text-[11px] text-red-400/70 dark:text-red-400/50">
                                                 {val > 0 ? formatCurrencyNoDecimals(val) : "-"}
@@ -491,11 +511,11 @@ export default function ContribuicaoSquad() {
                                             </td>
                                             {monthlyResults.map((_, i) => (
                                               <td key={i} className="py-0.5 px-2 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
-                                                {colab.salario > 0 ? formatCurrencyNoDecimals(colab.salario) : "-"}
+                                                {colab.porMes[i] > 0 ? formatCurrencyNoDecimals(colab.porMes[i]) : "-"}
                                               </td>
                                             ))}
                                             <td className="py-0.5 px-3 text-right text-[10px] font-medium text-red-400/50 dark:text-red-400/35">
-                                              {formatCurrencyNoDecimals(colab.salario)}
+                                              {formatCurrencyNoDecimals(colab.total)}
                                             </td>
                                             <td />
                                           </tr>
@@ -572,9 +592,10 @@ export default function ContribuicaoSquad() {
                       <td className="py-2.5 px-3" />
                       <td className="py-2.5 px-3 text-right text-xs font-bold text-muted-foreground">100%</td>
                     </tr>
-                    {/* Total Receita */}
-                    <tr className="border-b border-border/30 bg-muted">
-                      <td className="py-1.5 px-3 pl-9 text-xs text-emerald-600 dark:text-emerald-400 font-medium sticky left-0 z-10 bg-muted">
+                    {/* Total Receita (expandível) */}
+                    <tr className="border-b border-border/30 bg-muted cursor-pointer hover:bg-muted/80" onClick={() => toggleReceitasExpand("__total__")}>
+                      <td className="py-1.5 px-3 pl-7 text-xs text-emerald-600 dark:text-emerald-400 font-medium sticky left-0 z-10 bg-muted flex items-center gap-1">
+                        {expandedReceitas.has("__total__") ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                         Receita
                       </td>
                       {tableData.receitaTotalPorMes.map((val, i) => (
@@ -587,6 +608,39 @@ export default function ContribuicaoSquad() {
                       </td>
                       <td />
                     </tr>
+                    {expandedReceitas.has("__total__") && (() => {
+                      // Agregar todos os clientes de todos os squads com porMes somados
+                      const clienteMap = new Map<string, { porMes: number[]; total: number }>();
+                      for (const clientes of Object.values(bulkData?.receitasDetalhesPorSquad || {})) {
+                        for (const c of clientes) {
+                          const existing = clienteMap.get(c.cliente);
+                          if (existing) {
+                            c.porMes.forEach((v, i) => { existing.porMes[i] += v; });
+                            existing.total += c.total;
+                          } else {
+                            clienteMap.set(c.cliente, { porMes: [...c.porMes], total: c.total });
+                          }
+                        }
+                      }
+                      return Array.from(clienteMap.entries())
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .map(([cliente, data], idx) => (
+                          <tr key={`${cliente}-${idx}`} className="border-b border-border/10 bg-muted">
+                            <td className="py-0.5 px-3 pl-12 text-[10px] text-emerald-500/70 dark:text-emerald-400/50 font-medium sticky left-0 z-10 bg-muted truncate max-w-[200px]" title={cliente}>
+                              {cliente}
+                            </td>
+                            {monthlyResults.map((_, i) => (
+                              <td key={i} className="py-0.5 px-2 text-right text-[10px] text-emerald-500/70 dark:text-emerald-400/50">
+                                {data.porMes[i] > 0 ? formatCurrencyNoDecimals(data.porMes[i]) : "-"}
+                              </td>
+                            ))}
+                            <td className="py-0.5 px-3 text-right text-[10px] font-medium text-emerald-500/70 dark:text-emerald-400/50">
+                              {formatCurrencyNoDecimals(data.total)}
+                            </td>
+                            <td />
+                          </tr>
+                        ));
+                    })()}
                     {/* Total Despesas (expandível) */}
                     <tr className="border-b border-border/30 bg-muted cursor-pointer hover:bg-muted/80" onClick={() => toggleDespesasExpand("__total__")}>
                       <td className="py-1.5 px-3 pl-7 text-xs text-red-500 dark:text-red-400 font-medium sticky left-0 z-10 bg-muted flex items-center gap-1">
@@ -606,10 +660,9 @@ export default function ContribuicaoSquad() {
                     {expandedDespesas.has("__total__") && (
                       <>
                         {[
-                          { label: "Impostos", data: tableData.impostosPorMes, expandable: false },
                           { label: "Salários", data: tableData.salariosPorMes, expandable: true },
-                          { label: "CXCs", data: tableData.cxcsPorMes, expandable: false },
                           { label: "Freelancers", data: tableData.freelancersPorMes, expandable: false },
+                          { label: "iFood", data: tableData.ifoodPorMes, expandable: false },
                         ].map(({ label, data, expandable }) => {
                           const total = data.reduce((acc, v) => acc + v, 0);
                           const salKey = `__total____${label}`;
@@ -636,18 +689,18 @@ export default function ContribuicaoSquad() {
                                 </td>
                                 <td />
                               </tr>
-                              {isExpanded && Object.values(bulkData?.salariosDetalhesPorSquad || {}).flat().sort((a, b) => b.salario - a.salario).map((colab, idx) => (
+                              {isExpanded && Object.values(bulkData?.salariosDetalhesPorSquad || {}).flat().sort((a, b) => b.total - a.total).map((colab, idx) => (
                                 <tr key={`${colab.nome}-${idx}`} className="border-b border-border/10 bg-muted">
                                   <td className="py-0.5 px-3 pl-[72px] text-[10px] text-red-400/50 dark:text-red-400/35 font-medium sticky left-0 z-10 bg-muted truncate max-w-[160px]" title={colab.nome}>
                                     {colab.nome}
                                   </td>
                                   {monthlyResults.map((_, i) => (
                                     <td key={i} className="py-0.5 px-2 text-right text-[10px] text-red-400/50 dark:text-red-400/35">
-                                      {colab.salario > 0 ? formatCurrencyNoDecimals(colab.salario) : "-"}
+                                      {colab.porMes[i] > 0 ? formatCurrencyNoDecimals(colab.porMes[i]) : "-"}
                                     </td>
                                   ))}
                                   <td className="py-0.5 px-3 text-right text-[10px] font-medium text-red-400/50 dark:text-red-400/35">
-                                    {formatCurrencyNoDecimals(colab.salario)}
+                                    {formatCurrencyNoDecimals(colab.total)}
                                   </td>
                                   <td />
                                 </tr>

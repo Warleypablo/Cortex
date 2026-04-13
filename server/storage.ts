@@ -2306,36 +2306,36 @@ export class DbStorage implements IStorage {
       .where(
         or(
           inArray(schema.rhPatrimonio.responsavelId, colaboradorIds),
-          sql`TRIM(${schema.rhPatrimonio.responsavelAtual}) IN (${sql.join(colaboradorNomes.map(n => sql`${n}`), sql`, `)})`
+          sql`LOWER(TRIM(${schema.rhPatrimonio.responsavelAtual})) IN (${sql.join(colaboradorNomes.map(n => sql`${n.toLowerCase()}`), sql`, `)})`
         )
       );
     
     const patrimoniosPorId = new Map<number, { id: number; numeroAtivo: string | null; descricao: string | null }[]>();
     const patrimoniosPorNome = new Map<string, { id: number; numeroAtivo: string | null; descricao: string | null }[]>();
-    
+
     for (const p of patrimonios) {
       const patrimonioData = { id: p.id, numeroAtivo: p.numeroAtivo, descricao: p.descricao };
-      
+
       if (p.responsavelId) {
         const existing = patrimoniosPorId.get(p.responsavelId) || [];
         existing.push(patrimonioData);
         patrimoniosPorId.set(p.responsavelId, existing);
-      } else if (p.responsavelAtual) {
-        const trimmedName = p.responsavelAtual.trim();
+      }
+      if (p.responsavelAtual) {
+        const trimmedName = p.responsavelAtual.trim().toLowerCase();
         const existing = patrimoniosPorNome.get(trimmedName) || [];
         existing.push(patrimonioData);
         patrimoniosPorNome.set(trimmedName, existing);
       }
     }
-    
+
     const data = colaboradores.map(col => {
       const byId = patrimoniosPorId.get(col.id) || [];
-      if (byId.length > 0) {
-        return { ...col, patrimonios: byId };
-      }
-      const colName = (col.nome || '').trim();
+      const colName = (col.nome || '').trim().toLowerCase();
       const byName = patrimoniosPorNome.get(colName) || [];
-      return { ...col, patrimonios: byName };
+      const seenIds = new Set(byId.map(p => p.id));
+      const merged = [...byId, ...byName.filter(p => !seenIds.has(p.id))];
+      return { ...col, patrimonios: merged };
     });
     
     return {
@@ -2808,8 +2808,8 @@ export class DbStorage implements IStorage {
       `);
     } else {
       await db.execute(sql`
-        UPDATE "Inhire".rh_patrimonio 
-        SET responsavel_atual = ${responsavelNome} 
+        UPDATE "Inhire".rh_patrimonio
+        SET responsavel_atual = ${responsavelNome}, responsavel_id = NULL
         WHERE id = ${id}
       `);
     }
@@ -4529,19 +4529,20 @@ export class DbStorage implements IStorage {
       const inicioMes = new Date(ano, mesNum - 1, 1);
       const fimMes = new Date(ano, mesNum, 0, 23, 59, 59);
 
-      // Buscar o último snapshot do mês e somar valor_r dos contratos ativos
+      // Buscar snapshot do dia 1 do mês seguinte (estado final do mês), fallback para MAX dentro do mês
+      const primeiroDiaMesSeguinte = new Date(ano, mesNum, 1);
       const mrrQuery = await db.execute(sql`
         WITH ultimo_snapshot AS (
-          SELECT MAX(data_snapshot) as data_ultimo_snapshot
-          FROM ${schema.cupDataHist}
-          WHERE data_snapshot >= ${inicioMes}::timestamp
-            AND data_snapshot <= ${fimMes}::timestamp
+          SELECT COALESCE(
+            (SELECT data_snapshot FROM ${schema.cupDataHist} WHERE data_snapshot = ${primeiroDiaMesSeguinte}::date LIMIT 1),
+            (SELECT MAX(data_snapshot) FROM ${schema.cupDataHist} WHERE data_snapshot >= ${inicioMes}::timestamp AND data_snapshot <= ${fimMes}::timestamp)
+          ) as data_ultimo_snapshot
         )
-        SELECT 
+        SELECT
           us.data_ultimo_snapshot,
           COALESCE(SUM(h.valorr::numeric), 0) as mrr
         FROM ultimo_snapshot us
-        LEFT JOIN ${schema.cupDataHist} h 
+        LEFT JOIN ${schema.cupDataHist} h
           ON h.data_snapshot = us.data_ultimo_snapshot
           AND h.status IN ('ativo', 'onboarding', 'triagem')
         GROUP BY us.data_ultimo_snapshot
