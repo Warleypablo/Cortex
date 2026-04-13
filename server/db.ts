@@ -2342,11 +2342,10 @@ export async function initializeItemAliasMapTable(): Promise<void> {
           ('desenvolvimento de e commerce', 'ecommerce', 'Mesma coisa no Tech'),
           ('sustentacao de site e ecommerce', 'ecommerce', 'Idem')
       `);
-      console.log('[init] item_alias_map seeded com 9 aliases iniciais');
+      console.log('[database] item_alias_map seeded com 9 aliases iniciais');
     }
     console.log('[database] item_alias_map table initialized');
   } catch (error) {
-    console.error('[init] erro ao inicializar item_alias_map:', error);
-    throw error;
+    console.error('[database] erro ao inicializar item_alias_map:', error);
   }
 }
