@@ -1,6 +1,9 @@
 export const STOPWORDS = new Set<string>([
+  // Conectivos/fillers PT-BR (alguns já caem no filtro de length < 3, mantidos como defensivos)
   'para', 'com', 'por', 'sem', 'dos', 'das', 'mes', 'fee', 'uma',
+  // Tiers de produto — ignorados no match item↔contrato porque o Conta Azul e o ClickUp divergem
   'starter', 'scale', 'enterprise', 'standard', 'premium',
+  // Modificadores de oferta — não diferenciam o squad dono
   'pontual', 'recorrente', 'mensal', 'entrega', 'implantacao',
 ]);
 
