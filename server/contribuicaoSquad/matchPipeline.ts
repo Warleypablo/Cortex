@@ -1,3 +1,12 @@
+// Pure-TS reference implementation of the name normalization used pelo pipeline
+// de atribuição de receita por squad. NÃO é consumido no runtime — a query em
+// `receitaPorItens.ts` implementa a mesma lógica inline em SQL (via `unaccent`,
+// `REGEXP_REPLACE`, `STOPWORDS_SQL`). Este módulo existe como:
+//   1. Referência testável (matchPipeline.test.ts)
+//   2. Consumidor futuro: admin UI pra gerenciar `item_alias_map`
+//   3. Documentação viva das regras de normalização
+// Se alterar as regras aqui, atualize também o SQL em receitaPorItens.ts.
+
 export const STOPWORDS = new Set<string>([
   // Conectivos/fillers PT-BR (alguns já caem no filtro de length < 3, mantidos como defensivos)
   'para', 'com', 'por', 'sem', 'dos', 'das', 'mes', 'fee', 'uma',
