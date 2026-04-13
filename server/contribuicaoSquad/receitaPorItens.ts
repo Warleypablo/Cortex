@@ -4,6 +4,10 @@ import { db } from '../db';
 /** Parcela é considerada coberta pelo pipeline novo quando >= 99% do valor_pago foi atribuído aos itens. */
 const COVERAGE_THRESHOLD = 0.99;
 
+/** Label usado para itens que não casaram com nenhum contrato do ClickUp.
+ *  If you change SEM_SQUAD_LABEL, update the literal in the orfaos CTE below. */
+export const SEM_SQUAD_LABEL = '⚠️ Sem Squad';
+
 // Stopwords list — MUST stay in sync with STOPWORDS in matchPipeline.ts.
 // Interpolated as raw SQL because Drizzle can't parameterize an IN list well.
 const STOPWORDS_SQL = sql.raw(

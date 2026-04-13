@@ -54,7 +54,7 @@ import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { simulateCliente, ContratoSim, ClienteSim } from "./contribuicaoSquad/simulator";
-import { getReceitaPorItens, parcelasCobertas, type ReceitaItemLinha } from "./contribuicaoSquad/receitaPorItens";
+import { getReceitaPorItens, parcelasCobertas, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
 
 const gpturboOpenAI = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -5359,24 +5359,40 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       // Pipeline que atribui cada item da venda ao contrato/squad certo.
       // Parcelas totalmente cobertas (≥99% do valor_pago) são excluídas do
       // simulador A3 abaixo, evitando double-counting.
-      const receitaItens = await getReceitaPorItens(ano);
+      let receitaItens: ReceitaItemLinha[] = [];
+      let parcelasCobertasSet = new Set<string>();
+      let totalParcelasElegiveis = 0;
+      let itensFallbackUsed = false;
 
-      // Map de valor_pago por parcela_id (para saber o que o A3 tem que explicar)
-      const parcelaValorMap = new Map<string, number>();
-      const pagamentosResultPreview = await db.execute(sql`
-        SELECT p.id::text AS parcela_id, p.valor_pago::numeric AS valor_pago
-        FROM "Conta Azul".caz_parcelas p
-        WHERE p.tipo_evento = 'RECEITA'
-          AND p.status = 'QUITADO'
-          AND p.valor_pago::numeric > 0
-          AND EXTRACT(YEAR FROM p.data_quitacao) = ${ano}
-      `);
-      for (const row of pagamentosResultPreview.rows as any[]) {
-        parcelaValorMap.set(row.parcela_id, Number(row.valor_pago) || 0);
+      try {
+        receitaItens = await getReceitaPorItens(ano);
+
+        // Map de valor_pago por parcela_id (para saber o que o A3 tem que explicar).
+        // IMPORTANT: escopar a preview para parcelas ELEGÍVEIS ao pipeline de itens
+        // (venda_origem em VENDA/VENDA_AGENDADA com venda_id), para que pctViaItens
+        // tenha denominador significativo — RENEGOCIACAO/LANCAMENTO não podem ser
+        // atribuídas por itens.
+        const parcelaValorMap = new Map<string, number>();
+        const pagamentosResultPreview = await db.execute(sql`
+          SELECT p.id::text AS parcela_id, p.valor_pago::numeric AS valor_pago
+          FROM "Conta Azul".caz_parcelas p
+          WHERE p.tipo_evento = 'RECEITA'
+            AND p.status = 'QUITADO'
+            AND p.valor_pago::numeric > 0
+            AND p.venda_origem IN ('VENDA','VENDA_AGENDADA')
+            AND p.venda_id IS NOT NULL
+            AND EXTRACT(YEAR FROM p.data_quitacao) = ${ano}
+        `);
+        for (const row of pagamentosResultPreview.rows as Array<{ parcela_id: string; valor_pago: string | number }>) {
+          parcelaValorMap.set(row.parcela_id, Number(row.valor_pago) || 0);
+        }
+
+        parcelasCobertasSet = parcelasCobertas(receitaItens, parcelaValorMap);
+        totalParcelasElegiveis = parcelaValorMap.size;
+      } catch (err) {
+        console.error('[contribuicao-squad/bulk] receitaPorItens falhou, caindo para A3-only:', err);
+        itensFallbackUsed = true;
       }
-
-      const parcelasCobertasSet = parcelasCobertas(receitaItens, parcelaValorMap);
-      const totalParcelasAno = parcelaValorMap.size;
 
       // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
       // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
@@ -5452,9 +5468,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND p.status = 'QUITADO'
           AND p.valor_pago::numeric > 0
           AND caz.cnpj IS NOT NULL AND TRIM(caz.cnpj) != ''
-          AND ${parcelasExcluidas.length > 0
-            ? sql`p.id::text NOT IN (${sql.join(parcelasExcluidas.map(id => sql`${id}`), sql`, `)})`
-            : sql`TRUE`}
+          ${parcelasExcluidas.length > 0
+            ? sql`AND NOT EXISTS (
+                SELECT 1 FROM (VALUES ${sql.join(parcelasExcluidas.map(id => sql`(${id})`), sql`, `)}) AS excl(id)
+                WHERE excl.id = p.id::text
+              )`
+            : sql``}
         GROUP BY cnpj_limpo, TO_CHAR(p.data_quitacao, 'YYYY-MM')
         ORDER BY cnpj_limpo, mes
       `);
@@ -5602,12 +5621,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       }
 
       // ──── Mesclar receita via itens no mesesMap ─────────────────────────
-      // Órfãos ('⚠️ Sem Squad') são mantidos mesmo quando um squad filter é aplicado,
+      // Órfãos (SEM_SQUAD_LABEL) são mantidos mesmo quando um squad filter é aplicado,
       // para que fiquem visíveis no dashboard (e o usuário possa agir sobre eles).
       for (const linha of receitaItens) {
         const sqNorm = linha.squad;
 
-        if (!matchesSquadFilter(sqNorm) && sqNorm !== '⚠️ Sem Squad') continue;
+        if (!matchesSquadFilter(sqNorm) && sqNorm !== SEM_SQUAD_LABEL) continue;
 
         squadsSet.add(sqNorm);
 
@@ -6097,9 +6116,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // ──── Estatísticas de origem dos dados (itens vs A3) ────────────────
       const viaItens = parcelasCobertasSet.size;
-      const viaSimuladorA3 = Math.max(0, totalParcelasAno - viaItens);
-      const pctViaItens = totalParcelasAno > 0
-        ? Math.round((viaItens / totalParcelasAno) * 1000) / 10
+      const viaSimuladorA3 = Math.max(0, totalParcelasElegiveis - viaItens);
+      const pctViaItens = totalParcelasElegiveis > 0
+        ? Math.round((viaItens / totalParcelasElegiveis) * 1000) / 10
         : 0;
 
       res.json({
@@ -6113,10 +6132,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         salariosDetalhesPorSquad,
         receitasDetalhesPorSquad,
         fonteDados: {
-          totalParcelas: totalParcelasAno,
+          totalParcelasElegiveis,
           viaItens,
           viaSimuladorA3,
           pctViaItens,
+          fallbackUsed: itensFallbackUsed,
         },
       });
     } catch (error) {
