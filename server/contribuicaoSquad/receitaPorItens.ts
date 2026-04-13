@@ -1,6 +1,31 @@
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
 
+/** Parcela é considerada coberta pelo pipeline novo quando >= 99% do valor_pago foi atribuído aos itens. */
+const COVERAGE_THRESHOLD = 0.99;
+
+// Stopwords list — MUST stay in sync with STOPWORDS in matchPipeline.ts.
+// Interpolated as raw SQL because Drizzle can't parameterize an IN list well.
+const STOPWORDS_SQL = sql.raw(
+  `('para','com','por','sem','dos','das','mes','fee','uma',` +
+  `'starter','scale','enterprise','standard','premium',` +
+  `'pontual','recorrente','mensal','entrega','implantacao')`
+);
+
+type ReceitaItemRow = {
+  parcela_id: string;
+  item_id: string;
+  cnpj_limpo: string;
+  cliente_nome: string;
+  mes: string;
+  item_raw: string;
+  item_total: string | number;
+  id_subtask: string | null;
+  squad: string;
+  contrato_raw: string | null;
+  prioridade: number | null;
+};
+
 export interface ReceitaItemLinha {
   parcelaId: string;
   itemId: string;
@@ -61,9 +86,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
           SELECT array_agg(t)
           FROM unnest(string_to_array(i.item_norm, ' ')) AS t
           WHERE LENGTH(t) >= 3
-            AND t NOT IN ('para','com','por','sem','dos','das','mes','fee','uma',
-                          'starter','scale','enterprise','standard','premium',
-                          'pontual','recorrente','mensal','entrega','implantacao')
+            AND t NOT IN ${STOPWORDS_SQL}
         ), ARRAY[]::text[]) AS item_tokens
       FROM itens i
     ),
@@ -88,9 +111,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
           SELECT array_agg(t)
           FROM unnest(string_to_array(c.contrato_norm, ' ')) AS t
           WHERE LENGTH(t) >= 3
-            AND t NOT IN ('para','com','por','sem','dos','das','mes','fee','uma',
-                          'starter','scale','enterprise','standard','premium',
-                          'pontual','recorrente','mensal','entrega','implantacao')
+            AND t NOT IN ${STOPWORDS_SQL}
         ), ARRAY[]::text[]) AS contrato_tokens
       FROM contratos c
     ),
@@ -101,7 +122,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
     ),
     candidatos AS (
       SELECT
-        i.parcela_id, i.item_id, i.cliente_nome, i.mes, i.item_raw, i.item_total,
+        i.parcela_id, i.item_id, i.cnpj_limpo, i.cliente_nome, i.mes, i.item_raw, i.item_total,
         c.id_subtask, c.squad, c.contrato_raw, c.contrato_valor,
         CASE
           WHEN c.contrato_norm = i.item_norm THEN 1
@@ -121,7 +142,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
     ),
     melhor AS (
       SELECT DISTINCT ON (parcela_id, item_id)
-        parcela_id::text, item_id::text, cliente_nome, mes, item_raw, item_total::float8,
+        parcela_id::text, item_id::text, cnpj_limpo, cliente_nome, mes, item_raw, item_total::float8,
         id_subtask::text, squad, contrato_raw, prioridade
       FROM candidatos
       WHERE prioridade IS NOT NULL
@@ -129,7 +150,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
     ),
     orfaos AS (
       SELECT DISTINCT
-        i.parcela_id::text, i.item_id::text, i.cliente_nome, i.mes, i.item_raw, i.item_total::float8,
+        i.parcela_id::text, i.item_id::text, i.cnpj_limpo, i.cliente_nome, i.mes, i.item_raw, i.item_total::float8,
         NULL::text AS id_subtask,
         '⚠️ Sem Squad'::text AS squad,
         NULL::text AS contrato_raw,
@@ -142,19 +163,19 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
           AND c.prioridade IS NOT NULL
       )
     )
-    SELECT parcela_id, item_id, cliente_nome, mes, item_raw, item_total,
+    SELECT parcela_id, item_id, cnpj_limpo, cliente_nome, mes, item_raw, item_total,
            id_subtask, squad, contrato_raw, prioridade
     FROM melhor
     UNION ALL
-    SELECT parcela_id, item_id, cliente_nome, mes, item_raw, item_total,
+    SELECT parcela_id, item_id, cnpj_limpo, cliente_nome, mes, item_raw, item_total,
            id_subtask, squad, contrato_raw, prioridade
     FROM orfaos
   `);
 
-  return (result.rows as any[]).map((row): ReceitaItemLinha => ({
+  return (result.rows as ReceitaItemRow[]).map((row): ReceitaItemLinha => ({
     parcelaId: row.parcela_id,
     itemId: row.item_id,
-    cnpjLimpo: '',
+    cnpjLimpo: row.cnpj_limpo ?? '',
     clienteNome: row.cliente_nome,
     mes: row.mes,
     itemRaw: row.item_raw,
@@ -181,7 +202,7 @@ export function parcelasCobertas(
   const cobertas = new Set<string>();
   for (const [parcelaId, soma] of Array.from(somaPorParcela.entries())) {
     const valor = parcelaValor.get(parcelaId) || 0;
-    if (valor > 0 && soma >= valor * 0.99) cobertas.add(parcelaId);
+    if (valor > 0 && soma >= valor * COVERAGE_THRESHOLD) cobertas.add(parcelaId);
   }
   return cobertas;
 }
