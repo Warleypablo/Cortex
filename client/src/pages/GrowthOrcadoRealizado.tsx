@@ -36,6 +36,7 @@ interface MetricSection {
   title: string;
   icon: React.ReactNode;
   metrics: Metric[];
+  banner?: React.ReactNode;
 }
 
 interface MQLMetrics {
@@ -766,6 +767,13 @@ export default function GrowthOrcadoRealizado() {
             {section.title}
           </TableCell>
         </TableRow>
+        {section.banner && (
+          <TableRow className="bg-amber-50/50 dark:bg-amber-950/20 border-l-4 border-l-amber-400 dark:border-l-amber-500">
+            <TableCell colSpan={7} className="text-xs py-2 text-amber-900 dark:text-amber-200">
+              {section.banner}
+            </TableCell>
+          </TableRow>
+        )}
         {/* Metric rows */}
         {section.metrics.map(m => {
           const isPercent = m.format === 'percent';
@@ -966,6 +974,9 @@ export default function GrowthOrcadoRealizado() {
     frequenciaAlcance: number; ctrAlcanceVisitas: number; visitasPerfil: number;
     percEngajamento: number; interacoes: number; ctrAlcanceCliques: number;
     ctrVisitasCliques: number; cliquesLinkBio: number;
+    investimentoPago: number;
+    hasConnection: boolean;
+    snapshotCount: number;
   }
 
   interface PlatformFunnelData {
@@ -1298,7 +1309,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ig_ctrVisitasCliques', name: 'CTR Visitas > Cliques', type: 'formula', orcado: O.ctrVisitasCliques, realizado: d.ctrVisitasCliques ?? null, percentual: calcPercentual(O.ctrVisitasCliques, d.ctrVisitasCliques), format: 'percent' },
       { id: 'ig_cliquesLinkBio', name: 'Cliques no Link Bio', type: 'formula', orcado: O.cliquesLinkBio, realizado: d.cliquesLinkBio ?? 0, percentual: calcPercentual(O.cliquesLinkBio, d.cliquesLinkBio), format: 'number' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('ig', funnelByPlatformData?.instagram, O, null)];
+    return [...topMetrics, ...buildFunnelMetrics('ig', funnelByPlatformData?.instagram, O, d.investimentoPago ?? null)];
   }, [instagramDetailData, funnelByPlatformData, ORCADO_INSTAGRAM]);
 
   // YouTube platform metrics (manual only - no integration yet)
@@ -1336,14 +1347,26 @@ export default function GrowthOrcadoRealizado() {
     return [...topMetrics, ...buildFunnelMetrics('li', funnelByPlatformData?.linkedin, O, null)];
   }, [funnelByPlatformData, ORCADO_LINKEDIN]);
 
+  // Instagram empty-state banner: distinguish "no connection" from "connection ok but no data"
+  const instagramBanner = useMemo<React.ReactNode | undefined>(() => {
+    if (!instagramDetailData) return undefined;
+    if (instagramDetailData.hasConnection === false) {
+      return 'Nenhuma conexão Instagram ativa. Configure em Integrações para começar a coletar métricas.';
+    }
+    if (instagramDetailData.snapshotCount === 0) {
+      return 'Sem dados sincronizados para este período. O sync roda a cada 6h — aguarde ou cheque logs do Instagram sync.';
+    }
+    return undefined;
+  }, [instagramDetailData]);
+
   // Aprofundado sections with platform-specific metrics
   const aprofundadoPlatformSections: MetricSection[] = useMemo(() => [
     { title: 'Meta Ads', icon: <Megaphone className="w-5 h-5" />, metrics: metaAdsPlatformMetrics },
     { title: 'Google Ads', icon: <Megaphone className="w-5 h-5" />, metrics: googleAdsPlatformMetrics },
-    { title: 'Instagram', icon: <Camera className="w-5 h-5" />, metrics: instagramPlatformMetrics },
+    { title: 'Instagram', icon: <Camera className="w-5 h-5" />, metrics: instagramPlatformMetrics, banner: instagramBanner },
     { title: 'YouTube', icon: <Play className="w-5 h-5" />, metrics: youtubePlatformMetrics },
     { title: 'LinkedIn', icon: <Briefcase className="w-5 h-5" />, metrics: linkedinPlatformMetrics },
-  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, youtubePlatformMetrics, linkedinPlatformMetrics]);
+  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, linkedinPlatformMetrics]);
 
   const naoMqlMetrics: Metric[] = useMemo(() => {
     const data = naoMqlData || {} as NaoMQLMetrics;
