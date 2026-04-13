@@ -54,6 +54,7 @@ import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { simulateCliente, ContratoSim, ClienteSim } from "./contribuicaoSquad/simulator";
+import { getReceitaPorItens, parcelasCobertas, type ReceitaItemLinha } from "./contribuicaoSquad/receitaPorItens";
 
 const gpturboOpenAI = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -5353,7 +5354,30 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       
       const dataInicio = `${ano}-01-01`;
       const dataFim = `${ano}-12-31 23:59:59`;
-      
+
+      // ──── NOVO: receita via caz_vendas_itens (parcelas com venda_id) ──────
+      // Pipeline que atribui cada item da venda ao contrato/squad certo.
+      // Parcelas totalmente cobertas (≥99% do valor_pago) são excluídas do
+      // simulador A3 abaixo, evitando double-counting.
+      const receitaItens = await getReceitaPorItens(ano);
+
+      // Map de valor_pago por parcela_id (para saber o que o A3 tem que explicar)
+      const parcelaValorMap = new Map<string, number>();
+      const pagamentosResultPreview = await db.execute(sql`
+        SELECT p.id::text AS parcela_id, p.valor_pago::numeric AS valor_pago
+        FROM "Conta Azul".caz_parcelas p
+        WHERE p.tipo_evento = 'RECEITA'
+          AND p.status = 'QUITADO'
+          AND p.valor_pago::numeric > 0
+          AND EXTRACT(YEAR FROM p.data_quitacao) = ${ano}
+      `);
+      for (const row of pagamentosResultPreview.rows as any[]) {
+        parcelaValorMap.set(row.parcela_id, Number(row.valor_pago) || 0);
+      }
+
+      const parcelasCobertasSet = parcelasCobertas(receitaItens, parcelaValorMap);
+      const totalParcelasAno = parcelaValorMap.size;
+
       // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
       // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
 
@@ -5414,6 +5438,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       `);
 
       // Query 2: pagamentos cronológicos (histórico inteiro, todos os clientes)
+      // Exclui parcelas já cobertas pelo novo pipeline de itens (para evitar double-count).
+      const parcelasExcluidas = Array.from(parcelasCobertasSet);
       const pagamentosResult = await db.execute(sql`
         SELECT
           REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo,
@@ -5426,6 +5452,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND p.status = 'QUITADO'
           AND p.valor_pago::numeric > 0
           AND caz.cnpj IS NOT NULL AND TRIM(caz.cnpj) != ''
+          AND ${parcelasExcluidas.length > 0
+            ? sql`p.id::text NOT IN (${sql.join(parcelasExcluidas.map(id => sql`${id}`), sql`, `)})`
+            : sql`TRUE`}
         GROUP BY cnpj_limpo, TO_CHAR(p.data_quitacao, 'YYYY-MM')
         ORDER BY cnpj_limpo, mes
       `);
@@ -5571,7 +5600,59 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           }
         }
       }
-      
+
+      // ──── Mesclar receita via itens no mesesMap ─────────────────────────
+      // Órfãos ('⚠️ Sem Squad') são mantidos mesmo quando um squad filter é aplicado,
+      // para que fiquem visíveis no dashboard (e o usuário possa agir sobre eles).
+      for (const linha of receitaItens) {
+        const sqNorm = linha.squad;
+
+        if (!matchesSquadFilter(sqNorm) && sqNorm !== '⚠️ Sem Squad') continue;
+
+        squadsSet.add(sqNorm);
+
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
+        if (!mesesMap.has(linha.mes)) {
+          mesesMap.set(linha.mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
+        }
+        const mesData = mesesMap.get(linha.mes)!;
+        mesData.receitaTotal += linha.itemTotal;
+        mesData.totalParcelas += 1;
+
+        const categoriaNome = 'Sem Categoria';
+        if (!mesData.categorias.has(categoriaNome)) {
+          mesData.categorias.set(categoriaNome, { nome: categoriaNome, valorTotal: 0, clientes: new Map() });
+        }
+        const cat = mesData.categorias.get(categoriaNome)!;
+        cat.valorTotal += linha.itemTotal;
+
+        if (!cat.clientes.has(linha.clienteNome)) {
+          cat.clientes.set(linha.clienteNome, { valorTotal: 0, servicos: new Map() });
+        }
+        const cli = cat.clientes.get(linha.clienteNome)!;
+        cli.valorTotal += linha.itemTotal;
+
+        const chaveServico = `${linha.itemRaw}|${sqNorm}`;
+        if (!cli.servicos.has(chaveServico)) {
+          cli.servicos.set(chaveServico, { valor: 0, squad: sqNorm, parcelas: [] });
+        }
+        const srv = cli.servicos.get(chaveServico)!;
+        srv.valor += linha.itemTotal;
+        srv.parcelas.push({
+          id: linha.idSubtask,
+          valor: linha.itemTotal,
+          dataQuitacao: null,
+          linkNfse: null,
+          numNfse: null,
+          urlCobranca: null,
+          clienteNome: linha.clienteNome,
+          servicoNome: linha.itemRaw,
+          squad: sqNorm,
+        });
+      }
+
       // Converter para formato de resposta
       const mesesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       
@@ -6014,6 +6095,13 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
 
+      // ──── Estatísticas de origem dos dados (itens vs A3) ────────────────
+      const viaItens = parcelasCobertasSet.size;
+      const viaSimuladorA3 = Math.max(0, totalParcelasAno - viaItens);
+      const pctViaItens = totalParcelasAno > 0
+        ? Math.round((viaItens / totalParcelasAno) * 1000) / 10
+        : 0;
+
       res.json({
         ano,
         squad: squadFilter || 'todos',
@@ -6024,6 +6112,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         despesasPorSquadMensais,
         salariosDetalhesPorSquad,
         receitasDetalhesPorSquad,
+        fonteDados: {
+          totalParcelas: totalParcelasAno,
+          viaItens,
+          viaSimuladorA3,
+          pctViaItens,
+        },
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
