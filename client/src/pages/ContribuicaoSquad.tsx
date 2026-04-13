@@ -81,6 +81,7 @@ interface BulkResponse {
 }
 
 const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
+// ⚠️ Keep in sync with SEM_SQUAD_LABEL in server/contribuicaoSquad/receitaPorItens.ts
 const SEM_SQUAD_LABEL = '⚠️ Sem Squad';
 const isSemSquad = (squad: string) => squad === SEM_SQUAD_LABEL;
 
