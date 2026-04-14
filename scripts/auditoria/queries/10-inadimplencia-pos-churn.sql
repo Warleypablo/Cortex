@@ -1,10 +1,12 @@
 -- Cat 10: Parcelas vencidas há > 90 dias e não pagas, de clientes encerrados.
 WITH cup_closed AS (
-  SELECT ct.data_encerramento, cl.nome AS cliente,
-         LPAD(REGEXP_REPLACE(COALESCE(cl.cnpj, ''), '[^0-9]', '', 'g'), 14, '0') AS cnpj_norm
+  SELECT cl.nome AS cliente,
+         LPAD(REGEXP_REPLACE(COALESCE(cl.cnpj, ''), '[^0-9]', '', 'g'), 14, '0') AS cnpj_norm,
+         MAX(ct.data_encerramento) AS data_encerramento
   FROM "Clickup".cup_contratos ct
   JOIN "Clickup".cup_clientes cl ON cl.task_id = ct.id_task
   WHERE ct.data_encerramento IS NOT NULL
+  GROUP BY cl.nome, LPAD(REGEXP_REPLACE(COALESCE(cl.cnpj, ''), '[^0-9]', '', 'g'), 14, '0')
 ),
 caz_client AS (
   SELECT cl.ids,
