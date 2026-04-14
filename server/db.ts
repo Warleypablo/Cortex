@@ -2304,3 +2304,48 @@ export async function migrateMetricRulesetsContext(): Promise<void> {
     console.error('[database] Error migrating metric_rulesets:', error);
   }
 }
+
+export async function initializeItemAliasMapTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.item_alias_map (
+        id SERIAL PRIMARY KEY,
+        item_pattern VARCHAR(255) NOT NULL,
+        target_token VARCHAR(100) NOT NULL,
+        notes TEXT,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_item_alias_map_pattern_active
+      ON cortex_core.item_alias_map (item_pattern) WHERE active = true
+    `);
+
+    // Seed inicial — só insere se a tabela estiver vazia
+    const existing = await db.execute(sql`
+      SELECT COUNT(*)::int AS qtd FROM cortex_core.item_alias_map
+    `);
+    const count = Number((existing.rows[0] as any)?.qtd) || 0;
+    if (count === 0) {
+      await db.execute(sql`
+        INSERT INTO cortex_core.item_alias_map (item_pattern, target_token, notes) VALUES
+          ('aceleracao', 'performance', 'Aceleração Scale/Enterprise são variantes de Performance'),
+          ('trafego pago', 'performance', 'Nome alternativo no CAZ'),
+          ('trafego', 'performance', 'Nome alternativo no CAZ'),
+          ('referente a aceleracao mensal', 'performance', 'Texto livre recorrente'),
+          ('contrato personalizado', 'performance', 'Grupo Tommasi — cliente só tem squads Performance'),
+          ('variavel mensal', 'performance', 'Tipo de cobrança — sempre Performance em 2026'),
+          ('gameplan', 'gameplan', 'Mantém o termo para desambiguar'),
+          ('desenvolvimento de e commerce', 'ecommerce', 'Mesma coisa no Tech'),
+          ('sustentacao de site e ecommerce', 'ecommerce', 'Idem')
+      `);
+      console.log('[database] item_alias_map seeded com 9 aliases iniciais');
+    }
+    console.log('[database] item_alias_map table initialized');
+  } catch (error) {
+    console.error('[database] erro ao inicializar item_alias_map:', error);
+  }
+}
