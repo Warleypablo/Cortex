@@ -99,7 +99,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
         REPLACE(REPLACE(REPLACE(COALESCE(cl.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo,
         ct.id_subtask,
         ct.servico AS contrato_raw,
-        COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') AS squad,
+        COALESCE(NULLIF(TRIM(ct.squad), ''), '⚠️ Sem Squad') AS squad,
         GREATEST(COALESCE(ct.valorr::numeric, 0), COALESCE(ct.valorp::numeric, 0)) AS contrato_valor,
         TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(unaccent(ct.servico)), '[^a-z0-9 ]', ' ', 'g'), '\\s+', ' ', 'g')) AS contrato_norm,
         REGEXP_REPLACE(LOWER(unaccent(ct.servico)), '[^a-z0-9]', '', 'g') AS contrato_compact

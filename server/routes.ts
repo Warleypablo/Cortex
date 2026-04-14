@@ -5351,9 +5351,18 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
       const squad = req.query.squad as string | undefined;
       const squadFilter = squad && squad !== 'todos' ? squad : null;
-      
+
       const dataInicio = `${ano}-01-01`;
       const dataFim = `${ano}-12-31 23:59:59`;
+
+      // Normaliza variantes de "Sem Squad" para o label único exibido no frontend.
+      // Evita que contratos com squad vazio (legacy) apareçam como bucket separado
+      // do bucket de órfãos do pipeline de itens.
+      const normalizeSquadLabel = (raw: any): string => {
+        const v = (raw ?? '').toString().trim();
+        if (v === '' || v === 'Sem Squad') return SEM_SQUAD_LABEL;
+        return v;
+      };
 
       // ──── NOVO: receita via caz_vendas_itens (parcelas com venda_id) ──────
       // Pipeline que atribui cada item da venda ao contrato/squad certo.
@@ -5514,7 +5523,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         const contrato: ContratoSim = {
           id_subtask: row.id_subtask,
           cnpj,
-          squad: row.squad || 'Sem Squad',
+          squad: normalizeSquadLabel(row.squad),
           servico: row.servico || 'Serviço não identificado',
           tipo: row.tipo as 'recorrente' | 'pontual',
           valor: Number(row.valor) || 0,
@@ -5850,7 +5859,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         if (!salariosPorColab.has(id)) {
           salariosPorColab.set(id, {
             nome: row.colaborador_nome,
-            squad: row.squad || 'Sem Squad',
+            squad: normalizeSquadLabel(row.squad),
             porMes: new Array(12).fill(0),
             total: 0,
           });
