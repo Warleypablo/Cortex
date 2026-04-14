@@ -12,8 +12,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { cn } from "@/lib/utils";
-import { MultiSelect } from "@/components/ui/multi-select";
-import { TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
 import { startOfMonth, endOfMonth, format, parse, differenceInCalendarDays, subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRange } from "react-day-picker";
@@ -38,6 +36,7 @@ interface MetricSection {
   title: string;
   icon: React.ReactNode;
   metrics: Metric[];
+  banner?: React.ReactNode;
 }
 
 interface MQLMetrics {
@@ -60,6 +59,45 @@ interface MQLMetrics {
   ticketMedioImplantacao: number;
   dealsGanhos: number;
   contratosGanhos: number;
+}
+
+interface NaoMQLMetrics {
+  totalNaoMqls: number;
+  reunioesAgendadas: number;
+  reunioesRealizadas: number;
+  novosClientes: number;
+  contratosAceleracao: number;
+  contratosImplantacao: number;
+  faturamentoAceleracao: number;
+  faturamentoImplantacao: number;
+  faturamentoAceleracaoTrafego: number;
+  faturamentoImplantacaoTrafego: number;
+  percReuniaoAgendada: number;
+  percNoShow: number;
+  taxaVendas: number;
+  txContratosRecorrentes: number;
+  txContratosImplantacao: number;
+  ticketMedioAceleracao: number;
+  ticketMedioImplantacao: number;
+  dealsGanhos: number;
+  contratosGanhos: number;
+}
+
+interface AdsMetrics {
+  investimento: number;
+  impressoes: number;
+  cliques: number;
+  cpm: number;
+  ctr: number;
+  videoHook: number;
+  videoHold: number;
+  connectRate: number;
+  visualizacoesPagina: number;
+  leads: number;
+  mqls: number;
+  cpl: number;
+  cpmql: number;
+  percMqls: number;
 }
 
 function formatValue(value: number | string | null, format: 'currency' | 'number' | 'percent'): string {
@@ -165,9 +203,14 @@ function buildOrcadoRealizadoExportRows(
       const orcadoNum = typeof m.orcado === 'number' ? m.orcado : null;
       const realizadoNum = typeof m.realizado === 'number' ? m.realizado : null;
 
-      const desvio = calcDesvioMeta(orcadoNum, realizadoNum, params.propDias);
-      const previsao = calcPrevisaoAsIs(realizadoNum, params.propDias);
-      const recalculo = calcRecalculoMeta(orcadoNum, realizadoNum, params.diasRestantes, params.totalDias);
+      const isPercent = m.format === 'percent';
+      const desvio = isPercent
+        ? (orcadoNum !== null && realizadoNum !== null && orcadoNum !== 0
+            ? ((realizadoNum - orcadoNum) / orcadoNum) * 100
+            : null)
+        : calcDesvioMeta(orcadoNum, realizadoNum, params.propDias);
+      const previsao = isPercent ? null : calcPrevisaoAsIs(realizadoNum, params.propDias);
+      const recalculo = isPercent ? null : calcRecalculoMeta(orcadoNum, realizadoNum, params.diasRestantes, params.totalDias);
 
       rows.push([
         m.name,
@@ -407,8 +450,8 @@ const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
 };
 
 const PERCENT_METRICS = new Set([
-  'mql_ra_perc', 'mql_noshow', 'mql_taxa_vendas', 'mql_tx_recorrente', 'mql_tx_implantacao', 'mql_rr_perc', 'mql_taxa_conversao',
-  'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas', 'nmql_tx_recorrente', 'nmql_tx_implantacao', 'nmql_rr_perc', 'nmql_taxa_conversao',
+  'mql_ra_perc', 'mql_noshow', 'mql_taxa_vendas', 'mql_tx_recorrente', 'mql_tx_implantacao', 'mql_rr_perc',
+  'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas', 'nmql_tx_recorrente', 'nmql_tx_implantacao', 'nmql_rr_perc',
   'ctr', 'perc_mqls',
   // Meta Ads
   'meta_ctr', 'meta_videoHook', 'meta_videoHold', 'meta_videoP75', 'meta_videoP100',
@@ -436,7 +479,29 @@ const PERCENT_METRICS = new Set([
   'li_percRrVendas', 'li_percRrMqlVendas', 'li_percRrNmqlVendas',
 ]);
 
-
+// Métricas onde "menor é melhor" — cores invertidas na tabela
+const INVERTED_METRIC_IDS = new Set([
+  // Custo por resultado
+  'cpm', 'cpl', 'cpmql',
+  'meta_cpm', 'meta_cpl', 'meta_cpmql',
+  'gads_cpm', 'gads_cpl', 'gads_cpmql',
+  'ig_cpl', 'ig_cpmql',
+  'yt_cpl', 'yt_cpmql',
+  'li_cpl', 'li_cpmql',
+  // CAC
+  'total_cac_ads', 'total_cac_contrato',
+  'meta_cac', 'meta_cacUnico', 'meta_cacContrato',
+  'gads_cac', 'gads_cacUnico', 'gads_cacContrato',
+  'ig_cac', 'ig_cacUnico', 'ig_cacContrato',
+  'yt_cac', 'yt_cacUnico', 'yt_cacContrato',
+  'li_cac', 'li_cacUnico', 'li_cacContrato',
+  // No-show
+  'mql_noshow', 'nmql_noshow', 'total_noshow',
+  // Lead time
+  'meta_leadTime', 'gads_leadTime', 'ig_leadTime', 'yt_leadTime', 'li_leadTime',
+  // Perda de seguidores
+  'ig_percPerdaSeguidores', 'ig_deixaramSeguir',
+]);
 
 export default function GrowthOrcadoRealizado() {
   usePageTitle("Gestão de Metas");
@@ -449,10 +514,8 @@ export default function GrowthOrcadoRealizado() {
     from: startOfMonth(hoje),
     to: endOfMonth(hoje),
   });
-  const [cardFilter, setCardFilter] = useState<'todos' | 'mql' | 'nao-mql'>('todos');
   const [activeSection, setActiveSection] = useState<'consolidado' | 'aprofundado'>('consolidado');
   const [selectedPlataformas, setSelectedPlataformas] = useState<string[]>([]);
-  const [revenueFilter, setRevenueFilter] = useState<'todos' | 'recorrente' | 'pontual'>('todos');
 
   const [selectedProdutos, setSelectedProdutos] = useState<string[]>([]);
   // Editing is only allowed when at most 1 product and 1 platform is selected
@@ -568,24 +631,34 @@ export default function GrowthOrcadoRealizado() {
   const ORCADO_INSTAGRAM = useMemo(() => ({ ...DEFAULT_ORCADO_INSTAGRAM, ...(budgetsData?.instagram || {}) }), [budgetsData]);
   const ORCADO_YOUTUBE = useMemo(() => ({ ...DEFAULT_ORCADO_YOUTUBE, ...(budgetsData?.youtube || {}) }), [budgetsData]);
   const ORCADO_LINKEDIN = useMemo(() => ({ ...DEFAULT_ORCADO_LINKEDIN, ...(budgetsData?.linkedin || {}) }), [budgetsData]);
-  const ORCADO_TOTAL = useMemo(() => ({
-    percRA: 0.2317,
-    reunioesAgendadas: ORCADO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.reunioesAgendadas,
-    reunioesRealizadas: ORCADO_MQL.reunioesRealizadas + ORCADO_NAO_MQL.reunioesRealizadas,
-    percNoShow: 0.05,
-    percConversaoRRV: 0.28,
-    novosClientes: ORCADO_MQL.novosClientes + ORCADO_NAO_MQL.novosClientes,
-    contratosAceleracao: ORCADO_MQL.contratosAceleracao + ORCADO_NAO_MQL.contratosAceleracao,
-    contratosImplantacao: ORCADO_MQL.contratosImplantacao + ORCADO_NAO_MQL.contratosImplantacao,
-    faturamentoAceleracao: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao,
-    faturamentoImplantacao: ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
-    faturamentoTotal: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
-    taxaConversaoFunil: 0.0561,
-    taxaConversaoMQL: 0.0812,
-    ticketMedioGeral: 4192.07,
-    ticketMedioAceleracao: 4000,
-    ticketMedioImplantacao: 8500,
-  }), [ORCADO_MQL, ORCADO_NAO_MQL]);
+  const ORCADO_TOTAL = useMemo(() => {
+    const totalRA = ORCADO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.reunioesAgendadas;
+    const totalRR = ORCADO_MQL.reunioesRealizadas + ORCADO_NAO_MQL.reunioesRealizadas;
+    // Estimar total de leads a partir de %RA: leads = RA / %RA
+    const mqlLeads = ORCADO_MQL.percReuniaoAgendada > 0 ? ORCADO_MQL.reunioesAgendadas / ORCADO_MQL.percReuniaoAgendada : 0;
+    const nmqlLeads = ORCADO_NAO_MQL.percReuniaoAgendada > 0 ? ORCADO_NAO_MQL.reunioesAgendadas / ORCADO_NAO_MQL.percReuniaoAgendada : 0;
+    const totalLeads = mqlLeads + nmqlLeads;
+
+    return {
+      percRA: totalLeads > 0 ? totalRA / totalLeads : 0.2317,
+      reunioesAgendadas: totalRA,
+      reunioesRealizadas: totalRR,
+      percNoShow: 0.05,
+      percRr: totalLeads > 0 ? totalRR / totalLeads : undefined,
+      percConversaoRRV: 0.28,
+      novosClientes: ORCADO_MQL.novosClientes + ORCADO_NAO_MQL.novosClientes,
+      contratosAceleracao: ORCADO_MQL.contratosAceleracao + ORCADO_NAO_MQL.contratosAceleracao,
+      contratosImplantacao: ORCADO_MQL.contratosImplantacao + ORCADO_NAO_MQL.contratosImplantacao,
+      faturamentoAceleracao: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao,
+      faturamentoImplantacao: ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
+      faturamentoTotal: ORCADO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao + ORCADO_NAO_MQL.faturamentoImplantacao,
+      taxaConversaoFunil: 0.0561,
+      taxaConversaoMQL: 0.0812,
+      ticketMedioGeral: 4192.07,
+      ticketMedioAceleracao: 4000,
+      ticketMedioImplantacao: 8500,
+    };
+  }, [ORCADO_MQL, ORCADO_NAO_MQL]);
 
   const startEditing = () => {
     const values: Record<string, number> = {};
@@ -694,9 +767,55 @@ export default function GrowthOrcadoRealizado() {
             {section.title}
           </TableCell>
         </TableRow>
+        {section.banner && (
+          <TableRow className="bg-amber-50/50 dark:bg-amber-950/20 border-l-4 border-l-amber-400 dark:border-l-amber-500">
+            <TableCell colSpan={7} className="text-xs py-2 text-amber-900 dark:text-amber-200">
+              {section.banner}
+            </TableCell>
+          </TableRow>
+        )}
         {/* Metric rows */}
         {section.metrics.map(m => {
           const isPercent = m.format === 'percent';
+          const isInverted = INVERTED_METRIC_IDS.has(m.id);
+          const orcadoNum = typeof m.orcado === 'number' ? m.orcado : null;
+          const realizadoNum = typeof m.realizado === 'number' ? m.realizado : null;
+
+          // Cores do % Atingido: invertidas para métricas de custo
+          const percColor = (() => {
+            if (m.percentual === null) return '';
+            if (isInverted) {
+              if (m.percentual <= 100) return "text-emerald-600 dark:text-emerald-400";
+              if (m.percentual <= 120) return "text-amber-600 dark:text-amber-400";
+              return "text-red-600 dark:text-red-400";
+            }
+            if (m.percentual >= 100) return "text-emerald-600 dark:text-emerald-400";
+            if (m.percentual >= 80) return "text-amber-600 dark:text-amber-400";
+            return "text-red-600 dark:text-red-400";
+          })();
+
+          const barColor = (() => {
+            if (m.percentual === null) return "bg-muted";
+            if (isInverted) {
+              return m.percentual <= 100 ? "bg-emerald-500" : m.percentual <= 120 ? "bg-amber-500" : "bg-red-500";
+            }
+            return m.percentual >= 100 ? "bg-emerald-500" : m.percentual >= 80 ? "bg-amber-500" : "bg-red-500";
+          })();
+
+          // BUG 1 fix: métricas de % não escalam com dias — Desvio = diferença simples
+          const desvio = isPercent
+            ? (orcadoNum !== null && realizadoNum !== null && orcadoNum !== 0
+                ? ((realizadoNum - orcadoNum) / orcadoNum) * 100
+                : null)
+            : calcDesvioMeta(orcadoNum, realizadoNum, propDias);
+
+          // Para métricas invertidas, desvio positivo = ruim
+          const desvioColor = (() => {
+            if (desvio === null) return '';
+            if (isInverted) return desvio <= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+            return desvio >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+          })();
+
           return (
             <TableRow key={m.id} className={cn(
               "hover:bg-muted/30 transition-colors",
@@ -711,43 +830,32 @@ export default function GrowthOrcadoRealizado() {
               <TableCell className="text-right text-sm font-medium">
                 {formatValue(m.realizado, m.format)}
               </TableCell>
-              <TableCell className={cn("text-right text-sm font-semibold",
-                m.percentual !== null && m.percentual >= 100 && "text-emerald-600 dark:text-emerald-400",
-                m.percentual !== null && m.percentual >= 80 && m.percentual < 100 && "text-amber-600 dark:text-amber-400",
-                m.percentual !== null && m.percentual < 80 && "text-red-600 dark:text-red-400"
-              )}>
+              <TableCell className={cn("text-right text-sm font-semibold", percColor)}>
                 <div className="flex flex-col items-end gap-0.5">
                   <span>{m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}</span>
                   {m.percentual !== null && (
                     <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
-                      <div className={cn("h-full rounded-full",
-                        m.percentual >= 100 ? "bg-emerald-500" : m.percentual >= 80 ? "bg-amber-500" : "bg-red-500"
-                      )} style={{ width: `${Math.min(m.percentual, 100)}%` }} />
+                      <div className={cn("h-full rounded-full", barColor)}
+                        style={{ width: `${Math.min(isInverted ? (200 - m.percentual) : m.percentual, 100)}%` }} />
                     </div>
                   )}
                 </div>
               </TableCell>
-              <TableCell className={cn("text-right text-sm font-semibold",
-                (() => {
-                  const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
-                  if (d === null) return '';
-                  return d >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
-                })()
-              )}>
-                {(() => {
-                  const d = calcDesvioMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, propDias);
-                  return d !== null ? `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` : '-';
-                })()}
+              {/* Desvio Meta */}
+              <TableCell className={cn("text-right text-sm font-semibold", desvioColor)}>
+                {desvio !== null ? `${desvio >= 0 ? '+' : ''}${desvio.toFixed(1)}%` : '-'}
               </TableCell>
+              {/* Previsão As Is — não se aplica a métricas de taxa */}
               <TableCell className="text-right text-sm font-medium">
-                {(() => {
-                  const p = calcPrevisaoAsIs(typeof m.realizado === 'number' ? m.realizado : null, propDias);
+                {isPercent ? '-' : (() => {
+                  const p = calcPrevisaoAsIs(realizadoNum, propDias);
                   return p !== null ? formatValue(p, m.format) : '-';
                 })()}
               </TableCell>
+              {/* Recálculo Meta — não se aplica a métricas de taxa */}
               <TableCell className="text-right text-sm font-medium">
-                {(() => {
-                  const r = calcRecalculoMeta(typeof m.orcado === 'number' ? m.orcado : null, typeof m.realizado === 'number' ? m.realizado : null, diasRestantes, totalDias);
+                {isPercent ? '-' : (() => {
+                  const r = calcRecalculoMeta(orcadoNum, realizadoNum, diasRestantes, totalDias);
                   return r !== null ? formatValue(r, m.format) : '-';
                 })()}
               </TableCell>
@@ -786,28 +894,6 @@ export default function GrowthOrcadoRealizado() {
     staleTime: 0,
   });
 
-  interface NaoMQLMetrics {
-    totalNaoMqls: number;
-    reunioesAgendadas: number;
-    reunioesRealizadas: number;
-    novosClientes: number;
-    contratosAceleracao: number;
-    contratosImplantacao: number;
-    faturamentoAceleracao: number;
-    faturamentoImplantacao: number;
-    faturamentoAceleracaoTrafego: number;
-    faturamentoImplantacaoTrafego: number;
-    percReuniaoAgendada: number;
-    percNoShow: number;
-    taxaVendas: number;
-    txContratosRecorrentes: number;
-    txContratosImplantacao: number;
-    ticketMedioAceleracao: number;
-    ticketMedioImplantacao: number;
-    dealsGanhos: number;
-    contratosGanhos: number;
-  }
-
   const { data: naoMqlData, isLoading: naoMqlLoading } = useQuery<NaoMQLMetrics>({
     queryKey: ['/api/growth/orcado-realizado/nao-mql', dateRange.startDate, dateRange.endDate, selectedProdutos, selectedPlataformas],
     queryFn: async () => {
@@ -817,23 +903,6 @@ export default function GrowthOrcadoRealizado() {
     },
     staleTime: 0,
   });
-
-  interface AdsMetrics {
-    investimento: number;
-    impressoes: number;
-    cliques: number;
-    cpm: number;
-    ctr: number;
-    videoHook: number;
-    videoHold: number;
-    connectRate: number;
-    visualizacoesPagina: number;
-    leads: number;
-    mqls: number;
-    cpl: number;
-    cpmql: number;
-    percMqls: number;
-  }
 
   const { data: adsData, isLoading: adsLoading } = useQuery<AdsMetrics>({
     queryKey: ['/api/growth/orcado-realizado/ads', dateRange.startDate, dateRange.endDate, selectedProdutos, selectedPlataformas],
@@ -905,6 +974,9 @@ export default function GrowthOrcadoRealizado() {
     frequenciaAlcance: number; ctrAlcanceVisitas: number; visitasPerfil: number;
     percEngajamento: number; interacoes: number; ctrAlcanceCliques: number;
     ctrVisitasCliques: number; cliquesLinkBio: number;
+    investimentoPago: number;
+    hasConnection: boolean;
+    snapshotCount: number;
   }
 
   interface PlatformFunnelData {
@@ -1237,7 +1309,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ig_ctrVisitasCliques', name: 'CTR Visitas > Cliques', type: 'formula', orcado: O.ctrVisitasCliques, realizado: d.ctrVisitasCliques ?? null, percentual: calcPercentual(O.ctrVisitasCliques, d.ctrVisitasCliques), format: 'percent' },
       { id: 'ig_cliquesLinkBio', name: 'Cliques no Link Bio', type: 'formula', orcado: O.cliquesLinkBio, realizado: d.cliquesLinkBio ?? 0, percentual: calcPercentual(O.cliquesLinkBio, d.cliquesLinkBio), format: 'number' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('ig', funnelByPlatformData?.instagram, O, null)];
+    return [...topMetrics, ...buildFunnelMetrics('ig', funnelByPlatformData?.instagram, O, d.investimentoPago ?? null)];
   }, [instagramDetailData, funnelByPlatformData, ORCADO_INSTAGRAM]);
 
   // YouTube platform metrics (manual only - no integration yet)
@@ -1275,14 +1347,26 @@ export default function GrowthOrcadoRealizado() {
     return [...topMetrics, ...buildFunnelMetrics('li', funnelByPlatformData?.linkedin, O, null)];
   }, [funnelByPlatformData, ORCADO_LINKEDIN]);
 
+  // Instagram empty-state banner: distinguish "no connection" from "connection ok but no data"
+  const instagramBanner = useMemo<React.ReactNode | undefined>(() => {
+    if (!instagramDetailData) return undefined;
+    if (instagramDetailData.hasConnection === false) {
+      return 'Nenhuma conexão Instagram ativa. Configure em Integrações para começar a coletar métricas.';
+    }
+    if (instagramDetailData.snapshotCount === 0) {
+      return 'Sem dados sincronizados para este período. O sync roda a cada 6h — aguarde ou cheque logs do Instagram sync.';
+    }
+    return undefined;
+  }, [instagramDetailData]);
+
   // Aprofundado sections with platform-specific metrics
   const aprofundadoPlatformSections: MetricSection[] = useMemo(() => [
     { title: 'Meta Ads', icon: <Megaphone className="w-5 h-5" />, metrics: metaAdsPlatformMetrics },
     { title: 'Google Ads', icon: <Megaphone className="w-5 h-5" />, metrics: googleAdsPlatformMetrics },
-    { title: 'Instagram', icon: <Camera className="w-5 h-5" />, metrics: instagramPlatformMetrics },
+    { title: 'Instagram', icon: <Camera className="w-5 h-5" />, metrics: instagramPlatformMetrics, banner: instagramBanner },
     { title: 'YouTube', icon: <Play className="w-5 h-5" />, metrics: youtubePlatformMetrics },
     { title: 'LinkedIn', icon: <Briefcase className="w-5 h-5" />, metrics: linkedinPlatformMetrics },
-  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, youtubePlatformMetrics, linkedinPlatformMetrics]);
+  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, linkedinPlatformMetrics]);
 
   const naoMqlMetrics: Metric[] = useMemo(() => {
     const data = naoMqlData || {} as NaoMQLMetrics;
@@ -1546,23 +1630,6 @@ export default function GrowthOrcadoRealizado() {
     totalSection,
   ];
 
-  // Seções filtradas pelo cardFilter (Origem: MQL / Não-MQL / Todos)
-  const filteredSections: MetricSection[] = useMemo(() => {
-    if (cardFilter === 'mql') {
-      return [
-        ...marketingSections,
-        { title: 'Métricas de Vendas: MQL', icon: <Users className="w-5 h-5" />, metrics: mqlMetrics },
-      ];
-    }
-    if (cardFilter === 'nao-mql') {
-      return [
-        ...marketingSections,
-        { title: 'Métricas de Vendas: Não-MQL', icon: <Users className="w-5 h-5" />, metrics: naoMqlMetrics },
-      ];
-    }
-    return allSections;
-  }, [cardFilter, marketingSections, mqlMetrics, naoMqlMetrics, allSections]);
-
   // Aprofundado uses platform-specific sections filtered by selected platform
   const PLATFORM_OPTIONS = [
     { key: 'todos', label: 'Todas as Plataformas' },
@@ -1641,13 +1708,13 @@ export default function GrowthOrcadoRealizado() {
       if (platformSections.length > 0) {
         baseSections = [
           ...platformSections,
-          ...filteredSections.filter(s => s.title !== 'Métricas de Marketing'),
+          ...allSections.filter(s => s.title !== 'Métricas de Marketing'),
         ];
       } else {
-        baseSections = filteredSections;
+        baseSections = allSections;
       }
     } else {
-      baseSections = filteredSections;
+      baseSections = allSections;
     }
 
     return baseSections
@@ -1656,14 +1723,12 @@ export default function GrowthOrcadoRealizado() {
         metrics: section.metrics.filter(m => YELLOW_METRIC_IDS.has(m.id))
       }))
       .filter(section => section.metrics.length > 0);
-  }, [filteredSections, selectedPlataformas, aprofundadoPlatformSections]);
+  }, [allSections, selectedPlataformas, aprofundadoPlatformSections]);
 
   const getExportParams = (viewName: 'Consolidado' | 'Aprofundado'): ExportParams => {
     const plataformaLabels: Record<string, string> = {
       meta_ads: 'Meta Ads', google_ads: 'Google Ads', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn',
     };
-    const origemLabels: Record<string, string> = { todos: 'Todos', mql: 'MQL', 'nao-mql': 'Não-MQL' };
-
     return {
       sections: viewName === 'Consolidado' ? consolidadoSections : aprofundadoFilteredSections,
       viewName,
@@ -1676,7 +1741,7 @@ export default function GrowthOrcadoRealizado() {
         ? selectedPlataformas.map(p => plataformaLabels[p] || p).join(', ')
         : 'Todas',
       produtos: selectedProdutos.length > 0 ? selectedProdutos.join(', ') : 'Todos',
-      origem: origemLabels[cardFilter] || cardFilter,
+      origem: 'Todos',
       contagem: 'Negócios (Deals) + Contratos (Produtos)',
     };
   };
@@ -1693,13 +1758,6 @@ export default function GrowthOrcadoRealizado() {
   const mqlsPerc = mqlsOrcado > 0 ? (mqlsRealizado / mqlsOrcado) * 100 : 0;
   const mqlsLabel = 'Leads Totais';
 
-  // Helper para somar valores de MQL e/ou Não-MQL conforme cardFilter
-  const sumByCardFilter = (mqlVal: number, naoMqlVal: number) => {
-    if (cardFilter === 'mql') return mqlVal;
-    if (cardFilter === 'nao-mql') return naoMqlVal;
-    return mqlVal + naoMqlVal;
-  };
-
   // Helper para calcular variação vs período anterior
   const calcVariation = (current: number, previous: number | undefined): { pct: number; isPositive: boolean } | null => {
     if (previous === undefined || previous === null || previous === 0) return null;
@@ -1707,113 +1765,31 @@ export default function GrowthOrcadoRealizado() {
     return { pct, isPositive: pct >= 0 };
   };
 
-  // Helper para obter valor do período anterior por metric ID
-  const getPrevValue = (metricId: string): number | null => {
-    const prevMql = prevMqlData || {} as MQLMetrics;
-    const prevNaoMql = prevNaoMqlData || {} as NaoMQLMetrics;
-    const prevAds_ = prevAdsData || {} as AdsMetrics;
-
-    const map: Record<string, number | undefined> = {
-      // MQL
-      mql_ra_perc: prevMql.percReuniaoAgendada,
-      mql_ra_num: prevMql.reunioesAgendadas,
-      mql_rr_num: prevMql.reunioesRealizadas,
-      mql_noshow: prevMql.percNoShow,
-      mql_taxa_vendas: prevMql.taxaVendas,
-      mql_novos_clientes: prevMql.dealsGanhos,
-      mql_contratos_ganhos: prevMql.contratosGanhos,
-      mql_tx_recorrente: prevMql.txContratosRecorrentes,
-      mql_tx_implantacao: prevMql.txContratosImplantacao,
-      mql_contratos_acel: prevMql.contratosAceleracao,
-      mql_ticket_acel: prevMql.ticketMedioAceleracao,
-      mql_fat_acel: prevMql.faturamentoAceleracao,
-      mql_contratos_impl: prevMql.contratosImplantacao,
-      mql_ticket_impl: prevMql.ticketMedioImplantacao,
-      mql_fat_impl: prevMql.faturamentoImplantacao,
-      mql_fat_total: (prevMql.faturamentoAceleracao ?? 0) + (prevMql.faturamentoImplantacao ?? 0),
-      // Não-MQL
-      nmql_ra_perc: prevNaoMql.percReuniaoAgendada,
-      nmql_ra_num: prevNaoMql.reunioesAgendadas,
-      nmql_rr_num: prevNaoMql.reunioesRealizadas,
-      nmql_noshow: prevNaoMql.percNoShow,
-      nmql_taxa_vendas: prevNaoMql.taxaVendas,
-      nmql_novos_clientes: prevNaoMql.dealsGanhos,
-      nmql_contratos_ganhos: prevNaoMql.contratosGanhos,
-      nmql_tx_recorrente: prevNaoMql.txContratosRecorrentes,
-      nmql_tx_implantacao: prevNaoMql.txContratosImplantacao,
-      nmql_contratos_acel: prevNaoMql.contratosAceleracao,
-      nmql_ticket_acel: prevNaoMql.ticketMedioAceleracao,
-      nmql_fat_acel: prevNaoMql.faturamentoAceleracao,
-      nmql_contratos_impl: prevNaoMql.contratosImplantacao,
-      nmql_ticket_impl: prevNaoMql.ticketMedioImplantacao,
-      nmql_fat_impl: prevNaoMql.faturamentoImplantacao,
-      nmql_fat_total: (prevNaoMql.faturamentoAceleracao ?? 0) + (prevNaoMql.faturamentoImplantacao ?? 0),
-      // Ads
-      investimento: prevAds_.investimento,
-      cpm: prevAds_.cpm,
-      impressoes: prevAds_.impressoes,
-      ctr: prevAds_.ctr,
-      video_hook: prevAds_.videoHook,
-      video_hold: prevAds_.videoHold,
-      visualizacoes_pagina: prevAds_.visualizacoesPagina,
-      connect_rate: prevAds_.connectRate,
-      leads: prevAds_.leads,
-      mqls: prevAds_.mqls,
-      cpl: prevAds_.cpl,
-      cpmql: prevAds_.cpmql,
-      perc_mqls: prevAds_.percMqls,
-    };
-    const val = map[metricId];
-    return val !== undefined ? val : null;
-  };
-
-  // Negócios Ganhos: sempre usa deals (heroDealsRealizado), reage a cardFilter
-  const clientesRealizado = sumByCardFilter(mqlData?.dealsGanhos ?? 0, naoMqlData?.dealsGanhos ?? 0);
-  const clientesOrcado = sumByCardFilter(ORCADO_MQL.novosClientes, ORCADO_NAO_MQL.novosClientes);
+  // Negócios Ganhos
+  const clientesRealizado = (mqlData?.dealsGanhos ?? 0) + (naoMqlData?.dealsGanhos ?? 0);
+  const clientesOrcado = ORCADO_MQL.novosClientes + ORCADO_NAO_MQL.novosClientes;
   const clientesPerc = clientesOrcado > 0 ? (clientesRealizado / clientesOrcado) * 100 : 0;
 
-  // Card hero: sempre mostra deals como principal e contratos como secundário
-  const heroDealsRealizado = sumByCardFilter(mqlData?.dealsGanhos ?? 0, naoMqlData?.dealsGanhos ?? 0);
-  const heroContratosRealizado = sumByCardFilter(mqlData?.contratosGanhos ?? 0, naoMqlData?.contratosGanhos ?? 0);
+  const heroDealsRealizado = clientesRealizado;
+  const heroContratosRealizado = (mqlData?.contratosGanhos ?? 0) + (naoMqlData?.contratosGanhos ?? 0);
 
-  // Faturamento: usa apenas dados de tráfego (utm_source = facebook/google), reage a cardFilter + revenueFilter
-  const faturamentoRealizado = revenueFilter === 'recorrente'
-    ? sumByCardFilter(mqlData?.faturamentoAceleracaoTrafego ?? 0, naoMqlData?.faturamentoAceleracaoTrafego ?? 0)
-    : revenueFilter === 'pontual'
-    ? sumByCardFilter(mqlData?.faturamentoImplantacaoTrafego ?? 0, naoMqlData?.faturamentoImplantacaoTrafego ?? 0)
-    : sumByCardFilter(
-        (mqlData?.faturamentoAceleracaoTrafego ?? 0) + (mqlData?.faturamentoImplantacaoTrafego ?? 0),
-        (naoMqlData?.faturamentoAceleracaoTrafego ?? 0) + (naoMqlData?.faturamentoImplantacaoTrafego ?? 0)
-      );
-  const faturamentoOrcado = revenueFilter === 'recorrente'
-    ? sumByCardFilter(ORCADO_MQL.faturamentoAceleracao, ORCADO_NAO_MQL.faturamentoAceleracao)
-    : revenueFilter === 'pontual'
-    ? sumByCardFilter(ORCADO_MQL.faturamentoImplantacao, ORCADO_NAO_MQL.faturamentoImplantacao)
-    : sumByCardFilter(
-        ORCADO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao,
-        ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoImplantacao
-      );
+  // Faturamento: usa apenas dados de tráfego pago (utm_source = facebook/google)
+  const faturamentoRealizado = (mqlData?.faturamentoAceleracaoTrafego ?? 0) + (mqlData?.faturamentoImplantacaoTrafego ?? 0)
+    + (naoMqlData?.faturamentoAceleracaoTrafego ?? 0) + (naoMqlData?.faturamentoImplantacaoTrafego ?? 0);
+  const faturamentoOrcado = ORCADO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao
+    + ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoImplantacao;
   const faturamentoPerc = faturamentoOrcado > 0 ? (faturamentoRealizado / faturamentoOrcado) * 100 : 0;
-  const faturamentoLabel = revenueFilter === 'recorrente' ? 'Faturamento Recorrente'
-    : revenueFilter === 'pontual' ? 'Faturamento Implantação'
-    : 'Faturamento';
 
-  // Breakdown recorrente vs pontual (para exibir no card quando filtro = todos)
-  const fatRecorrenteRealizado = sumByCardFilter(mqlData?.faturamentoAceleracaoTrafego ?? 0, naoMqlData?.faturamentoAceleracaoTrafego ?? 0);
-  const fatPontualRealizado = sumByCardFilter(mqlData?.faturamentoImplantacaoTrafego ?? 0, naoMqlData?.faturamentoImplantacaoTrafego ?? 0);
+  // Breakdown recorrente vs pontual (para exibir no card)
+  const fatRecorrenteRealizado = (mqlData?.faturamentoAceleracaoTrafego ?? 0) + (naoMqlData?.faturamentoAceleracaoTrafego ?? 0);
+  const fatPontualRealizado = (mqlData?.faturamentoImplantacaoTrafego ?? 0) + (naoMqlData?.faturamentoImplantacaoTrafego ?? 0);
 
   // Previous period values for hero cards
   const prevInvestimento = prevAdsData?.investimento ?? 0;
   const prevLeads = prevAdsData?.leads ?? 0;
-  const prevClientes = sumByCardFilter(prevMqlData?.dealsGanhos ?? 0, prevNaoMqlData?.dealsGanhos ?? 0);
-  const prevFaturamento = revenueFilter === 'recorrente'
-    ? sumByCardFilter(prevMqlData?.faturamentoAceleracaoTrafego ?? 0, prevNaoMqlData?.faturamentoAceleracaoTrafego ?? 0)
-    : revenueFilter === 'pontual'
-    ? sumByCardFilter(prevMqlData?.faturamentoImplantacaoTrafego ?? 0, prevNaoMqlData?.faturamentoImplantacaoTrafego ?? 0)
-    : sumByCardFilter(
-        (prevMqlData?.faturamentoAceleracaoTrafego ?? 0) + (prevMqlData?.faturamentoImplantacaoTrafego ?? 0),
-        (prevNaoMqlData?.faturamentoAceleracaoTrafego ?? 0) + (prevNaoMqlData?.faturamentoImplantacaoTrafego ?? 0)
-      );
+  const prevClientes = (prevMqlData?.dealsGanhos ?? 0) + (prevNaoMqlData?.dealsGanhos ?? 0);
+  const prevFaturamento = (prevMqlData?.faturamentoAceleracaoTrafego ?? 0) + (prevMqlData?.faturamentoImplantacaoTrafego ?? 0)
+    + (prevNaoMqlData?.faturamentoAceleracaoTrafego ?? 0) + (prevNaoMqlData?.faturamentoImplantacaoTrafego ?? 0);
 
   const prevCac = prevClientes > 0 ? prevInvestimento / prevClientes : 0;
 
@@ -2116,7 +2092,7 @@ export default function GrowthOrcadoRealizado() {
         <Card className="border bg-card flex flex-col">
           <CardContent className="pt-4 pb-3 px-4 flex flex-col flex-1">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{faturamentoLabel}</span>
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Faturamento (Tráfego Pago)</span>
               <Badge variant="outline" className={cn("text-[10px] font-mono tabular-nums",
                 faturamentoPerc >= 100 ? "text-emerald-600 border-emerald-200 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:bg-emerald-950" :
                 faturamentoPerc >= 80 ? "text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:bg-amber-950" :
@@ -2139,7 +2115,7 @@ export default function GrowthOrcadoRealizado() {
                 <span>{faturamentoVar.isPositive ? '+' : ''}{faturamentoVar.pct.toFixed(1)}% vs anterior</span>
               </div>
             )}
-            {revenueFilter === 'todos' && !(mqlLoading || naoMqlLoading) && (
+            {!(mqlLoading || naoMqlLoading) && (
               <div className="flex items-center gap-2 text-[10px] mt-1.5">
                 <div className="flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
