@@ -11,6 +11,7 @@ export function validateCnpj(input: string | null | undefined): boolean {
     return mod < 2 ? 0 : 11 - mod;
   };
 
+  // Receita Federal Módulo 11 weights: ordered right-to-left, cycling positions 2..9.
   const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
   const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
 
