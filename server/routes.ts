@@ -5970,6 +5970,23 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
 
+      // Mesclar contribuições do pipeline novo (receitaItens) no squadSummaryMap
+      for (const linha of receitaItens) {
+        const sq = linha.squad;
+        if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
+        if (!squadSummaryMap.has(sq)) {
+          squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
+        }
+        const entry = squadSummaryMap.get(sq)!;
+        const monthIdx = parseInt(linha.mes.split('-')[1]) - 1;
+        entry.total += linha.itemTotal;
+        entry.porMes[monthIdx] += linha.itemTotal;
+        entry.contratos.add(`${linha.clienteNome}|${linha.itemRaw}|${sq}`);
+      }
+
       const resumoPorSquad = Array.from(squadSummaryMap.entries())
         .filter(([sq]) => !/\bOFF\b/i.test(sq))
         .map(([squad, data]) => ({
@@ -6073,6 +6090,25 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           }
         }
       }
+      // Mesclar contribuições do pipeline novo (receitaItens) em receitasDetalhesPorSquad
+      for (const linha of receitaItens) {
+        const sq = linha.squad;
+        if (/\bOFF\b/i.test(sq)) continue;
+        if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
+        const monthIdx = parseInt(linha.mes.split('-')[1]) - 1;
+        if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
+        let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === linha.clienteNome);
+        if (!entry) {
+          entry = { cliente: linha.clienteNome, porMes: new Array(12).fill(0), total: 0 };
+          receitasDetalhesPorSquad[sq].push(entry);
+        }
+        entry.porMes[monthIdx] += linha.itemTotal;
+        entry.total += linha.itemTotal;
+      }
+
       // Ordenar clientes por total desc dentro de cada squad
       for (const sq of Object.keys(receitasDetalhesPorSquad)) {
         receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
