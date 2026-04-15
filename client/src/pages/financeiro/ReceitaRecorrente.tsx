@@ -8,12 +8,24 @@ import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { KpiCards } from "./receita-recorrente/KpiCards";
+import { ChartReceitaMensal } from "./receita-recorrente/ChartReceitaMensal";
+import { TabelaReceitaMensal } from "./receita-recorrente/TabelaReceitaMensal";
+import { DrilldownClientesModal } from "./receita-recorrente/DrilldownClientesModal";
 import type {
   ResumoReceitaResponse,
   Empresa,
+  CellClickPayload,
 } from "@shared/receitaRecorrenteTypes";
 
 type RangeKey = "6m" | "12m" | "ytd";
+
+interface ModalState {
+  open: boolean;
+  mes: string | null;
+  tipo: CellClickPayload["tipo"] | null;
+  empresa: Empresa | null;
+}
 
 function computeRange(key: RangeKey): { ini: string; fim: string } {
   const now = new Date();
@@ -38,21 +50,30 @@ export default function ReceitaRecorrente() {
 
   const [rangeKey, setRangeKey] = useState<RangeKey>("6m");
   const [empresa, setEmpresa] = useState<Empresa | "todas">("todas");
+  const [modal, setModal] = useState<ModalState>({
+    open: false, mes: null, tipo: null, empresa: null,
+  });
 
   const { ini, fim } = useMemo(() => computeRange(rangeKey), [rangeKey]);
 
-  // queryKey[1] deve ser objeto (não string) para que o queryFn default
-  // em client/src/lib/queryClient.ts construa a query string corretamente.
   const queryParams = useMemo(() => {
     const params: Record<string, string> = { data_ini: ini, data_fim: fim };
     if (empresa !== "todas") params.empresa = empresa;
     return params;
   }, [ini, fim, empresa]);
 
-  const { data, isLoading, error, refetch } = useQuery<ResumoReceitaResponse>({
+  const { data, isLoading, error, refetch, isFetching } = useQuery<ResumoReceitaResponse>({
     queryKey: ["/api/financeiro/receita-recorrente/resumo", queryParams],
     staleTime: 5 * 60 * 1000,
   });
+
+  const handleCellClick = (payload: CellClickPayload) => {
+    setModal({ open: true, ...payload });
+  };
+
+  const handleCloseModal = () => {
+    setModal((m) => ({ ...m, open: false }));
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -68,7 +89,7 @@ export default function ReceitaRecorrente() {
         </div>
         <div className="flex gap-2">
           <Select value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
-            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="6m">Últimos 6 meses</SelectItem>
               <SelectItem value="12m">Últimos 12 meses</SelectItem>
@@ -113,18 +134,31 @@ export default function ReceitaRecorrente() {
               <Skeleton key={i} className="h-24 w-full rounded-lg" />
             ))}
           </div>
-          <Skeleton className="h-[400px] w-full rounded-lg" />
+          <Skeleton className="h-[440px] w-full rounded-lg" />
           <Skeleton className="h-[300px] w-full rounded-lg" />
         </>
       )}
 
-      {/* Content placeholder — subcomponents wired in Task 11 */}
+      {/* Content */}
       {data && (
-        <div className="text-sm text-gray-500">
-          Carregado: {data.meses.length} linhas × mês × empresa.
-          Cards e gráficos nas próximas tasks.
+        <div className={isFetching ? "opacity-70 transition-opacity" : ""}>
+          <KpiCards cards={data.cards} />
+          <div className="mt-6">
+            <ChartReceitaMensal meses={data.meses} />
+          </div>
+          <div className="mt-6">
+            <TabelaReceitaMensal meses={data.meses} onCellClick={handleCellClick} />
+          </div>
         </div>
       )}
+
+      <DrilldownClientesModal
+        open={modal.open}
+        mes={modal.mes}
+        tipo={modal.tipo}
+        empresa={modal.empresa}
+        onClose={handleCloseModal}
+      />
     </div>
   );
 }
