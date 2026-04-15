@@ -7,29 +7,44 @@ interface Props {
   cards: CardsReceita;
 }
 
-function formatPct(value: number, digits = 1): string {
-  return `${value.toFixed(digits)}%`;
+function formatPct(value: number): string {
+  return `${value.toFixed(1)}%`;
 }
 
-function formatDelta(pct: number): { value: string; isPositive: boolean } {
-  const sign = pct >= 0 ? "+" : "";
+function formatDelta(pct: number): { value: string; isPositive: boolean } | undefined {
+  if (pct === 0) return undefined;
+  const sign = pct > 0 ? "+" : "";
   return {
     value: `${sign}${pct.toFixed(1)}% vs mês anterior`,
-    isPositive: pct >= 0,
+    isPositive: pct > 0,
+  };
+}
+
+function gapStatus(pct: number): { color: string; label: string } {
+  const abs = Math.abs(pct);
+  if (abs < 3) return {
+    color: "text-emerald-600 dark:text-emerald-400",
+    label: "Dentro da tolerância",
+  };
+  if (abs < 10) return {
+    color: "text-amber-600 dark:text-amber-400",
+    label: "Atenção",
+  };
+  return {
+    color: "text-red-600 dark:text-red-400",
+    label: "Divergência alta",
   };
 }
 
 export function KpiCards({ cards }: Props) {
-  const gapColor = (() => {
-    if (!cards.gap_contratado) return "text-gray-500";
-    const pct = Math.abs(cards.gap_contratado.pct);
-    if (pct < 3) return "text-emerald-600 dark:text-emerald-400";
-    if (pct < 10) return "text-amber-600 dark:text-amber-400";
-    return "text-red-600 dark:text-red-400";
-  })();
+  const gap = cards.gap_contratado ? gapStatus(cards.gap_contratado.pct) : null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div
+      role="region"
+      aria-label="KPIs de Receita Recorrente"
+      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+    >
       <Card>
         <CardContent className="p-4">
           <HeroMetric
@@ -71,15 +86,9 @@ export function KpiCards({ cards }: Props) {
             }
             subtitle="MRR contratado (ClickUp) − MRR realizado recorrente (Conta Azul)"
           />
-          <div className={`mt-1 text-xs ${gapColor}`}>
-            {cards.gap_contratado
-              ? Math.abs(cards.gap_contratado.pct) < 3
-                ? "Dentro da tolerância"
-                : Math.abs(cards.gap_contratado.pct) < 10
-                ? "Atenção"
-                : "Divergência alta"
-              : ""}
-          </div>
+          {gap && (
+            <div className={`mt-1 text-xs ${gap.color}`}>{gap.label}</div>
+          )}
         </CardContent>
       </Card>
 
@@ -107,7 +116,7 @@ export function KpiCards({ cards }: Props) {
         <CardContent className="p-4">
           <HeroMetric
             label="Entrantes / Saintes"
-            value={`+${cards.novos_recorrente} / −${cards.churned_recorrente}`}
+            value={`+${Math.max(0, cards.novos_recorrente)} / −${Math.max(0, cards.churned_recorrente)}`}
             subtitle="Clientes com parcela recorrente neste mês que não estavam no mês anterior (ou vice-versa)"
           />
         </CardContent>
