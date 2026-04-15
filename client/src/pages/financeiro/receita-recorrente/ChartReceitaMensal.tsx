@@ -24,11 +24,12 @@ interface ChartPoint {
   is_futuro: boolean;
 }
 
+// Parse ISO "YYYY-MM-01" como data local (não UTC) para evitar off-by-one.
 function monthLabel(iso: string): string {
-  const d = new Date(iso);
-  const month = d.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
-  const year = String(d.getFullYear()).slice(-2);
-  return `${month}/${year}`;
+  const [year, month] = iso.split("-");
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  const label = d.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
+  return `${label}/${year.slice(-2)}`;
 }
 
 export function ChartReceitaMensal({ meses }: Props) {

@@ -2,25 +2,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrencyNoDecimals, cn } from "@/lib/utils";
 import { Clock } from "lucide-react";
 import type {
-  MesReceita, TipoReceita, Empresa,
+  MesReceita, Empresa, CellClickPayload,
 } from "@shared/receitaRecorrenteTypes";
-
-interface CellClickPayload {
-  mes: string;
-  tipo: TipoReceita;
-  empresa: Empresa;
-}
 
 interface Props {
   meses: MesReceita[];
   onCellClick: (payload: CellClickPayload) => void;
 }
 
+// Parse ISO "YYYY-MM-01" como data local (não UTC) para evitar off-by-one
+// no fuso horário do Brasil (UTC-3 puxa "2026-03-01" para "2026-02-28"
+// quando vai para toLocaleString).
 function monthLabel(iso: string): string {
-  const d = new Date(iso);
-  const month = d.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
-  const year = String(d.getFullYear()).slice(-2);
-  return `${month}/${year}`;
+  const [year, month] = iso.split("-");
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  const label = d.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
+  return `${label}/${year.slice(-2)}`;
 }
 
 function empresaLabel(e: Empresa): string {
