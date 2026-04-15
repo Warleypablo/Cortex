@@ -2,6 +2,16 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 
+function findMesCorrente(now: Date): string {
+  const mesCorrente = new Date(now.getFullYear(), now.getMonth(), 1);
+  return mesCorrente.toISOString().slice(0, 10);
+}
+
+function findMesAnterior(now: Date): string {
+  const mesAnt = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return mesAnt.toISOString().slice(0, 10);
+}
+
 export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: IStorage) {
   app.get("/api/financeiro/receita-recorrente/resumo", async (req, res) => {
     try {
@@ -116,6 +126,50 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
       `);
       const mrrContratado = (mrrContratadoResult.rows[0] as any)?.total || 0;
 
+      const mesCorrenteStr = findMesCorrente(now);
+      const mesAnteriorStr = findMesAnterior(now);
+
+      // Clientes recorrentes do mês corrente (para ticket médio)
+      const clientesRecorrenteAtualResult = await db.execute(sql`
+        SELECT COUNT(DISTINCT p.id_cliente)::int AS total
+        FROM "Conta Azul".caz_parcelas p
+        WHERE p.tipo_evento = 'RECEITA'
+          AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mesCorrenteStr}::date
+          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND p.centro_custo_nome ILIKE '%recorrente%'
+          AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
+          ${empresaClause}
+          AND p.id_cliente IS NOT NULL
+      `);
+      const totalClientesRecorrente = (clientesRecorrenteAtualResult.rows[0] as any)?.total || 0;
+
+      // Novos/churned: comparar sets de clientes entre mês corrente e anterior
+      const clientesRecorrenteMesAtualResult = await db.execute(sql`
+        SELECT DISTINCT p.id_cliente::text AS id_cliente
+        FROM "Conta Azul".caz_parcelas p
+        WHERE p.tipo_evento = 'RECEITA'
+          AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mesCorrenteStr}::date
+          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND p.centro_custo_nome ILIKE '%recorrente%'
+          ${empresaClause}
+          AND p.id_cliente IS NOT NULL
+      `);
+      const clientesRecorrenteMesAnteriorResult = await db.execute(sql`
+        SELECT DISTINCT p.id_cliente::text AS id_cliente
+        FROM "Conta Azul".caz_parcelas p
+        WHERE p.tipo_evento = 'RECEITA'
+          AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mesAnteriorStr}::date
+          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND p.centro_custo_nome ILIKE '%recorrente%'
+          ${empresaClause}
+          AND p.id_cliente IS NOT NULL
+      `);
+
+      const setAtual = new Set((clientesRecorrenteMesAtualResult.rows as any[]).map(r => r.id_cliente));
+      const setAnterior = new Set((clientesRecorrenteMesAnteriorResult.rows as any[]).map(r => r.id_cliente));
+      const novos_recorrente = Array.from(setAtual).filter(id => !setAnterior.has(id)).length;
+      const churned_recorrente = Array.from(setAnterior).filter(id => !setAtual.has(id)).length;
+
       // Mapa de cobertura
       const coberturaMap = new Map<string, number>();
       for (const row of coberturaResult.rows as any[]) {
@@ -173,19 +227,70 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         return a.mes.localeCompare(b.mes);
       });
 
+      // Consolidar meses por data (somando empresas) para calcular cards
+      const mesesConsolidados = new Map<string, { previsto: number; realizado: number; recorrente_previsto: number; recorrente_realizado: number; pontual_previsto: number; pontual_realizado: number }>();
+      for (const m of meses) {
+        const entry = mesesConsolidados.get(m.mes) || {
+          previsto: 0, realizado: 0,
+          recorrente_previsto: 0, recorrente_realizado: 0,
+          pontual_previsto: 0, pontual_realizado: 0,
+        };
+        entry.previsto += m.total_previsto;
+        entry.realizado += m.total_realizado;
+        entry.recorrente_previsto += m.recorrente_previsto;
+        entry.recorrente_realizado += m.recorrente_realizado;
+        entry.pontual_previsto += m.pontual_previsto;
+        entry.pontual_realizado += m.pontual_realizado;
+        mesesConsolidados.set(m.mes, entry);
+      }
+
+      const corrente = mesesConsolidados.get(mesCorrenteStr);
+      const anterior = mesesConsolidados.get(mesAnteriorStr);
+
+      const mrrRecorrenteAtual = corrente?.recorrente_realizado || 0;
+      const mrrRecorrenteAnt = anterior?.recorrente_realizado || 0;
+      const mrrRecorrenteDeltaPct = mrrRecorrenteAnt > 0
+        ? ((mrrRecorrenteAtual - mrrRecorrenteAnt) / mrrRecorrenteAnt) * 100
+        : 0;
+
+      const pontualAtual = corrente?.pontual_realizado || 0;
+      const pontualAnt = anterior?.pontual_realizado || 0;
+      const pontualDeltaPct = pontualAnt > 0
+        ? ((pontualAtual - pontualAnt) / pontualAnt) * 100
+        : 0;
+
+      const totalCorrente = corrente?.realizado || 0;
+      const mixRecorrentePct = totalCorrente > 0
+        ? (mrrRecorrenteAtual / totalCorrente) * 100
+        : 0;
+
+      const realizadoPct = (corrente?.previsto || 0) > 0
+        ? ((corrente?.realizado || 0) / (corrente?.previsto || 1)) * 100
+        : 0;
+
+      const gapAbs = mrrContratado - mrrRecorrenteAtual;
+      const gapPct = mrrContratado > 0 ? (gapAbs / mrrContratado) * 100 : 0;
+      const gapContratado = mrrContratado > 0
+        ? { valor: gapAbs, pct: gapPct }
+        : null;
+
+      const ticketMedioRecorrente = totalClientesRecorrente > 0
+        ? mrrRecorrenteAtual / totalClientesRecorrente
+        : 0;
+
       res.json({
         meses,
         cards: {
-          mrr_recorrente_atual: 0,
-          mrr_recorrente_delta_pct: 0,
-          pontual_atual: 0,
-          pontual_delta_pct: 0,
-          mix_recorrente_pct: 0,
-          realizado_pct: 0,
-          gap_contratado: null,
-          ticket_medio_recorrente: 0,
-          novos_recorrente: 0,
-          churned_recorrente: 0,
+          mrr_recorrente_atual: mrrRecorrenteAtual,
+          mrr_recorrente_delta_pct: mrrRecorrenteDeltaPct,
+          pontual_atual: pontualAtual,
+          pontual_delta_pct: pontualDeltaPct,
+          mix_recorrente_pct: mixRecorrentePct,
+          realizado_pct: realizadoPct,
+          gap_contratado: gapContratado,
+          ticket_medio_recorrente: ticketMedioRecorrente,
+          novos_recorrente,
+          churned_recorrente,
         },
         range: { data_ini: dataIni, data_fim: dataFim },
         empresa_filtro: empresaFiltro,
