@@ -262,19 +262,23 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
       const corrente = mesesConsolidados.get(mesCorrenteStr);
       const anterior = mesesConsolidados.get(mesAnteriorStr);
 
-      const mrrRecorrenteAtual = corrente?.recorrente_realizado || 0;
-      const mrrRecorrenteAnt = anterior?.recorrente_realizado || 0;
+      // MRR em competência = previsto (tudo que o contrato gerou de parcela
+      // no mês, pago ou não). Em caixa, previsto == realizado por construção
+      // da query (SQL pré-filtra para QUITADO), então usar previsto funciona
+      // nos dois modos.
+      const mrrRecorrenteAtual = corrente?.recorrente_previsto || 0;
+      const mrrRecorrenteAnt = anterior?.recorrente_previsto || 0;
       const mrrRecorrenteDeltaPct = mrrRecorrenteAnt > 0
         ? ((mrrRecorrenteAtual - mrrRecorrenteAnt) / mrrRecorrenteAnt) * 100
         : 0;
 
-      const pontualAtual = corrente?.pontual_realizado || 0;
-      const pontualAnt = anterior?.pontual_realizado || 0;
+      const pontualAtual = corrente?.pontual_previsto || 0;
+      const pontualAnt = anterior?.pontual_previsto || 0;
       const pontualDeltaPct = pontualAnt > 0
         ? ((pontualAtual - pontualAnt) / pontualAnt) * 100
         : 0;
 
-      const totalCorrente = corrente?.realizado || 0;
+      const totalCorrente = corrente?.previsto || 0;
       const mixRecorrentePct = totalCorrente > 0
         ? (mrrRecorrenteAtual / totalCorrente) * 100
         : 0;
