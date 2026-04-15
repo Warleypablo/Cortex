@@ -7,6 +7,7 @@ import { config as loadEnv } from 'dotenv';
 import { CATALOG, type QuerySpec } from './auditoria/catalog.js';
 import { runQueryFile, type QueryResult } from './auditoria/lib/run-query.js';
 import { writeCsv } from './auditoria/lib/render-csv.js';
+import { renderMarkdown } from './auditoria/lib/render-markdown.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -86,13 +87,9 @@ async function main() {
       }
     }
 
-    // Placeholder: render markdown — implemented in Task 11
+    const md = renderMarkdown({ date: TODAY, results });
     mkdirSync(join(REPO_ROOT, 'docs', 'auditoria'), { recursive: true });
-    writeFileSync(
-      REPORT_PATH,
-      `# Auditoria CRM → ERP — ${TODAY}\n\n(Render completo em Task 11.)\n\n${results.map(r => `- [${r.spec.number}] ${r.spec.title}: ${r.result.error ? '⚠️ ' + r.result.error : r.result.total + ' linhas'}`).join('\n')}\n`,
-      'utf-8',
-    );
+    writeFileSync(REPORT_PATH, md, 'utf-8');
 
     console.log(`[auditoria] relatório: ${REPORT_PATH}`);
     console.log(`[auditoria] csvs: ${CSV_DIR}`);
