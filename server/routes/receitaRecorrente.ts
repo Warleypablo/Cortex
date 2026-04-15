@@ -143,7 +143,10 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
       `);
       const totalClientesRecorrente = (clientesRecorrenteAtualResult.rows[0] as any)?.total || 0;
 
-      // Novos/churned: comparar sets de clientes entre mês corrente e anterior
+      // Novos/churned: comparar sets de clientes entre mês corrente e anterior.
+      // Filtro 04.% consistente com a query principal — evita contar clientes
+      // cuja única atividade recorrente no mês foi um lançamento de categoria
+      // não-operacional (aportes/transferências).
       const clientesRecorrenteMesAtualResult = await db.execute(sql`
         SELECT DISTINCT p.id_cliente::text AS id_cliente
         FROM "Conta Azul".caz_parcelas p
@@ -151,6 +154,7 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
           AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mesCorrenteStr}::date
           AND COALESCE(p.status, '') <> 'CANCELADO'
           AND p.centro_custo_nome ILIKE '%recorrente%'
+          AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
           ${empresaClause}
           AND p.id_cliente IS NOT NULL
       `);
@@ -161,6 +165,7 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
           AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mesAnteriorStr}::date
           AND COALESCE(p.status, '') <> 'CANCELADO'
           AND p.centro_custo_nome ILIKE '%recorrente%'
+          AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
           ${empresaClause}
           AND p.id_cliente IS NOT NULL
       `);
