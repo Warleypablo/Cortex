@@ -39,7 +39,9 @@ export function classifyParcela(p: ParcelaInput): ClassifiedResult[] {
     }];
   }
 
-  // Detecta se é misto (Recorrente + Pontual juntos) ou mesmo-tipo
+  // "Misto" exige AMBOS "recorrente" e "pontual" presentes. CC como
+  // "Recorrente;OutroCC" cai no Case 2 (valor_bruto direto), espelhando
+  // o CASE WHEN do SQL que só marca MISTO quando os dois tipos coexistem.
   const lower = nome.toLowerCase();
   const hasRec = lower.includes('recorrente');
   const hasPon = lower.includes('pontual');
@@ -71,6 +73,9 @@ export function classifyParcela(p: ParcelaInput): ClassifiedResult[] {
     const itemTipo = classifySingle(nomes[i]);
     const rawValor = valores[i] ?? '';
     const valor = rawValor.trim() === '' ? 0 : Number(rawValor);
+    // Valor malformado: pula posição inteira (nome e valor). O total
+    // da parcela já está em valor_bruto e esta função preserva apenas
+    // o que foi explicitamente rateado pelo Conta Azul.
     if (Number.isNaN(valor)) continue;
     seen.add(itemTipo);
     agregado[itemTipo].previsto += valor;
