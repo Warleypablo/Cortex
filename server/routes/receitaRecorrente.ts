@@ -28,14 +28,17 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         ? sql` AND p.empresa = ${empresaFiltro}`
         : sql``;
 
-      // Competência: data_competencia (fallback data_vencimento), tudo exceto CANCELADO.
-      // Caixa: data_quitacao (dinheiro no banco), só QUITADO.
+      // Competência: aloca pelo data_vencimento (data da cobrança contratual).
+      //   Consistente com Metas de Receita, DRE e o resto do sistema.
+      //   Evita o campo data_competencia do Conta Azul que é preenchido de
+      //   forma inconsistente.
+      // Caixa: data_quitacao (dinheiro no banco), só QUITADO. Bate com DFC.
       const dataExpr = modo === "caixa"
         ? sql`p.data_quitacao::date`
-        : sql`COALESCE(p.data_competencia, p.data_vencimento)`;
+        : sql`p.data_vencimento::date`;
       const statusClause = modo === "caixa"
         ? sql`p.status = 'QUITADO' AND p.data_quitacao IS NOT NULL`
-        : sql`COALESCE(p.status, '') <> 'CANCELADO'`;
+        : sql`COALESCE(p.status, '') <> 'CANCELADO' AND p.data_vencimento IS NOT NULL`;
 
       // Query principal com 3-case split
       const mesesResult = await db.execute(sql`
@@ -338,14 +341,14 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         return res.status(400).json({ error: "Missing required params: mes, tipo" });
       }
 
-      // Mesma convenção do /resumo: competência usa data_competencia
-      // (fallback vencimento), caixa usa data_quitacao.
+      // Mesma convenção do /resumo: competência usa data_vencimento,
+      // caixa usa data_quitacao.
       const dataExprDrill = modo === "caixa"
         ? sql`p.data_quitacao::date`
-        : sql`COALESCE(p.data_competencia, p.data_vencimento)`;
+        : sql`p.data_vencimento::date`;
       const statusClauseDrill = modo === "caixa"
         ? sql`p.status = 'QUITADO' AND p.data_quitacao IS NOT NULL`
-        : sql`COALESCE(p.status, '') <> 'CANCELADO'`;
+        : sql`COALESCE(p.status, '') <> 'CANCELADO' AND p.data_vencimento IS NOT NULL`;
 
       const VALID_TIPOS = ['RECORRENTE', 'PONTUAL', 'NAO_CLASSIFICADO'];
       if (!VALID_TIPOS.includes(tipo)) {
