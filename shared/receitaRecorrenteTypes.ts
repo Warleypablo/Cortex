@@ -52,3 +52,9 @@ export interface DrilldownParcela {
 }
 
 export type DrilldownResponse = DrilldownParcela[];
+
+export interface CellClickPayload {
+  mes: string;
+  tipo: TipoReceita;
+  empresa: Empresa;
+}
