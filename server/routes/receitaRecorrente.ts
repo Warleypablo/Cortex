@@ -126,15 +126,15 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         coberturaMap.set(key, pct);
       }
 
-      // Agrupa resultado por mês × empresa
+      // Agrupa resultado por mês × empresa.
+      // Compara meses como strings ISO ("YYYY-MM-01") para evitar
+      // ambiguidades de timezone entre o Date local do Node e o mes::text do Postgres.
       const mesMap = new Map<string, any>();
-      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
       for (const row of mesesResult.rows as any[]) {
         const key = `${row.empresa}|${row.mes}`;
         if (!mesMap.has(key)) {
-          const coberturaKey = `${row.empresa}|${row.mes}`;
-          const mesDate = new Date(row.mes);
           mesMap.set(key, {
             mes: row.mes,
             empresa: row.empresa,
@@ -146,9 +146,9 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
             nao_classif_realizado: 0,
             total_previsto: 0,
             total_realizado: 0,
-            cobertura_cc_pct: coberturaMap.get(coberturaKey) ?? 0,
+            cobertura_cc_pct: coberturaMap.get(key) ?? 0,
             mrr_contratado: mrrContratado,
-            is_futuro: mesDate > currentMonthStart,
+            is_futuro: row.mes > currentMonthStr,
           });
         }
         const entry = mesMap.get(key);
