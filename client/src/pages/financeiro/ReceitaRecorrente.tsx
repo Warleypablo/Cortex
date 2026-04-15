@@ -88,8 +88,8 @@ export default function ReceitaRecorrente() {
           </h1>
           <p className="text-sm text-gray-600 dark:text-zinc-400">
             {modo === "competencia"
-              ? "Regime de competência — receita alocada ao mês da data de competência (accrual, padrão MRR)"
-              : "Regime de caixa — receita alocada ao mês da data de quitação (bate com DFC)"}
+              ? "Regime de competência — receita alocada ao mês da competência (accrual, padrão MRR)"
+              : "Regime de caixa — receita alocada ao mês da quitação (bate com DFC)"}
           </p>
         </div>
         <div className="flex gap-2">

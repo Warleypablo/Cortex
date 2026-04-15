@@ -20,25 +20,7 @@ function formatDelta(pct: number): { value: string; isPositive: boolean } | unde
   };
 }
 
-function gapStatus(pct: number): { color: string; label: string } {
-  const abs = Math.abs(pct);
-  if (abs < 3) return {
-    color: "text-emerald-600 dark:text-emerald-400",
-    label: "Dentro da tolerância",
-  };
-  if (abs < 10) return {
-    color: "text-amber-600 dark:text-amber-400",
-    label: "Atenção",
-  };
-  return {
-    color: "text-red-600 dark:text-red-400",
-    label: "Divergência alta",
-  };
-}
-
 export function KpiCards({ cards }: Props) {
-  const gap = cards.gap_contratado ? gapStatus(cards.gap_contratado.pct) : null;
-
   return (
     <div
       role="region"
@@ -72,23 +54,6 @@ export function KpiCards({ cards }: Props) {
             value={formatPct(cards.mix_recorrente_pct)}
             subtitle="% da receita total do mês que é recorrente"
           />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4">
-          <HeroMetric
-            label="Gap vs Contratado"
-            value={
-              cards.gap_contratado
-                ? `${formatCurrencyNoDecimals(cards.gap_contratado.valor)} (${cards.gap_contratado.pct.toFixed(1)}%)`
-                : "—"
-            }
-            subtitle="MRR contratado (ClickUp) − MRR realizado recorrente (Conta Azul)"
-          />
-          {gap && (
-            <div className={`mt-1 text-xs ${gap.color}`}>{gap.label}</div>
-          )}
         </CardContent>
       </Card>
 

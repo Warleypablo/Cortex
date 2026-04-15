@@ -109,7 +109,6 @@ export function TabelaReceitaMensal({ meses, onCellClick }: Props) {
               <th className="px-3 py-2 text-right">Realizado</th>
               <th className="px-3 py-2 text-right">% Real</th>
               <th className="px-3 py-2 text-center">Cobertura</th>
-              <th className="px-3 py-2 text-right">Contratado</th>
             </tr>
           </thead>
           <tbody>
@@ -149,15 +148,12 @@ export function TabelaReceitaMensal({ meses, onCellClick }: Props) {
                   </td>
                   <td className="px-3 py-2 text-right">{pctReal.toFixed(1)}%</td>
                   <td className="px-3 py-2 text-center">{coberturaBadge(m.cobertura_cc_pct)}</td>
-                  <td className="px-3 py-2 text-right text-gray-500">
-                    {formatCurrencyNoDecimals(m.mrr_contratado)}
-                  </td>
                 </tr>
               );
             })}
             {sorted.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={9} className="px-3 py-8 text-center text-gray-500">
                   Nenhum registro encontrado.
                 </td>
               </tr>
@@ -172,7 +168,7 @@ export function TabelaReceitaMensal({ meses, onCellClick }: Props) {
                 <td className="px-3 py-2 text-right">{formatCurrencyNoDecimals(totais.nao_classif)}</td>
                 <td className="px-3 py-2 text-right">{formatCurrencyNoDecimals(totais.previsto)}</td>
                 <td className="px-3 py-2 text-right">{formatCurrencyNoDecimals(totais.realizado)}</td>
-                <td colSpan={3} />
+                <td colSpan={2} />
               </tr>
             </tfoot>
           )}

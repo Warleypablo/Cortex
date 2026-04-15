@@ -20,7 +20,6 @@ interface ChartPoint {
   nao_classif_realizado: number;
   total_previsto: number;
   total_realizado: number;
-  mrr_contratado: number;
   is_futuro: boolean;
 }
 
@@ -30,6 +29,108 @@ function monthLabel(iso: string): string {
   const d = new Date(Number(year), Number(month) - 1, 1);
   const label = d.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
   return `${label}/${year.slice(-2)}`;
+}
+
+const SERIES_LABELS: Record<string, string> = {
+  recorrente_realizado: "Recorrente",
+  pontual_realizado: "Pontual",
+  nao_classif_realizado: "Não Classif",
+  total_previsto: "Previsto total",
+};
+
+interface TooltipRow {
+  name: string;
+  value: number;
+  color: string;
+}
+
+function CustomTooltip({
+  active,
+  payload,
+  label,
+  isDark,
+  gridColor,
+}: {
+  active?: boolean;
+  payload?: Array<{ name?: string; dataKey?: string; value?: number; color?: string }>;
+  label?: string;
+  isDark: boolean;
+  gridColor: string;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const rows: TooltipRow[] = [];
+  let stackedTotal = 0;
+  for (const p of payload) {
+    const key = p.dataKey || "";
+    const valor = typeof p.value === "number" ? p.value : 0;
+    const nome = SERIES_LABELS[key] || p.name || key;
+    rows.push({ name: nome, value: valor, color: p.color || "#888" });
+    if (key === "recorrente_realizado" || key === "pontual_realizado" || key === "nao_classif_realizado") {
+      stackedTotal += valor;
+    }
+  }
+
+  return (
+    <div
+      style={{
+        backgroundColor: isDark ? "#18181b" : "#ffffff",
+        border: `1px solid ${gridColor}`,
+        borderRadius: 8,
+        padding: "8px 12px",
+        fontSize: 12,
+        minWidth: 200,
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 6, color: isDark ? "#fafafa" : "#18181b" }}>
+        {label}
+      </div>
+      {rows.map((r) => (
+        <div
+          key={r.name}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 16,
+            color: isDark ? "#d4d4d8" : "#374151",
+          }}
+        >
+          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span
+              style={{
+                display: "inline-block",
+                width: 8,
+                height: 8,
+                borderRadius: 2,
+                backgroundColor: r.color,
+              }}
+            />
+            {r.name}
+          </span>
+          <span style={{ fontVariantNumeric: "tabular-nums" }}>
+            {formatCurrencyNoDecimals(r.value)}
+          </span>
+        </div>
+      ))}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: 16,
+          marginTop: 6,
+          paddingTop: 6,
+          borderTop: `1px solid ${gridColor}`,
+          fontWeight: 600,
+          color: isDark ? "#fafafa" : "#18181b",
+        }}
+      >
+        <span>Total realizado</span>
+        <span style={{ fontVariantNumeric: "tabular-nums" }}>
+          {formatCurrencyNoDecimals(stackedTotal)}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function ChartReceitaMensal({ meses }: Props) {
@@ -56,7 +157,6 @@ export function ChartReceitaMensal({ meses }: Props) {
           nao_classif_realizado: m.nao_classif_realizado,
           total_previsto: m.total_previsto,
           total_realizado: m.total_realizado,
-          mrr_contratado: m.mrr_contratado,
           is_futuro: m.is_futuro,
         });
       }
@@ -84,19 +184,7 @@ export function ChartReceitaMensal({ meses }: Props) {
                 tickFormatter={(v) => formatCurrencyNoDecimals(v).replace("R$", "").trim()}
                 width={80}
               />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: isDark ? "#18181b" : "#ffffff",
-                  border: `1px solid ${gridColor}`,
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-                labelStyle={{ color: axisColor }}
-                formatter={(value: number | string, name: string) => {
-                  if (typeof value !== "number") return [value, name];
-                  return [formatCurrencyNoDecimals(value), name];
-                }}
-              />
+              <Tooltip content={<CustomTooltip isDark={isDark} gridColor={gridColor} />} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
 
               <Bar
@@ -141,14 +229,6 @@ export function ChartReceitaMensal({ meses }: Props) {
 
               <Line
                 type="monotone"
-                dataKey="mrr_contratado"
-                name="MRR Contratado (ClickUp)"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={{ r: 4, fill: "#3b82f6" }}
-              />
-              <Line
-                type="monotone"
                 dataKey="total_previsto"
                 name="Previsto total"
                 stroke="#9ca3af"
@@ -160,7 +240,7 @@ export function ChartReceitaMensal({ meses }: Props) {
           </ResponsiveContainer>
         </div>
         <p className="mt-2 text-xs text-gray-500 dark:text-zinc-400">
-          Barras claras = meses futuros com parcelas agendadas. Linha azul = MRR contratado (snapshot ClickUp). Linha cinza tracejada = total previsto do mês.
+          Barras claras = meses futuros com parcelas agendadas. Linha cinza tracejada = total previsto do mês.
         </p>
       </CardContent>
     </Card>
