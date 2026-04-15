@@ -2,15 +2,16 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import type {
   ResumoReceitaResponse,
   Empresa,
-} from "../../../../shared/receitaRecorrenteTypes";
+} from "@shared/receitaRecorrenteTypes";
 
 type RangeKey = "6m" | "12m" | "ytd";
 
@@ -40,10 +41,12 @@ export default function ReceitaRecorrente() {
 
   const { ini, fim } = useMemo(() => computeRange(rangeKey), [rangeKey]);
 
+  // queryKey[1] deve ser objeto (não string) para que o queryFn default
+  // em client/src/lib/queryClient.ts construa a query string corretamente.
   const queryParams = useMemo(() => {
-    const params = new URLSearchParams({ data_ini: ini, data_fim: fim });
-    if (empresa !== "todas") params.set("empresa", empresa);
-    return params.toString();
+    const params: Record<string, string> = { data_ini: ini, data_fim: fim };
+    if (empresa !== "todas") params.empresa = empresa;
+    return params;
   }, [ini, fim, empresa]);
 
   const { data, isLoading, error, refetch } = useQuery<ResumoReceitaResponse>({
@@ -90,12 +93,14 @@ export default function ReceitaRecorrente() {
             <span className="text-red-700 dark:text-red-300">
               Falha ao carregar dados de receita.
             </span>
-            <button
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
               onClick={() => refetch()}
-              className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
             >
               Tentar novamente
-            </button>
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -104,7 +109,7 @@ export default function ReceitaRecorrente() {
       {isLoading && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Array.from({ length: 7 }).map((_, i) => (
+            {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="h-24 w-full rounded-lg" />
             ))}
           </div>
@@ -114,7 +119,7 @@ export default function ReceitaRecorrente() {
       )}
 
       {/* Content placeholder — subcomponents wired in Task 11 */}
-      {data && !isLoading && (
+      {data && (
         <div className="text-sm text-gray-500">
           Carregado: {data.meses.length} linhas × mês × empresa.
           Cards e gráficos nas próximas tasks.
