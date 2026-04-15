@@ -314,7 +314,54 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
 
   app.get("/api/financeiro/receita-recorrente/drilldown", async (req, res) => {
     try {
-      res.json([]);
+      const mes = req.query.mes as string;          // e.g. "2026-03-01"
+      const tipo = req.query.tipo as string;        // "RECORRENTE" | "PONTUAL" | "NAO_CLASSIFICADO"
+      const empresaFiltro = (req.query.empresa as string) || null;
+
+      if (!mes || !tipo) {
+        return res.status(400).json({ error: "Missing required params: mes, tipo" });
+      }
+
+      // Filtro por tipo no centro_custo_nome
+      let tipoClause;
+      if (tipo === 'RECORRENTE') {
+        tipoClause = sql` AND p.centro_custo_nome ILIKE '%recorrente%' AND NOT (p.centro_custo_nome ILIKE '%recorrente%' AND p.centro_custo_nome ILIKE '%pontual%')`;
+      } else if (tipo === 'PONTUAL') {
+        tipoClause = sql` AND p.centro_custo_nome ILIKE '%pontual%' AND NOT (p.centro_custo_nome ILIKE '%recorrente%' AND p.centro_custo_nome ILIKE '%pontual%')`;
+      } else {
+        tipoClause = sql` AND (p.centro_custo_nome IS NULL OR p.centro_custo_nome = '' OR (p.centro_custo_nome NOT ILIKE '%recorrente%' AND p.centro_custo_nome NOT ILIKE '%pontual%'))`;
+      }
+
+      const empresaClause = empresaFiltro
+        ? sql` AND p.empresa = ${empresaFiltro}`
+        : sql``;
+
+      const result = await db.execute(sql`
+        SELECT
+          p.id::text AS id_parcela,
+          COALESCE(cl.nome, p.nome)::text AS cliente_nome,
+          cl.cnpj::text AS cliente_cnpj,
+          p.descricao::text AS descricao,
+          p.categoria_nome::text AS categoria_nome,
+          p.valor_bruto::float AS valor_bruto,
+          p.status::text AS status,
+          COALESCE(p.data_competencia, p.data_vencimento)::date::text AS data_competencia,
+          p.data_vencimento::date::text AS data_vencimento,
+          p.venda_id::text AS venda_id,
+          p.empresa::text AS empresa
+        FROM "Conta Azul".caz_parcelas p
+        LEFT JOIN "Conta Azul".caz_clientes cl
+          ON cl.ids::uuid = p.id_cliente
+        WHERE p.tipo_evento = 'RECEITA'
+          AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mes}::date
+          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
+          ${tipoClause}
+          ${empresaClause}
+        ORDER BY p.valor_bruto DESC NULLS LAST
+      `);
+
+      res.json(result.rows);
     } catch (error: any) {
       console.error("[api] Error fetching receita-recorrente/drilldown:", error);
       res.status(500).json({ error: error.message || "Failed to fetch drilldown" });
