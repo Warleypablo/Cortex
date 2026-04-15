@@ -269,13 +269,19 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         ? (mrrRecorrenteAtual / totalCorrente) * 100
         : 0;
 
-      const realizadoPct = (corrente?.previsto || 0) > 0
-        ? ((corrente?.realizado || 0) / (corrente?.previsto || 1)) * 100
+      const previstoCorrente = corrente?.previsto || 0;
+      const realizadoCorrente = corrente?.realizado || 0;
+      const realizadoPct = previstoCorrente > 0
+        ? (realizadoCorrente / previstoCorrente) * 100
         : 0;
 
+      // gap_contratado só faz sentido na visão consolidada. cup_contratos não
+      // tem a mesma dimensão "empresa" do Conta Azul, então quando o usuário
+      // filtra por TURBO ou PD o denominador e numerador ficam em bases
+      // diferentes — retorna null nesse caso.
       const gapAbs = mrrContratado - mrrRecorrenteAtual;
       const gapPct = mrrContratado > 0 ? (gapAbs / mrrContratado) * 100 : 0;
-      const gapContratado = mrrContratado > 0
+      const gapContratado = (!empresaFiltro && mrrContratado > 0)
         ? { valor: gapAbs, pct: gapPct }
         : null;
 
