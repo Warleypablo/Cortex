@@ -31,7 +31,7 @@ export const PERMISSION_KEYS = {
     TURBOZAP: 'fin.turbozap',
     DRE: 'fin.dre',
     NOTAS_FISCAIS: 'fin.notas_fiscais',
-    RECEITA_RECORRENTE: 'fin.receita_recorrente',   // NEW
+    RECEITA_RECORRENTE: 'fin.receita_recorrente',
   },
   // Gestão (antigo Operação)
   GESTAO: {
