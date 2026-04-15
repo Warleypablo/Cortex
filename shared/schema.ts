@@ -1571,6 +1571,21 @@ export const iaHubMensagens = cortexCoreSchema.table("ia_hub_mensagens", {
 
 export type IaHubMensagem = typeof iaHubMensagens.$inferSelect;
 
+// Item Alias Map — aliases para match item (Conta Azul) ↔ contrato (ClickUp)
+// Usado pela aba Contribuição por Squad para atribuir receita correta quando
+// o nome do item não casa literalmente com o serviço do contrato.
+export const itemAliasMap = cortexCoreSchema.table("item_alias_map", {
+  id: serial("id").primaryKey(),
+  itemPattern: varchar("item_pattern", { length: 255 }).notNull(),
+  targetToken: varchar("target_token", { length: 100 }).notNull(),
+  notes: text("notes"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ItemAliasMap = typeof itemAliasMap.$inferSelect;
+
 // Tabela para comunicações/avisos internos sobre clientes
 export const clienteComunicacoes = pgTable("cliente_comunicacoes", {
   id: serial("id").primaryKey(),

@@ -55,6 +55,7 @@ import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { simulateCliente, ContratoSim, ClienteSim } from "./contribuicaoSquad/simulator";
+import { getReceitaPorItens, parcelasCobertas, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
 
 const gpturboOpenAI = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -5348,10 +5349,58 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
       const squad = req.query.squad as string | undefined;
       const squadFilter = squad && squad !== 'todos' ? squad : null;
-      
+
       const dataInicio = `${ano}-01-01`;
       const dataFim = `${ano}-12-31 23:59:59`;
-      
+
+      // Normaliza variantes de "Sem Squad" para o label único exibido no frontend.
+      // Evita que contratos com squad vazio (legacy) apareçam como bucket separado
+      // do bucket de órfãos do pipeline de itens.
+      const normalizeSquadLabel = (raw: any): string => {
+        const v = (raw ?? '').toString().trim();
+        if (v === '' || v === 'Sem Squad') return SEM_SQUAD_LABEL;
+        return v;
+      };
+
+      // ──── NOVO: receita via caz_vendas_itens (parcelas com venda_id) ──────
+      // Pipeline que atribui cada item da venda ao contrato/squad certo.
+      // Parcelas totalmente cobertas (≥99% do valor_pago) são excluídas do
+      // simulador A3 abaixo, evitando double-counting.
+      let receitaItens: ReceitaItemLinha[] = [];
+      let parcelasCobertasSet = new Set<string>();
+      let totalParcelasElegiveis = 0;
+      let itensFallbackUsed = false;
+
+      try {
+        receitaItens = await getReceitaPorItens(ano);
+
+        // Map de valor_pago por parcela_id (para saber o que o A3 tem que explicar).
+        // IMPORTANT: escopar a preview para parcelas ELEGÍVEIS ao pipeline de itens
+        // (venda_origem em VENDA/VENDA_AGENDADA com venda_id), para que pctViaItens
+        // tenha denominador significativo — RENEGOCIACAO/LANCAMENTO não podem ser
+        // atribuídas por itens.
+        const parcelaValorMap = new Map<string, number>();
+        const pagamentosResultPreview = await db.execute(sql`
+          SELECT p.id::text AS parcela_id, p.valor_pago::numeric AS valor_pago
+          FROM "Conta Azul".caz_parcelas p
+          WHERE p.tipo_evento = 'RECEITA'
+            AND p.status = 'QUITADO'
+            AND p.valor_pago::numeric > 0
+            AND p.venda_origem IN ('VENDA','VENDA_AGENDADA')
+            AND p.venda_id IS NOT NULL
+            AND EXTRACT(YEAR FROM p.data_quitacao) = ${ano}
+        `);
+        for (const row of pagamentosResultPreview.rows as Array<{ parcela_id: string; valor_pago: string | number }>) {
+          parcelaValorMap.set(row.parcela_id, Number(row.valor_pago) || 0);
+        }
+
+        parcelasCobertasSet = parcelasCobertas(receitaItens, parcelaValorMap);
+        totalParcelasElegiveis = parcelaValorMap.size;
+      } catch (err) {
+        console.error('[contribuicao-squad/bulk] receitaPorItens falhou, caindo para A3-only:', err);
+        itensFallbackUsed = true;
+      }
+
       // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
       // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
 
@@ -5412,6 +5461,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       `);
 
       // Query 2: pagamentos cronológicos (histórico inteiro, todos os clientes)
+      // Exclui parcelas já cobertas pelo novo pipeline de itens (para evitar double-count).
+      const parcelasExcluidas = Array.from(parcelasCobertasSet);
       const pagamentosResult = await db.execute(sql`
         SELECT
           REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo,
@@ -5424,6 +5475,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND p.status = 'QUITADO'
           AND p.valor_pago::numeric > 0
           AND caz.cnpj IS NOT NULL AND TRIM(caz.cnpj) != ''
+          ${parcelasExcluidas.length > 0
+            ? sql`AND NOT EXISTS (
+                SELECT 1 FROM (VALUES ${sql.join(parcelasExcluidas.map(id => sql`(${id})`), sql`, `)}) AS excl(id)
+                WHERE excl.id = p.id::text
+              )`
+            : sql``}
         GROUP BY cnpj_limpo, TO_CHAR(p.data_quitacao, 'YYYY-MM')
         ORDER BY cnpj_limpo, mes
       `);
@@ -5464,7 +5521,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         const contrato: ContratoSim = {
           id_subtask: row.id_subtask,
           cnpj,
-          squad: row.squad || 'Sem Squad',
+          squad: normalizeSquadLabel(row.squad),
           servico: row.servico || 'Serviço não identificado',
           tipo: row.tipo as 'recorrente' | 'pontual',
           valor: Number(row.valor) || 0,
@@ -5569,7 +5626,59 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           }
         }
       }
-      
+
+      // ──── Mesclar receita via itens no mesesMap ─────────────────────────
+      // Órfãos (SEM_SQUAD_LABEL) são mantidos mesmo quando um squad filter é aplicado,
+      // para que fiquem visíveis no dashboard (e o usuário possa agir sobre eles).
+      for (const linha of receitaItens) {
+        const sqNorm = linha.squad;
+
+        if (!matchesSquadFilter(sqNorm) && sqNorm !== SEM_SQUAD_LABEL) continue;
+
+        squadsSet.add(sqNorm);
+
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
+        if (!mesesMap.has(linha.mes)) {
+          mesesMap.set(linha.mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
+        }
+        const mesData = mesesMap.get(linha.mes)!;
+        mesData.receitaTotal += linha.itemTotal;
+        mesData.totalParcelas += 1;
+
+        const categoriaNome = 'Sem Categoria';
+        if (!mesData.categorias.has(categoriaNome)) {
+          mesData.categorias.set(categoriaNome, { nome: categoriaNome, valorTotal: 0, clientes: new Map() });
+        }
+        const cat = mesData.categorias.get(categoriaNome)!;
+        cat.valorTotal += linha.itemTotal;
+
+        if (!cat.clientes.has(linha.clienteNome)) {
+          cat.clientes.set(linha.clienteNome, { valorTotal: 0, servicos: new Map() });
+        }
+        const cli = cat.clientes.get(linha.clienteNome)!;
+        cli.valorTotal += linha.itemTotal;
+
+        const chaveServico = `${linha.itemRaw}|${sqNorm}`;
+        if (!cli.servicos.has(chaveServico)) {
+          cli.servicos.set(chaveServico, { valor: 0, squad: sqNorm, parcelas: [] });
+        }
+        const srv = cli.servicos.get(chaveServico)!;
+        srv.valor += linha.itemTotal;
+        srv.parcelas.push({
+          id: linha.idSubtask,
+          valor: linha.itemTotal,
+          dataQuitacao: null,
+          linkNfse: null,
+          numNfse: null,
+          urlCobranca: null,
+          clienteNome: linha.clienteNome,
+          servicoNome: linha.itemRaw,
+          squad: sqNorm,
+        });
+      }
+
       // Converter para formato de resposta
       const mesesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       
@@ -5748,7 +5857,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         if (!salariosPorColab.has(id)) {
           salariosPorColab.set(id, {
             nome: row.colaborador_nome,
-            squad: row.squad || 'Sem Squad',
+            squad: normalizeSquadLabel(row.squad),
             porMes: new Array(12).fill(0),
             total: 0,
           });
@@ -5868,6 +5977,23 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
 
+      // Mesclar contribuições do pipeline novo (receitaItens) no squadSummaryMap
+      for (const linha of receitaItens) {
+        const sq = linha.squad;
+        if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
+        if (!squadSummaryMap.has(sq)) {
+          squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
+        }
+        const entry = squadSummaryMap.get(sq)!;
+        const monthIdx = parseInt(linha.mes.split('-')[1]) - 1;
+        entry.total += linha.itemTotal;
+        entry.porMes[monthIdx] += linha.itemTotal;
+        entry.contratos.add(`${linha.clienteNome}|${linha.itemRaw}|${sq}`);
+      }
+
       const resumoPorSquad = Array.from(squadSummaryMap.entries())
         .filter(([sq]) => !/\bOFF\b/i.test(sq))
         .map(([squad, data]) => ({
@@ -5971,6 +6097,25 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           }
         }
       }
+      // Mesclar contribuições do pipeline novo (receitaItens) em receitasDetalhesPorSquad
+      for (const linha of receitaItens) {
+        const sq = linha.squad;
+        if (/\bOFF\b/i.test(sq)) continue;
+        if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
+        const monthIdx = parseInt(linha.mes.split('-')[1]) - 1;
+        if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
+        let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === linha.clienteNome);
+        if (!entry) {
+          entry = { cliente: linha.clienteNome, porMes: new Array(12).fill(0), total: 0 };
+          receitasDetalhesPorSquad[sq].push(entry);
+        }
+        entry.porMes[monthIdx] += linha.itemTotal;
+        entry.total += linha.itemTotal;
+      }
+
       // Ordenar clientes por total desc dentro de cada squad
       for (const sq of Object.keys(receitasDetalhesPorSquad)) {
         receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
@@ -6012,6 +6157,13 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
 
+      // ──── Estatísticas de origem dos dados (itens vs A3) ────────────────
+      const viaItens = parcelasCobertasSet.size;
+      const viaSimuladorA3 = Math.max(0, totalParcelasElegiveis - viaItens);
+      const pctViaItens = totalParcelasElegiveis > 0
+        ? Math.round((viaItens / totalParcelasElegiveis) * 1000) / 10
+        : 0;
+
       res.json({
         ano,
         squad: squadFilter || 'todos',
@@ -6022,6 +6174,13 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         despesasPorSquadMensais,
         salariosDetalhesPorSquad,
         receitasDetalhesPorSquad,
+        fonteDados: {
+          totalParcelasElegiveis,
+          viaItens,
+          viaSimuladorA3,
+          pctViaItens,
+          fallbackUsed: itensFallbackUsed,
+        },
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
@@ -8052,6 +8211,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // OKR 2026 - registered from separate file
   registerOKR2026Routes(app);
+
+  // Receita Recorrente por Centro de Custo
   registerReceitaRecorrenteRoutes(app, db, storage);
 
   // Jurídico Module - registered from separate file

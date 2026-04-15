@@ -2717,25 +2717,27 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
-      // Find active Instagram connection
+      // Find all active Instagram connections (may be >1: e.g. test + production)
       const connections = await db.execute(sql`
-        SELECT id FROM cortex_core.instagram_connections WHERE is_active = true LIMIT 1
+        SELECT id FROM cortex_core.instagram_connections WHERE is_active = true
       `);
+      const emptyPayload = {
+        comecaramSeguir: 0, deixaramSeguir: 0, percPerdaSeguidores: 0,
+        deltaSeguidores: 0, totalSeguidores: 0, percCrescimentoSeguidores: 0,
+        visualizacoesTotais: 0, percVisualizacoesOrganicas: 0, visualizacoesOrganicas: 0,
+        percVisualizacoesPagas: 0, visualizacoesPagas: 0,
+        alcanceTotal: 0, alcanceOrganico: 0, alcancePago: 0,
+        frequenciaAlcance: 0, ctrAlcanceVisitas: 0, visitasPerfil: 0,
+        percEngajamento: 0, interacoes: 0, ctrAlcanceCliques: 0,
+        ctrVisitasCliques: 0, cliquesLinkBio: 0,
+        investimentoPago: 0,
+      };
       if (connections.rows.length === 0) {
-        return res.json({
-          comecaramSeguir: 0, deixaramSeguir: 0, percPerdaSeguidores: 0,
-          deltaSeguidores: 0, totalSeguidores: 0, percCrescimentoSeguidores: 0,
-          visualizacoesTotais: 0, percVisualizacoesOrganicas: 0, visualizacoesOrganicas: 0,
-          percVisualizacoesPagas: 0, visualizacoesPagas: 0,
-          alcanceTotal: 0, alcanceOrganico: 0, alcancePago: 0,
-          frequenciaAlcance: 0, ctrAlcanceVisitas: 0, visitasPerfil: 0,
-          percEngajamento: 0, interacoes: 0, ctrAlcanceCliques: 0,
-          ctrVisitasCliques: 0, cliquesLinkBio: 0,
-        });
+        return res.json({ ...emptyPayload, hasConnection: false, snapshotCount: 0 });
       }
-      const connectionId = (connections.rows[0] as any).id;
+      const connectionIds = connections.rows.map((r: any) => r.id);
 
-      // Snapshots for the period (all relevant columns)
+      // Snapshots for the period across all active connections
       const snapshotsResult = await db.execute(sql`
         SELECT metric_date, followers, reach_day, impressions_day,
                COALESCE(follows_day, 0) as follows_day,
@@ -2746,7 +2748,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                COALESCE(website_clicks, 0) as website_clicks,
                COALESCE(accounts_engaged, 0) as accounts_engaged
         FROM cortex_core.instagram_metrics_snapshots
-        WHERE connection_id = ${connectionId}
+        WHERE connection_id IN (${sql.join(connectionIds.map((id: any) => sql`${id}`), sql`, `)})
           AND metric_date >= ${startDate}::date
           AND metric_date <= ${endDate}::date
         ORDER BY metric_date ASC
@@ -2789,27 +2791,28 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Use account-level total_interactions from snapshots (more accurate than post-level)
       const interacoes = snapshots.reduce((s, r) => s + (parseInt(r.total_interactions) || 0), 0);
 
-      // Get paid impressions/reach from Meta Ads
-      // TODO: Currently sums ALL Meta Ads platforms (Facebook + Instagram + Audience Network).
-      // To isolate Instagram-only, add publisher_platform column to meta_insights_daily
-      // and update metaAdsSync to use breakdowns: 'publisher_platform'.
+      // Paid impressions/reach/spend from Meta Ads — Instagram publisher_platform only
       let visualizacoesPagas = 0;
       let alcancePago = 0;
+      let investimentoPago = 0;
       try {
         const metaIgResult = await db.execute(sql`
           SELECT
-            COALESCE(SUM(mid.impressions), 0) as impressoes_pagas,
-            COALESCE(SUM(mid.reach), 0) as alcance_pago
-          FROM meta_ads.meta_insights_daily mid
-          WHERE mid.date_start >= ${startDate}::date
-            AND mid.date_start <= ${endDate}::date
-            AND mid.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+            COALESCE(SUM(impressions), 0) as impressoes_pagas,
+            COALESCE(SUM(reach), 0) as alcance_pago,
+            COALESCE(SUM(spend), 0) as investimento_pago
+          FROM meta_ads.meta_insights_by_platform_daily
+          WHERE date_start >= ${startDate}::date
+            AND date_start <= ${endDate}::date
+            AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+            AND publisher_platform = 'instagram'
         `);
         const mRow = metaIgResult.rows[0] as any;
         visualizacoesPagas = parseInt(mRow.impressoes_pagas) || 0;
         alcancePago = parseInt(mRow.alcance_pago) || 0;
+        investimentoPago = parseFloat(mRow.investimento_pago) || 0;
       } catch {
-        // Meta Ads data may not be available
+        // Table may not exist yet (before first sync runs ensureByPlatformTable)
       }
 
       const visualizacoesOrganicas = Math.max(0, visualizacoesTotais - visualizacoesPagas);
@@ -2832,6 +2835,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         frequenciaAlcance, ctrAlcanceVisitas, visitasPerfil,
         percEngajamento, interacoes, ctrAlcanceCliques,
         ctrVisitasCliques, cliquesLinkBio,
+        investimentoPago,
+        hasConnection: true,
+        snapshotCount: snapshots.length,
       });
     } catch (error) {
       console.error("[api] Error fetching Instagram metrics:", error);
