@@ -18,7 +18,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as path from "path";
 import * as fs from "fs";
-import { registerAcessosRoutes, registerAcessosPublicRoutes } from "./routes/acessos";
+import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerCapacityRoutes } from "./routes/capacity";
@@ -430,9 +430,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
   registerInstagramRoutes(app, db, storage);
-
-  // Acessos public routes (before isAuthenticated — token-based approval links)
-  registerAcessosPublicRoutes(app);
 
   app.use("/api", isAuthenticated);
 
