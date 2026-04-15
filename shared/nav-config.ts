@@ -31,6 +31,7 @@ export const PERMISSION_KEYS = {
     TURBOZAP: 'fin.turbozap',
     DRE: 'fin.dre',
     NOTAS_FISCAIS: 'fin.notas_fiscais',
+    RECEITA_RECORRENTE: 'fin.receita_recorrente',   // NEW
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -214,6 +215,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/dre': PERMISSION_KEYS.FIN.DRE,
   '/dashboard/notas-fiscais': PERMISSION_KEYS.FIN.NOTAS_FISCAIS,
   '/financeiro/negativacao': PERMISSION_KEYS.FIN.INADIMPLENCIA,
+  '/financeiro/receita-recorrente': PERMISSION_KEYS.FIN.RECEITA_RECORRENTE,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
@@ -423,6 +425,7 @@ export const NAV_CONFIG = {
         { title: 'TurboZap', url: '/turbozap', icon: 'Zap', permissionKey: PERMISSION_KEYS.FIN.TURBOZAP },
         { title: 'Notas Fiscais', url: '/dashboard/notas-fiscais', icon: 'FileText', permissionKey: PERMISSION_KEYS.FIN.NOTAS_FISCAIS },
         { title: 'Negativacao', url: '/financeiro/negativacao', icon: 'Scale', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
+        { title: 'Receita Recorrente', url: '/financeiro/receita-recorrente', icon: 'Repeat', permissionKey: PERMISSION_KEYS.FIN.RECEITA_RECORRENTE },
       ],
     },
     {
