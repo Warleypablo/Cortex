@@ -33,7 +33,29 @@
       "Bash(git fetch:*)",
       "Bash(git update-index:*)",
       "Bash(grep -r \"cup_churn\" /Users/mac0267/Cortex --include=\"*.ts\" --include=\"*.tsx\" --include=\"*.sql\" 2>/dev/null | grep -v node_modules)",
-      "Bash(grep -l \"cup_churn\\\\|CREATE TABLE.*churn\" /Users/mac0267/Cortex/scripts/*.sql 2>/dev/null)"
+      "Bash(grep -l \"cup_churn\\\\|CREATE TABLE.*churn\" /Users/mac0267/Cortex/scripts/*.sql 2>/dev/null)",
+      "Bash(git rebase:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(grep -r \"from.*formatCurrency\\\\|from.*formatPercent\" /Users/ichino/Documents/Turbo/Cortex/client/src/pages/*.tsx)",
+      "Bash(find:*)",
+      "Bash(grep -n \"CREATE TABLE.*growth\\\\|CREATE TABLE.*meta_ads\\\\|CREATE TABLE.*instagram\" /Users/ichino/Documents/Turbo/Cortex/scripts/*.sql)",
+      "Bash(node:*)",
+      "Bash(jobs -l)",
+      "Skill(keybindings-help)",
+      "Bash(git revert:*)",
+      "WebFetch(domain:developers.facebook.com)",
+      "WebSearch",
+      "Bash(grep -l \"ACCESS_TOKEN_META_SYSTEM\\\\|ACCESS_TOKEN_META_HUMAN\\\\|APP_ID_META\\\\|BUSINESS_ID_META\" /Users/ichino/Documents/Turbo/Cortex/.env*)",
+      "Bash(git -C /Users/ichino/Documents/Turbo/Cortex status --short)",
+      "Bash(git -C /Users/ichino/Documents/Turbo/Cortex diff --stat)",
+      "Bash(awk -F= '{print $1}')",
+      "Bash(git -C /Users/ichino/Documents/Turbo/Cortex diff --stat HEAD)",
+      "Bash(git -C /Users/ichino/Documents/Turbo/Cortex diff .claude/settings.local.json)",
+      "Bash(git -C /Users/ichino/Documents/Turbo/Cortex diff client/src/pages/GrowthOrcadoRealizado.tsx)",
+      "Bash(awk '/^[A-Z_]+=/ {split\\($0,a,\"=\"\\); print a[1]}' .env)",
+      "Bash(git -C /Users/ichino/Documents/Turbo/Cortex add .claude/settings.local.json client/src/pages/GrowthOrcadoRealizado.tsx)",
+      "Bash(git -C /Users/ichino/Documents/Turbo/Cortex commit -m ':*)",
+      "Bash(git -C /Users/ichino/Documents/Turbo/Cortex push)"
     ]
   }
 }

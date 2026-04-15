@@ -20,6 +20,7 @@ interface SyncResult {
   ads: number;
   creatives: number;
   insights: number;
+  byPlatformInsights: number;
   errors: string[];
   duration_ms: number;
 }
@@ -27,6 +28,118 @@ interface SyncResult {
 interface MetaCredentials {
   accessToken: string;
   businessId: string;
+}
+
+interface ParsedInsightRow {
+  impressions: number;
+  clicks: number;
+  spend: number;
+  reach: number;
+  frequency: number;
+  cpm: number;
+  cpc: number;
+  ctr: number;
+  inlineLinkClicks: number;
+  outboundClicks: number;
+  videoPlay: number;
+  videoP25: number;
+  videoP50: number;
+  videoP75: number;
+  videoP100: number;
+  conversions: number;
+  landingPageViews: number;
+}
+
+function parseInsightRow(row: any): ParsedInsightRow {
+  let actionsLead = 0;
+  let actionsPurchase = 0;
+  let landingPageViews = 0;
+
+  if (row.actions) {
+    for (const a of row.actions) {
+      if (a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead') {
+        actionsLead += parseInt(a.value || '0');
+      }
+      if (a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase') {
+        actionsPurchase += parseInt(a.value || '0');
+      }
+      if (a.action_type === 'landing_page_view') {
+        landingPageViews += parseInt(a.value || '0');
+      }
+    }
+  }
+
+  const getVideoMetric = (arr: any[] | undefined): number => {
+    if (!arr) return 0;
+    return arr.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
+  };
+
+  const outboundClicks = Array.isArray(row.outbound_clicks)
+    ? row.outbound_clicks.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0)
+    : parseInt(row.outbound_clicks || '0');
+
+  return {
+    impressions: parseInt(row.impressions || '0'),
+    clicks: parseInt(row.clicks || '0'),
+    spend: parseFloat(row.spend || '0'),
+    reach: parseInt(row.reach || '0'),
+    frequency: parseFloat(row.frequency || '0'),
+    cpm: parseFloat(row.cpm || '0'),
+    cpc: parseFloat(row.cpc || '0'),
+    ctr: parseFloat(row.ctr || '0'),
+    inlineLinkClicks: parseInt(row.inline_link_clicks || '0'),
+    outboundClicks,
+    videoPlay: getVideoMetric(row.video_play_actions),
+    videoP25: getVideoMetric(row.video_p25_watched_actions),
+    videoP50: getVideoMetric(row.video_p50_watched_actions),
+    videoP75: getVideoMetric(row.video_p75_watched_actions),
+    videoP100: getVideoMetric(row.video_p100_watched_actions),
+    conversions: actionsLead + actionsPurchase,
+    landingPageViews,
+  };
+}
+
+async function ensureByPlatformTable(pool: Pool): Promise<void> {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS meta_ads.meta_insights_by_platform_daily (
+      id SERIAL PRIMARY KEY,
+      account_id VARCHAR(50) NOT NULL,
+      campaign_id VARCHAR(50),
+      adset_id VARCHAR(50),
+      ad_id VARCHAR(50),
+      date_start DATE NOT NULL,
+      date_stop DATE NOT NULL,
+      publisher_platform VARCHAR(32) NOT NULL,
+      impressions INTEGER DEFAULT 0,
+      clicks INTEGER DEFAULT 0,
+      spend DECIMAL(15,4) DEFAULT 0,
+      reach INTEGER DEFAULT 0,
+      frequency DECIMAL(10,4) DEFAULT 0,
+      cpm DECIMAL(10,4) DEFAULT 0,
+      cpc DECIMAL(10,4) DEFAULT 0,
+      ctr DECIMAL(10,6) DEFAULT 0,
+      inline_link_clicks INTEGER DEFAULT 0,
+      outbound_clicks INTEGER DEFAULT 0,
+      video_play_actions INTEGER DEFAULT 0,
+      video_p25_watched_actions INTEGER DEFAULT 0,
+      video_p50_watched_actions INTEGER DEFAULT 0,
+      video_p75_watched_actions INTEGER DEFAULT 0,
+      video_p100_watched_actions INTEGER DEFAULT 0,
+      conversions INTEGER DEFAULT 0,
+      landing_page_views INTEGER DEFAULT 0,
+      data_importacao TIMESTAMP DEFAULT NOW(),
+      CONSTRAINT meta_insights_by_platform_unique UNIQUE
+        (account_id, campaign_id, adset_id, ad_id, date_start, publisher_platform)
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_meta_insights_platform_date
+    ON meta_ads.meta_insights_by_platform_daily (date_start, publisher_platform)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_meta_insights_platform_account
+    ON meta_ads.meta_insights_by_platform_daily (account_id, publisher_platform)
+  `);
 }
 
 function getCredentials(): MetaCredentials {
@@ -247,44 +360,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
 
   let count = 0;
   for (const row of insights) {
-    // Extract lead, purchase, and landing_page_view actions
-    let actionsLead = 0;
-    let actionsPurchase = 0;
-    let actionValuesPurchase = 0;
-    let landingPageViews = 0;
-
-    if (row.actions) {
-      for (const a of row.actions) {
-        if (a.action_type === 'lead' || a.action_type === 'offsite_conversion.fb_pixel_lead') {
-          actionsLead += parseInt(a.value || '0');
-        }
-        if (a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase') {
-          actionsPurchase += parseInt(a.value || '0');
-        }
-        if (a.action_type === 'landing_page_view') {
-          landingPageViews += parseInt(a.value || '0');
-        }
-      }
-    }
-    if (row.action_values) {
-      for (const av of row.action_values) {
-        if (av.action_type === 'purchase' || av.action_type === 'offsite_conversion.fb_pixel_purchase') {
-          actionValuesPurchase += parseFloat(av.value || '0');
-        }
-      }
-    }
-
-    // Extract video metrics
-    const getVideoMetric = (arr: any[] | undefined): number => {
-      if (!arr) return 0;
-      return arr.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0);
-    };
-
-    // Extract outbound_clicks (comes as array from Meta API)
-    const outboundClicks = Array.isArray(row.outbound_clicks)
-      ? row.outbound_clicks.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0)
-      : parseInt(row.outbound_clicks || '0');
-
+    const p = parseInsightRow(row);
     await pool.query(`
       INSERT INTO meta_ads.meta_insights_daily (
         account_id, campaign_id, adset_id, ad_id, date_start, date_stop,
@@ -310,18 +386,12 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
     `, [
       TURBO_ACCOUNT_ID, row.campaign_id || null, row.adset_id || null, row.ad_id || null,
       row.date_start,
-      parseInt(row.impressions || '0'), parseInt(row.clicks || '0'),
-      parseFloat(row.spend || '0'), parseInt(row.reach || '0'),
-      parseFloat(row.frequency || '0'), parseFloat(row.cpm || '0'),
-      parseFloat(row.cpc || '0'), parseFloat(row.ctr || '0'),
-      parseInt(row.inline_link_clicks || '0'), outboundClicks,
-      getVideoMetric(row.video_play_actions),
-      getVideoMetric(row.video_p25_watched_actions),
-      getVideoMetric(row.video_p50_watched_actions),
-      getVideoMetric(row.video_p75_watched_actions),
-      getVideoMetric(row.video_p100_watched_actions),
-      actionsLead + actionsPurchase,
-      landingPageViews,
+      p.impressions, p.clicks, p.spend, p.reach,
+      p.frequency, p.cpm, p.cpc, p.ctr,
+      p.inlineLinkClicks, p.outboundClicks,
+      p.videoPlay,
+      p.videoP25, p.videoP50, p.videoP75, p.videoP100,
+      p.conversions, p.landingPageViews,
     ]);
     count++;
   }
@@ -330,12 +400,65 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
   return count;
 }
 
+async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: string): Promise<number> {
+  console.log(`[MetaSync] Syncing daily insights BY PLATFORM ${since} → ${until}...`);
+
+  const timeRange = JSON.stringify({ since, until });
+  const insights = await fetchAllPages(`${TURBO_ACCOUNT_ID}/insights`, {
+    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions',
+    time_range: timeRange,
+    level: 'ad',
+    time_increment: '1',
+    breakdowns: 'publisher_platform',
+  });
+
+  let count = 0;
+  for (const row of insights) {
+    const platform: string = row.publisher_platform || 'unknown';
+    const p = parseInsightRow(row);
+    await pool.query(`
+      INSERT INTO meta_ads.meta_insights_by_platform_daily (
+        account_id, campaign_id, adset_id, ad_id, date_start, date_stop, publisher_platform,
+        impressions, clicks, spend, reach, frequency, cpm, cpc, ctr,
+        inline_link_clicks, outbound_clicks,
+        video_p25_watched_actions, video_p50_watched_actions,
+        video_p75_watched_actions, video_p100_watched_actions,
+        conversions, landing_page_views, data_importacao
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
+      ON CONFLICT ON CONSTRAINT meta_insights_by_platform_unique
+      DO UPDATE SET
+        impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
+        reach=EXCLUDED.reach, frequency=EXCLUDED.frequency, cpm=EXCLUDED.cpm,
+        cpc=EXCLUDED.cpc, ctr=EXCLUDED.ctr,
+        inline_link_clicks=EXCLUDED.inline_link_clicks, outbound_clicks=EXCLUDED.outbound_clicks,
+        video_p25_watched_actions=EXCLUDED.video_p25_watched_actions,
+        video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
+        video_p75_watched_actions=EXCLUDED.video_p75_watched_actions,
+        video_p100_watched_actions=EXCLUDED.video_p100_watched_actions,
+        conversions=EXCLUDED.conversions, landing_page_views=EXCLUDED.landing_page_views,
+        data_importacao=NOW()
+    `, [
+      TURBO_ACCOUNT_ID, row.campaign_id || null, row.adset_id || null, row.ad_id || null,
+      row.date_start, platform,
+      p.impressions, p.clicks, p.spend, p.reach,
+      p.frequency, p.cpm, p.cpc, p.ctr,
+      p.inlineLinkClicks, p.outboundClicks,
+      p.videoP25, p.videoP50, p.videoP75, p.videoP100,
+      p.conversions, p.landingPageViews,
+    ]);
+    count++;
+  }
+
+  console.log(`[MetaSync] ${count} by-platform insight rows synced`);
+  return count;
+}
+
 // ===================== MAIN SYNC FUNCTION =====================
 
 export async function syncMetaAds(pool: Pool, options?: { since?: string; until?: string }): Promise<SyncResult> {
   const start = Date.now();
   const errors: string[] = [];
-  const result: SyncResult = { accounts: 0, campaigns: 0, adsets: 0, ads: 0, creatives: 0, insights: 0, errors: [], duration_ms: 0 };
+  const result: SyncResult = { accounts: 0, campaigns: 0, adsets: 0, ads: 0, creatives: 0, insights: 0, byPlatformInsights: 0, errors: [], duration_ms: 0 };
 
   // Default: last 90 days
   const today = new Date();
@@ -352,6 +475,14 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
     await pool.query(`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`);
   } catch (e) {
     // Column may already exist
+  }
+
+  // Ensure the per-platform breakdown table exists (isolated from meta_insights_daily)
+  try {
+    await ensureByPlatformTable(pool);
+  } catch (e: any) {
+    errors.push(`ByPlatform table: ${e.message}`);
+    console.error('[MetaSync] Failed to ensure by-platform table:', e.message);
   }
 
   // 1. Account
@@ -396,11 +527,19 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
     console.error('[MetaSync] Insights sync failed:', e.message);
   }
 
+  // 6. Daily Insights by publisher_platform (Instagram/Facebook/AN/Messenger)
+  try {
+    result.byPlatformInsights = await syncInsightsDailyByPlatform(pool, since, until);
+  } catch (e: any) {
+    errors.push(`InsightsByPlatform: ${e.message}`);
+    console.error('[MetaSync] Insights by-platform sync failed:', e.message);
+  }
+
   result.errors = errors;
   result.duration_ms = Date.now() - start;
 
   console.log(`[MetaSync] Sync complete in ${(result.duration_ms / 1000).toFixed(1)}s`);
-  console.log(`[MetaSync] Results: ${result.accounts} accounts, ${result.campaigns} campaigns, ${result.adsets} adsets, ${result.ads} ads, ${result.creatives} creatives, ${result.insights} insights`);
+  console.log(`[MetaSync] Results: ${result.accounts} accounts, ${result.campaigns} campaigns, ${result.adsets} adsets, ${result.ads} ads, ${result.creatives} creatives, ${result.insights} insights, ${result.byPlatformInsights} by-platform insights`);
   if (errors.length > 0) console.log(`[MetaSync] Errors: ${errors.join('; ')}`);
 
   return result;
