@@ -1,5 +1,6 @@
 export type Empresa = "TURBO PARTNERS" | "PEIXOTO DEBBANE";
 export type TipoReceita = "RECORRENTE" | "PONTUAL" | "NAO_CLASSIFICADO";
+export type ModoReceita = "competencia" | "caixa";
 
 export interface MesReceita {
   mes: string;                         // ISO date "2026-03-01"
@@ -35,6 +36,7 @@ export interface ResumoReceitaResponse {
   cards: CardsReceita;
   range: { data_ini: string; data_fim: string };
   empresa_filtro: Empresa | null;
+  modo: ModoReceita;
 }
 
 export interface DrilldownParcela {
