@@ -146,6 +146,7 @@ const PortalCliente = PortalClientePage;
 const PortalCreator = lazyWithRetry(() => import("@/pages/PortalCreator"));
 const TestWorkflow = lazyWithRetry(() => import("@/pages/TestWorkflow"));
 const Negativacao = lazyWithRetry(() => import("@/pages/Negativacao"));
+const ReceitaRecorrente = lazyWithRetry(() => import("@/pages/financeiro/ReceitaRecorrente"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
 // Error boundary to catch silent crashes in the portal.
@@ -314,6 +315,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/dre">{() => <ProtectedRoute path="/dashboard/dre" component={DRE} />}</Route>
       <Route path="/dashboard/notas-fiscais">{() => <ProtectedRoute path="/dashboard/notas-fiscais" component={NotasFiscais} />}</Route>
       <Route path="/financeiro/negativacao">{() => <ProtectedRoute path="/financeiro/negativacao" component={Negativacao} />}</Route>
+      <Route path="/financeiro/receita-recorrente">{() => <ProtectedRoute path="/financeiro/receita-recorrente" component={ReceitaRecorrente} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}
