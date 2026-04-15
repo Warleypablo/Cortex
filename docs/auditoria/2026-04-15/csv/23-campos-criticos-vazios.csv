@@ -1,0 +1,11 @@
+campo,vazios,total,pct_vazio
+crm_deal.empresa,16279,16279,100.0
+crm_deal.stage_semantic,16262,16279,99.9
+crm_deal.cnpj,15081,16279,92.6
+cup_contratos.valorr,980,2417,40.5
+cup_clientes.vendedor,135,1281,10.5
+cup_clientes.responsavel,79,1281,6.2
+cup_clientes.cnpj,2,1281,0.2
+cup_contratos.data_inicio,0,2417,0.0
+caz_clientes.cnpj,0,3131,0.0
+crm_deal.data_fechamento,6,16279,0.0
