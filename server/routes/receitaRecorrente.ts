@@ -322,12 +322,20 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         return res.status(400).json({ error: "Missing required params: mes, tipo" });
       }
 
-      // Filtro por tipo no centro_custo_nome
+      const VALID_TIPOS = ['RECORRENTE', 'PONTUAL', 'NAO_CLASSIFICADO'];
+      if (!VALID_TIPOS.includes(tipo)) {
+        return res.status(400).json({
+          error: `Invalid tipo: must be one of ${VALID_TIPOS.join(', ')}`,
+        });
+      }
+
+      // Filtro por tipo no centro_custo_nome — mistos (Recorrente+Pontual)
+      // ficam fora de RECORRENTE e PONTUAL para evitar double-counting v1.
       let tipoClause;
       if (tipo === 'RECORRENTE') {
-        tipoClause = sql` AND p.centro_custo_nome ILIKE '%recorrente%' AND NOT (p.centro_custo_nome ILIKE '%recorrente%' AND p.centro_custo_nome ILIKE '%pontual%')`;
+        tipoClause = sql` AND p.centro_custo_nome ILIKE '%recorrente%' AND p.centro_custo_nome NOT ILIKE '%pontual%'`;
       } else if (tipo === 'PONTUAL') {
-        tipoClause = sql` AND p.centro_custo_nome ILIKE '%pontual%' AND NOT (p.centro_custo_nome ILIKE '%recorrente%' AND p.centro_custo_nome ILIKE '%pontual%')`;
+        tipoClause = sql` AND p.centro_custo_nome ILIKE '%pontual%' AND p.centro_custo_nome NOT ILIKE '%recorrente%'`;
       } else {
         tipoClause = sql` AND (p.centro_custo_nome IS NULL OR p.centro_custo_nome = '' OR (p.centro_custo_nome NOT ILIKE '%recorrente%' AND p.centro_custo_nome NOT ILIKE '%pontual%'))`;
       }
@@ -341,8 +349,8 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
           p.id::text AS id_parcela,
           COALESCE(cl.nome, p.nome)::text AS cliente_nome,
           cl.cnpj::text AS cliente_cnpj,
-          p.descricao::text AS descricao,
-          p.categoria_nome::text AS categoria_nome,
+          COALESCE(p.descricao, '')::text AS descricao,
+          COALESCE(p.categoria_nome, '')::text AS categoria_nome,
           p.valor_bruto::float AS valor_bruto,
           p.status::text AS status,
           COALESCE(p.data_competencia, p.data_vencimento)::date::text AS data_competencia,
