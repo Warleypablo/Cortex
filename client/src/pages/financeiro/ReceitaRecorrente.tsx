@@ -16,6 +16,7 @@ import type {
   ResumoReceitaResponse,
   Empresa,
   CellClickPayload,
+  ModoReceita,
 } from "@shared/receitaRecorrenteTypes";
 
 type RangeKey = "6m" | "12m" | "ytd";
@@ -25,6 +26,7 @@ interface ModalState {
   mes: string | null;
   tipo: CellClickPayload["tipo"] | null;
   empresa: Empresa | null;
+  modo: ModoReceita;
 }
 
 function computeRange(key: RangeKey): { ini: string; fim: string } {
@@ -50,17 +52,18 @@ export default function ReceitaRecorrente() {
 
   const [rangeKey, setRangeKey] = useState<RangeKey>("6m");
   const [empresa, setEmpresa] = useState<Empresa | "todas">("todas");
+  const [modo, setModo] = useState<ModoReceita>("competencia");
   const [modal, setModal] = useState<ModalState>({
-    open: false, mes: null, tipo: null, empresa: null,
+    open: false, mes: null, tipo: null, empresa: null, modo: "competencia",
   });
 
   const { ini, fim } = useMemo(() => computeRange(rangeKey), [rangeKey]);
 
   const queryParams = useMemo(() => {
-    const params: Record<string, string> = { data_ini: ini, data_fim: fim };
+    const params: Record<string, string> = { data_ini: ini, data_fim: fim, modo };
     if (empresa !== "todas") params.empresa = empresa;
     return params;
-  }, [ini, fim, empresa]);
+  }, [ini, fim, empresa, modo]);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<ResumoReceitaResponse>({
     queryKey: ["/api/financeiro/receita-recorrente/resumo", queryParams],
@@ -68,7 +71,7 @@ export default function ReceitaRecorrente() {
   });
 
   const handleCellClick = (payload: CellClickPayload) => {
-    setModal({ open: true, ...payload });
+    setModal({ open: true, ...payload, modo });
   };
 
   const handleCloseModal = () => {
@@ -84,10 +87,19 @@ export default function ReceitaRecorrente() {
             Receita Recorrente
           </h1>
           <p className="text-sm text-gray-600 dark:text-zinc-400">
-            MRR realizado por centro de custo (Conta Azul) vs contratado (ClickUp)
+            {modo === "competencia"
+              ? "Regime de competência — receita alocada ao mês da data de competência (accrual, padrão MRR)"
+              : "Regime de caixa — receita alocada ao mês da data de quitação (bate com DFC)"}
           </p>
         </div>
         <div className="flex gap-2">
+          <Select value={modo} onValueChange={(v) => setModo(v as ModoReceita)}>
+            <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="competencia">Competência</SelectItem>
+              <SelectItem value="caixa">Caixa</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={rangeKey} onValueChange={(v) => setRangeKey(v as RangeKey)}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -157,6 +169,7 @@ export default function ReceitaRecorrente() {
         mes={modal.mes}
         tipo={modal.tipo}
         empresa={modal.empresa}
+        modo={modal.modo}
         onClose={handleCloseModal}
       />
     </div>

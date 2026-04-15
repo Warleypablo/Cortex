@@ -22,10 +22,20 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
       const dataIni = (req.query.data_ini as string) || defaultIni.toISOString().slice(0, 10);
       const dataFim = (req.query.data_fim as string) || defaultFim.toISOString().slice(0, 10);
       const empresaFiltro = (req.query.empresa as string) || null;
+      const modo = ((req.query.modo as string) === "caixa" ? "caixa" : "competencia") as "competencia" | "caixa";
 
       const empresaClause = empresaFiltro
         ? sql` AND p.empresa = ${empresaFiltro}`
         : sql``;
+
+      // Competência: data_competencia (fallback data_vencimento), tudo exceto CANCELADO.
+      // Caixa: data_quitacao (dinheiro no banco), só QUITADO.
+      const dataExpr = modo === "caixa"
+        ? sql`p.data_quitacao::date`
+        : sql`COALESCE(p.data_competencia, p.data_vencimento)`;
+      const statusClause = modo === "caixa"
+        ? sql`p.status = 'QUITADO' AND p.data_quitacao IS NOT NULL`
+        : sql`COALESCE(p.status, '') <> 'CANCELADO'`;
 
       // Query principal com 3-case split
       const mesesResult = await db.execute(sql`
@@ -33,7 +43,7 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
           SELECT
             p.id,
             p.empresa,
-            DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento))::date AS mes,
+            DATE_TRUNC('month', ${dataExpr})::date AS mes,
             p.valor_bruto,
             p.status,
             p.centro_custo_nome,
@@ -46,9 +56,9 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
             END AS classe
           FROM "Conta Azul".caz_parcelas p
           WHERE p.tipo_evento = 'RECEITA'
-            AND COALESCE(p.data_competencia, p.data_vencimento) >= ${dataIni}::date
-            AND COALESCE(p.data_competencia, p.data_vencimento) < ${dataFim}::date
-            AND COALESCE(p.status, '') <> 'CANCELADO'
+            AND ${dataExpr} >= ${dataIni}::date
+            AND ${dataExpr} < ${dataFim}::date
+            AND ${statusClause}
             AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
             ${empresaClause}
         ),
@@ -100,18 +110,18 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         ORDER BY empresa, mes, tipo;
       `);
 
-      // Cobertura CC por mês × empresa
+      // Cobertura CC por mês × empresa (respeita o modo selecionado)
       const coberturaResult = await db.execute(sql`
         SELECT
           p.empresa::text AS empresa,
-          DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento))::date::text AS mes,
+          DATE_TRUNC('month', ${dataExpr})::date::text AS mes,
           (SUM(p.valor_bruto) FILTER (WHERE p.centro_custo_nome IS NOT NULL AND p.centro_custo_nome <> ''))::float AS com_cc,
           SUM(p.valor_bruto)::float AS total
         FROM "Conta Azul".caz_parcelas p
         WHERE p.tipo_evento = 'RECEITA'
-          AND COALESCE(p.data_competencia, p.data_vencimento) >= ${dataIni}::date
-          AND COALESCE(p.data_competencia, p.data_vencimento) < ${dataFim}::date
-          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND ${dataExpr} >= ${dataIni}::date
+          AND ${dataExpr} < ${dataFim}::date
+          AND ${statusClause}
           AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
           ${empresaClause}
         GROUP BY 1, 2
@@ -134,8 +144,8 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         SELECT COUNT(DISTINCT p.id_cliente)::int AS total
         FROM "Conta Azul".caz_parcelas p
         WHERE p.tipo_evento = 'RECEITA'
-          AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mesCorrenteStr}::date
-          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND DATE_TRUNC('month', ${dataExpr}) = ${mesCorrenteStr}::date
+          AND ${statusClause}
           AND p.centro_custo_nome ILIKE '%recorrente%'
           AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
           ${empresaClause}
@@ -151,8 +161,8 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         SELECT DISTINCT p.id_cliente::text AS id_cliente
         FROM "Conta Azul".caz_parcelas p
         WHERE p.tipo_evento = 'RECEITA'
-          AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mesCorrenteStr}::date
-          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND DATE_TRUNC('month', ${dataExpr}) = ${mesCorrenteStr}::date
+          AND ${statusClause}
           AND p.centro_custo_nome ILIKE '%recorrente%'
           AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
           ${empresaClause}
@@ -162,8 +172,8 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         SELECT DISTINCT p.id_cliente::text AS id_cliente
         FROM "Conta Azul".caz_parcelas p
         WHERE p.tipo_evento = 'RECEITA'
-          AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mesAnteriorStr}::date
-          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND DATE_TRUNC('month', ${dataExpr}) = ${mesAnteriorStr}::date
+          AND ${statusClause}
           AND p.centro_custo_nome ILIKE '%recorrente%'
           AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
           ${empresaClause}
@@ -305,6 +315,7 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         },
         range: { data_ini: dataIni, data_fim: dataFim },
         empresa_filtro: empresaFiltro,
+        modo,
       });
     } catch (error: any) {
       console.error("[api] Error fetching receita-recorrente/resumo:", error);
@@ -317,10 +328,20 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
       const mes = req.query.mes as string;          // e.g. "2026-03-01"
       const tipo = req.query.tipo as string;        // "RECORRENTE" | "PONTUAL" | "NAO_CLASSIFICADO"
       const empresaFiltro = (req.query.empresa as string) || null;
+      const modo = ((req.query.modo as string) === "caixa" ? "caixa" : "competencia") as "competencia" | "caixa";
 
       if (!mes || !tipo) {
         return res.status(400).json({ error: "Missing required params: mes, tipo" });
       }
+
+      // Mesma convenção do /resumo: competência usa data_competencia
+      // (fallback vencimento), caixa usa data_quitacao.
+      const dataExprDrill = modo === "caixa"
+        ? sql`p.data_quitacao::date`
+        : sql`COALESCE(p.data_competencia, p.data_vencimento)`;
+      const statusClauseDrill = modo === "caixa"
+        ? sql`p.status = 'QUITADO' AND p.data_quitacao IS NOT NULL`
+        : sql`COALESCE(p.status, '') <> 'CANCELADO'`;
 
       const VALID_TIPOS = ['RECORRENTE', 'PONTUAL', 'NAO_CLASSIFICADO'];
       if (!VALID_TIPOS.includes(tipo)) {
@@ -361,8 +382,8 @@ export function registerReceitaRecorrenteRoutes(app: Express, db: any, storage: 
         LEFT JOIN "Conta Azul".caz_clientes cl
           ON cl.ids::uuid = p.id_cliente
         WHERE p.tipo_evento = 'RECEITA'
-          AND DATE_TRUNC('month', COALESCE(p.data_competencia, p.data_vencimento)) = ${mes}::date
-          AND COALESCE(p.status, '') <> 'CANCELADO'
+          AND DATE_TRUNC('month', ${dataExprDrill}) = ${mes}::date
+          AND ${statusClauseDrill}
           AND COALESCE(p.categoria_nome, '') NOT LIKE '04.%'
           ${tipoClause}
           ${empresaClause}

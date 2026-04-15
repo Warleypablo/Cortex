@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import type {
-  DrilldownResponse, TipoReceita, Empresa,
+  DrilldownResponse, TipoReceita, Empresa, ModoReceita,
 } from "@shared/receitaRecorrenteTypes";
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
   mes: string | null;
   tipo: TipoReceita | null;
   empresa: Empresa | null;
+  modo: ModoReceita;
   onClose: () => void;
 }
 
@@ -33,16 +34,16 @@ function monthLabelLong(iso: string | null): string {
   return d.toLocaleString("pt-BR", { month: "long", year: "numeric" });
 }
 
-export function DrilldownClientesModal({ open, mes, tipo, empresa, onClose }: Props) {
+export function DrilldownClientesModal({ open, mes, tipo, empresa, modo, onClose }: Props) {
   const [search, setSearch] = useState("");
 
   // queryKey[1] must be an object so the default queryFn builds the query string correctly.
   const queryParams = useMemo(() => {
     if (!mes || !tipo) return null;
-    const p: Record<string, string> = { mes, tipo };
+    const p: Record<string, string> = { mes, tipo, modo };
     if (empresa) p.empresa = empresa;
     return p;
-  }, [mes, tipo, empresa]);
+  }, [mes, tipo, empresa, modo]);
 
   const { data, isLoading, error, refetch } = useQuery<DrilldownResponse>({
     queryKey: ["/api/financeiro/receita-recorrente/drilldown", queryParams],
