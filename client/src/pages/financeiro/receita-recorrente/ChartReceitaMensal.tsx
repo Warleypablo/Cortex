@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import {
-  ComposedChart, Bar, Line, XAxis, YAxis,
+  ComposedChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +15,9 @@ interface Props {
 interface ChartPoint {
   mes: string;
   mesLabel: string;
-  recorrente_realizado: number;
-  pontual_realizado: number;
-  nao_classif_realizado: number;
+  recorrente_previsto: number;
+  pontual_previsto: number;
+  nao_classif_previsto: number;
   total_previsto: number;
   total_realizado: number;
   is_futuro: boolean;
@@ -32,10 +32,9 @@ function monthLabel(iso: string): string {
 }
 
 const SERIES_LABELS: Record<string, string> = {
-  recorrente_realizado: "Recorrente",
-  pontual_realizado: "Pontual",
-  nao_classif_realizado: "Não Classif",
-  total_previsto: "Previsto total",
+  recorrente_previsto: "Recorrente",
+  pontual_previsto: "Pontual",
+  nao_classif_previsto: "Não Classif",
 };
 
 interface TooltipRow {
@@ -66,7 +65,7 @@ function CustomTooltip({
     const valor = typeof p.value === "number" ? p.value : 0;
     const nome = SERIES_LABELS[key] || p.name || key;
     rows.push({ name: nome, value: valor, color: p.color || "#888" });
-    if (key === "recorrente_realizado" || key === "pontual_realizado" || key === "nao_classif_realizado") {
+    if (key === "recorrente_previsto" || key === "pontual_previsto" || key === "nao_classif_previsto") {
       stackedTotal += valor;
     }
   }
@@ -124,7 +123,7 @@ function CustomTooltip({
           color: isDark ? "#fafafa" : "#18181b",
         }}
       >
-        <span>Total realizado</span>
+        <span>Total</span>
         <span style={{ fontVariantNumeric: "tabular-nums" }}>
           {formatCurrencyNoDecimals(stackedTotal)}
         </span>
@@ -143,18 +142,18 @@ export function ChartReceitaMensal({ meses }: Props) {
     for (const m of meses) {
       const existing = map.get(m.mes);
       if (existing) {
-        existing.recorrente_realizado += m.recorrente_realizado;
-        existing.pontual_realizado += m.pontual_realizado;
-        existing.nao_classif_realizado += m.nao_classif_realizado;
+        existing.recorrente_previsto += m.recorrente_previsto;
+        existing.pontual_previsto += m.pontual_previsto;
+        existing.nao_classif_previsto += m.nao_classif_previsto;
         existing.total_previsto += m.total_previsto;
         existing.total_realizado += m.total_realizado;
       } else {
         map.set(m.mes, {
           mes: m.mes,
           mesLabel: monthLabel(m.mes),
-          recorrente_realizado: m.recorrente_realizado,
-          pontual_realizado: m.pontual_realizado,
-          nao_classif_realizado: m.nao_classif_realizado,
+          recorrente_previsto: m.recorrente_previsto,
+          pontual_previsto: m.pontual_previsto,
+          nao_classif_previsto: m.nao_classif_previsto,
           total_previsto: m.total_previsto,
           total_realizado: m.total_realizado,
           is_futuro: m.is_futuro,
@@ -188,9 +187,9 @@ export function ChartReceitaMensal({ meses }: Props) {
               <Legend wrapperStyle={{ fontSize: 12 }} />
 
               <Bar
-                dataKey="recorrente_realizado"
+                dataKey="recorrente_previsto"
                 name="Recorrente"
-                stackId="realizado"
+                stackId="total"
                 fill="#10b981"
               >
                 {chartData.map((entry, index) => (
@@ -201,9 +200,9 @@ export function ChartReceitaMensal({ meses }: Props) {
                 ))}
               </Bar>
               <Bar
-                dataKey="pontual_realizado"
+                dataKey="pontual_previsto"
                 name="Pontual"
-                stackId="realizado"
+                stackId="total"
                 fill="#f59e0b"
               >
                 {chartData.map((entry, index) => (
@@ -214,9 +213,9 @@ export function ChartReceitaMensal({ meses }: Props) {
                 ))}
               </Bar>
               <Bar
-                dataKey="nao_classif_realizado"
+                dataKey="nao_classif_previsto"
                 name="Não Classif"
-                stackId="realizado"
+                stackId="total"
                 fill="#64748b"
               >
                 {chartData.map((entry, index) => (
@@ -226,21 +225,11 @@ export function ChartReceitaMensal({ meses }: Props) {
                   />
                 ))}
               </Bar>
-
-              <Line
-                type="monotone"
-                dataKey="total_previsto"
-                name="Previsto total"
-                stroke="#9ca3af"
-                strokeDasharray="4 4"
-                strokeWidth={1.5}
-                dot={false}
-              />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
         <p className="mt-2 text-xs text-gray-500 dark:text-zinc-400">
-          Barras claras = meses futuros com parcelas agendadas. Linha cinza tracejada = total previsto do mês.
+          Barras claras = meses futuros com parcelas agendadas.
         </p>
       </CardContent>
     </Card>

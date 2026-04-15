@@ -79,12 +79,13 @@ export function TabelaReceitaMensal({ meses, onCellClick }: Props) {
     return a.empresa.localeCompare(b.empresa);
   });
 
-  // Totalizador do rodapé
+  // Totalizador do rodapé (usa previsto como métrica principal em competência;
+  // em caixa previsto == realizado por construção do SQL).
   const totais = sorted.reduce(
     (acc, m) => ({
-      recorrente: acc.recorrente + m.recorrente_realizado,
-      pontual: acc.pontual + m.pontual_realizado,
-      nao_classif: acc.nao_classif + m.nao_classif_realizado,
+      recorrente: acc.recorrente + m.recorrente_previsto,
+      pontual: acc.pontual + m.pontual_previsto,
+      nao_classif: acc.nao_classif + m.nao_classif_previsto,
       previsto: acc.previsto + m.total_previsto,
       realizado: acc.realizado + m.total_realizado,
     }),
@@ -128,17 +129,17 @@ export function TabelaReceitaMensal({ meses, onCellClick }: Props) {
                   </td>
                   <td className="px-3 py-2">{empresaLabel(m.empresa)}</td>
                   <ValorCell
-                    value={m.recorrente_realizado}
+                    value={m.recorrente_previsto}
                     onClick={() => onCellClick({ mes: m.mes, tipo: "RECORRENTE", empresa: m.empresa })}
                     disabled={m.is_futuro}
                   />
                   <ValorCell
-                    value={m.pontual_realizado}
+                    value={m.pontual_previsto}
                     onClick={() => onCellClick({ mes: m.mes, tipo: "PONTUAL", empresa: m.empresa })}
                     disabled={m.is_futuro}
                   />
                   <ValorCell
-                    value={m.nao_classif_realizado}
+                    value={m.nao_classif_previsto}
                     onClick={() => onCellClick({ mes: m.mes, tipo: "NAO_CLASSIFICADO", empresa: m.empresa })}
                     disabled={m.is_futuro}
                   />
