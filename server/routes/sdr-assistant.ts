@@ -1,6 +1,13 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
+import Anthropic from "@anthropic-ai/sdk";
 import { isAuthenticated } from "../auth/middleware";
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const MODEL = "claude-sonnet-4-5-20250929";
+const MAX_TOOL_ITERATIONS = 5;
+const MAX_TOKENS = 1024;
 
 export type DealStatus = "ativo" | "ganho" | "perdido";
 
@@ -115,6 +122,167 @@ export async function getCompanyTimeline(
     motivo_perda: row.motivo_perda,
     origem: row.source,
   }));
+}
+
+const TOOLS: Anthropic.Messages.Tool[] = [
+  {
+    name: "search_companies",
+    description:
+      "Busca empresas no CRM Bitrix por nome (fuzzy match). Use quando o SDR informa o nome de uma empresa para verificar histórico. Retorna até 10 matches com deal_count e last_stage.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Nome ou parte do nome da empresa (mínimo 3 caracteres)",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "get_company_timeline",
+    description:
+      "Retorna todos os deals de uma empresa específica em ordem cronológica decrescente. Use após identificar a empresa correta via search_companies.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        company_name: {
+          type: "string",
+          description: "Nome exato da empresa conforme retornado por search_companies",
+        },
+      },
+      required: ["company_name"],
+    },
+  },
+];
+
+const SYSTEM_PROMPT = `Você é o SDR Assistant da Turbo Partners. Ajuda o time comercial a checar histórico de empresas no CRM Bitrix antes de abordar.
+
+REGRAS:
+1. SDR envia nome da empresa. Você busca no Bitrix usando search_companies.
+2. Se múltiplos matches (>1), peça disambiguação. Liste até 5 opções com: número, nome completo, stage atual, quantidade de deals. Peça "digite o número ou o nome completo".
+3. Se 1 match, chame get_company_timeline automaticamente e apresente o resultado.
+4. Se 0 matches, responda "Empresa nova — sem histórico no Bitrix." e sugira prosseguir.
+5. Para descartes, informe o motivo se motivo_perda estiver preenchido; caso contrário, diga "motivo não registrado".
+6. Tom: direto, sem floreio. SDR tem pressa. Use bullets e emojis 🟢 📜.
+7. NUNCA invente dados. Se a tool não retornou, diga que não tem.
+
+FORMATO PADRÃO quando há histórico:
+
+🟢 ATIVO — <responsável> | <stage> | criado em <data>
+   <valor MRR se houver> | Origem: <origem>
+
+📜 HISTÓRICO (N deals anteriores):
+   • <data> — <responsável> | <stage_final> | <motivo se descarte>
+   • ...
+
+Destaque sempre o deal ATIVO no topo (se existir). Se só tem deals fechados (perdidos/ganhos), liste todos em ordem decrescente.`;
+
+export type ChatMessage = { role: "user" | "assistant"; content: string };
+
+export async function runSdrAssistant(
+  db: any,
+  conversation: ChatMessage[]
+): Promise<{
+  response: string;
+  toolCalls: string[];
+  tokensTotal: number;
+  matchedCompany: string | null;
+}> {
+  const messages: Anthropic.Messages.MessageParam[] = conversation.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
+  const toolCalls: string[] = [];
+  let matchedCompany: string | null = null;
+  let totalTokens = 0;
+
+  for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+    const resp = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system: [
+        {
+          type: "text",
+          text: SYSTEM_PROMPT,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      tools: TOOLS,
+      messages,
+    });
+
+    totalTokens +=
+      (resp.usage?.input_tokens || 0) + (resp.usage?.output_tokens || 0);
+
+    if (resp.stop_reason === "end_turn" || resp.stop_reason === "max_tokens") {
+      const textBlock = resp.content.find((b) => b.type === "text") as
+        | Anthropic.Messages.TextBlock
+        | undefined;
+      return {
+        response: textBlock?.text || "(sem resposta)",
+        toolCalls,
+        tokensTotal: totalTokens,
+        matchedCompany,
+      };
+    }
+
+    if (resp.stop_reason === "tool_use") {
+      messages.push({ role: "assistant", content: resp.content });
+
+      const toolUseBlocks = resp.content.filter(
+        (b) => b.type === "tool_use"
+      ) as Anthropic.Messages.ToolUseBlock[];
+
+      const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
+      for (const block of toolUseBlocks) {
+        toolCalls.push(block.name);
+        try {
+          let result: unknown;
+          if (block.name === "search_companies") {
+            const { query } = block.input as { query: string };
+            result = await searchCompanies(db, query);
+          } else if (block.name === "get_company_timeline") {
+            const { company_name } = block.input as { company_name: string };
+            matchedCompany = company_name;
+            result = await getCompanyTimeline(db, company_name);
+          } else {
+            result = { error: `unknown tool: ${block.name}` };
+          }
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: JSON.stringify(result),
+          });
+        } catch (err: any) {
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: JSON.stringify({ error: err.message || "erro desconhecido" }),
+            is_error: true,
+          });
+        }
+      }
+      messages.push({ role: "user", content: toolResults });
+      continue;
+    }
+
+    return {
+      response: "(erro: stop_reason inesperado)",
+      toolCalls,
+      tokensTotal: totalTokens,
+      matchedCompany,
+    };
+  }
+
+  return {
+    response: "(limite de iterações de tools excedido)",
+    toolCalls,
+    tokensTotal: totalTokens,
+    matchedCompany,
+  };
 }
 
 const ALLOWED_DEPARTMENTS = new Set(["admin", "comercial"]);
