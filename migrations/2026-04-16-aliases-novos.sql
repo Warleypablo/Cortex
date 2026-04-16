@@ -1,6 +1,7 @@
 -- Aliases adicionados para reduzir órfãos identificados no diagnóstico de jan/2026.
 -- Contexto: docs/superpowers/plans/2026-04-16-receita-squad-100pct-itens.md
--- Nota: ON CONFLICT ON CONSTRAINT usado pois a UNIQUE é parcial (WHERE active=true).
+-- Idempotência: usa WHERE NOT EXISTS pois a UNIQUE da tabela é parcial (WHERE active=true),
+-- inviabilizando ON CONFLICT direto.
 INSERT INTO cortex_core.item_alias_map (item_pattern, target_token, active)
 SELECT item_pattern, target_token, true
 FROM (VALUES
