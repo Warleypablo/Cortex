@@ -141,7 +141,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
     candidatos AS (
       SELECT
         i.parcela_id, i.item_id, i.cnpj_limpo, i.cliente_nome, i.mes, i.item_raw, i.item_total,
-        c.id_subtask, c.squad, c.contrato_raw, c.contrato_valor,
+        c.id_subtask, c.squad, c.contrato_raw, c.contrato_valor, c.is_ativo,
         CASE
           WHEN c.contrato_norm = i.item_norm THEN 1
           WHEN c.contrato_compact LIKE '%' || i.item_compact || '%'
