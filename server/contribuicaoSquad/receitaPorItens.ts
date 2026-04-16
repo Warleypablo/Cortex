@@ -162,6 +162,8 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
       SELECT
         i.parcela_id, i.item_id, i.cnpj_limpo, i.cliente_nome, i.mes, i.item_raw, i.item_total,
         c.id_subtask, c.squad, c.contrato_raw, c.contrato_valor, c.is_ativo,
+        -- Diferença absoluta entre valor pago do item e valor do contrato (usado no desempate)
+        ABS(i.item_total - COALESCE(c.contrato_valor, 0)) AS valor_diff_abs,
         CASE
           WHEN c.contrato_norm = i.item_norm THEN 1
           WHEN c.contrato_compact LIKE '%' || i.item_compact || '%'
@@ -173,6 +175,10 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
                ) THEN 3
           WHEN c.contrato_tokens && i.item_tokens THEN 4
           WHEN similarity(c.contrato_norm, i.item_norm) >= 0.4 THEN 5
+          -- Prioridade 6: match por valor (±5%). Resgata casos onde o nome do item difere
+          -- do nome do contrato mas o valor pago bate com o valor de algum contrato do CNPJ.
+          WHEN c.contrato_valor > 0
+            AND ABS(i.item_total - c.contrato_valor) / NULLIF(i.item_total, 0) <= 0.05 THEN 6
           ELSE NULL
         END AS prioridade
       FROM itens_tok i
@@ -184,7 +190,8 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
         id_subtask::text, squad, contrato_raw, prioridade
       FROM candidatos
       WHERE prioridade IS NOT NULL
-      ORDER BY parcela_id, item_id, prioridade ASC, is_ativo DESC, contrato_valor DESC NULLS LAST
+      -- Desempate: prioridade ASC > ativo > valor mais próximo do item > maior valor
+      ORDER BY parcela_id, item_id, prioridade ASC, is_ativo DESC, valor_diff_abs ASC, contrato_valor DESC NULLS LAST
     ),
     fallback_por_cnpj AS (
       -- Para cada CNPJ, escolhe o contrato ATIVO de maior valor como fallback.
