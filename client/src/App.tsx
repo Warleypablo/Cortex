@@ -102,6 +102,7 @@ const FunilVendas = lazyWithRetry(() => import("@/pages/FunilVendas"));
 const Criativos = lazyWithRetry(() => import("@/pages/Criativos"));
 const GrowthOrcadoRealizado = lazyWithRetry(() => import("@/pages/GrowthOrcadoRealizado"));
 const GrowthAI = lazyWithRetry(() => import("@/pages/GrowthAI"));
+const SdrAssistant = lazyWithRetry(() => import("@/pages/SdrAssistant"));
 const GrowthVisaoGeral = lazyWithRetry(() => import("@/pages/GrowthVisaoGeral"));
 const PerformancePlataformas = lazyWithRetry(() => import("@/pages/PerformancePlataformas"));
 const KeywordPerformance = lazyWithRetry(() => import("@/pages/KeywordPerformance"));
@@ -341,6 +342,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/reunioes">{() => <ProtectedRoute path="/dashboard/comercial/reunioes" component={ComercialReunioes} />}</Route>
       <Route path="/dashboard/comercial/funil">{() => <ProtectedRoute path="/dashboard/comercial/funil" component={FunilVendas} />}</Route>
       <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
+      <Route path="/dashboard/comercial/sdr-assistant">{() => <ProtectedRoute path="/dashboard/comercial/sdr-assistant" component={SdrAssistant} />}</Route>
       <Route path="/presentation">{() => <ProtectedRoute path="/presentation" component={PresentationMode} />}</Route>
       
       {/* Growth */}

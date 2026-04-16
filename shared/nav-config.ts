@@ -65,6 +65,7 @@ export const PERMISSION_KEYS = {
     APRESENTACAO: 'com.apresentacao',
     REUNIOES: 'com.reunioes',
     CONTRATOS_CLIENTES: 'com.contratos_clientes',
+    SDR_ASSISTANT: 'com.sdr_assistant',
   },
   // Growth
   GROWTH: {
@@ -239,6 +240,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/comercial/analise-vendas': PERMISSION_KEYS.COM.ANALISE_VENDAS,
   '/dashboard/comercial/apresentacao': PERMISSION_KEYS.COM.APRESENTACAO,
   '/dashboard/comercial/reunioes': PERMISSION_KEYS.COM.REUNIOES,
+  '/dashboard/comercial/sdr-assistant': PERMISSION_KEYS.COM.SDR_ASSISTANT,
   '/presentation': PERMISSION_KEYS.COM.APRESENTACAO,
   // Growth
   '/growth/visao-geral': PERMISSION_KEYS.GROWTH.VISAO_GERAL,
@@ -444,6 +446,7 @@ export const NAV_CONFIG = {
         { title: 'Detalhamento Vendas', url: '/dashboard/comercial/detalhamento-vendas', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.COM.DET_VENDAS },
         { title: 'Análise de Vendas', url: '/dashboard/comercial/analise-vendas', icon: 'LineChart', permissionKey: PERMISSION_KEYS.COM.ANALISE_VENDAS },
         { title: 'Reuniões', url: '/dashboard/comercial/reunioes', icon: 'Phone', permissionKey: PERMISSION_KEYS.COM.REUNIOES },
+        { title: 'SDR Assistant', url: '/dashboard/comercial/sdr-assistant', icon: 'MessagesSquare', permissionKey: PERMISSION_KEYS.COM.SDR_ASSISTANT },
         { title: 'Contratos Clientes', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.COM.CONTRATOS_CLIENTES },
       ],
     },
@@ -662,6 +665,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.COM.DET_VENDAS]: 'Detalhamento Vendas',
   [PERMISSION_KEYS.COM.ANALISE_VENDAS]: 'Análise de Vendas',
   [PERMISSION_KEYS.COM.REUNIOES]: 'Reuniões',
+  [PERMISSION_KEYS.COM.SDR_ASSISTANT]: 'SDR Assistant',
   [PERMISSION_KEYS.GROWTH.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.GROWTH.META_ADS]: 'Meta Ads',
   [PERMISSION_KEYS.GROWTH.PLATAFORMA]: 'Por Plataforma',
