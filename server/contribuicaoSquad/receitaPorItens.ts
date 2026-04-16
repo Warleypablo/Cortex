@@ -164,14 +164,32 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
       WHERE prioridade IS NOT NULL
       ORDER BY parcela_id, item_id, prioridade ASC, is_ativo DESC, contrato_valor DESC NULLS LAST
     ),
+    fallback_por_cnpj AS (
+      -- Para cada CNPJ, escolhe o contrato ATIVO de maior valor como fallback.
+      -- Se o CNPJ não tem contrato ativo, fb.id_subtask será NULL e o item vai para "⚠️ Sem Squad".
+      SELECT DISTINCT ON (cnpj_limpo)
+        cnpj_limpo, id_subtask, squad, contrato_raw
+      FROM contratos_tok
+      WHERE is_ativo = 1
+      ORDER BY cnpj_limpo, contrato_valor DESC NULLS LAST
+    ),
     orfaos AS (
       SELECT DISTINCT
-        i.parcela_id::text, i.item_id::text, i.cnpj_limpo, i.cliente_nome, i.mes, i.item_raw, i.item_total::float8,
-        NULL::text AS id_subtask,
-        '⚠️ Sem Squad'::text AS squad,
-        NULL::text AS contrato_raw,
-        NULL::int AS prioridade
+        i.parcela_id::text,
+        i.item_id::text,
+        i.cnpj_limpo,
+        i.cliente_nome,
+        i.mes,
+        i.item_raw,
+        i.item_total::float8,
+        fb.id_subtask::text AS id_subtask,
+        COALESCE(fb.squad, '⚠️ Sem Squad')::text AS squad,
+        fb.contrato_raw::text AS contrato_raw,
+        -- prioridade = 99 quando atribuído via fallback (acima de 5 que é o pior match real,
+        -- abaixo de NULL que indica órfão verdadeiro). Permite distinguir nas análises.
+        CASE WHEN fb.id_subtask IS NOT NULL THEN 99 ELSE NULL END::int AS prioridade
       FROM itens_tok i
+      LEFT JOIN fallback_por_cnpj fb ON fb.cnpj_limpo = i.cnpj_limpo
       WHERE NOT EXISTS (
         SELECT 1 FROM candidatos c
         WHERE c.parcela_id = i.parcela_id
