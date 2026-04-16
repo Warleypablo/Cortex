@@ -306,6 +306,7 @@ export function registerSdrAssistantRoutes(app: Express, db: any) {
     isAuthenticated,
     requireInternalCollaborator,
     async (req: Request, res: Response) => {
+      console.log("[sdr-assistant] HANDLER CALLED");
       const user = (req as any).user;
       const { messages } = req.body as { messages?: ChatMessage[] };
 
