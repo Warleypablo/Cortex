@@ -76,13 +76,22 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
         pa.parcela_id, pa.cnpj_limpo, pa.cliente_nome, pa.mes, pa.valor_pago,
         i.id AS item_id,
         i.nome AS item_raw,
-        (i.valor * i.quantidade)::numeric AS item_total,
+        -- Rateio proporcional: a parcela leva sua fração dos itens da venda.
+        -- Ex: venda R$ 12k em 12 parcelas de R$ 1k → cada parcela leva 1/12 dos itens.
+        -- Fallback: se v.total é NULL/0, mantém item_total cru (degrada graciosamente).
+        CASE
+          WHEN COALESCE(v.total, 0) > 0
+            THEN ((i.valor * i.quantidade) * (pa.valor_pago / v.total))::numeric
+          ELSE (i.valor * i.quantidade)::numeric
+        END AS item_total,
         TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(unaccent(i.nome)), '[^a-z0-9 ]', ' ', 'g'), '\\s+', ' ', 'g')) AS item_norm,
         REGEXP_REPLACE(LOWER(unaccent(i.nome)), '[^a-z0-9]', '', 'g') AS item_compact
       FROM parcelas_ano pa
       JOIN "Conta Azul".caz_vendas_itens i
         ON CAST(i.venda_id AS text) = CAST(pa.venda_id AS text)
        AND i.empresa = pa.empresa
+      LEFT JOIN "Conta Azul".caz_vendas v
+        ON CAST(v.id AS text) = CAST(pa.venda_id AS text)
     ),
     itens_tok AS (
       SELECT i.*,
