@@ -56,6 +56,67 @@ export async function searchCompanies(
   return (result.rows || []) as CompanyMatch[];
 }
 
+export interface DealDetails {
+  id: number;
+  title: string;
+  stage: string;
+  categoria: string | null;
+  sdr: string | null;
+  closer: string | null;
+  criado_em: string | null;
+  fechado_em: string | null;
+  valor_mrr: number | null;
+  valor_pontual: number | null;
+  status: DealStatus;
+  motivo_perda: string | null;
+  origem: string | null;
+}
+
+function toIsoDate(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const str = String(value);
+  if (str.length >= 10) return str.slice(0, 10);
+  return null;
+}
+
+export async function getCompanyTimeline(
+  db: any,
+  companyName: string
+): Promise<DealDetails[]> {
+  const result = await db.execute(sql`
+    SELECT
+      d.id, d.title, d.stage_name,
+      d.category_name AS categoria,
+      d.source,
+      d.valor_recorrente, d.valor_pontual,
+      d.date_create, d.data_fechamento,
+      d.comments,
+      NULL::text AS motivo_perda,
+      d.assigned_by_name AS responsavel,
+      d.closer
+    FROM "Bitrix".crm_deal d
+    WHERE d.company_name = ${companyName}
+    ORDER BY d.date_create DESC NULLS LAST
+  `);
+
+  return (result.rows || []).map((row: any): DealDetails => ({
+    id: Number(row.id),
+    title: row.title,
+    stage: row.stage_name,
+    categoria: row.categoria,
+    sdr: row.responsavel ?? null,
+    closer: row.closer ?? null,
+    criado_em: toIsoDate(row.date_create),
+    fechado_em: toIsoDate(row.data_fechamento),
+    valor_mrr: row.valor_recorrente != null ? Number(row.valor_recorrente) : null,
+    valor_pontual: row.valor_pontual != null ? Number(row.valor_pontual) : null,
+    status: classifyDealStatus(row.stage_name),
+    motivo_perda: row.motivo_perda,
+    origem: row.source,
+  }));
+}
+
 const ALLOWED_DEPARTMENTS = new Set(["admin", "comercial"]);
 
 function requireInternalCollaborator(req: Request, res: Response, next: NextFunction) {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { classifyDealStatus, searchCompanies } from "./sdr-assistant";
+import { classifyDealStatus, searchCompanies, getCompanyTimeline } from "./sdr-assistant";
 
 describe("classifyDealStatus", () => {
   it("retorna 'perdido' quando stage contém 'Perdido'", () => {
@@ -96,5 +96,109 @@ describe("searchCompanies", () => {
     });
     const result = await searchCompanies(mockDb, "Empresa");
     expect(result).toHaveLength(10);
+  });
+});
+
+describe("getCompanyTimeline", () => {
+  const mockDb = { execute: vi.fn() } as any;
+  beforeEach(() => {
+    mockDb.execute.mockReset();
+  });
+
+  it("retorna array vazio quando empresa não tem deals", async () => {
+    mockDb.execute.mockResolvedValueOnce({ rows: [] });
+    const result = await getCompanyTimeline(mockDb, "Inexistente LTDA");
+    expect(result).toEqual([]);
+  });
+
+  it("classifica status correto em cada deal", async () => {
+    mockDb.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 3, title: "X - Prospect", stage_name: "Proposta enviada",
+          categoria: "Comercial", source: null,
+          valor_recorrente: 1000, valor_pontual: null,
+          date_create: "2026-04-01", data_fechamento: null,
+          comments: null, motivo_perda: null,
+          responsavel: "Laura", closer: null,
+        },
+        {
+          id: 2, title: "X - retry", stage_name: "Descartado/sem fit",
+          categoria: "Comercial", source: null,
+          valor_recorrente: null, valor_pontual: null,
+          date_create: "2024-08-01", data_fechamento: "2024-08-15",
+          comments: "já tem agência", motivo_perda: null,
+          responsavel: "Kaike", closer: null,
+        },
+        {
+          id: 1, title: "X - fechado", stage_name: "Negócio Ganho",
+          categoria: "Comercial", source: null,
+          valor_recorrente: 2000, valor_pontual: null,
+          date_create: "2023-11-01", data_fechamento: "2023-11-20",
+          comments: null, motivo_perda: null,
+          responsavel: "Guilherme", closer: "João",
+        },
+      ],
+    });
+    const result = await getCompanyTimeline(mockDb, "X");
+    expect(result).toHaveLength(3);
+    expect(result[0].status).toBe("ativo");
+    expect(result[1].status).toBe("perdido"); // "Descartado/sem fit"
+    expect(result[2].status).toBe("ganho");
+    expect(result[2].closer).toBe("João");
+  });
+
+  it("converte date_create ISO para YYYY-MM-DD", async () => {
+    mockDb.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 10, title: "X", stage_name: "Ativo",
+          categoria: null, source: null,
+          valor_recorrente: null, valor_pontual: null,
+          date_create: new Date("2026-04-10T12:34:56Z"),
+          data_fechamento: null, comments: null, motivo_perda: null,
+          responsavel: "João", closer: null,
+        },
+      ],
+    });
+    const result = await getCompanyTimeline(mockDb, "X");
+    expect(result[0].criado_em).toBe("2026-04-10");
+  });
+
+  it("converte valores numéricos Decimal para Number", async () => {
+    mockDb.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 1, title: "X", stage_name: "Ativo",
+          categoria: null, source: null,
+          valor_recorrente: "1500.00", valor_pontual: "500.00",
+          date_create: "2026-04-01", data_fechamento: null,
+          comments: null, motivo_perda: null,
+          responsavel: null, closer: null,
+        },
+      ],
+    });
+    const result = await getCompanyTimeline(mockDb, "X");
+    expect(result[0].valor_mrr).toBe(1500);
+    expect(result[0].valor_pontual).toBe(500);
+  });
+
+  it("trata responsavel e closer nulos sem quebrar", async () => {
+    mockDb.execute.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 1, title: "X", stage_name: "Ativo",
+          categoria: null, source: null,
+          valor_recorrente: null, valor_pontual: null,
+          date_create: "2026-04-01", data_fechamento: null,
+          comments: null, motivo_perda: null,
+          responsavel: null, closer: null,
+        },
+      ],
+    });
+    const result = await getCompanyTimeline(mockDb, "X");
+    expect(result[0].sdr).toBeNull();
+    expect(result[0].closer).toBeNull();
+    expect(result[0].valor_mrr).toBeNull();
   });
 });
