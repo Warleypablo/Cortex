@@ -5742,36 +5742,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         };
       }
 
-      // ──── Agregar resumo por squad a partir dos contratos simulados ──────
+      // ──── Agregar resumo por squad a partir do pipeline de itens ──────
       const squadSummaryMap = new Map<string, { total: number; porMes: number[]; contratos: Set<string> }>();
-      for (const cliente of Array.from(clientesMap.values())) {
-        for (const contrato of cliente.contratos) {
-          const sq = contrato.squad;
-
-          if (!matchesSquadFilter(sq)) continue;
-
-          if (!squadSummaryMap.has(sq)) {
-            squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
-          }
-          const entry = squadSummaryMap.get(sq)!;
-
-          let teveValorNoAno = false;
-          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
-            if (!mes.startsWith(`${ano}-`)) continue;
-            if (valor <= 0) continue;
-            const monthIdx = parseInt(mes.split('-')[1]) - 1;
-            entry.total += valor;
-            entry.porMes[monthIdx] += valor;
-            teveValorNoAno = true;
-          }
-
-          if (teveValorNoAno) {
-            entry.contratos.add(`${cliente.cliente_nome}|${contrato.servico}|${sq}`);
-          }
-        }
-      }
-
-      // Mesclar contribuições do pipeline novo (receitaItens) no squadSummaryMap
       for (const linha of receitaItens) {
         const sq = linha.squad;
         if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
@@ -5869,29 +5841,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // ──── Detalhes de receita por squad → cliente → mês ─────────────────
       const receitasDetalhesPorSquad: Record<string, { cliente: string; porMes: number[]; total: number }[]> = {};
-      for (const cliente of Array.from(clientesMap.values())) {
-        for (const contrato of cliente.contratos) {
-          const sq = contrato.squad;
-          if (/\bOFF\b/i.test(sq)) continue;
-          if (!matchesSquadFilter(sq)) continue;
-
-          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
-            if (!mes.startsWith(`${ano}-`)) continue;
-            if (valor <= 0) continue;
-            const monthIdx = parseInt(mes.split('-')[1]) - 1;
-
-            if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
-            let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === cliente.cliente_nome);
-            if (!entry) {
-              entry = { cliente: cliente.cliente_nome, porMes: new Array(12).fill(0), total: 0 };
-              receitasDetalhesPorSquad[sq].push(entry);
-            }
-            entry.porMes[monthIdx] += valor;
-            entry.total += valor;
-          }
-        }
-      }
-      // Mesclar contribuições do pipeline novo (receitaItens) em receitasDetalhesPorSquad
       for (const linha of receitaItens) {
         const sq = linha.squad;
         if (/\bOFF\b/i.test(sq)) continue;
