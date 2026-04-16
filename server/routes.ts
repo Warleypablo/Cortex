@@ -5555,6 +5555,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         clienteNome: string;
         servicoNome: string;
         squad: string;
+        causa?: 'match' | 'fallback_maior_valor' | 'cnpj_sem_contrato_clickup' | 'item_nao_casou';
       };
       type ServicoInfo = { valor: number; squad: string; parcelas: ParcelaInfo[] };
       type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
@@ -5676,6 +5677,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           clienteNome: linha.clienteNome,
           servicoNome: linha.itemRaw,
           squad: sqNorm,
+          causa: linha.causa,
         });
       }
 
