@@ -1,9 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
 
-/** Parcela é considerada coberta pelo pipeline novo quando >= 99% do valor_pago foi atribuído aos itens. */
-const COVERAGE_THRESHOLD = 0.99;
-
 /** Label usado para itens que não casaram com nenhum contrato do ClickUp.
  *  If you change SEM_SQUAD_LABEL, update the literal in the orfaos CTE below. */
 export const SEM_SQUAD_LABEL = '⚠️ Sem Squad';
@@ -301,22 +298,3 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
   }));
 }
 
-/**
- * Retorna o conjunto de parcela_ids que foram cobertos pelo pipeline novo.
- * Uma parcela é considerada coberta se a soma dos itens atribuídos é ≥ 99% do valor_pago.
- */
-export function parcelasCobertas(
-  linhas: ReceitaItemLinha[],
-  parcelaValor: Map<string, number>
-): Set<string> {
-  const somaPorParcela = new Map<string, number>();
-  for (const l of linhas) {
-    somaPorParcela.set(l.parcelaId, (somaPorParcela.get(l.parcelaId) || 0) + l.itemTotal);
-  }
-  const cobertas = new Set<string>();
-  for (const [parcelaId, soma] of Array.from(somaPorParcela.entries())) {
-    const valor = parcelaValor.get(parcelaId) || 0;
-    if (valor > 0 && soma >= valor * COVERAGE_THRESHOLD) cobertas.add(parcelaId);
-  }
-  return cobertas;
-}
