@@ -101,12 +101,15 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
         ct.servico AS contrato_raw,
         COALESCE(NULLIF(TRIM(ct.squad), ''), '⚠️ Sem Squad') AS squad,
         GREATEST(COALESCE(ct.valorr::numeric, 0), COALESCE(ct.valorp::numeric, 0)) AS contrato_valor,
+        CASE
+          WHEN COALESCE(ct.valorr::numeric, 0) > 0 OR COALESCE(ct.valorp::numeric, 0) > 0 THEN 1
+          ELSE 0
+        END AS is_ativo,
         TRIM(REGEXP_REPLACE(REGEXP_REPLACE(LOWER(unaccent(ct.servico)), '[^a-z0-9 ]', ' ', 'g'), '\\s+', ' ', 'g')) AS contrato_norm,
         REGEXP_REPLACE(LOWER(unaccent(ct.servico)), '[^a-z0-9]', '', 'g') AS contrato_compact
       FROM "Clickup".cup_clientes cl
       JOIN "Clickup".cup_contratos ct ON cl.task_id = ct.id_task
       WHERE ct.servico IS NOT NULL AND TRIM(ct.servico) != ''
-        AND (COALESCE(ct.valorr::numeric,0) > 0 OR COALESCE(ct.valorp::numeric,0) > 0)
         AND cl.cnpj IS NOT NULL AND TRIM(cl.cnpj) != ''
     ),
     contratos_tok AS (
@@ -150,7 +153,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
         id_subtask::text, squad, contrato_raw, prioridade
       FROM candidatos
       WHERE prioridade IS NOT NULL
-      ORDER BY parcela_id, item_id, prioridade ASC, contrato_valor DESC NULLS LAST
+      ORDER BY parcela_id, item_id, prioridade ASC, is_ativo DESC, contrato_valor DESC NULLS LAST
     ),
     orfaos AS (
       SELECT DISTINCT
