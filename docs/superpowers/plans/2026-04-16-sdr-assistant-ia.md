@@ -74,21 +74,37 @@ psql "$DEV_DATABASE_URL" -c "
 
 Expected: 3 linhas com dados. Confirmar que `company_name` tem valor preenchido (se for vazio, usar `title` como fallback nas queries).
 
-- [ ] **Step 4: Documentar o mapa real em variáveis locais**
+- [x] **Step 4: Mapa REAL das colunas (confirmado em 2026-04-16)**
 
-Criar um rascunho mental (não commita ainda) com os nomes reais. Estas duas variáveis ficarão na Task 5:
+Tabela `"Bitrix".crm_deal` tem 50+ colunas. Nomes reais (schemas `crm_users`/`crm_closers` NÃO são usados):
 
-```ts
-// Nomes reais das colunas (preencher após Step 1):
-// Exemplo hipotético — SUBSTITUA pelos valores reais da query:
-const COL_RESPONSAVEL_ID  = "assigned_by_id";   // ← confirmar
-const COL_CLOSER_ID       = "closer_id";        // ← confirmar
-const COL_DATA_CRIACAO    = "data_criacao";     // ← confirmar
-const COL_DATA_FECHAMENTO = "data_fechamento";  // ← confirmar
-const COL_COMMENTS        = "comments";         // ← confirmar
+```
+id                bigint        PK
+title             text          título (fallback quando company_name é null)
+company_name      text          nome da empresa (68% preenchido — 10.855/15.957)
+stage_name        text          nome do stage (PT/EN)
+stage_semantic    text          'S'/'F'/'P' — só 17/15957 preenchidos, IGNORAR
+date_create       timestamp     criação
+date_modify       timestamp     modificação
+data_fechamento   date          fechamento (deals finalizados)
+comments          text          observações livres
+category_name     text          funil (Comercial, Ecommerce, Creators, Odonto, Bootcamp)
+source            varchar       origem (UTM/canal)
+valor_recorrente  numeric(15,2) MRR previsto
+valor_pontual     numeric(15,2) setup/pontual
+sdr               text          SDR responsável (71% preenchido — 11.333/15.957)
+closer            text          Closer responsável (13% — 2.048/15.957)
+assigned_by_name  text          responsável atual (99% — 15.945/15.957 — mais confiável)
 ```
 
-- [ ] **Step 5: Nenhum commit nesta task** — é só investigação. Siga pra Task 2 com os nomes corretos na cabeça.
+**IMPORTANTES divergências da spec original:**
+- ❌ NÃO fazer JOIN com `crm_users` nem `crm_closers` — nomes já estão em colunas TEXT.
+- ❌ `stage_semantic` é inútil (quase sempre NULL). Classificação = string matching em `stage_name`.
+- ✅ "Responsável" = `COALESCE(sdr, assigned_by_name)`.
+- ✅ Match de empresa aceita `company_name ILIKE` OU `title ILIKE`.
+- ✅ `data_criacao` não existe — usar `date_create`.
+
+- [ ] **Step 5: Nenhum commit nesta task** — investigação concluída.
 
 ---
 
@@ -449,12 +465,12 @@ export async function searchCompanies(
   const result = await db.execute(sql`
     SELECT
       d.company_name,
-      COUNT(*)::int            AS deal_count,
-      MAX(d.id)::int           AS last_deal_id,
-      MAX(d.stage_name)        AS last_stage
+      COUNT(*)::int                      AS deal_count,
+      MAX(d.id)::int                     AS last_deal_id,
+      (ARRAY_AGG(d.stage_name ORDER BY d.date_create DESC NULLS LAST))[1] AS last_stage
     FROM "Bitrix".crm_deal d
-    WHERE d.company_name ILIKE ${pattern}
-       OR d.title        ILIKE ${pattern}
+    WHERE d.company_name IS NOT NULL
+      AND (d.company_name ILIKE ${pattern} OR d.title ILIKE ${pattern})
     GROUP BY d.company_name
     ORDER BY deal_count DESC, last_deal_id DESC
     LIMIT 10
@@ -462,6 +478,8 @@ export async function searchCompanies(
   return (result.rows || []) as CompanyMatch[];
 }
 ```
+
+> **Nota:** `company_name IS NOT NULL` filtra os ~32% de deals sem empresa mapeada (leads iniciais). Esses deals não são úteis para a consulta do SDR.
 
 - [ ] **Step 4: Rodar testes e verificar que passam**
 
@@ -523,18 +541,18 @@ describe("getCompanyTimeline", () => {
   it("classifica status correto em cada deal", async () => {
     mockDb.execute.mockResolvedValueOnce({
       rows: [
-        { id: 3, title: "X", stage_name: "Proposta enviada", company_name: "X", categoria: "Comercial",
-          source: null, valor_recorrente: 1000, valor_pontual: null, data_criacao: "2026-04-01",
+        { id: 3, title: "X", stage_name: "Proposta enviada", categoria: "Comercial",
+          source: null, valor_recorrente: 1000, valor_pontual: null, date_create: "2026-04-01",
           data_fechamento: null, comments: null, motivo_perda: null,
-          responsavel_nome: "Laura", closer_nome: null },
-        { id: 2, title: "X", stage_name: "Negócio Perdido", company_name: "X", categoria: "Comercial",
-          source: null, valor_recorrente: null, valor_pontual: null, data_criacao: "2024-08-01",
+          responsavel: "Laura", closer: null },
+        { id: 2, title: "X", stage_name: "Negócio Perdido", categoria: "Comercial",
+          source: null, valor_recorrente: null, valor_pontual: null, date_create: "2024-08-01",
           data_fechamento: "2024-08-15", comments: "já tem agência", motivo_perda: "já possui agência",
-          responsavel_nome: "Kaike", closer_nome: null },
-        { id: 1, title: "X", stage_name: "Negócio Ganho", company_name: "X", categoria: "Comercial",
-          source: null, valor_recorrente: 2000, valor_pontual: null, data_criacao: "2023-11-01",
+          responsavel: "Kaike", closer: null },
+        { id: 1, title: "X", stage_name: "Negócio Ganho", categoria: "Comercial",
+          source: null, valor_recorrente: 2000, valor_pontual: null, date_create: "2023-11-01",
           data_fechamento: "2023-11-20", comments: null, motivo_perda: null,
-          responsavel_nome: "Guilherme", closer_nome: "João" },
+          responsavel: "Guilherme", closer: "João" },
       ],
     });
     const result = await getCompanyTimeline(mockDb, "X");
@@ -548,14 +566,14 @@ describe("getCompanyTimeline", () => {
   it("mantém ordem cronológica decrescente (do mais novo ao mais antigo)", async () => {
     mockDb.execute.mockResolvedValueOnce({
       rows: [
-        { id: 10, title: "X", stage_name: "Ativo", company_name: "X", categoria: null,
-          source: null, valor_recorrente: null, valor_pontual: null, data_criacao: "2026-04-10",
+        { id: 10, title: "X", stage_name: "Ativo", categoria: null,
+          source: null, valor_recorrente: null, valor_pontual: null, date_create: "2026-04-10",
           data_fechamento: null, comments: null, motivo_perda: null,
-          responsavel_nome: null, closer_nome: null },
-        { id: 5, title: "X", stage_name: "Perdido", company_name: "X", categoria: null,
-          source: null, valor_recorrente: null, valor_pontual: null, data_criacao: "2025-01-01",
+          responsavel: null, closer: null },
+        { id: 5, title: "X", stage_name: "Perdido", categoria: null,
+          source: null, valor_recorrente: null, valor_pontual: null, date_create: "2025-01-01",
           data_fechamento: null, comments: null, motivo_perda: null,
-          responsavel_nome: null, closer_nome: null },
+          responsavel: null, closer: null },
       ],
     });
     const result = await getCompanyTimeline(mockDb, "X");
@@ -601,29 +619,33 @@ export async function getCompanyTimeline(
 ): Promise<DealDetails[]> {
   const result = await db.execute(sql`
     SELECT
-      d.id, d.title, d.stage_name, d.category_name AS categoria, d.source,
+      d.id, d.title, d.stage_name,
+      d.category_name AS categoria,
+      d.source,
       d.valor_recorrente, d.valor_pontual,
-      d.data_criacao, d.data_fechamento,
+      d.date_create, d.data_fechamento,
       d.comments,
       NULL::text AS motivo_perda,
-      u.nome AS responsavel_nome,
-      c.nome AS closer_nome
+      COALESCE(d.sdr, d.assigned_by_name) AS responsavel,
+      d.closer
     FROM "Bitrix".crm_deal d
-    LEFT JOIN "Bitrix".crm_users   u ON d.assigned_by_id = u.id
-    LEFT JOIN "Bitrix".crm_closers c ON d.closer_id      = c.id
     WHERE d.company_name = ${companyName}
-    ORDER BY d.data_criacao DESC
+    ORDER BY d.date_create DESC NULLS LAST
   `);
 
   return (result.rows || []).map((row: any): DealDetails => ({
-    id: row.id,
+    id: Number(row.id),
     title: row.title,
     stage: row.stage_name,
     categoria: row.categoria,
-    sdr: row.responsavel_nome,
-    closer: row.closer_nome,
-    criado_em: row.data_criacao,
-    fechado_em: row.data_fechamento,
+    sdr: row.responsavel,
+    closer: row.closer,
+    criado_em: row.date_create
+      ? new Date(row.date_create).toISOString().slice(0, 10)
+      : null,
+    fechado_em: row.data_fechamento
+      ? new Date(row.data_fechamento).toISOString().slice(0, 10)
+      : null,
     valor_mrr: row.valor_recorrente ? Number(row.valor_recorrente) : null,
     valor_pontual: row.valor_pontual ? Number(row.valor_pontual) : null,
     status: classifyDealStatus(row.stage_name),
