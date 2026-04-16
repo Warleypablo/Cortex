@@ -2,6 +2,15 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
 import { isAuthenticated } from "../auth/middleware";
 
+export type DealStatus = "ativo" | "ganho" | "perdido";
+
+export function classifyDealStatus(stageName: string): DealStatus {
+  const s = (stageName || "").toLowerCase();
+  if (s.includes("perdido") || s.includes("lose")) return "perdido";
+  if (s.includes("ganho") || s.includes("won")) return "ganho";
+  return "ativo";
+}
+
 const ALLOWED_DEPARTMENTS = new Set(["admin", "comercial"]);
 
 function requireInternalCollaborator(req: Request, res: Response, next: NextFunction) {
