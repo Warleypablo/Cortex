@@ -305,8 +305,58 @@ export function registerSdrAssistantRoutes(app: Express, db: any) {
     "/api/sdr-assistant/chat",
     isAuthenticated,
     requireInternalCollaborator,
-    async (_req: Request, res: Response) => {
-      return res.json({ response: "skeleton ok", tool_calls: [], usage: null });
+    async (req: Request, res: Response) => {
+      const user = (req as any).user;
+      const { messages } = req.body as { messages?: ChatMessage[] };
+
+      if (!Array.isArray(messages) || messages.length === 0) {
+        return res
+          .status(400)
+          .json({ error: "messages deve ser array não vazio" });
+      }
+
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+      const query = lastUserMsg?.content || "";
+      const startedAt = Date.now();
+
+      try {
+        const result = await runSdrAssistant(db, messages);
+        const durationMs = Date.now() - startedAt;
+
+        await db
+          .execute(sql`
+            INSERT INTO cortex_core.sdr_assistant_usage
+              (user_id, query, matched_company, tool_calls, tokens_total, duration_ms)
+            VALUES
+              (${user.id}, ${query}, ${result.matchedCompany},
+               ${result.toolCalls.length}, ${result.tokensTotal}, ${durationMs})
+          `)
+          .catch((err: any) => {
+            console.error("[sdr-assistant] erro ao gravar log:", err.message);
+          });
+
+        return res.json({
+          response: result.response,
+          tool_calls: result.toolCalls,
+          usage: { tokens: result.tokensTotal, duration_ms: durationMs },
+        });
+      } catch (err: any) {
+        console.error("[sdr-assistant] erro:", err);
+        const durationMs = Date.now() - startedAt;
+        await db
+          .execute(sql`
+            INSERT INTO cortex_core.sdr_assistant_usage
+              (user_id, query, matched_company, tool_calls, tokens_total, duration_ms)
+            VALUES
+              (${user.id}, ${query}, NULL, 0, 0, ${durationMs})
+          `)
+          .catch(() => {
+            /* não propagar falha de log */
+          });
+        return res
+          .status(500)
+          .json({ error: "Erro interno ao processar a consulta." });
+      }
     }
   );
 }
