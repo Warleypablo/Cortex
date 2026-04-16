@@ -1,3 +1,6 @@
+// Nota (2026-04-16): Aliases vivem na tabela cortex_core.item_alias_map e são consultados
+// inline na query SQL de receitaPorItens.ts. Não há função TS pura para testar.
+// Validação cobre: matchPipeline.test.ts (normalize/tokenize) + queries SQL ad-hoc + scripts/validateSquadVsDFC.ts.
 import { describe, it, expect } from 'vitest';
 import {
   normalizeNome,
