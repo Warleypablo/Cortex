@@ -43,6 +43,7 @@ import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
 import { registerGrowthAiRoutes } from "./routes/growth-ai";
+import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
@@ -7749,6 +7750,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
+
+  // SDR Assistant Module - registered from separate file
+  registerSdrAssistantRoutes(app, db);
 
   // Capacity Module - registered from separate file
   registerCapacityRoutes(app, db);
