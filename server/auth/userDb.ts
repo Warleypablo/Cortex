@@ -170,6 +170,7 @@ const ALL_ROUTES = [
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/apresentacao',
+  '/dashboard/comercial/sdr-assistant',
   '/presentation',
   '/growth/visao-geral',
   '/growth/criativos',
@@ -224,6 +225,7 @@ const DEFAULT_USER_ROUTES = [
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/apresentacao',
+  '/dashboard/comercial/sdr-assistant',
   '/presentation',
   // Growth
   '/growth/visao-geral',
@@ -259,6 +261,9 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
     }
     if (!migratedRoutes.includes('/presentation')) {
       migratedRoutes.push('/presentation');
+    }
+    if (!migratedRoutes.includes('/dashboard/comercial/sdr-assistant')) {
+      migratedRoutes.push('/dashboard/comercial/sdr-assistant');
     }
   }
   
