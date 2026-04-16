@@ -28,6 +28,7 @@ type ReceitaItemRow = {
   squad: string;
   contrato_raw: string | null;
   prioridade: number | null;
+  causa: 'match' | 'fallback_maior_valor' | 'cnpj_sem_contrato_clickup' | 'item_nao_casou';
 };
 
 export interface ReceitaItemLinha {
@@ -42,6 +43,7 @@ export interface ReceitaItemLinha {
   squad: string;            // nome do squad (ou '⚠️ Sem Squad')
   contratoRaw: string | null;
   prioridade: number | null; // 1=exato, 2=substring, 3=alias, 4=token, 5=fuzzy, null=órfão
+  causa: 'match' | 'fallback_maior_valor' | 'cnpj_sem_contrato_clickup' | 'item_nao_casou';
 }
 
 /**
@@ -198,11 +200,18 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
       )
     )
     SELECT parcela_id, item_id, cnpj_limpo, cliente_nome, mes, item_raw, item_total,
-           id_subtask, squad, contrato_raw, prioridade
+           id_subtask, squad, contrato_raw, prioridade,
+           'match'::text AS causa
     FROM melhor
     UNION ALL
     SELECT parcela_id, item_id, cnpj_limpo, cliente_nome, mes, item_raw, item_total,
-           id_subtask, squad, contrato_raw, prioridade
+           id_subtask, squad, contrato_raw, prioridade,
+           CASE
+             WHEN prioridade = 99 THEN 'fallback_maior_valor'
+             WHEN NOT EXISTS (SELECT 1 FROM contratos cc WHERE cc.cnpj_limpo = orfaos.cnpj_limpo)
+               THEN 'cnpj_sem_contrato_clickup'
+             ELSE 'item_nao_casou'
+           END::text AS causa
     FROM orfaos
   `);
 
@@ -218,6 +227,7 @@ export async function getReceitaPorItens(ano: number): Promise<ReceitaItemLinha[
     squad: row.squad,
     contratoRaw: row.contrato_raw ?? null,
     prioridade: row.prioridade != null ? Number(row.prioridade) : null,
+    causa: row.causa,
   }));
 }
 
