@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS cortex_core.sdr_assistant_usage (
   id              SERIAL PRIMARY KEY,
-  user_id         INTEGER,
+  user_id         VARCHAR(100),
   query           TEXT,
   matched_company TEXT,
   tool_calls      INTEGER,
