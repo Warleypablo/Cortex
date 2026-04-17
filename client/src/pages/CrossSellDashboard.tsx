@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { formatCurrency } from "@/lib/utils";
@@ -100,11 +100,7 @@ function medal(index: number): string {
 // ---------------------------------------------------------------------------
 
 export default function CrossSellDashboard() {
-  const setPageInfo = useSetPageInfo();
-
-  useEffect(() => {
-    setPageInfo({ title: "Cross-Sell Dashboard", subtitle: "Analise de oportunidades cross-sell" });
-  }, [setPageInfo]);
+  useSetPageInfo("CrossSell Dashboard", "Análise de oportunidades de cross-sell");
 
   const now = new Date();
   const [mes, setMes] = useState(String(now.getMonth() + 1));
