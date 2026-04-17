@@ -161,10 +161,12 @@ export async function checkClickupStatus(
       ch.motivo_cancelamento AS churn_motivo,
       ch.submotivo_cancelamento AS churn_submotivo,
       ch.data_solicitacao_encerramento::text AS churn_data_solicitacao,
-      ch.status AS churn_status
+      ch.status_cancelamento AS churn_status
     FROM "Clickup".cup_clientes c
     LEFT JOIN "Clickup".cup_churn ch
       ON UPPER(ch.nome) = UPPER(c.nome)
+      AND ch.status_cancelamento IS NOT NULL
+      AND ch.status_cancelamento != ''
     WHERE c.nome ILIKE ${pattern}
     LIMIT 10
   `);
@@ -247,7 +249,7 @@ FORMATO PADRÃO quando há histórico:
 ⚠️ CLIENTE ATIVO NO CLICKUP (se check_clickup_status retornou dados):
    Responsável: <responsavel> | Squad: <squad> | Status: <status>
    MRR: <valor> | Vendedor: <vendedor>
-   🔴 EM CHURN: <motivo> (se churn_status != null)
+   🔴 EM CHURN: <churn_status> — <motivo> (SOMENTE se churn_status estiver preenchido)
 
 🟢 DEAL ATIVO NO BITRIX — <responsável> | <stage> | criado em <data>
    <valor MRR se houver> | Origem: <origem>
