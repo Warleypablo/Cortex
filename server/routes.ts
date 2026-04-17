@@ -44,6 +44,7 @@ import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
 import { registerGrowthAiRoutes } from "./routes/growth-ai";
+import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
@@ -54,8 +55,7 @@ import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
-import { simulateCliente, ContratoSim, ClienteSim } from "./contribuicaoSquad/simulator";
-import { getReceitaPorItens, parcelasCobertas, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
+import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
 
 const gpturboOpenAI = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -5362,44 +5362,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return v;
       };
 
-      // ──── NOVO: receita via caz_vendas_itens (parcelas com venda_id) ──────
+      // ──── Receita via caz_vendas_itens (pipeline de itens) ─────────────────
       // Pipeline que atribui cada item da venda ao contrato/squad certo.
-      // Parcelas totalmente cobertas (≥99% do valor_pago) são excluídas do
-      // simulador A3 abaixo, evitando double-counting.
-      let receitaItens: ReceitaItemLinha[] = [];
-      let parcelasCobertasSet = new Set<string>();
-      let totalParcelasElegiveis = 0;
-      let itensFallbackUsed = false;
-
-      try {
-        receitaItens = await getReceitaPorItens(ano);
-
-        // Map de valor_pago por parcela_id (para saber o que o A3 tem que explicar).
-        // IMPORTANT: escopar a preview para parcelas ELEGÍVEIS ao pipeline de itens
-        // (venda_origem em VENDA/VENDA_AGENDADA com venda_id), para que pctViaItens
-        // tenha denominador significativo — RENEGOCIACAO/LANCAMENTO não podem ser
-        // atribuídas por itens.
-        const parcelaValorMap = new Map<string, number>();
-        const pagamentosResultPreview = await db.execute(sql`
-          SELECT p.id::text AS parcela_id, p.valor_pago::numeric AS valor_pago
-          FROM "Conta Azul".caz_parcelas p
-          WHERE p.tipo_evento = 'RECEITA'
-            AND p.status = 'QUITADO'
-            AND p.valor_pago::numeric > 0
-            AND p.venda_origem IN ('VENDA','VENDA_AGENDADA')
-            AND p.venda_id IS NOT NULL
-            AND EXTRACT(YEAR FROM p.data_quitacao) = ${ano}
-        `);
-        for (const row of pagamentosResultPreview.rows as Array<{ parcela_id: string; valor_pago: string | number }>) {
-          parcelaValorMap.set(row.parcela_id, Number(row.valor_pago) || 0);
-        }
-
-        parcelasCobertasSet = parcelasCobertas(receitaItens, parcelaValorMap);
-        totalParcelasElegiveis = parcelaValorMap.size;
-      } catch (err) {
-        console.error('[contribuicao-squad/bulk] receitaPorItens falhou, caindo para A3-only:', err);
-        itensFallbackUsed = true;
-      }
+      // Cobre 100% das parcelas RECEITA QUITADO/RECEBIDO_PARCIAL do ano (Task 11).
+      const receitaItens: ReceitaItemLinha[] = await getReceitaPorItens(ano);
 
       // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
       // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
@@ -5430,121 +5396,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return isNaN(d.getTime()) ? null : new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
       };
 
-      const FALLBACK_DATA_INICIO = new Date(Date.UTC(1900, 0, 1));
-
-      // Query 1: contratos relevantes (sem filtro de ano nem squad — JS aplica)
-      const contratosResult = await db.execute(sql`
-        WITH cnpj_norm AS (
-          SELECT
-            cl.task_id,
-            REPLACE(REPLACE(REPLACE(COALESCE(cl.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo
-          FROM "Clickup".cup_clientes cl
-          WHERE cl.cnpj IS NOT NULL AND TRIM(cl.cnpj) != ''
-        )
-        SELECT
-          cn.cnpj_limpo,
-          ct.id_subtask,
-          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') AS squad,
-          COALESCE(ct.servico, 'Serviço não identificado') AS servico,
-          CASE
-            WHEN COALESCE(ct.valorr::numeric, 0) > 0 THEN 'recorrente'
-            WHEN COALESCE(ct.valorp::numeric, 0) > 0 THEN 'pontual'
-          END AS tipo,
-          GREATEST(COALESCE(ct.valorr::numeric, 0), COALESCE(ct.valorp::numeric, 0)) AS valor,
-          ct.data_inicio,
-          COALESCE(ct.data_solicitacao_encerramento, ct.data_encerramento) AS data_fim,
-          COALESCE(ct.status, '') AS status
-        FROM cnpj_norm cn
-        INNER JOIN "Clickup".cup_contratos ct ON cn.task_id = ct.id_task
-        WHERE (COALESCE(ct.valorr::numeric, 0) > 0 OR COALESCE(ct.valorp::numeric, 0) > 0)
-          AND ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-      `);
-
-      // Query 2: pagamentos cronológicos (histórico inteiro, todos os clientes)
-      // Exclui parcelas já cobertas pelo novo pipeline de itens (para evitar double-count).
-      const parcelasExcluidas = Array.from(parcelasCobertasSet);
-      const pagamentosResult = await db.execute(sql`
-        SELECT
-          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo,
-          MAX(caz.nome) AS cliente_nome,
-          TO_CHAR(p.data_quitacao, 'YYYY-MM') AS mes,
-          SUM(p.valor_pago::numeric) AS total_pago_mes
-        FROM "Conta Azul".caz_parcelas p
-        INNER JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        WHERE p.tipo_evento = 'RECEITA'
-          AND p.status = 'QUITADO'
-          AND p.valor_pago::numeric > 0
-          AND caz.cnpj IS NOT NULL AND TRIM(caz.cnpj) != ''
-          ${parcelasExcluidas.length > 0
-            ? sql`AND NOT EXISTS (
-                SELECT 1 FROM (VALUES ${sql.join(parcelasExcluidas.map(id => sql`(${id})`), sql`, `)}) AS excl(id)
-                WHERE excl.id = p.id::text
-              )`
-            : sql``}
-        GROUP BY cnpj_limpo, TO_CHAR(p.data_quitacao, 'YYYY-MM')
-        ORDER BY cnpj_limpo, mes
-      `);
-
-      // ──── Montar Map<cnpj, ClienteSim> ─────────────────────────────────────
-      const clientesMap = new Map<string, ClienteSim>();
-
-      // Primeiro: criar entrada por cliente a partir dos pagamentos
-      for (const row of pagamentosResult.rows as any[]) {
-        const cnpj = row.cnpj_limpo;
-        if (!cnpj) continue;
-        let cliente = clientesMap.get(cnpj);
-        if (!cliente) {
-          cliente = {
-            cnpj,
-            cliente_nome: row.cliente_nome || 'Cliente não identificado',
-            contratos: [],
-            pagamentos_por_mes: new Map(),
-          };
-          clientesMap.set(cnpj, cliente);
-        }
-        const mes = row.mes as string;
-        const valor = Number(row.total_pago_mes) || 0;
-        cliente.pagamentos_por_mes.set(mes, (cliente.pagamentos_por_mes.get(mes) || 0) + valor);
-      }
-
-      // Depois: anexar contratos a cada cliente que tem pagamentos
-      for (const row of contratosResult.rows as any[]) {
-        const cnpj = row.cnpj_limpo;
-        if (!cnpj) continue;
-        const cliente = clientesMap.get(cnpj);
-        if (!cliente) continue; // cliente sem pagamento — ignorar
-        if (!row.tipo) continue; // contrato sem valor — pulado pela CASE da query
-
-        const dataInicioParsed = parseDbDate(row.data_inicio) || FALLBACK_DATA_INICIO;
-        const dataFimParsed = parseDbDate(row.data_fim);
-
-        const contrato: ContratoSim = {
-          id_subtask: row.id_subtask,
-          cnpj,
-          squad: normalizeSquadLabel(row.squad),
-          servico: row.servico || 'Serviço não identificado',
-          tipo: row.tipo as 'recorrente' | 'pontual',
-          valor: Number(row.valor) || 0,
-          data_inicio: dataInicioParsed,
-          data_fim: dataFimParsed,
-          status: row.status || '',
-          saldo_devedor: 0,
-          recebido_por_mes: new Map(),
-        };
-        cliente.contratos.push(contrato);
-      }
-
-      // ──── Rodar simulação para cada cliente ─────────────────────────────────
-      const hojeSim = new Date();
-      const mesAtualYYYYMM = `${hojeSim.getUTCFullYear()}-${String(hojeSim.getUTCMonth() + 1).padStart(2, '0')}`;
-
-      for (const cliente of Array.from(clientesMap.values())) {
-        // Cliente sem contratos é ignorado (decisão #6)
-        if (cliente.contratos.length === 0) continue;
-        simulateCliente(cliente, mesAtualYYYYMM);
-      }
-
-      // ──── Agregar resultados em estruturas legacy (mesesMap) ───────────────
+      // ──── Estruturas de dados para agregação ──────────────────────────────
       type ParcelaInfo = {
         id: string | null;
         valor: number;
@@ -5555,6 +5407,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         clienteNome: string;
         servicoNome: string;
         squad: string;
+        causa?: 'match' | 'fallback_maior_valor' | 'cnpj_sem_contrato_clickup' | 'item_nao_casou';
       };
       type ServicoInfo = { valor: number; squad: string; parcelas: ParcelaInfo[] };
       type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
@@ -5568,66 +5421,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const mesesMap = new Map<string, MesData>();
       const squadsSet = new Set<string>();
 
-      // Iterar contratos simulados, somando recebido_por_mes nos meses do ano selecionado
-      for (const cliente of Array.from(clientesMap.values())) {
-        for (const contrato of cliente.contratos) {
-          const sqNorm = contrato.squad;
-
-          if (!matchesSquadFilter(sqNorm)) continue;
-
-          squadsSet.add(sqNorm);
-
-          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
-            // Filtrar só meses do ano selecionado
-            if (!mes.startsWith(`${ano}-`)) continue;
-            if (valor <= 0) continue;
-
-            if (!mesesMap.has(mes)) {
-              mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
-            }
-            const mesData = mesesMap.get(mes)!;
-            mesData.receitaTotal += valor;
-            mesData.totalParcelas += 1;
-
-            const categoriaNome = 'Sem Categoria';
-            if (!mesData.categorias.has(categoriaNome)) {
-              mesData.categorias.set(categoriaNome, {
-                nome: categoriaNome,
-                valorTotal: 0,
-                clientes: new Map(),
-              });
-            }
-            const cat = mesData.categorias.get(categoriaNome)!;
-            cat.valorTotal += valor;
-
-            if (!cat.clientes.has(cliente.cliente_nome)) {
-              cat.clientes.set(cliente.cliente_nome, { valorTotal: 0, servicos: new Map() });
-            }
-            const cli = cat.clientes.get(cliente.cliente_nome)!;
-            cli.valorTotal += valor;
-
-            const chaveServico = `${contrato.servico}|${sqNorm}`;
-            if (!cli.servicos.has(chaveServico)) {
-              cli.servicos.set(chaveServico, { valor: 0, squad: sqNorm, parcelas: [] });
-            }
-            const srv = cli.servicos.get(chaveServico)!;
-            srv.valor += valor;
-            srv.parcelas.push({
-              id: contrato.id_subtask,
-              valor,
-              dataQuitacao: null,
-              linkNfse: null,
-              numNfse: null,
-              urlCobranca: null,
-              clienteNome: cliente.cliente_nome,
-              servicoNome: contrato.servico,
-              squad: sqNorm,
-            });
-          }
-        }
-      }
-
-      // ──── Mesclar receita via itens no mesesMap ─────────────────────────
+      // ──── Populando mesesMap via pipeline de itens ──────────────────────
       // Órfãos (SEM_SQUAD_LABEL) são mantidos mesmo quando um squad filter é aplicado,
       // para que fiquem visíveis no dashboard (e o usuário possa agir sobre eles).
       for (const linha of receitaItens) {
@@ -5676,6 +5470,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           clienteNome: linha.clienteNome,
           servicoNome: linha.itemRaw,
           squad: sqNorm,
+          causa: linha.causa,
         });
       }
 
@@ -5948,36 +5743,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         };
       }
 
-      // ──── Agregar resumo por squad a partir dos contratos simulados ──────
+      // ──── Agregar resumo por squad a partir do pipeline de itens ──────
       const squadSummaryMap = new Map<string, { total: number; porMes: number[]; contratos: Set<string> }>();
-      for (const cliente of Array.from(clientesMap.values())) {
-        for (const contrato of cliente.contratos) {
-          const sq = contrato.squad;
-
-          if (!matchesSquadFilter(sq)) continue;
-
-          if (!squadSummaryMap.has(sq)) {
-            squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
-          }
-          const entry = squadSummaryMap.get(sq)!;
-
-          let teveValorNoAno = false;
-          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
-            if (!mes.startsWith(`${ano}-`)) continue;
-            if (valor <= 0) continue;
-            const monthIdx = parseInt(mes.split('-')[1]) - 1;
-            entry.total += valor;
-            entry.porMes[monthIdx] += valor;
-            teveValorNoAno = true;
-          }
-
-          if (teveValorNoAno) {
-            entry.contratos.add(`${cliente.cliente_nome}|${contrato.servico}|${sq}`);
-          }
-        }
-      }
-
-      // Mesclar contribuições do pipeline novo (receitaItens) no squadSummaryMap
       for (const linha of receitaItens) {
         const sq = linha.squad;
         if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
@@ -6075,29 +5842,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // ──── Detalhes de receita por squad → cliente → mês ─────────────────
       const receitasDetalhesPorSquad: Record<string, { cliente: string; porMes: number[]; total: number }[]> = {};
-      for (const cliente of Array.from(clientesMap.values())) {
-        for (const contrato of cliente.contratos) {
-          const sq = contrato.squad;
-          if (/\bOFF\b/i.test(sq)) continue;
-          if (!matchesSquadFilter(sq)) continue;
-
-          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
-            if (!mes.startsWith(`${ano}-`)) continue;
-            if (valor <= 0) continue;
-            const monthIdx = parseInt(mes.split('-')[1]) - 1;
-
-            if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
-            let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === cliente.cliente_nome);
-            if (!entry) {
-              entry = { cliente: cliente.cliente_nome, porMes: new Array(12).fill(0), total: 0 };
-              receitasDetalhesPorSquad[sq].push(entry);
-            }
-            entry.porMes[monthIdx] += valor;
-            entry.total += valor;
-          }
-        }
-      }
-      // Mesclar contribuições do pipeline novo (receitaItens) em receitasDetalhesPorSquad
       for (const linha of receitaItens) {
         const sq = linha.squad;
         if (/\bOFF\b/i.test(sq)) continue;
@@ -6157,13 +5901,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
 
-      // ──── Estatísticas de origem dos dados (itens vs A3) ────────────────
-      const viaItens = parcelasCobertasSet.size;
-      const viaSimuladorA3 = Math.max(0, totalParcelasElegiveis - viaItens);
-      const pctViaItens = totalParcelasElegiveis > 0
-        ? Math.round((viaItens / totalParcelasElegiveis) * 1000) / 10
-        : 0;
-
       res.json({
         ano,
         squad: squadFilter || 'todos',
@@ -6174,13 +5911,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         despesasPorSquadMensais,
         salariosDetalhesPorSquad,
         receitasDetalhesPorSquad,
-        fonteDados: {
-          totalParcelasElegiveis,
-          viaItens,
-          viaSimuladorA3,
-          pctViaItens,
-          fallbackUsed: itensFallbackUsed,
-        },
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
@@ -8158,6 +7888,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
+
+  // SDR Assistant Module - registered from separate file
+  registerSdrAssistantRoutes(app, db);
 
   // Capacity Module - registered from separate file
   registerCapacityRoutes(app, db);
