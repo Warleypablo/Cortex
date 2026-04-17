@@ -130,6 +130,45 @@ export async function getCompanyTimeline(
   }));
 }
 
+export interface ClickupClientInfo {
+  nome: string;
+  status: string | null;
+  responsavel: string | null;
+  squad: string | null;
+  segmento: string | null;
+  mrr: number | null;
+  vendedor: string | null;
+}
+
+export async function checkClickupStatus(
+  db: any,
+  query: string
+): Promise<ClickupClientInfo[]> {
+  const pattern = `%${(query || "").trim()}%`;
+  const result = await db.execute(sql`
+    SELECT
+      c.nome,
+      c.status,
+      c.responsavel_geral AS responsavel,
+      c.squad,
+      c.segmento,
+      c.valorr AS mrr,
+      c.vendedor
+    FROM "Clickup".cup_clientes c
+    WHERE c.nome ILIKE ${pattern}
+    LIMIT 10
+  `);
+  return (result.rows || []).map((row: any): ClickupClientInfo => ({
+    nome: row.nome,
+    status: row.status,
+    responsavel: row.responsavel,
+    squad: row.squad,
+    segmento: row.segmento,
+    mrr: row.mrr != null ? Number(row.mrr) : null,
+    vendedor: row.vendedor,
+  }));
+}
+
 const TOOLS: Anthropic.Messages.Tool[] = [
   {
     name: "search_companies",
@@ -161,29 +200,54 @@ const TOOLS: Anthropic.Messages.Tool[] = [
       required: ["company_name"],
     },
   },
+  {
+    name: "check_clickup_status",
+    description:
+      "Verifica se a empresa já é cliente ativo no ClickUp (operações). Retorna status da conta, responsável, squad, MRR e se há processo de churn. SEMPRE chame esta tool junto com search_companies para ter visão completa.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description: "Nome ou parte do nome da empresa (mínimo 3 caracteres)",
+        },
+      },
+      required: ["query"],
+    },
+  },
 ];
 
-const SYSTEM_PROMPT = `Você é o SDR Assistant da Turbo Partners. Ajuda o time comercial a checar histórico de empresas no CRM Bitrix antes de abordar.
+const SYSTEM_PROMPT = `Você é o SDR Assistant da Turbo Partners. Ajuda o time comercial a checar histórico de empresas antes de abordar.
 
 REGRAS:
-1. SDR envia nome da empresa. Você busca no Bitrix usando search_companies.
-2. Se múltiplos matches (>1), peça disambiguação. Liste até 5 opções com: número, nome completo, stage atual, quantidade de deals. Peça "digite o número ou o nome completo".
-3. Se 1 match, chame get_company_timeline automaticamente e apresente o resultado.
-4. Se 0 matches, responda "Empresa nova — sem histórico no Bitrix." e sugira prosseguir.
+1. SDR envia nome da empresa. Você SEMPRE chama search_companies E check_clickup_status em paralelo.
+2. Se múltiplos matches no Bitrix (>1), peça disambiguação. Liste até 5 opções com: número, nome completo, stage atual, quantidade de deals. Peça "digite o número ou o nome completo".
+3. Se 1 match no Bitrix, chame get_company_timeline automaticamente e apresente o resultado.
+4. Se 0 matches em AMBOS (Bitrix e ClickUp), responda "Empresa nova — sem histórico no Bitrix nem no ClickUp." e sugira prosseguir.
 5. Para descartes, informe o motivo se motivo_perda estiver preenchido; caso contrário, diga "motivo não registrado".
-6. Tom: direto, sem floreio. SDR tem pressa. Use bullets e emojis 🟢 📜.
+6. Tom: direto, sem floreio. SDR tem pressa. Use bullets e emojis 🟢 📜 ⚠️.
 7. NUNCA invente dados. Se a tool não retornou, diga que não tem.
 
 FORMATO PADRÃO quando há histórico:
 
-🟢 ATIVO — <responsável> | <stage> | criado em <data>
+⚠️ CLIENTE NO CLICKUP (se check_clickup_status retornou dados):
+   Status: <status> | Responsável: <responsavel> | Squad: <squad>
+   MRR: <valor> | Vendedor: <vendedor>
+   Status possíveis: ativo, em cancelamento, cancelado/inativo, pausado, onboarding, entregue, triagem
+   🔴 Se status="em cancelamento" → destacar "EM PROCESSO DE CANCELAMENTO"
+   Se status="cancelado/inativo" → informar que já foi cliente mas cancelou
+
+🟢 DEAL ATIVO NO BITRIX — <responsável> | <stage> | criado em <data>
    <valor MRR se houver> | Origem: <origem>
 
-📜 HISTÓRICO (N deals anteriores):
+📜 HISTÓRICO BITRIX (N deals anteriores):
    • <data> — <responsável> | <stage_final> | <motivo se descarte>
    • ...
 
-Destaque sempre o deal ATIVO no topo (se existir). Se só tem deals fechados (perdidos/ganhos), liste todos em ordem decrescente.`;
+PRIORIDADES DE EXIBIÇÃO:
+- Se é cliente ativo no ClickUp → SEMPRE mostrar aviso ⚠️ no topo (SDR precisa saber que já é cliente!)
+- Se tem churn ativo → destacar com 🔴
+- Destaque deal ATIVO no Bitrix abaixo. Se só tem deals fechados, liste em ordem decrescente.`;
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -254,6 +318,9 @@ export async function runSdrAssistant(
             const { company_name } = block.input as { company_name: string };
             matchedCompany = company_name;
             result = await getCompanyTimeline(db, company_name);
+          } else if (block.name === "check_clickup_status") {
+            const { query } = block.input as { query: string };
+            result = await checkClickupStatus(db, query);
           } else {
             result = { error: `unknown tool: ${block.name}` };
           }
