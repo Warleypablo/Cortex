@@ -4701,28 +4701,43 @@ Estruture sua resposta em:
         cursor.setMonth(cursor.getMonth() + 1);
       }
 
-      // Para cada mês no range, buscar MRR base do mês anterior (último snapshot)
+      // Para cada mês no range, buscar MRR base: primeiro snapshot do mês atual, fallback último do mês anterior
       const mrrBasePorMes: Record<string, { total: number; por_squad: Record<string, number> }> = {};
 
       for (const mesKey of mesesNoRange) {
         const [ano, mes] = mesKey.split('-').map(Number);
-        // Mês anterior = mês de referência para o MRR base
+        // Primeiro: tentar primeiro snapshot do próprio mês
+        const inicioMesAtual = new Date(ano, mes - 1, 1);
+        const fimMesAtual = new Date(ano, mes - 1, 5, 23, 59, 59); // primeiros 5 dias
+        // Fallback: último snapshot do mês anterior
         const refMonth = mes === 1 ? 12 : mes - 1;
         const refYear = mes === 1 ? ano - 1 : ano;
         const inicioRef = new Date(refYear, refMonth - 1, 1);
         const fimRef = new Date(refYear, refMonth, 0, 23, 59, 59);
 
         const mrrResult = await db.execute(sql`
-          WITH ultimo_snapshot AS (
-            SELECT MAX(data_snapshot) as data_ultimo_snapshot
+          WITH snapshot_atual AS (
+            SELECT MIN(data_snapshot) as data_snapshot
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioMesAtual}::timestamp
+              AND data_snapshot <= ${fimMesAtual}::timestamp
+          ),
+          snapshot_anterior AS (
+            SELECT MAX(data_snapshot) as data_snapshot
             FROM "Clickup".cup_data_hist
             WHERE data_snapshot >= ${inicioRef}::timestamp
               AND data_snapshot <= ${fimRef}::timestamp
+          ),
+          snapshot_ref AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM snapshot_atual WHERE data_snapshot IS NOT NULL),
+              (SELECT data_snapshot FROM snapshot_anterior)
+            ) as data_ultimo_snapshot
           )
           SELECT
             COALESCE(h.squad, 'Não especificado') as squad,
             COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
-          FROM ultimo_snapshot us
+          FROM snapshot_ref us
           JOIN "Clickup".cup_data_hist h
             ON h.data_snapshot = us.data_ultimo_snapshot
             AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')

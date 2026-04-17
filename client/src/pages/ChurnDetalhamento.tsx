@@ -1966,6 +1966,15 @@ export default function ChurnDetalhamento() {
               
               {/* Coluna 2: Métricas principais */}
               <div className="flex flex-col gap-3">
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 flex flex-col justify-center">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">MRR Base</span>
+                    <DollarSign className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(mrrBaseReal)}</div>
+                  <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base de referência do período</div>
+                </div>
+
                 <div className="flex-1 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase">MRR Perdido</span>
