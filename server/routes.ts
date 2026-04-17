@@ -39,6 +39,7 @@ import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
 import { registerOKR2026Routes } from "./routes/okr2026";
+import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
@@ -7943,6 +7944,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // OKR 2026 - registered from separate file
   registerOKR2026Routes(app);
+
+  // Receita Recorrente por Centro de Custo
+  registerReceitaRecorrenteRoutes(app, db, storage);
 
   // Jurídico Module - registered from separate file
   registerJuridicoRoutes(app);

@@ -48,15 +48,21 @@ export async function searchCompanies(
   }
   const pattern = `%${trimmed}%`;
   const result = await db.execute(sql`
+    WITH normalized AS (
+      SELECT
+        COALESCE(NULLIF(d.company_name, ''), d.title) AS nome,
+        d.id, d.stage_name, d.date_create
+      FROM "Bitrix".crm_deal d
+      WHERE d.company_name ILIKE ${pattern}
+         OR d.title ILIKE ${pattern}
+    )
     SELECT
-      d.company_name,
+      (ARRAY_AGG(nome ORDER BY id DESC))[1] AS company_name,
       COUNT(*)::int AS deal_count,
-      MAX(d.id)::int AS last_deal_id,
-      (ARRAY_AGG(d.stage_name ORDER BY d.date_create DESC NULLS LAST))[1] AS last_stage
-    FROM "Bitrix".crm_deal d
-    WHERE d.company_name IS NOT NULL
-      AND (d.company_name ILIKE ${pattern} OR d.title ILIKE ${pattern})
-    GROUP BY d.company_name
+      MAX(id)::int AS last_deal_id,
+      (ARRAY_AGG(stage_name ORDER BY date_create DESC NULLS LAST))[1] AS last_stage
+    FROM normalized
+    GROUP BY UPPER(nome)
     ORDER BY deal_count DESC, last_deal_id DESC
     LIMIT 10
   `);
@@ -103,7 +109,7 @@ export async function getCompanyTimeline(
       d.assigned_by_name AS responsavel,
       d.closer
     FROM "Bitrix".crm_deal d
-    WHERE d.company_name = ${companyName}
+    WHERE UPPER(COALESCE(NULLIF(d.company_name, ''), d.title)) = UPPER(${companyName})
     ORDER BY d.date_create DESC NULLS LAST
   `);
 
