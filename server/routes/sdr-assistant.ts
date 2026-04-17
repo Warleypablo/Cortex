@@ -138,10 +138,6 @@ export interface ClickupClientInfo {
   segmento: string | null;
   mrr: number | null;
   vendedor: string | null;
-  churn_motivo: string | null;
-  churn_submotivo: string | null;
-  churn_data_solicitacao: string | null;
-  churn_status: string | null;
 }
 
 export async function checkClickupStatus(
@@ -157,16 +153,8 @@ export async function checkClickupStatus(
       c.squad,
       c.segmento,
       c.valorr AS mrr,
-      c.vendedor,
-      ch.motivo_cancelamento AS churn_motivo,
-      ch.submotivo_cancelamento AS churn_submotivo,
-      ch.data_solicitacao_encerramento::text AS churn_data_solicitacao,
-      ch.status_cancelamento AS churn_status
+      c.vendedor
     FROM "Clickup".cup_clientes c
-    LEFT JOIN "Clickup".cup_churn ch
-      ON UPPER(ch.nome) = UPPER(c.nome)
-      AND ch.status_cancelamento IS NOT NULL
-      AND ch.status_cancelamento != ''
     WHERE c.nome ILIKE ${pattern}
     LIMIT 10
   `);
@@ -178,10 +166,6 @@ export async function checkClickupStatus(
     segmento: row.segmento,
     mrr: row.mrr != null ? Number(row.mrr) : null,
     vendedor: row.vendedor,
-    churn_motivo: row.churn_motivo,
-    churn_submotivo: row.churn_submotivo,
-    churn_data_solicitacao: row.churn_data_solicitacao ? String(row.churn_data_solicitacao).slice(0, 10) : null,
-    churn_status: row.churn_status,
   }));
 }
 
@@ -246,10 +230,12 @@ REGRAS:
 
 FORMATO PADRÃO quando há histórico:
 
-⚠️ CLIENTE ATIVO NO CLICKUP (se check_clickup_status retornou dados):
-   Responsável: <responsavel> | Squad: <squad> | Status: <status>
+⚠️ CLIENTE NO CLICKUP (se check_clickup_status retornou dados):
+   Status: <status> | Responsável: <responsavel> | Squad: <squad>
    MRR: <valor> | Vendedor: <vendedor>
-   🔴 EM CHURN: <churn_status> — <motivo> (SOMENTE se churn_status estiver preenchido)
+   Status possíveis: ativo, em cancelamento, cancelado/inativo, pausado, onboarding, entregue, triagem
+   🔴 Se status="em cancelamento" → destacar "EM PROCESSO DE CANCELAMENTO"
+   Se status="cancelado/inativo" → informar que já foi cliente mas cancelou
 
 🟢 DEAL ATIVO NO BITRIX — <responsável> | <stage> | criado em <data>
    <valor MRR se houver> | Origem: <origem>
