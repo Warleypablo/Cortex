@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar, Phone, DollarSign, TrendingUp, BarChart3 } from "lucide-react";
+import { Calendar, Phone, DollarSign, TrendingUp, BarChart3, Sparkles } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -35,6 +35,7 @@ const ETAPA_LABELS: Record<string, string> = {
   proposta_enviada: "Proposta enviada",
   forte_interesse: "Forte interesse",
   descartado: "Descartado",
+  sugerido_sistema: "Sugerido",
 };
 
 const ETAPA_COLORS: Record<string, string> = {
@@ -45,6 +46,7 @@ const ETAPA_COLORS: Record<string, string> = {
   proposta_enviada: "#3b82f6",
   forte_interesse: "#a855f7",
   descartado: "#ef4444",
+  sugerido_sistema: "#818cf8",
 };
 
 const MONTHS = [
@@ -77,6 +79,8 @@ interface DashboardData {
     totalRNegociacao: number;
     totalPNegociacao: number;
     taxaConversao: number;
+    sugestoesAtivas: number;
+    taxaAceitacao: number;
   };
   funilEtapas: Array<{ etapa: string; total: number }>;
   reunioesPorCx: Array<{ cxResponsavel: string; total: number }>;
@@ -160,13 +164,13 @@ export default function CrossSellDashboard() {
 
       {/* KPI Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+          {Array.from({ length: 7 }).map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <KpiCard
             title="Reunioes Agendadas"
             value={String(data?.kpis.reunioesAgendadas ?? 0)}
@@ -194,6 +198,18 @@ export default function CrossSellDashboard() {
             value={`${data?.kpis.taxaConversao ?? 0}%`}
             icon={<TrendingUp className="h-5 w-5 text-emerald-500" />}
             accent="text-emerald-600 dark:text-emerald-400"
+          />
+          <KpiCard
+            title="Sugestoes Ativas"
+            value={String(data?.kpis.sugestoesAtivas ?? 0)}
+            icon={<Sparkles className="h-5 w-5 text-indigo-500" />}
+            accent="text-indigo-600 dark:text-indigo-400"
+          />
+          <KpiCard
+            title="Taxa Aceitacao"
+            value={`${data?.kpis.taxaAceitacao ?? 0}%`}
+            icon={<TrendingUp className="h-5 w-5 text-cyan-500" />}
+            accent="text-cyan-600 dark:text-cyan-400"
           />
         </div>
       )}
