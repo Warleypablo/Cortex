@@ -10,8 +10,7 @@ interface ClienteContrato {
   clienteId: string;
   nome: string;
   cluster: string | null;
-  faturamentoMensal: number;
-  investimentoAds: number;
+  valorrCliente: number;
   responsavel: string | null;
   produtos: string[];
   mrrTotal: number;
@@ -65,12 +64,13 @@ const MAX_SUGESTOES_POR_CLIENTE = 3;
 
 async function buildCoOccurrenceMatrix(): Promise<Record<string, Record<string, number>>> {
   const result = await db.execute(sql.raw(`
-    SELECT ct.cnpj, ct.produto
+    SELECT c.cnpj, ct.produto
     FROM "Clickup".cup_contratos ct
+    JOIN "Clickup".cup_clientes c ON c.task_id = ct.id_task
     WHERE ct.status IN ('ativo', 'Ativo', 'ATIVO')
       AND ct.produto IS NOT NULL
       AND ct.produto != ''
-    GROUP BY ct.cnpj, ct.produto
+    GROUP BY c.cnpj, ct.produto
   `));
 
   const clientProducts: Record<string, Set<string>> = {};
@@ -140,15 +140,13 @@ function calcGap(
 }
 
 function calcFinanceiro(
-  faturamento: number,
-  investAds: number,
+  valorrCliente: number,
   mrr: number,
-  percentis: { faturamento: number[]; investAds: number[]; mrr: number[] }
+  percentis: { valorrCliente: number[]; mrr: number[] }
 ): number {
-  const pFat = percentilRank(faturamento, percentis.faturamento);
-  const pAds = percentilRank(investAds, percentis.investAds);
+  const pValor = percentilRank(valorrCliente, percentis.valorrCliente);
   const pMrr = percentilRank(mrr, percentis.mrr);
-  return (pFat + pAds + pMrr) / 3;
+  return (pValor + pMrr) / 2;
 }
 
 function calcTenure(contratoMaisAntigo: Date | null): number {
@@ -202,24 +200,23 @@ export async function mapearOportunidades(): Promise<MapearResult> {
       c.task_id AS cliente_id,
       c.nome,
       c.cluster,
-      COALESCE(NULLIF(regexp_replace(c.faturamento_mensal, '[^0-9.]', '', 'g'), ''), '0')::float AS faturamento_mensal,
-      COALESCE(NULLIF(regexp_replace(c.investimento_ads, '[^0-9.]', '', 'g'), ''), '0')::float AS investimento_ads,
+      COALESCE(c.valorr, 0)::float AS valorr_cliente,
       c.responsavel
     FROM "Clickup".cup_clientes c
-    WHERE c.status IN ('ativo', 'Ativo', 'ATIVO', 'Ativo ')
-      AND c.cnpj IS NOT NULL
+    WHERE c.cnpj IS NOT NULL
       AND c.cnpj != ''
   `));
 
   const contratosResult = await db.execute(sql.raw(`
     SELECT
-      ct.cnpj,
+      c.cnpj,
       ct.produto,
       ct.status,
       COALESCE(ct.valorr, 0)::float AS valorr,
       ct.data_inicio
     FROM "Clickup".cup_contratos ct
-    WHERE ct.cnpj IS NOT NULL AND ct.cnpj != ''
+    JOIN "Clickup".cup_clientes c ON c.task_id = ct.id_task
+    WHERE c.cnpj IS NOT NULL AND c.cnpj != ''
   `));
 
   // 2. Existing opportunities for deduplication
@@ -246,8 +243,7 @@ export async function mapearOportunidades(): Promise<MapearResult> {
       clienteId: row.cliente_id,
       nome: row.nome,
       cluster: row.cluster,
-      faturamentoMensal: row.faturamento_mensal,
-      investimentoAds: row.investimento_ads,
+      valorrCliente: row.valorr_cliente,
       responsavel: row.responsavel,
       produtos: [],
       mrrTotal: 0,
@@ -303,12 +299,8 @@ export async function mapearOportunidades(): Promise<MapearResult> {
     : 1;
 
   // 6. Percentile arrays
-  const faturamentos = Object.values(clienteMap)
-    .map((c) => c.faturamentoMensal)
-    .filter((v) => v > 0)
-    .sort((a, b) => a - b);
-  const investimentos = Object.values(clienteMap)
-    .map((c) => c.investimentoAds)
+  const valoresCliente = Object.values(clienteMap)
+    .map((c) => c.valorrCliente)
     .filter((v) => v > 0)
     .sort((a, b) => a - b);
   const mrrs = Object.values(clienteMap)
@@ -316,7 +308,7 @@ export async function mapearOportunidades(): Promise<MapearResult> {
     .filter((v) => v > 0)
     .sort((a, b) => a - b);
 
-  const percentis = { faturamento: faturamentos, investAds: investimentos, mrr: mrrs };
+  const percentis = { valorrCliente: valoresCliente, mrr: mrrs };
 
   // 7. All known products
   const allProducts = new Set<string>(Object.keys(matrix));
@@ -344,8 +336,7 @@ export async function mapearOportunidades(): Promise<MapearResult> {
 
       const gap = calcGap(cliente.produtos.length, clusterAvg, cliente.cluster);
       const financeiro = calcFinanceiro(
-        cliente.faturamentoMensal,
-        cliente.investimentoAds,
+        cliente.valorrCliente,
         cliente.mrrTotal,
         percentis
       );
