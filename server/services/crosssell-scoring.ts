@@ -330,7 +330,7 @@ export async function mapearOportunidades(): Promise<MapearResult> {
 
     const candidatos: OportunidadeSugerida[] = [];
 
-    for (const targetProduct of allProducts) {
+    for (const targetProduct of Array.from(allProducts)) {
       if (cliente.produtos.includes(targetProduct)) continue;
 
       const key = `${cliente.cnpj}|${targetProduct}`;
