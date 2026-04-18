@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import { mapearOportunidades } from "../services/crosssell-scoring";
 
 export function registerCrossSellRoutes(app: Express) {
   // ==================== CROSS-SELL MANAGEMENT ====================
@@ -52,6 +53,10 @@ export function registerCrossSellRoutes(app: Express) {
           o.ultimo_contato,
           o.criado_em,
           o.atualizado_em,
+          o.origem,
+          o.prioridade,
+          o.score_detalhes,
+          o.motivo,
           COALESCE(contratos.valor_r_atual, 0) AS valor_r_atual,
           COALESCE(contratos.valor_p_atual, 0) AS valor_p_atual,
           contratos.contrato_inicio,
@@ -97,6 +102,10 @@ export function registerCrossSellRoutes(app: Express) {
         ultimoContato: r.ultimo_contato,
         criadoEm: r.criado_em,
         atualizadoEm: r.atualizado_em,
+        origem: r.origem ?? "manual",
+        prioridade: r.prioridade,
+        scoreDetalhes: r.score_detalhes,
+        motivo: r.motivo,
         valorRAtual: Number(r.valor_r_atual),
         valorPAtual: Number(r.valor_p_atual),
         contratoInicio: r.contrato_inicio,
@@ -131,6 +140,17 @@ export function registerCrossSellRoutes(app: Express) {
     } catch (error) {
       console.error("[crosssell] Error creating oportunidade:", error);
       res.status(500).json({ error: "Failed to create oportunidade" });
+    }
+  });
+
+  // POST /api/comercial/crosssell/mapear — Auto-map opportunities
+  app.post("/api/comercial/crosssell/mapear", async (req, res) => {
+    try {
+      const result = await mapearOportunidades();
+      res.json(result);
+    } catch (error) {
+      console.error("[crosssell] Error mapping oportunidades:", error);
+      res.status(500).json({ error: "Failed to map oportunidades" });
     }
   });
 
@@ -373,6 +393,9 @@ export function registerCrossSellRoutes(app: Express) {
             (SELECT COALESCE(SUM(o.valor_p_negociacao), 0) FROM cortex_core.crosssell_oportunidades o WHERE o.etapa NOT IN ('ganho', 'perdido') ${opDateFilter}) AS total_p_negociacao,
             (SELECT COUNT(*)::int FROM cortex_core.crosssell_negocios_ganhos ng WHERE 1=1 ${ganhoDateFilter}) AS total_ganhos,
             (SELECT COUNT(*)::int FROM cortex_core.crosssell_oportunidades o WHERE 1=1 ${opDateFilter}) AS total_oportunidades
+            ,(SELECT COUNT(*)::int FROM cortex_core.crosssell_oportunidades o WHERE o.etapa = 'sugerido_sistema') AS sugestoes_ativas
+            ,(SELECT COUNT(*)::int FROM cortex_core.crosssell_etapa_log el WHERE el.etapa_anterior = 'sugerido_sistema' AND el.etapa_nova != 'descartado') AS sugestoes_aceitas
+            ,(SELECT COUNT(*)::int FROM cortex_core.crosssell_etapa_log el WHERE el.etapa_anterior = 'sugerido_sistema') AS sugestoes_total_transicoes
         `)),
 
         // Funil por etapa
@@ -425,6 +448,10 @@ export function registerCrossSellRoutes(app: Express) {
           totalRNegociacao: Number(kpis.total_r_negociacao),
           totalPNegociacao: Number(kpis.total_p_negociacao),
           taxaConversao: Number(((totalGanhos / totalOps) * 100).toFixed(1)),
+          sugestoesAtivas: Number(kpis.sugestoes_ativas),
+          taxaAceitacao: Number(kpis.sugestoes_total_transicoes) > 0
+            ? Number(((Number(kpis.sugestoes_aceitas) / Number(kpis.sugestoes_total_transicoes)) * 100).toFixed(1))
+            : 0,
         },
         funilEtapas: (funilResult.rows as any[]).map((r) => ({
           etapa: r.etapa,
