@@ -200,7 +200,7 @@ export async function mapearOportunidades(): Promise<MapearResult> {
       c.task_id AS cliente_id,
       c.nome,
       c.cluster,
-      COALESCE(c.valorr, 0)::float AS valorr_cliente,
+      COALESCE(NULLIF(regexp_replace(c.valorr::text, '[^0-9.]', '', 'g'), ''), '0')::float AS valorr_cliente,
       c.responsavel
     FROM "Clickup".cup_clientes c
     WHERE c.cnpj IS NOT NULL
