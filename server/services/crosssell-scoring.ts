@@ -202,8 +202,8 @@ export async function mapearOportunidades(): Promise<MapearResult> {
       c.task_id AS cliente_id,
       c.nome,
       c.cluster,
-      COALESCE(c.faturamento_mensal, 0)::float AS faturamento_mensal,
-      COALESCE(c.investimento_ads, 0)::float AS investimento_ads,
+      COALESCE(NULLIF(regexp_replace(c.faturamento_mensal, '[^0-9.]', '', 'g'), ''), '0')::float AS faturamento_mensal,
+      COALESCE(NULLIF(regexp_replace(c.investimento_ads, '[^0-9.]', '', 'g'), ''), '0')::float AS investimento_ads,
       c.responsavel
     FROM "Clickup".cup_clientes c
     WHERE c.status IN ('ativo', 'Ativo', 'ATIVO', 'Ativo ')
