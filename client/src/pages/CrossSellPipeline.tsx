@@ -41,6 +41,7 @@ import {
   User,
   Package,
   Clock,
+  Sparkles,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,7 @@ const PRODUTOS = [
 ];
 
 const ETAPAS = [
+  "sugerido_sistema",
   "fazer_contato",
   "tentativa_contato",
   "reuniao_agendada",
@@ -67,6 +69,7 @@ const ETAPAS = [
 type Etapa = (typeof ETAPAS)[number];
 
 const ETAPA_LABELS: Record<Etapa, string> = {
+  sugerido_sistema: "Sugerido",
   fazer_contato: "Fazer Contato",
   tentativa_contato: "Tentativa de Contato",
   reuniao_agendada: "Reuniao Agendada",
@@ -77,6 +80,7 @@ const ETAPA_LABELS: Record<Etapa, string> = {
 };
 
 const ETAPA_COLORS: Record<Etapa, string> = {
+  sugerido_sistema: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
   fazer_contato: "bg-gray-200 text-gray-800 dark:bg-zinc-700 dark:text-zinc-200",
   tentativa_contato: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
   reuniao_agendada: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
@@ -89,6 +93,18 @@ const ETAPA_COLORS: Record<Etapa, string> = {
 const CLUSTERS = ["Regulares", "Imperdiveis", "Chaves", "NFNC"];
 
 const OPERACOES = ["Upsell", "CrossSell", "Renovacao", "Upgrade"];
+
+const PRIORIDADE_COLORS: Record<string, string> = {
+  alta: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  media: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+  baixa: "bg-gray-100 text-gray-600 dark:bg-zinc-700 dark:text-zinc-400",
+};
+
+const PRIORIDADE_LABELS: Record<string, string> = {
+  alta: "Alta",
+  media: "Média",
+  baixa: "Baixa",
+};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,6 +130,17 @@ interface Oportunidade {
   valorPAtual: number;
   contratoInicio: string | null;
   totalComentarios: number;
+  origem: string | null;
+  prioridade: string | null;
+  scoreDetalhes: {
+    afinidade: number;
+    gap: number;
+    financeiro: number;
+    tenure: number;
+    churn: number;
+    total: number;
+  } | null;
+  motivo: string | null;
 }
 
 interface ClienteSearch {
@@ -172,6 +199,8 @@ export default function CrossSellPipeline() {
   const [cxResp, setCxResp] = useState("todos");
   const [etapaFilter, setEtapaFilter] = useState("todas");
   const [produtoFilter, setProdutoFilter] = useState("todos");
+  const [origemFilter, setOrigemFilter] = useState("todas");
+  const [prioridadeFilter, setPrioridadeFilter] = useState("todas");
 
   // Modals
   const [showNew, setShowNew] = useState(false);
@@ -196,9 +225,32 @@ export default function CrossSellPipeline() {
       if (etapaFilter !== "todas" && o.etapa !== etapaFilter) return false;
       if (produtoFilter !== "todos" && o.produtoMapeado !== produtoFilter)
         return false;
+      if (origemFilter !== "todas" && (o.origem ?? "manual") !== origemFilter) return false;
+      if (prioridadeFilter !== "todas" && o.prioridade !== prioridadeFilter) return false;
       return true;
     });
-  }, [oportunidades, cluster, cxResp, etapaFilter, produtoFilter]);
+  }, [oportunidades, cluster, cxResp, etapaFilter, produtoFilter, origemFilter, prioridadeFilter]);
+
+  const mapear = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/comercial/crosssell/mapear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) throw new Error("Erro ao mapear oportunidades");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/comercial/crosssell"] });
+      alert(
+        `${data.criadas} oportunidades mapeadas:\n` +
+        `Alta: ${data.distribuicao.alta}\n` +
+        `Média: ${data.distribuicao.media}\n` +
+        `Baixa: ${data.distribuicao.baixa}\n` +
+        `${data.ignoradas} ignoradas (já existentes)`
+      );
+    },
+  });
 
   // Mutation: change etapa
   const changeEtapa = useMutation({
@@ -285,7 +337,40 @@ export default function CrossSellPipeline() {
           </SelectContent>
         </Select>
 
+        <Select value={origemFilter} onValueChange={setOrigemFilter}>
+          <SelectTrigger className="w-36 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue placeholder="Origem" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas Origens</SelectItem>
+            <SelectItem value="manual">Manual</SelectItem>
+            <SelectItem value="sistema">Sistema</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
+          <SelectTrigger className="w-40 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue placeholder="Prioridade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas Prioridades</SelectItem>
+            <SelectItem value="alta">Alta</SelectItem>
+            <SelectItem value="media">Média</SelectItem>
+            <SelectItem value="baixa">Baixa</SelectItem>
+          </SelectContent>
+        </Select>
+
         <div className="flex-1" />
+
+        <Button
+          variant="outline"
+          onClick={() => mapear.mutate()}
+          disabled={mapear.isPending}
+          className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
+        >
+          <Sparkles className="h-4 w-4" />
+          {mapear.isPending ? "Mapeando..." : "Mapear Oportunidades"}
+        </Button>
 
         <Button onClick={() => setShowNew(true)} className="gap-2">
           <Plus className="h-4 w-4" />
@@ -379,7 +464,7 @@ function OpCard({
     <Card
       className={`bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 ${
         isDescartado ? "opacity-60" : ""
-      }`}
+      } ${op.origem === "sistema" ? "border-l-4 border-l-indigo-400 dark:border-l-indigo-500" : ""}`}
     >
       <CardContent className="p-4 space-y-3">
         {/* Header */}
@@ -408,6 +493,20 @@ function OpCard({
             </SelectContent>
           </Select>
         </div>
+
+        {/* System scoring info */}
+        {op.origem === "sistema" && op.prioridade && (
+          <div className="flex items-center gap-2">
+            <Badge className={`text-xs ${PRIORIDADE_COLORS[op.prioridade] ?? ""}`}>
+              {PRIORIDADE_LABELS[op.prioridade] ?? op.prioridade}
+            </Badge>
+            {op.motivo && (
+              <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+                {op.motivo}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Data grid */}
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
