@@ -69,7 +69,8 @@ export function registerCrossSellRoutes(app: Express) {
             SUM(ct.valorp) AS valor_p_atual,
             MIN(ct.data_inicio) AS contrato_inicio
           FROM "Clickup".cup_contratos ct
-          WHERE ct.cnpj = o.cnpj AND ct.status IN ('ativo', 'Ativo', 'ATIVO')
+          JOIN "Clickup".cup_clientes cl ON cl.task_id = ct.id_task
+          WHERE cl.cnpj = o.cnpj AND ct.status IN ('ativo', 'Ativo', 'ATIVO')
         ) contratos ON true
         LEFT JOIN LATERAL (
           SELECT COUNT(*)::int AS total
