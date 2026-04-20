@@ -147,6 +147,8 @@ const PortalCliente = PortalClientePage;
 const PortalCreator = lazyWithRetry(() => import("@/pages/PortalCreator"));
 const TestWorkflow = lazyWithRetry(() => import("@/pages/TestWorkflow"));
 const Negativacao = lazyWithRetry(() => import("@/pages/Negativacao"));
+const CrossSellPipeline = lazyWithRetry(() => import("@/pages/CrossSellPipeline"));
+const CrossSellDashboard = lazyWithRetry(() => import("@/pages/CrossSellDashboard"));
 const ReceitaRecorrente = lazyWithRetry(() => import("@/pages/financeiro/ReceitaRecorrente"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
@@ -350,6 +352,8 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/funil">{() => <ProtectedRoute path="/dashboard/comercial/funil" component={FunilVendas} />}</Route>
       <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
       <Route path="/dashboard/comercial/sdr-assistant">{() => <ProtectedRoute path="/dashboard/comercial/sdr-assistant" component={SdrAssistant} />}</Route>
+      <Route path="/dashboard/comercial/crosssell">{() => <ProtectedRoute path="/dashboard/comercial/crosssell" component={CrossSellPipeline} />}</Route>
+      <Route path="/dashboard/comercial/crosssell-dashboard">{() => <ProtectedRoute path="/dashboard/comercial/crosssell-dashboard" component={CrossSellDashboard} />}</Route>
       <Route path="/presentation">{() => <ProtectedRoute path="/presentation" component={PresentationMode} />}</Route>
       
       {/* Growth */}

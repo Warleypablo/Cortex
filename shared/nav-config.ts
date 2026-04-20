@@ -68,6 +68,7 @@ export const PERMISSION_KEYS = {
     REUNIOES: 'com.reunioes',
     CONTRATOS_CLIENTES: 'com.contratos_clientes',
     SDR_ASSISTANT: 'com.sdr_assistant',
+    CROSSSELL: 'com.crosssell',
   },
   // Growth
   GROWTH: {
@@ -247,6 +248,8 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/comercial/apresentacao': PERMISSION_KEYS.COM.APRESENTACAO,
   '/dashboard/comercial/reunioes': PERMISSION_KEYS.COM.REUNIOES,
   '/dashboard/comercial/sdr-assistant': PERMISSION_KEYS.COM.SDR_ASSISTANT,
+  '/dashboard/comercial/crosssell': PERMISSION_KEYS.COM.CROSSSELL,
+  '/dashboard/comercial/crosssell-dashboard': PERMISSION_KEYS.COM.CROSSSELL,
   '/presentation': PERMISSION_KEYS.COM.APRESENTACAO,
   // Growth
   '/growth/visao-geral': PERMISSION_KEYS.GROWTH.VISAO_GERAL,
@@ -457,6 +460,8 @@ export const NAV_CONFIG = {
         { title: 'Análise de Vendas', url: '/dashboard/comercial/analise-vendas', icon: 'LineChart', permissionKey: PERMISSION_KEYS.COM.ANALISE_VENDAS },
         { title: 'Reuniões', url: '/dashboard/comercial/reunioes', icon: 'Phone', permissionKey: PERMISSION_KEYS.COM.REUNIOES },
         { title: 'SDR Assistant', url: '/dashboard/comercial/sdr-assistant', icon: 'MessagesSquare', permissionKey: PERMISSION_KEYS.COM.SDR_ASSISTANT },
+        { title: 'CrossSell', url: '/dashboard/comercial/crosssell', icon: 'Repeat2', permissionKey: PERMISSION_KEYS.COM.CROSSSELL },
+        { title: 'CrossSell Dashboard', url: '/dashboard/comercial/crosssell-dashboard', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.COM.CROSSSELL },
         { title: 'Contratos Clientes', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.COM.CONTRATOS_CLIENTES },
       ],
     },
