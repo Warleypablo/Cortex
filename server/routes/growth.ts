@@ -2065,7 +2065,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Calcular taxas
       const percReuniaoAgendada = totalMqls > 0 ? reunioesAgendadas / totalMqls : 0;
       const percNoShow = reunioesAgendadas > 0 ? (reunioesAgendadas - reunioesRealizadas) / reunioesAgendadas : 0;
-      const taxaVendas = reunioesRealizadas > 0 ? novosClientes / reunioesRealizadas : 0;
+      const taxaVendas = reunioesRealizadas > 0 ? dealsGanhos / reunioesRealizadas : 0;
       const txContratosRecorrentes = novosClientes > 0 ? contratosAceleracao / novosClientes : 0;
       const txContratosImplantacao = novosClientes > 0 ? contratosImplantacao / novosClientes : 0;
       const ticketMedioAceleracao = contratosAceleracao > 0 ? faturamentoAceleracao / contratosAceleracao : 0;
@@ -2267,7 +2267,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Calcular taxas
       const percReuniaoAgendada = totalNaoMqls > 0 ? reunioesAgendadas / totalNaoMqls : 0;
       const percNoShow = reunioesAgendadas > 0 ? (reunioesAgendadas - reunioesRealizadas) / reunioesAgendadas : 0;
-      const taxaVendas = reunioesRealizadas > 0 ? novosClientes / reunioesRealizadas : 0;
+      const taxaVendas = reunioesRealizadas > 0 ? dealsGanhos / reunioesRealizadas : 0;
       const txContratosRecorrentes = novosClientes > 0 ? contratosAceleracao / novosClientes : 0;
       const txContratosImplantacao = novosClientes > 0 ? contratosImplantacao / novosClientes : 0;
       const ticketMedioAceleracao = contratosAceleracao > 0 ? faturamentoAceleracao / contratosAceleracao : 0;
