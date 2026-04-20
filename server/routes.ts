@@ -38,6 +38,7 @@ import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
 import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
+import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
 import { registerJuridicoRoutes } from "./routes/juridico";
@@ -7956,6 +7957,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Comercial (Closers, SDRs, Vendas) - registered from separate file
   registerComercialRoutes(app);
+
+  // Cross-Sell Management - registered from separate file
+  registerCrossSellRoutes(app);
 
   // OKR 2026 - registered from separate file
   registerOKR2026Routes(app);

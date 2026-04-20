@@ -3230,3 +3230,59 @@ export const insertInstagramPostMetricSchema = createInsertSchema(instagramPostM
   .omit({ id: true });
 export type InstagramPostMetric = typeof instagramPostMetrics.$inferSelect;
 export type InsertInstagramPostMetric = z.infer<typeof insertInstagramPostMetricSchema>;
+
+// ==================== CROSSSELL ====================
+
+export const crosssellOportunidades = cortexCoreSchema.table("crosssell_oportunidades", {
+  id: serial("id").primaryKey(),
+  clienteId: text("cliente_id").notNull(),
+  cnpj: text("cnpj").notNull(),
+  produtoMapeado: text("produto_mapeado").notNull(),
+  etapa: text("etapa").notNull().default("fazer_contato"),
+  valorRNegociacao: decimal("valor_r_negociacao", { precision: 12, scale: 2 }).default("0"),
+  valorPNegociacao: decimal("valor_p_negociacao", { precision: 12, scale: 2 }).default("0"),
+  cxResponsavel: text("cx_responsavel").notNull(),
+  ultimoContato: date("ultimo_contato"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type CrosssellOportunidade = typeof crosssellOportunidades.$inferSelect;
+export type InsertCrosssellOportunidade = typeof crosssellOportunidades.$inferInsert;
+
+export const crosssellComentarios = cortexCoreSchema.table("crosssell_comentarios", {
+  id: serial("id").primaryKey(),
+  oportunidadeId: integer("oportunidade_id").notNull(),
+  autor: text("autor").notNull(),
+  texto: text("texto").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type CrosssellComentario = typeof crosssellComentarios.$inferSelect;
+
+export const crosssellNegociosGanhos = cortexCoreSchema.table("crosssell_negocios_ganhos", {
+  id: serial("id").primaryKey(),
+  oportunidadeId: integer("oportunidade_id").notNull(),
+  clienteNome: text("cliente_nome").notNull(),
+  cnpj: text("cnpj").notNull(),
+  valorR: decimal("valor_r", { precision: 12, scale: 2 }).notNull(),
+  valorP: decimal("valor_p", { precision: 12, scale: 2 }).notNull(),
+  cxResponsavel: text("cx_responsavel").notNull(),
+  operacao: text("operacao").array().notNull(),
+  produto: text("produto").notNull(),
+  mesGanho: date("mes_ganho").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type CrosssellNegocioGanho = typeof crosssellNegociosGanhos.$inferSelect;
+
+export const crosssellEtapaLog = cortexCoreSchema.table("crosssell_etapa_log", {
+  id: serial("id").primaryKey(),
+  oportunidadeId: integer("oportunidade_id").notNull(),
+  etapaAnterior: text("etapa_anterior").notNull(),
+  etapaNova: text("etapa_nova").notNull(),
+  alteradoPor: text("alterado_por").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type CrosssellEtapaLog = typeof crosssellEtapaLog.$inferSelect;
