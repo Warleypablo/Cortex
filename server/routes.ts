@@ -21,6 +21,7 @@ import * as fs from "fs";
 import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
+import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMetasRoutes } from "./routes/metas";
@@ -7901,6 +7902,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
+
+  // Growth — Orçamento por Campanha
+  registerOrcamentoCampanhasRoutes(app, db);
 
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
