@@ -14,6 +14,10 @@ import { cn } from "@/lib/utils";
 
 type Platform = "meta" | "google";
 
+// Google Ads sync está travado em 2025-11. Esconder da UI até sync voltar.
+// Backend continua preparado — basta alternar para true quando o sync estiver ok.
+const SHOW_GOOGLE = false;
+
 interface Campanha {
   platform: Platform;
   campaignId: string;
@@ -149,7 +153,9 @@ function variancePctColor(investido: number, meta: number | null): string {
 export default function GrowthOrcamentoCampanhas() {
   useSetPageInfo(
     "Orçamento por Campanha",
-    "Orçamento diário, investido e projeção por campanha — Meta + Google",
+    SHOW_GOOGLE
+      ? "Orçamento diário, investido e projeção por campanha — Meta + Google"
+      : "Orçamento diário, investido e projeção por campanha — Meta Ads",
   );
 
   const queryClient = useQueryClient();
@@ -182,7 +188,8 @@ export default function GrowthOrcamentoCampanhas() {
     let totalInvestido = 0;
     for (const c of data?.campanhas ?? []) {
       if (c.platform === "meta") metaRows.push(c);
-      else googleRows.push(c);
+      else if (SHOW_GOOGLE) googleRows.push(c);
+      else continue; // Google escondido — não soma aos totais.
       totalDaily += c.dailyBudgetAtual;
       totalDailyMeta += c.orcamentoDiarioMeta ?? 0;
       totalMensalMeta += c.investimentoMensalMeta ?? 0;
