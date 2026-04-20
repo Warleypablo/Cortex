@@ -742,6 +742,21 @@ export async function initializeSysSchema(): Promise<void> {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_churn_risk_score ON cortex_core.churn_risk_scores(score DESC)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_churn_risk_contrato ON cortex_core.churn_risk_scores(contrato_id)`);
 
+    // Campaign Monthly Budget — metas mensais de investimento por campanha (Meta + Google Ads)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.campaign_monthly_budget (
+        id SERIAL PRIMARY KEY,
+        platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
+        campaign_id TEXT NOT NULL,
+        month DATE NOT NULL,
+        monthly_budget_target NUMERIC(12, 2) NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        UNIQUE (platform, campaign_id, month)
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_campaign_monthly_budget_month ON cortex_core.campaign_monthly_budget(month)`);
+
     console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
