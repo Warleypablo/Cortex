@@ -3,6 +3,9 @@ import { sql } from "drizzle-orm";
 
 const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
 
+// Único usuário autorizado a editar as metas mensais de investimento.
+const ALLOWED_EDITOR_EMAIL = "ferramentas@turbopartners.com.br";
+
 type Platform = "meta" | "google";
 
 interface CampanhaRow {
@@ -207,6 +210,10 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
   // Upsert da meta mensal manual de uma campanha.
   app.put("/api/growth/orcamento-campanhas/meta", async (req, res) => {
     try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (userEmail !== ALLOWED_EDITOR_EMAIL) {
+        return res.status(403).json({ error: "Apenas o editor autorizado pode alterar metas." });
+      }
       const { platform, campaignId, month, monthlyBudgetTarget } = req.body || {};
       if (platform !== "meta" && platform !== "google") {
         return res.status(400).json({ error: "platform must be 'meta' or 'google'" });
@@ -232,10 +239,11 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         `);
       } else {
         await db.execute(sql`
-          INSERT INTO cortex_core.campaign_monthly_budget (platform, campaign_id, month, monthly_budget_target)
-          VALUES (${platform}, ${campaignId}, ${monthDate}::date, ${target})
+          INSERT INTO cortex_core.campaign_monthly_budget (platform, campaign_id, month, monthly_budget_target, updated_by)
+          VALUES (${platform}, ${campaignId}, ${monthDate}::date, ${target}, ${userEmail})
           ON CONFLICT (platform, campaign_id, month) DO UPDATE SET
             monthly_budget_target = EXCLUDED.monthly_budget_target,
+            updated_by = EXCLUDED.updated_by,
             updated_at = NOW()
         `);
       }

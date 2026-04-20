@@ -11,6 +11,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+
+const ALLOWED_EDITOR_EMAIL = "ferramentas@turbopartners.com.br";
 
 type Platform = "meta" | "google";
 
@@ -64,12 +67,14 @@ function MetaInput({
   month,
   value,
   onSaved,
+  canEdit,
 }: {
   platform: Platform;
   campaignId: string;
   month: string;
   value: number | null;
   onSaved: () => void;
+  canEdit: boolean;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -122,6 +127,14 @@ function MetaInput({
     );
   }
 
+  if (!canEdit) {
+    return (
+      <span className="block text-right font-mono px-1 py-1" data-testid={`meta-readonly-${platform}-${campaignId}`}>
+        {value !== null ? formatCurrency(value) : <span className="text-muted-foreground">—</span>}
+      </span>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -150,6 +163,17 @@ function variancePctColor(investido: number, meta: number | null): string {
   return "text-green-600 dark:text-green-400";
 }
 
+// Cor da projeção comparada à meta mensal:
+// vermelho se vai estourar (>105%), verde se vai ficar dentro/abaixo (<=100%),
+// amarelo na zona de alerta entre 100-105%. Sem meta, sem cor.
+function projecaoColor(projecao: number, meta: number | null): string {
+  if (meta === null || meta === 0) return "";
+  const pct = (projecao / meta) * 100;
+  if (pct > 105) return "text-red-500 dark:text-red-400";
+  if (pct > 100) return "text-yellow-500 dark:text-yellow-400";
+  return "text-green-600 dark:text-green-400";
+}
+
 export default function GrowthOrcamentoCampanhas() {
   useSetPageInfo(
     "Orçamento por Campanha",
@@ -157,6 +181,9 @@ export default function GrowthOrcamentoCampanhas() {
       ? "Orçamento diário, investido e projeção por campanha — Meta + Google"
       : "Orçamento diário, investido e projeção por campanha — Meta Ads",
   );
+
+  const { user } = useAuth();
+  const canEditMeta = user?.email === ALLOWED_EDITOR_EMAIL;
 
   const queryClient = useQueryClient();
   const monthOptions = useMemo(() => getMonthOptions(), []);
@@ -233,9 +260,12 @@ export default function GrowthOrcamentoCampanhas() {
           month={month}
           value={c.investimentoMensalMeta}
           onSaved={invalidate}
+          canEdit={canEditMeta}
         />
       </TableCell>
-      <TableCell className="text-right font-mono">{formatCurrency(c.projecaoAsIs)}</TableCell>
+      <TableCell className={cn("text-right font-mono", projecaoColor(c.projecaoAsIs, c.investimentoMensalMeta))}>
+        {formatCurrency(c.projecaoAsIs)}
+      </TableCell>
       <TableCell className={cn("text-right font-mono", variancePctColor(c.investidoTotal, c.investimentoMensalMeta))}>
         {formatCurrency(c.investidoTotal)}
       </TableCell>
@@ -357,7 +387,9 @@ export default function GrowthOrcamentoCampanhas() {
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalDaily)}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalDailyMeta)}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalMensalMeta)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(totals.totalProjecao)}</TableCell>
+                  <TableCell className={cn("text-right font-mono", projecaoColor(totals.totalProjecao, totals.totalMensalMeta || null))}>
+                    {formatCurrency(totals.totalProjecao)}
+                  </TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalInvestido)}</TableCell>
                   <TableCell className="text-right font-mono">
                     {totals.totalMensalMeta > 0
