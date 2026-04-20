@@ -55,6 +55,9 @@ export async function searchCompanies(
       FROM "Bitrix".crm_deal d
       WHERE d.company_name ILIKE ${pattern}
          OR d.title ILIKE ${pattern}
+         OR unaccent(d.company_name) ILIKE unaccent(${pattern})
+         OR unaccent(d.title) ILIKE unaccent(${pattern})
+         OR similarity(COALESCE(d.company_name, d.title), ${trimmed}) > 0.3
     )
     SELECT
       (ARRAY_AGG(nome ORDER BY id DESC))[1] AS company_name,
@@ -144,7 +147,8 @@ export async function checkClickupStatus(
   db: any,
   query: string
 ): Promise<ClickupClientInfo[]> {
-  const pattern = `%${(query || "").trim()}%`;
+  const trimmedQ = (query || "").trim();
+  const pattern = `%${trimmedQ}%`;
   const result = await db.execute(sql`
     SELECT
       c.nome,
@@ -156,6 +160,8 @@ export async function checkClickupStatus(
       c.vendedor
     FROM "Clickup".cup_clientes c
     WHERE c.nome ILIKE ${pattern}
+       OR unaccent(c.nome) ILIKE unaccent(${pattern})
+       OR similarity(c.nome, ${trimmedQ}) > 0.3
     LIMIT 10
   `);
   return (result.rows || []).map((row: any): ClickupClientInfo => ({
