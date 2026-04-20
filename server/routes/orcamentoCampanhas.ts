@@ -3,8 +3,11 @@ import { sql } from "drizzle-orm";
 
 const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
 
-// Único usuário autorizado a editar as metas mensais de investimento.
-const ALLOWED_EDITOR_EMAIL = "ferramentas@turbopartners.com.br";
+// Usuários autorizados a editar as metas mensais de investimento.
+const ALLOWED_EDITOR_EMAILS = new Set([
+  "ferramentas@turbopartners.com.br",
+  "vinicius.ichino@turbopartners.com.br",
+]);
 
 type Platform = "meta" | "google";
 
@@ -211,8 +214,8 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
   app.put("/api/growth/orcamento-campanhas/meta", async (req, res) => {
     try {
       const userEmail = (req.user as any)?.email as string | undefined;
-      if (userEmail !== ALLOWED_EDITOR_EMAIL) {
-        return res.status(403).json({ error: "Apenas o editor autorizado pode alterar metas." });
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar metas." });
       }
       const { platform, campaignId, month, monthlyBudgetTarget } = req.body || {};
       if (platform !== "meta" && platform !== "google") {

@@ -13,7 +13,10 @@ import { formatCurrency } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ALLOWED_EDITOR_EMAIL = "ferramentas@turbopartners.com.br";
+const ALLOWED_EDITOR_EMAILS = new Set([
+  "ferramentas@turbopartners.com.br",
+  "vinicius.ichino@turbopartners.com.br",
+]);
 
 type Platform = "meta" | "google";
 
@@ -183,7 +186,7 @@ export default function GrowthOrcamentoCampanhas() {
   );
 
   const { user } = useAuth();
-  const canEditMeta = user?.email === ALLOWED_EDITOR_EMAIL;
+  const canEditMeta = !!user?.email && ALLOWED_EDITOR_EMAILS.has(user.email);
 
   const queryClient = useQueryClient();
   const monthOptions = useMemo(() => getMonthOptions(), []);
