@@ -21,6 +21,7 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
             WHERE p.nao_pago > 0
               AND p.tipo_evento != 'DESPESA'
               AND p.data_vencimento < CURRENT_DATE
+              AND p.id_cliente IS NOT NULL
           )
       `);
 
