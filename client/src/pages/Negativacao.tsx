@@ -37,6 +37,8 @@ import {
   ChevronRight,
   GripVertical,
   CircleDot,
+  MessageSquare,
+  Phone,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -75,6 +77,14 @@ interface KanbanData {
     totalAcordos: number;
     taxaRecuperacao: number;
   };
+}
+
+interface MensagemCobranca {
+  tipo_cobranca: string;
+  criado_em: string;
+  valor: string;
+  telefone: string;
+  status: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -175,6 +185,16 @@ export default function Negativacao() {
     queryFn: async () => {
       const r = await fetch(`/api/negativacao/cliente/${selectedClient}`);
       if (!r.ok) throw new Error("Failed to fetch client history");
+      return r.json();
+    },
+    enabled: !!selectedClient,
+  });
+
+  const { data: mensagensCobranca, isLoading: isLoadingMensagens } = useQuery<MensagemCobranca[]>({
+    queryKey: ["/api/negativacao/mensagens", selectedClient],
+    queryFn: async () => {
+      const r = await fetch(`/api/negativacao/mensagens/${selectedClient}`);
+      if (!r.ok) throw new Error("Failed to fetch billing messages");
       return r.json();
     },
     enabled: !!selectedClient,
@@ -700,6 +720,83 @@ export default function Negativacao() {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Mensagens de Cobrança */}
+              <div className="border-t border-gray-200 dark:border-zinc-700 pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <h4 className="font-medium text-sm text-gray-700 dark:text-zinc-300">
+                    Mensagens de Cobrança
+                  </h4>
+                  {mensagensCobranca && mensagensCobranca.length > 0 && (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                      {mensagensCobranca.length}
+                    </Badge>
+                  )}
+                </div>
+
+                {isLoadingMensagens ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                  </div>
+                ) : !mensagensCobranca || mensagensCobranca.length === 0 ? (
+                  <p className="text-sm text-gray-400 dark:text-zinc-500 italic">
+                    Nenhuma mensagem de cobrança encontrada para este cliente.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {mensagensCobranca.map((msg, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 dark:bg-zinc-800/50 border border-gray-100 dark:border-zinc-700/50"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-mono bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
+                            >
+                              {msg.tipo_cobranca}
+                            </Badge>
+                            <span className="text-xs text-gray-500 dark:text-zinc-400">
+                              {msg.criado_em
+                                ? new Date(msg.criado_em).toLocaleDateString("pt-BR", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "-"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-zinc-400">
+                            <span className="font-medium">
+                              {formatCurrency(parseFloat(msg.valor || "0"))}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {msg.telefone}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {msg.status === "enviado" && (
+                            <span className="text-green-600 dark:text-green-400 text-sm" title="Enviado">✓</span>
+                          )}
+                          {msg.status === "erro" && (
+                            <span className="text-red-600 dark:text-red-400 text-sm" title="Erro">✗</span>
+                          )}
+                          {msg.status === "pulado" && (
+                            <span className="text-gray-400 dark:text-zinc-500 text-sm" title="Pulado">⏭</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Edit Form */}
