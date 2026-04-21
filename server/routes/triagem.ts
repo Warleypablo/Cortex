@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import { triagemAnalises } from "../../shared/schema";
 import { buscarTranscricao, analisarTranscricao, initTriagemTable } from "../services/triagem";
 
@@ -13,19 +13,18 @@ export function registerTriagemRoutes(app: Express, db: any) {
     try {
       const { status, score, squad } = req.query;
 
-      let conditions = [];
-      if (status && status !== "todos") conditions.push(`status = '${String(status).replace(/'/g, "")}'`);
-      if (score && score !== "todos") conditions.push(`score = '${String(score).replace(/'/g, "")}'`);
-      if (squad && squad !== "todos") conditions.push(`squad = '${String(squad).replace(/'/g, "")}'`);
+      let conditions: any[] = [];
+      if (status && status !== "todos") conditions.push(eq(triagemAnalises.status, String(status)));
+      if (score && score !== "todos") conditions.push(eq(triagemAnalises.score, String(score)));
+      if (squad && squad !== "todos") conditions.push(eq(triagemAnalises.squad, String(squad)));
 
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const results = await db
+        .select()
+        .from(triagemAnalises)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(triagemAnalises.criadoEm));
 
-      const result = await db.execute(sql.raw(`
-        SELECT * FROM cortex_core.triagem_analises
-        ${whereClause}
-        ORDER BY criado_em DESC
-      `));
-      res.json(result.rows || []);
+      res.json(results);
     } catch (error) {
       console.error("[api] Error fetching triagem list:", error);
       res.status(500).json({ error: "Failed to fetch triagem list" });
