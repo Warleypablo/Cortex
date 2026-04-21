@@ -212,4 +212,26 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
       res.status(500).json({ error: "Failed to fetch resumo" });
     }
   });
+
+  // GET /api/negativacao/mensagens/:clienteId — Billing messages from TurboZap
+  app.get("/api/negativacao/mensagens/:clienteId", async (req, res) => {
+    try {
+      const { clienteId } = req.params;
+      const result = await db.execute(sql`
+        SELECT
+          tipo_cobranca,
+          criado_em,
+          valor,
+          telefone,
+          status
+        FROM cortex_core.turbozap_envios
+        WHERE id_cliente = ${clienteId}
+        ORDER BY criado_em DESC
+      `);
+      res.json(result.rows || []);
+    } catch (error) {
+      console.error("[api] Error fetching mensagens cobranca:", error);
+      res.status(500).json({ error: "Failed to fetch billing messages" });
+    }
+  });
 }
