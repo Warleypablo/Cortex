@@ -39,6 +39,7 @@ import {
   CircleDot,
   MessageSquare,
   Phone,
+  CheckCircle2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ interface KanbanData {
     protesto: NegativacaoAcao[];
     negativacao: NegativacaoAcao[];
     acao_judicial: NegativacaoAcao[];
+    recuperados: NegativacaoAcao[];
   };
   resumo: {
     totalClientes: number;
@@ -142,6 +144,19 @@ const ETAPAS = [
     badgeBg: "bg-purple-500",
     textColor: "text-purple-700 dark:text-purple-400",
   },
+  {
+    key: "recuperados",
+    label: "Recuperados",
+    icon: CheckCircle2,
+    color: "green",
+    bgLight: "bg-green-50",
+    bgDark: "dark:bg-green-950/30",
+    borderLight: "border-green-200",
+    borderDark: "dark:border-green-800",
+    headerBg: "bg-green-100 dark:bg-green-900/40",
+    badgeBg: "bg-green-500",
+    textColor: "text-green-700 dark:text-green-400",
+  },
 ] as const;
 
 const STATUS_COLORS: Record<string, string> = {
@@ -149,6 +164,7 @@ const STATUS_COLORS: Record<string, string> = {
   em_andamento: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   concluido: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   cancelado: "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300",
+  quitado: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
 };
 
 const ETAPA_ORDER = ["notificacao", "protesto", "negativacao", "acao_judicial"];
@@ -489,7 +505,7 @@ export default function Negativacao() {
       </div>
 
       {/* ─── Kanban Board ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {ETAPAS.map((etapa) => {
           const actions =
             (kanbanData?.colunas as any)?.[etapa.key] || [];
@@ -507,8 +523,8 @@ export default function Negativacao() {
                 etapa.borderLight,
                 etapa.borderDark
               )}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, etapa.key)}
+              onDragOver={etapa.key !== "recuperados" ? handleDragOver : undefined}
+              onDrop={etapa.key !== "recuperados" ? (e) => handleDrop(e, etapa.key) : undefined}
             >
               {/* Column Header */}
               <div
@@ -552,8 +568,8 @@ export default function Negativacao() {
                   uniqueCards.map((action) => (
                     <div
                       key={action.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, action.clienteId)}
+                      draggable={etapa.key !== "recuperados"}
+                      onDragStart={(e) => etapa.key !== "recuperados" && handleDragStart(e, action.clienteId)}
                       onClick={() => handleCardClick(action)}
                       className={cn(
                         "bg-white dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700 p-3 cursor-pointer",
@@ -564,7 +580,9 @@ export default function Negativacao() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-1.5">
-                          <GripVertical className="h-3.5 w-3.5 text-gray-400 dark:text-zinc-500 flex-shrink-0" />
+                          {etapa.key !== "recuperados" && (
+                            <GripVertical className="h-3.5 w-3.5 text-gray-400 dark:text-zinc-500 flex-shrink-0" />
+                          )}
                           <span className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[140px]">
                             {action.clienteNome}
                           </span>
