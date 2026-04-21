@@ -37,6 +37,9 @@ import {
   ChevronRight,
   GripVertical,
   CircleDot,
+  MessageSquare,
+  Phone,
+  CheckCircle2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -68,6 +71,7 @@ interface KanbanData {
     protesto: NegativacaoAcao[];
     negativacao: NegativacaoAcao[];
     acao_judicial: NegativacaoAcao[];
+    recuperados: NegativacaoAcao[];
   };
   resumo: {
     totalClientes: number;
@@ -75,6 +79,14 @@ interface KanbanData {
     totalAcordos: number;
     taxaRecuperacao: number;
   };
+}
+
+interface MensagemCobranca {
+  tipo_cobranca: string;
+  criado_em: string;
+  valor: string;
+  telefone: string;
+  status: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -132,6 +144,19 @@ const ETAPAS = [
     badgeBg: "bg-purple-500",
     textColor: "text-purple-700 dark:text-purple-400",
   },
+  {
+    key: "recuperados",
+    label: "Recuperados",
+    icon: CheckCircle2,
+    color: "green",
+    bgLight: "bg-green-50",
+    bgDark: "dark:bg-green-950/30",
+    borderLight: "border-green-200",
+    borderDark: "dark:border-green-800",
+    headerBg: "bg-green-100 dark:bg-green-900/40",
+    badgeBg: "bg-green-500",
+    textColor: "text-green-700 dark:text-green-400",
+  },
 ] as const;
 
 const STATUS_COLORS: Record<string, string> = {
@@ -139,6 +164,7 @@ const STATUS_COLORS: Record<string, string> = {
   em_andamento: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   concluido: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   cancelado: "bg-gray-100 text-gray-800 dark:bg-gray-900/40 dark:text-gray-300",
+  quitado: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
 };
 
 const ETAPA_ORDER = ["notificacao", "protesto", "negativacao", "acao_judicial"];
@@ -175,6 +201,16 @@ export default function Negativacao() {
     queryFn: async () => {
       const r = await fetch(`/api/negativacao/cliente/${selectedClient}`);
       if (!r.ok) throw new Error("Failed to fetch client history");
+      return r.json();
+    },
+    enabled: !!selectedClient,
+  });
+
+  const { data: mensagensCobranca, isLoading: isLoadingMensagens } = useQuery<MensagemCobranca[]>({
+    queryKey: ["/api/negativacao/mensagens", selectedClient],
+    queryFn: async () => {
+      const r = await fetch(`/api/negativacao/mensagens/${selectedClient}`);
+      if (!r.ok) throw new Error("Failed to fetch billing messages");
       return r.json();
     },
     enabled: !!selectedClient,
@@ -469,7 +505,7 @@ export default function Negativacao() {
       </div>
 
       {/* ─── Kanban Board ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {ETAPAS.map((etapa) => {
           const actions =
             (kanbanData?.colunas as any)?.[etapa.key] || [];
@@ -487,8 +523,8 @@ export default function Negativacao() {
                 etapa.borderLight,
                 etapa.borderDark
               )}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, etapa.key)}
+              onDragOver={etapa.key !== "recuperados" ? handleDragOver : undefined}
+              onDrop={etapa.key !== "recuperados" ? (e) => handleDrop(e, etapa.key) : undefined}
             >
               {/* Column Header */}
               <div
@@ -532,8 +568,8 @@ export default function Negativacao() {
                   uniqueCards.map((action) => (
                     <div
                       key={action.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, action.clienteId)}
+                      draggable={etapa.key !== "recuperados"}
+                      onDragStart={(e) => etapa.key !== "recuperados" && handleDragStart(e, action.clienteId)}
                       onClick={() => handleCardClick(action)}
                       className={cn(
                         "bg-white dark:bg-zinc-800 rounded-lg border border-gray-200 dark:border-zinc-700 p-3 cursor-pointer",
@@ -544,7 +580,9 @@ export default function Negativacao() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-1.5">
-                          <GripVertical className="h-3.5 w-3.5 text-gray-400 dark:text-zinc-500 flex-shrink-0" />
+                          {etapa.key !== "recuperados" && (
+                            <GripVertical className="h-3.5 w-3.5 text-gray-400 dark:text-zinc-500 flex-shrink-0" />
+                          )}
                           <span className="font-medium text-sm text-gray-900 dark:text-white truncate max-w-[140px]">
                             {action.clienteNome}
                           </span>
@@ -700,6 +738,83 @@ export default function Negativacao() {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Mensagens de Cobrança */}
+              <div className="border-t border-gray-200 dark:border-zinc-700 pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  <h4 className="font-medium text-sm text-gray-700 dark:text-zinc-300">
+                    Mensagens de Cobrança
+                  </h4>
+                  {mensagensCobranca && mensagensCobranca.length > 0 && (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                      {mensagensCobranca.length}
+                    </Badge>
+                  )}
+                </div>
+
+                {isLoadingMensagens ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                  </div>
+                ) : !mensagensCobranca || mensagensCobranca.length === 0 ? (
+                  <p className="text-sm text-gray-400 dark:text-zinc-500 italic">
+                    Nenhuma mensagem de cobrança encontrada para este cliente.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {mensagensCobranca.map((msg, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 dark:bg-zinc-800/50 border border-gray-100 dark:border-zinc-700/50"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge
+                              variant="outline"
+                              className="text-xs font-mono bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
+                            >
+                              {msg.tipo_cobranca}
+                            </Badge>
+                            <span className="text-xs text-gray-500 dark:text-zinc-400">
+                              {msg.criado_em
+                                ? new Date(msg.criado_em).toLocaleDateString("pt-BR", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "-"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-zinc-400">
+                            <span className="font-medium">
+                              {formatCurrency(parseFloat(msg.valor || "0"))}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {msg.telefone}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {msg.status === "enviado" && (
+                            <span className="text-green-600 dark:text-green-400 text-sm" title="Enviado">✓</span>
+                          )}
+                          {msg.status === "erro" && (
+                            <span className="text-red-600 dark:text-red-400 text-sm" title="Erro">✗</span>
+                          )}
+                          {msg.status === "pulado" && (
+                            <span className="text-gray-400 dark:text-zinc-500 text-sm" title="Pulado">⏭</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Edit Form */}

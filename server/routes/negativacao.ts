@@ -8,9 +8,64 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
   // GET /api/negativacao/kanban — All actions grouped by etapa
   app.get("/api/negativacao/kanban", async (_req, res) => {
     try {
+      // Reset any previously auto-moved records so they get re-evaluated
+      await db.execute(sql`
+        UPDATE cortex_core.negativacao_acoes
+        SET status = 'pendente', etapa = 'notificacao'
+        WHERE observacoes IN ('Quitado - removido automaticamente', 'Quitado - movido automaticamente')
+          AND status IN ('concluido', 'quitado')
+      `);
+
+      // Clients with no overdue unpaid debt: check WHY they have no debt
+      // 1) "Recuperados" = paid late (>20 days after due date) — real recovery effort
+      await db.execute(sql`
+        UPDATE cortex_core.negativacao_acoes
+        SET status = 'quitado',
+            etapa = 'recuperados',
+            observacoes = 'Recuperado - pagamento com atraso > 20 dias',
+            atualizado_em = NOW()
+        WHERE status IN ('pendente', 'em_andamento')
+          AND cliente_id IN (
+            SELECT DISTINCT p.id_cliente::text
+            FROM "Conta Azul".caz_parcelas p
+            WHERE p.tipo_evento != 'DESPESA'
+              AND p.id_cliente IS NOT NULL
+              AND p.data_quitacao IS NOT NULL
+              AND p.data_quitacao::date - p.data_vencimento::date > 20
+              AND p.nao_pago = 0
+            GROUP BY p.id_cliente
+          )
+          AND cliente_id NOT IN (
+            SELECT DISTINCT p.id_cliente::text
+            FROM "Conta Azul".caz_parcelas p
+            WHERE p.nao_pago > 0
+              AND p.tipo_evento != 'DESPESA'
+              AND p.data_vencimento < CURRENT_DATE
+              AND p.id_cliente IS NOT NULL
+          )
+      `);
+
+      // 2) Everyone else with no overdue debt: remove silently (paid on time, no parcelas, future only)
+      await db.execute(sql`
+        UPDATE cortex_core.negativacao_acoes
+        SET status = 'concluido',
+            observacoes = 'Removido - sem débito vencido pendente',
+            atualizado_em = NOW()
+        WHERE status IN ('pendente', 'em_andamento')
+          AND cliente_id NOT IN (
+            SELECT DISTINCT p.id_cliente::text
+            FROM "Conta Azul".caz_parcelas p
+            WHERE p.nao_pago > 0
+              AND p.tipo_evento != 'DESPESA'
+              AND p.data_vencimento < CURRENT_DATE
+              AND p.id_cliente IS NOT NULL
+          )
+      `);
+
       const allActions = await db
         .select()
         .from(negativacaoAcoes)
+        .where(sql`${negativacaoAcoes.status} IN ('pendente', 'em_andamento', 'quitado')`)
         .orderBy(desc(negativacaoAcoes.criadoEm));
 
       // Group by etapa
@@ -18,6 +73,7 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
       const protesto = allActions.filter((a: any) => a.etapa === "protesto");
       const negativacao = allActions.filter((a: any) => a.etapa === "negativacao");
       const acaoJudicial = allActions.filter((a: any) => a.etapa === "acao_judicial");
+      const recuperados = allActions.filter((a: any) => a.etapa === "recuperados");
 
       // Summary metrics
       const clienteIds = new Set(allActions.map((a: any) => a.clienteId));
@@ -36,7 +92,7 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
         totalValor > 0 ? (totalAcordado / totalValor) * 100 : 0;
 
       res.json({
-        colunas: { notificacao, protesto, negativacao, acao_judicial: acaoJudicial },
+        colunas: { notificacao, protesto, negativacao, acao_judicial: acaoJudicial, recuperados },
         resumo: {
           totalClientes: clienteIds.size,
           totalValor,
@@ -210,6 +266,28 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching negativacao resumo:", error);
       res.status(500).json({ error: "Failed to fetch resumo" });
+    }
+  });
+
+  // GET /api/negativacao/mensagens/:clienteId — Billing messages from TurboZap
+  app.get("/api/negativacao/mensagens/:clienteId", async (req, res) => {
+    try {
+      const { clienteId } = req.params;
+      const result = await db.execute(sql`
+        SELECT
+          tipo_cobranca,
+          criado_em,
+          valor,
+          telefone,
+          status
+        FROM cortex_core.turbozap_envios
+        WHERE id_cliente = ${clienteId}
+        ORDER BY criado_em DESC
+      `);
+      res.json(result.rows || []);
+    } catch (error) {
+      console.error("[api] Error fetching mensagens cobranca:", error);
+      res.status(500).json({ error: "Failed to fetch billing messages" });
     }
   });
 }
