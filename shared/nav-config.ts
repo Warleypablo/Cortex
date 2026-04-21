@@ -225,10 +225,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
-  '/dashboard/saude-base-ativa': PERMISSION_KEYS.GESTAO.SAUDE_BASE,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
-  '/capacity': PERMISSION_KEYS.GESTAO.CAPACITY,
-  '/dashboard/analise-preditiva': PERMISSION_KEYS.GESTAO.ANALISE_PREDITIVA,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   '/contratos': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   // Operação
@@ -444,10 +441,7 @@ export const NAV_CONFIG = {
         { title: 'Evolução Mensal', url: '/dashboard/evolucao-mensal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
-        { title: 'Saúde da Base', url: '/dashboard/saude-base-ativa', icon: 'HeartPulse', permissionKey: PERMISSION_KEYS.GESTAO.SAUDE_BASE },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
-        { title: 'Capacity', url: '/capacity', icon: 'Gauge', permissionKey: PERMISSION_KEYS.GESTAO.CAPACITY },
-        { title: 'Análise Preditiva', url: '/dashboard/analise-preditiva', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_PREDITIVA },
       ],
     },
     {
