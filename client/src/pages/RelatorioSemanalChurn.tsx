@@ -16,6 +16,13 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   TrendingDown,
   DollarSign,
   Users,
@@ -258,6 +265,7 @@ const CustomTooltip = ({ active, payload, label, valueFormatter }: any) => {
 
 export default function RelatorioSemanalChurn() {
   const [weekOffset, setWeekOffset] = useState(0);
+  const [selectedSquad, setSelectedSquad] = useState<string>("todos");
   const { toast } = useToast();
 
   // Calculate week boundaries
@@ -308,13 +316,24 @@ export default function RelatorioSemanalChurn() {
     queryKey: ["/api/analytics/churn-detalhamento", { startDate: monthStart, endDate: monthEnd }],
   });
 
+  // Extract unique squads for filter
+  const availableSquads = useMemo(() => {
+    if (!currentData?.contratos) return [];
+    const squads = new Set(currentData.contratos.map((c) => c.squad).filter(Boolean));
+    return Array.from(squads).sort();
+  }, [currentData]);
+
   // Compute metrics for current week
   const weekMetrics = useMemo(() => {
     if (!currentData?.contratos) return null;
 
-    const churnContratos = currentData.contratos.filter((c) => c.tipo === "churn" && !c.is_abonado);
-    const abonadoContratos = currentData.contratos.filter((c) => c.is_abonado);
-    const pausados = currentData.contratos.filter((c) => c.tipo === "pausado");
+    const filteredContratos = selectedSquad === "todos"
+      ? currentData.contratos
+      : currentData.contratos.filter((c) => c.squad === selectedSquad);
+
+    const churnContratos = filteredContratos.filter((c) => c.tipo === "churn" && !c.is_abonado);
+    const abonadoContratos = filteredContratos.filter((c) => c.is_abonado);
+    const pausados = filteredContratos.filter((c) => c.tipo === "pausado");
     const totalChurns = churnContratos.length;
     const mrrPerdido = churnContratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const totalAbonados = abonadoContratos.length;
@@ -379,7 +398,7 @@ export default function RelatorioSemanalChurn() {
       totalAbonados,
       mrrAbonado,
     };
-  }, [currentData]);
+  }, [currentData, selectedSquad]);
 
   // Compute comparison with previous week
   const comparison = useMemo(() => {
@@ -697,6 +716,19 @@ export default function RelatorioSemanalChurn() {
                   Semana Atual
                 </Button>
               )}
+              <Select value={selectedSquad} onValueChange={setSelectedSquad}>
+                <SelectTrigger className="w-[180px] h-9">
+                  <SelectValue placeholder="Filtrar por squad" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os squads</SelectItem>
+                  {availableSquads.map((squad) => (
+                    <SelectItem key={squad} value={squad}>
+                      {squad}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
               <Button

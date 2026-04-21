@@ -1886,7 +1886,7 @@ export default function ChurnDetalhamento() {
       </Card>
 
       {/* Tabs de nível superior */}
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio" | "consolidado")}>
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio")}>
         <TabsList>
           <TabsTrigger value="analise" className="gap-2" data-testid="main-tab-analise">
             <BarChart3 className="h-4 w-4" />
@@ -1895,10 +1895,6 @@ export default function ChurnDetalhamento() {
           <TabsTrigger value="contratos" className="gap-2" data-testid="main-tab-contratos">
             <FileText className="h-4 w-4" />
             Contratos
-          </TabsTrigger>
-          <TabsTrigger value="consolidado" className="gap-2" data-testid="main-tab-consolidado">
-            <Target className="h-4 w-4" />
-            Consolidado Trimestral
           </TabsTrigger>
           <TabsTrigger value="relatorio" className="gap-2" data-testid="main-tab-relatorio">
             <CalendarRange className="h-4 w-4" />
@@ -1909,8 +1905,6 @@ export default function ChurnDetalhamento() {
 
       {mainTab === "relatorio" ? (
         <RelatorioSemanalChurn />
-      ) : mainTab === "consolidado" ? (
-        <ChurnConsolidadoTrimestral />
       ) : mainTab === "analise" ? (
       <>
 
@@ -1951,9 +1945,6 @@ export default function ChurnDetalhamento() {
               <div className="flex flex-col items-center justify-center p-4 bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Taxa de Churn</h3>
                 <ChurnGauge value={filteredTaxaChurn || 0} statusOverride={gaugeStatusOverride} />
-                <p className="text-xs text-muted-foreground mt-3 text-center">
-                  Base: {format(BASE_REFERENCE_DATE, "MMMM/yyyy", { locale: ptBR })}
-                </p>
                 {churnPlanejado.taxaPlanejada > 0 && (
                   <p className="text-[11px] text-muted-foreground text-center mt-1">
                     Planejado até hoje: <span className="font-semibold">{churnPlanejado.taxaPlanejada.toFixed(2)}%</span>
