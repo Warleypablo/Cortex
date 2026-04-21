@@ -711,7 +711,7 @@ function AnaliseCard({ analise, onView, onDecide }: AnaliseCardProps) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Triagem() {
-  useSetPageInfo({ title: "Triagem Inteligente", icon: "ShieldAlert" });
+  useSetPageInfo("Triagem Inteligente", "Análise de risco pré-onboarding");
 
   const [filterStatus, setFilterStatus] = useState("todos");
   const [filterScore, setFilterScore] = useState("todos");
