@@ -65,6 +65,7 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
       const allActions = await db
         .select()
         .from(negativacaoAcoes)
+        .where(sql`${negativacaoAcoes.status} IN ('pendente', 'em_andamento', 'quitado')`)
         .orderBy(desc(negativacaoAcoes.criadoEm));
 
       // Group by etapa
