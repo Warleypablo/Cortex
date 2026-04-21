@@ -8,11 +8,20 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
   // GET /api/negativacao/kanban — All actions grouped by etapa
   app.get("/api/negativacao/kanban", async (_req, res) => {
     try {
+      // One-time migration: move previously auto-removed to recuperados
+      await db.execute(sql`
+        UPDATE cortex_core.negativacao_acoes
+        SET status = 'quitado', etapa = 'recuperados'
+        WHERE status = 'concluido'
+          AND observacoes = 'Quitado - removido automaticamente'
+      `);
+
       // Auto-remove clients with no overdue unpaid debt (paid or not yet due)
       await db.execute(sql`
         UPDATE cortex_core.negativacao_acoes
-        SET status = 'concluido',
-            observacoes = 'Quitado - removido automaticamente',
+        SET status = 'quitado',
+            etapa = 'recuperados',
+            observacoes = 'Quitado - movido automaticamente',
             atualizado_em = NOW()
         WHERE status IN ('pendente', 'em_andamento')
           AND cliente_id NOT IN (
@@ -35,6 +44,7 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
       const protesto = allActions.filter((a: any) => a.etapa === "protesto");
       const negativacao = allActions.filter((a: any) => a.etapa === "negativacao");
       const acaoJudicial = allActions.filter((a: any) => a.etapa === "acao_judicial");
+      const recuperados = allActions.filter((a: any) => a.etapa === "recuperados");
 
       // Summary metrics
       const clienteIds = new Set(allActions.map((a: any) => a.clienteId));
@@ -53,7 +63,7 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
         totalValor > 0 ? (totalAcordado / totalValor) * 100 : 0;
 
       res.json({
-        colunas: { notificacao, protesto, negativacao, acao_judicial: acaoJudicial },
+        colunas: { notificacao, protesto, negativacao, acao_judicial: acaoJudicial, recuperados },
         resumo: {
           totalClientes: clienteIds.size,
           totalValor,
