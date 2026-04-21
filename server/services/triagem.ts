@@ -110,7 +110,10 @@ export async function analisarTranscricao(transcricao: string): Promise<any> {
   });
 
   const block = response.content[0];
-  const text = block.type === "text" ? block.text : "{}";
+  let text = block.type === "text" ? block.text : "{}";
+
+  // Strip markdown code fences if present
+  text = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
 
   try {
     return JSON.parse(text);
