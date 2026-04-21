@@ -8,20 +8,48 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
   // GET /api/negativacao/kanban — All actions grouped by etapa
   app.get("/api/negativacao/kanban", async (_req, res) => {
     try {
-      // One-time migration: move previously auto-removed to recuperados
+      // Reset any previously auto-moved records so they get re-evaluated
       await db.execute(sql`
         UPDATE cortex_core.negativacao_acoes
-        SET status = 'quitado', etapa = 'recuperados'
-        WHERE status = 'concluido'
-          AND observacoes = 'Quitado - removido automaticamente'
+        SET status = 'pendente', etapa = 'notificacao'
+        WHERE observacoes IN ('Quitado - removido automaticamente', 'Quitado - movido automaticamente')
+          AND status IN ('concluido', 'quitado')
       `);
 
-      // Auto-remove clients with no overdue unpaid debt (paid or not yet due)
+      // Clients with no overdue unpaid debt: check WHY they have no debt
+      // 1) "Recuperados" = paid late (>20 days after due date) — real recovery effort
       await db.execute(sql`
         UPDATE cortex_core.negativacao_acoes
         SET status = 'quitado',
             etapa = 'recuperados',
-            observacoes = 'Quitado - movido automaticamente',
+            observacoes = 'Recuperado - pagamento com atraso > 20 dias',
+            atualizado_em = NOW()
+        WHERE status IN ('pendente', 'em_andamento')
+          AND cliente_id IN (
+            SELECT DISTINCT p.id_cliente::text
+            FROM "Conta Azul".caz_parcelas p
+            WHERE p.tipo_evento != 'DESPESA'
+              AND p.id_cliente IS NOT NULL
+              AND p.data_quitacao IS NOT NULL
+              AND p.data_quitacao::date - p.data_vencimento::date > 20
+              AND p.nao_pago = 0
+            GROUP BY p.id_cliente
+          )
+          AND cliente_id NOT IN (
+            SELECT DISTINCT p.id_cliente::text
+            FROM "Conta Azul".caz_parcelas p
+            WHERE p.nao_pago > 0
+              AND p.tipo_evento != 'DESPESA'
+              AND p.data_vencimento < CURRENT_DATE
+              AND p.id_cliente IS NOT NULL
+          )
+      `);
+
+      // 2) Everyone else with no overdue debt: remove silently (paid on time, no parcelas, future only)
+      await db.execute(sql`
+        UPDATE cortex_core.negativacao_acoes
+        SET status = 'concluido',
+            observacoes = 'Removido - sem débito vencido pendente',
             atualizado_em = NOW()
         WHERE status IN ('pendente', 'em_andamento')
           AND cliente_id NOT IN (
