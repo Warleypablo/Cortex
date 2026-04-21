@@ -8,6 +8,26 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
   // GET /api/negativacao/kanban — All actions grouped by etapa
   app.get("/api/negativacao/kanban", async (_req, res) => {
     try {
+      // Auto-remove clients who have paid all outstanding debt
+      await db.execute(sql`
+        UPDATE cortex_core.negativacao_acoes
+        SET status = 'concluido',
+            observacoes = 'Quitado - removido automaticamente',
+            atualizado_em = NOW()
+        WHERE status IN ('pendente', 'em_andamento')
+          AND cliente_id IN (
+            SELECT DISTINCT n.cliente_id
+            FROM cortex_core.negativacao_acoes n
+            LEFT JOIN "Conta Azul".caz_parcelas p
+              ON p.id_cliente::text = n.cliente_id::text
+              AND p.nao_pago > 0
+              AND p.tipo_evento != 'DESPESA'
+            WHERE n.status IN ('pendente', 'em_andamento')
+            GROUP BY n.cliente_id
+            HAVING COALESCE(SUM(p.nao_pago), 0) = 0
+          )
+      `);
+
       const allActions = await db
         .select()
         .from(negativacaoAcoes)
