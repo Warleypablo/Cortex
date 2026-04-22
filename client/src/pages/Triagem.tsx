@@ -50,6 +50,7 @@ import {
   ExternalLink,
   Eye,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -455,9 +456,10 @@ interface DetailSheetProps {
   analise: TriagemAnalise | null;
   onClose: () => void;
   onDecide: (a: TriagemAnalise) => void;
+  onDelete: (a: TriagemAnalise) => void;
 }
 
-function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
+function DetailSheet({ analise, onClose, onDecide, onDelete }: DetailSheetProps) {
   if (!analise) return null;
 
   const aj = analise.analiseJson;
@@ -722,16 +724,26 @@ function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
             </div>
           )}
 
-          {/* Action button */}
-          {analise.status === "pendente" && (
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            {analise.status === "pendente" && (
+              <Button
+                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white gap-2"
+                onClick={() => { onClose(); onDecide(analise); }}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Registrar Decisão
+              </Button>
+            )}
             <Button
-              className="w-full bg-violet-600 hover:bg-violet-700 text-white gap-2"
-              onClick={() => { onClose(); onDecide(analise); }}
+              variant="outline"
+              className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 gap-2"
+              onClick={() => { onClose(); onDelete(analise); }}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              Registrar Decisão
+              <Trash2 className="w-4 h-4" />
+              Excluir
             </Button>
-          )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
@@ -856,6 +868,29 @@ export default function Triagem() {
   const [showNovaAnalise, setShowNovaAnalise] = useState(false);
   const [selectedAnalise, setSelectedAnalise] = useState<TriagemAnalise | null>(null);
   const [decisaoAnalise, setDecisaoAnalise] = useState<TriagemAnalise | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/triagem/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Erro ao excluir análise");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/triagem"] });
+      toast({ title: "Análise excluída com sucesso" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir análise", variant: "destructive" });
+    },
+  });
+
+  function handleDelete(analise: TriagemAnalise) {
+    if (confirm(`Excluir análise de "${analise.clienteNome}"?`)) {
+      deleteMutation.mutate(analise.id);
+    }
+  }
 
   const params = new URLSearchParams();
   if (filterStatus !== "todos") params.set("status", filterStatus);
@@ -1009,6 +1044,7 @@ export default function Triagem() {
         analise={selectedAnalise}
         onClose={() => setSelectedAnalise(null)}
         onDecide={(a) => { setSelectedAnalise(null); setDecisaoAnalise(a); }}
+        onDelete={(a) => { setSelectedAnalise(null); handleDelete(a); }}
       />
       <DecisaoModal
         analise={decisaoAnalise}

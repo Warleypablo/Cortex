@@ -103,6 +103,26 @@ export function registerTriagemRoutes(app: Express, db: any) {
     }
   });
 
+  // DELETE /api/triagem/:id — Delete an analysis
+  app.delete("/api/triagem/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [deleted] = await db
+        .delete(triagemAnalises)
+        .where(eq(triagemAnalises.id, parseInt(id)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting triagem analysis:", error);
+      res.status(500).json({ error: "Failed to delete analysis" });
+    }
+  });
+
   // PUT /api/triagem/:id/decidir — Record decision on an analysis
   app.put("/api/triagem/:id/decidir", async (req, res) => {
     try {
