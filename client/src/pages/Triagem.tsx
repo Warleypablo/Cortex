@@ -51,6 +51,8 @@ import {
   Eye,
   RefreshCw,
   Trash2,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -78,6 +80,19 @@ interface ComposicaoScore {
   formula: string;
 }
 
+interface PontoVendedor {
+  aspecto: string;
+  justificativa: string;
+  trecho: string;
+}
+
+interface AvaliacaoVendedor {
+  pontos_negativos: PontoVendedor[];
+  pontos_positivos: PontoVendedor[];
+  nota_geral: "boa" | "regular" | "ruim";
+  resumo_vendedor: string;
+}
+
 interface AnaliseJson {
   score: "alto" | "medio" | "baixo";
   score_numerico: number;
@@ -89,6 +104,7 @@ interface AnaliseJson {
   };
   agravantes: SinalSecundario[];
   atenuantes: SinalSecundario[];
+  avaliacao_vendedor?: AvaliacaoVendedor;
   resumo: string;
   recomendacao: "Aprovar" | "Aprovar com atenção" | "Escalar para gestor" | "Rejeitar - alto risco";
 }
@@ -703,6 +719,69 @@ function DetailSheet({ analise, onClose, onDecide, onDelete }: DetailSheetProps)
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Avaliação do Vendedor */}
+          {aj?.avaliacao_vendedor && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide flex items-center gap-1.5">
+                  <User className="w-4 h-4" />
+                  Avaliação do Vendedor
+                </h3>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  aj.avaliacao_vendedor.nota_geral === "boa"
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : aj.avaliacao_vendedor.nota_geral === "ruim"
+                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                }`}>
+                  {aj.avaliacao_vendedor.nota_geral === "boa" ? "Boa" : aj.avaliacao_vendedor.nota_geral === "ruim" ? "Ruim" : "Regular"}
+                </span>
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-zinc-400 italic">
+                {aj.avaliacao_vendedor.resumo_vendedor}
+              </p>
+
+              {aj.avaliacao_vendedor.pontos_negativos.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <ThumbsDown className="w-3 h-3" /> Pontos Negativos
+                  </p>
+                  {aj.avaliacao_vendedor.pontos_negativos.map((ponto, i) => (
+                    <div key={i} className="rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-900/10 p-3">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">{ponto.aspecto}</p>
+                      <p className="text-xs text-gray-600 dark:text-zinc-400">{ponto.justificativa}</p>
+                      {ponto.trecho && (
+                        <blockquote className="mt-1.5 text-xs italic text-gray-500 dark:text-zinc-500 border-l-2 border-red-300 dark:border-red-700 pl-2">
+                          "{ponto.trecho}"
+                        </blockquote>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {aj.avaliacao_vendedor.pontos_positivos.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <ThumbsUp className="w-3 h-3" /> Pontos Positivos
+                  </p>
+                  {aj.avaliacao_vendedor.pontos_positivos.map((ponto, i) => (
+                    <div key={i} className="rounded-lg border border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10 p-3">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">{ponto.aspecto}</p>
+                      <p className="text-xs text-gray-600 dark:text-zinc-400">{ponto.justificativa}</p>
+                      {ponto.trecho && (
+                        <blockquote className="mt-1.5 text-xs italic text-gray-500 dark:text-zinc-500 border-l-2 border-green-300 dark:border-green-700 pl-2">
+                          "{ponto.trecho}"
+                        </blockquote>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

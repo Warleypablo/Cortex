@@ -123,6 +123,27 @@ Com base no score_numerico:
 - 51-70: "Escalar para gestor"
 - 71-100: "Rejeitar - alto risco"
 
+## AVALIAÇÃO DO VENDEDOR
+
+Analise a postura e conduta do vendedor durante a reunião. Identifique SEPARADAMENTE pontos negativos e positivos:
+
+**Pontos negativos a observar:**
+- Prometeu resultados exagerados ou prazos irreais para fechar a venda
+- Empurrou produto/serviço desnecessário ou inadequado para o perfil do cliente
+- Não alinhou expectativas quando o cliente demonstrou visão irrealista
+- Não investigou a real necessidade do cliente (venda consultiva fraca)
+- Omitiu limitações, riscos ou pré-requisitos do serviço
+
+**Pontos positivos a observar:**
+- Alinhou expectativas de forma clara e honesta
+- Fez perguntas consultivas para entender a real necessidade
+- Sugeriu o produto/serviço mais adequado ao perfil
+- Explicou pré-requisitos e o que o cliente precisa ter pronto
+- Conduziu a reunião de forma profissional e organizada
+- Estabeleceu próximos passos claros
+
+Liste TODOS os pontos identificados (positivos E negativos), com justificativa e trecho da transcrição para cada um.
+
 Responda EXCLUSIVAMENTE em JSON válido, sem markdown, sem backticks, sem texto antes ou depois. Use esta estrutura exata:
 
 {
@@ -173,6 +194,24 @@ Responda EXCLUSIVAMENTE em JSON válido, sem markdown, sem backticks, sem texto 
       "justificativa": "<explicação breve>"
     }
   ],
+  "avaliacao_vendedor": {
+    "pontos_negativos": [
+      {
+        "aspecto": "<descrição curta do problema>",
+        "justificativa": "<explicação em 1-2 frases>",
+        "trecho": "<trecho relevante da transcrição>"
+      }
+    ],
+    "pontos_positivos": [
+      {
+        "aspecto": "<descrição curta do acerto>",
+        "justificativa": "<explicação em 1-2 frases>",
+        "trecho": "<trecho relevante da transcrição>"
+      }
+    ],
+    "nota_geral": "boa" | "regular" | "ruim",
+    "resumo_vendedor": "<resumo da postura do vendedor em 1-2 frases>"
+  },
   "resumo": "<resumo executivo em 2-3 frases>",
   "recomendacao": "Aprovar" | "Aprovar com atenção" | "Escalar para gestor" | "Rejeitar - alto risco"
 }`;
@@ -218,6 +257,12 @@ export async function analisarTranscricao(transcricao: string): Promise<any> {
       },
       agravantes: [],
       atenuantes: [],
+      avaliacao_vendedor: {
+        pontos_negativos: [],
+        pontos_positivos: [],
+        nota_geral: "regular",
+        resumo_vendedor: "Não foi possível avaliar a postura do vendedor.",
+      },
       resumo: "Análise inconclusiva - resposta da IA não pôde ser processada.",
       recomendacao: "Escalar para gestor",
     };
