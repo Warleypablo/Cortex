@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 interface UnavailabilityRequestGG {
   id: number;
@@ -114,13 +115,15 @@ interface SelectedColaboradorDetail {
   tipoDesligamento?: string | null;
 }
 
-type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano";
+type PeriodoPreset = "mesAtual" | "trimestre" | "semestre" | "ano" | "custom";
 
 interface PeriodoState {
   preset: PeriodoPreset;
+  from?: Date;
+  to?: Date;
 }
 
-const PERIODO_PRESETS: { value: PeriodoPreset; label: string }[] = [
+const PERIODO_PRESETS: { value: Exclude<PeriodoPreset, "custom">; label: string }[] = [
   { value: "mesAtual", label: "Mês Atual" },
   { value: "trimestre", label: "Trimestre" },
   { value: "semestre", label: "Semestre" },
@@ -144,18 +147,25 @@ const SQUAD_OPTIONS: { value: string; label: string }[] = [
   { value: "Fragmentados", label: "🧩 Fragmentados (OFF)" },
 ];
 
-function getPeriodoParaQuery(periodoState: PeriodoState): string {
+function getPeriodoParaQuery(periodoState: PeriodoState): { periodo: string; dataInicio?: string; dataFim?: string } {
+  if (periodoState.preset === "custom" && periodoState.from && periodoState.to) {
+    return {
+      periodo: "custom",
+      dataInicio: periodoState.from.toISOString().split("T")[0],
+      dataFim: periodoState.to.toISOString().split("T")[0],
+    };
+  }
   switch (periodoState.preset) {
     case "mesAtual":
-      return "mes";
+      return { periodo: "mes" };
     case "trimestre":
-      return "trimestre";
+      return { periodo: "trimestre" };
     case "semestre":
-      return "semestre";
+      return { periodo: "semestre" };
     case "ano":
-      return "ano";
+      return { periodo: "ano" };
     default:
-      return "trimestre";
+      return { periodo: "trimestre" };
   }
 }
 
@@ -675,18 +685,19 @@ export default function DashboardGeG() {
     localStorage.removeItem('geg-ignored-alerts');
   };
 
-  const periodo = getPeriodoParaQuery(periodoState);
+  const { periodo, dataInicio: dataInicioQuery, dataFim: dataFimQuery } = getPeriodoParaQuery(periodoState);
+  const periodoParams = { periodo, ...(dataInicioQuery && { dataInicio: dataInicioQuery }), ...(dataFimQuery && { dataFim: dataFimQuery }) };
 
   const { data: metricas, isLoading: isLoadingMetricas } = useQuery<GegMetricas>({
-    queryKey: ['/api/geg/metricas', { periodo, squad, setor, nivel, cargo }],
+    queryKey: ['/api/geg/metricas', { ...periodoParams, squad, setor, nivel, cargo }],
   });
 
   const { data: evolucaoHeadcount, isLoading: isLoadingEvolucao } = useQuery<EvolucaoHeadcount[]>({
-    queryKey: ['/api/geg/evolucao-headcount', { periodo, squad, setor, nivel, cargo }],
+    queryKey: ['/api/geg/evolucao-headcount', { ...periodoParams, squad, setor, nivel, cargo }],
   });
 
   const { data: admissoesDemissoes, isLoading: isLoadingAdmissoesDemissoes } = useQuery<AdmissoesDemissoes[]>({
-    queryKey: ['/api/geg/admissoes-demissoes', { periodo, squad, setor, nivel, cargo }],
+    queryKey: ['/api/geg/admissoes-demissoes', { ...periodoParams, squad, setor, nivel, cargo }],
   });
 
   const { data: aniversariantesMes, isLoading: isLoadingAniversariantes } = useQuery<Aniversariante[]>({
@@ -783,7 +794,7 @@ export default function DashboardGeG() {
   });
 
   const { data: retencaoSaude, isLoading: isLoadingRetencaoSaude } = useQuery<RetencaoSaude>({
-    queryKey: ['/api/geg/retencao-saude', { periodo, squad, setor, nivel, cargo }],
+    queryKey: ['/api/geg/retencao-saude', { ...periodoParams, squad, setor, nivel, cargo }],
   });
 
   const { data: colaboradoresPorSaude, isLoading: isLoadingColaboradoresPorSaude } = useQuery<ColaboradoresPorSaude>({
@@ -931,7 +942,7 @@ export default function DashboardGeG() {
                 </Popover>
               </div>
               
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {PERIODO_PRESETS.map((preset) => (
                   <Button
                     key={preset.value}
@@ -943,6 +954,19 @@ export default function DashboardGeG() {
                     {preset.label}
                   </Button>
                 ))}
+                <DateRangePicker
+                  value={periodoState.preset === "custom" && periodoState.from && periodoState.to
+                    ? { from: periodoState.from, to: periodoState.to }
+                    : undefined}
+                  onChange={(range) => {
+                    if (range?.from && range?.to) {
+                      setPeriodoState({ preset: "custom", from: range.from, to: range.to });
+                    }
+                  }}
+                  placeholder="Personalizado"
+                  align="end"
+                  triggerClassName={`h-8 min-w-0 text-xs px-3 ${periodoState.preset === "custom" ? "border-primary text-primary" : ""}`}
+                />
               </div>
             </div>
           </CardContent>

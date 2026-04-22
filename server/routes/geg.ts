@@ -12,8 +12,10 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       const setor = req.query.setor as string || 'todos';
       const nivel = req.query.nivel as string || 'todos';
       const cargo = req.query.cargo as string || 'todos';
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
 
-      const metricas = await storage.getGegMetricas(periodo, squad, setor, nivel, cargo);
+      const metricas = await storage.getGegMetricas(periodo, squad, setor, nivel, cargo, dataInicio, dataFim);
       res.json(metricas);
     } catch (error) {
       console.error("[api] Error fetching GEG metricas:", error);
@@ -28,8 +30,10 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       const setor = req.query.setor as string || 'todos';
       const nivel = req.query.nivel as string || 'todos';
       const cargo = req.query.cargo as string || 'todos';
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
 
-      const evolucao = await storage.getGegEvolucaoHeadcount(periodo, squad, setor, nivel, cargo);
+      const evolucao = await storage.getGegEvolucaoHeadcount(periodo, squad, setor, nivel, cargo, dataInicio, dataFim);
       res.json(evolucao);
     } catch (error) {
       console.error("[api] Error fetching GEG evolucao headcount:", error);
@@ -44,8 +48,10 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       const setor = req.query.setor as string || 'todos';
       const nivel = req.query.nivel as string || 'todos';
       const cargo = req.query.cargo as string || 'todos';
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
 
-      const dados = await storage.getGegAdmissoesDemissoes(periodo, squad, setor, nivel, cargo);
+      const dados = await storage.getGegAdmissoesDemissoes(periodo, squad, setor, nivel, cargo, dataInicio, dataFim);
       res.json(dados);
     } catch (error) {
       console.error("[api] Error fetching GEG admissoes demissoes:", error);
@@ -585,16 +591,26 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
   app.get("/api/geg/retencao-saude", async (req, res) => {
     try {
       const periodo = req.query.periodo as string || 'ano';
+      const dataInicioCustom = req.query.dataInicio as string | undefined;
+      const dataFimCustom = req.query.dataFim as string | undefined;
       const colaboradores = await storage.getColaboradores({});
 
       const hoje = new Date();
-      let inicioMeses = 12;
-      if (periodo === 'trimestre') inicioMeses = 3;
-      else if (periodo === 'semestre') inicioMeses = 6;
-      else if (periodo === 'mes') inicioMeses = 1;
+      let dataInicio: Date;
+      let dataFim: Date = hoje;
 
-      const dataInicio = new Date(hoje);
-      dataInicio.setMonth(dataInicio.getMonth() - inicioMeses);
+      if (periodo === 'custom' && dataInicioCustom && dataFimCustom) {
+        dataInicio = new Date(dataInicioCustom);
+        dataFim = new Date(dataFimCustom);
+      } else {
+        let inicioMeses = 12;
+        if (periodo === 'trimestre') inicioMeses = 3;
+        else if (periodo === 'semestre') inicioMeses = 6;
+        else if (periodo === 'mes') inicioMeses = 1;
+
+        dataInicio = new Date(hoje);
+        dataInicio.setMonth(dataInicio.getMonth() - inicioMeses);
+      }
 
       // Count active at start of period
       const ativosInicio = colaboradores.filter(c => {
@@ -609,7 +625,7 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       // Count dismissed in period
       const demitidosPeriodo = colaboradores.filter(c => {
         const demissao = c.demissao ? new Date(c.demissao) : null;
-        return demissao && demissao >= dataInicio && demissao <= hoje;
+        return demissao && demissao >= dataInicio && demissao <= dataFim;
       }).length;
 
       // Retention rate
