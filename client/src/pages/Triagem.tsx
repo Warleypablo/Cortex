@@ -749,8 +749,9 @@ interface AnaliseCardProps {
 function AnaliseCard({ analise, onView, onDecide }: AnaliseCardProps) {
   const aj = analise.analiseJson;
   const detectedCount = aj
-    ? Object.values(aj.analise).filter(c => c.detectado).length
+    ? Object.values(aj.analise).filter(c => c.detectado).length + (aj.agravantes?.length || 0)
     : 0;
+  const mitigatorCount = aj?.atenuantes?.length || 0;
 
   return (
     <Card
@@ -802,6 +803,11 @@ function AnaliseCard({ analise, onView, onDecide }: AnaliseCardProps) {
           {detectedCount > 0 && (
             <span className="flex items-center gap-1 text-red-500 dark:text-red-400">
               <AlertTriangle className="w-3 h-3" /> {detectedCount} sinal{detectedCount > 1 ? "is" : ""}
+            </span>
+          )}
+          {mitigatorCount > 0 && (
+            <span className="flex items-center gap-1 text-green-500 dark:text-green-400">
+              <ShieldCheck className="w-3 h-3" /> {mitigatorCount} atenuante{mitigatorCount > 1 ? "s" : ""}
             </span>
           )}
         </div>
