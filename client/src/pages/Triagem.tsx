@@ -656,6 +656,54 @@ function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
             </div>
           )}
 
+          {/* Agravantes */}
+          {aj?.agravantes && aj.agravantes.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" />
+                Sinais Agravantes (+{aj.agravantes.reduce((s, a) => s + a.pontos, 0)} pts)
+              </h3>
+              <div className="space-y-2">
+                {aj.agravantes.map((agr, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-900/10 p-3"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{agr.sinal}</span>
+                      <span className="text-xs font-bold text-red-600 dark:text-red-400">+{agr.pontos} pts</span>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-zinc-400">{agr.justificativa}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Atenuantes */}
+          {aj?.atenuantes && aj.atenuantes.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4" />
+                Sinais Atenuantes (-{aj.atenuantes.reduce((s, a) => s + a.pontos, 0)} pts)
+              </h3>
+              <div className="space-y-2">
+                {aj.atenuantes.map((att, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg border border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10 p-3"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{att.sinal}</span>
+                      <span className="text-xs font-bold text-green-600 dark:text-green-400">-{att.pontos} pts</span>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-zinc-400">{att.justificativa}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Decision info */}
           {analise.status !== "pendente" && (
             <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-4 space-y-1">
