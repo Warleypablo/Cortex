@@ -460,7 +460,7 @@ function UnavailabilityApprovalSection() {
                   <p>Nenhuma indisponibilidade alinhada registrada.</p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-6 max-h-[400px] overflow-y-auto pr-2">
                   {Object.entries(groupedByMonth).map(([month, requests]) => (
                     <div key={month}>
                       <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
