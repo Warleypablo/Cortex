@@ -123,9 +123,9 @@ Com base no score_numerico:
 - 51-70: "Escalar para gestor"
 - 71-100: "Rejeitar - alto risco"
 
-## AVALIAÇÃO DO VENDEDOR
+## AVALIAÇÃO DO VENDEDOR (OBRIGATÓRIO — sempre incluir no JSON)
 
-Analise a postura e conduta do vendedor durante a reunião. Identifique SEPARADAMENTE pontos negativos e positivos:
+Analise a postura e conduta do vendedor durante a reunião. Este campo é OBRIGATÓRIO mesmo que não haja pontos negativos. Identifique SEPARADAMENTE pontos negativos e positivos:
 
 **Pontos negativos a observar:**
 - Prometeu resultados exagerados ou prazos irreais para fechar a venda
