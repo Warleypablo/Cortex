@@ -5,8 +5,14 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, TrendingUp, Megaphone, Users, UserCheck, Wallet, ChevronDown, ChevronRight } from "lucide-react";
+import { Loader2, TrendingUp, Megaphone, Users, UserCheck, Wallet, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
+
+const EXPORT_ALLOWED_EMAILS = new Set([
+  "vinicius.ichino@turbopartners.com.br",
+  "ferramentas@turbopartners.com.br",
+]);
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM } from "@/lib/metasBudgetConfig";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { cn } from "@/lib/utils";
@@ -480,6 +486,11 @@ export default function GrowthEvolucaoTemporal() {
   usePageTitle("Evolução Temporal");
   useSetPageInfo("Evolução Temporal", "Matriz de métricas por mês ao longo do ano");
 
+  const { user } = useAuth();
+  const canExport =
+    user?.role === "admin" ||
+    (!!user?.email && EXPORT_ALLOWED_EMAILS.has(user.email));
+
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState<number>(currentYear);
   const [selectedProdutos, setSelectedProdutos] = useState<string[]>([]);
@@ -724,6 +735,42 @@ export default function GrowthEvolucaoTemporal() {
   const expandAll = () => setExpandedMonths(new Set(buckets.map((b) => b.key)));
   const collapseAll = () => setExpandedMonths(new Set());
 
+  const buildExportRows = () => {
+    const header = ["Seção", "Métrica", ...columns.map((c) => c.kind === "month" ? c.bucket.label : c.week.label)];
+    const rows: (string | number | null)[][] = [];
+    for (const sKey of SECTION_ORDER) {
+      const defs = metricsBySection[sKey];
+      if (!defs || defs.length === 0) continue;
+      const sectionTitle = SECTION_META[sKey].title;
+      for (const m of defs) {
+        const row: (string | number | null)[] = [sectionTitle, m.name];
+        for (const col of columns) {
+          const bKey = col.kind === "month" ? col.bucket.key : col.week.key;
+          const data = byBucket[bKey] || {};
+          const realizado = m.realizado(data);
+          row.push(realizado === null || !Number.isFinite(realizado) ? null : Number(realizado));
+        }
+        rows.push(row);
+      }
+    }
+    return { header, rows };
+  };
+
+  const fileBase = () => {
+    const exp = expandedMonths.size > 0 ? `_semanas${expandedMonths.size}` : "";
+    return `EvolucaoTemporal_${year}${exp}`;
+  };
+
+  const exportXLSX = async () => {
+    const XLSX = await import("xlsx");
+    const { header, rows } = buildExportRows();
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws["!cols"] = [{ wch: 20 }, { wch: 34 }, ...columns.map(() => ({ wch: 12 }))];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Evolução Temporal");
+    XLSX.writeFile(wb, `${fileBase()}.xlsx`);
+  };
+
   return (
     <div className="p-6 space-y-4">
       <Card>
@@ -761,6 +808,11 @@ export default function GrowthEvolucaoTemporal() {
               <Button variant="outline" size="sm" onClick={collapseAll} disabled={expandedMonths.size === 0}>
                 Colapsar todos
               </Button>
+              {canExport && (
+                <Button variant="outline" size="sm" onClick={exportXLSX} title="Exportar matriz visível em XLSX">
+                  <Download className="h-3.5 w-3.5 mr-1" /> Exportar XLSX
+                </Button>
+              )}
             </div>
           </div>
 
