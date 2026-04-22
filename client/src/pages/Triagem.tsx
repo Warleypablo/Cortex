@@ -165,6 +165,21 @@ function ScoreBar({ value }: { value: number | null }) {
   );
 }
 
+function ScoreCompositionBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-gray-600 dark:text-zinc-400">{label}</span>
+        <span className="font-medium text-gray-700 dark:text-zinc-300">{value}/{max}</span>
+      </div>
+      <div className="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-1.5 overflow-hidden">
+        <div className={`${color} h-1.5 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 // ─── New Analysis Form ────────────────────────────────────────────────────────
 
 interface NovaAnaliseFormProps {
@@ -487,6 +502,50 @@ function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
             </div>
           )}
 
+          {/* Score Composition */}
+          {aj?.composicao_score && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                Composição do Score
+              </h3>
+              <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-4 space-y-3">
+                <ScoreCompositionBar
+                  label="Expectativa Irreal"
+                  value={aj.composicao_score.expectativa_irreal}
+                  max={40}
+                  color="bg-red-500"
+                />
+                <ScoreCompositionBar
+                  label="Falta de Estrutura"
+                  value={aj.composicao_score.falta_estrutura}
+                  max={35}
+                  color="bg-orange-500"
+                />
+                <ScoreCompositionBar
+                  label="Serviço Inadequado"
+                  value={aj.composicao_score.servico_inadequado}
+                  max={25}
+                  color="bg-yellow-500"
+                />
+                {aj.composicao_score.agravantes_total > 0 && (
+                  <div className="flex justify-between text-xs pt-1 border-t border-gray-200 dark:border-zinc-700">
+                    <span className="text-red-600 dark:text-red-400">+ Agravantes</span>
+                    <span className="font-medium text-red-600 dark:text-red-400">+{aj.composicao_score.agravantes_total}</span>
+                  </div>
+                )}
+                {aj.composicao_score.atenuantes_total > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-600 dark:text-green-400">- Atenuantes</span>
+                    <span className="font-medium text-green-600 dark:text-green-400">-{aj.composicao_score.atenuantes_total}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs pt-1 border-t border-gray-200 dark:border-zinc-700">
+                  <span className="text-gray-500 dark:text-zinc-500 font-mono">{aj.composicao_score.formula}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Metadata */}
           <div className="grid grid-cols-2 gap-3">
             {analise.squad && (
@@ -572,6 +631,11 @@ function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
                       <span className={`text-xs font-medium capitalize ${SEVERIDADE_CONFIG[data.severidade]}`}>
                         {data.severidade === "nenhuma" ? "Não detectado" : `Severidade: ${data.severidade}`}
                       </span>
+                      {data.pontos > 0 && (
+                        <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                          +{data.pontos} pts
+                        </span>
+                      )}
                     </div>
                   </div>
                   <p className="text-sm text-gray-600 dark:text-zinc-400">{data.justificativa}</p>
