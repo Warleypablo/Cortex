@@ -207,29 +207,32 @@ interface NovaAnaliseFormProps {
 function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({
-    clienteNome: "",
-    clienteId: "",
-    squad: "",
-    vendedor: "",
-    produto: "",
-    valorContrato: "",
-    transcricaoManual: "",
+  const [selectedCliente, setSelectedCliente] = useState("");
+  const [transcricaoManual, setTranscricaoManual] = useState("");
+
+  const { data: clientesTriagem = [] } = useQuery<{ nome: string; vendedor: string | null; squad: string | null; servico: string | null }[]>({
+    queryKey: ["/api/triagem/clientes"],
+    queryFn: async () => {
+      const res = await fetch("/api/triagem/clientes");
+      if (!res.ok) throw new Error("Erro ao buscar clientes");
+      return res.json();
+    },
+    enabled: open,
   });
 
+  const clienteSelecionado = clientesTriagem.find(c => c.nome === selectedCliente);
+
   const mutation = useMutation({
-    mutationFn: async (data: typeof form) => {
+    mutationFn: async () => {
       const res = await fetch("/api/triagem/analisar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clienteNome: data.clienteNome,
-          clienteId: data.clienteId || undefined,
-          squad: data.squad || undefined,
-          vendedor: data.vendedor || undefined,
-          produto: data.produto || undefined,
-          valorContrato: data.valorContrato ? Number(data.valorContrato) : undefined,
-          transcricaoManual: data.transcricaoManual || undefined,
+          clienteNome: selectedCliente,
+          vendedor: clienteSelecionado?.vendedor || undefined,
+          squad: clienteSelecionado?.squad || undefined,
+          produto: clienteSelecionado?.servico || undefined,
+          transcricaoManual: transcricaoManual || undefined,
         }),
       });
       if (!res.ok) {
@@ -242,16 +245,13 @@ function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/triagem"] });
       toast({ title: "Análise criada com sucesso!" });
       onClose();
-      setForm({ clienteNome: "", clienteId: "", squad: "", vendedor: "", produto: "", valorContrato: "", transcricaoManual: "" });
+      setSelectedCliente("");
+      setTranscricaoManual("");
     },
     onError: (e: Error) => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     },
   });
-
-  function handleChange(field: keyof typeof form, value: string) {
-    setForm(prev => ({ ...prev, [field]: value }));
-  }
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -264,54 +264,50 @@ function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <Label className="text-gray-700 dark:text-zinc-300">Nome do Cliente *</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Ex: Empresa XYZ"
-                value={form.clienteNome}
-                onChange={e => handleChange("clienteNome", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 dark:text-zinc-300">Squad</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Ex: Inbound"
-                value={form.squad}
-                onChange={e => handleChange("squad", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 dark:text-zinc-300">Vendedor</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Nome do vendedor"
-                value={form.vendedor}
-                onChange={e => handleChange("vendedor", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 dark:text-zinc-300">Produto</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Ex: Performance"
-                value={form.produto}
-                onChange={e => handleChange("produto", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 dark:text-zinc-300">Valor do Contrato (R$)</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Ex: 3500"
-                type="number"
-                value={form.valorContrato}
-                onChange={e => handleChange("valorContrato", e.target.value)}
-              />
-            </div>
+          <div>
+            <Label className="text-gray-700 dark:text-zinc-300">Cliente em Triagem *</Label>
+            <Select value={selectedCliente} onValueChange={setSelectedCliente}>
+              <SelectTrigger className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white">
+                <SelectValue placeholder="Selecione um cliente..." />
+              </SelectTrigger>
+              <SelectContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+                {clientesTriagem.length === 0 ? (
+                  <SelectItem value="_empty" disabled className="text-gray-400 dark:text-zinc-500">
+                    Nenhum cliente em triagem
+                  </SelectItem>
+                ) : (
+                  clientesTriagem.map(c => (
+                    <SelectItem key={c.nome} value={c.nome} className="text-gray-900 dark:text-white">
+                      {c.nome}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
           </div>
+
+          {clienteSelecionado && (
+            <div className="grid grid-cols-3 gap-2">
+              {clienteSelecionado.vendedor && (
+                <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-2.5">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500">Vendedor</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{clienteSelecionado.vendedor}</p>
+                </div>
+              )}
+              {clienteSelecionado.squad && (
+                <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-2.5">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500">Squad</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{clienteSelecionado.squad}</p>
+                </div>
+              )}
+              {clienteSelecionado.servico && (
+                <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-2.5">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500">Serviço</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{clienteSelecionado.servico}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <Label className="text-gray-700 dark:text-zinc-300">
@@ -322,8 +318,8 @@ function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
               className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white resize-none"
               placeholder="Cole aqui a transcrição da reunião de venda..."
               rows={6}
-              value={form.transcricaoManual}
-              onChange={e => handleChange("transcricaoManual", e.target.value)}
+              value={transcricaoManual}
+              onChange={e => setTranscricaoManual(e.target.value)}
             />
           </div>
         </div>
@@ -337,8 +333,8 @@ function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
             Cancelar
           </Button>
           <Button
-            onClick={() => mutation.mutate(form)}
-            disabled={!form.clienteNome || mutation.isPending}
+            onClick={() => mutation.mutate()}
+            disabled={!selectedCliente || mutation.isPending}
             className="bg-violet-600 hover:bg-violet-700 text-white gap-2"
           >
             {mutation.isPending ? (
