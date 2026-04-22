@@ -8,6 +8,22 @@ export function registerTriagemRoutes(app: Express, db: any) {
     console.error("[triagem] Error initializing table:", err)
   );
 
+  // GET /api/triagem/clientes — List clients with status 'triagem' from cup_clientes
+  app.get("/api/triagem/clientes", async (req, res) => {
+    try {
+      const results = await db.execute(sql`
+        SELECT DISTINCT nome, vendedor, squad, servico
+        FROM "Clickup".cup_clientes
+        WHERE status = 'triagem' AND nome IS NOT NULL
+        ORDER BY nome
+      `);
+      res.json(results.rows);
+    } catch (error) {
+      console.error("[api] Error fetching triagem clients:", error);
+      res.status(500).json({ error: "Failed to fetch triagem clients" });
+    }
+  });
+
   // GET /api/triagem — List all analyses with optional filters
   app.get("/api/triagem", async (req, res) => {
     try {
@@ -100,6 +116,26 @@ export function registerTriagemRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error creating triagem analysis:", error);
       res.status(500).json({ error: "Failed to create analysis" });
+    }
+  });
+
+  // DELETE /api/triagem/:id — Delete an analysis
+  app.delete("/api/triagem/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [deleted] = await db
+        .delete(triagemAnalises)
+        .where(eq(triagemAnalises.id, parseInt(id)))
+        .returning();
+
+      if (!deleted) {
+        return res.status(404).json({ error: "Analysis not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error deleting triagem analysis:", error);
+      res.status(500).json({ error: "Failed to delete analysis" });
     }
   });
 

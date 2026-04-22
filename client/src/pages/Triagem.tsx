@@ -50,6 +50,9 @@ import {
   ExternalLink,
   Eye,
   RefreshCw,
+  Trash2,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -57,18 +60,51 @@ import {
 interface CriterioAnalise {
   detectado: boolean;
   severidade: "alta" | "media" | "baixa" | "nenhuma";
+  pontos: number;
   justificativa: string;
   trechos: string[];
+}
+
+interface SinalSecundario {
+  sinal: string;
+  pontos: number;
+  justificativa: string;
+}
+
+interface ComposicaoScore {
+  expectativa_irreal: number;
+  falta_estrutura: number;
+  servico_inadequado: number;
+  agravantes_total: number;
+  atenuantes_total: number;
+  formula: string;
+}
+
+interface PontoVendedor {
+  aspecto: string;
+  justificativa: string;
+  trecho: string;
+}
+
+interface AvaliacaoVendedor {
+  pontos_negativos: PontoVendedor[];
+  pontos_positivos: PontoVendedor[];
+  nota_geral: "boa" | "regular" | "ruim";
+  resumo_vendedor: string;
 }
 
 interface AnaliseJson {
   score: "alto" | "medio" | "baixo";
   score_numerico: number;
+  composicao_score: ComposicaoScore;
   analise: {
     expectativa_irreal: CriterioAnalise;
     falta_estrutura: CriterioAnalise;
     servico_inadequado: CriterioAnalise;
   };
+  agravantes: SinalSecundario[];
+  atenuantes: SinalSecundario[];
+  avaliacao_vendedor?: AvaliacaoVendedor;
   resumo: string;
   recomendacao: "Aprovar" | "Aprovar com atenção" | "Escalar para gestor" | "Rejeitar - alto risco";
 }
@@ -146,6 +182,21 @@ function ScoreBar({ value }: { value: number | null }) {
   );
 }
 
+function ScoreCompositionBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-gray-600 dark:text-zinc-400">{label}</span>
+        <span className="font-medium text-gray-700 dark:text-zinc-300">{value}/{max}</span>
+      </div>
+      <div className="w-full bg-gray-200 dark:bg-zinc-700 rounded-full h-1.5 overflow-hidden">
+        <div className={`${color} h-1.5 rounded-full transition-all`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 // ─── New Analysis Form ────────────────────────────────────────────────────────
 
 interface NovaAnaliseFormProps {
@@ -156,29 +207,32 @@ interface NovaAnaliseFormProps {
 function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({
-    clienteNome: "",
-    clienteId: "",
-    squad: "",
-    vendedor: "",
-    produto: "",
-    valorContrato: "",
-    transcricaoManual: "",
+  const [selectedCliente, setSelectedCliente] = useState("");
+  const [transcricaoManual, setTranscricaoManual] = useState("");
+
+  const { data: clientesTriagem = [] } = useQuery<{ nome: string; vendedor: string | null; squad: string | null; servico: string | null }[]>({
+    queryKey: ["/api/triagem/clientes"],
+    queryFn: async () => {
+      const res = await fetch("/api/triagem/clientes");
+      if (!res.ok) throw new Error("Erro ao buscar clientes");
+      return res.json();
+    },
+    enabled: open,
   });
 
+  const clienteSelecionado = clientesTriagem.find(c => c.nome === selectedCliente);
+
   const mutation = useMutation({
-    mutationFn: async (data: typeof form) => {
+    mutationFn: async () => {
       const res = await fetch("/api/triagem/analisar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clienteNome: data.clienteNome,
-          clienteId: data.clienteId || undefined,
-          squad: data.squad || undefined,
-          vendedor: data.vendedor || undefined,
-          produto: data.produto || undefined,
-          valorContrato: data.valorContrato ? Number(data.valorContrato) : undefined,
-          transcricaoManual: data.transcricaoManual || undefined,
+          clienteNome: selectedCliente,
+          vendedor: clienteSelecionado?.vendedor || undefined,
+          squad: clienteSelecionado?.squad || undefined,
+          produto: clienteSelecionado?.servico || undefined,
+          transcricaoManual: transcricaoManual || undefined,
         }),
       });
       if (!res.ok) {
@@ -191,16 +245,13 @@ function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/triagem"] });
       toast({ title: "Análise criada com sucesso!" });
       onClose();
-      setForm({ clienteNome: "", clienteId: "", squad: "", vendedor: "", produto: "", valorContrato: "", transcricaoManual: "" });
+      setSelectedCliente("");
+      setTranscricaoManual("");
     },
     onError: (e: Error) => {
       toast({ title: "Erro", description: e.message, variant: "destructive" });
     },
   });
-
-  function handleChange(field: keyof typeof form, value: string) {
-    setForm(prev => ({ ...prev, [field]: value }));
-  }
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -213,54 +264,50 @@ function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <Label className="text-gray-700 dark:text-zinc-300">Nome do Cliente *</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Ex: Empresa XYZ"
-                value={form.clienteNome}
-                onChange={e => handleChange("clienteNome", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 dark:text-zinc-300">Squad</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Ex: Inbound"
-                value={form.squad}
-                onChange={e => handleChange("squad", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 dark:text-zinc-300">Vendedor</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Nome do vendedor"
-                value={form.vendedor}
-                onChange={e => handleChange("vendedor", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 dark:text-zinc-300">Produto</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Ex: Performance"
-                value={form.produto}
-                onChange={e => handleChange("produto", e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-gray-700 dark:text-zinc-300">Valor do Contrato (R$)</Label>
-              <Input
-                className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white"
-                placeholder="Ex: 3500"
-                type="number"
-                value={form.valorContrato}
-                onChange={e => handleChange("valorContrato", e.target.value)}
-              />
-            </div>
+          <div>
+            <Label className="text-gray-700 dark:text-zinc-300">Cliente em Triagem *</Label>
+            <Select value={selectedCliente} onValueChange={setSelectedCliente}>
+              <SelectTrigger className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white">
+                <SelectValue placeholder="Selecione um cliente..." />
+              </SelectTrigger>
+              <SelectContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+                {clientesTriagem.length === 0 ? (
+                  <SelectItem value="_empty" disabled className="text-gray-400 dark:text-zinc-500">
+                    Nenhum cliente em triagem
+                  </SelectItem>
+                ) : (
+                  clientesTriagem.map(c => (
+                    <SelectItem key={c.nome} value={c.nome} className="text-gray-900 dark:text-white">
+                      {c.nome}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
           </div>
+
+          {clienteSelecionado && (
+            <div className="grid grid-cols-3 gap-2">
+              {clienteSelecionado.vendedor && (
+                <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-2.5">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500">Vendedor</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{clienteSelecionado.vendedor}</p>
+                </div>
+              )}
+              {clienteSelecionado.squad && (
+                <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-2.5">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500">Squad</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{clienteSelecionado.squad}</p>
+                </div>
+              )}
+              {clienteSelecionado.servico && (
+                <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-2.5">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500">Serviço</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{clienteSelecionado.servico}</p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div>
             <Label className="text-gray-700 dark:text-zinc-300">
@@ -271,8 +318,8 @@ function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
               className="mt-1 bg-gray-50 dark:bg-zinc-800 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white resize-none"
               placeholder="Cole aqui a transcrição da reunião de venda..."
               rows={6}
-              value={form.transcricaoManual}
-              onChange={e => handleChange("transcricaoManual", e.target.value)}
+              value={transcricaoManual}
+              onChange={e => setTranscricaoManual(e.target.value)}
             />
           </div>
         </div>
@@ -286,8 +333,8 @@ function NovaAnaliseForm({ open, onClose }: NovaAnaliseFormProps) {
             Cancelar
           </Button>
           <Button
-            onClick={() => mutation.mutate(form)}
-            disabled={!form.clienteNome || mutation.isPending}
+            onClick={() => mutation.mutate()}
+            disabled={!selectedCliente || mutation.isPending}
             className="bg-violet-600 hover:bg-violet-700 text-white gap-2"
           >
             {mutation.isPending ? (
@@ -421,9 +468,10 @@ interface DetailSheetProps {
   analise: TriagemAnalise | null;
   onClose: () => void;
   onDecide: (a: TriagemAnalise) => void;
+  onDelete: (a: TriagemAnalise) => void;
 }
 
-function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
+function DetailSheet({ analise, onClose, onDecide, onDelete }: DetailSheetProps) {
   if (!analise) return null;
 
   const aj = analise.analiseJson;
@@ -465,6 +513,50 @@ function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
                 <span className="font-semibold text-gray-900 dark:text-white">{analise.scoreNumerico}/100</span>
               </div>
               <ScoreBar value={analise.scoreNumerico} />
+            </div>
+          )}
+
+          {/* Score Composition */}
+          {aj?.composicao_score && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                Composição do Score
+              </h3>
+              <div className="bg-gray-50 dark:bg-zinc-800 rounded-lg p-4 space-y-3">
+                <ScoreCompositionBar
+                  label="Expectativa Irreal"
+                  value={aj.composicao_score.expectativa_irreal}
+                  max={40}
+                  color="bg-red-500"
+                />
+                <ScoreCompositionBar
+                  label="Falta de Estrutura"
+                  value={aj.composicao_score.falta_estrutura}
+                  max={35}
+                  color="bg-orange-500"
+                />
+                <ScoreCompositionBar
+                  label="Serviço Inadequado"
+                  value={aj.composicao_score.servico_inadequado}
+                  max={25}
+                  color="bg-yellow-500"
+                />
+                {aj.composicao_score.agravantes_total > 0 && (
+                  <div className="flex justify-between text-xs pt-1 border-t border-gray-200 dark:border-zinc-700">
+                    <span className="text-red-600 dark:text-red-400">+ Agravantes</span>
+                    <span className="font-medium text-red-600 dark:text-red-400">+{aj.composicao_score.agravantes_total}</span>
+                  </div>
+                )}
+                {aj.composicao_score.atenuantes_total > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-600 dark:text-green-400">- Atenuantes</span>
+                    <span className="font-medium text-green-600 dark:text-green-400">-{aj.composicao_score.atenuantes_total}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs pt-1 border-t border-gray-200 dark:border-zinc-700">
+                  <span className="text-gray-500 dark:text-zinc-500 font-mono">{aj.composicao_score.formula}</span>
+                </div>
+              </div>
             </div>
           )}
 
@@ -553,6 +645,11 @@ function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
                       <span className={`text-xs font-medium capitalize ${SEVERIDADE_CONFIG[data.severidade]}`}>
                         {data.severidade === "nenhuma" ? "Não detectado" : `Severidade: ${data.severidade}`}
                       </span>
+                      {data.pontos > 0 && (
+                        <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                          +{data.pontos} pts
+                        </span>
+                      )}
                     </div>
                   </div>
                   <p className="text-sm text-gray-600 dark:text-zinc-400">{data.justificativa}</p>
@@ -570,6 +667,117 @@ function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Agravantes */}
+          {aj?.agravantes && aj.agravantes.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4" />
+                Sinais Agravantes (+{aj.agravantes.reduce((s, a) => s + a.pontos, 0)} pts)
+              </h3>
+              <div className="space-y-2">
+                {aj.agravantes.map((agr, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-900/10 p-3"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{agr.sinal}</span>
+                      <span className="text-xs font-bold text-red-600 dark:text-red-400">+{agr.pontos} pts</span>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-zinc-400">{agr.justificativa}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Atenuantes */}
+          {aj?.atenuantes && aj.atenuantes.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4" />
+                Sinais Atenuantes (-{aj.atenuantes.reduce((s, a) => s + a.pontos, 0)} pts)
+              </h3>
+              <div className="space-y-2">
+                {aj.atenuantes.map((att, i) => (
+                  <div
+                    key={i}
+                    className="rounded-lg border border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10 p-3"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{att.sinal}</span>
+                      <span className="text-xs font-bold text-green-600 dark:text-green-400">-{att.pontos} pts</span>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-zinc-400">{att.justificativa}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Avaliação do Vendedor */}
+          {aj?.avaliacao_vendedor && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide flex items-center gap-1.5">
+                  <User className="w-4 h-4" />
+                  Avaliação do Vendedor
+                </h3>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  aj.avaliacao_vendedor.nota_geral === "boa"
+                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                    : aj.avaliacao_vendedor.nota_geral === "ruim"
+                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                }`}>
+                  {aj.avaliacao_vendedor.nota_geral === "boa" ? "Boa" : aj.avaliacao_vendedor.nota_geral === "ruim" ? "Ruim" : "Regular"}
+                </span>
+              </div>
+
+              <p className="text-sm text-gray-600 dark:text-zinc-400 italic">
+                {aj.avaliacao_vendedor.resumo_vendedor}
+              </p>
+
+              {aj.avaliacao_vendedor.pontos_negativos.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <ThumbsDown className="w-3 h-3" /> Pontos Negativos
+                  </p>
+                  {aj.avaliacao_vendedor.pontos_negativos.map((ponto, i) => (
+                    <div key={i} className="rounded-lg border border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-900/10 p-3">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">{ponto.aspecto}</p>
+                      <p className="text-xs text-gray-600 dark:text-zinc-400">{ponto.justificativa}</p>
+                      {ponto.trecho && (
+                        <blockquote className="mt-1.5 text-xs italic text-gray-500 dark:text-zinc-500 border-l-2 border-red-300 dark:border-red-700 pl-2">
+                          "{ponto.trecho}"
+                        </blockquote>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {aj.avaliacao_vendedor.pontos_positivos.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-green-600 dark:text-green-400 flex items-center gap-1">
+                    <ThumbsUp className="w-3 h-3" /> Pontos Positivos
+                  </p>
+                  {aj.avaliacao_vendedor.pontos_positivos.map((ponto, i) => (
+                    <div key={i} className="rounded-lg border border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10 p-3">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">{ponto.aspecto}</p>
+                      <p className="text-xs text-gray-600 dark:text-zinc-400">{ponto.justificativa}</p>
+                      {ponto.trecho && (
+                        <blockquote className="mt-1.5 text-xs italic text-gray-500 dark:text-zinc-500 border-l-2 border-green-300 dark:border-green-700 pl-2">
+                          "{ponto.trecho}"
+                        </blockquote>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -591,16 +799,26 @@ function DetailSheet({ analise, onClose, onDecide }: DetailSheetProps) {
             </div>
           )}
 
-          {/* Action button */}
-          {analise.status === "pendente" && (
+          {/* Action buttons */}
+          <div className="flex gap-2">
+            {analise.status === "pendente" && (
+              <Button
+                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white gap-2"
+                onClick={() => { onClose(); onDecide(analise); }}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                Registrar Decisão
+              </Button>
+            )}
             <Button
-              className="w-full bg-violet-600 hover:bg-violet-700 text-white gap-2"
-              onClick={() => { onClose(); onDecide(analise); }}
+              variant="outline"
+              className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 gap-2"
+              onClick={() => { onClose(); onDelete(analise); }}
             >
-              <CheckCircle2 className="w-4 h-4" />
-              Registrar Decisão
+              <Trash2 className="w-4 h-4" />
+              Excluir
             </Button>
-          )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
@@ -618,8 +836,9 @@ interface AnaliseCardProps {
 function AnaliseCard({ analise, onView, onDecide }: AnaliseCardProps) {
   const aj = analise.analiseJson;
   const detectedCount = aj
-    ? Object.values(aj.analise).filter(c => c.detectado).length
+    ? Object.values(aj.analise).filter(c => c.detectado).length + (aj.agravantes?.length || 0)
     : 0;
+  const mitigatorCount = aj?.atenuantes?.length || 0;
 
   return (
     <Card
@@ -673,6 +892,11 @@ function AnaliseCard({ analise, onView, onDecide }: AnaliseCardProps) {
               <AlertTriangle className="w-3 h-3" /> {detectedCount} sinal{detectedCount > 1 ? "is" : ""}
             </span>
           )}
+          {mitigatorCount > 0 && (
+            <span className="flex items-center gap-1 text-green-500 dark:text-green-400">
+              <ShieldCheck className="w-3 h-3" /> {mitigatorCount} atenuante{mitigatorCount > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
 
         {/* Resumo */}
@@ -719,6 +943,29 @@ export default function Triagem() {
   const [showNovaAnalise, setShowNovaAnalise] = useState(false);
   const [selectedAnalise, setSelectedAnalise] = useState<TriagemAnalise | null>(null);
   const [decisaoAnalise, setDecisaoAnalise] = useState<TriagemAnalise | null>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/triagem/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Erro ao excluir análise");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/triagem"] });
+      toast({ title: "Análise excluída com sucesso" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir análise", variant: "destructive" });
+    },
+  });
+
+  function handleDelete(analise: TriagemAnalise) {
+    if (confirm(`Excluir análise de "${analise.clienteNome}"?`)) {
+      deleteMutation.mutate(analise.id);
+    }
+  }
 
   const params = new URLSearchParams();
   if (filterStatus !== "todos") params.set("status", filterStatus);
@@ -872,6 +1119,7 @@ export default function Triagem() {
         analise={selectedAnalise}
         onClose={() => setSelectedAnalise(null)}
         onDecide={(a) => { setSelectedAnalise(null); setDecisaoAnalise(a); }}
+        onDelete={(a) => { setSelectedAnalise(null); handleDelete(a); }}
       />
       <DecisaoModal
         analise={decisaoAnalise}
