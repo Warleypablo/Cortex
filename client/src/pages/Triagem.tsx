@@ -57,18 +57,37 @@ import {
 interface CriterioAnalise {
   detectado: boolean;
   severidade: "alta" | "media" | "baixa" | "nenhuma";
+  pontos: number;
   justificativa: string;
   trechos: string[];
+}
+
+interface SinalSecundario {
+  sinal: string;
+  pontos: number;
+  justificativa: string;
+}
+
+interface ComposicaoScore {
+  expectativa_irreal: number;
+  falta_estrutura: number;
+  servico_inadequado: number;
+  agravantes_total: number;
+  atenuantes_total: number;
+  formula: string;
 }
 
 interface AnaliseJson {
   score: "alto" | "medio" | "baixo";
   score_numerico: number;
+  composicao_score: ComposicaoScore;
   analise: {
     expectativa_irreal: CriterioAnalise;
     falta_estrutura: CriterioAnalise;
     servico_inadequado: CriterioAnalise;
   };
+  agravantes: SinalSecundario[];
+  atenuantes: SinalSecundario[];
   resumo: string;
   recomendacao: "Aprovar" | "Aprovar com atenção" | "Escalar para gestor" | "Rejeitar - alto risco";
 }
