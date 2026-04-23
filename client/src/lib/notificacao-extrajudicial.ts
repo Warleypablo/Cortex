@@ -127,12 +127,12 @@ function calcularAnoPrincipal(parcelas: ParcelaParaNotificacao[]): number {
   // Ano com mais parcelas; empate → maior
   let anoPrincipal = new Date().getUTCFullYear();
   let maxCount = -1;
-  for (const [ano, count] of contagem.entries()) {
+  contagem.forEach((count, ano) => {
     if (count > maxCount || (count === maxCount && ano > anoPrincipal)) {
       anoPrincipal = ano;
       maxCount = count;
     }
-  }
+  });
   return anoPrincipal;
 }
 
