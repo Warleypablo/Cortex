@@ -40,7 +40,9 @@ import {
   MessageSquare,
   Phone,
   CheckCircle2,
+  Mail,
 } from "lucide-react";
+import { NotificacaoExtrajudicialModal } from "@/components/juridico/NotificacaoExtrajudicialModal";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -184,6 +186,7 @@ export default function Negativacao() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draggedClientId, setDraggedClientId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const [notificacaoClienteId, setNotificacaoClienteId] = useState<string | null>(null);
 
   // ─── Data Fetching ──────────────────────────────────────────────────
 
@@ -214,6 +217,26 @@ export default function Negativacao() {
       return r.json();
     },
     enabled: !!selectedClient,
+  });
+
+  const { data: notificacaoData } = useQuery<{
+    cliente: {
+      nomeCliente: string;
+      empresa: string;
+      cnpj: string | null;
+      email: string | null;
+      endereco: string | null;
+      servicos: string | null;
+    };
+    parcelas: { naoPago: number; dataVencimento: string }[];
+  }>({
+    queryKey: ["/api/negativacao/notificacao-data", notificacaoClienteId],
+    queryFn: async () => {
+      const r = await fetch(`/api/negativacao/cliente/${notificacaoClienteId}/notificacao-data`);
+      if (!r.ok) throw new Error("Failed to fetch notification data");
+      return r.json();
+    },
+    enabled: !!notificacaoClienteId,
   });
 
   // ─── Mutations ──────────────────────────────────────────────────────
@@ -619,7 +642,7 @@ export default function Negativacao() {
                         )}
                       </div>
 
-                      <div className="mt-2">
+                      <div className="mt-2 flex items-center justify-between gap-2">
                         <Badge
                           variant="outline"
                           className={cn(
@@ -630,6 +653,21 @@ export default function Negativacao() {
                         >
                           {action.status}
                         </Badge>
+                        {etapa.key === "notificacao" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNotificacaoClienteId(action.clienteId);
+                            }}
+                            data-testid={`button-notificacao-${action.clienteId}`}
+                          >
+                            <Mail className="h-3 w-3 mr-1" />
+                            Notificar
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -989,6 +1027,16 @@ export default function Negativacao() {
           )}
         </SheetContent>
       </Sheet>
+
+      {notificacaoClienteId && notificacaoData && (
+        <NotificacaoExtrajudicialModal
+          key={notificacaoClienteId}
+          open={!!notificacaoClienteId}
+          onClose={() => setNotificacaoClienteId(null)}
+          cliente={notificacaoData.cliente}
+          parcelas={notificacaoData.parcelas}
+        />
+      )}
     </div>
   );
 }
