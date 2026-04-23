@@ -1441,6 +1441,25 @@ export const negativacaoAcoes = cortexCoreSchema.table("negativacao_acoes", {
   index("idx_neg_etapa").on(table.etapa),
 ]);
 
+// Notificações Extrajudiciais Enviadas - Auditoria de emails enviados
+export const notificacoesExtrajudiciaisEnviadas = cortexCoreSchema.table(
+  "notificacoes_extrajudiciais_enviadas",
+  {
+    id: serial("id").primaryKey(),
+    clienteId: text("cliente_id").notNull(),
+    clienteNome: text("cliente_nome"),
+    emailDestino: text("email_destino").notNull(),
+    assunto: text("assunto").notNull(),
+    corpoTexto: text("corpo_texto").notNull(),
+    corpoHtml: text("corpo_html").notNull(),
+    enviadoPor: text("enviado_por").notNull(),
+    enviadoEm: timestamp("enviado_em", { withTimezone: true }).defaultNow().notNull(),
+    sendgridMessageId: text("sendgrid_message_id"),
+    status: text("status").notNull().default("enviado"),
+    erro: text("erro"),
+  },
+);
+
 // Metric Formatting Rules - Conditional coloring system
 export const metricRulesets = pgTable("metric_rulesets", {
   id: integer("id").primaryKey(),
