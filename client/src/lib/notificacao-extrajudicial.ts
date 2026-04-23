@@ -139,7 +139,7 @@ function calcularAnoPrincipal(parcelas: ParcelaParaNotificacao[]): number {
 export function renderizarNotificacao(input: RenderizarInput): string {
   const { cliente, parcelas, form, hoje = new Date() } = input;
 
-  const nomeNotificada = (cliente.empresa?.trim() || cliente.nomeCliente || '').toUpperCase();
+  const nomeNotificada = (cliente.nomeCliente?.trim() || cliente.empresa?.trim() || '').toUpperCase();
   const cnpjNotificada = cliente.cnpj?.trim() || '[CNPJ NÃO INFORMADO]';
   const enderecoNotificada = form.endereco.trim() || '[ENDEREÇO NÃO INFORMADO]';
   const numeroContrato = form.numeroContrato.trim() || '[Nº DO CONTRATO]';
