@@ -219,7 +219,7 @@ export default function Negativacao() {
     enabled: !!selectedClient,
   });
 
-  const { data: notificacaoData } = useQuery<{
+  const { data: notificacaoData, isLoading: isLoadingNotificacao, error: notificacaoError } = useQuery<{
     cliente: {
       nomeCliente: string;
       empresa: string;
@@ -232,12 +232,29 @@ export default function Negativacao() {
   }>({
     queryKey: ["/api/negativacao/notificacao-data", notificacaoClienteId],
     queryFn: async () => {
-      const r = await fetch(`/api/negativacao/cliente/${notificacaoClienteId}/notificacao-data`);
-      if (!r.ok) throw new Error("Failed to fetch notification data");
+      const r = await fetch(`/api/negativacao/cliente/${notificacaoClienteId}/notificacao-data`, {
+        credentials: "include",
+      });
+      if (!r.ok) {
+        const text = await r.text().catch(() => "");
+        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`);
+      }
       return r.json();
     },
     enabled: !!notificacaoClienteId,
+    retry: false,
   });
+
+  useEffect(() => {
+    if (notificacaoError) {
+      toast({
+        title: "Erro ao carregar dados",
+        description: notificacaoError.message,
+        variant: "destructive",
+      });
+      setNotificacaoClienteId(null);
+    }
+  }, [notificacaoError, toast]);
 
   // ─── Mutations ──────────────────────────────────────────────────────
 
@@ -1030,12 +1047,28 @@ export default function Negativacao() {
 
       {notificacaoClienteId && notificacaoData && (
         <NotificacaoExtrajudicialModal
-          key={notificacaoClienteId}
-          open={!!notificacaoClienteId}
+          key={`${notificacaoClienteId}-loaded`}
+          open={true}
           onClose={() => setNotificacaoClienteId(null)}
           cliente={notificacaoData.cliente}
           parcelas={notificacaoData.parcelas}
         />
+      )}
+      {notificacaoClienteId && !notificacaoData && isLoadingNotificacao && (
+        <Sheet open={true} onOpenChange={() => setNotificacaoClienteId(null)}>
+          <SheetContent className="w-full sm:max-w-md bg-white dark:bg-zinc-900">
+            <SheetHeader>
+              <SheetTitle className="text-gray-900 dark:text-white">
+                Carregando dados da notificação...
+              </SheetTitle>
+            </SheetHeader>
+            <div className="mt-6 space-y-3">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-40 w-full" />
+            </div>
+          </SheetContent>
+        </Sheet>
       )}
     </div>
   );
