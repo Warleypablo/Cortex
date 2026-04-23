@@ -101,7 +101,74 @@ export function formatarValoresDescricao(parcelas: ParcelaParaNotificacao[]): st
   return `sendo ${items.slice(0, -1).join(', ')} e ${items[items.length - 1]}`;
 }
 
-// Stubs que serão implementados nas próximas tasks
-export function renderizarNotificacao(_input: RenderizarInput): string {
-  return '';
+const ANOS_EXTENSO: Record<number, string> = {
+  2024: 'Dois Mil e Vinte e Quatro',
+  2025: 'Dois Mil e Vinte e Cinco',
+  2026: 'Dois Mil e Vinte e Seis',
+  2027: 'Dois Mil e Vinte e Sete',
+  2028: 'Dois Mil e Vinte e Oito',
+  2029: 'Dois Mil e Vinte e Nove',
+  2030: 'Dois Mil e Trinta',
+};
+
+export function anoPorExtenso(ano: number): string {
+  return ANOS_EXTENSO[ano] ?? '[ANO POR EXTENSO]';
+}
+
+function calcularAnoPrincipal(parcelas: ParcelaParaNotificacao[]): number {
+  if (parcelas.length === 0) return new Date().getUTCFullYear();
+  const contagem = new Map<number, number>();
+  for (const p of parcelas) {
+    const d = new Date(p.dataVencimento);
+    if (isNaN(d.getTime())) continue;
+    const ano = d.getUTCFullYear();
+    contagem.set(ano, (contagem.get(ano) ?? 0) + 1);
+  }
+  // Ano com mais parcelas; empate → maior
+  let anoPrincipal = new Date().getUTCFullYear();
+  let maxCount = -1;
+  for (const [ano, count] of contagem.entries()) {
+    if (count > maxCount || (count === maxCount && ano > anoPrincipal)) {
+      anoPrincipal = ano;
+      maxCount = count;
+    }
+  }
+  return anoPrincipal;
+}
+
+export function renderizarNotificacao(input: RenderizarInput): string {
+  const { cliente, parcelas, form, hoje = new Date() } = input;
+
+  const nomeNotificada = (cliente.empresa?.trim() || cliente.nomeCliente || '').toUpperCase();
+  const cnpjNotificada = cliente.cnpj?.trim() || '[CNPJ NÃO INFORMADO]';
+  const enderecoNotificada = form.endereco.trim() || '[ENDEREÇO NÃO INFORMADO]';
+  const numeroContrato = form.numeroContrato.trim() || '[Nº DO CONTRATO]';
+  const dataAssinatura = form.dataContrato ? formatarDataBR(form.dataContrato) : '[DATA DO CONTRATO]';
+  const nomeServico = form.nomeServico.trim() || '[NOME DO SERVIÇO]';
+
+  const mesesEmAtraso = formatarMesesEmAtraso(parcelas.map(p => p.dataVencimento));
+  const anoPrincipal = calcularAnoPrincipal(parcelas);
+  const valoresDescricao = formatarValoresDescricao(parcelas);
+
+  const dia = String(hoje.getUTCDate()).padStart(2, '0');
+  const mes = String(hoje.getUTCMonth() + 1).padStart(2, '0');
+  const ano = hoje.getUTCFullYear();
+  const dataEmissao = `${dia}/${mes}/${ano}`;
+
+  return `NOTIFICAÇÃO EXTRAJUDICIAL DE COBRANÇA
+
+NOTIFICANTE: TURBO PARTNERS, pessoa jurídica de direito privado, com sede na Rua Carlos Fernando Lindenberg Filho, 90, no bairro Monte Belo, em Vitória - ES, CEP 29053-315, inscrita no CNPJ sob o nº 42.100.292/0001-84.
+
+NOTIFICADA: ${nomeNotificada}, inscrita no CNPJ sob o nº ${cnpjNotificada}, a qual possui sede em ${enderecoNotificada}.
+
+Por meio da presente Notificação Extrajudicial, a NOTIFICANTE, servindo-se da via Cartório de Títulos e Documentos, vem comunicar à NOTIFICADA acerca da sua patente e real inadimplência existente perante a ora NOTIFICANTE, referente aos débitos tocantes aos meses de ${mesesEmAtraso || '[MESES EM ATRASO]'}, de ${anoPrincipal} (${anoPorExtenso(anoPrincipal)}), que estão em ATRASO.
+
+Deve-se, aqui, rememorar que em ${dataAssinatura} a NOTIFICADA firmou um contrato específico de compra e venda de "${nomeServico}" com a NOTIFICANTE, o qual está registrado sob o nº ${numeroContrato}, obrigando-se a pagar parcelas ${valoresDescricao || '[VALORES DAS PARCELAS]'}, no que concerne à contratação do serviço já citado acima.
+
+Cumpre informar, através deste documento, portanto, que, nos termos do artigo 726 do Código de Processo Civil (Lei 13.105/2015), caso as parcelas não sejam quitadas até 10 (Dez) dias após o recebimento desta Notificação Extrajudicial, serão tomadas as medidas judiciais cabíveis, bem como a NOTIFICANTE procederá à abertura de inscrição do nome do NOTIFICADO junto aos órgãos competentes: SERASA - SCPC, consoante determina o artigo 43 parágrafo 3º da Lei nº 8.078/1990.
+
+
+Sem mais, e nos termos da lei,
+
+Vitória/ES, ${dataEmissao}.`;
 }
