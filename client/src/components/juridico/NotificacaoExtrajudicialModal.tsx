@@ -106,7 +106,7 @@ export function NotificacaoExtrajudicialModal({
         <DialogHeader>
           <DialogTitle>Notificação Extrajudicial de Cobrança</DialogTitle>
           <DialogDescription>
-            {cliente.empresa || cliente.nomeCliente}
+            {cliente.nomeCliente || cliente.empresa}
           </DialogDescription>
         </DialogHeader>
 

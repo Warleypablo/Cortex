@@ -91,8 +91,8 @@ describe('anoPorExtenso', () => {
 
 describe('renderizarNotificacao', () => {
   const cliente = {
-    nomeCliente: 'João da Silva',
-    empresa: 'EMPRESA DEVEDORA LTDA',
+    nomeCliente: 'EMPRESA DEVEDORA LTDA',
+    empresa: 'Turbo Partners',
     cnpj: '22.222.020/0002-22',
   };
 
@@ -170,10 +170,10 @@ describe('renderizarNotificacao', () => {
     expect(texto).toContain('[CNPJ NÃO INFORMADO]');
   });
 
-  it('faz fallback de empresa para nomeCliente quando empresa vazia', () => {
-    const clienteSemEmpresa = { ...cliente, empresa: '' };
-    const texto = renderizarNotificacao({ cliente: clienteSemEmpresa, parcelas, form, hoje });
-    expect(texto).toContain('JOÃO DA SILVA');
+  it('faz fallback de nomeCliente para empresa quando nomeCliente vazio', () => {
+    const clienteSemNome = { ...cliente, nomeCliente: '', empresa: 'RAZAO SOCIAL LTDA' };
+    const texto = renderizarNotificacao({ cliente: clienteSemNome, parcelas, form, hoje });
+    expect(texto).toContain('RAZAO SOCIAL LTDA');
   });
 
   it('inclui cabeçalho fixo da TURBO PARTNERS', () => {
