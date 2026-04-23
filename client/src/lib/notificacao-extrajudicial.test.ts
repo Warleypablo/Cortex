@@ -208,17 +208,17 @@ Vitória/ES, 23/04/2026.`;
 
   it('aplica <strong> em NOTIFICANTE:', () => {
     const html = renderizarNotificacaoHtml(textoSimples);
-    expect(html).toMatch(/<strong>NOTIFICANTE:<\/strong>/);
+    expect(html).toMatch(/<strong[^>]*>NOTIFICANTE:<\/strong>/);
   });
 
   it('aplica <strong> em NOTIFICADA:', () => {
     const html = renderizarNotificacaoHtml(textoSimples);
-    expect(html).toMatch(/<strong>NOTIFICADA:<\/strong>/);
+    expect(html).toMatch(/<strong[^>]*>NOTIFICADA:<\/strong>/);
   });
 
   it('usa <p> para parágrafos comuns', () => {
     const html = renderizarNotificacaoHtml(textoSimples);
-    expect(html).toContain('<p style="margin:12px 0;line-height:1.6;">Texto do corpo da notificação.</p>');
+    expect(html).toMatch(/<p[^>]*>Texto do corpo da notificação\.<\/p>/);
   });
 
   it('escapa caracteres especiais HTML no corpo', () => {
@@ -232,5 +232,23 @@ Vitória/ES, 23/04/2026.`;
   it('lida com texto vazio retornando div vazia', () => {
     const html = renderizarNotificacaoHtml('');
     expect(html).toMatch(/<div[^>]*><\/div>/);
+  });
+
+  it('renderiza cabeçalho com marca TURBO PARTNERS e tagline', () => {
+    const html = renderizarNotificacaoHtml(textoSimples);
+    expect(html).toMatch(/<h1[^>]*>TURBO PARTNERS<\/h1>/);
+    expect(html).toContain('Departamento Jurídico');
+  });
+
+  it('renderiza rodapé informativo com CNPJ da notificante', () => {
+    const html = renderizarNotificacaoHtml(textoSimples);
+    expect(html).toContain('Esta é uma notificação extrajudicial');
+    expect(html).toContain('42.100.292/0001-84');
+  });
+
+  it('destaca o parágrafo do aviso legal (art. 726 CPC) em caixa própria', () => {
+    const textoComAviso = `TÍTULO\n\nCumpre informar, através deste documento, nos termos do artigo 726 do CPC, que prazo é de 10 dias.`;
+    const html = renderizarNotificacaoHtml(textoComAviso);
+    expect(html).toMatch(/<div[^>]*border:1px solid[^>]*>[^<]*Cumpre informar/);
   });
 });
