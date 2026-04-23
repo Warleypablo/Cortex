@@ -182,6 +182,31 @@ function escaparHtml(texto: string): string {
     .replace(/'/g, '&#39;');
 }
 
+const OUTER_STYLE =
+  "margin:0;padding:32px 16px;background-color:#f5f5f5;font-family:Georgia,'Times New Roman',serif;";
+const CONTAINER_STYLE =
+  "max-width:640px;margin:0 auto;background-color:#ffffff;border:1px solid #e5e5e5;";
+const HEADER_STYLE =
+  "padding:32px 40px 24px;background-color:#0a0a0a;color:#ffffff;text-align:center;";
+const BRAND_STYLE =
+  "margin:0;font-size:28px;font-weight:bold;letter-spacing:4px;font-family:Georgia,'Times New Roman',serif;";
+const TAGLINE_STYLE =
+  "margin:6px 0 0;font-size:11px;letter-spacing:2px;color:#9ca3af;text-transform:uppercase;";
+const TITLE_WRAPPER_STYLE =
+  "padding:24px 40px;border-bottom:2px solid #0a0a0a;text-align:center;";
+const CONTENT_STYLE =
+  "padding:32px 40px;color:#1a1a1a;font-size:14px;line-height:1.7;";
+const PARTY_BOX_STYLE =
+  "margin:0 0 16px;padding:14px 18px;background-color:#fafafa;border-left:3px solid #0a0a0a;";
+const PARAGRAPH_STYLE =
+  "margin:16px 0;line-height:1.7;text-align:justify;";
+const LEGAL_BOX_STYLE =
+  "margin:24px 0;padding:16px 20px;background-color:#fafafa;border:1px solid #e5e5e5;font-size:13px;line-height:1.6;text-align:justify;";
+const FOOTER_STYLE =
+  "padding:24px 40px 32px;border-top:1px solid #e5e5e5;color:#4b5563;font-size:13px;";
+const SIGNATURE_STYLE =
+  "margin-top:20px;padding-top:16px;border-top:1px solid #d1d5db;text-align:right;color:#374151;";
+
 export function renderizarNotificacaoHtml(texto: string): string {
   if (!texto.trim()) {
     return `<div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;color:#1a1a1a;padding:20px;"></div>`;
@@ -189,24 +214,55 @@ export function renderizarNotificacaoHtml(texto: string): string {
 
   const paragrafos = texto.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
 
-  const html = paragrafos.map((p, idx) => {
+  const blocos = paragrafos.map((p, idx) => {
     const escapado = escaparHtml(p);
 
+    // 1) Primeira linha: título "NOTIFICAÇÃO EXTRAJUDICIAL DE COBRANÇA"
     if (idx === 0) {
-      return `<h2 style="font-size:16px;font-weight:bold;margin-bottom:20px;">${escapado}</h2>`;
+      return `<h2 style="margin:0;font-size:15px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;color:#0a0a0a;">${escapado}</h2>`;
     }
 
     const paragrafoComBr = escapado.replace(/\n/g, '<br>');
 
+    // 2) Blocos NOTIFICANTE / NOTIFICADA: caixa destacada com borda lateral
     const matchLabel = /^(NOTIFICANTE|NOTIFICADA):/.exec(paragrafoComBr);
     if (matchLabel) {
       const label = matchLabel[1];
       const resto = paragrafoComBr.substring(matchLabel[0].length);
-      return `<p style="margin:12px 0;line-height:1.6;"><strong>${label}:</strong>${resto}</p>`;
+      return `<p style="${PARTY_BOX_STYLE}"><strong style="display:block;font-size:12px;letter-spacing:2px;color:#0a0a0a;margin-bottom:4px;">${label}:</strong><span style="color:#1a1a1a;">${resto.trim()}</span></p>`;
     }
 
-    return `<p style="margin:12px 0;line-height:1.6;">${paragrafoComBr}</p>`;
-  }).join('\n');
+    // 3) Aviso legal (parágrafo que menciona art. 726 CPC): caixa com fundo claro
+    if (/artigo\s+726|Cumpre informar/i.test(escapado)) {
+      return `<div style="${LEGAL_BOX_STYLE}">${paragrafoComBr}</div>`;
+    }
 
-  return `<div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;color:#1a1a1a;padding:20px;">${html}</div>`;
+    // 4) Assinatura (última linha "Vitória/ES, dd/mm/aaaa."): texto alinhado à direita
+    const isAssinatura = /^Vitória\/ES/i.test(escapado);
+    if (isAssinatura) {
+      return `<p style="${SIGNATURE_STYLE}"><strong>${paragrafoComBr}</strong></p>`;
+    }
+
+    return `<p style="${PARAGRAPH_STYLE}">${paragrafoComBr}</p>`;
+  });
+
+  const titulo = blocos[0];
+  const corpo = blocos.slice(1).join('\n');
+
+  return `<div style="${OUTER_STYLE}">
+  <div style="${CONTAINER_STYLE}">
+    <div style="${HEADER_STYLE}">
+      <h1 style="${BRAND_STYLE}">TURBO PARTNERS</h1>
+      <p style="${TAGLINE_STYLE}">Departamento Jurídico</p>
+    </div>
+    <div style="${TITLE_WRAPPER_STYLE}">${titulo}</div>
+    <div style="${CONTENT_STYLE}">${corpo}</div>
+    <div style="${FOOTER_STYLE}">
+      <p style="margin:0;color:#6b7280;font-size:12px;text-align:center;">
+        Esta é uma notificação extrajudicial. Em caso de dúvidas, responda este e-mail.<br>
+        <span style="color:#9ca3af;">TURBO PARTNERS · CNPJ 42.100.292/0001-84</span>
+      </p>
+    </div>
+  </div>
+</div>`;
 }
