@@ -123,6 +123,80 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
     }
   });
 
+  // GET /api/negativacao/cliente/:clienteId/notificacao-data — Dados para gerar notificação extrajudicial
+  app.get("/api/negativacao/cliente/:clienteId/notificacao-data", async (req, res) => {
+    try {
+      const { clienteId } = req.params;
+
+      const clienteResult = await db.execute(sql`
+        WITH cliente_base AS (
+          SELECT DISTINCT ON (TRIM(cc.ids::text))
+            TRIM(cc.ids::text) as id_cliente,
+            cc.nome,
+            cc.empresa,
+            cc.cnpj,
+            cc.email,
+            cc.endereco,
+            cup.task_id
+          FROM "Conta Azul".caz_clientes cc
+          LEFT JOIN "Clickup".cup_clientes cup
+            ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
+            AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
+          WHERE TRIM(cc.ids::text) = ${clienteId}
+          ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
+          LIMIT 1
+        ),
+        servicos_agg AS (
+          SELECT STRING_AGG(DISTINCT cont.servico, ', ') as servicos
+          FROM cliente_base cb
+          LEFT JOIN "Clickup".cup_contratos cont
+            ON TRIM(cb.task_id::text) = TRIM(cont.id_task::text)
+          WHERE cont.servico IS NOT NULL
+        )
+        SELECT cb.*, sa.servicos
+        FROM cliente_base cb
+        CROSS JOIN servicos_agg sa
+      `);
+
+      const row = (clienteResult.rows as any[])[0];
+      if (!row) {
+        return res.status(404).json({ error: "Cliente não encontrado" });
+      }
+
+      const parcelasResult = await db.execute(sql`
+        SELECT nao_pago, data_vencimento
+        FROM "Conta Azul".caz_parcelas
+        WHERE id_cliente = ${clienteId}
+          AND tipo_evento = 'RECEITA'
+          AND nao_pago::numeric > 0
+          AND data_vencimento < CURRENT_DATE
+        ORDER BY data_vencimento ASC
+      `);
+
+      const parcelas = (parcelasResult.rows as any[]).map((p) => ({
+        naoPago: parseFloat(p.nao_pago || "0"),
+        dataVencimento: p.data_vencimento instanceof Date
+          ? p.data_vencimento.toISOString().split("T")[0]
+          : String(p.data_vencimento),
+      }));
+
+      res.json({
+        cliente: {
+          nomeCliente: row.nome || "",
+          empresa: row.empresa || "",
+          cnpj: row.cnpj || null,
+          email: row.email || null,
+          endereco: row.endereco || null,
+          servicos: row.servicos || null,
+        },
+        parcelas,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching notificacao-data:", error);
+      res.status(500).json({ error: "Failed to fetch notification data" });
+    }
+  });
+
   // POST /api/negativacao/acoes — Create new action
   app.post("/api/negativacao/acoes", async (req, res) => {
     try {
