@@ -1050,7 +1050,10 @@ export default function Negativacao() {
           key={`${notificacaoClienteId}-loaded`}
           open={true}
           onClose={() => setNotificacaoClienteId(null)}
-          cliente={notificacaoData.cliente}
+          cliente={{
+            ...notificacaoData.cliente,
+            idCliente: notificacaoClienteId,
+          }}
           parcelas={notificacaoData.parcelas}
         />
       )}

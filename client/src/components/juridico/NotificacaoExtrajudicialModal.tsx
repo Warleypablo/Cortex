@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Mail, Copy, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Send, Copy, RotateCcw, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -15,15 +15,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import {
   renderizarNotificacao,
+  renderizarNotificacaoHtml,
   type ClienteParaNotificacao,
   type ParcelaParaNotificacao,
   type FormularioNotificacao,
 } from '@/lib/notificacao-extrajudicial';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
+import { ConfirmacaoEnvioDialog } from './ConfirmacaoEnvioDialog';
 
 interface NotificacaoExtrajudicialModalProps {
   open: boolean;
   onClose: () => void;
   cliente: ClienteParaNotificacao & {
+    idCliente: string;
     email: string | null;
     endereco: string | null;
     servicos: string | null;
@@ -32,7 +37,6 @@ interface NotificacaoExtrajudicialModalProps {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAILTO_MAX_LENGTH = 1800;
 
 export function NotificacaoExtrajudicialModal({
   open,
@@ -52,6 +56,27 @@ export function NotificacaoExtrajudicialModal({
 
   const [previewEditado, setPreviewEditado] = useState<string | null>(null);
   const [manualEdit, setManualEdit] = useState(false);
+
+  const { data: historicoEnvios } = useQuery<
+    { id: number; emailDestino: string; enviadoPor: string; enviadoEm: string; status: string }[]
+  >({
+    queryKey: ['/api/negativacao/cliente', cliente.idCliente, 'notificacoes-enviadas'],
+    queryFn: async () => {
+      const r = await fetch(
+        `/api/negativacao/cliente/${cliente.idCliente}/notificacoes-enviadas`,
+        { credentials: 'include' },
+      );
+      if (!r.ok) throw new Error('Failed to fetch history');
+      return r.json();
+    },
+    enabled: open,
+  });
+
+  const ultimoEnvio = historicoEnvios?.[0]
+    ? { enviadoEm: historicoEnvios[0].enviadoEm, enviadoPor: historicoEnvios[0].enviadoPor }
+    : null;
+
+  const [confirmacaoOpen, setConfirmacaoOpen] = useState(false);
 
   const previewGerado = useMemo(
     () => renderizarNotificacao({ cliente, parcelas, form }),
@@ -86,19 +111,48 @@ export function NotificacaoExtrajudicialModal({
     }
   };
 
-  const handleAbrirEmail = () => {
-    const encoded = encodeURIComponent(preview);
-    if (encoded.length > MAILTO_MAX_LENGTH) {
-      toast({
-        title: 'Texto muito longo para mailto',
-        description: "Use 'Copiar texto' e cole no cliente de email.",
+  const enviarMutation = useMutation({
+    mutationFn: async () => {
+      const corpoHtml = renderizarNotificacaoHtml(preview);
+      const r = await fetch('/api/negativacao/notificacoes/enviar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          clienteId: cliente.idCliente,
+          clienteNome: cliente.nomeCliente,
+          emailDestino: form.email.trim(),
+          assunto: 'Notificação Extrajudicial de Cobrança - TURBO PARTNERS',
+          corpoTexto: preview,
+          corpoHtml,
+        }),
       });
-      return;
-    }
-    const subject = encodeURIComponent('Notificação Extrajudicial de Cobrança - TURBO PARTNERS');
-    const mailto = `mailto:${encodeURIComponent(form.email.trim())}?subject=${subject}&body=${encoded}`;
-    window.location.href = mailto;
-  };
+      if (!r.ok) {
+        const text = await r.text().catch(() => '');
+        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`);
+      }
+      return r.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: 'Notificação enviada',
+        description: `ID: ${result.sendgridMessageId ?? result.id}`,
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['/api/negativacao/cliente', cliente.idCliente, 'notificacoes-enviadas'],
+      });
+      setConfirmacaoOpen(false);
+      onClose();
+    },
+    onError: (err: Error) => {
+      toast({
+        title: 'Falha no envio',
+        description: err.message,
+        variant: 'destructive',
+      });
+      setConfirmacaoOpen(false);
+    },
+  });
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -220,18 +274,30 @@ export function NotificacaoExtrajudicialModal({
           </Button>
           <Button
             variant="outline"
-            onClick={handleAbrirEmail}
-            disabled={!emailValido}
-            data-testid="button-abrir-email"
+            onClick={handleCopiar}
+            data-testid="button-copiar-notificacao"
           >
-            <Mail className="h-4 w-4 mr-2" />
-            Abrir no email
-          </Button>
-          <Button onClick={handleCopiar} data-testid="button-copiar-notificacao">
             <Copy className="h-4 w-4 mr-2" />
             Copiar texto
           </Button>
+          <Button
+            onClick={() => setConfirmacaoOpen(true)}
+            disabled={!emailValido}
+            data-testid="button-enviar-notificacao"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            Enviar agora
+          </Button>
         </DialogFooter>
+        <ConfirmacaoEnvioDialog
+          open={confirmacaoOpen}
+          onOpenChange={setConfirmacaoOpen}
+          onConfirm={() => enviarMutation.mutate()}
+          emailDestino={form.email.trim()}
+          clienteNome={cliente.nomeCliente || cliente.empresa || ''}
+          ultimoEnvio={ultimoEnvio}
+          isSending={enviarMutation.isPending}
+        />
       </DialogContent>
     </Dialog>
   );
