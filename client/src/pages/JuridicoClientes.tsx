@@ -61,7 +61,6 @@ import {
   Flame,
   Timer,
   Receipt,
-  Mail,
 } from "lucide-react";
 import {
   PieChart as RechartsPie,
@@ -80,7 +79,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { NotificacaoExtrajudicialModal } from "@/components/juridico/NotificacaoExtrajudicialModal";
 
 interface ClienteInadimplente {
   idCliente: string;
@@ -91,8 +89,6 @@ interface ClienteInadimplente {
   diasAtrasoMax: number;
   empresa: string;
   cnpj: string | null;
-  email: string | null;
-  endereco: string | null;
   statusClickup: string | null;
   responsavel: string | null;
   cluster: string | null;
@@ -237,7 +233,6 @@ export default function JuridicoClientes({
   const [editingCliente, setEditingCliente] = useState<ClienteJuridico | null>(
     null,
   );
-  const [notificacaoCliente, setNotificacaoCliente] = useState<ClienteJuridico | null>(null);
   const [editForm, setEditForm] = useState({
     contextoJuridico: "",
     procedimentoJuridico: "",
@@ -1216,20 +1211,6 @@ export default function JuridicoClientes({
                               return null;
                             })()}
 
-                            {item.contexto?.procedimentoJuridico === "notificacao" && (
-                              <Button
-                                size="default"
-                                variant="outline"
-                                className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20 flex-1 sm:flex-none min-w-[100px]"
-                                onClick={() => setNotificacaoCliente(item)}
-                                data-testid={`button-notificacao-${index}`}
-                              >
-                                <Mail className="h-4 w-4 mr-1.5 sm:mr-2" />
-                                <span className="hidden xs:inline">Gerar Notificação</span>
-                                <span className="xs:hidden">Notificar</span>
-                              </Button>
-                            )}
-
                             <Button
                               size="default"
                               className="bg-primary hover:bg-primary/90 text-white font-medium flex-1 sm:flex-none min-w-[100px]"
@@ -2053,26 +2034,6 @@ export default function JuridicoClientes({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {notificacaoCliente && (
-        <NotificacaoExtrajudicialModal
-          key={notificacaoCliente.cliente.idCliente}
-          open={!!notificacaoCliente}
-          onClose={() => setNotificacaoCliente(null)}
-          cliente={{
-            nomeCliente: notificacaoCliente.cliente.nomeCliente,
-            empresa: notificacaoCliente.cliente.empresa,
-            cnpj: notificacaoCliente.cliente.cnpj,
-            email: notificacaoCliente.cliente.email,
-            endereco: notificacaoCliente.cliente.endereco,
-            servicos: notificacaoCliente.cliente.servicos,
-          }}
-          parcelas={notificacaoCliente.parcelas.map(p => ({
-            naoPago: p.naoPago,
-            dataVencimento: p.dataVencimento,
-          }))}
-        />
-      )}
     </div>
   );
 }
