@@ -172,3 +172,41 @@ Sem mais, e nos termos da lei,
 
 Vitória/ES, ${dataEmissao}.`;
 }
+
+function escaparHtml(texto: string): string {
+  return texto
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function renderizarNotificacaoHtml(texto: string): string {
+  if (!texto.trim()) {
+    return `<div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;color:#1a1a1a;padding:20px;"></div>`;
+  }
+
+  const paragrafos = texto.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+
+  const html = paragrafos.map((p, idx) => {
+    const escapado = escaparHtml(p);
+
+    if (idx === 0) {
+      return `<h2 style="font-size:16px;font-weight:bold;margin-bottom:20px;">${escapado}</h2>`;
+    }
+
+    const paragrafoComBr = escapado.replace(/\n/g, '<br>');
+
+    const matchLabel = /^(NOTIFICANTE|NOTIFICADA):/.exec(paragrafoComBr);
+    if (matchLabel) {
+      const label = matchLabel[1];
+      const resto = paragrafoComBr.substring(matchLabel[0].length);
+      return `<p style="margin:12px 0;line-height:1.6;"><strong>${label}:</strong>${resto}</p>`;
+    }
+
+    return `<p style="margin:12px 0;line-height:1.6;">${paragrafoComBr}</p>`;
+  }).join('\n');
+
+  return `<div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;color:#1a1a1a;padding:20px;">${html}</div>`;
+}

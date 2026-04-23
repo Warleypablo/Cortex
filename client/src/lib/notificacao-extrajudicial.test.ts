@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatarMesesEmAtraso, formatarValoresDescricao, renderizarNotificacao, anoPorExtenso } from './notificacao-extrajudicial';
+import { formatarMesesEmAtraso, formatarValoresDescricao, renderizarNotificacao, anoPorExtenso, renderizarNotificacaoHtml } from './notificacao-extrajudicial';
 
 describe('formatarMesesEmAtraso', () => {
   it('formata um único mês', () => {
@@ -181,5 +181,56 @@ describe('renderizarNotificacao', () => {
     expect(texto).toContain('TURBO PARTNERS');
     expect(texto).toContain('42.100.292/0001-84');
     expect(texto).toContain('Rua Carlos Fernando Lindenberg Filho, 90');
+  });
+});
+
+describe('renderizarNotificacaoHtml', () => {
+  const textoSimples = `NOTIFICAÇÃO EXTRAJUDICIAL DE COBRANÇA
+
+NOTIFICANTE: TURBO PARTNERS, pessoa jurídica com CNPJ 42.100.292/0001-84.
+
+NOTIFICADA: EMPRESA LTDA, CNPJ 22.222.020/0002-22.
+
+Texto do corpo da notificação.
+
+Vitória/ES, 23/04/2026.`;
+
+  it('envolve output em div com inline style de fonte serif', () => {
+    const html = renderizarNotificacaoHtml(textoSimples);
+    expect(html).toMatch(/<div[^>]*style="[^"]*Georgia[^"]*"[^>]*>/);
+    expect(html).toContain('</div>');
+  });
+
+  it('usa <h2> para a primeira linha', () => {
+    const html = renderizarNotificacaoHtml(textoSimples);
+    expect(html).toMatch(/<h2[^>]*>NOTIFICAÇÃO EXTRAJUDICIAL DE COBRANÇA<\/h2>/);
+  });
+
+  it('aplica <strong> em NOTIFICANTE:', () => {
+    const html = renderizarNotificacaoHtml(textoSimples);
+    expect(html).toMatch(/<strong>NOTIFICANTE:<\/strong>/);
+  });
+
+  it('aplica <strong> em NOTIFICADA:', () => {
+    const html = renderizarNotificacaoHtml(textoSimples);
+    expect(html).toMatch(/<strong>NOTIFICADA:<\/strong>/);
+  });
+
+  it('usa <p> para parágrafos comuns', () => {
+    const html = renderizarNotificacaoHtml(textoSimples);
+    expect(html).toContain('<p style="margin:12px 0;line-height:1.6;">Texto do corpo da notificação.</p>');
+  });
+
+  it('escapa caracteres especiais HTML no corpo', () => {
+    const textoComHtml = `Título\n\nParágrafo com <script>alert("xss")</script> e & ampersand.`;
+    const html = renderizarNotificacaoHtml(textoComHtml);
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('&amp;');
+  });
+
+  it('lida com texto vazio retornando div vazia', () => {
+    const html = renderizarNotificacaoHtml('');
+    expect(html).toMatch(/<div[^>]*><\/div>/);
   });
 });
