@@ -1,6 +1,17 @@
 import type { Express } from "express";
 import { eq, desc, asc, sql, and } from "drizzle-orm";
-import { negativacaoAcoes } from "../../shared/schema";
+import { negativacaoAcoes, notificacoesExtrajudiciaisEnviadas } from "../../shared/schema";
+import { z } from "zod";
+import { sendNotificacaoExtrajudicial, SendGridError } from "../services/sendgrid-notification";
+
+const enviarNotificacaoSchema = z.object({
+  clienteId: z.string().min(1),
+  clienteNome: z.string().optional(),
+  emailDestino: z.string().email(),
+  assunto: z.string().min(10).max(200),
+  corpoTexto: z.string().min(100).max(50000),
+  corpoHtml: z.string().min(100).max(100000),
+});
 
 export function registerNegativacaoRoutes(app: Express, db: any) {
   // ============== NEGATIVAÇÃO ==============
@@ -194,6 +205,108 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching notificacao-data:", error);
       res.status(500).json({ error: "Failed to fetch notification data" });
+    }
+  });
+
+  // GET /api/negativacao/cliente/:clienteId/notificacoes-enviadas — histórico de envios
+  app.get(
+    "/api/negativacao/cliente/:clienteId/notificacoes-enviadas",
+    async (req, res) => {
+      try {
+        const { clienteId } = req.params;
+        const rows = await db
+          .select({
+            id: notificacoesExtrajudiciaisEnviadas.id,
+            emailDestino: notificacoesExtrajudiciaisEnviadas.emailDestino,
+            enviadoPor: notificacoesExtrajudiciaisEnviadas.enviadoPor,
+            enviadoEm: notificacoesExtrajudiciaisEnviadas.enviadoEm,
+            status: notificacoesExtrajudiciaisEnviadas.status,
+          })
+          .from(notificacoesExtrajudiciaisEnviadas)
+          .where(eq(notificacoesExtrajudiciaisEnviadas.clienteId, clienteId))
+          .orderBy(desc(notificacoesExtrajudiciaisEnviadas.enviadoEm))
+          .limit(10);
+
+        res.json(rows);
+      } catch (error) {
+        console.error("[api] Error fetching notificacoes enviadas:", error);
+        res.status(500).json({ error: "Failed to fetch notification history" });
+      }
+    },
+  );
+
+  // POST /api/negativacao/notificacoes/enviar — dispara envio + grava auditoria
+  app.post("/api/negativacao/notificacoes/enviar", async (req, res) => {
+    try {
+      const parsed = enviarNotificacaoSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: "Validation failed",
+          issues: parsed.error.issues,
+        });
+      }
+
+      const user = (req as any).user;
+      const enviadoPor = user?.name || user?.googleId || "Sistema";
+
+      const { clienteId, clienteNome, emailDestino, assunto, corpoTexto, corpoHtml } = parsed.data;
+
+      // 1. Grava registro otimista
+      const [inserted] = await db
+        .insert(notificacoesExtrajudiciaisEnviadas)
+        .values({
+          clienteId,
+          clienteNome: clienteNome ?? null,
+          emailDestino,
+          assunto,
+          corpoTexto,
+          corpoHtml,
+          enviadoPor,
+          status: "enviado",
+        })
+        .returning({ id: notificacoesExtrajudiciaisEnviadas.id });
+
+      // 2. Chama SendGrid
+      try {
+        const result = await sendNotificacaoExtrajudicial({
+          to: emailDestino,
+          subject: assunto,
+          text: corpoTexto,
+          html: corpoHtml,
+        });
+
+        // 3. Atualiza com message_id
+        await db
+          .update(notificacoesExtrajudiciaisEnviadas)
+          .set({ sendgridMessageId: result.messageId })
+          .where(eq(notificacoesExtrajudiciaisEnviadas.id, inserted.id));
+
+        return res.json({
+          id: inserted.id,
+          status: "enviado",
+          sendgridMessageId: result.messageId,
+        });
+      } catch (sendErr: any) {
+        const erroMsg =
+          sendErr instanceof SendGridError
+            ? `SendGrid ${sendErr.status}: ${JSON.stringify(sendErr.body)}`
+            : sendErr?.message ?? "Erro desconhecido";
+
+        await db
+          .update(notificacoesExtrajudiciaisEnviadas)
+          .set({ status: "erro", erro: erroMsg })
+          .where(eq(notificacoesExtrajudiciaisEnviadas.id, inserted.id));
+
+        console.error("[api] SendGrid error:", erroMsg);
+        return res
+          .status(500)
+          .json({ error: "Falha no envio", detail: erroMsg, auditId: inserted.id });
+      }
+    } catch (error: any) {
+      console.error("[api] Error in POST /notificacoes/enviar:", error);
+      return res
+        .status(500)
+        .json({ error: "Unexpected error", message: error?.message });
     }
   });
 
