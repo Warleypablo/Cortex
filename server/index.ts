@@ -794,6 +794,19 @@ app.use((req, res, next) => {
   }, PREDICTIONS_INTERVAL);
   console.log(`[predictions] Scheduled every ${PREDICTIONS_INTERVAL / 3600000}h`);
 
+  // Inadimplência — snapshot mensal (último dia do mês, meio-dia)
+  try {
+    const { setupInadimplenciaSnapshotJob } = await import(
+      "./services/inadimplenciaSnapshotJob"
+    );
+    setupInadimplenciaSnapshotJob();
+  } catch (err) {
+    console.error(
+      "[inadimplencia-snapshot] Falha ao registrar job:",
+      err,
+    );
+  }
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
