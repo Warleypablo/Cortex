@@ -40,7 +40,9 @@ import {
   MessageSquare,
   Phone,
   CheckCircle2,
+  Mail,
 } from "lucide-react";
+import { NotificacaoExtrajudicialModal } from "@/components/juridico/NotificacaoExtrajudicialModal";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -184,6 +186,7 @@ export default function Negativacao() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draggedClientId, setDraggedClientId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Record<string, any>>({});
+  const [notificacaoClienteId, setNotificacaoClienteId] = useState<string | null>(null);
 
   // ─── Data Fetching ──────────────────────────────────────────────────
 
@@ -215,6 +218,43 @@ export default function Negativacao() {
     },
     enabled: !!selectedClient,
   });
+
+  const { data: notificacaoData, isLoading: isLoadingNotificacao, error: notificacaoError } = useQuery<{
+    cliente: {
+      nomeCliente: string;
+      empresa: string;
+      cnpj: string | null;
+      email: string | null;
+      endereco: string | null;
+      servicos: string | null;
+    };
+    parcelas: { naoPago: number; dataVencimento: string }[];
+  }>({
+    queryKey: ["/api/negativacao/notificacao-data", notificacaoClienteId],
+    queryFn: async () => {
+      const r = await fetch(`/api/negativacao/cliente/${notificacaoClienteId}/notificacao-data`, {
+        credentials: "include",
+      });
+      if (!r.ok) {
+        const text = await r.text().catch(() => "");
+        throw new Error(`HTTP ${r.status}: ${text || r.statusText}`);
+      }
+      return r.json();
+    },
+    enabled: !!notificacaoClienteId,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (notificacaoError) {
+      toast({
+        title: "Erro ao carregar dados",
+        description: notificacaoError.message,
+        variant: "destructive",
+      });
+      setNotificacaoClienteId(null);
+    }
+  }, [notificacaoError, toast]);
 
   // ─── Mutations ──────────────────────────────────────────────────────
 
@@ -619,7 +659,7 @@ export default function Negativacao() {
                         )}
                       </div>
 
-                      <div className="mt-2">
+                      <div className="mt-2 flex items-center justify-between gap-2">
                         <Badge
                           variant="outline"
                           className={cn(
@@ -630,6 +670,21 @@ export default function Negativacao() {
                         >
                           {action.status}
                         </Badge>
+                        {etapa.key === "notificacao" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNotificacaoClienteId(action.clienteId);
+                            }}
+                            data-testid={`button-notificacao-${action.clienteId}`}
+                          >
+                            <Mail className="h-3 w-3 mr-1" />
+                            Notificar
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -989,6 +1044,35 @@ export default function Negativacao() {
           )}
         </SheetContent>
       </Sheet>
+
+      {notificacaoClienteId && notificacaoData && (
+        <NotificacaoExtrajudicialModal
+          key={`${notificacaoClienteId}-loaded`}
+          open={true}
+          onClose={() => setNotificacaoClienteId(null)}
+          cliente={{
+            ...notificacaoData.cliente,
+            idCliente: notificacaoClienteId,
+          }}
+          parcelas={notificacaoData.parcelas}
+        />
+      )}
+      {notificacaoClienteId && !notificacaoData && isLoadingNotificacao && (
+        <Sheet open={true} onOpenChange={() => setNotificacaoClienteId(null)}>
+          <SheetContent className="w-full sm:max-w-md bg-white dark:bg-zinc-900">
+            <SheetHeader>
+              <SheetTitle className="text-gray-900 dark:text-white">
+                Carregando dados da notificação...
+              </SheetTitle>
+            </SheetHeader>
+            <div className="mt-6 space-y-3">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-40 w-full" />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 }
