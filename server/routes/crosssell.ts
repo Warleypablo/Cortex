@@ -413,7 +413,15 @@ export function registerCrossSellRoutes(app: Express) {
         opDateFilter = `AND EXTRACT(YEAR FROM o.criado_em) = ${Number(ano)}`;
       }
 
-      const [kpisResult, funilResult, reunioesPorCxResult, rankingValorResult, rankingReunioesResult] = await Promise.all([
+      const [
+        kpisResult,
+        funilResult,
+        reunioesPorCxResult,
+        rankingValorResult,
+        rankingReunioesResult,
+        clientesNegociacaoResult,
+        coberturaResult,
+      ] = await Promise.all([
         // KPIs
         db.execute(sql.raw(`
           SELECT
@@ -465,6 +473,25 @@ export function registerCrossSellRoutes(app: Express) {
           GROUP BY o.cx_responsavel
           ORDER BY total_reunioes DESC
         `)),
+
+        // Clientes em negociação ativa (distinct cnpj com oportunidades em etapas ativas)
+        db.execute(sql.raw(`
+          SELECT COUNT(DISTINCT cnpj)::int AS total
+          FROM cortex_core.crosssell_oportunidades
+          WHERE etapa NOT IN ('ganho', 'descartado', 'sugerido_sistema')
+        `)),
+
+        // Cobertura: clientes com oportunidades / total clientes ativos
+        db.execute(sql.raw(`
+          SELECT
+            (SELECT COUNT(DISTINCT cnpj)::int
+             FROM cortex_core.crosssell_oportunidades
+             WHERE etapa NOT IN ('ganho', 'descartado')) AS com_oportunidade,
+            (SELECT COUNT(*)::int
+             FROM "Clickup".cup_clientes
+             WHERE status IN ('ativo', 'Ativo', 'ATIVO')
+               AND cnpj IS NOT NULL AND cnpj != '') AS total_ativos
+        `)),
       ]);
 
       const kpis = kpisResult.rows[0] as any;
@@ -482,6 +509,14 @@ export function registerCrossSellRoutes(app: Express) {
           taxaAceitacao: Number(kpis.sugestoes_total_transicoes) > 0
             ? Number(((Number(kpis.sugestoes_aceitas) / Number(kpis.sugestoes_total_transicoes)) * 100).toFixed(1))
             : 0,
+          clientesEmNegociacao: Number((clientesNegociacaoResult.rows[0] as any).total),
+          coberturaBase: (() => {
+            const r = coberturaResult.rows[0] as any;
+            const total = Number(r.total_ativos);
+            return total > 0
+              ? Number(((Number(r.com_oportunidade) / total) * 100).toFixed(1))
+              : 0;
+          })(),
         },
         funilEtapas: (funilResult.rows as any[]).map((r) => ({
           etapa: r.etapa,
