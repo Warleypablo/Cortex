@@ -152,17 +152,19 @@ export function registerCrossSellRoutes(app: Express) {
   // 2. POST /api/comercial/crosssell — Create oportunidade
   app.post("/api/comercial/crosssell", async (req, res) => {
     try {
-      const { clienteId, cnpj, produtoMapeado, cxResponsavel, valorRNegociacao, valorPNegociacao } = req.body;
+      const { clienteId, cnpj, produtoMapeado, cxResponsavel, valorRNegociacao, valorPNegociacao, etapa } = req.body;
 
       if (!clienteId || !cnpj || !produtoMapeado || !cxResponsavel) {
         return res.status(400).json({ error: "clienteId, cnpj, produtoMapeado, cxResponsavel são obrigatórios" });
       }
 
+      const etapaInicial = typeof etapa === "string" && etapa.length > 0 ? etapa : "fazer_contato";
+
       const result = await db.execute(sql`
         INSERT INTO cortex_core.crosssell_oportunidades
           (cliente_id, cnpj, produto_mapeado, cx_responsavel, valor_r_negociacao, valor_p_negociacao, etapa)
         VALUES
-          (${clienteId}, ${cnpj}, ${produtoMapeado}, ${cxResponsavel}, ${valorRNegociacao || null}, ${valorPNegociacao || null}, 'fazer_contato')
+          (${clienteId}, ${cnpj}, ${produtoMapeado}, ${cxResponsavel}, ${valorRNegociacao || null}, ${valorPNegociacao || null}, ${etapaInicial})
         RETURNING *
       `);
 
