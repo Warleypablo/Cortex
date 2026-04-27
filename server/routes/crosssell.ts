@@ -54,6 +54,7 @@ export function registerCrossSellRoutes(app: Express) {
             c.cluster,
             c.status AS cliente_status,
             c.responsavel AS cx_conta,
+            c.vendedor AS vendedor,
             (SELECT COUNT(*)::int FROM cortex_core.crosssell_comentarios cm
              WHERE cm.oportunidade_id = o.id) AS total_comentarios
           FROM cortex_core.crosssell_oportunidades o
@@ -83,6 +84,7 @@ export function registerCrossSellRoutes(app: Express) {
           MAX(of_.cluster) AS cluster,
           MAX(of_.cliente_status) AS cliente_status,
           MAX(of_.cx_conta) AS cx_conta,
+          MAX(of_.vendedor) AS vendedor,
           COALESCE(MAX(cc.valor_r_atual), 0) AS valor_r_atual,
           COALESCE(MAX(cc.valor_p_atual), 0) AS valor_p_atual,
           MAX(cc.contrato_inicio) AS contrato_inicio,
@@ -121,6 +123,7 @@ export function registerCrossSellRoutes(app: Express) {
         cluster: r.cluster,
         status: r.cliente_status,
         cxConta: r.cx_conta,
+        vendedor: r.vendedor,
         valorRAtual: Number(r.valor_r_atual),
         valorPAtual: Number(r.valor_p_atual),
         contratoInicio: r.contrato_inicio,
