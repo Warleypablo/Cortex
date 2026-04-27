@@ -227,6 +227,7 @@ export default function Negativacao() {
       email: string | null;
       endereco: string | null;
       servicos: string | null;
+      telefone: string | null;
     };
     parcelas: { naoPago: number; dataVencimento: string }[];
   }>({
