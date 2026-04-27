@@ -4835,7 +4835,7 @@ export class DbStorage implements IStorage {
     
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
     
-    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status IN ('QUITADO', 'RECEBIDO_PARCIAL')"];
+    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status = 'QUITADO'"];
 
     // Filtrar por empresa se especificado
     if (empresa && empresa !== 'todas') {
