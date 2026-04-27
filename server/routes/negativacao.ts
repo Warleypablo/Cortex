@@ -383,6 +383,30 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
       const { clienteId } = req.params;
       const { novaEtapa, responsavel, criadoPor } = req.body;
 
+      // Avanço para etapas pós-notificação exige que a notificação extrajudicial
+      // já tenha sido enviada (registro em notificacoes_extrajudiciais_enviadas).
+      const ETAPAS_POS_NOTIFICACAO = ["protesto", "negativacao", "acao_judicial"];
+      if (ETAPAS_POS_NOTIFICACAO.includes(novaEtapa)) {
+        const notif = await db
+          .select({ id: notificacoesExtrajudiciaisEnviadas.id })
+          .from(notificacoesExtrajudiciaisEnviadas)
+          .where(
+            and(
+              eq(notificacoesExtrajudiciaisEnviadas.clienteId, clienteId),
+              eq(notificacoesExtrajudiciaisEnviadas.status, "enviado"),
+            ),
+          )
+          .limit(1);
+
+        if (notif.length === 0) {
+          return res.status(400).json({
+            error: "notificacao_nao_enviada",
+            message:
+              "Cliente só pode avançar para protesto, negativação ou ação judicial após o envio da notificação extrajudicial.",
+          });
+        }
+      }
+
       // Get the latest action for this client
       const [latest] = await db
         .select()
