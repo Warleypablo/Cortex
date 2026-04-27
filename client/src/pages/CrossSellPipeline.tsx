@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -176,6 +176,30 @@ function formatCurrencyCompact(value: number | null | undefined): string {
   return `R$ ${value.toFixed(0)}`;
 }
 
+type ClienteEtapaGroup = {
+  cliente: ClienteCrossSell;
+  oportunidades: Oportunidade[];
+};
+
+function groupClientesByEtapa(
+  clientes: ClienteCrossSell[]
+): Map<Etapa, ClienteEtapaGroup[]> {
+  const groups = new Map<Etapa, ClienteEtapaGroup[]>();
+  for (const cliente of clientes) {
+    const byEtapa = new Map<Etapa, Oportunidade[]>();
+    for (const op of cliente.oportunidades) {
+      const e = op.etapa as Etapa;
+      if (!byEtapa.has(e)) byEtapa.set(e, []);
+      byEtapa.get(e)!.push(op);
+    }
+    for (const [e, ops] of byEtapa) {
+      if (!groups.has(e)) groups.set(e, []);
+      groups.get(e)!.push({ cliente, oportunidades: ops });
+    }
+  }
+  return groups;
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -193,9 +217,13 @@ export default function CrossSellPipeline() {
   const [ordenacao, setOrdenacao] = useState<"score" | "mrr" | "recente" | "nome">("score");
 
   // Modals
-  const [showNew, setShowNew] = useState(false);
+  const [newOpEtapa, setNewOpEtapa] = useState<Etapa | null>(null);
   const [ganhoCtx, setGanhoCtx] = useState<{ op: Oportunidade; clienteNome: string } | null>(null);
   const [commentCtx, setCommentCtx] = useState<{ op: Oportunidade; clienteNome: string } | null>(null);
+
+  // Accordion expansion
+  const [etapasExpandidas, setEtapasExpandidas] = useState<Set<Etapa>>(new Set());
+  const initializedExpansion = useRef(false);
 
   // Build query string for backend filters
   const queryString = useMemo(() => {
@@ -229,30 +257,18 @@ export default function CrossSellPipeline() {
     return Array.from(set).sort();
   }, [clientes]);
 
-  // Sorted clients
-  const sorted = useMemo(() => {
-    const arr = [...clientes];
-    switch (ordenacao) {
-      case "mrr":
-        arr.sort((a, b) => b.valorRAtual - a.valorRAtual);
-        break;
-      case "recente":
-        arr.sort((a, b) => {
-          const aMax = a.oportunidades.reduce((m, op) => Math.max(m, new Date(op.atualizadoEm).getTime()), 0);
-          const bMax = b.oportunidades.reduce((m, op) => Math.max(m, new Date(op.atualizadoEm).getTime()), 0);
-          return bMax - aMax;
-        });
-        break;
-      case "nome":
-        arr.sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? ""));
-        break;
-      case "score":
-      default:
-        arr.sort((a, b) => b.scoreMaximo - a.scoreMaximo);
-        break;
-    }
-    return arr;
-  }, [clientes, ordenacao]);
+  // Group clientes by etapa (each cliente appears in N sections, one per etapa where they have ≥1 op)
+  const grupos = useMemo(() => groupClientesByEtapa(clientes), [clientes]);
+
+  // Initialize default expansion: 3 first etapas with cards (excluding sugerido_sistema/descartado)
+  useEffect(() => {
+    if (initializedExpansion.current || clientes.length === 0) return;
+    const etapasComCards = ETAPAS.filter(
+      (e) => e !== "sugerido_sistema" && e !== "descartado" && (grupos.get(e)?.length ?? 0) > 0
+    );
+    setEtapasExpandidas(new Set(etapasComCards.slice(0, 3)));
+    initializedExpansion.current = true;
+  }, [clientes, grupos]);
 
   const totalOportunidades = useMemo(
     () => clientes.reduce((s, c) => s + c.oportunidades.length, 0),
@@ -397,7 +413,7 @@ export default function CrossSellPipeline() {
           {mapear.isPending ? "Mapeando..." : "Mapear Oportunidades"}
         </Button>
 
-        <Button onClick={() => setShowNew(true)} className="gap-2">
+        <Button onClick={() => setNewOpEtapa("fazer_contato")} className="gap-2">
           <Plus className="h-4 w-4" />
           Nova Oportunidade
         </Button>
@@ -405,36 +421,55 @@ export default function CrossSellPipeline() {
 
       {/* Summary */}
       <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-zinc-400">
-        <span>{sorted.length} clientes</span>
+        <span>{clientes.length} clientes únicos</span>
         <span>·</span>
         <span>{totalOportunidades} oportunidades</span>
         <span>·</span>
         <span>{formatCurrency(totalRNegociacao)} em negociação</span>
       </div>
 
-      {/* Card grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {sorted.map((c) => (
-          <ClienteCard
-            key={c.cnpj}
-            cliente={c}
-            onChangeEtapa={(opId, etapa) => changeEtapa.mutate({ id: opId, etapa })}
-            onGanho={(op) => setGanhoCtx({ op, clienteNome: c.nome ?? c.cnpj })}
-            onComments={(op) => setCommentCtx({ op, clienteNome: c.nome ?? c.cnpj })}
+      {/* Etapas accordion */}
+      <div className="space-y-1">
+        {ETAPAS.filter((e) => (grupos.get(e)?.length ?? 0) > 0).map((etapa) => (
+          <EtapaSection
+            key={etapa}
+            etapa={etapa}
+            grupos={grupos.get(etapa) ?? []}
+            expanded={etapasExpandidas.has(etapa)}
+            onToggle={() =>
+              setEtapasExpandidas((prev) => {
+                const next = new Set(prev);
+                if (next.has(etapa)) next.delete(etapa);
+                else next.add(etapa);
+                return next;
+              })
+            }
+            onNewOpForEtapa={(e) => setNewOpEtapa(e)}
+            ordenacao={ordenacao}
+            onChangeEtapa={(opId, e) => changeEtapa.mutate({ id: opId, etapa: e })}
+            onGanho={(op) => {
+              const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
+              if (grupo) setGanhoCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
+            }}
+            onComments={(op) => {
+              const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
+              if (grupo) setCommentCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
+            }}
           />
         ))}
-        {sorted.length === 0 && (
-          <div className="col-span-full text-center py-16 text-gray-400 dark:text-zinc-500">
+        {grupos.size === 0 && (
+          <div className="text-center py-16 text-gray-400 dark:text-zinc-500">
             Nenhum cliente encontrado com os filtros selecionados.
           </div>
         )}
       </div>
 
       {/* Modals */}
-      {showNew && (
+      {newOpEtapa && (
         <NewOpDialog
-          open={showNew}
-          onClose={() => setShowNew(false)}
+          open={!!newOpEtapa}
+          etapaInicial={newOpEtapa}
+          onClose={() => setNewOpEtapa(null)}
           userName={user?.name ?? ""}
         />
       )}
@@ -461,20 +496,111 @@ export default function CrossSellPipeline() {
 }
 
 // ---------------------------------------------------------------------------
+// EtapaSection
+// ---------------------------------------------------------------------------
+
+function EtapaSection({
+  etapa,
+  grupos,
+  expanded,
+  onToggle,
+  onNewOpForEtapa,
+  ordenacao,
+  onChangeEtapa,
+  onGanho,
+  onComments,
+}: {
+  etapa: Etapa;
+  grupos: ClienteEtapaGroup[];
+  expanded: boolean;
+  onToggle: () => void;
+  onNewOpForEtapa: (etapa: Etapa) => void;
+  ordenacao: "score" | "mrr" | "recente" | "nome";
+  onChangeEtapa: (opId: number, etapa: string) => void;
+  onGanho: (op: Oportunidade) => void;
+  onComments: (op: Oportunidade) => void;
+}) {
+  const sorted = useMemo(() => {
+    const arr = [...grupos];
+    switch (ordenacao) {
+      case "mrr":
+        arr.sort((a, b) => b.cliente.valorRAtual - a.cliente.valorRAtual);
+        break;
+      case "recente":
+        arr.sort((a, b) => {
+          const aMax = a.oportunidades.reduce((m, op) => Math.max(m, new Date(op.atualizadoEm).getTime()), 0);
+          const bMax = b.oportunidades.reduce((m, op) => Math.max(m, new Date(op.atualizadoEm).getTime()), 0);
+          return bMax - aMax;
+        });
+        break;
+      case "nome":
+        arr.sort((a, b) => (a.cliente.nome ?? "").localeCompare(b.cliente.nome ?? ""));
+        break;
+      case "score":
+      default:
+        arr.sort((a, b) => b.cliente.scoreMaximo - a.cliente.scoreMaximo);
+        break;
+    }
+    return arr;
+  }, [grupos, ordenacao]);
+
+  return (
+    <section>
+      <div
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-900/50 rounded px-1"
+      >
+        <span className={`text-gray-500 dark:text-zinc-400 transition-transform inline-block ${expanded ? "rotate-90" : ""}`}>▸</span>
+        <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
+          {ETAPA_LABELS[etapa] ?? etapa}
+        </Badge>
+        <span className="text-sm text-gray-500 dark:text-zinc-400">{grupos.length}</span>
+        <div className="flex-1" />
+        <button
+          onClick={(e) => { e.stopPropagation(); onNewOpForEtapa(etapa); }}
+          className="text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 px-2 py-0.5 text-sm"
+          title={`Nova oportunidade em ${ETAPA_LABELS[etapa]}`}
+        >
+          +
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2 mb-4 pl-6">
+          {sorted.map(({ cliente, oportunidades }) => (
+            <ClienteCard
+              key={`${etapa}-${cliente.cnpj}`}
+              cliente={cliente}
+              oportunidadesFiltradas={oportunidades}
+              onChangeEtapa={onChangeEtapa}
+              onGanho={onGanho}
+              onComments={onComments}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // ClienteCard
 // ---------------------------------------------------------------------------
 
 function ClienteCard({
   cliente,
+  oportunidadesFiltradas,
   onChangeEtapa,
   onGanho,
   onComments,
 }: {
   cliente: ClienteCrossSell;
+  oportunidadesFiltradas?: Oportunidade[];
   onChangeEtapa: (opId: number, etapa: string) => void;
   onGanho: (op: Oportunidade) => void;
   onComments: (op: Oportunidade) => void;
 }) {
+  const oportunidadesVisiveis = oportunidadesFiltradas ?? cliente.oportunidades;
   return (
     <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
       <CardContent className="p-4 space-y-3">
@@ -527,10 +653,10 @@ function ClienteCard({
         {/* Oportunidades */}
         <div className="border-t border-gray-100 dark:border-zinc-800 pt-2">
           <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
-            Oportunidades mapeadas ({cliente.oportunidades.length})
+            Oportunidades mapeadas ({oportunidadesVisiveis.length})
           </p>
           <div className="divide-y divide-gray-50 dark:divide-zinc-800/60">
-            {cliente.oportunidades.map((op) => (
+            {oportunidadesVisiveis.map((op) => (
               <OportunidadeRow
                 key={op.id}
                 op={op}
@@ -653,10 +779,12 @@ function OportunidadeRow({
 
 function NewOpDialog({
   open,
+  etapaInicial,
   onClose,
   userName,
 }: {
   open: boolean;
+  etapaInicial?: Etapa;
   onClose: () => void;
   userName: string;
 }) {
@@ -693,6 +821,7 @@ function NewOpDialog({
           cxResponsavel: userName || selectedCliente.responsavel,
           valorRNegociacao: valorR ? Number(valorR) : undefined,
           valorPNegociacao: valorP ? Number(valorP) : undefined,
+          etapa: etapaInicial,
         }),
       });
       if (!res.ok) {
@@ -714,6 +843,11 @@ function NewOpDialog({
           <DialogTitle className="text-gray-900 dark:text-white">
             Nova Oportunidade de CrossSell
           </DialogTitle>
+          {etapaInicial && etapaInicial !== "fazer_contato" && (
+            <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
+              Será criada em: <strong className="text-gray-900 dark:text-white">{ETAPA_LABELS[etapaInicial]}</strong>
+            </p>
+          )}
         </DialogHeader>
 
         <div className="space-y-4">
