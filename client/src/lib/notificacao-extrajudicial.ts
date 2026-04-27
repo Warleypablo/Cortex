@@ -197,7 +197,7 @@ const TITLE_WRAPPER_STYLE =
 const CONTENT_STYLE =
   "padding:32px 40px;color:#1a1a1a;font-size:14px;line-height:1.7;";
 const PARTY_BOX_STYLE =
-  "margin:0 0 16px;padding:14px 18px;background-color:#fafafa;border-left:3px solid #0a0a0a;";
+  "margin:0 0 16px;padding:14px 18px;background-color:#fafafa;border-left:3px solid #0a0a0a;text-align:justify;";
 const PARAGRAPH_STYLE =
   "margin:16px 0;line-height:1.7;text-align:justify;";
 const LEGAL_BOX_STYLE =
