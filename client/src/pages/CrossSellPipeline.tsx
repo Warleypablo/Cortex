@@ -37,6 +37,7 @@ import {
   Search,
   Send,
   User,
+  Briefcase,
   Clock,
   Sparkles,
 } from "lucide-react";
@@ -117,6 +118,7 @@ interface ClienteCrossSell {
   cluster: string | null;
   status: string | null;
   cxConta: string | null;
+  vendedor: string | null;
   valorRAtual: number;
   valorPAtual: number;
   contratoInicio: string | null;
@@ -610,11 +612,6 @@ function ClienteCard({
             {cliente.nome ?? cliente.cnpj}
           </h3>
           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 mt-1 flex-wrap">
-            <span className="flex items-center gap-1">
-              <User className="h-3 w-3" />
-              {cliente.cxConta ?? "—"}
-            </span>
-            <span>·</span>
             <span>{cliente.cluster ?? "—"}</span>
             <span>·</span>
             <span>{cliente.status ?? "—"}</span>
@@ -622,6 +619,18 @@ function ClienteCard({
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {calcLifetime(cliente.contratoInicio)}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-zinc-300 mt-1.5 flex-wrap">
+            <span className="flex items-center gap-1">
+              <User className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+              <span className="text-gray-400 dark:text-zinc-500">CxCs:</span>
+              <span className="font-medium">{cliente.cxConta ?? "—"}</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <Briefcase className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+              <span className="text-gray-400 dark:text-zinc-500">Vendedor:</span>
+              <span className="font-medium">{cliente.vendedor ?? "—"}</span>
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-zinc-300 mt-1.5 font-medium">
