@@ -32,6 +32,7 @@ interface NotificacaoExtrajudicialModalProps {
     email: string | null;
     endereco: string | null;
     servicos: string | null;
+    telefone: string | null;
   };
   parcelas: ParcelaParaNotificacao[];
 }
@@ -125,6 +126,7 @@ export function NotificacaoExtrajudicialModal({
           assunto: 'Notificação Extrajudicial de Cobrança - TURBO PARTNERS',
           corpoTexto: preview,
           corpoHtml,
+          telefone: cliente.telefone,
         }),
       });
       if (!r.ok) {
@@ -134,9 +136,23 @@ export function NotificacaoExtrajudicialModal({
       return r.json();
     },
     onSuccess: (result) => {
+      const wpp = result?.whatsapp as
+        | { status: 'enviado' | 'sem_telefone' | 'erro'; detalhe?: string }
+        | undefined;
+
+      let descricaoWpp = '';
+      if (wpp?.status === 'enviado') {
+        descricaoWpp = ' WhatsApp de aviso também enviado.';
+      } else if (wpp?.status === 'sem_telefone') {
+        descricaoWpp = ' WhatsApp não enviado: cliente sem telefone cadastrado.';
+      } else if (wpp?.status === 'erro') {
+        descricaoWpp = ` WhatsApp falhou: ${wpp.detalhe ?? 'erro desconhecido'}.`;
+      }
+
       toast({
         title: 'Notificação enviada',
-        description: `ID: ${result.sendgridMessageId ?? result.id}`,
+        description: `ID: ${result.sendgridMessageId ?? result.id}.${descricaoWpp}`,
+        variant: wpp?.status === 'erro' ? 'destructive' : 'default',
       });
       queryClient.invalidateQueries({
         queryKey: ['/api/negativacao/cliente', cliente.idCliente, 'notificacoes-enviadas'],

@@ -3,6 +3,7 @@ import { eq, desc, asc, sql, and } from "drizzle-orm";
 import { negativacaoAcoes, notificacoesExtrajudiciaisEnviadas } from "../../shared/schema";
 import { z } from "zod";
 import { sendNotificacaoExtrajudicial, SendGridError } from "../services/sendgrid-notification";
+import { enviarMensagemWhatsApp, normalizarNumero } from "../services/turbozap";
 
 const enviarNotificacaoSchema = z.object({
   clienteId: z.string().min(1),
@@ -11,6 +12,7 @@ const enviarNotificacaoSchema = z.object({
   assunto: z.string().min(10).max(200),
   corpoTexto: z.string().min(100).max(50000),
   corpoHtml: z.string().min(100).max(100000),
+  telefone: z.string().optional().nullable(),
 });
 
 export function registerNegativacaoRoutes(app: Express, db: any) {
@@ -148,7 +150,8 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
             cc.cnpj,
             cc.email,
             cc.endereco,
-            cup.task_id
+            cup.task_id,
+            cup.telefone
           FROM "Conta Azul".caz_clientes cc
           LEFT JOIN "Clickup".cup_clientes cup
             ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
@@ -199,6 +202,7 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
           email: row.email || null,
           endereco: row.endereco || null,
           servicos: row.servicos || null,
+          telefone: row.telefone || null,
         },
         parcelas,
       });
@@ -249,7 +253,7 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
       const user = (req as any).user;
       const enviadoPor = user?.name || user?.googleId || "Sistema";
 
-      const { clienteId, clienteNome, emailDestino, assunto, corpoTexto, corpoHtml } = parsed.data;
+      const { clienteId, clienteNome, emailDestino, assunto, corpoTexto, corpoHtml, telefone } = parsed.data;
 
       // 1. Grava registro otimista
       const [inserted] = await db
@@ -281,10 +285,33 @@ export function registerNegativacaoRoutes(app: Express, db: any) {
           .set({ sendgridMessageId: result.messageId })
           .where(eq(notificacoesExtrajudiciaisEnviadas.id, inserted.id));
 
+        // 4. WhatsApp de cortesia (instância jurídica) — não bloqueia o envio do email
+        let whatsapp: { status: "enviado" | "sem_telefone" | "erro"; detalhe?: string } = {
+          status: "sem_telefone",
+        };
+        if (telefone && telefone.trim()) {
+          const numero = normalizarNumero(telefone);
+          const nomeAviso = clienteNome?.trim() || "prezado cliente";
+          const mensagemWhats =
+            `Olá, ${nomeAviso}.\n\n` +
+            `A *Turbo Partners* acaba de enviar uma *notificação extrajudicial de cobrança* ` +
+            `para o e-mail *${emailDestino}*.\n\n` +
+            `Por gentileza, verifique sua caixa de entrada (e a pasta de spam). ` +
+            `Em caso de dúvidas, responda este WhatsApp ou entre em contato com o jurídico.`;
+          const wppResult = await enviarMensagemWhatsApp(numero, mensagemWhats, "juridico");
+          whatsapp = wppResult.success
+            ? { status: "enviado" }
+            : { status: "erro", detalhe: wppResult.error };
+          if (!wppResult.success) {
+            console.warn("[notificacao] WhatsApp falhou:", wppResult.error);
+          }
+        }
+
         return res.json({
           id: inserted.id,
           status: "enviado",
           sendgridMessageId: result.messageId,
+          whatsapp,
         });
       } catch (sendErr: any) {
         const erroMsg =
