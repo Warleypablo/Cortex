@@ -21,6 +21,7 @@ import * as fs from "fs";
 import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
+import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMetasRoutes } from "./routes/metas";
@@ -38,19 +39,26 @@ import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
 import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
+import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
+import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
 import { registerGrowthAiRoutes } from "./routes/growth-ai";
+import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerNegativacaoRoutes } from "./routes/negativacao";
+import { registerTriagemRoutes } from "./routes/triagem";
+import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
+import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
 
 const gpturboOpenAI = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -2094,17 +2102,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startDateStr = startDate.toISOString().split('T')[0];
       
       // Buscar evolução de MRR por mês
-      // Para meses anteriores: usa snapshots históricos (cup_data_hist)
+      // Para meses anteriores: usa snapshot do dia 1 do mês seguinte (estado final do mês)
+      // Fallback: último snapshot dentro do mês se dia 1 não existir
       // Para o mês atual: usa dados ao vivo (cup_contratos) para evitar valores incompletos
       const mrrResult = await db.execute(sql`
-        WITH snapshots_mensais AS (
-          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
-            DATE_TRUNC('month', data_snapshot) as mes,
-            data_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE DATE(data_snapshot) >= ${startDateStr}::date
-            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
-          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        WITH meses_range AS (
+          SELECT generate_series(
+            DATE_TRUNC('month', ${startDateStr}::date),
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month',
+            INTERVAL '1 month'
+          )::date as mes
+        ),
+        snapshots_mensais AS (
+          SELECT
+            mr.mes,
+            COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (mr.mes + INTERVAL '1 month')::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE DATE_TRUNC('month', data_snapshot) = mr.mes)
+            ) as data_snapshot
+          FROM meses_range mr
         ),
         historical_data AS (
           SELECT
@@ -2115,7 +2131,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             COUNT(*) as total_contratos
           FROM snapshots_mensais sm
           JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          WHERE sm.data_snapshot IS NOT NULL
+            AND h.status IN ('ativo', 'onboarding', 'triagem')
             AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
           GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ),
@@ -2192,45 +2209,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Gerar insights de IA sobre evolução mensal (SSE streaming)
   app.post("/api/dashboard/evolucao-mensal/insights", async (req, res) => {
     try {
-      const numMeses = 6;
+      const { meses: mesesParam, squad: squadFilter, operador: operadorFilter } = req.body || {};
+      const numMeses = Math.min(Math.max(parseInt(mesesParam) || 6, 1), 36);
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - numMeses);
       const startDateStr = startDate.toISOString().split('T')[0];
 
-      const HIDDEN_SQUADS_SQL = "('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')";
-
       const mrrResult = await db.execute(sql`
-        WITH snapshots_mensais AS (
-          SELECT DISTINCT ON (DATE_TRUNC('month', data_snapshot))
-            DATE_TRUNC('month', data_snapshot) as mes,
-            data_snapshot
-          FROM "Clickup".cup_data_hist
-          WHERE DATE(data_snapshot) >= ${startDateStr}::date
-            AND DATE_TRUNC('month', data_snapshot) < DATE_TRUNC('month', CURRENT_DATE)
-          ORDER BY DATE_TRUNC('month', data_snapshot), data_snapshot DESC
+        WITH meses_range AS (
+          SELECT generate_series(
+            DATE_TRUNC('month', ${startDateStr}::date),
+            DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '1 month',
+            INTERVAL '1 month'
+          )::date as mes
+        ),
+        snapshots_mensais AS (
+          SELECT
+            mr.mes,
+            COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (mr.mes + INTERVAL '1 month')::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE DATE_TRUNC('month', data_snapshot) = mr.mes)
+            ) as data_snapshot
+          FROM meses_range mr
         ),
         historical_data AS (
           SELECT
             TO_CHAR(sm.mes, 'YYYY-MM') as mes,
             h.squad,
+            h.responsavel,
             COALESCE(SUM(h.valorr), 0) as mrr_total,
             COUNT(*) as total_contratos
           FROM snapshots_mensais sm
           JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
-          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+          WHERE sm.data_snapshot IS NOT NULL
+            AND h.status IN ('ativo', 'onboarding', 'triagem')
             AND h.squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
-          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad
+          GROUP BY TO_CHAR(sm.mes, 'YYYY-MM'), h.squad, h.responsavel
         ),
         current_month_data AS (
           SELECT
             TO_CHAR(DATE_TRUNC('month', CURRENT_DATE), 'YYYY-MM') as mes,
             squad,
+            responsavel,
             COALESCE(SUM(valorr), 0) as mrr_total,
             COUNT(*) as total_contratos
           FROM "Clickup".cup_contratos
           WHERE status IN ('ativo', 'onboarding', 'triagem')
             AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
-          GROUP BY squad
+          GROUP BY squad, responsavel
         )
         SELECT * FROM historical_data
         UNION ALL
@@ -2242,6 +2268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         SELECT
           TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           squad,
+          responsavel_geral as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0) as mrr_churn
         FROM "Clickup".cup_churn
@@ -2249,19 +2276,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
-        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad
+        GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
         ORDER BY mes, squad
       `);
 
+      // Apply squad/operador filters
+      let mrrRows = mrrResult.rows as any[];
+      let churnRows = churnResult.rows as any[];
+      if (squadFilter) {
+        mrrRows = mrrRows.filter((r: any) => r.squad === squadFilter);
+        churnRows = churnRows.filter((r: any) => r.squad === squadFilter);
+      }
+      if (operadorFilter) {
+        mrrRows = mrrRows.filter((r: any) => r.responsavel === operadorFilter);
+        churnRows = churnRows.filter((r: any) => r.responsavel === operadorFilter);
+      }
+
       // Montar resumo dos dados para o prompt
-      const meses = Array.from(new Set(mrrResult.rows.map((r: any) => r.mes))).sort();
-      const squads = Array.from(new Set(mrrResult.rows.map((r: any) => r.squad)));
+      const filterDesc = squadFilter ? `Filtro: Squad ${squadFilter}` : operadorFilter ? `Filtro: Operador ${operadorFilter}` : "Visão geral (todos os squads)";
+      const meses = Array.from(new Set(mrrRows.map((r: any) => r.mes))).sort();
+      const squads = Array.from(new Set(mrrRows.map((r: any) => r.squad)));
 
       let dataContext = "## Dados de MRR por Squad e Mês\n\n";
       for (const mes of meses) {
-        const mrrMes = mrrResult.rows.filter((r: any) => r.mes === mes);
+        const mrrMes = mrrRows.filter((r: any) => r.mes === mes);
         const totalMrr = mrrMes.reduce((acc: number, r: any) => acc + Number(r.mrr_total), 0);
         dataContext += `### ${mes} (MRR Total: R$ ${totalMrr.toLocaleString('pt-BR')})\n`;
         for (const r of mrrMes as any[]) {
@@ -2272,7 +2312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       dataContext += "\n## Dados de Churn por Squad e Mês\n\n";
       for (const mes of meses) {
-        const churnMes = churnResult.rows.filter((r: any) => r.mes === mes);
+        const churnMes = churnRows.filter((r: any) => r.mes === mes);
         if (churnMes.length === 0) continue;
         const totalChurn = churnMes.reduce((acc: number, r: any) => acc + Number(r.mrr_churn), 0);
         const totalChurns = churnMes.reduce((acc: number, r: any) => acc + Number(r.churns), 0);
@@ -2288,10 +2328,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (let i = 1; i < meses.length; i++) {
         const mesAnterior = meses[i - 1];
         const mesAtual = meses[i];
-        const mrrAnterior = mrrResult.rows
+        const mrrAnterior = mrrRows
           .filter((r: any) => r.mes === mesAnterior)
           .reduce((acc: number, r: any) => acc + Number(r.mrr_total), 0);
-        const churnAtual = churnResult.rows
+        const churnAtual = churnRows
           .filter((r: any) => r.mes === mesAtual)
           .reduce((acc: number, r: any) => acc + Number(r.mrr_churn), 0);
         const taxa = mrrAnterior > 0 ? ((churnAtual / mrrAnterior) * 100).toFixed(1) : "0.0";
@@ -2329,7 +2369,7 @@ Estruture sua resposta em:
         model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Analise os seguintes dados dos últimos ${numMeses} meses:\n\n${dataContext}` }
+          { role: "user", content: `Analise os seguintes dados dos últimos ${numMeses} meses.\n${filterDesc}\n\n${dataContext}` }
         ],
         max_tokens: 2048,
         stream: true,
@@ -4664,28 +4704,43 @@ Estruture sua resposta em:
         cursor.setMonth(cursor.getMonth() + 1);
       }
 
-      // Para cada mês no range, buscar MRR base do mês anterior (último snapshot)
+      // Para cada mês no range, buscar MRR base: primeiro snapshot do mês atual, fallback último do mês anterior
       const mrrBasePorMes: Record<string, { total: number; por_squad: Record<string, number> }> = {};
 
       for (const mesKey of mesesNoRange) {
         const [ano, mes] = mesKey.split('-').map(Number);
-        // Mês anterior = mês de referência para o MRR base
+        // Primeiro: tentar primeiro snapshot do próprio mês
+        const inicioMesAtual = new Date(ano, mes - 1, 1);
+        const fimMesAtual = new Date(ano, mes - 1, 5, 23, 59, 59); // primeiros 5 dias
+        // Fallback: último snapshot do mês anterior
         const refMonth = mes === 1 ? 12 : mes - 1;
         const refYear = mes === 1 ? ano - 1 : ano;
         const inicioRef = new Date(refYear, refMonth - 1, 1);
         const fimRef = new Date(refYear, refMonth, 0, 23, 59, 59);
 
         const mrrResult = await db.execute(sql`
-          WITH ultimo_snapshot AS (
-            SELECT MAX(data_snapshot) as data_ultimo_snapshot
+          WITH snapshot_atual AS (
+            SELECT MIN(data_snapshot) as data_snapshot
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioMesAtual}::timestamp
+              AND data_snapshot <= ${fimMesAtual}::timestamp
+          ),
+          snapshot_anterior AS (
+            SELECT MAX(data_snapshot) as data_snapshot
             FROM "Clickup".cup_data_hist
             WHERE data_snapshot >= ${inicioRef}::timestamp
               AND data_snapshot <= ${fimRef}::timestamp
+          ),
+          snapshot_ref AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM snapshot_atual WHERE data_snapshot IS NOT NULL),
+              (SELECT data_snapshot FROM snapshot_anterior)
+            ) as data_ultimo_snapshot
           )
           SELECT
             COALESCE(h.squad, 'Não especificado') as squad,
             COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
-          FROM ultimo_snapshot us
+          FROM snapshot_ref us
           JOIN "Clickup".cup_data_hist h
             ON h.data_snapshot = us.data_ultimo_snapshot
             AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
@@ -4894,6 +4949,8 @@ Estruture sua resposta em:
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND EXTRACT(YEAR FROM ultimo_dia_operacao) = ${ano}
           AND ultimo_dia_operacao <= CURRENT_DATE
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY squad, ano, trimestre
         ORDER BY ano, trimestre, valor_total DESC
       `);
@@ -4919,6 +4976,8 @@ Estruture sua resposta em:
         WHERE ultimo_dia_operacao IS NOT NULL AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND valor_r > 0
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY squad, ano, trimestre
         ORDER BY squad, ano, trimestre
       `);
@@ -4992,6 +5051,8 @@ Estruture sua resposta em:
           AND ultimo_dia_operacao IS NOT NULL
           AND EXTRACT(YEAR FROM ultimo_dia_operacao) = ${ano}
           AND ultimo_dia_operacao <= CURRENT_DATE
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         ORDER BY ultimo_dia_operacao DESC
       `);
 
@@ -5306,161 +5367,131 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
       const squad = req.query.squad as string | undefined;
       const squadFilter = squad && squad !== 'todos' ? squad : null;
-      
+
       const dataInicio = `${ano}-01-01`;
       const dataFim = `${ano}-12-31 23:59:59`;
-      
-      // Query única para todo o ano com agregação por mês
-      const result = await db.execute(sql`
-        WITH cnpj_normalizado AS (
-          SELECT 
-            ids,
-            nome,
-            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-          FROM "Conta Azul".caz_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
-        ),
-        cup_cnpj_normalizado AS (
-          SELECT 
-            task_id,
-            REPLACE(REPLACE(REPLACE(COALESCE(cnpj, ''), '.', ''), '-', ''), '/', '') as cnpj_limpo
-          FROM "Clickup".cup_clientes
-          WHERE cnpj IS NOT NULL AND TRIM(cnpj) != ''
-        ),
-        contrato_todos AS (
-          SELECT DISTINCT
-            cc.cnpj_limpo,
-            ct.squad,
-            ct.servico,
-            ct.id_subtask,
-            COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
-          FROM cup_cnpj_normalizado cc
-          INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
-          WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-        ),
-        contrato_com_peso AS (
-          SELECT
-            cnpj_limpo,
-            squad,
-            servico,
-            id_subtask,
-            CASE
-              WHEN SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo) > 0
-              THEN valor_contrato / SUM(valor_contrato) OVER (PARTITION BY cnpj_limpo)
-              ELSE 1.0 / COUNT(*) OVER (PARTITION BY cnpj_limpo)
-            END as peso
-          FROM contrato_todos
-        )
-        SELECT
-          TO_CHAR(p.data_quitacao, 'YYYY-MM') as mes,
-          COALESCE(p.categoria_id, 'SEM_CATEGORIA') as categoria_id,
-          COALESCE(p.categoria_nome, 'Sem Categoria') as categoria_nome,
-          COALESCE(caz.nome, 'Cliente não identificado') as cliente_nome,
-          COALESCE(cu.servico, 'Serviço não identificado') as servico_nome,
-          COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') as squad,
-          p.id as parcela_id,
-          (p.valor_pago::numeric * COALESCE(cu.peso, 1)) as valor,
-          p.data_quitacao,
-          p.url_cobranca
-        FROM "Conta Azul".caz_parcelas p
-        LEFT JOIN cnpj_normalizado caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        LEFT JOIN contrato_com_peso cu ON caz.cnpj_limpo = cu.cnpj_limpo
-        WHERE p.status = 'QUITADO'
-          AND p.tipo_evento = 'RECEITA'
-          AND p.data_quitacao >= ${dataInicio}::date
-          AND p.data_quitacao <= ${dataFim}::timestamp
-          AND p.valor_pago::numeric > 0
-          AND (
-            ${squadFilter}::text IS NULL 
-            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') = ${squadFilter}
-            OR COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter}, '^[^a-zA-Z]+', '', 'g')
-            OR ${squadFilter} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(cu.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
-          )
-        ORDER BY mes, categoria_id, cliente_nome, servico_nome
-      `);
-      
-      // Processar dados agrupados por mês
+
+      // Normaliza variantes de "Sem Squad" para o label único exibido no frontend.
+      // Evita que contratos com squad vazio (legacy) apareçam como bucket separado
+      // do bucket de órfãos do pipeline de itens.
+      const normalizeSquadLabel = (raw: any): string => {
+        const v = (raw ?? '').toString().trim();
+        if (v === '' || v === 'Sem Squad') return SEM_SQUAD_LABEL;
+        return v;
+      };
+
+      // ──── Receita via caz_vendas_itens (pipeline de itens) ─────────────────
+      // Pipeline que atribui cada item da venda ao contrato/squad certo.
+      // Cobre 100% das parcelas RECEITA QUITADO/RECEBIDO_PARCIAL do ano (Task 11).
+      const receitaItens: ReceitaItemLinha[] = await getReceitaPorItens(ano);
+
+      // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
+      // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
+
+      // Helper compartilhado: aplica fuzzy match do squadFilter (mesma lógica do código antigo)
+      const matchesSquadFilter = (sq: string): boolean => {
+        if (!squadFilter) return true;
+        const stripPrefix = (s: string) => s.replace(/^[^a-zA-Z]+/, '');
+        return (
+          sq === squadFilter ||
+          sq.toLowerCase().includes(stripPrefix(squadFilter).toLowerCase()) ||
+          squadFilter.toLowerCase().includes(stripPrefix(sq).toLowerCase())
+        );
+      };
+
+      // Helper para normalizar datas do Postgres em UTC midnight (evita TZ drift)
+      const parseDbDate = (raw: any): Date | null => {
+        if (!raw) return null;
+        if (raw instanceof Date) {
+          return new Date(Date.UTC(raw.getUTCFullYear(), raw.getUTCMonth(), raw.getUTCDate()));
+        }
+        const s = String(raw);
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) {
+          return new Date(Date.UTC(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3])));
+        }
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      };
+
+      // ──── Estruturas de dados para agregação ──────────────────────────────
       type ParcelaInfo = {
-        id: string;
+        id: string | null;
         valor: number;
-        dataQuitacao: string;
+        dataQuitacao: string | null;
         linkNfse: string | null;
         numNfse: string | null;
         urlCobranca: string | null;
         clienteNome: string;
         servicoNome: string;
         squad: string;
+        causa?: 'match' | 'fallback_maior_valor' | 'cnpj_sem_contrato_clickup' | 'item_nao_casou';
       };
-      
       type ServicoInfo = { valor: number; squad: string; parcelas: ParcelaInfo[] };
       type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
       type CategoriaInfo = { nome: string; valorTotal: number; clientes: Map<string, ClienteInfo> };
-      type MesData = { 
-        categorias: Map<string, CategoriaInfo>; 
+      type MesData = {
+        categorias: Map<string, CategoriaInfo>;
         receitaTotal: number;
         totalParcelas: number;
       };
-      
+
       const mesesMap = new Map<string, MesData>();
       const squadsSet = new Set<string>();
-      
-      for (const row of result.rows as any[]) {
-        const mes = row.mes;
-        const categoriaNome = row.categoria_nome || 'Sem Categoria';
-        const clienteNome = row.cliente_nome;
-        const servicoNome = row.servico_nome;
-        const squadNome = row.squad;
-        const valor = Number(row.valor) || 0;
 
-        squadsSet.add(squadNome);
+      // ──── Populando mesesMap via pipeline de itens ──────────────────────
+      // Órfãos (SEM_SQUAD_LABEL) são mantidos mesmo quando um squad filter é aplicado,
+      // para que fiquem visíveis no dashboard (e o usuário possa agir sobre eles).
+      for (const linha of receitaItens) {
+        const sqNorm = linha.squad;
 
-        if (!mesesMap.has(mes)) {
-          mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
+        if (!matchesSquadFilter(sqNorm) && sqNorm !== SEM_SQUAD_LABEL) continue;
+
+        squadsSet.add(sqNorm);
+
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
+        if (!mesesMap.has(linha.mes)) {
+          mesesMap.set(linha.mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
         }
-
-        const mesData = mesesMap.get(mes)!;
-        mesData.receitaTotal += valor;
+        const mesData = mesesMap.get(linha.mes)!;
+        mesData.receitaTotal += linha.itemTotal;
         mesData.totalParcelas += 1;
 
-        // Agrupar por categoria_nome (não UUID) para unificar categorias com mesmo nome
+        const categoriaNome = 'Sem Categoria';
         if (!mesData.categorias.has(categoriaNome)) {
-          mesData.categorias.set(categoriaNome, {
-            nome: categoriaNome,
-            valorTotal: 0,
-            clientes: new Map()
-          });
+          mesData.categorias.set(categoriaNome, { nome: categoriaNome, valorTotal: 0, clientes: new Map() });
         }
-
         const cat = mesData.categorias.get(categoriaNome)!;
-        cat.valorTotal += valor;
-        
-        if (!cat.clientes.has(clienteNome)) {
-          cat.clientes.set(clienteNome, { valorTotal: 0, servicos: new Map() });
+        cat.valorTotal += linha.itemTotal;
+
+        if (!cat.clientes.has(linha.clienteNome)) {
+          cat.clientes.set(linha.clienteNome, { valorTotal: 0, servicos: new Map() });
         }
-        
-        const cliente = cat.clientes.get(clienteNome)!;
-        cliente.valorTotal += valor;
-        
-        const chaveServico = `${servicoNome}|${squadNome}`;
-        if (!cliente.servicos.has(chaveServico)) {
-          cliente.servicos.set(chaveServico, { valor: 0, squad: squadNome, parcelas: [] });
+        const cli = cat.clientes.get(linha.clienteNome)!;
+        cli.valorTotal += linha.itemTotal;
+
+        const chaveServico = `${linha.itemRaw}|${sqNorm}`;
+        if (!cli.servicos.has(chaveServico)) {
+          cli.servicos.set(chaveServico, { valor: 0, squad: sqNorm, parcelas: [] });
         }
-        
-        const servico = cliente.servicos.get(chaveServico)!;
-        servico.valor += valor;
-        servico.parcelas.push({
-          id: row.parcela_id,
-          valor,
-          dataQuitacao: row.data_quitacao,
+        const srv = cli.servicos.get(chaveServico)!;
+        srv.valor += linha.itemTotal;
+        srv.parcelas.push({
+          id: linha.idSubtask,
+          valor: linha.itemTotal,
+          dataQuitacao: null,
           linkNfse: null,
           numNfse: null,
-          urlCobranca: row.url_cobranca,
-          clienteNome,
-          servicoNome,
-          squad: squadNome
+          urlCobranca: null,
+          clienteNome: linha.clienteNome,
+          servicoNome: linha.itemRaw,
+          squad: sqNorm,
+          causa: linha.causa,
         });
       }
-      
+
       // Converter para formato de resposta
       const mesesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       
@@ -5540,60 +5571,117 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         });
       }
       
-      // ──── DESPESAS: Salários, CXCS, Freelancers ────────────────────────────
-      // Salários ativos do squad (rh_pessoal)
+      // ──── DESPESAS: Salários proporcionais por admissão/demissão ────────────
+      // Warning para colaboradores sem data de admissão (não entram no cálculo)
+      const semAdmissaoResult = await db.execute(sql`
+        SELECT COUNT(*)::int AS qtd
+        FROM "Inhire".rh_pessoal
+        WHERE admissao IS NULL AND LOWER(TRIM(status)) = 'ativo'
+      `);
+      const qtdSemAdmissao = Number((semAdmissaoResult.rows[0] as any)?.qtd) || 0;
+      if (qtdSemAdmissao > 0) {
+        console.warn(
+          `[contribuicao-squad] ${qtdSemAdmissao} colaborador(es) ativo(s) sem data de admissão — não entram no cálculo proporcional.`
+        );
+      }
+
+      // Query única: salário proporcional por (colaborador × mês) usando datas de admissão/demissão
       const salarioResult = await db.execute(sql`
-        WITH salarios_normalizados AS (
+        WITH meses AS (
+          SELECT generate_series(
+            ${dataInicio}::date,
+            (${dataInicio}::date + INTERVAL '11 months')::date,
+            INTERVAL '1 month'
+          )::date AS mes_inicio
+        ),
+        meses_calc AS (
+          SELECT
+            mes_inicio,
+            (mes_inicio + INTERVAL '1 month - 1 day')::date AS mes_fim,
+            EXTRACT(DAY FROM (mes_inicio + INTERVAL '1 month - 1 day'))::int AS dias_no_mes
+          FROM meses
+        ),
+        colaboradores AS (
           SELECT
             rp.id,
-            rp.nome as colaborador_nome,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
+            rp.nome AS colaborador_nome,
+            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') AS squad,
+            rp.admissao,
+            rp.demissao,
             CASE
               WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
               WHEN rp.salario::text LIKE '%,%' THEN
                 NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
-              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
+              WHEN rp.salario::text ~ '\.[0-9]{1,2}$' THEN
                 NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
               ELSE
                 NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
-            END as salario
+            END AS salario
           FROM "Inhire".rh_pessoal rp
+          WHERE rp.admissao IS NOT NULL
+            -- Safety net: zumbis (dispensado com demissao NULL) seriam contados indefinidamente.
+            -- Aceitar registro se: tem demissao (real) OU status atual = ativo.
+            AND (rp.demissao IS NOT NULL OR LOWER(TRIM(COALESCE(rp.status, ''))) = 'ativo')
         )
-        SELECT id, colaborador_nome, salario, squad
-        FROM salarios_normalizados
-        WHERE status_norm = 'ativo'
-          AND salario IS NOT NULL AND salario > 0
+        SELECT
+          c.id,
+          c.colaborador_nome,
+          c.squad,
+          TO_CHAR(m.mes_inicio, 'YYYY-MM') AS mes,
+          ROUND(
+            c.salario
+            * (LEAST(m.mes_fim, COALESCE(c.demissao, m.mes_fim))::date
+               - GREATEST(m.mes_inicio, c.admissao)::date + 1)::numeric
+            / m.dias_no_mes,
+            2
+          ) AS salario_proporcional
+        FROM colaboradores c
+        CROSS JOIN meses_calc m
+        WHERE c.salario IS NOT NULL
+          AND c.salario > 0
+          -- Despesa só conta meses já realizados (passado + mês atual).
+          -- Meses futuros ainda não foram pagos, então não viram despesa.
+          AND m.mes_inicio <= DATE_TRUNC('month', CURRENT_DATE)
+          AND LEAST(m.mes_fim, COALESCE(c.demissao, m.mes_fim))
+              >= GREATEST(m.mes_inicio, c.admissao)
           AND (
             ${squadFilter}::text IS NULL
-            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squadFilter}
-            OR COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') ILIKE '%' || REGEXP_REPLACE(${squadFilter || ''}, '^[^a-zA-Z]+', '', 'g')
-            OR ${squadFilter || ''} ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
+            OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squadFilter}
+            OR COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad')
+               ILIKE '%' || REGEXP_REPLACE(${squadFilter || ''}, '^[^a-zA-Z]+', '', 'g')
+            OR ${squadFilter || ''}
+               ILIKE '%' || REGEXP_REPLACE(COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad'), '^[^a-zA-Z]+', '', 'g')
           )
-        ORDER BY squad, colaborador_nome
+        ORDER BY c.squad, c.colaborador_nome, mes
       `);
 
-      let salarioTotal = 0;
-      const salariosPorColab = new Map<number, { nome: string; salario: number; squad: string }>();
+      // Agregar por colaborador (para detalhe) e por mês (para despesasMensais.salarios)
+      type ColabAgg = { nome: string; squad: string; porMes: number[]; total: number };
+      const salariosPorColab = new Map<number, ColabAgg>();
+      const salariosPorMesMap = new Map<string, number>();
+
       for (const row of salarioResult.rows as any[]) {
         const id = Number(row.id);
-        if (!salariosPorColab.has(id)) {
-          const sal = Number(row.salario) || 0;
-          const sq = row.squad || 'Sem Squad';
-          salariosPorColab.set(id, { nome: row.colaborador_nome, salario: sal, squad: sq });
-          salarioTotal += sal;
-        }
-      }
+        const mes = row.mes as string;
+        const valor = Number(row.salario_proporcional) || 0;
 
-      // CXCS (média salarial dos CXCS ativos)
-      const cxcsResult = await db.execute(sql`
-        SELECT AVG(salario::numeric) as media_cxcs
-        FROM "Inhire".rh_pessoal
-        WHERE UPPER(TRIM(cargo)) = 'CXCS'
-          AND UPPER(TRIM(status)) = 'ATIVO'
-          AND salario IS NOT NULL AND salario::numeric > 0
-      `);
-      const mediaCxcs = Number((cxcsResult.rows[0] as any)?.media_cxcs) || 0;
+        salariosPorMesMap.set(mes, (salariosPorMesMap.get(mes) || 0) + valor);
+
+        if (!salariosPorColab.has(id)) {
+          salariosPorColab.set(id, {
+            nome: row.colaborador_nome,
+            squad: normalizeSquadLabel(row.squad),
+            porMes: new Array(12).fill(0),
+            total: 0,
+          });
+        }
+        const entry = salariosPorColab.get(id)!;
+        // Assume calendar-year window (dataInicio = ${ano}-01-01). If the window
+        // ever becomes rolling/multi-year, this index calculation will collide.
+        const monthIdx = parseInt(mes.split('-')[1]) - 1;
+        entry.porMes[monthIdx] = valor;
+        entry.total += valor;
+      }
 
       // Freelancers agrupados por mês
       const freelaResult = await db.execute(sql`
@@ -5648,32 +5736,47 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         freelaTotal += valor;
       }
 
+      // Contagem GLOBAL de colaboradores ativos por mês (qualquer salário > 0 no mês)
+      // Usado para iFood total (despesasMensais), inclui colaboradores em squads não-mapeados
+      const IFOOD_POR_COLAB_MES = 400;
+      const colabsAtivosGlobalPorMes = new Map<string, Set<number>>();
+      for (const [colabId, colab] of Array.from(salariosPorColab.entries())) {
+        for (let i = 0; i < 12; i++) {
+          if ((colab.porMes[i] || 0) === 0) continue;
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+          if (!colabsAtivosGlobalPorMes.has(mesKey)) colabsAtivosGlobalPorMes.set(mesKey, new Set());
+          colabsAtivosGlobalPorMes.get(mesKey)!.add(colabId);
+        }
+      }
+
       // Montar objeto de despesas mensais
-      const despesasMensais: Record<string, { salarios: number; cxcs: number; freelancers: number }> = {};
+      const despesasMensais: Record<string, { salarios: number; freelancers: number; ifood: number }> = {};
       for (let m = 0; m < 12; m++) {
         const mesKey = `${ano}-${String(m + 1).padStart(2, '0')}`;
+        const colabsAtivosNoMes = colabsAtivosGlobalPorMes.get(mesKey)?.size || 0;
         despesasMensais[mesKey] = {
-          salarios: salarioTotal,
-          cxcs: mediaCxcs,
+          salarios: salariosPorMesMap.get(mesKey) || 0,
           freelancers: freelaPorMes.get(mesKey) || 0,
+          ifood: colabsAtivosNoMes * IFOOD_POR_COLAB_MES,
         };
       }
 
-      // Agregar resumo por squad a partir dos dados brutos
+      // ──── Agregar resumo por squad a partir do pipeline de itens ──────
       const squadSummaryMap = new Map<string, { total: number; porMes: number[]; contratos: Set<string> }>();
-      for (const row of result.rows as any[]) {
-        const sq = row.squad || 'Sem Squad';
+      for (const linha of receitaItens) {
+        const sq = linha.squad;
+        if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
         if (!squadSummaryMap.has(sq)) {
           squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
         }
         const entry = squadSummaryMap.get(sq)!;
-        const monthIdx = parseInt(row.mes.split('-')[1]) - 1;
-        const valor = Number(row.valor) || 0;
-        entry.total += valor;
-        entry.porMes[monthIdx] += valor;
-        // Usar combinação cliente+serviço+squad como identificador de contrato
-        const contratoKey = `${row.cliente_nome}|${row.servico_nome}|${sq}`;
-        entry.contratos.add(contratoKey);
+        const monthIdx = parseInt(linha.mes.split('-')[1]) - 1;
+        entry.total += linha.itemTotal;
+        entry.porMes[monthIdx] += linha.itemTotal;
+        entry.contratos.add(`${linha.clienteNome}|${linha.itemRaw}|${sq}`);
       }
 
       const resumoPorSquad = Array.from(squadSummaryMap.entries())
@@ -5686,52 +5789,22 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }))
         .sort((a, b) => b.receitaTotal - a.receitaTotal);
 
-      // Detalhes individuais de salários — query separada sem filtro de squad
-      const salDetalhesResult = await db.execute(sql`
-        WITH salarios_normalizados AS (
-          SELECT
-            rp.id,
-            rp.nome as colaborador_nome,
-            COALESCE(NULLIF(TRIM(rp.squad), ''), 'Sem Squad') as squad,
-            LOWER(TRIM(COALESCE(rp.status, ''))) as status_norm,
-            CASE
-              WHEN rp.salario IS NULL OR TRIM(rp.salario::text) = '' THEN NULL
-              WHEN rp.salario::text LIKE '%,%' THEN
-                NULLIF(REPLACE(REGEXP_REPLACE(rp.salario::text, '[^0-9,]', '', 'g'), ',', '.'), '')::numeric
-              WHEN rp.salario::text ~ '\\.[0-9]{1,2}$' THEN
-                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9.]', '', 'g'), '')::numeric
-              ELSE
-                NULLIF(REGEXP_REPLACE(rp.salario::text, '[^0-9]', '', 'g'), '')::numeric
-            END as salario
-          FROM "Inhire".rh_pessoal rp
-        )
-        SELECT id, colaborador_nome, salario, squad
-        FROM salarios_normalizados
-        WHERE status_norm = 'ativo'
-          AND salario IS NOT NULL AND salario > 0
-        ORDER BY squad, salario DESC
-      `);
-
-      // Normalizar nome de squad removendo emojis/símbolos para match
+      // ──── Helpers para mapear squad RH → squad de Receita ───────────────
+      // Usado para atribuir despesas (salários, freelancers) ao squad correto.
       const stripEmoji = (s: string) =>
         s.replace(/[^\p{L}\p{N}\s.&+]/gu, '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-      // Mapa: nome normalizado → nome original da receita
       const revenueSquadMap = new Map<string, string>();
       for (const s of resumoPorSquad) {
         revenueSquadMap.set(stripEmoji(s.squad), s.squad);
       }
 
-      // Fallback: match parcial (um nome contém o outro) para squads como "Black" vs "Black Sheep"
       const findRevenueSquad = (normKey: string): string | null => {
-        // 1. Match exato
         if (revenueSquadMap.has(normKey)) return revenueSquadMap.get(normKey)!;
-        // 2. Match parcial: revenue contém HR ou HR contém revenue
         let bestMatch: string | null = null;
         let bestLen = 0;
-        for (const [revNorm, revName] of revenueSquadMap) {
+        for (const [revNorm, revName] of Array.from(revenueSquadMap)) {
           if (normKey.startsWith(revNorm) || revNorm.startsWith(normKey)) {
-            // Preferir o match mais longo (mais específico)
             const matchLen = Math.min(normKey.length, revNorm.length);
             if (matchLen > bestLen) {
               bestLen = matchLen;
@@ -5742,18 +5815,108 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return bestMatch;
       };
 
-      const salariosDetalhesPorSquad: Record<string, { nome: string; salario: number }[]> = {};
-      const seen = new Set<number>();
-      for (const row of salDetalhesResult.rows as any[]) {
-        const id = Number(row.id);
-        if (seen.has(id)) continue;
-        seen.add(id);
+      // ──── Agregação de salários por (squad de receita, mês) ────────────
+      const salariosPorSquadMes = new Map<string, Map<string, number>>();
+      // Set de colaboradores ativos por (squad, mes) — usado pra calcular iFood por squad
+      const colabsAtivosPorSquadMes = new Map<string, Map<string, Set<number>>>();
+      for (const [colabId, colab] of Array.from(salariosPorColab.entries())) {
+        const normKey = stripEmoji(colab.squad);
+        const matchedSquad = findRevenueSquad(normKey);
+        if (!matchedSquad) continue; // squad RH não casa com squad de receita → fora da tabela visível
+
+        for (let i = 0; i < 12; i++) {
+          const valor = colab.porMes[i] || 0;
+          if (valor === 0) continue;
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+
+          if (!salariosPorSquadMes.has(matchedSquad)) salariosPorSquadMes.set(matchedSquad, new Map());
+          salariosPorSquadMes.get(matchedSquad)!.set(
+            mesKey,
+            (salariosPorSquadMes.get(matchedSquad)!.get(mesKey) || 0) + valor
+          );
+
+          if (!colabsAtivosPorSquadMes.has(matchedSquad)) colabsAtivosPorSquadMes.set(matchedSquad, new Map());
+          if (!colabsAtivosPorSquadMes.get(matchedSquad)!.has(mesKey)) {
+            colabsAtivosPorSquadMes.get(matchedSquad)!.set(mesKey, new Set());
+          }
+          colabsAtivosPorSquadMes.get(matchedSquad)!.get(mesKey)!.add(colabId);
+        }
+      }
+
+      // ──── Agregação de freelancers por (squad de receita, mês) ─────────
+      const freelaPorSquadMes = new Map<string, Map<string, number>>();
+      for (const row of freelaResult.rows as any[]) {
+        const mes = row.mes as string;
+        const valor = Number(row.valor) || 0;
         const rawSquad = row.squad || 'Sem Squad';
         const normKey = stripEmoji(rawSquad);
-        // Casar com o nome do squad da receita, fallback pro raw
-        const matchedSquad = findRevenueSquad(normKey) || rawSquad;
+        const matchedSquad = findRevenueSquad(normKey);
+        if (!matchedSquad) continue; // freela sem match → fora da tabela visível
+
+        if (!freelaPorSquadMes.has(matchedSquad)) freelaPorSquadMes.set(matchedSquad, new Map());
+        const inner = freelaPorSquadMes.get(matchedSquad)!;
+        inner.set(mes, (inner.get(mes) || 0) + valor);
+      }
+
+      // ──── Detalhes de receita por squad → cliente → mês ─────────────────
+      const receitasDetalhesPorSquad: Record<string, { cliente: string; porMes: number[]; total: number }[]> = {};
+      for (const linha of receitaItens) {
+        const sq = linha.squad;
+        if (/\bOFF\b/i.test(sq)) continue;
+        if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
+
+        const monthIdx = parseInt(linha.mes.split('-')[1]) - 1;
+        if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
+        let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === linha.clienteNome);
+        if (!entry) {
+          entry = { cliente: linha.clienteNome, porMes: new Array(12).fill(0), total: 0 };
+          receitasDetalhesPorSquad[sq].push(entry);
+        }
+        entry.porMes[monthIdx] += linha.itemTotal;
+        entry.total += linha.itemTotal;
+      }
+
+      // Ordenar clientes por total desc dentro de cada squad
+      for (const sq of Object.keys(receitasDetalhesPorSquad)) {
+        receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
+      }
+
+      // Detalhes individuais de salários — agregados a partir de salariosPorColab
+      const salariosDetalhesPorSquad: Record<string, { nome: string; porMes: number[]; total: number }[]> = {};
+      for (const colab of salariosPorColab.values()) {
+        const normKey = stripEmoji(colab.squad);
+        const matchedSquad = findRevenueSquad(normKey) || colab.squad;
         if (!salariosDetalhesPorSquad[matchedSquad]) salariosDetalhesPorSquad[matchedSquad] = [];
-        salariosDetalhesPorSquad[matchedSquad].push({ nome: row.colaborador_nome, salario: Number(row.salario) || 0 });
+        salariosDetalhesPorSquad[matchedSquad].push({
+          nome: colab.nome,
+          porMes: colab.porMes,
+          total: colab.total,
+        });
+      }
+      // Ordenar por total desc dentro de cada squad
+      for (const sq of Object.keys(salariosDetalhesPorSquad)) {
+        salariosDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
+      }
+
+      // ──── Montar despesasPorSquadMensais ───────────────────────────────
+      const despesasPorSquadMensais: Record<string, Record<string, { salarios: number; freelancers: number; ifood: number }>> = {};
+      const todosSquadsDespesa = new Set<string>([
+        ...Array.from(salariosPorSquadMes.keys()),
+        ...Array.from(freelaPorSquadMes.keys()),
+      ]);
+      for (const squad of Array.from(todosSquadsDespesa)) {
+        despesasPorSquadMensais[squad] = {};
+        for (let i = 0; i < 12; i++) {
+          const mesKey = `${ano}-${String(i + 1).padStart(2, '0')}`;
+          const sal = salariosPorSquadMes.get(squad)?.get(mesKey) || 0;
+          const fre = freelaPorSquadMes.get(squad)?.get(mesKey) || 0;
+          const colabsCount = colabsAtivosPorSquadMes.get(squad)?.get(mesKey)?.size || 0;
+          const ifood = colabsCount * IFOOD_POR_COLAB_MES;
+          if (sal === 0 && fre === 0 && ifood === 0) continue;
+          despesasPorSquadMensais[squad][mesKey] = { salarios: sal, freelancers: fre, ifood };
+        }
       }
 
       res.json({
@@ -5763,7 +5926,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         meses: monthlyData,
         resumoPorSquad,
         despesasMensais,
+        despesasPorSquadMensais,
         salariosDetalhesPorSquad,
+        receitasDetalhesPorSquad,
       });
     } catch (error) {
       console.error("[api] Error fetching contribuição squad DFC bulk:", error);
@@ -5830,7 +5995,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
             cc.cnpj_limpo,
             ct.squad,
             ct.id_subtask,
-            COALESCE(ct.valorr::numeric, 0) + COALESCE(ct.valorp::numeric, 0) as valor_contrato
+            COALESCE(ct.valorr::numeric, 0) as valor_contrato
           FROM cup_cnpj_normalizado cc
           INNER JOIN "Clickup".cup_contratos ct ON cc.task_id = ct.id_task
           WHERE ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
@@ -6122,6 +6287,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND valor_r > 0
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
         ORDER BY mes, squad
@@ -6289,7 +6455,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável')
       `);
       const churnPorOperadorRows = churnResult.rows as any[];
@@ -6359,7 +6525,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável')
       `);
       const churnAnteriorRows = churnAnteriorResult.rows as any[];
@@ -6463,7 +6629,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           AND c.valor_r > 0
           AND COALESCE(NULLIF(TRIM(c.squad), ''), 'Sem Squad') = ${squad}
           AND COALESCE(c.abonar_churn, '') != 'Sim'
-          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         ORDER BY c.data_solicitacao_encerramento DESC, c.valor_r::numeric DESC
       `);
 
@@ -6513,7 +6679,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
         GROUP BY 1 ORDER BY 1
@@ -6527,7 +6693,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         FROM "Clickup".cup_churn
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND valor_r > 0
           AND COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') = ${squad}
         GROUP BY 1, 2 ORDER BY 1
@@ -7529,7 +7695,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // POST create/update ruleset
   app.post("/api/metric-rules", async (req, res) => {
     try {
-      const { metricKey, displayLabel, defaultColor, updatedBy } = req.body;
+      const { metricKey, displayLabel, defaultColor, updatedBy, produto, plataforma } = req.body;
       if (!metricKey || !displayLabel) {
         return res.status(400).json({ error: "metricKey and displayLabel are required" });
       }
@@ -7538,6 +7704,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         displayLabel,
         defaultColor: defaultColor || 'default',
         updatedBy: updatedBy || null,
+        produto: produto || null,
+        plataforma: plataforma || null,
       });
       res.json(ruleset);
     } catch (error) {
@@ -7546,10 +7714,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
-  // DELETE ruleset by key
+  // DELETE ruleset by key (supports context via query params)
   app.delete("/api/metric-rules/:metricKey", async (req, res) => {
     try {
-      await storage.deleteMetricRuleset(req.params.metricKey);
+      const produto = (req.query.produto as string) || null;
+      const plataforma = (req.query.plataforma as string) || null;
+      await storage.deleteMetricRuleset(req.params.metricKey, produto, plataforma);
       res.json({ success: true });
     } catch (error) {
       console.error("[api] Error deleting metric ruleset:", error);
@@ -7618,51 +7788,38 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
-  // POST save complete ruleset with thresholds (bulk save)
+  // POST save complete ruleset with thresholds (bulk save, transactional)
   app.post("/api/metric-rules/:metricKey/save", async (req, res) => {
     try {
-      const { displayLabel, defaultColor, updatedBy, thresholds } = req.body;
+      const { displayLabel, defaultColor, updatedBy, thresholds, produto, plataforma } = req.body;
       const metricKey = req.params.metricKey;
-      
+
       if (!displayLabel) {
         return res.status(400).json({ error: "displayLabel is required" });
       }
-      
-      // Upsert ruleset
-      const ruleset = await storage.upsertMetricRuleset({
-        metricKey,
-        displayLabel,
-        defaultColor: defaultColor || 'default',
-        updatedBy: updatedBy || null,
-      });
-      
-      // Delete all existing thresholds for this ruleset
-      await storage.deleteMetricThresholdsByRuleset(ruleset.id);
-      
-      // Create new thresholds
-      const newThresholds = [];
-      if (thresholds && Array.isArray(thresholds)) {
-        for (let i = 0; i < thresholds.length; i++) {
-          const t = thresholds[i];
-          const threshold = await storage.createMetricThreshold({
-            rulesetId: ruleset.id,
-            minValue: t.minValue !== undefined ? t.minValue : null,
-            maxValue: t.maxValue !== undefined ? t.maxValue : null,
-            color: t.color || 'default',
-            label: t.label || null,
-            sortOrder: i,
-          });
-          newThresholds.push(threshold);
-        }
-      }
-      
-      res.json({
-        ...ruleset,
-        thresholds: newThresholds,
-      });
-    } catch (error) {
-      console.error("[api] Error saving metric ruleset:", error);
-      res.status(500).json({ error: "Failed to save metric ruleset" });
+
+      const result = await storage.saveMetricRulesetWithThresholds(
+        {
+          metricKey,
+          displayLabel,
+          defaultColor: defaultColor || 'default',
+          updatedBy: updatedBy || null,
+          produto: produto || null,
+          plataforma: plataforma || null,
+        },
+        (thresholds || []).map((t: any) => ({
+          minValue: t.minValue !== undefined ? t.minValue : null,
+          maxValue: t.maxValue !== undefined ? t.maxValue : null,
+          color: t.color || 'default',
+          label: t.label || null,
+          sortOrder: t.sortOrder || 0,
+        }))
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[api] Error saving metric ruleset:", error?.message, error?.stack);
+      res.status(500).json({ error: "Failed to save metric ruleset", details: error?.message });
     }
   });
 
@@ -7747,8 +7904,14 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
 
+  // Growth — Orçamento por Campanha
+  registerOrcamentoCampanhasRoutes(app, db);
+
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
+
+  // SDR Assistant Module - registered from separate file
+  registerSdrAssistantRoutes(app, db);
 
   // Capacity Module - registered from separate file
   registerCapacityRoutes(app, db);
@@ -7800,8 +7963,14 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Comercial (Closers, SDRs, Vendas) - registered from separate file
   registerComercialRoutes(app);
 
+  // Cross-Sell Management - registered from separate file
+  registerCrossSellRoutes(app);
+
   // OKR 2026 - registered from separate file
   registerOKR2026Routes(app);
+
+  // Receita Recorrente por Centro de Custo
+  registerReceitaRecorrenteRoutes(app, db, storage);
 
   // Jurídico Module - registered from separate file
   registerJuridicoRoutes(app);
@@ -7823,6 +7992,15 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Solicitação de Ferramentas/Cursos - registered from separate file
   registerSolicitacaoFerramentasRoutes(app);
+
+  // Negativação Module
+  registerNegativacaoRoutes(app, db);
+
+  // Triagem Inteligente Module
+  registerTriagemRoutes(app, db);
+
+  // Predictions Module - Análise Preditiva
+  registerPredictionRoutes(app);
 
   // ============================================
   // Sugestões API
@@ -9605,30 +9783,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
       
-      // Buscar próximos eventos (próximos 30 dias)
-      const hoje = new Date();
-      const em30Dias = new Date();
-      em30Dias.setDate(em30Dias.getDate() + 30);
-      
-      const eventosQuery = await db.execute(sql`
-        SELECT id, titulo, tipo, data_inicio, data_fim, local, cor
-        FROM cortex_core.turbo_eventos
-        WHERE data_inicio >= ${hoje.toISOString()}
-          AND data_inicio <= ${em30Dias.toISOString()}
-        ORDER BY data_inicio ASC
-        LIMIT 5
-      `);
-      
-      const proximosEventos = eventosQuery.rows.map((row: any) => ({
-        id: row.id,
-        titulo: row.titulo,
-        tipo: row.tipo,
-        dataInicio: row.data_inicio,
-        dataFim: row.data_fim,
-        local: row.local,
-        cor: row.cor,
-      }));
-      
       // Buscar alertas e pendências (com tratamento de erro para tabelas que podem não existir)
       let alertasRows: any[] = [];
       let contratosVencendoRows: any[] = [];
@@ -9740,7 +9894,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         mrrVariacao,
         ticketMedioVariacao,
         clientes: meusClientes,
-        proximosEventos,
         alertas,
       });
     } catch (error) {
@@ -11519,6 +11672,35 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
   
+  app.get("/api/unavailability-requests/today", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          ur.id,
+          ur.colaborador_nome,
+          ur.colaborador_email,
+          ur.data_fim
+        FROM cortex_core.unavailability_requests ur
+        WHERE ur.status_rh = 'aprovado'
+          AND ur.status_lider = 'aprovado'
+          AND CURRENT_DATE BETWEEN ur.data_inicio AND ur.data_fim
+        ORDER BY ur.colaborador_nome ASC
+      `);
+
+      const items = result.rows.map((row: any) => ({
+        id: row.id,
+        nome: row.colaborador_nome,
+        email: row.colaborador_email,
+        dataFim: row.data_fim,
+      }));
+
+      res.json(items);
+    } catch (error: any) {
+      console.error("[unavailability-today] Error fetching today list:", error);
+      res.json([]);
+    }
+  });
+
   app.get("/api/unavailability-requests", isAuthenticated, async (req, res) => {
     try {
       const { status, colaboradorId, squadNome } = req.query;
@@ -11580,10 +11762,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       if (diffDays < 0) {
         return res.status(400).json({ error: "Data de fim deve ser posterior à data de início" });
       }
-      if (diffDays > 7) {
-        return res.status(400).json({ error: "Período máximo de 7 dias" });
-      }
-      
       const result = await db.execute(sql`
         INSERT INTO cortex_core.unavailability_requests 
         (colaborador_id, colaborador_nome, colaborador_email, data_inicio, data_fim, motivo, data_admissao, status, status_rh, status_lider, squad_nome)
@@ -11687,10 +11865,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       if (diffDays < 0) {
         return res.status(400).json({ error: "Data de fim deve ser posterior à data de início" });
       }
-      if (diffDays > 7) {
-        return res.status(400).json({ error: "Período máximo de 7 dias" });
-      }
-      
       const result = await db.execute(sql`
         UPDATE cortex_core.unavailability_requests 
         SET data_inicio = ${dataInicio}, 
@@ -11832,7 +12006,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const fs = await import("fs/promises");
       const path = await import("path");
 
-      const baseDir = path.default.join(process.cwd(), "attached_assets", "2026");
+      const baseDir = path.default.join(process.cwd(), "2026");
       const monthDirs = (await fs.default.readdir(baseDir, { withFileTypes: true }))
         .filter(d => d.isDirectory() && /^\d{2}\s*-\s*/.test(d.name))
         .sort((a, b) => a.name.localeCompare(b.name));

@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Building2, Loader2, ArrowLeft, Shield, Lock, Eye, EyeOff } from "lucide-react";
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
-import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
+import turboLogo from "@assets/logo-turbo-branca.svg";
 
 function maskCnpj(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 14);

@@ -49,6 +49,7 @@ export function configurePassport() {
             '/patrimonio',
             '/ferramentas',
             '/turbozap',
+            '/acessos',
             '/visao-geral',
             '/dashboard/geg',
             '/dashboard/inhire',
@@ -58,8 +59,10 @@ export function configurePassport() {
             '/dashboard/dfc',
             '/dashboard/auditoria-sistemas',
             '/admin/usuarios',
-            '/admin/regras-notificacoes'
-          ]
+            '/admin/regras-notificacoes',
+            '/dashboard/comercial/sdr-assistant',
+          ],
+          department: 'admin',
         };
         return done(null, devUser);
       }

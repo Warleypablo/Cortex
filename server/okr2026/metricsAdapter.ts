@@ -386,7 +386,7 @@ export async function getGrossChurnMrr(): Promise<number> {
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       `);
       return parseFloat((result.rows[0] as any)?.churn_mrr || "0");
     }
@@ -497,7 +497,7 @@ export async function getLogoChurn(): Promise<number> {
           WHERE c.data_solicitacao_encerramento IS NOT NULL
             AND TO_CHAR(c.data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
             AND COALESCE(c.abonar_churn, '') != 'Sim'
-            AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+            AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         ),
         clientes_ainda_ativos AS (
           SELECT DISTINCT id_task
@@ -795,14 +795,16 @@ export async function getNrrForPeriod(startDate: string, endDate: string): Promi
   try {
     const [breakdown, churnResult, mrrResult] = await Promise.all([
       getVendasMrrBreakdown(startDate, endDate),
-      // Gross churn no período
+      // Gross churn no período (excluindo abonados)
       db.execute(sql`
-        SELECT COALESCE(SUM(valorr::numeric), 0) as gross_churn
-        FROM "Clickup".cup_contratos
-        WHERE valorr > 0
+        SELECT COALESCE(SUM(valor_r::numeric), 0) as gross_churn
+        FROM "Clickup".cup_churn
+        WHERE valor_r > 0
           AND data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento::date >= ${startDate}::date
           AND data_solicitacao_encerramento::date <= ${endDate}::date
+          AND COALESCE(abonar_churn, '') != 'Sim'
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       `),
       // MRR início = primeiro snapshot do mês de startDate
       db.execute(sql`
@@ -1618,7 +1620,7 @@ async function getChurnSeriesForRange(startDate: string, endDate: string): Promi
           AND data_solicitacao_encerramento >= '2026-02-01'::date
           AND data_solicitacao_encerramento <= ${endDate}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
         GROUP BY TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM')
       ) combined
       GROUP BY date
@@ -2028,7 +2030,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
             AND data_solicitacao_encerramento >= '2026-02-01'::date
             AND data_solicitacao_encerramento <= ${endDate}::date
             AND COALESCE(abonar_churn, '') != 'Sim'
-            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           GROUP BY TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM')
         ) combined
         GROUP BY month
@@ -2123,7 +2125,7 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
             AND data_solicitacao_encerramento >= '2026-02-01'::date
             AND data_solicitacao_encerramento <= ${endDate}::date
             AND COALESCE(abonar_churn, '') != 'Sim'
-            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             AND COALESCE(parent_id, task_id) NOT IN (
               SELECT DISTINCT id_task
               FROM "Clickup".cup_contratos

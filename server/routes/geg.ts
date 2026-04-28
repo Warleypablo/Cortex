@@ -12,8 +12,10 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       const setor = req.query.setor as string || 'todos';
       const nivel = req.query.nivel as string || 'todos';
       const cargo = req.query.cargo as string || 'todos';
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
 
-      const metricas = await storage.getGegMetricas(periodo, squad, setor, nivel, cargo);
+      const metricas = await storage.getGegMetricas(periodo, squad, setor, nivel, cargo, dataInicio, dataFim);
       res.json(metricas);
     } catch (error) {
       console.error("[api] Error fetching GEG metricas:", error);
@@ -28,8 +30,10 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       const setor = req.query.setor as string || 'todos';
       const nivel = req.query.nivel as string || 'todos';
       const cargo = req.query.cargo as string || 'todos';
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
 
-      const evolucao = await storage.getGegEvolucaoHeadcount(periodo, squad, setor, nivel, cargo);
+      const evolucao = await storage.getGegEvolucaoHeadcount(periodo, squad, setor, nivel, cargo, dataInicio, dataFim);
       res.json(evolucao);
     } catch (error) {
       console.error("[api] Error fetching GEG evolucao headcount:", error);
@@ -44,8 +48,10 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       const setor = req.query.setor as string || 'todos';
       const nivel = req.query.nivel as string || 'todos';
       const cargo = req.query.cargo as string || 'todos';
+      const dataInicio = req.query.dataInicio as string | undefined;
+      const dataFim = req.query.dataFim as string | undefined;
 
-      const dados = await storage.getGegAdmissoesDemissoes(periodo, squad, setor, nivel, cargo);
+      const dados = await storage.getGegAdmissoesDemissoes(periodo, squad, setor, nivel, cargo, dataInicio, dataFim);
       res.json(dados);
     } catch (error) {
       console.error("[api] Error fetching GEG admissoes demissoes:", error);
@@ -585,16 +591,26 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
   app.get("/api/geg/retencao-saude", async (req, res) => {
     try {
       const periodo = req.query.periodo as string || 'ano';
+      const dataInicioCustom = req.query.dataInicio as string | undefined;
+      const dataFimCustom = req.query.dataFim as string | undefined;
       const colaboradores = await storage.getColaboradores({});
 
       const hoje = new Date();
-      let inicioMeses = 12;
-      if (periodo === 'trimestre') inicioMeses = 3;
-      else if (periodo === 'semestre') inicioMeses = 6;
-      else if (periodo === 'mes') inicioMeses = 1;
+      let dataInicio: Date;
+      let dataFim: Date = hoje;
 
-      const dataInicio = new Date(hoje);
-      dataInicio.setMonth(dataInicio.getMonth() - inicioMeses);
+      if (periodo === 'custom' && dataInicioCustom && dataFimCustom) {
+        dataInicio = new Date(dataInicioCustom);
+        dataFim = new Date(dataFimCustom);
+      } else {
+        let inicioMeses = 12;
+        if (periodo === 'trimestre') inicioMeses = 3;
+        else if (periodo === 'semestre') inicioMeses = 6;
+        else if (periodo === 'mes') inicioMeses = 1;
+
+        dataInicio = new Date(hoje);
+        dataInicio.setMonth(dataInicio.getMonth() - inicioMeses);
+      }
 
       // Count active at start of period
       const ativosInicio = colaboradores.filter(c => {
@@ -609,7 +625,7 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       // Count dismissed in period
       const demitidosPeriodo = colaboradores.filter(c => {
         const demissao = c.demissao ? new Date(c.demissao) : null;
-        return demissao && demissao >= dataInicio && demissao <= hoje;
+        return demissao && demissao >= dataInicio && demissao <= dataFim;
       }).length;
 
       // Retention rate
@@ -1026,6 +1042,7 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
 
         // Skip CEO / Sócios — handled separately
         if (setor === "Sócios" || cargo.toLowerCase().includes("ceo")) continue;
+
         // Skip inactive squads and generic groups
         if (squad.toLowerCase().includes("(off)") || squad.toLowerCase().includes("supreme")) continue;
 
@@ -1039,6 +1056,12 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         if (setor === "Growth Interno" || setor === "Growth") {
           if (isLeader(cargo)) { growthLeader = nome; growthLeaderCargo = cargo; growthLeaderFoto = foto; }
           else growthMembers.push(member);
+          continue;
+        }
+
+        // Squad I.A → Tech Interno department (under CTO)
+        if (squad === "Squad I.A") {
+          techInternoMembers.push(member);
           continue;
         }
 
@@ -1077,7 +1100,7 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
 
         // Commerce (default for "Commerce" setor or known squads)
         if (setor === "Commerce" || knownCommerceSquads.some(s => squad.includes(s))) {
-          // Map CX&CS to Customer Success
+          // Map squad names
           let teamName = squad;
           if (teamName === "CX&CS" || teamName.includes("CS")) teamName = "Customer Success";
 
@@ -1101,15 +1124,18 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         return row?.foto || null;
       };
 
-      // ── Assemble departments ──
-      const departments: Department[] = [];
+      // ── Assemble departments (grouped by C-Level) ──
+      // COO side: Commerce, Growth
+      // CTO side: Tech, Tech Interno, Back Office
+      // CEO direct: Comercial
+      const cooDepartments: Department[] = [];
+      const ctoDepartments: Department[] = [];
+      const ceoDepartments: Department[] = [];
 
-      // Commerce
+      // Commerce (COO)
       if (commerceTeams.size > 0) {
-        // Set default leaders for teams without one detected from cargo
         const csTeam = commerceTeams.get("Customer Success");
         if (csTeam && !csTeam.leader) {
-          // Find Maria Dias in members and promote to leader
           const mariaIdx = csTeam.members.findIndex(m => m.nome.toLowerCase().includes("maria") && m.nome.toLowerCase().includes("dias"));
           if (mariaIdx >= 0) {
             csTeam.leader = csTeam.members[mariaIdx].nome;
@@ -1123,28 +1149,16 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
           }
         }
 
-        const sortOrder = ["Squadra", "Makers", "Pulse", "Selva", "Black Sheep", "Customer Success", "Squad I.A"];
+        const sortOrder = ["Squadra", "Makers", "Pulse", "Selva", "Black Sheep", "Customer Success"];
         const sorted = Array.from(commerceTeams.values()).sort((a, b) => {
           const ai = sortOrder.indexOf(a.name);
           const bi = sortOrder.indexOf(b.name);
           return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
         });
-        departments.push({ name: "Commerce", color: "purple", teams: sorted });
+        cooDepartments.push({ name: "Commerce", color: "purple", teams: sorted });
       }
 
-      // Tech — single unified team with Breno as leader
-      const allTechMembers = [...techSitesMembers, ...techInternoMembers];
-      // Remove Breno from members (he's the leader)
-      const techMembersFiltered = allTechMembers.filter(m => !m.nome.toLowerCase().includes("breno"));
-      if (techMembersFiltered.length > 0 || techSitesLeader || techInternoLeader) {
-        departments.push({
-          name: "Tech",
-          color: "blue",
-          teams: [{ name: "Tech", leader: "Breno Carmo", leaderCargo: "Líder", leaderFoto: findFoto("breno"), members: techMembersFiltered }],
-        });
-      }
-
-      // Comercial
+      // Comercial (CEO direct)
       const comercialTeams: Team[] = [];
       if (comercialPreVendas.length > 0 || comercialPreVendasLeader) {
         comercialTeams.push({ name: "Pré-Vendas", leader: comercialPreVendasLeader || "Lucas Pereira", leaderCargo: comercialPreVendasLeaderCargo, leaderFoto: comercialPreVendasLeaderFoto || findFoto("lucas pereira"), members: comercialPreVendas });
@@ -1153,15 +1167,46 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
         comercialTeams.push({ name: "Vendas", leader: comercialVendasLeader || "João Guarçoni", leaderCargo: comercialVendasLeaderCargo, leaderFoto: comercialVendasLeaderFoto || findFoto("guarçoni"), members: comercialVendas });
       }
       if (comercialTeams.length > 0) {
-        departments.push({ name: "Comercial", color: "emerald", teams: comercialTeams });
+        ceoDepartments.push({ name: "Comercial", color: "emerald", teams: comercialTeams });
       }
 
-      // Growth
+      // Growth (CEO direct)
       if (growthMembers.length > 0 || growthLeader) {
-        departments.push({
+        ceoDepartments.push({
           name: "Growth",
           color: "orange",
           teams: [{ name: "Growth Interno", leader: growthLeader || "Lucas Pereira", leaderCargo: growthLeaderCargo || "Líder", leaderFoto: growthLeaderFoto || findFoto("lucas pereira"), members: growthMembers }],
+        });
+      }
+
+      // Tech (CTO)
+      const allTechMembers = [...techSitesMembers];
+      const techMembersFiltered = allTechMembers.filter(m => !m.nome.toLowerCase().includes("breno"));
+      if (techMembersFiltered.length > 0 || techSitesLeader) {
+        ctoDepartments.push({
+          name: "Tech",
+          color: "blue",
+          teams: [{ name: "Tech", leader: "Breno Carmo", leaderCargo: "Líder", leaderFoto: findFoto("breno"), members: techMembersFiltered }],
+        });
+      }
+
+      // Tech Interno (CTO) — Squad I.A members, Caio as leader, Thiago below
+      if (techInternoMembers.length > 0) {
+        const caioIdx = techInternoMembers.findIndex(m => m.nome.toLowerCase().includes("caio"));
+        let tiLeader = "Caio Massaroni";
+        let tiLeaderCargo = "Líder";
+        let tiLeaderFoto = findFoto("caio");
+        const tiMembers = [...techInternoMembers];
+        if (caioIdx >= 0) {
+          tiLeader = tiMembers[caioIdx].nome;
+          tiLeaderCargo = tiMembers[caioIdx].cargo;
+          tiLeaderFoto = tiMembers[caioIdx].foto;
+          tiMembers.splice(caioIdx, 1);
+        }
+        ctoDepartments.push({
+          name: "Tech Interno",
+          color: "cyan",
+          teams: [{ name: "Tech Interno", leader: tiLeader, leaderCargo: tiLeaderCargo, leaderFoto: tiLeaderFoto, members: tiMembers }],
         });
       }
 
@@ -1201,13 +1246,22 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
             members: gegFiltered,
           },
         ];
-        departments.push({ name: "Back Office", color: "gray", teams: boTeams });
+        ctoDepartments.push({ name: "Back Office", color: "gray", teams: boTeams });
       }
 
       res.json({
-        ceo: { nome: "Victor de Souza Peixoto", cargo: "CEO", foto: findFoto("victor") || findFoto("peixoto") },
-        coo: { nome: "Rafael Vilela", cargo: "COO", foto: findFoto("rafael vilela") || findFoto("vilela") },
-        departments,
+        ceo: { nome: "Victor de Souza Peixoto", cargo: "CEO", foto: findFoto("peixoto") },
+        socios: [
+          { nome: "Victor de Souza Peixoto", cargo: "CEO", foto: findFoto("peixoto") },
+          { nome: "Rodrigo Queiroz", cargo: "CTO", foto: findFoto("rodrigo queiroz") },
+          { nome: "André Musso", cargo: "C-Level", foto: findFoto("musso") },
+        ],
+        coo: { nome: "Rafael Vilela", cargo: "COO", foto: findFoto("vilela") },
+        cto: { nome: "Rodrigo Queiroz", cargo: "CTO", foto: findFoto("rodrigo queiroz") },
+        cooDepartments,
+        ctoDepartments,
+        ceoDepartments,
+        departments: [...cooDepartments, ...ceoDepartments, ...ctoDepartments],
         totalColaboradores: rows.filter(r => r.setor !== "Sócios").length,
       });
     } catch (error) {

@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Colaborador, InsertColaborador, RhPromocao } from "@shared/schema";
 import { insertColaboradorSchema } from "@shared/schema";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Dialog,
@@ -257,7 +257,9 @@ function getInitials(nome: string) {
 function formatDate(date: string | Date | null | undefined) {
   if (!date) return "-";
   try {
-    return new Date(date).toLocaleDateString("pt-BR");
+    // Use parseISO for strings to avoid UTC timezone shift (e.g., "2005-12-19" showing as 18/12)
+    const d = typeof date === "string" ? parseISO(date) : date;
+    return d.toLocaleDateString("pt-BR");
   } catch {
     return "-";
   }
@@ -266,7 +268,8 @@ function formatDate(date: string | Date | null | undefined) {
 function formatDateFns(date: string | Date | null | undefined) {
   if (!date) return "-";
   try {
-    return format(new Date(date), "dd/MM/yyyy", { locale: ptBR });
+    const d = typeof date === "string" ? parseISO(date) : date;
+    return format(d, "dd/MM/yyyy", { locale: ptBR });
   } catch {
     return "-";
   }
@@ -5041,11 +5044,6 @@ function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, 
       toast({ title: "Erro", description: "Data de fim deve ser posterior à data de início.", variant: "destructive" });
       return;
     }
-    if (diffDays > 7) {
-      toast({ title: "Erro", description: "Período máximo permitido é de 7 dias.", variant: "destructive" });
-      return;
-    }
-
     createMutation.mutate({
       colaboradorId: parseInt(colaboradorId),
       colaboradorNome,
@@ -5091,7 +5089,7 @@ function UnavailabilityCard({ colaboradorId, colaboradorNome, colaboradorEmail, 
         <Card className="p-4 mb-6 bg-muted/50" data-testid="form-indisponibilidade">
           <h3 className="font-medium mb-4">Solicitar Período de Indisponibilidade</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Você pode solicitar até 7 dias de indisponibilidade. O pedido será enviado para alinhamento com o G&G.
+            Solicite o período de indisponibilidade desejado. O pedido será enviado para alinhamento com o G&G.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>

@@ -170,6 +170,7 @@ const ALL_ROUTES = [
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/apresentacao',
+  '/dashboard/comercial/sdr-assistant',
   '/presentation',
   '/growth/visao-geral',
   '/growth/criativos',
@@ -224,6 +225,7 @@ const DEFAULT_USER_ROUTES = [
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/apresentacao',
+  '/dashboard/comercial/sdr-assistant',
   '/presentation',
   // Growth
   '/growth/visao-geral',
@@ -231,6 +233,14 @@ const DEFAULT_USER_ROUTES = [
   '/growth/performance-plataformas',
   // E-NPS (pesquisa anônima - acesso padrão para todos)
   '/rh/nps/responder',
+  // Organograma
+  '/gg/organograma',
+  // Solicitação de Ferramentas
+  '/solicitacao-ferramentas',
+  // Instagram Analytics
+  '/growth/instagram',
+  // Calendário de Férias / Indisponibilidade
+  '/gg/calendario-ferias',
 ];
 
 // Migra permissões antigas automaticamente
@@ -252,6 +262,9 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
     if (!migratedRoutes.includes('/presentation')) {
       migratedRoutes.push('/presentation');
     }
+    if (!migratedRoutes.includes('/dashboard/comercial/sdr-assistant')) {
+      migratedRoutes.push('/dashboard/comercial/sdr-assistant');
+    }
   }
   
   // Auto-adicionar /sugestoes para todos os usuários (rota padrão)
@@ -262,6 +275,11 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
   // Auto-adicionar /rh/nps/responder para todos os usuários
   if (!migratedRoutes.includes('/rh/nps/responder')) {
     migratedRoutes.push('/rh/nps/responder');
+  }
+
+  // Auto-adicionar /growth/instagram para todos os usuários
+  if (!migratedRoutes.includes('/growth/instagram')) {
+    migratedRoutes.push('/growth/instagram');
   }
 
   // Migrar Contratos Freelancers de Jurídico → Social

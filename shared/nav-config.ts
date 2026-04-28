@@ -31,6 +31,7 @@ export const PERMISSION_KEYS = {
     TURBOZAP: 'fin.turbozap',
     DRE: 'fin.dre',
     NOTAS_FISCAIS: 'fin.notas_fiscais',
+    RECEITA_RECORRENTE: 'fin.receita_recorrente',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -43,6 +44,7 @@ export const PERMISSION_KEYS = {
     SAUDE_BASE: 'gestao.saude_base',
     BP_PRODUTOS: 'gestao.bp_produtos',
     CAPACITY: 'gestao.capacity',
+    ANALISE_PREDITIVA: 'gestao.analise_preditiva',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -65,6 +67,8 @@ export const PERMISSION_KEYS = {
     APRESENTACAO: 'com.apresentacao',
     REUNIOES: 'com.reunioes',
     CONTRATOS_CLIENTES: 'com.contratos_clientes',
+    SDR_ASSISTANT: 'com.sdr_assistant',
+    CROSSSELL: 'com.crosssell',
   },
   // Growth
   GROWTH: {
@@ -73,9 +77,11 @@ export const PERMISSION_KEYS = {
     PLATAFORMA: 'growth.plataforma',
     CRIATIVOS: 'growth.criativos',
     ORCADO_REALIZADO: 'growth.orcado_realizado',
+    ORCAMENTO_CAMPANHAS: 'growth.orcamento_campanhas',
     KEYWORD_PERFORMANCE: 'growth.keyword_performance',
     FUNIL_CONVERSAO: 'growth.funil_conversao',
     INSTAGRAM: 'growth.instagram',
+    PLANEJAMENTO_METAS: 'growth.planejamento_metas',
   },
   // G&G (Pessoas)
   GG: {
@@ -211,15 +217,16 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/turbozap': PERMISSION_KEYS.FIN.TURBOZAP,
   '/dashboard/dre': PERMISSION_KEYS.FIN.DRE,
   '/dashboard/notas-fiscais': PERMISSION_KEYS.FIN.NOTAS_FISCAIS,
+  '/financeiro/negativacao': PERMISSION_KEYS.FIN.INADIMPLENCIA,
+  '/financeiro/receita-recorrente': PERMISSION_KEYS.FIN.RECEITA_RECORRENTE,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
-  '/dashboard/saude-base-ativa': PERMISSION_KEYS.GESTAO.SAUDE_BASE,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
-  '/capacity': PERMISSION_KEYS.GESTAO.CAPACITY,
+  '/triagem': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   '/contratos': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
   // Operação
@@ -239,6 +246,9 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/comercial/analise-vendas': PERMISSION_KEYS.COM.ANALISE_VENDAS,
   '/dashboard/comercial/apresentacao': PERMISSION_KEYS.COM.APRESENTACAO,
   '/dashboard/comercial/reunioes': PERMISSION_KEYS.COM.REUNIOES,
+  '/dashboard/comercial/sdr-assistant': PERMISSION_KEYS.COM.SDR_ASSISTANT,
+  '/dashboard/comercial/crosssell': PERMISSION_KEYS.COM.CROSSSELL,
+  '/dashboard/comercial/crosssell-dashboard': PERMISSION_KEYS.COM.CROSSSELL,
   '/presentation': PERMISSION_KEYS.COM.APRESENTACAO,
   // Growth
   '/growth/visao-geral': PERMISSION_KEYS.GROWTH.VISAO_GERAL,
@@ -247,6 +257,8 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/criativos': PERMISSION_KEYS.GROWTH.CRIATIVOS,
   '/growth/auto-report': PERMISSION_KEYS.REPORTS.AUTO_REPORT,
   '/growth/orcado-realizado': PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO,
+  '/growth/orcamento-campanhas': PERMISSION_KEYS.GROWTH.ORCAMENTO_CAMPANHAS,
+  '/growth/planejamento-metas': PERMISSION_KEYS.GROWTH.PLANEJAMENTO_METAS,
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
   '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
   '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
@@ -417,6 +429,8 @@ export const NAV_CONFIG = {
         { title: 'Contribuição por Squad', url: '/dashboard/contribuicao-squad', icon: 'Users2', permissionKey: PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR },
         { title: 'TurboZap', url: '/turbozap', icon: 'Zap', permissionKey: PERMISSION_KEYS.FIN.TURBOZAP },
         { title: 'Notas Fiscais', url: '/dashboard/notas-fiscais', icon: 'FileText', permissionKey: PERMISSION_KEYS.FIN.NOTAS_FISCAIS },
+        { title: 'Negativacao', url: '/financeiro/negativacao', icon: 'Scale', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
+        { title: 'Receita Recorrente', url: '/financeiro/receita-recorrente', icon: 'Repeat', permissionKey: PERMISSION_KEYS.FIN.RECEITA_RECORRENTE },
       ],
     },
     {
@@ -428,9 +442,8 @@ export const NAV_CONFIG = {
         { title: 'Evolução Mensal', url: '/dashboard/evolucao-mensal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
-        { title: 'Saúde da Base', url: '/dashboard/saude-base-ativa', icon: 'HeartPulse', permissionKey: PERMISSION_KEYS.GESTAO.SAUDE_BASE },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
-        { title: 'Capacity', url: '/capacity', icon: 'Gauge', permissionKey: PERMISSION_KEYS.GESTAO.CAPACITY },
+        { title: 'Triagem Inteligente', url: '/triagem', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
       ],
     },
     {
@@ -444,6 +457,9 @@ export const NAV_CONFIG = {
         { title: 'Detalhamento Vendas', url: '/dashboard/comercial/detalhamento-vendas', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.COM.DET_VENDAS },
         { title: 'Análise de Vendas', url: '/dashboard/comercial/analise-vendas', icon: 'LineChart', permissionKey: PERMISSION_KEYS.COM.ANALISE_VENDAS },
         { title: 'Reuniões', url: '/dashboard/comercial/reunioes', icon: 'Phone', permissionKey: PERMISSION_KEYS.COM.REUNIOES },
+        { title: 'SDR Assistant', url: '/dashboard/comercial/sdr-assistant', icon: 'MessagesSquare', permissionKey: PERMISSION_KEYS.COM.SDR_ASSISTANT },
+        { title: 'CrossSell', url: '/dashboard/comercial/crosssell', icon: 'Repeat2', permissionKey: PERMISSION_KEYS.COM.CROSSSELL },
+        { title: 'CrossSell Dashboard', url: '/dashboard/comercial/crosssell-dashboard', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.COM.CROSSSELL },
         { title: 'Contratos Clientes', url: '/contratos-module', icon: 'FileText', permissionKey: PERMISSION_KEYS.COM.CONTRATOS_CLIENTES },
       ],
     },
@@ -454,7 +470,10 @@ export const NAV_CONFIG = {
         { title: 'Por Plataforma', url: '/growth/performance-plataformas', icon: 'Layers', permissionKey: PERMISSION_KEYS.GROWTH.PLATAFORMA },
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
         { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
+        { title: 'Orçamento por Campanha', url: '/growth/orcamento-campanhas', icon: 'Wallet', permissionKey: PERMISSION_KEYS.GROWTH.ORCAMENTO_CAMPANHAS },
+        { title: 'Planejamento de Metas', url: '/growth/planejamento-metas', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.GROWTH.PLANEJAMENTO_METAS },
         { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
+        { title: 'Instagram', url: '/growth/instagram', icon: 'Instagram', permissionKey: PERMISSION_KEYS.GROWTH.INSTAGRAM },
       ],
     },
     {
@@ -651,6 +670,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.ANALISE_SQUADS]: 'Análise de Squads',
   [PERMISSION_KEYS.GESTAO.SAUDE_BASE]: 'Saúde da Base Ativa',
   [PERMISSION_KEYS.GESTAO.BP_PRODUTOS]: 'BP Produtos',
+  [PERMISSION_KEYS.GESTAO.ANALISE_PREDITIVA]: 'Análise Preditiva',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',
@@ -662,6 +682,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.COM.DET_VENDAS]: 'Detalhamento Vendas',
   [PERMISSION_KEYS.COM.ANALISE_VENDAS]: 'Análise de Vendas',
   [PERMISSION_KEYS.COM.REUNIOES]: 'Reuniões',
+  [PERMISSION_KEYS.COM.SDR_ASSISTANT]: 'SDR Assistant',
   [PERMISSION_KEYS.GROWTH.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.GROWTH.META_ADS]: 'Meta Ads',
   [PERMISSION_KEYS.GROWTH.PLATAFORMA]: 'Por Plataforma',

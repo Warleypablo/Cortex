@@ -29,9 +29,20 @@ interface Department {
   teams: Team[];
 }
 
+interface CLevel {
+  nome: string;
+  cargo: string;
+  foto: string | null;
+}
+
 interface OrgData {
-  ceo: { nome: string; cargo: string; foto: string | null };
-  coo?: { nome: string; cargo: string; foto: string | null };
+  ceo: CLevel;
+  socios?: CLevel[];
+  coo?: CLevel;
+  cto?: CLevel;
+  cooDepartments?: Department[];
+  ctoDepartments?: Department[];
+  ceoDepartments?: Department[];
   departments: Department[];
   totalColaboradores: number;
 }
@@ -113,6 +124,12 @@ const DEPT_STYLES: Record<
     text: "text-orange-700 dark:text-orange-300",
     teamBorder: "border-orange-200 dark:border-orange-800",
   },
+  cyan: {
+    border: "border-cyan-400 dark:border-cyan-600",
+    bg: "bg-cyan-50 dark:bg-cyan-950/30",
+    text: "text-cyan-700 dark:text-cyan-300",
+    teamBorder: "border-cyan-200 dark:border-cyan-800",
+  },
   gray: {
     border: "border-gray-400 dark:border-zinc-500",
     bg: "bg-gray-50 dark:bg-zinc-900/50",
@@ -134,7 +151,7 @@ function VLine({ height = 24 }: { height?: number }) {
 
 // Dynamic horizontal connector that measures child positions via offsetLeft/offsetWidth
 // (not getBoundingClientRect, which is affected by CSS transforms like scale)
-function DynamicHLine({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
+function DynamicHLine({ containerRef, position = "top" }: { containerRef: React.RefObject<HTMLDivElement | null>; position?: "top" | "bottom" }) {
   const lineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -171,9 +188,65 @@ function DynamicHLine({ containerRef }: { containerRef: React.RefObject<HTMLDivE
     <div
       ref={lineRef}
       data-hline="true"
-      className="absolute top-0 h-0.5 bg-gray-400 dark:bg-zinc-500"
+      className={cn("absolute h-0.5 bg-gray-400 dark:bg-zinc-500", position === "bottom" ? "bottom-0" : "top-0")}
       style={{ left: 0, right: 0 }}
     />
+  );
+}
+
+const CLEVEL_COLORS: Record<string, { border: string; bg: string; text: string; accent: string }> = {
+  sky: { border: "border-sky-400 dark:border-sky-500", bg: "bg-sky-50 dark:bg-sky-950/30", text: "text-sky-600 dark:text-sky-400", accent: "bg-sky-200 dark:bg-sky-800 text-sky-800 dark:text-sky-200" },
+  violet: { border: "border-violet-400 dark:border-violet-500", bg: "bg-violet-50 dark:bg-violet-950/30", text: "text-violet-600 dark:text-violet-400", accent: "bg-violet-200 dark:bg-violet-800 text-violet-800 dark:text-violet-200" },
+};
+
+function CLevelCard({ person, fallbackName, color }: { person?: CLevel | null; color: string }) {
+  const styles = CLEVEL_COLORS[color] || CLEVEL_COLORS.sky;
+  const nome = person?.nome || fallbackName;
+  const cargo = person?.cargo || "C-Level";
+  const foto = person?.foto;
+
+  return (
+    <div className={cn("px-4 py-2 rounded-lg border-2 text-center shadow-sm", styles.border, styles.bg)}>
+      {foto ? (
+        <img src={foto} alt="" className="w-8 h-8 rounded-full mx-auto mb-1 object-cover" referrerPolicy="no-referrer" />
+      ) : (
+        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-1", styles.accent)}>
+          <span className="text-xs font-bold">{getInitials(nome)}</span>
+        </div>
+      )}
+      <div className={cn("text-[9px] font-semibold uppercase tracking-wider", styles.text)}>{cargo}</div>
+      <div className="text-xs font-bold text-gray-900 dark:text-white">{nome}</div>
+    </div>
+  );
+}
+
+const SOCIO_COLORS: Record<string, { border: string; bg: string; text: string; accent: string }> = {
+  amber: { border: "border-amber-400 dark:border-amber-500", bg: "bg-amber-50 dark:bg-amber-950/30", text: "text-amber-600 dark:text-amber-400", accent: "bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200" },
+  violet: { border: "border-violet-400 dark:border-violet-500", bg: "bg-violet-50 dark:bg-violet-950/30", text: "text-violet-600 dark:text-violet-400", accent: "bg-violet-200 dark:bg-violet-800 text-violet-800 dark:text-violet-200" },
+  emerald: { border: "border-emerald-400 dark:border-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-950/30", text: "text-emerald-600 dark:text-emerald-400", accent: "bg-emerald-200 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200" },
+};
+
+function SocioCard({ socio, color }: { socio: CLevel; color: string }) {
+  const styles = SOCIO_COLORS[color] || SOCIO_COLORS.amber;
+  return (
+    <div className={cn("px-6 py-4 rounded-xl border-2 text-center shadow-lg", styles.border, styles.bg)}>
+      {socio.foto ? (
+        <img src={socio.foto} alt="" className="w-12 h-12 rounded-full mx-auto mb-2 object-cover" referrerPolicy="no-referrer" />
+      ) : (
+        <div className={cn("w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2", styles.accent)}>
+          <span className="text-lg font-bold">{getInitials(socio.nome)}</span>
+        </div>
+      )}
+      <div className="flex items-center justify-center gap-2 mb-1">
+        <Crown className="h-4 w-4 text-amber-500" />
+        <span className={cn("text-xs font-semibold uppercase tracking-wider", styles.text)}>
+          {socio.cargo}
+        </span>
+      </div>
+      <div className="text-lg font-bold text-gray-900 dark:text-white">
+        {socio.nome}
+      </div>
+    </div>
   );
 }
 
@@ -555,19 +628,67 @@ export default function Organograma() {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const deptsContainerRef = useRef<HTMLDivElement>(null);
-
-  const handleWheel = useCallback((e: WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setScale((s) => Math.min(1.5, Math.max(0.3, s + delta)));
-  }, []);
+  const cooContainerRef = useRef<HTMLDivElement>(null);
+  const ctoContainerRef = useRef<HTMLDivElement>(null);
+  const ctoDepsRef = useRef<HTMLDivElement>(null);
+  const ceoCardRef = useRef<HTMLDivElement>(null);
+  const ctoCardRef = useRef<HTMLDivElement>(null);
+  const csoCardRef = useRef<HTMLDivElement>(null);
+  const topLineRef = useRef<HTMLDivElement>(null);
+  const leftLineRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    el.addEventListener('wheel', handleWheel, { passive: false });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -0.05 : 0.05;
+      setScale((s) => Math.min(1.5, Math.max(0.3, s + delta)));
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [data]);
+
+  // Draw horizontal lines between CSO—CEO and CEO—CTO cards
+  useEffect(() => {
+    const ceo = ceoCardRef.current;
+    const cto = ctoCardRef.current;
+    const cso = csoCardRef.current;
+    const rightLine = topLineRef.current;
+    const leftLine = leftLineRef.current;
+
+    const update = () => {
+      if (ceo && cto && rightLine) {
+        const ceoRight = ceo.offsetLeft + ceo.offsetWidth;
+        const ctoLeft = cto.offsetLeft;
+        const midY = ceo.offsetTop + ceo.offsetHeight / 2;
+        rightLine.style.left = `${ceoRight}px`;
+        rightLine.style.width = `${ctoLeft - ceoRight}px`;
+        rightLine.style.top = `${midY}px`;
+        rightLine.style.display = 'block';
+      }
+      if (ceo && cso && leftLine) {
+        const csoRight = cso.offsetLeft + cso.offsetWidth;
+        const ceoLeft = ceo.offsetLeft;
+        const midY = ceo.offsetTop + ceo.offsetHeight / 2;
+        leftLine.style.left = `${csoRight}px`;
+        leftLine.style.width = `${ceoLeft - csoRight}px`;
+        leftLine.style.top = `${midY}px`;
+        leftLine.style.display = 'block';
+      }
+    };
+
+    requestAnimationFrame(() => requestAnimationFrame(update));
+    const container = ceo?.parentElement;
+    if (!container) return;
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [data]);
 
   // Auto-center on first load
   useEffect(() => {
@@ -742,51 +863,72 @@ export default function Organograma() {
             transition: isDragging ? 'none' : 'transform 75ms ease-out',
           }}
         >
-          {/* Level 1: CEO */}
-          <CeoCard ceo={data.ceo} />
-          <VLine />
+          {/* Top row: CEO (left-center) ——— CTO (right) */}
+          <div className="relative flex items-start min-w-fit">
+            {/* Horizontal lines connecting André—Victor and Victor—Rodrigo */}
+            <div ref={leftLineRef} className="absolute h-0.5 bg-gray-400 dark:bg-zinc-500 pointer-events-none" style={{ display: 'none' }} />
+            <div ref={topLineRef} className="absolute h-0.5 bg-gray-400 dark:bg-zinc-500 pointer-events-none" style={{ display: 'none' }} />
 
-          {/* Level 2+3: Departments + Teams */}
-          {displayDepts.length > 0 ? (
-            <div ref={deptsContainerRef} className="relative flex justify-center gap-4 lg:gap-6 pt-6 min-w-fit">
-              {/* Dynamic horizontal connector line */}
-              <DynamicHLine containerRef={deptsContainerRef} />
-              {displayDepts.map((dept) => (
-                <div key={dept.name} className="flex flex-col items-center">
-                  {/* Vertical line from horizontal bar down to department */}
-                  {dept.name === "Commerce" ? (
-                    <>
-                      <VLine />
-                      <div className="px-4 py-2 rounded-lg border-2 border-sky-400 dark:border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-center shadow-sm mb-0">
-                          {data.coo?.foto ? (
-                          <img src={data.coo.foto} alt="" className="w-8 h-8 rounded-full mx-auto mb-1 object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-sky-200 dark:bg-sky-800 flex items-center justify-center mx-auto mb-1">
-                            <span className="text-xs font-bold text-sky-800 dark:text-sky-200">{getInitials(data.coo?.nome || "RV")}</span>
-                          </div>
-                        )}
-                        <div className="text-[9px] text-sky-600 dark:text-sky-400 font-semibold uppercase tracking-wider">{data.coo?.cargo || "COO"}</div>
-                        <div className="text-xs font-bold text-gray-900 dark:text-white">{data.coo?.nome || "Rafael Vilela"}</div>
-                      </div>
-                    </>
-                  ) : (
+            {/* André Musso (left) — no departments, just the card */}
+            {data.socios && data.socios.length > 2 && (
+              <div className="flex flex-col items-center mr-4">
+                <div ref={csoCardRef}><SocioCard socio={data.socios[2]} color="emerald" /></div>
+              </div>
+            )}
+
+            {/* Victor's entire tree */}
+            <div className="flex flex-col items-center">
+              <div ref={ceoCardRef}><CeoCard ceo={data.ceo} /></div>
+              <VLine />
+              <div ref={cooContainerRef} className="relative flex justify-center items-start gap-4 lg:gap-6 pt-6 min-w-fit">
+                <DynamicHLine containerRef={cooContainerRef} />
+
+                {/* COO → Commerce */}
+                {(data.cooDepartments || []).length > 0 && (
+                  <div className="flex flex-col items-center">
                     <VLine />
-                  )}
-                  <DepartmentColumn
-                    dept={dept}
-                    selectedTeamKey={selectedTeamKey}
-                    onSelectTeam={handleSelectTeam}
-                    viewMode={viewMode}
-                    searchQuery={searchQuery}
-                  />
-                </div>
-              ))}
+                    <CLevelCard person={data.coo} fallbackName="Rafael Vilela" color="sky" />
+                    <VLine height={16} />
+                    <div ref={ctoContainerRef} className="relative flex justify-center gap-3 lg:gap-4 pt-4 min-w-fit">
+                      {(data.cooDepartments || []).length > 1 && <DynamicHLine containerRef={ctoContainerRef} />}
+                      {(data.cooDepartments || []).filter(d => displayDepts.some(dd => dd.name === d.name)).map((dept) => (
+                        <div key={dept.name} className="flex flex-col items-center">
+                          <VLine />
+                          <DepartmentColumn dept={dept} selectedTeamKey={selectedTeamKey} onSelectTeam={handleSelectTeam} viewMode={viewMode} searchQuery={searchQuery} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* CEO Direct Departments (Comercial, Growth) */}
+                {(data.ceoDepartments || []).filter(d => displayDepts.some(dd => dd.name === d.name)).map((dept) => (
+                  <div key={dept.name} className="flex flex-col items-center">
+                    <VLine />
+                    <DepartmentColumn dept={dept} selectedTeamKey={selectedTeamKey} onSelectTeam={handleSelectTeam} viewMode={viewMode} searchQuery={searchQuery} />
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div className="text-sm text-muted-foreground mt-8">
-              Nenhum departamento encontrado
+
+            {/* Spacer between Victor's tree and Rodrigo's tree */}
+            <div className="w-4 shrink-0" />
+
+            {/* Rodrigo's entire tree */}
+            <div className="flex flex-col items-center">
+              <div ref={ctoCardRef}><SocioCard socio={data.cto!} color="violet" /></div>
+              <VLine />
+              <div ref={ctoDepsRef} className="relative flex justify-center gap-3 lg:gap-4 pt-6 min-w-fit">
+                {(data.ctoDepartments || []).length > 1 && <DynamicHLine containerRef={ctoDepsRef} />}
+                {(data.ctoDepartments || []).filter(d => displayDepts.some(dd => dd.name === d.name)).map((dept) => (
+                  <div key={dept.name} className="flex flex-col items-center">
+                    <VLine />
+                    <DepartmentColumn dept={dept} selectedTeamKey={selectedTeamKey} onSelectTeam={handleSelectTeam} viewMode={viewMode} searchQuery={searchQuery} />
+                  </div>
+                ))}
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 

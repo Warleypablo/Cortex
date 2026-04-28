@@ -593,6 +593,41 @@ export async function executarEnvioMassa(
           'enviado', ${executadoPor}, ${execucaoId}
         )
       `);
+
+      // Toda nova ação criada pelo TurboZap entra em "notificacao".
+      // Avanço para protesto/negativação/judicial é manual, e só permitido
+      // depois que a notificação extrajudicial for efetivamente enviada.
+      if (["D+30", "D+40", "D+50"].includes(tipoCobranca)) {
+        try {
+          const existing = await db.execute(sql`
+            SELECT id FROM cortex_core.negativacao_acoes
+            WHERE cliente_id = ${cliente.id_cliente}
+              AND etapa = 'notificacao'
+              AND status IN ('pendente', 'em_andamento')
+            LIMIT 1
+          `);
+          if (existing.rows.length === 0) {
+            const diasAtraso = cliente.data_vencimento
+              ? Math.floor((Date.now() - new Date(cliente.data_vencimento).getTime()) / 86400000)
+              : 0;
+            await db.execute(sql`
+              INSERT INTO cortex_core.negativacao_acoes (
+                cliente_id, cliente_nome, cliente_cnpj, etapa, status,
+                valor_inadimplente, dias_atraso, data_acao, criado_por, observacoes
+              ) VALUES (
+                ${cliente.id_cliente}, ${cliente.cliente_nome}, ${cliente.cnpj || ""},
+                'notificacao', 'pendente',
+                ${Number(cliente.total)}, ${diasAtraso},
+                CURRENT_DATE, 'turbozap-auto',
+                ${"Criado automaticamente via TurboZap (" + tipoCobranca + ")"}
+              )
+            `);
+            console.log(`[TurboZap→Negativação] Cliente ${cliente.cliente_nome} adicionado à etapa notificacao`);
+          }
+        } catch (negErr: any) {
+          console.warn(`[TurboZap→Negativação] Erro ao criar ação: ${negErr.message}`);
+        }
+      }
     } else {
       erros++;
       await db.execute(sql`

@@ -9,8 +9,8 @@ import {
   Star, Gauge, Bot
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import turboLogoLight from "@assets/Logo_(15)_1766960214260.png";
-import turboLogoDark from "@assets/Logo_(14)_1766960225379.png";
+import turboLogoLight from "@assets/logo-turbo-light.svg";
+import turboLogoDark from "@assets/logo-turbo-dark.svg";
 import {
   Sidebar,
   SidebarContent,
