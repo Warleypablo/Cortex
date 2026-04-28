@@ -693,42 +693,46 @@ function ClienteRow({
         </span>
       </div>
 
-      {/* Conteúdo expandido */}
+      {/* Conteúdo expandido — side-by-side: serviços (esquerda fixa) + oportunidades (resto) */}
       {expanded && (
-        <div className="px-3 pb-3 pt-1 space-y-3 bg-gray-50/40 dark:bg-zinc-900/40">
-          {cliente.servicosAtivos.length > 0 && (
+        <div className="px-3 pb-3 pt-1 bg-gray-50/40 dark:bg-zinc-900/40">
+          <div className="grid gap-6" style={{ gridTemplateColumns: "minmax(180px, 240px) 1fr" }}>
             <div>
               <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-1.5">
                 Serviços ativos
               </p>
-              <div className="flex flex-wrap gap-1">
-                {cliente.servicosAtivos.map((s) => (
-                  <span
-                    key={s}
-                    className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-[11px] text-gray-700 dark:text-zinc-300"
-                  >
-                    {s}
-                  </span>
+              {cliente.servicosAtivos.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {cliente.servicosAtivos.map((s) => (
+                    <span
+                      key={s}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-[11px] text-gray-700 dark:text-zinc-300"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 dark:text-zinc-600 italic">Nenhum serviço ativo</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
+                Oportunidades mapeadas ({oportunidadesVisiveis.length})
+              </p>
+              <div className="divide-y divide-gray-100 dark:divide-zinc-800">
+                {oportunidadesVisiveis.map((op) => (
+                  <OportunidadeRow
+                    key={op.id}
+                    op={op}
+                    onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
+                    onChangeValor={(field, value) => onChangeValor(op.id, field, value)}
+                    onGanho={() => onGanho(op)}
+                    onComments={() => onComments(op)}
+                  />
                 ))}
               </div>
-            </div>
-          )}
-
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
-              Oportunidades mapeadas ({oportunidadesVisiveis.length})
-            </p>
-            <div className="divide-y divide-gray-100 dark:divide-zinc-800">
-              {oportunidadesVisiveis.map((op) => (
-                <OportunidadeRow
-                  key={op.id}
-                  op={op}
-                  onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
-                  onChangeValor={(field, value) => onChangeValor(op.id, field, value)}
-                  onGanho={() => onGanho(op)}
-                  onComments={() => onComments(op)}
-                />
-              ))}
             </div>
           </div>
         </div>
@@ -835,9 +839,15 @@ function OportunidadeRow({
 
   return (
     <div className={`flex flex-col gap-1 py-2 ${isDescartado ? "opacity-50" : ""}`}>
-      <div className="flex items-center gap-2">
-        <span className={`h-2 w-2 rounded-full shrink-0 ${dotColor}`} />
-        <span className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0">
+      <div
+        className="grid items-center gap-2"
+        style={{
+          gridTemplateColumns:
+            "16px minmax(160px, 1fr) 140px 100px 100px 32px 56px",
+        }}
+      >
+        <span className={`h-2 w-2 rounded-full ${dotColor}`} />
+        <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
           {op.produto}
         </span>
 
@@ -845,7 +855,7 @@ function OportunidadeRow({
           value={etapa}
           onValueChange={(v) => (v === "ganho" ? onGanho() : onChangeEtapa(v))}
         >
-          <SelectTrigger className="h-auto py-0.5 px-2 border-0 w-auto gap-1 text-xs">
+          <SelectTrigger className="h-auto py-0.5 px-2 border-0 w-auto gap-1 text-xs justify-self-start">
             <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
               {ETAPA_LABELS[etapa] ?? etapa}
             </Badge>
@@ -871,7 +881,7 @@ function OportunidadeRow({
         />
 
         <button
-          className="text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 flex items-center gap-0.5 text-xs"
+          className="text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 flex items-center gap-0.5 text-xs justify-self-center"
           onClick={onComments}
           title="Comentários"
         >
@@ -881,7 +891,7 @@ function OportunidadeRow({
 
         {!isDescartado && !isSugerido && (
           <button
-            className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+            className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 justify-self-center"
             onClick={onGanho}
             title="Marcar como ganho"
           >
@@ -890,7 +900,7 @@ function OportunidadeRow({
         )}
 
         {isSugerido && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 justify-self-center">
             <button
               className="text-green-600 hover:text-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 rounded hover:bg-green-50 dark:hover:bg-green-900/30"
               onClick={() => onChangeEtapa("fazer_contato")}
@@ -907,6 +917,8 @@ function OportunidadeRow({
             </button>
           </div>
         )}
+
+        {isDescartado && <span />}
       </div>
 
       {isSugerido && op.motivo && (
