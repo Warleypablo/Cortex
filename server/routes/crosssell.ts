@@ -360,20 +360,33 @@ export function registerCrossSellRoutes(app: Express) {
   // 7. GET /api/comercial/crosssell/ganhos — List won deals
   app.get("/api/comercial/crosssell/ganhos", async (req, res) => {
     try {
-      const { mes, ano } = req.query;
+      const { mes, ano, operacao } = req.query;
 
-      let whereClause = "";
+      const conditions: string[] = [];
       if (mes && ano) {
-        whereClause = `WHERE EXTRACT(MONTH FROM mes_ganho) = ${Number(mes)} AND EXTRACT(YEAR FROM mes_ganho) = ${Number(ano)}`;
+        conditions.push(`EXTRACT(MONTH FROM g.mes_ganho) = ${Number(mes)}`);
+        conditions.push(`EXTRACT(YEAR FROM g.mes_ganho) = ${Number(ano)}`);
       } else if (ano) {
-        whereClause = `WHERE EXTRACT(YEAR FROM mes_ganho) = ${Number(ano)}`;
+        conditions.push(`EXTRACT(YEAR FROM g.mes_ganho) = ${Number(ano)}`);
       }
+      if (operacao && typeof operacao === "string") {
+        const ops = operacao
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((s) => `'${s.replace(/'/g, "''")}'`);
+        if (ops.length > 0) conditions.push(`g.operacao IN (${ops.join(",")})`);
+      }
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
       const result = await db.execute(sql.raw(`
-        SELECT *
-        FROM cortex_core.crosssell_negocios_ganhos
+        SELECT
+          g.*,
+          c.vendedor AS vendedor
+        FROM cortex_core.crosssell_negocios_ganhos g
+        LEFT JOIN "Clickup".cup_clientes c ON c.cnpj = g.cnpj
         ${whereClause}
-        ORDER BY criado_em DESC
+        ORDER BY g.criado_em DESC
       `));
 
       const rows = (result.rows as any[]).map((r) => ({
@@ -384,6 +397,7 @@ export function registerCrossSellRoutes(app: Express) {
         valorR: r.valor_r ? Number(r.valor_r) : null,
         valorP: r.valor_p ? Number(r.valor_p) : null,
         cxResponsavel: r.cx_responsavel,
+        vendedor: r.vendedor,
         operacao: r.operacao,
         produto: r.produto,
         mesGanho: r.mes_ganho,

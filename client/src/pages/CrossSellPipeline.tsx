@@ -217,6 +217,9 @@ export default function CrossSellPipeline() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // View tabs
+  const [view, setView] = useState<"pipeline" | "ganhos">("pipeline");
+
   // Filters
   const [cluster, setCluster] = useState("todos");
   const [cxResp, setCxResp] = useState("todos");
@@ -362,6 +365,34 @@ export default function CrossSellPipeline() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200 dark:border-zinc-700">
+        <button
+          onClick={() => setView("pipeline")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            view === "pipeline"
+              ? "border-indigo-500 text-indigo-700 dark:text-indigo-300"
+              : "border-transparent text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+          }`}
+        >
+          Pipeline
+        </button>
+        <button
+          onClick={() => setView("ganhos")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            view === "ganhos"
+              ? "border-indigo-500 text-indigo-700 dark:text-indigo-300"
+              : "border-transparent text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+          }`}
+        >
+          Ganhos
+        </button>
+      </div>
+
+      {view === "ganhos" && <GanhosList />}
+
+      {view === "pipeline" && (
+      <>
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={cluster} onValueChange={setCluster}>
@@ -487,6 +518,8 @@ export default function CrossSellPipeline() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Modals */}
       {newOpEtapa && (
@@ -1419,5 +1452,200 @@ function CommentsSheet({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GanhosList — visualizacao em tabela dos negocios ganhos
+// ---------------------------------------------------------------------------
+
+interface Ganho {
+  id: number;
+  oportunidadeId: number;
+  clienteNome: string;
+  cnpj: string;
+  valorR: number | null;
+  valorP: number | null;
+  cxResponsavel: string | null;
+  vendedor: string | null;
+  operacao: string;
+  produto: string;
+  mesGanho: string;
+  criadoEm: string;
+}
+
+const MESES_LABEL = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+];
+
+function formatMesGanho(d: string | null): string {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return "—";
+  return `${MESES_LABEL[dt.getMonth()]}/${dt.getFullYear()}`;
+}
+
+const GANHOS_GRID_TEMPLATE =
+  "minmax(180px, 2fr) 110px 110px minmax(140px, 1.2fr) minmax(140px, 1.2fr) 120px minmax(140px, 1.2fr) 100px";
+
+function GanhosList() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const [ano, setAno] = useState<string>(String(currentYear));
+  const [mes, setMes] = useState<string>("todos");
+  const [operacoesFilter, setOperacoesFilter] = useState<string[]>([]);
+
+  const queryString = useMemo(() => {
+    const p = new URLSearchParams();
+    if (ano !== "todos") p.set("ano", ano);
+    if (mes !== "todos") p.set("mes", mes);
+    if (operacoesFilter.length > 0) p.set("operacao", operacoesFilter.join(","));
+    return p.toString();
+  }, [ano, mes, operacoesFilter]);
+
+  const { data: ganhos = [], isLoading } = useQuery<Ganho[]>({
+    queryKey: ["/api/comercial/crosssell/ganhos", queryString],
+    queryFn: async () => {
+      const url = queryString
+        ? `/api/comercial/crosssell/ganhos?${queryString}`
+        : `/api/comercial/crosssell/ganhos`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erro ao carregar ganhos");
+      return res.json();
+    },
+  });
+
+  const totalR = ganhos.reduce((s, g) => s + (g.valorR ?? 0), 0);
+  const totalP = ganhos.reduce((s, g) => s + (g.valorP ?? 0), 0);
+
+  const toggleOperacao = (op: string) => {
+    setOperacoesFilter((prev) =>
+      prev.includes(op) ? prev.filter((x) => x !== op) : [...prev, op]
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={ano} onValueChange={setAno}>
+          <SelectTrigger className="w-32 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue placeholder="Ano" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos anos</SelectItem>
+            {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={mes} onValueChange={setMes}>
+          <SelectTrigger className="w-32 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue placeholder="Mês" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos meses</SelectItem>
+            {MESES_LABEL.map((m, i) => (
+              <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-xs text-gray-400 dark:text-zinc-500 mr-1">Operação:</span>
+          {OPERACOES.map((op) => {
+            const active = operacoesFilter.includes(op);
+            return (
+              <button
+                key={op}
+                onClick={() => toggleOperacao(op)}
+                className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                  active
+                    ? "bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-zinc-900 dark:text-zinc-400 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {op}
+              </button>
+            );
+          })}
+          {operacoesFilter.length > 0 && (
+            <button
+              onClick={() => setOperacoesFilter([])}
+              className="ml-1 text-xs text-gray-400 hover:text-gray-700 dark:text-zinc-500 dark:hover:text-zinc-200"
+            >
+              limpar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-zinc-400">
+        <span>{ganhos.length} ganhos</span>
+        <span>·</span>
+        <span>R total: {formatCurrency(totalR)}</span>
+        <span>·</span>
+        <span>P total: {formatCurrency(totalP)}</span>
+      </div>
+
+      {/* Tabela */}
+      <div className="border border-gray-200 dark:border-zinc-700/60 rounded-md overflow-x-auto">
+        {/* Header */}
+        <div
+          className="grid items-center gap-3 px-3 py-2 bg-gray-50 dark:bg-zinc-900/80 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-zinc-400 border-b border-gray-200 dark:border-zinc-700/60"
+          style={{ gridTemplateColumns: GANHOS_GRID_TEMPLATE }}
+        >
+          <span>Cliente</span>
+          <span className="text-right">Valor R</span>
+          <span className="text-right">Valor P</span>
+          <span>CX</span>
+          <span>Vendedor</span>
+          <span>Operação</span>
+          <span>Produto</span>
+          <span>Mês ganho</span>
+        </div>
+
+        {/* Rows */}
+        <div className="divide-y divide-gray-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900">
+          {isLoading && (
+            <div className="px-3 py-8 text-center text-gray-400 dark:text-zinc-500">
+              Carregando...
+            </div>
+          )}
+          {!isLoading && ganhos.length === 0 && (
+            <div className="px-3 py-8 text-center text-gray-400 dark:text-zinc-500">
+              Nenhum ganho registrado para os filtros selecionados.
+            </div>
+          )}
+          {ganhos.map((g) => (
+            <div
+              key={g.id}
+              className="grid items-center gap-3 px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+              style={{ gridTemplateColumns: GANHOS_GRID_TEMPLATE }}
+            >
+              <span className="font-medium text-gray-900 dark:text-white truncate">{g.clienteNome}</span>
+              <span className="text-right text-gray-700 dark:text-zinc-300 whitespace-nowrap">
+                {formatCurrency(g.valorR ?? 0)}
+              </span>
+              <span className="text-right text-gray-700 dark:text-zinc-300 whitespace-nowrap">
+                {formatCurrency(g.valorP ?? 0)}
+              </span>
+              <span className="text-gray-700 dark:text-zinc-300 truncate">{g.cxResponsavel ?? "—"}</span>
+              <span className="text-gray-700 dark:text-zinc-300 truncate">{g.vendedor ?? "—"}</span>
+              <span>
+                <Badge className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  {g.operacao}
+                </Badge>
+              </span>
+              <span className="text-gray-700 dark:text-zinc-300 truncate">{g.produto}</span>
+              <span className="text-gray-700 dark:text-zinc-300 whitespace-nowrap">{formatMesGanho(g.mesGanho)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
