@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,11 +35,9 @@ import {
   MessageSquare,
   Trophy,
   Search,
-  ChevronDown,
   Send,
-  Calendar,
   User,
-  Package,
+  Briefcase,
   Clock,
   Sparkles,
 } from "lucide-react";
@@ -94,53 +92,39 @@ const CLUSTERS = ["Regulares", "Imperdiveis", "Chaves", "NFNC"];
 
 const OPERACOES = ["Upsell", "CrossSell", "Renovacao", "Upgrade"];
 
-const PRIORIDADE_COLORS: Record<string, string> = {
-  alta: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  media: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
-  baixa: "bg-gray-100 text-gray-600 dark:bg-zinc-700 dark:text-zinc-400",
-};
-
-const PRIORIDADE_LABELS: Record<string, string> = {
-  alta: "Alta",
-  media: "Média",
-  baixa: "Baixa",
-};
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface Oportunidade {
   id: number;
-  clienteId: string;
-  cnpj: string;
-  clienteNome: string | null;
-  clienteStatus: string | null;
-  cluster: string | null;
-  cxCliente: string | null;
-  produtoMapeado: string;
+  produto: string;
   etapa: string;
   valorRNegociacao: number | null;
   valorPNegociacao: number | null;
   cxResponsavel: string;
   ultimoContato: string | null;
-  criadoEm: string;
+  origem: "manual" | "sistema";
+  prioridade: "alta" | "media" | "baixa" | null;
+  motivo: string | null;
+  totalComentarios: number;
   atualizadoEm: string;
+}
+
+interface ClienteCrossSell {
+  cnpj: string;
+  clienteId: string;
+  nome: string;
+  cluster: string | null;
+  status: string | null;
+  cxConta: string | null;
+  vendedor: string | null;
   valorRAtual: number;
   valorPAtual: number;
   contratoInicio: string | null;
-  totalComentarios: number;
-  origem: string | null;
-  prioridade: string | null;
-  scoreDetalhes: {
-    afinidade: number;
-    gap: number;
-    financeiro: number;
-    tenure: number;
-    churn: number;
-    total: number;
-  } | null;
-  motivo: string | null;
+  servicosAtivos: string[];
+  scoreMaximo: number;
+  oportunidades: Oportunidade[];
 }
 
 interface ClienteSearch {
@@ -185,6 +169,39 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleDateString("pt-BR");
 }
 
+function formatCurrencyCompact(value: number | null | undefined): string {
+  if (value == null || value === 0) return "—";
+  if (value >= 1000) {
+    const k = value / 1000;
+    return `R$ ${k.toFixed(k >= 10 ? 0 : 1)}k`;
+  }
+  return `R$ ${value.toFixed(0)}`;
+}
+
+type ClienteEtapaGroup = {
+  cliente: ClienteCrossSell;
+  oportunidades: Oportunidade[];
+};
+
+function groupClientesByEtapa(
+  clientes: ClienteCrossSell[]
+): Map<Etapa, ClienteEtapaGroup[]> {
+  const groups = new Map<Etapa, ClienteEtapaGroup[]>();
+  for (const cliente of clientes) {
+    const byEtapa = new Map<Etapa, Oportunidade[]>();
+    for (const op of cliente.oportunidades) {
+      const e = op.etapa as Etapa;
+      if (!byEtapa.has(e)) byEtapa.set(e, []);
+      byEtapa.get(e)!.push(op);
+    }
+    for (const [e, ops] of byEtapa) {
+      if (!groups.has(e)) groups.set(e, []);
+      groups.get(e)!.push({ cliente, oportunidades: ops });
+    }
+  }
+  return groups;
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -199,37 +216,75 @@ export default function CrossSellPipeline() {
   const [cxResp, setCxResp] = useState("todos");
   const [etapaFilter, setEtapaFilter] = useState("todas");
   const [produtoFilter, setProdutoFilter] = useState("todos");
-  const [origemFilter, setOrigemFilter] = useState("todas");
-  const [prioridadeFilter, setPrioridadeFilter] = useState("todas");
+  const [ordenacao, setOrdenacao] = useState<"score" | "mrr" | "recente" | "nome">("score");
 
   // Modals
-  const [showNew, setShowNew] = useState(false);
-  const [ganhoOp, setGanhoOp] = useState<Oportunidade | null>(null);
-  const [commentOp, setCommentOp] = useState<Oportunidade | null>(null);
+  const [newOpEtapa, setNewOpEtapa] = useState<Etapa | null>(null);
+  const [ganhoCtx, setGanhoCtx] = useState<{ op: Oportunidade; clienteNome: string } | null>(null);
+  const [commentCtx, setCommentCtx] = useState<{ op: Oportunidade; clienteNome: string } | null>(null);
+
+  // Accordion expansion
+  const [etapasExpandidas, setEtapasExpandidas] = useState<Set<Etapa>>(new Set());
+  const initializedExpansion = useRef(false);
+
+  // Build query string for backend filters
+  const queryString = useMemo(() => {
+    const p = new URLSearchParams();
+    if (cluster !== "todos") p.set("cluster", cluster);
+    if (cxResp !== "todos") p.set("cx", cxResp);
+    if (etapaFilter !== "todas") p.set("etapa", etapaFilter);
+    if (produtoFilter !== "todos") p.set("produto", produtoFilter);
+    return p.toString();
+  }, [cluster, cxResp, etapaFilter, produtoFilter]);
 
   // Query
-  const { data: oportunidades = [], isLoading } = useQuery<Oportunidade[]>({
-    queryKey: ["/api/comercial/crosssell"],
+  const { data: clientes = [], isLoading } = useQuery<ClienteCrossSell[]>({
+    queryKey: ["/api/comercial/crosssell", queryString],
+    queryFn: async () => {
+      const url = queryString
+        ? `/api/comercial/crosssell?${queryString}`
+        : `/api/comercial/crosssell`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erro ao carregar clientes");
+      return res.json();
+    },
   });
 
-  // Derived filters
+  // Derived: list of distinct CX responsáveis (entre todas oportunidades)
   const cxResponsaveis = useMemo(() => {
-    const set = new Set(oportunidades.map((o) => o.cxResponsavel));
+    const set = new Set<string>();
+    for (const c of clientes) {
+      for (const op of c.oportunidades) set.add(op.cxResponsavel);
+    }
     return Array.from(set).sort();
-  }, [oportunidades]);
+  }, [clientes]);
 
-  const filtered = useMemo(() => {
-    return oportunidades.filter((o) => {
-      if (cluster !== "todos" && o.cluster !== cluster) return false;
-      if (cxResp !== "todos" && o.cxResponsavel !== cxResp) return false;
-      if (etapaFilter !== "todas" && o.etapa !== etapaFilter) return false;
-      if (produtoFilter !== "todos" && o.produtoMapeado !== produtoFilter)
-        return false;
-      if (origemFilter !== "todas" && (o.origem ?? "manual") !== origemFilter) return false;
-      if (prioridadeFilter !== "todas" && o.prioridade !== prioridadeFilter) return false;
-      return true;
-    });
-  }, [oportunidades, cluster, cxResp, etapaFilter, produtoFilter, origemFilter, prioridadeFilter]);
+  // Group clientes by etapa (each cliente appears in N sections, one per etapa where they have ≥1 op)
+  const grupos = useMemo(() => groupClientesByEtapa(clientes), [clientes]);
+
+  // Initialize default expansion: 3 first etapas with cards (excluding sugerido_sistema/descartado)
+  useEffect(() => {
+    if (initializedExpansion.current || clientes.length === 0) return;
+    const etapasComCards = ETAPAS.filter(
+      (e) => e !== "sugerido_sistema" && e !== "descartado" && (grupos.get(e)?.length ?? 0) > 0
+    );
+    setEtapasExpandidas(new Set(etapasComCards.slice(0, 3)));
+    initializedExpansion.current = true;
+  }, [clientes, grupos]);
+
+  const totalOportunidades = useMemo(
+    () => clientes.reduce((s, c) => s + c.oportunidades.length, 0),
+    [clientes]
+  );
+  const totalRNegociacao = useMemo(
+    () =>
+      clientes.reduce(
+        (s, c) =>
+          s + c.oportunidades.reduce((s2, op) => s2 + (op.valorRNegociacao ?? 0), 0),
+        0
+      ),
+    [clientes]
+  );
 
   const mapear = useMutation({
     mutationFn: async () => {
@@ -252,7 +307,6 @@ export default function CrossSellPipeline() {
     },
   });
 
-  // Mutation: change etapa
   const changeEtapa = useMutation({
     mutationFn: async ({ id, etapa }: { id: number; etapa: string }) => {
       const res = await fetch(`/api/comercial/crosssell/${id}`, {
@@ -278,7 +332,7 @@ export default function CrossSellPipeline() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-64 w-full rounded-xl" />
+            <Skeleton key={i} className="h-72 w-full rounded-xl" />
           ))}
         </div>
       </div>
@@ -337,26 +391,15 @@ export default function CrossSellPipeline() {
           </SelectContent>
         </Select>
 
-        <Select value={origemFilter} onValueChange={setOrigemFilter}>
-          <SelectTrigger className="w-36 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <SelectValue placeholder="Origem" />
+        <Select value={ordenacao} onValueChange={(v) => setOrdenacao(v as any)}>
+          <SelectTrigger className="w-52 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue placeholder="Ordenar por" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas Origens</SelectItem>
-            <SelectItem value="manual">Manual</SelectItem>
-            <SelectItem value="sistema">Sistema</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
-          <SelectTrigger className="w-40 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <SelectValue placeholder="Prioridade" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas Prioridades</SelectItem>
-            <SelectItem value="alta">Alta</SelectItem>
-            <SelectItem value="media">Média</SelectItem>
-            <SelectItem value="baixa">Baixa</SelectItem>
+            <SelectItem value="score">Maior potencial</SelectItem>
+            <SelectItem value="mrr">Maior MRR atual</SelectItem>
+            <SelectItem value="recente">Mais recentes</SelectItem>
+            <SelectItem value="nome">Alfabético</SelectItem>
           </SelectContent>
         </Select>
 
@@ -372,7 +415,7 @@ export default function CrossSellPipeline() {
           {mapear.isPending ? "Mapeando..." : "Mapear Oportunidades"}
         </Button>
 
-        <Button onClick={() => setShowNew(true)} className="gap-2">
+        <Button onClick={() => setNewOpEtapa("fazer_contato")} className="gap-2">
           <Plus className="h-4 w-4" />
           Nova Oportunidade
         </Button>
@@ -380,61 +423,73 @@ export default function CrossSellPipeline() {
 
       {/* Summary */}
       <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-zinc-400">
-        <span>{filtered.length} oportunidades</span>
-        <span>|</span>
-        <span>
-          Valor R em negociacao:{" "}
-          {formatCurrency(
-            filtered.reduce((s, o) => s + (o.valorRNegociacao ?? 0), 0)
-          )}
-        </span>
-        <span>
-          Valor P em negociacao:{" "}
-          {formatCurrency(
-            filtered.reduce((s, o) => s + (o.valorPNegociacao ?? 0), 0)
-          )}
-        </span>
+        <span>{clientes.length} clientes únicos</span>
+        <span>·</span>
+        <span>{totalOportunidades} oportunidades</span>
+        <span>·</span>
+        <span>{formatCurrency(totalRNegociacao)} em negociação</span>
       </div>
 
-      {/* Card grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map((op) => (
-          <OpCard
-            key={op.id}
-            op={op}
-            onChangeEtapa={(etapa) => changeEtapa.mutate({ id: op.id, etapa })}
-            onGanho={() => setGanhoOp(op)}
-            onComments={() => setCommentOp(op)}
+      {/* Etapas accordion */}
+      <div className="space-y-1">
+        {ETAPAS.filter((e) => (grupos.get(e)?.length ?? 0) > 0).map((etapa) => (
+          <EtapaSection
+            key={etapa}
+            etapa={etapa}
+            grupos={grupos.get(etapa) ?? []}
+            expanded={etapasExpandidas.has(etapa)}
+            onToggle={() =>
+              setEtapasExpandidas((prev) => {
+                const next = new Set(prev);
+                if (next.has(etapa)) next.delete(etapa);
+                else next.add(etapa);
+                return next;
+              })
+            }
+            onNewOpForEtapa={(e) => setNewOpEtapa(e)}
+            ordenacao={ordenacao}
+            onChangeEtapa={(opId, e) => changeEtapa.mutate({ id: opId, etapa: e })}
+            onGanho={(op) => {
+              const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
+              if (grupo) setGanhoCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
+            }}
+            onComments={(op) => {
+              const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
+              if (grupo) setCommentCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
+            }}
           />
         ))}
-        {filtered.length === 0 && (
-          <div className="col-span-full text-center py-16 text-gray-400 dark:text-zinc-500">
-            Nenhuma oportunidade encontrada com os filtros selecionados.
+        {grupos.size === 0 && (
+          <div className="text-center py-16 text-gray-400 dark:text-zinc-500">
+            Nenhum cliente encontrado com os filtros selecionados.
           </div>
         )}
       </div>
 
       {/* Modals */}
-      {showNew && (
+      {newOpEtapa && (
         <NewOpDialog
-          open={showNew}
-          onClose={() => setShowNew(false)}
+          open={!!newOpEtapa}
+          etapaInicial={newOpEtapa}
+          onClose={() => setNewOpEtapa(null)}
           userName={user?.name ?? ""}
         />
       )}
-      {ganhoOp && (
+      {ganhoCtx && (
         <GanhoDialog
-          open={!!ganhoOp}
-          op={ganhoOp}
-          onClose={() => setGanhoOp(null)}
+          open={!!ganhoCtx}
+          op={ganhoCtx.op}
+          clienteNome={ganhoCtx.clienteNome}
+          onClose={() => setGanhoCtx(null)}
           userName={user?.name ?? ""}
         />
       )}
-      {commentOp && (
+      {commentCtx && (
         <CommentsSheet
-          open={!!commentOp}
-          op={commentOp}
-          onClose={() => setCommentOp(null)}
+          open={!!commentCtx}
+          op={commentCtx.op}
+          clienteNome={commentCtx.clienteNome}
+          onClose={() => setCommentCtx(null)}
           userName={user?.name ?? ""}
         />
       )}
@@ -443,10 +498,194 @@ export default function CrossSellPipeline() {
 }
 
 // ---------------------------------------------------------------------------
-// OpCard
+// EtapaSection
 // ---------------------------------------------------------------------------
 
-function OpCard({
+function EtapaSection({
+  etapa,
+  grupos,
+  expanded,
+  onToggle,
+  onNewOpForEtapa,
+  ordenacao,
+  onChangeEtapa,
+  onGanho,
+  onComments,
+}: {
+  etapa: Etapa;
+  grupos: ClienteEtapaGroup[];
+  expanded: boolean;
+  onToggle: () => void;
+  onNewOpForEtapa: (etapa: Etapa) => void;
+  ordenacao: "score" | "mrr" | "recente" | "nome";
+  onChangeEtapa: (opId: number, etapa: string) => void;
+  onGanho: (op: Oportunidade) => void;
+  onComments: (op: Oportunidade) => void;
+}) {
+  const sorted = useMemo(() => {
+    const arr = [...grupos];
+    switch (ordenacao) {
+      case "mrr":
+        arr.sort((a, b) => b.cliente.valorRAtual - a.cliente.valorRAtual);
+        break;
+      case "recente":
+        arr.sort((a, b) => {
+          const aMax = a.oportunidades.reduce((m, op) => Math.max(m, new Date(op.atualizadoEm).getTime()), 0);
+          const bMax = b.oportunidades.reduce((m, op) => Math.max(m, new Date(op.atualizadoEm).getTime()), 0);
+          return bMax - aMax;
+        });
+        break;
+      case "nome":
+        arr.sort((a, b) => (a.cliente.nome ?? "").localeCompare(b.cliente.nome ?? ""));
+        break;
+      case "score":
+      default:
+        arr.sort((a, b) => b.cliente.scoreMaximo - a.cliente.scoreMaximo);
+        break;
+    }
+    return arr;
+  }, [grupos, ordenacao]);
+
+  return (
+    <section>
+      <div
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-900/50 rounded px-1"
+      >
+        <span className={`text-gray-500 dark:text-zinc-400 transition-transform inline-block ${expanded ? "rotate-90" : ""}`}>▸</span>
+        <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
+          {ETAPA_LABELS[etapa] ?? etapa}
+        </Badge>
+        <span className="text-sm text-gray-500 dark:text-zinc-400">{grupos.length}</span>
+        <div className="flex-1" />
+        <button
+          onClick={(e) => { e.stopPropagation(); onNewOpForEtapa(etapa); }}
+          className="text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 px-2 py-0.5 text-sm"
+          title={`Nova oportunidade em ${ETAPA_LABELS[etapa]}`}
+        >
+          +
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2 mb-4 pl-6">
+          {sorted.map(({ cliente, oportunidades }) => (
+            <ClienteCard
+              key={`${etapa}-${cliente.cnpj}`}
+              cliente={cliente}
+              oportunidadesFiltradas={oportunidades}
+              onChangeEtapa={onChangeEtapa}
+              onGanho={onGanho}
+              onComments={onComments}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ClienteCard
+// ---------------------------------------------------------------------------
+
+function ClienteCard({
+  cliente,
+  oportunidadesFiltradas,
+  onChangeEtapa,
+  onGanho,
+  onComments,
+}: {
+  cliente: ClienteCrossSell;
+  oportunidadesFiltradas?: Oportunidade[];
+  onChangeEtapa: (opId: number, etapa: string) => void;
+  onGanho: (op: Oportunidade) => void;
+  onComments: (op: Oportunidade) => void;
+}) {
+  const oportunidadesVisiveis = oportunidadesFiltradas ?? cliente.oportunidades;
+  return (
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+      <CardContent className="p-4 space-y-3">
+        {/* Header */}
+        <div>
+          <h3 className="font-semibold text-gray-900 dark:text-white truncate">
+            {cliente.nome ?? cliente.cnpj}
+          </h3>
+          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 mt-1 flex-wrap">
+            <span>{cliente.cluster ?? "—"}</span>
+            <span>·</span>
+            <span>{cliente.status ?? "—"}</span>
+            <span>·</span>
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {calcLifetime(cliente.contratoInicio)}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-zinc-300 mt-1.5 flex-wrap">
+            <span className="flex items-center gap-1">
+              <User className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+              <span className="text-gray-400 dark:text-zinc-500">CxCs:</span>
+              <span className="font-medium">{cliente.cxConta ?? "—"}</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <Briefcase className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+              <span className="text-gray-400 dark:text-zinc-500">Vendedor:</span>
+              <span className="font-medium">{cliente.vendedor ?? "—"}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-zinc-300 mt-1.5 font-medium">
+            <span>R: {formatCurrency(cliente.valorRAtual)}</span>
+            <span className="text-gray-400 dark:text-zinc-600">·</span>
+            <span>P: {formatCurrency(cliente.valorPAtual)}</span>
+          </div>
+        </div>
+
+        {/* Serviços ativos */}
+        {cliente.servicosAtivos.length > 0 && (
+          <div className="border-t border-gray-100 dark:border-zinc-800 pt-2">
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-1.5">
+              Serviços ativos
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {cliente.servicosAtivos.map((s) => (
+                <span
+                  key={s}
+                  className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-[11px] text-gray-700 dark:text-zinc-300"
+                >
+                  {s}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Oportunidades */}
+        <div className="border-t border-gray-100 dark:border-zinc-800 pt-2">
+          <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
+            Oportunidades mapeadas ({oportunidadesVisiveis.length})
+          </p>
+          <div className="divide-y divide-gray-50 dark:divide-zinc-800/60">
+            {oportunidadesVisiveis.map((op) => (
+              <OportunidadeRow
+                key={op.id}
+                op={op}
+                onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
+                onGanho={() => onGanho(op)}
+                onComments={() => onComments(op)}
+              />
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OportunidadeRow
+// ---------------------------------------------------------------------------
+
+function OportunidadeRow({
   op,
   onChangeEtapa,
   onGanho,
@@ -458,148 +697,87 @@ function OpCard({
   onComments: () => void;
 }) {
   const etapa = op.etapa as Etapa;
+  const isSugerido = etapa === "sugerido_sistema";
   const isDescartado = etapa === "descartado";
 
-  return (
-    <Card
-      className={`bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 ${
-        isDescartado ? "opacity-60" : ""
-      } ${op.origem === "sistema" ? "border-l-4 border-l-indigo-400 dark:border-l-indigo-500" : ""}`}
-    >
-      <CardContent className="p-4 space-y-3">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-              {op.clienteNome ?? op.cnpj}
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1">
-              <User className="h-3 w-3" />
-              {op.cxResponsavel}
-            </p>
-          </div>
-          <Select value={etapa} onValueChange={onChangeEtapa}>
-            <SelectTrigger className="h-auto py-0.5 px-2 border-0 w-auto gap-1">
-              <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
-                {ETAPA_LABELS[etapa] ?? etapa}
-              </Badge>
-            </SelectTrigger>
-            <SelectContent>
-              {ETAPAS.map((e) => (
-                <SelectItem key={e} value={e}>
-                  {ETAPA_LABELS[e]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+  // Cor da bolinha: prioridade (se sistema) ou neutra (manual)
+  const dotColor = isSugerido && op.prioridade
+    ? op.prioridade === "alta"
+      ? "bg-green-500"
+      : op.prioridade === "media"
+        ? "bg-yellow-500"
+        : "bg-gray-400"
+    : "bg-blue-400";
 
-        {/* System scoring info */}
-        {op.origem === "sistema" && op.prioridade && (
-          <div className="flex items-center gap-2">
-            <Badge className={`text-xs ${PRIORIDADE_COLORS[op.prioridade] ?? ""}`}>
-              {PRIORIDADE_LABELS[op.prioridade] ?? op.prioridade}
+  return (
+    <div className={`flex flex-col gap-1 py-2 ${isDescartado ? "opacity-50" : ""}`}>
+      <div className="flex items-center gap-2">
+        <span className={`h-2 w-2 rounded-full shrink-0 ${dotColor}`} />
+        <span className="text-sm font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0">
+          {op.produto}
+        </span>
+
+        <Select value={etapa} onValueChange={onChangeEtapa}>
+          <SelectTrigger className="h-auto py-0.5 px-2 border-0 w-auto gap-1 text-xs">
+            <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
+              {ETAPA_LABELS[etapa] ?? etapa}
             </Badge>
-            {op.motivo && (
-              <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-                {op.motivo}
-              </span>
-            )}
-          </div>
+          </SelectTrigger>
+          <SelectContent>
+            {ETAPAS.map((e) => (
+              <SelectItem key={e} value={e}>{ETAPA_LABELS[e]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <span className="text-xs text-gray-600 dark:text-zinc-400 w-14 text-right">
+          {formatCurrencyCompact(op.valorRNegociacao)}
+        </span>
+
+        <button
+          className="text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 flex items-center gap-0.5 text-xs"
+          onClick={onComments}
+          title="Comentários"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          {op.totalComentarios > 0 && <span>{op.totalComentarios}</span>}
+        </button>
+
+        {!isDescartado && !isSugerido && (
+          <button
+            className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+            onClick={onGanho}
+            title="Marcar como ganho"
+          >
+            <Trophy className="h-3.5 w-3.5" />
+          </button>
         )}
 
-        {/* Data grid */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-          <DataCell
-            icon={<Package className="h-3 w-3" />}
-            label="Produto"
-            value={op.produtoMapeado}
-          />
-          <DataCell label="Status Conta" value={op.clienteStatus ?? "-"} />
-          <DataCell
-            label="Valor R Atual"
-            value={formatCurrency(op.valorRAtual)}
-          />
-          <DataCell
-            label="Valor P Atual"
-            value={formatCurrency(op.valorPAtual)}
-          />
-          <DataCell
-            label="Valor R Neg."
-            value={
-              op.valorRNegociacao != null
-                ? formatCurrency(op.valorRNegociacao)
-                : "-"
-            }
-          />
-          <DataCell
-            label="Valor P Neg."
-            value={
-              op.valorPNegociacao != null
-                ? formatCurrency(op.valorPNegociacao)
-                : "-"
-            }
-          />
-          <DataCell
-            icon={<Clock className="h-3 w-3" />}
-            label="Lifetime"
-            value={calcLifetime(op.contratoInicio)}
-          />
-          <DataCell
-            icon={<Calendar className="h-3 w-3" />}
-            label="Ultimo Contato"
-            value={formatDate(op.ultimoContato)}
-          />
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-zinc-800">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-gray-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white"
-            onClick={onComments}
-          >
-            <MessageSquare className="h-4 w-4" />
-            {op.totalComentarios > 0 && (
-              <span className="text-xs">{op.totalComentarios}</span>
-            )}
-          </Button>
-          {!isDescartado && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
-              onClick={onGanho}
+        {isSugerido && (
+          <div className="flex items-center gap-1">
+            <button
+              className="text-green-600 hover:text-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 rounded hover:bg-green-50 dark:hover:bg-green-900/30"
+              onClick={() => onChangeEtapa("fazer_contato")}
+              title="Aceitar sugestão"
             >
-              <Trophy className="h-4 w-4" />
-              Ganho
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+              ✓
+            </button>
+            <button
+              className="text-red-500 hover:text-red-600 dark:text-red-400 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
+              onClick={() => onChangeEtapa("descartado")}
+              title="Descartar sugestão"
+            >
+              ✗
+            </button>
+          </div>
+        )}
+      </div>
 
-function DataCell({
-  icon,
-  label,
-  value,
-}: {
-  icon?: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 flex items-center gap-1">
-        {icon}
-        {label}
-      </p>
-      <p className="text-gray-900 dark:text-white font-medium truncate">
-        {value}
-      </p>
+      {isSugerido && op.motivo && (
+        <p className="text-[11px] text-gray-500 dark:text-zinc-500 pl-4 truncate">
+          {op.motivo}
+        </p>
+      )}
     </div>
   );
 }
@@ -610,10 +788,12 @@ function DataCell({
 
 function NewOpDialog({
   open,
+  etapaInicial,
   onClose,
   userName,
 }: {
   open: boolean;
+  etapaInicial?: Etapa;
   onClose: () => void;
   userName: string;
 }) {
@@ -650,6 +830,7 @@ function NewOpDialog({
           cxResponsavel: userName || selectedCliente.responsavel,
           valorRNegociacao: valorR ? Number(valorR) : undefined,
           valorPNegociacao: valorP ? Number(valorP) : undefined,
+          etapa: etapaInicial,
         }),
       });
       if (!res.ok) {
@@ -671,6 +852,11 @@ function NewOpDialog({
           <DialogTitle className="text-gray-900 dark:text-white">
             Nova Oportunidade de CrossSell
           </DialogTitle>
+          {etapaInicial && etapaInicial !== "fazer_contato" && (
+            <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
+              Será criada em: <strong className="text-gray-900 dark:text-white">{ETAPA_LABELS[etapaInicial]}</strong>
+            </p>
+          )}
         </DialogHeader>
 
         <div className="space-y-4">
@@ -802,17 +988,19 @@ function NewOpDialog({
 function GanhoDialog({
   open,
   op,
+  clienteNome,
   onClose,
   userName,
 }: {
   open: boolean;
   op: Oportunidade;
+  clienteNome: string;
   onClose: () => void;
   userName: string;
 }) {
   const queryClient = useQueryClient();
   const [operacoes, setOperacoes] = useState<string[]>([]);
-  const [produto, setProduto] = useState(op.produtoMapeado);
+  const [produto, setProduto] = useState(op.produto);
   const [mesGanho, setMesGanho] = useState(
     new Date().toISOString().slice(0, 7)
   );
@@ -865,7 +1053,7 @@ function GanhoDialog({
 
         <div className="space-y-4">
           <p className="text-sm text-gray-600 dark:text-zinc-400">
-            Cliente: <strong className="text-gray-900 dark:text-white">{op.clienteNome ?? op.cnpj}</strong>
+            Cliente: <strong className="text-gray-900 dark:text-white">{clienteNome}</strong>
           </p>
 
           {/* Operacao badges */}
@@ -973,11 +1161,13 @@ function GanhoDialog({
 function CommentsSheet({
   open,
   op,
+  clienteNome,
   onClose,
   userName,
 }: {
   open: boolean;
   op: Oportunidade;
+  clienteNome: string;
   onClose: () => void;
   userName: string;
 }) {
@@ -1018,7 +1208,7 @@ function CommentsSheet({
       <SheetContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 w-full sm:max-w-md flex flex-col">
         <SheetHeader>
           <SheetTitle className="text-gray-900 dark:text-white">
-            Comentarios - {op.clienteNome ?? op.cnpj}
+            Comentários — {clienteNome}
           </SheetTitle>
         </SheetHeader>
 
