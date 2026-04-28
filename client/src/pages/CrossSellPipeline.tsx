@@ -734,7 +734,7 @@ function OportunidadeRow({
             </Badge>
           </SelectTrigger>
           <SelectContent>
-            {ETAPAS_DROPDOWN.filter((e) => !(isSugerido && e === "ganho")).map((e) => (
+            {ETAPAS_DROPDOWN.map((e) => (
               <SelectItem key={e} value={e}>{ETAPA_LABELS[e]}</SelectItem>
             ))}
           </SelectContent>
