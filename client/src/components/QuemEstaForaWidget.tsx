@@ -39,20 +39,25 @@ export function QuemEstaForaWidget({ userPhotos }: QuemEstaForaWidgetProps) {
   return (
     <Card data-testid="card-quem-esta-fora" className="h-full flex flex-col overflow-hidden">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Plane className="w-4 h-4" />
-            Quem está fora hoje
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-base flex items-center gap-2 min-w-0">
+            <Plane className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Fora hoje</span>
             {lista.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-xs">
+              <Badge variant="secondary" className="text-xs flex-shrink-0">
                 {lista.length}
               </Badge>
             )}
           </CardTitle>
-          <Link href="/calendario-ferias">
-            <Button variant="ghost" size="sm" data-testid="button-ver-calendario-ferias">
-              Ver todos
-              <ExternalLink className="w-3 h-3 ml-1" />
+          <Link href="/gg/calendario-ferias">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-shrink-0"
+              data-testid="button-ver-calendario-ferias"
+              title="Ver calendário de férias"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
             </Button>
           </Link>
         </div>
