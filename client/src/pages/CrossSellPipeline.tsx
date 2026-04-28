@@ -834,7 +834,7 @@ function InlineValorInput({
           }
         }}
         onClick={(e) => e.stopPropagation()}
-        className="w-16 px-1 py-0.5 bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-zinc-600 focus:border-blue-400 dark:focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 rounded text-xs text-right outline-none"
+        className="w-16 px-1 py-0.5 bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-zinc-600 focus:border-blue-400 dark:focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 rounded text-xs text-left outline-none"
         placeholder="0"
       />
     </span>
