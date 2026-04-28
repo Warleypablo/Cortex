@@ -622,7 +622,13 @@ function EtapaSection({
         </button>
       </div>
 
-      {expanded && (
+      {expanded && etapa === "ganho" && (
+        <div className="mt-2 mb-4 ml-6">
+          <GanhosList embedded />
+        </div>
+      )}
+
+      {expanded && etapa !== "ganho" && (
         <div className="mt-2 mb-4 ml-6 border border-gray-200 dark:border-zinc-700/60 rounded-md divide-y divide-gray-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900 overflow-x-auto">
           {sorted.map(({ cliente, oportunidades }) => (
             <ClienteRow
@@ -1443,10 +1449,10 @@ function formatMesGanho(d: string | null): string {
 const GANHOS_GRID_TEMPLATE =
   "minmax(180px, 2fr) 110px 110px minmax(140px, 1.2fr) minmax(140px, 1.2fr) 120px minmax(140px, 1.2fr) 100px";
 
-function GanhosList() {
+function GanhosList({ embedded = false }: { embedded?: boolean }) {
   const now = new Date();
   const currentYear = now.getFullYear();
-  const [ano, setAno] = useState<string>(String(currentYear));
+  const [ano, setAno] = useState<string>(embedded ? "todos" : String(currentYear));
   const [mes, setMes] = useState<string>("todos");
   const [operacoesFilter, setOperacoesFilter] = useState<string[]>([]);
 
@@ -1481,6 +1487,8 @@ function GanhosList() {
 
   return (
     <div className="space-y-4">
+      {!embedded && (
+      <>
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={ano} onValueChange={setAno}>
@@ -1544,6 +1552,8 @@ function GanhosList() {
         <span>·</span>
         <span>P total: {formatCurrency(totalP)}</span>
       </div>
+      </>
+      )}
 
       {/* Tabela */}
       <div className="border border-gray-200 dark:border-zinc-700/60 rounded-md overflow-x-auto">
