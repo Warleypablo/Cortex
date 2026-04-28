@@ -1468,7 +1468,7 @@ interface Ganho {
   valorP: number | null;
   cxResponsavel: string | null;
   vendedor: string | null;
-  operacao: string;
+  operacao: string[];
   produto: string;
   mesGanho: string;
   criadoEm: string;
@@ -1635,10 +1635,15 @@ function GanhosList() {
               </span>
               <span className="text-gray-700 dark:text-zinc-300 truncate">{g.cxResponsavel ?? "—"}</span>
               <span className="text-gray-700 dark:text-zinc-300 truncate">{g.vendedor ?? "—"}</span>
-              <span>
-                <Badge className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  {g.operacao}
-                </Badge>
+              <span className="flex flex-wrap gap-1">
+                {(g.operacao ?? []).map((op) => (
+                  <Badge
+                    key={op}
+                    className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  >
+                    {op}
+                  </Badge>
+                ))}
               </span>
               <span className="text-gray-700 dark:text-zinc-300 truncate">{g.produto}</span>
               <span className="text-gray-700 dark:text-zinc-300 whitespace-nowrap">{formatMesGanho(g.mesGanho)}</span>
