@@ -144,10 +144,10 @@ interface ClienteSearch {
 
 interface Comentario {
   id: number;
-  oportunidade_id: number;
+  oportunidadeId: number;
   autor: string;
   texto: string;
-  criado_em: string;
+  criadoEm: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -1384,7 +1384,7 @@ function CommentsSheet({
                   {c.autor}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-zinc-500">
-                  {new Date(c.criado_em).toLocaleString("pt-BR")}
+                  {new Date(c.criadoEm).toLocaleString("pt-BR")}
                 </span>
               </div>
               <p className="text-sm text-gray-700 dark:text-zinc-300">
