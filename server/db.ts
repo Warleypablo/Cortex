@@ -697,11 +697,15 @@ export async function initializeSysSchema(): Promise<void> {
         data_aprovacao_lider TIMESTAMP,
         observacao_lider TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT chk_max_days CHECK ((data_fim - data_inicio) <= 7)
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    
+
+    // Remove 7-day constraint if it exists (legacy)
+    try {
+      await pool.query(`ALTER TABLE cortex_core.unavailability_requests DROP CONSTRAINT IF EXISTS chk_max_days`);
+    } catch (e) {}
+
     // Add dual approval columns if they don't exist (for existing databases)
     await db.execute(sql`
       ALTER TABLE cortex_core.unavailability_requests 
@@ -737,6 +741,21 @@ export async function initializeSysSchema(): Promise<void> {
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_churn_risk_score ON cortex_core.churn_risk_scores(score DESC)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_churn_risk_contrato ON cortex_core.churn_risk_scores(contrato_id)`);
+
+    // Campaign Monthly Budget — metas mensais de investimento por campanha (Meta + Google Ads)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.campaign_monthly_budget (
+        id SERIAL PRIMARY KEY,
+        platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
+        campaign_id TEXT NOT NULL,
+        month DATE NOT NULL,
+        monthly_budget_target NUMERIC(12, 2) NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        UNIQUE (platform, campaign_id, month)
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_campaign_monthly_budget_month ON cortex_core.campaign_monthly_budget(month)`);
 
     console.log('[database] cortex_core schema tables created');
 
@@ -2182,6 +2201,52 @@ export async function initializeCapacityTable(): Promise<void> {
   }
 }
 
+export async function initializePredictionsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.predictions_cache (
+        id SERIAL PRIMARY KEY,
+        tipo TEXT NOT NULL,
+        horizonte_meses INTEGER NOT NULL,
+        data_referencia TIMESTAMP NOT NULL,
+        data_alvo TIMESTAMP NOT NULL,
+        valor_otimista DECIMAL,
+        valor_realista DECIMAL,
+        valor_pessimista DECIMAL,
+        metadata JSONB DEFAULT '{}',
+        criado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.predictions_accuracy (
+        id SERIAL PRIMARY KEY,
+        prediction_id INTEGER,
+        tipo TEXT NOT NULL,
+        data_alvo TIMESTAMP NOT NULL,
+        valor_previsto DECIMAL,
+        valor_real DECIMAL,
+        erro_percentual DECIMAL,
+        criado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_predictions_cache_tipo_horizonte
+      ON cortex_core.predictions_cache(tipo, horizonte_meses, data_alvo)
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_predictions_accuracy_tipo
+      ON cortex_core.predictions_accuracy(tipo, data_alvo)
+    `);
+
+    console.log('[database] Predictions tables initialized');
+  } catch (error) {
+    console.error('[database] Error initializing predictions tables:', error);
+  }
+}
+
 export async function initializeContratoTemplatesTable(): Promise<void> {
   try {
     await db.execute(sql`
@@ -2198,5 +2263,104 @@ export async function initializeContratoTemplatesTable(): Promise<void> {
     console.log('[database] Contrato templates table initialized');
   } catch (error) {
     console.error('[database] Error initializing contrato templates table:', error);
+  }
+}
+
+export async function initializeMetricRulesetsTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS metric_rulesets (
+        id SERIAL PRIMARY KEY,
+        metric_key VARCHAR(50) NOT NULL,
+        display_label VARCHAR(100) NOT NULL,
+        default_color VARCHAR(20) DEFAULT 'default',
+        updated_at TIMESTAMP DEFAULT NOW(),
+        updated_by VARCHAR(100),
+        produto VARCHAR(100),
+        plataforma VARCHAR(50)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS metric_thresholds (
+        id SERIAL PRIMARY KEY,
+        ruleset_id INTEGER NOT NULL REFERENCES metric_rulesets(id) ON DELETE CASCADE,
+        min_value DECIMAL(15,4),
+        max_value DECIMAL(15,4),
+        color VARCHAR(20) NOT NULL,
+        label VARCHAR(100),
+        sort_order INTEGER DEFAULT 0
+      )
+    `);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS metric_rulesets_context_unique
+        ON metric_rulesets (metric_key, COALESCE(produto, ''), COALESCE(plataforma, ''))
+    `);
+    console.log('[database] Metric rulesets tables initialized');
+  } catch (error) {
+    console.error('[database] Error initializing metric rulesets tables:', error);
+  }
+}
+
+export async function migrateMetricRulesetsContext(): Promise<void> {
+  try {
+    // Add produto and plataforma columns
+    await db.execute(sql`ALTER TABLE metric_rulesets ADD COLUMN IF NOT EXISTS produto VARCHAR(100)`);
+    await db.execute(sql`ALTER TABLE metric_rulesets ADD COLUMN IF NOT EXISTS plataforma VARCHAR(50)`);
+
+    // Replace old unique constraint with composite one
+    await db.execute(sql`ALTER TABLE metric_rulesets DROP CONSTRAINT IF EXISTS metric_rulesets_metric_key_key`);
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS metric_rulesets_context_unique
+        ON metric_rulesets (metric_key, COALESCE(produto, ''), COALESCE(plataforma, ''))
+    `);
+
+    console.log('[database] metric_rulesets context migration complete');
+  } catch (error) {
+    console.error('[database] Error migrating metric_rulesets:', error);
+  }
+}
+
+export async function initializeItemAliasMapTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.item_alias_map (
+        id SERIAL PRIMARY KEY,
+        item_pattern VARCHAR(255) NOT NULL,
+        target_token VARCHAR(100) NOT NULL,
+        notes TEXT,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_item_alias_map_pattern_active
+      ON cortex_core.item_alias_map (item_pattern) WHERE active = true
+    `);
+
+    // Seed inicial — só insere se a tabela estiver vazia
+    const existing = await db.execute(sql`
+      SELECT COUNT(*)::int AS qtd FROM cortex_core.item_alias_map
+    `);
+    const count = Number((existing.rows[0] as any)?.qtd) || 0;
+    if (count === 0) {
+      await db.execute(sql`
+        INSERT INTO cortex_core.item_alias_map (item_pattern, target_token, notes) VALUES
+          ('aceleracao', 'performance', 'Aceleração Scale/Enterprise são variantes de Performance'),
+          ('trafego pago', 'performance', 'Nome alternativo no CAZ'),
+          ('trafego', 'performance', 'Nome alternativo no CAZ'),
+          ('referente a aceleracao mensal', 'performance', 'Texto livre recorrente'),
+          ('contrato personalizado', 'performance', 'Grupo Tommasi — cliente só tem squads Performance'),
+          ('variavel mensal', 'performance', 'Tipo de cobrança — sempre Performance em 2026'),
+          ('gameplan', 'gameplan', 'Mantém o termo para desambiguar'),
+          ('desenvolvimento de e commerce', 'ecommerce', 'Mesma coisa no Tech'),
+          ('sustentacao de site e ecommerce', 'ecommerce', 'Idem')
+      `);
+      console.log('[database] item_alias_map seeded com 9 aliases iniciais');
+    }
+    console.log('[database] item_alias_map table initialized');
+  } catch (error) {
+    console.error('[database] erro ao inicializar item_alias_map:', error);
   }
 }

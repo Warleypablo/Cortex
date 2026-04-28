@@ -70,6 +70,7 @@ const CalendarioFerias = lazyWithRetry(() => import("@/pages/CalendarioFerias"))
 const Organograma = lazyWithRetry(() => import("@/pages/Organograma"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
 const ChurnPredicao = lazyWithRetry(() => import("@/pages/ChurnPredicao"));
+const AnalisePreditiva = lazyWithRetry(() => import("@/pages/gestao/AnalisePreditiva"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
 const DashboardDFC = lazyWithRetry(() => import("@/pages/DashboardDFC"));
 const DashboardInadimplencia = lazyWithRetry(() => import("@/pages/DashboardInadimplencia"));
@@ -81,7 +82,7 @@ const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
-const InstagramConexoes = lazyWithRetry(() => import("@/pages/InstagramConexoes"));
+const InstagramDashboard = lazyWithRetry(() => import("@/pages/InstagramDashboard"));
 const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
 const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
 const ContribuicaoOperador = lazyWithRetry(() => import("@/pages/ContribuicaoOperador"));
@@ -101,7 +102,10 @@ const ComercialReunioes = lazyWithRetry(() => import("@/pages/ComercialReunioes"
 const FunilVendas = lazyWithRetry(() => import("@/pages/FunilVendas"));
 const Criativos = lazyWithRetry(() => import("@/pages/Criativos"));
 const GrowthOrcadoRealizado = lazyWithRetry(() => import("@/pages/GrowthOrcadoRealizado"));
+const GrowthOrcamentoCampanhas = lazyWithRetry(() => import("@/pages/GrowthOrcamentoCampanhas"));
+const PlanejamentoMetas = lazyWithRetry(() => import("@/pages/PlanejamentoMetas"));
 const GrowthAI = lazyWithRetry(() => import("@/pages/GrowthAI"));
+const SdrAssistant = lazyWithRetry(() => import("@/pages/SdrAssistant"));
 const GrowthVisaoGeral = lazyWithRetry(() => import("@/pages/GrowthVisaoGeral"));
 const PerformancePlataformas = lazyWithRetry(() => import("@/pages/PerformancePlataformas"));
 const KeywordPerformance = lazyWithRetry(() => import("@/pages/KeywordPerformance"));
@@ -143,6 +147,11 @@ const Capacity = lazyWithRetry(() => import("@/pages/Capacity"));
 const PortalCliente = PortalClientePage;
 const PortalCreator = lazyWithRetry(() => import("@/pages/PortalCreator"));
 const TestWorkflow = lazyWithRetry(() => import("@/pages/TestWorkflow"));
+const Negativacao = lazyWithRetry(() => import("@/pages/Negativacao"));
+const Triagem = lazyWithRetry(() => import("@/pages/Triagem"));
+const CrossSellPipeline = lazyWithRetry(() => import("@/pages/CrossSellPipeline"));
+const CrossSellDashboard = lazyWithRetry(() => import("@/pages/CrossSellDashboard"));
+const ReceitaRecorrente = lazyWithRetry(() => import("@/pages/financeiro/ReceitaRecorrente"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
 // Error boundary to catch silent crashes in the portal.
@@ -296,6 +305,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>
       <Route path="/dashboard/analise-squads">{() => <ProtectedRoute path="/dashboard/analise-squads" component={AnaliseSquads} />}</Route>
       <Route path="/dashboard/saude-base-ativa">{() => <ProtectedRoute path="/dashboard/saude-base-ativa" component={SaudeBaseAtiva} />}</Route>
+      <Route path="/dashboard/analise-preditiva">{() => <ProtectedRoute path="/dashboard/analise-preditiva" component={AnalisePreditiva} />}</Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       
       {/* Financeiro */}
@@ -309,6 +319,9 @@ function ProtectedRouter() {
       <Route path="/dashboard/contribuicao-squad">{() => <ProtectedRoute path="/dashboard/contribuicao-squad" component={ContribuicaoSquad} />}</Route>
       <Route path="/dashboard/dre">{() => <ProtectedRoute path="/dashboard/dre" component={DRE} />}</Route>
       <Route path="/dashboard/notas-fiscais">{() => <ProtectedRoute path="/dashboard/notas-fiscais" component={NotasFiscais} />}</Route>
+      <Route path="/financeiro/negativacao">{() => <ProtectedRoute path="/financeiro/negativacao" component={Negativacao} />}</Route>
+      <Route path="/triagem">{() => <ProtectedRoute path="/triagem" component={Triagem} />}</Route>
+      <Route path="/financeiro/receita-recorrente">{() => <ProtectedRoute path="/financeiro/receita-recorrente" component={ReceitaRecorrente} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}
@@ -341,6 +354,9 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/reunioes">{() => <ProtectedRoute path="/dashboard/comercial/reunioes" component={ComercialReunioes} />}</Route>
       <Route path="/dashboard/comercial/funil">{() => <ProtectedRoute path="/dashboard/comercial/funil" component={FunilVendas} />}</Route>
       <Route path="/dashboard/comercial/apresentacao">{() => <ProtectedRoute path="/dashboard/comercial/apresentacao" component={PresentationMode} />}</Route>
+      <Route path="/dashboard/comercial/sdr-assistant">{() => <ProtectedRoute path="/dashboard/comercial/sdr-assistant" component={SdrAssistant} />}</Route>
+      <Route path="/dashboard/comercial/crosssell">{() => <ProtectedRoute path="/dashboard/comercial/crosssell" component={CrossSellPipeline} />}</Route>
+      <Route path="/dashboard/comercial/crosssell-dashboard">{() => <ProtectedRoute path="/dashboard/comercial/crosssell-dashboard" component={CrossSellDashboard} />}</Route>
       <Route path="/presentation">{() => <ProtectedRoute path="/presentation" component={PresentationMode} />}</Route>
       
       {/* Growth */}
@@ -350,9 +366,11 @@ function ProtectedRouter() {
       <Route path="/growth/keyword-performance">{() => <ProtectedRoute path="/growth/keyword-performance" component={KeywordPerformance} />}</Route>
       <Route path="/growth/funil-conversao">{() => <ProtectedRoute path="/growth/funil-conversao" component={FunilConversaoGrowth} />}</Route>
       <Route path="/growth/orcado-realizado">{() => <ProtectedRoute path="/growth/orcado-realizado" component={GrowthOrcadoRealizado} />}</Route>
+      <Route path="/growth/orcamento-campanhas">{() => <ProtectedRoute path="/growth/orcamento-campanhas" component={GrowthOrcamentoCampanhas} />}</Route>
+      <Route path="/growth/planejamento-metas">{() => <ProtectedRoute path="/growth/planejamento-metas" component={PlanejamentoMetas} />}</Route>
       <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
-      <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramConexoes} />}</Route>
+      <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramDashboard} />}</Route>
       
       {/* Social (Makers) */}
       <Route path="/social/creators">{() => <ProtectedRoute path="/social/creators" component={Creators} />}</Route>

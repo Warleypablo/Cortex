@@ -125,6 +125,7 @@ export interface ReceitaChurnMes {
   month: string;
   label: string;
   mrr: number;
+  pontual: number;
   churnBrl: number;
   churnPct: number;
 }
@@ -183,6 +184,54 @@ export interface TechSlideData {
   pipeline: TechPipelineItem[];
 }
 
+export interface PontualServicoAberto {
+  servico: string;
+  valor: number;
+  contratos: number;
+}
+
+export interface PontualSquadEntrega {
+  squad: string;
+  valor: number;
+  contratos: number;
+}
+
+export interface PontualEntregaProdutoMes {
+  month: string;
+  label: string;
+  produtos: Record<string, number>;
+  total: number;
+}
+
+export interface PontualTempoMedio {
+  produto: string;
+  diasMedio: number;
+  contratos: number;
+}
+
+export interface PontualData {
+  emAberto: {
+    valor: number;
+    contratos: number;
+    porServico: PontualServicoAberto[];
+  };
+  aquisicao: {
+    valor: number;
+    contratos: number;
+  };
+  entregasMes: {
+    porSquad: PontualSquadEntrega[];
+    total: number;
+  };
+  variacaoEstoque: {
+    entrou: number;
+    saiu: number;
+    delta: number;
+  };
+  entregasPorProdutoMes: PontualEntregaProdutoMes[];
+  tempoMedioEntrega: PontualTempoMedio[];
+}
+
 export interface RelatorioMensalData {
   mesReferencia: string;
   mesLabel: string;
@@ -201,4 +250,5 @@ export interface RelatorioMensalData {
   squadDetails: SquadDetail[];
   techData: TechSlideData;
   indicacoes: Indicacoes;
+  pontualData: PontualData;
 }

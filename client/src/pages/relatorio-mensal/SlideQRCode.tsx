@@ -1,5 +1,5 @@
-import turboLogo from "@assets/Logo-Turbo-branca_(1)_1766081013390.png";
-import qrCode from "@assets/qrcode-qa-2026-03.jpeg";
+import turboLogo from "@assets/logo-preta.png";
+import qrCode from "@assets/qr-code-qa.png";
 import SlideLayout from "./SlideLayout";
 
 export default function SlideQRCode() {

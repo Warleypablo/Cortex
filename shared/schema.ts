@@ -50,6 +50,37 @@ export const churnRiskScores = cortexCoreSchema.table("churn_risk_scores", {
 export type ChurnRiskScore = typeof churnRiskScores.$inferSelect;
 export type InsertChurnRiskScore = typeof churnRiskScores.$inferInsert;
 
+// ============== PREDICTIONS ==============
+
+export const predictionsCache = cortexCoreSchema.table("predictions_cache", {
+  id: serial("id").primaryKey(),
+  tipo: text("tipo").notNull(),
+  horizonteMeses: integer("horizonte_meses").notNull(),
+  dataReferencia: timestamp("data_referencia").notNull(),
+  dataAlvo: timestamp("data_alvo").notNull(),
+  valorOtimista: decimal("valor_otimista"),
+  valorRealista: decimal("valor_realista"),
+  valorPessimista: decimal("valor_pessimista"),
+  metadata: jsonb("metadata").default({}),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type PredictionCache = typeof predictionsCache.$inferSelect;
+export type InsertPredictionCache = typeof predictionsCache.$inferInsert;
+
+export const predictionsAccuracy = cortexCoreSchema.table("predictions_accuracy", {
+  id: serial("id").primaryKey(),
+  predictionId: integer("prediction_id"),
+  tipo: text("tipo").notNull(),
+  dataAlvo: timestamp("data_alvo").notNull(),
+  valorPrevisto: decimal("valor_previsto"),
+  valorReal: decimal("valor_real"),
+  erroPercentual: decimal("erro_percentual"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type PredictionAccuracy = typeof predictionsAccuracy.$inferSelect;
+
 export const cazClientes = contaAzulSchema.table("caz_clientes", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
@@ -1385,14 +1416,60 @@ export const insertInadimplenciaContextoSchema = createInsertSchema(inadimplenci
 export type InadimplenciaContexto = typeof inadimplenciaContextos.$inferSelect;
 export type InsertInadimplenciaContexto = z.infer<typeof insertInadimplenciaContextoSchema>;
 
+// Negativação Pipeline Actions
+export const negativacaoAcoes = cortexCoreSchema.table("negativacao_acoes", {
+  id: serial("id").primaryKey(),
+  clienteId: text("cliente_id").notNull(),
+  clienteNome: text("cliente_nome").notNull(),
+  clienteCnpj: text("cliente_cnpj"),
+  etapa: text("etapa").notNull().default("notificacao"),
+  status: text("status").notNull().default("pendente"),
+  valorInadimplente: decimal("valor_inadimplente", { precision: 12, scale: 2 }).default("0"),
+  diasAtraso: integer("dias_atraso").default(0),
+  protocolo: text("protocolo"),
+  responsavel: text("responsavel"),
+  valorAcordado: decimal("valor_acordado", { precision: 12, scale: 2 }),
+  dataAcao: date("data_acao"),
+  dataAcordo: date("data_acordo"),
+  observacoes: text("observacoes"),
+  documentoUrl: text("documento_url"),
+  criadoPor: text("criado_por"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+}, (table) => [
+  index("idx_neg_cliente_id").on(table.clienteId),
+  index("idx_neg_etapa").on(table.etapa),
+]);
+
+// Notificações Extrajudiciais Enviadas - Auditoria de emails enviados
+export const notificacoesExtrajudiciaisEnviadas = cortexCoreSchema.table(
+  "notificacoes_extrajudiciais_enviadas",
+  {
+    id: serial("id").primaryKey(),
+    clienteId: text("cliente_id").notNull(),
+    clienteNome: text("cliente_nome"),
+    emailDestino: text("email_destino").notNull(),
+    assunto: text("assunto").notNull(),
+    corpoTexto: text("corpo_texto").notNull(),
+    corpoHtml: text("corpo_html").notNull(),
+    enviadoPor: text("enviado_por").notNull(),
+    enviadoEm: timestamp("enviado_em", { withTimezone: true }).defaultNow().notNull(),
+    sendgridMessageId: text("sendgrid_message_id"),
+    status: text("status").notNull().default("enviado"),
+    erro: text("erro"),
+  },
+);
+
 // Metric Formatting Rules - Conditional coloring system
 export const metricRulesets = pgTable("metric_rulesets", {
   id: integer("id").primaryKey(),
-  metricKey: varchar("metric_key", { length: 50 }).notNull().unique(),
+  metricKey: varchar("metric_key", { length: 50 }).notNull(),
   displayLabel: varchar("display_label", { length: 100 }).notNull(),
   defaultColor: varchar("default_color", { length: 20 }).default("default"),
   updatedAt: timestamp("updated_at").defaultNow(),
   updatedBy: varchar("updated_by", { length: 100 }),
+  produto: varchar("produto", { length: 100 }),
+  plataforma: varchar("plataforma", { length: 50 }),
 });
 
 export const metricThresholds = pgTable("metric_thresholds", {
@@ -1512,6 +1589,21 @@ export const iaHubMensagens = cortexCoreSchema.table("ia_hub_mensagens", {
 });
 
 export type IaHubMensagem = typeof iaHubMensagens.$inferSelect;
+
+// Item Alias Map — aliases para match item (Conta Azul) ↔ contrato (ClickUp)
+// Usado pela aba Contribuição por Squad para atribuir receita correta quando
+// o nome do item não casa literalmente com o serviço do contrato.
+export const itemAliasMap = cortexCoreSchema.table("item_alias_map", {
+  id: serial("id").primaryKey(),
+  itemPattern: varchar("item_pattern", { length: 255 }).notNull(),
+  targetToken: varchar("target_token", { length: 100 }).notNull(),
+  notes: text("notes"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ItemAliasMap = typeof itemAliasMap.$inferSelect;
 
 // Tabela para comunicações/avisos internos sobre clientes
 export const clienteComunicacoes = pgTable("cliente_comunicacoes", {
@@ -3102,6 +3194,18 @@ export const instagramMetricsSnapshots = cortexCoreSchema.table(
     postsCount: integer("posts_count"),
     reachDay: integer("reach_day"),
     impressionsDay: integer("impressions_day"),
+    followsDay: integer("follows_day").default(0),
+    unfollowsDay: integer("unfollows_day").default(0),
+    viewsDay: integer("views_day").default(0),
+    accountsEngaged: integer("accounts_engaged").default(0),
+    totalInteractions: integer("total_interactions").default(0),
+    likesDay: integer("likes_day").default(0),
+    commentsDay: integer("comments_day").default(0),
+    savesDay: integer("saves_day").default(0),
+    sharesDay: integer("shares_day").default(0),
+    profileLinksTaps: integer("profile_links_taps").default(0),
+    profileViews: integer("profile_views"),
+    websiteClicks: integer("website_clicks"),
     recordedAt: timestamp("recorded_at").defaultNow(),
   },
   (table) => [
@@ -3145,3 +3249,83 @@ export const insertInstagramPostMetricSchema = createInsertSchema(instagramPostM
   .omit({ id: true });
 export type InstagramPostMetric = typeof instagramPostMetrics.$inferSelect;
 export type InsertInstagramPostMetric = z.infer<typeof insertInstagramPostMetricSchema>;
+
+// ==================== CROSSSELL ====================
+
+export const crosssellOportunidades = cortexCoreSchema.table("crosssell_oportunidades", {
+  id: serial("id").primaryKey(),
+  clienteId: text("cliente_id").notNull(),
+  cnpj: text("cnpj").notNull(),
+  produtoMapeado: text("produto_mapeado").notNull(),
+  etapa: text("etapa").notNull().default("fazer_contato"),
+  valorRNegociacao: decimal("valor_r_negociacao", { precision: 12, scale: 2 }).default("0"),
+  valorPNegociacao: decimal("valor_p_negociacao", { precision: 12, scale: 2 }).default("0"),
+  cxResponsavel: text("cx_responsavel").notNull(),
+  ultimoContato: date("ultimo_contato"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type CrosssellOportunidade = typeof crosssellOportunidades.$inferSelect;
+export type InsertCrosssellOportunidade = typeof crosssellOportunidades.$inferInsert;
+
+export const crosssellComentarios = cortexCoreSchema.table("crosssell_comentarios", {
+  id: serial("id").primaryKey(),
+  oportunidadeId: integer("oportunidade_id").notNull(),
+  autor: text("autor").notNull(),
+  texto: text("texto").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type CrosssellComentario = typeof crosssellComentarios.$inferSelect;
+
+export const crosssellNegociosGanhos = cortexCoreSchema.table("crosssell_negocios_ganhos", {
+  id: serial("id").primaryKey(),
+  oportunidadeId: integer("oportunidade_id").notNull(),
+  clienteNome: text("cliente_nome").notNull(),
+  cnpj: text("cnpj").notNull(),
+  valorR: decimal("valor_r", { precision: 12, scale: 2 }).notNull(),
+  valorP: decimal("valor_p", { precision: 12, scale: 2 }).notNull(),
+  cxResponsavel: text("cx_responsavel").notNull(),
+  operacao: text("operacao").array().notNull(),
+  produto: text("produto").notNull(),
+  mesGanho: date("mes_ganho").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type CrosssellNegocioGanho = typeof crosssellNegociosGanhos.$inferSelect;
+
+export const crosssellEtapaLog = cortexCoreSchema.table("crosssell_etapa_log", {
+  id: serial("id").primaryKey(),
+  oportunidadeId: integer("oportunidade_id").notNull(),
+  etapaAnterior: text("etapa_anterior").notNull(),
+  etapaNova: text("etapa_nova").notNull(),
+  alteradoPor: text("alterado_por").notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type CrosssellEtapaLog = typeof crosssellEtapaLog.$inferSelect;
+
+// Triagem Inteligente - Análise de risco pré-onboarding
+export const triagemAnalises = cortexCoreSchema.table("triagem_analises", {
+  id: serial("id").primaryKey(),
+  clienteId: text("cliente_id"),
+  clienteNome: text("cliente_nome").notNull(),
+  squad: text("squad"),
+  vendedor: text("vendedor"),
+  produto: text("produto"),
+  valorContrato: decimal("valor_contrato", { precision: 12, scale: 2 }),
+  transcricaoUrl: text("transcricao_url"),
+  transcricaoTexto: text("transcricao_texto"),
+  score: text("score"),
+  scoreNumerico: integer("score_numerico"),
+  analiseJson: jsonb("analise_json"),
+  status: text("status").notNull().default("pendente"),
+  decisaoPor: text("decisao_por"),
+  decisaoObservacoes: text("decisao_observacoes"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type TriagemAnalise = typeof triagemAnalises.$inferSelect;
+export type InsertTriagemAnalise = typeof triagemAnalises.$inferInsert;

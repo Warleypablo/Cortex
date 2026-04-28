@@ -208,7 +208,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const credentialsResult = await db.execute(sql`
         SELECT * FROM cortex_core.credentials WHERE client_id::text = ANY(${idsArray}::text[]) ORDER BY platform
       `);
-      
+
       const credentialsByClientId = new Map<string, any[]>();
       for (const cred of credentialsResult.rows) {
         const clientId = String((cred as any).client_id);
@@ -217,12 +217,12 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
         }
         credentialsByClientId.get(clientId)!.push(mapCredential(cred));
       }
-      
+
       const result = clientsResult.rows.map((client: any) => ({
         ...mapClient(client),
         credentials: credentialsByClientId.get(String(client.id)) || []
       }));
-      
+
       res.json(result);
     } catch (error) {
       console.error("[api] Error fetching batch clients:", error);
@@ -285,9 +285,11 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       `);
       
       const client = clientResult.rows[0] as any;
+      const credentials = credentialsResult.rows.map(mapCredential);
+
       res.json({
         ...mapClient(client),
-        credentials: credentialsResult.rows.map(mapCredential)
+        credentials
       });
     } catch (error) {
       console.error("[api] Error fetching client:", error);
@@ -876,6 +878,7 @@ export async function registerAcessosRoutes(app: Express, db: any, storage: ISto
       const result = await db.execute(sql`
         SELECT * FROM cortex_core.credentials WHERE client_id::text = ${clientId} ORDER BY platform
       `);
+
       res.json(result.rows.map(mapCredential));
     } catch (error) {
       console.error("[api] Error fetching credentials:", error);

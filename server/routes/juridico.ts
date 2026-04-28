@@ -175,19 +175,26 @@ export function registerJuridicoRoutes(app: Express) {
       // Esses clientes têm contexto jurídico mas não estão mais inadimplentes
       
       // Buscar nomes reais dos clientes históricos
-      const nomesClientesHistoricos: Record<string, { nome: string; empresa: string }> = {};
+      const nomesClientesHistoricos: Record<string, { nome: string; empresa: string; email: string | null; endereco: string | null }> = {};
       if (idsHistoricoNaoInadimplentes.length > 0) {
         const nomesResult = await db.execute(sql`
           SELECT DISTINCT ON (TRIM(ids::text))
             TRIM(ids::text) as id_cliente,
             nome,
-            COALESCE(empresa, '') as empresa
+            COALESCE(empresa, '') as empresa,
+            email,
+            endereco
           FROM "Conta Azul".caz_clientes
           WHERE ids IS NOT NULL AND TRIM(ids::text) = ANY(${idsHistoricoNaoInadimplentes})
           ORDER BY TRIM(ids::text)
         `);
         for (const row of nomesResult.rows as any[]) {
-          nomesClientesHistoricos[row.id_cliente] = { nome: row.nome || '', empresa: row.empresa || '' };
+          nomesClientesHistoricos[row.id_cliente] = {
+            nome: row.nome || '',
+            empresa: row.empresa || '',
+            email: row.email || null,
+            endereco: row.endereco || null,
+          };
         }
       }
       
@@ -222,6 +229,8 @@ export function registerJuridicoRoutes(app: Express) {
               diasAtrasoMax: 0,
               empresa: empresaReal,
               cnpj: null,
+              email: clienteInfo?.email || null,
+              endereco: clienteInfo?.endereco || null,
               statusClickup: null,
               responsavel: null,
               cluster: null,

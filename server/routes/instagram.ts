@@ -12,6 +12,7 @@ import {
   exchangeCodeForToken,
   syncProfile,
   syncInsights,
+  syncInsightsHistorical,
   syncMedia,
   syncMediaInsights,
   revokeAccess,
@@ -366,14 +367,34 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       }
 
       // 2. Sync insights
-      let reachDay = 0;
-      let impressionsDay = 0;
+      let reachDay = 0, impressionsDay = 0, viewsDay = 0;
+      let followsDay = 0, unfollowsDay = 0;
+      let accountsEngaged = 0, totalInteractions = 0;
+      let likesDay = 0, commentsDay = 0, savesDay = 0, sharesDay = 0;
+      let profileLinksTaps = 0;
+      let profileViews = 0, websiteClicks = 0;
       try {
         const insights = await syncInsights(conn.igUserId, token);
         for (const metric of insights) {
-          if (metric.name === "reach") reachDay = metric.values?.[0]?.value || 0;
-          if (metric.name === "impressions") impressionsDay = metric.values?.[0]?.value || 0;
+          // Support both total_value format and time_series values format
+          const value = metric.total_value?.value ?? metric.values?.[0]?.value ?? 0;
+          if (metric.name === "reach") reachDay = value;
+          if (metric.name === "views") { viewsDay = value; impressionsDay = value; }
+          if (metric.name === "follows_and_unfollows") {
+            if (value >= 0) { followsDay = value; unfollowsDay = 0; }
+            else { followsDay = 0; unfollowsDay = Math.abs(value); }
+          }
+          if (metric.name === "accounts_engaged") accountsEngaged = value;
+          if (metric.name === "total_interactions") totalInteractions = value;
+          if (metric.name === "likes") likesDay = value;
+          if (metric.name === "comments") commentsDay = value;
+          if (metric.name === "saves") savesDay = value;
+          if (metric.name === "shares") sharesDay = value;
+          if (metric.name === "profile_links_taps") profileLinksTaps = value;
+          if (metric.name === "profile_views") profileViews = value;
+          if (metric.name === "website_clicks") websiteClicks = value;
         }
+        console.log("[Instagram] Insights extracted: reach=", reachDay, "impressions=", impressionsDay, "views=", viewsDay, "follows=", followsDay, "engaged=", accountsEngaged);
       } catch (insightsErr: any) {
         console.warn("[Instagram] Insights sync partial failure:", insightsErr.message);
       }
@@ -389,6 +410,18 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           postsCount: profile.media_count || 0,
           reachDay,
           impressionsDay,
+          followsDay,
+          unfollowsDay,
+          viewsDay,
+          accountsEngaged,
+          totalInteractions,
+          likesDay,
+          commentsDay,
+          savesDay,
+          sharesDay,
+          profileLinksTaps,
+          profileViews,
+          websiteClicks,
         })
         .onConflictDoUpdate({
           target: [instagramMetricsSnapshots.connectionId, instagramMetricsSnapshots.metricDate],
@@ -398,17 +431,108 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             postsCount: sql`EXCLUDED.posts_count`,
             reachDay: sql`EXCLUDED.reach_day`,
             impressionsDay: sql`EXCLUDED.impressions_day`,
+            followsDay: sql`EXCLUDED.follows_day`,
+            unfollowsDay: sql`EXCLUDED.unfollows_day`,
+            viewsDay: sql`EXCLUDED.views_day`,
+            accountsEngaged: sql`EXCLUDED.accounts_engaged`,
+            totalInteractions: sql`EXCLUDED.total_interactions`,
+            likesDay: sql`EXCLUDED.likes_day`,
+            commentsDay: sql`EXCLUDED.comments_day`,
+            savesDay: sql`EXCLUDED.saves_day`,
+            sharesDay: sql`EXCLUDED.shares_day`,
+            profileLinksTaps: sql`EXCLUDED.profile_links_taps`,
+            profileViews: sql`EXCLUDED.profile_views`,
+            websiteClicks: sql`EXCLUDED.website_clicks`,
             recordedAt: sql`NOW()`,
           },
         });
 
+      // 3b. Sync historical daily insights (last 30 days)
+      try {
+        const historical = await syncInsightsHistorical(conn.igUserId, token, 30);
+
+        // follower_count in time_series is daily delta, not absolute.
+        // Reconstruct absolute values: current total - sum of future deltas
+        const currentFollowers = profile.followers_count || 0;
+        let cumulativeDelta = 0;
+        // Process in reverse (most recent first) to build absolute values
+        const reversedHistory = [...historical].reverse();
+        const absoluteFollowers: Record<string, number> = {};
+        for (const day of reversedHistory) {
+          absoluteFollowers[day.date] = currentFollowers - cumulativeDelta;
+          cumulativeDelta += day.followers; // followers here is daily delta
+        }
+
+        for (const day of historical) {
+          await db
+            .insert(instagramMetricsSnapshots)
+            .values({
+              connectionId: id,
+              metricDate: day.date,
+              followers: absoluteFollowers[day.date] || currentFollowers,
+              following: profile.follows_count || 0,
+              postsCount: profile.media_count || 0,
+              reachDay: day.reach,
+              impressionsDay: day.views,
+              followsDay: day.followsDay,
+              unfollowsDay: day.unfollowsDay,
+              viewsDay: day.views,
+              accountsEngaged: day.accountsEngaged,
+              totalInteractions: day.totalInteractions,
+              likesDay: day.likesDay,
+              commentsDay: day.commentsDay,
+              savesDay: day.savesDay,
+              sharesDay: day.sharesDay,
+              profileLinksTaps: day.profileLinksTaps,
+            })
+            .onConflictDoUpdate({
+              target: [instagramMetricsSnapshots.connectionId, instagramMetricsSnapshots.metricDate],
+              set: {
+                followers: sql`EXCLUDED.followers`,
+                reachDay: sql`EXCLUDED.reach_day`,
+                impressionsDay: sql`EXCLUDED.impressions_day`,
+                followsDay: sql`EXCLUDED.follows_day`,
+                unfollowsDay: sql`EXCLUDED.unfollows_day`,
+                viewsDay: sql`EXCLUDED.views_day`,
+                accountsEngaged: sql`EXCLUDED.accounts_engaged`,
+                totalInteractions: sql`EXCLUDED.total_interactions`,
+                likesDay: sql`EXCLUDED.likes_day`,
+                commentsDay: sql`EXCLUDED.comments_day`,
+                savesDay: sql`EXCLUDED.saves_day`,
+                sharesDay: sql`EXCLUDED.shares_day`,
+                profileLinksTaps: sql`EXCLUDED.profile_links_taps`,
+                recordedAt: sql`NOW()`,
+              },
+            });
+        }
+        console.log("[Instagram] Historical snapshots saved:", historical.length, "days");
+      } catch (histErr: any) {
+        console.warn("[Instagram] Historical insights error:", histErr.message);
+      }
+
       // 4. Sync media
-      const mediaItems = await syncMedia(conn.igUserId, token);
+      let mediaItems: any[] = [];
+      try {
+        mediaItems = await syncMedia(conn.igUserId, token);
+        console.log("[Instagram] Media fetched:", mediaItems.length, "items");
+      } catch (mediaErr: any) {
+        console.error("[Instagram] Media sync error:", mediaErr.message);
+      }
       let postsUpserted = 0;
 
       for (const item of mediaItems) {
-        // 5. Get per-post insights
-        const postInsights = await syncMediaInsights(item.id, token, item.media_type);
+        // 5. Get per-post insights (skip to avoid long sync times — use basic metrics from media endpoint)
+        let postInsights: Record<string, number> = {};
+        try {
+          postInsights = await syncMediaInsights(item.id, token, item.media_type);
+        } catch {
+          // Use basic metrics from media response as fallback
+        }
+
+        const likes = postInsights.likes ?? item.like_count ?? 0;
+        const comments = postInsights.comments ?? item.comments_count ?? 0;
+        const saves = postInsights.saved ?? 0;
+        const shares = postInsights.shares ?? 0;
 
         await db
           .insert(instagramPostMetrics)
@@ -420,14 +544,14 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
             permalink: item.permalink,
             thumbnailUrl: item.thumbnail_url || null,
             postedAt: item.timestamp ? new Date(item.timestamp) : null,
-            likes: postInsights.likes ?? item.like_count ?? 0,
-            comments: postInsights.comments ?? item.comments_count ?? 0,
-            saves: postInsights.saved ?? 0,
-            shares: postInsights.shares ?? 0,
-            impressions: postInsights.impressions ?? 0,
+            likes,
+            comments,
+            saves,
+            shares,
+            impressions: postInsights.views ?? postInsights.impressions ?? 0,
             reach: postInsights.reach ?? 0,
-            plays: postInsights.plays ?? 0,
-            totalInteractions: postInsights.total_interactions ?? 0,
+            plays: postInsights.views ?? postInsights.plays ?? 0,
+            totalInteractions: postInsights.total_interactions ?? (likes + comments + saves + shares),
             lastSyncedAt: new Date(),
           })
           .onConflictDoUpdate({
@@ -465,7 +589,7 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           following: profile.follows_count,
           posts: profile.media_count,
         },
-        metricsSnapshot: { reachDay, impressionsDay },
+        metricsSnapshot: { reachDay, impressionsDay, profileViews, websiteClicks },
         postsUpserted,
       });
     } catch (err: any) {
@@ -526,20 +650,32 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ error: "Invalid connection ID" });
 
-      const days = parseInt(req.query.days as string, 10) || 90;
-      const sinceDate = new Date();
-      sinceDate.setDate(sinceDate.getDate() - days);
-      const sinceDateStr = sinceDate.toISOString().split("T")[0];
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+
+      let sinceDateStr: string;
+      if (startDate) {
+        sinceDateStr = startDate;
+      } else {
+        const days = parseInt(req.query.days as string, 10) || 90;
+        const sinceDate = new Date();
+        sinceDate.setDate(sinceDate.getDate() - days);
+        sinceDateStr = sinceDate.toISOString().split("T")[0];
+      }
+
+      const conditions = [
+        eq(instagramMetricsSnapshots.connectionId, id),
+        sql`${instagramMetricsSnapshots.metricDate} >= ${sinceDateStr}::date`,
+      ];
+
+      if (endDate) {
+        conditions.push(sql`${instagramMetricsSnapshots.metricDate} <= ${endDate}::date`);
+      }
 
       const rows = await db
         .select()
         .from(instagramMetricsSnapshots)
-        .where(
-          and(
-            eq(instagramMetricsSnapshots.connectionId, id),
-            gte(instagramMetricsSnapshots.metricDate, sinceDateStr),
-          ),
-        )
+        .where(and(...conditions))
         .orderBy(instagramMetricsSnapshots.metricDate);
 
       return res.json(rows);
@@ -559,11 +695,22 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       if (isNaN(id)) return res.status(400).json({ error: "Invalid connection ID" });
 
       const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+
+      const conditions = [eq(instagramPostMetrics.connectionId, id)];
+
+      if (startDate) {
+        conditions.push(sql`${instagramPostMetrics.postedAt} >= ${startDate}::timestamp`);
+      }
+      if (endDate) {
+        conditions.push(sql`${instagramPostMetrics.postedAt} <= ${endDate}::timestamp`);
+      }
 
       const rows = await db
         .select()
         .from(instagramPostMetrics)
-        .where(eq(instagramPostMetrics.connectionId, id))
+        .where(and(...conditions))
         .orderBy(desc(instagramPostMetrics.postedAt))
         .limit(limit);
 

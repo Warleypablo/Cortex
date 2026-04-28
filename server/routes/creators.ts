@@ -89,7 +89,7 @@ async function ensureCreatorsTables() {
 // ── PDF Generation ────────────────────────────────────────────────────────────
 
 export interface ContratoCreatorPDFData {
-  creator: { nome: string; cpf: string | null; cnpj: string | null; email?: string; endereco: string | null; cidade: string | null; estado: string | null; cep: string | null };
+  creator: { nome: string; cpf: string | null; cnpj: string | null; email?: string; endereco: string | null };
   contrato: { cargo: string; descricao_servicos: string; valor_remuneracao: string; duracao_meses: number; data_inicio: string; data_fim: string; qtd_videos?: number; qtd_variacoes_gancho?: number; unidade_prazo?: string; cliente_nome?: string; prazo_entrega_dias?: number };
 }
 
@@ -146,11 +146,7 @@ export async function gerarContratoCreatorPDF({ creator, contrato }: ContratoCre
   if (creator.cpf) contratadaParts.push(`CPF ${creator.cpf}`);
   if (creator.cnpj) contratadaParts.push(`CNPJ ${creator.cnpj}`);
   if (creator.endereco) {
-    const endParts = [creator.endereco];
-    if (creator.cidade) endParts.push(creator.cidade);
-    if (creator.estado) endParts.push(creator.estado);
-    if (creator.cep) endParts.push(`CEP ${creator.cep}`);
-    contratadaParts.push(`com endereço em ${endParts.join(', ')}`);
+    contratadaParts.push(`com endereço em ${creator.endereco}`);
   }
   if (creator.email) contratadaParts.push(`e-mail ${creator.email}`);
   p(`${contratadaParts.join(', ')};`, { spacing: 1 });
@@ -417,9 +413,10 @@ export function registerCreatorsRoutes(app: Express) {
         SELECT cc.*, cr.nome AS creator_nome, cr.email AS creator_email
         FROM cortex_core.contratos_creators cc
         JOIN cortex_core.creators cr ON cr.id = cc.creator_id
+        WHERE cc.status != 'excluido'
       `;
       if (statusFilter) {
-        query += ` WHERE cc.status = '${statusFilter.replace(/'/g, "''")}'`;
+        query += ` AND cc.status = '${statusFilter.replace(/'/g, "''")}'`;
       }
       query += ` ORDER BY cc.criado_em DESC`;
       const result = await db.execute(sql.raw(query));
@@ -534,9 +531,6 @@ export function registerCreatorsRoutes(app: Express) {
       if ((tipo_pessoa === 'fisica' || tipo_pessoa === 'ambos') && !cpf) return res.status(400).json({ error: "CPF é obrigatório para pessoa física" });
       if ((tipo_pessoa === 'juridica' || tipo_pessoa === 'ambos') && !cnpj) return res.status(400).json({ error: "CNPJ é obrigatório para pessoa jurídica" });
       if (!endereco) return res.status(400).json({ error: "Endereço é obrigatório" });
-      if (!cidade) return res.status(400).json({ error: "Cidade é obrigatória" });
-      if (!estado) return res.status(400).json({ error: "UF é obrigatório" });
-      if (!cep) return res.status(400).json({ error: "CEP é obrigatório" });
       if (!tipo_pix) return res.status(400).json({ error: "Tipo PIX é obrigatório" });
       if (!chave_pix) return res.status(400).json({ error: "Chave PIX é obrigatória" });
 
@@ -610,7 +604,7 @@ export function registerCreatorsRoutes(app: Express) {
     try {
       const creatorId = parseInt(req.params.id);
       const result = await db.execute(sql`
-        SELECT * FROM cortex_core.contratos_creators WHERE creator_id = ${creatorId} ORDER BY criado_em DESC
+        SELECT * FROM cortex_core.contratos_creators WHERE creator_id = ${creatorId} AND status != 'excluido' ORDER BY criado_em DESC
       `);
       res.json(result.rows);
     } catch (error: any) {
@@ -687,7 +681,7 @@ export function registerCreatorsRoutes(app: Express) {
 
       const row = result.rows[0] as any;
       const pdfBuffer = await gerarContratoCreatorPDF({
-        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco, cidade: row.cidade, estado: row.estado, cep: row.cep },
+        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco },
         contrato: {
           cargo: row.cargo || 'prestador de serviços',
           descricao_servicos: row.descricao_servicos || 'conforme acordado entre as partes',
@@ -751,7 +745,7 @@ export function registerCreatorsRoutes(app: Express) {
       const [FormDataModule] = await Promise.all([import('form-data')]);
 
       const pdfBuffer = await gerarContratoCreatorPDF({
-        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco, cidade: row.cidade, estado: row.estado, cep: row.cep },
+        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco },
         contrato: {
           cargo: row.cargo || 'prestador de serviços',
           descricao_servicos: row.descricao_servicos || 'conforme acordado entre as partes',
@@ -927,14 +921,17 @@ export function registerCreatorsRoutes(app: Express) {
       const rawSigners = Array.isArray(assignment.signers) ? assignment.signers : [];
       const items = Array.isArray(assignment.items) ? assignment.items : [];
 
-      // Build signer list with completion status from items
+      const signingUrls = Array.isArray(assignment.signing_urls) ? assignment.signing_urls : [];
+
+      // Build signer list with completion status and signing URL
       const signers = rawSigners.map((s: any) => {
         const item = items.find((it: any) => it.signer?.id === s.id);
         const signed = item?.completed === true || item?.value === 'SIGNED';
+        const signingEntry = signingUrls.find((su: any) => su.signer_id === s.id);
         return {
           name: s.full_name || '',
           email: s.email || '',
-          url: '',
+          url: signingEntry?.url || '',
           status: signed ? 'signed' : 'pending',
         };
       });
@@ -942,7 +939,7 @@ export function registerCreatorsRoutes(app: Express) {
       const creatorSigner = signers.find((s: any) => s.email?.toLowerCase() === data.creator_email?.toLowerCase());
 
       res.json({
-        url: creatorSigner?.url || signers[0]?.url || '',
+        url: creatorSigner?.url || signers[0]?.url || doc.signing_url || '',
         signers,
       });
     } catch (error: any) {
@@ -1057,6 +1054,66 @@ export function registerCreatorsRoutes(app: Express) {
       res.json({ token, url: `${baseUrl}/portal/creator?token=${token}` });
     } catch (error: any) {
       console.error("[creators] Erro ao gerar token:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // DELETE /api/creators/contratos/:id — Soft delete contrato + excluir no Assinafy
+  app.delete("/api/creators/contratos/:id", async (req, res) => {
+    const contratoId = parseInt(req.params.id);
+
+    try {
+      // Buscar contrato
+      const result = await db.execute(sql`
+        SELECT id, status, assinafy_document_id FROM cortex_core.contratos_creators WHERE id = ${contratoId}
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+
+      const contrato = result.rows[0] as any;
+
+      // Se tem documento no Assinafy, tentar excluir lá
+      if (contrato.assinafy_document_id) {
+        try {
+          const configResult = await db.execute(sql`
+            SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'creators' LIMIT 1
+          `);
+
+          if (configResult.rows.length > 0) {
+            const config = configResult.rows[0] as { api_key: string; api_url: string };
+            const deleteUrl = `${config.api_url}/documents/${contrato.assinafy_document_id}`;
+            console.log(`[creators] Deleting Assinafy document: ${contrato.assinafy_document_id}`);
+
+            const response = await fetch(deleteUrl, {
+              method: "DELETE",
+              headers: { "X-Api-Key": config.api_key },
+            });
+
+            if (response.ok) {
+              console.log(`[creators] Assinafy document deleted successfully`);
+            } else {
+              const errorText = await response.text();
+              console.error(`[creators] Assinafy delete failed (${response.status}): ${errorText}`);
+              // Continue with local soft delete even if Assinafy fails
+            }
+          }
+        } catch (err) {
+          console.error("[creators] Error deleting from Assinafy:", err);
+          // Continue with local soft delete
+        }
+      }
+
+      // Soft delete local
+      await db.execute(sql`
+        UPDATE cortex_core.contratos_creators SET status = 'excluido' WHERE id = ${contratoId}
+      `);
+
+      console.log(`[creators] Contrato ${contratoId} excluído (soft delete)`);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[creators] Erro ao excluir contrato:", error);
       res.status(500).json({ error: error.message });
     }
   });

@@ -1,7 +1,7 @@
 import { useState, useMemo, Fragment, useEffect } from "react";
 import { usePersistentFilters } from "@/hooks/use-persistent-filters";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import type { Client, Credential, InsertClient, InsertCredential, AccessLog, ClientStatus } from "@shared/schema";
 import { insertClientSchema, insertCredentialSchema } from "@shared/schema";
@@ -80,6 +80,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 
 type ClientWithCredentialCount = Client & { credential_count: number; cazClienteId?: number | null; platforms?: string[] };
 type ClientWithCredentials = Client & { credentials: Credential[] };
@@ -1189,13 +1190,13 @@ function EditCredentialDialog({
   );
 }
 
-function CredentialRow({ 
-  credential, 
+function CredentialRow({
+  credential,
   clientId,
   clientName,
-  onEdit, 
-  onDelete 
-}: { 
+  onEdit,
+  onDelete,
+}: {
   credential: Credential;
   clientId: string;
   clientName: string;
@@ -1230,9 +1231,9 @@ function CredentialRow({
       clientId,
       clientName,
     });
-    toast({ 
-      title: "Copiado!", 
-      description: "Senha copiada para a área de transferência" 
+    toast({
+      title: "Copiado!",
+      description: "Senha copiada para a área de transferência"
     });
   };
 

@@ -14,4 +14,4 @@ credentials/
 *.pem
 .superpowers/
 contracts.db/
-attached_assets/*.csv
+attached_assets/

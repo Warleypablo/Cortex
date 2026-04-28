@@ -174,7 +174,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
               {tipos.map(tipo => (
                 <div key={tipo} className="flex items-center gap-1">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getColor(tipo) }} />
-                  <span className="text-[9px] text-zinc-400">{tipo}</span>
+                  <span className="text-xs text-zinc-400">{tipo}</span>
                 </div>
               ))}
             </div>
@@ -252,7 +252,7 @@ export default function SlideAreaTech({ techData, mesLabel }: Props) {
               {tipos.map(tipo => (
                 <div key={tipo} className="flex items-center gap-1">
                   <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getColor(tipo) }} />
-                  <span className="text-[9px] text-zinc-400">{tipo}</span>
+                  <span className="text-xs text-zinc-400">{tipo}</span>
                 </div>
               ))}
             </div>
