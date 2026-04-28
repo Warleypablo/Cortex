@@ -11721,9 +11721,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       }));
 
       res.json(items);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[unavailability-today] Error fetching today list:", error);
-      res.status(500).json({ error: "Failed to fetch unavailability today" });
+      res.status(500).json({ error: error.message || "Erro ao buscar indisponibilidades de hoje" });
     }
   });
 
