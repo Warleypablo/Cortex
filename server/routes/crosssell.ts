@@ -11,7 +11,7 @@ export function registerCrossSellRoutes(app: Express) {
     try {
       const { cluster, cx, etapa, produto } = req.query;
 
-      const conditions: string[] = [`o.etapa NOT IN ('ganho', 'descartado')`];
+      const conditions: string[] = [`o.etapa != 'ganho'`];
       const params: any[] = [];
 
       if (cluster && typeof cluster === "string") {
