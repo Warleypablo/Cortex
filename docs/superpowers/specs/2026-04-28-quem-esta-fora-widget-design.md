@@ -74,7 +74,7 @@ type QuemEstaForaItem = {
 Estrutura:
 ```tsx
 type Props = {
-  userPhotos?: Record<number, string>; // colaboradorId → URL da foto
+  userPhotos: Record<string, string>; // email (lowercased) → URL da foto
 };
 
 function QuemEstaForaWidget({ userPhotos }: Props) {
