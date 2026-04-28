@@ -329,6 +329,21 @@ export default function CrossSellPipeline() {
     },
   });
 
+  const changeValor = useMutation({
+    mutationFn: async ({ id, field, value }: { id: number; field: "valorRNegociacao" | "valorPNegociacao"; value: number }) => {
+      const res = await fetch(`/api/comercial/crosssell/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value, alteradoPor: user?.name }),
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar valor");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/comercial/crosssell"] });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -456,6 +471,7 @@ export default function CrossSellPipeline() {
             onNewOpForEtapa={(e) => setNewOpEtapa(e)}
             ordenacao={ordenacao}
             onChangeEtapa={(opId, e) => changeEtapa.mutate({ id: opId, etapa: e })}
+            onChangeValor={(opId, field, value) => changeValor.mutate({ id: opId, field, value })}
             onGanho={(op) => {
               const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
               if (grupo) setGanhoCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
@@ -516,6 +532,7 @@ function EtapaSection({
   onNewOpForEtapa,
   ordenacao,
   onChangeEtapa,
+  onChangeValor,
   onGanho,
   onComments,
 }: {
@@ -526,6 +543,7 @@ function EtapaSection({
   onNewOpForEtapa: (etapa: Etapa) => void;
   ordenacao: "score" | "mrr" | "recente" | "nome";
   onChangeEtapa: (opId: number, etapa: string) => void;
+  onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
   onGanho: (op: Oportunidade) => void;
   onComments: (op: Oportunidade) => void;
 }) {
@@ -582,6 +600,7 @@ function EtapaSection({
               cliente={cliente}
               oportunidadesFiltradas={oportunidades}
               onChangeEtapa={onChangeEtapa}
+              onChangeValor={onChangeValor}
               onGanho={onGanho}
               onComments={onComments}
             />
@@ -600,12 +619,14 @@ function ClienteCard({
   cliente,
   oportunidadesFiltradas,
   onChangeEtapa,
+  onChangeValor,
   onGanho,
   onComments,
 }: {
   cliente: ClienteCrossSell;
   oportunidadesFiltradas?: Oportunidade[];
   onChangeEtapa: (opId: number, etapa: string) => void;
+  onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
   onGanho: (op: Oportunidade) => void;
   onComments: (op: Oportunidade) => void;
 }) {
@@ -677,6 +698,7 @@ function ClienteCard({
                 key={op.id}
                 op={op}
                 onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
+                onChangeValor={(field, value) => onChangeValor(op.id, field, value)}
                 onGanho={() => onGanho(op)}
                 onComments={() => onComments(op)}
               />
@@ -689,23 +711,91 @@ function ClienteCard({
 }
 
 // ---------------------------------------------------------------------------
+// InlineValorInput — input numerico inline (somente leitura quando nao editavel)
+// ---------------------------------------------------------------------------
+
+function InlineValorInput({
+  label,
+  value,
+  editable,
+  onSave,
+}: {
+  label: string;
+  value: number | null;
+  editable: boolean;
+  onSave: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string>(value != null ? String(value) : "");
+
+  useEffect(() => {
+    setDraft(value != null ? String(value) : "");
+  }, [value]);
+
+  if (!editable) {
+    return (
+      <span className="text-xs text-gray-500 dark:text-zinc-500 whitespace-nowrap">
+        <span className="text-gray-400 dark:text-zinc-600">{label}:</span>{" "}
+        {formatCurrencyCompact(value)}
+      </span>
+    );
+  }
+
+  const commit = () => {
+    const cleaned = draft.replace(/\./g, "").replace(",", ".").trim();
+    const parsed = cleaned === "" ? 0 : Number(cleaned);
+    if (!Number.isFinite(parsed)) {
+      setDraft(value != null ? String(value) : "");
+      return;
+    }
+    if (parsed === (value ?? 0)) return;
+    onSave(parsed);
+  };
+
+  return (
+    <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-zinc-400 whitespace-nowrap">
+      <span className="text-gray-400 dark:text-zinc-500">{label}:</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") {
+            setDraft(value != null ? String(value) : "");
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-16 px-1 py-0.5 bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-zinc-600 focus:border-blue-400 dark:focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 rounded text-xs text-right outline-none"
+        placeholder="0"
+      />
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // OportunidadeRow
 // ---------------------------------------------------------------------------
 
 function OportunidadeRow({
   op,
   onChangeEtapa,
+  onChangeValor,
   onGanho,
   onComments,
 }: {
   op: Oportunidade;
   onChangeEtapa: (etapa: string) => void;
+  onChangeValor: (field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
   onGanho: () => void;
   onComments: () => void;
 }) {
   const etapa = op.etapa as Etapa;
   const isSugerido = etapa === "sugerido_sistema";
   const isDescartado = etapa === "descartado";
+  const valoresEditaveis = !isSugerido && !isDescartado;
 
   // Cor da bolinha: prioridade (se sistema) ou neutra (manual)
   const dotColor = isSugerido && op.prioridade
@@ -740,9 +830,18 @@ function OportunidadeRow({
           </SelectContent>
         </Select>
 
-        <span className="text-xs text-gray-600 dark:text-zinc-400 w-14 text-right">
-          {formatCurrencyCompact(op.valorRNegociacao)}
-        </span>
+        <InlineValorInput
+          label="R"
+          value={op.valorRNegociacao}
+          editable={valoresEditaveis}
+          onSave={(v) => onChangeValor("valorRNegociacao", v)}
+        />
+        <InlineValorInput
+          label="P"
+          value={op.valorPNegociacao}
+          editable={valoresEditaveis}
+          onSave={(v) => onChangeValor("valorPNegociacao", v)}
+        />
 
         <button
           className="text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 flex items-center gap-0.5 text-xs"
