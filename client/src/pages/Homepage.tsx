@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { formatCurrency, formatCurrencyCompact, formatPercent } from "@/lib/utils";
 import { KpiCardGrid } from "@/components/ui/charts";
 import type { KpiCard } from "@/components/ui/charts";
+import { QuemEstaForaWidget } from "@/components/QuemEstaForaWidget";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -32,7 +33,6 @@ import {
   ShieldCheck,
   Briefcase,
   Calendar,
-  MapPin,
   ExternalLink,
   Bell,
   FileText,
@@ -92,15 +92,6 @@ interface HomeOverview {
     contratosAtivos: number;
     produto: string;
     squad: string;
-  }>;
-  proximosEventos: Array<{
-    id: number;
-    titulo: string;
-    tipo: string;
-    dataInicio: string;
-    dataFim: string | null;
-    local: string | null;
-    cor: string | null;
   }>;
   alertas: Array<{
     tipo: 'cobranca_vencida' | 'contrato_vencendo' | 'cliente_risco';
@@ -233,80 +224,6 @@ function AvisosCarousel({ avisos }: { avisos: Aviso[] }) {
         )}
       </div>
     </div>
-  );
-}
-
-function MiniCalendar({ eventos }: { eventos: HomeOverview['proximosEventos'] }) {
-  if (eventos.length === 0) {
-    return (
-      <Card data-testid="card-mini-calendar" className="h-full flex flex-col">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              Próximos Eventos
-            </CardTitle>
-            <Link href="/calendario">
-              <Button variant="ghost" size="sm" data-testid="button-ver-calendario">
-                Ver todos
-                <ExternalLink className="w-3 h-3 ml-1" />
-              </Button>
-            </Link>
-          </div>
-        </CardHeader>
-        <CardContent className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground text-center py-8">
-            Nenhum evento nos próximos 30 dias
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card data-testid="card-mini-calendar" className="h-full flex flex-col">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            Próximos Eventos
-          </CardTitle>
-          <Link href="/calendario">
-            <Button variant="ghost" size="sm" data-testid="button-ver-calendario">
-              Ver todos
-              <ExternalLink className="w-3 h-3 ml-1" />
-            </Button>
-          </Link>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3 flex-1 overflow-auto">
-        {eventos.map((evento) => (
-          <div 
-            key={evento.id} 
-            className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-            data-testid={`event-item-${evento.id}`}
-          >
-            <div 
-              className="w-1 h-full min-h-[48px] rounded-full" 
-              style={{ backgroundColor: evento.cor || '#3b82f6' }}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{evento.titulo}</p>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                <Clock className="w-3.5 h-3.5" />
-                {format(parseISO(evento.dataInicio), "dd MMM, HH:mm", { locale: ptBR })}
-              </div>
-              {evento.local && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span className="truncate">{evento.local}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -901,7 +818,7 @@ function DashboardAdmin() {
           contratosAtivos={homeOverview?.contratosAtivos || 0}
         />
         <AlertasWidget alertas={homeOverview?.alertas || []} />
-        <MiniCalendar eventos={homeOverview?.proximosEventos || []} />
+        <QuemEstaForaWidget userPhotos={userPhotos} />
         <AniversariantesWidget aniversariantes={aniversariantes || []} userPhotos={userPhotos} />
       </div>
 
