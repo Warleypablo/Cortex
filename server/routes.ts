@@ -11677,19 +11677,18 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const result = await db.execute(sql`
         SELECT
           ur.id,
-          ur.colaborador_id,
           ur.colaborador_nome,
           ur.colaborador_email,
           ur.data_fim
         FROM cortex_core.unavailability_requests ur
-        WHERE ur.status = 'aprovado'
+        WHERE ur.status_rh = 'aprovado'
+          AND ur.status_lider = 'aprovado'
           AND CURRENT_DATE BETWEEN ur.data_inicio AND ur.data_fim
         ORDER BY ur.colaborador_nome ASC
       `);
 
       const items = result.rows.map((row: any) => ({
         id: row.id,
-        colaboradorId: row.colaborador_id,
         nome: row.colaborador_nome,
         email: row.colaborador_email,
         dataFim: row.data_fim,
@@ -11698,7 +11697,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       res.json(items);
     } catch (error: any) {
       console.error("[unavailability-today] Error fetching today list:", error);
-      res.status(500).json({ error: error.message || "Erro ao buscar indisponibilidades de hoje" });
+      res.json([]);
     }
   });
 

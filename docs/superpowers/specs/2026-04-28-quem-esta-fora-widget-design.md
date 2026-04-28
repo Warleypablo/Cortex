@@ -44,22 +44,25 @@ Substituir o widget "Próximos Eventos" por um widget **"Quem está fora hoje"**
 ```sql
 SELECT
   ur.id,
-  ur.colaborador_id,
   ur.colaborador_nome,
+  ur.colaborador_email,
   ur.data_fim
 FROM cortex_core.unavailability_requests ur
-WHERE ur.status = 'aprovado'
+WHERE ur.status_rh = 'aprovado'
+  AND ur.status_lider = 'aprovado'
   AND CURRENT_DATE BETWEEN ur.data_inicio AND ur.data_fim
 ORDER BY ur.colaborador_nome ASC;
 ```
+
+> Nota: a regra de "aprovado" usa `status_rh AND status_lider` (igual aos demais endpoints), evitando depender do campo `status` agregado.
 
 **Resposta:**
 ```ts
 type QuemEstaForaItem = {
   id: number;
-  colaboradorId: number;
   nome: string;
-  dataFim: string; // ISO YYYY-MM-DD
+  email: string | null;
+  dataFim: string; // ISO
 };
 ```
 

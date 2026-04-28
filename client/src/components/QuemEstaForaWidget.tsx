@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 interface QuemEstaForaItem {
   id: number;
-  colaboradorId: number;
   nome: string;
   email: string | null;
   dataFim: string;
