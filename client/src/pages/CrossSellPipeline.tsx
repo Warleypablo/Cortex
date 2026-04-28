@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -571,6 +570,8 @@ function EtapaSection({
     return arr;
   }, [grupos, ordenacao]);
 
+  const [clientesExpandidos, setClientesExpandidos] = useState<Set<string>>(new Set());
+
   return (
     <section>
       <div
@@ -593,12 +594,21 @@ function EtapaSection({
       </div>
 
       {expanded && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2 mb-4 pl-6">
+        <div className="mt-2 mb-4 pl-6 border border-gray-200 dark:border-zinc-700/60 rounded-md divide-y divide-gray-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900">
           {sorted.map(({ cliente, oportunidades }) => (
-            <ClienteCard
+            <ClienteRow
               key={`${etapa}-${cliente.cnpj}`}
               cliente={cliente}
               oportunidadesFiltradas={oportunidades}
+              expanded={clientesExpandidos.has(cliente.cnpj)}
+              onToggle={() => {
+                setClientesExpandidos((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(cliente.cnpj)) next.delete(cliente.cnpj);
+                  else next.add(cliente.cnpj);
+                  return next;
+                });
+              }}
               onChangeEtapa={onChangeEtapa}
               onChangeValor={onChangeValor}
               onGanho={onGanho}
@@ -612,12 +622,15 @@ function EtapaSection({
 }
 
 // ---------------------------------------------------------------------------
-// ClienteCard
+// ClienteRow — linha compacta (colapsada) que expande in-place revelando
+// serviços ativos + oportunidades editáveis
 // ---------------------------------------------------------------------------
 
-function ClienteCard({
+function ClienteRow({
   cliente,
   oportunidadesFiltradas,
+  expanded,
+  onToggle,
   onChangeEtapa,
   onChangeValor,
   onGanho,
@@ -625,6 +638,8 @@ function ClienteCard({
 }: {
   cliente: ClienteCrossSell;
   oportunidadesFiltradas?: Oportunidade[];
+  expanded: boolean;
+  onToggle: () => void;
   onChangeEtapa: (opId: number, etapa: string) => void;
   onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
   onGanho: (op: Oportunidade) => void;
@@ -632,81 +647,88 @@ function ClienteCard({
 }) {
   const oportunidadesVisiveis = oportunidadesFiltradas ?? cliente.oportunidades;
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardContent className="p-4 space-y-3">
-        {/* Header */}
-        <div>
-          <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-            {cliente.nome ?? cliente.cnpj}
-          </h3>
-          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-400 mt-1 flex-wrap">
-            <span>{cliente.cluster ?? "—"}</span>
-            <span>·</span>
-            <span>{cliente.status ?? "—"}</span>
-            <span>·</span>
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {calcLifetime(cliente.contratoInicio)}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-zinc-300 mt-1.5 flex-wrap">
-            <span className="flex items-center gap-1">
-              <User className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
-              <span className="text-gray-400 dark:text-zinc-500">CxCs:</span>
-              <span className="font-medium">{cliente.cxConta ?? "—"}</span>
-            </span>
-            <span className="flex items-center gap-1">
-              <Briefcase className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
-              <span className="text-gray-400 dark:text-zinc-500">Vendedor:</span>
-              <span className="font-medium">{cliente.vendedor ?? "—"}</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-zinc-300 mt-1.5 font-medium">
-            <span>R: {formatCurrency(cliente.valorRAtual)}</span>
-            <span className="text-gray-400 dark:text-zinc-600">·</span>
-            <span>P: {formatCurrency(cliente.valorPAtual)}</span>
-          </div>
-        </div>
+    <div>
+      {/* Linha colapsada */}
+      <div
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 text-sm"
+      >
+        <span
+          className={`text-gray-400 dark:text-zinc-500 transition-transform inline-block shrink-0 ${expanded ? "rotate-90" : ""}`}
+        >
+          ▸
+        </span>
+        <span className="font-semibold text-gray-900 dark:text-white truncate min-w-[140px] max-w-[260px]">
+          {cliente.nome ?? cliente.cnpj}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 hidden md:flex items-center gap-1.5 whitespace-nowrap">
+          <span>{cliente.cluster ?? "—"}</span>
+          <span>·</span>
+          <span>{cliente.status ?? "—"}</span>
+          <span>·</span>
+          <Clock className="h-3 w-3" />
+          <span>{calcLifetime(cliente.contratoInicio)}</span>
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 hidden xl:flex items-center gap-1 whitespace-nowrap">
+          <User className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+          <span className="text-gray-400 dark:text-zinc-500">CxCs:</span>
+          <span className="text-gray-700 dark:text-zinc-300 font-medium truncate max-w-[180px]">{cliente.cxConta ?? "—"}</span>
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 hidden xl:flex items-center gap-1 whitespace-nowrap">
+          <Briefcase className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+          <span className="text-gray-400 dark:text-zinc-500">Vendedor:</span>
+          <span className="text-gray-700 dark:text-zinc-300 font-medium truncate max-w-[160px]">{cliente.vendedor ?? "—"}</span>
+        </span>
+        <div className="flex-1" />
+        <span className="text-xs text-gray-600 dark:text-zinc-300 font-medium whitespace-nowrap hidden sm:inline">
+          R {formatCurrency(cliente.valorRAtual)} · P {formatCurrency(cliente.valorPAtual)}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 whitespace-nowrap">
+          {oportunidadesVisiveis.length} op
+        </span>
+      </div>
 
-        {/* Serviços ativos */}
-        {cliente.servicosAtivos.length > 0 && (
-          <div className="border-t border-gray-100 dark:border-zinc-800 pt-2">
-            <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-1.5">
-              Serviços ativos
+      {/* Conteúdo expandido */}
+      {expanded && (
+        <div className="px-3 pb-3 pt-1 space-y-3 bg-gray-50/40 dark:bg-zinc-900/40">
+          {cliente.servicosAtivos.length > 0 && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-1.5">
+                Serviços ativos
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {cliente.servicosAtivos.map((s) => (
+                  <span
+                    key={s}
+                    className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-[11px] text-gray-700 dark:text-zinc-300"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
+              Oportunidades mapeadas ({oportunidadesVisiveis.length})
             </p>
-            <div className="flex flex-wrap gap-1">
-              {cliente.servicosAtivos.map((s) => (
-                <span
-                  key={s}
-                  className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 text-[11px] text-gray-700 dark:text-zinc-300"
-                >
-                  {s}
-                </span>
+            <div className="divide-y divide-gray-100 dark:divide-zinc-800">
+              {oportunidadesVisiveis.map((op) => (
+                <OportunidadeRow
+                  key={op.id}
+                  op={op}
+                  onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
+                  onChangeValor={(field, value) => onChangeValor(op.id, field, value)}
+                  onGanho={() => onGanho(op)}
+                  onComments={() => onComments(op)}
+                />
               ))}
             </div>
           </div>
-        )}
-
-        {/* Oportunidades */}
-        <div className="border-t border-gray-100 dark:border-zinc-800 pt-2">
-          <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
-            Oportunidades mapeadas ({oportunidadesVisiveis.length})
-          </p>
-          <div className="divide-y divide-gray-50 dark:divide-zinc-800/60">
-            {oportunidadesVisiveis.map((op) => (
-              <OportunidadeRow
-                key={op.id}
-                op={op}
-                onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
-                onChangeValor={(field, value) => onChangeValor(op.id, field, value)}
-                onGanho={() => onGanho(op)}
-                onComments={() => onComments(op)}
-              />
-            ))}
-          </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </div>
   );
 }
 
