@@ -594,7 +594,7 @@ function EtapaSection({
       </div>
 
       {expanded && (
-        <div className="mt-2 mb-4 pl-6 border border-gray-200 dark:border-zinc-700/60 rounded-md divide-y divide-gray-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900">
+        <div className="mt-2 mb-4 ml-6 border border-gray-200 dark:border-zinc-700/60 rounded-md divide-y divide-gray-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900 overflow-x-auto">
           {sorted.map(({ cliente, oportunidades }) => (
             <ClienteRow
               key={`${etapa}-${cliente.cnpj}`}
@@ -648,42 +648,47 @@ function ClienteRow({
   const oportunidadesVisiveis = oportunidadesFiltradas ?? cliente.oportunidades;
   return (
     <div>
-      {/* Linha colapsada */}
+      {/* Linha colapsada — grid de 9 colunas alinhadas para todas as linhas */}
       <div
         onClick={onToggle}
-        className="w-full flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 text-sm"
+        className="w-full grid items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 text-sm"
+        style={{
+          gridTemplateColumns:
+            "16px minmax(160px, 1.5fr) 80px 110px 56px minmax(140px, 1.2fr) minmax(140px, 1.2fr) 200px 64px",
+        }}
       >
         <span
-          className={`text-gray-400 dark:text-zinc-500 transition-transform inline-block shrink-0 ${expanded ? "rotate-90" : ""}`}
+          className={`text-gray-400 dark:text-zinc-500 transition-transform inline-block ${expanded ? "rotate-90" : ""}`}
         >
           ▸
         </span>
-        <span className="font-semibold text-gray-900 dark:text-white truncate min-w-[140px] max-w-[260px]">
+        <span className="font-semibold text-gray-900 dark:text-white truncate">
           {cliente.nome ?? cliente.cnpj}
         </span>
-        <span className="text-xs text-gray-500 dark:text-zinc-400 hidden md:flex items-center gap-1.5 whitespace-nowrap">
-          <span>{cliente.cluster ?? "—"}</span>
-          <span>·</span>
-          <span>{cliente.status ?? "—"}</span>
-          <span>·</span>
-          <Clock className="h-3 w-3" />
-          <span>{calcLifetime(cliente.contratoInicio)}</span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+          {cliente.cluster ?? "—"}
         </span>
-        <span className="text-xs text-gray-500 dark:text-zinc-400 hidden xl:flex items-center gap-1 whitespace-nowrap">
-          <User className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
-          <span className="text-gray-400 dark:text-zinc-500">CxCs:</span>
-          <span className="text-gray-700 dark:text-zinc-300 font-medium truncate max-w-[180px]">{cliente.cxConta ?? "—"}</span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+          {cliente.status ?? "—"}
         </span>
-        <span className="text-xs text-gray-500 dark:text-zinc-400 hidden xl:flex items-center gap-1 whitespace-nowrap">
-          <Briefcase className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
-          <span className="text-gray-400 dark:text-zinc-500">Vendedor:</span>
-          <span className="text-gray-700 dark:text-zinc-300 font-medium truncate max-w-[160px]">{cliente.vendedor ?? "—"}</span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1 whitespace-nowrap">
+          <Clock className="h-3 w-3 shrink-0" />
+          <span className="truncate">{calcLifetime(cliente.contratoInicio)}</span>
         </span>
-        <div className="flex-1" />
-        <span className="text-xs text-gray-600 dark:text-zinc-300 font-medium whitespace-nowrap hidden sm:inline">
+        <span className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1 min-w-0">
+          <User className="h-3 w-3 text-gray-400 dark:text-zinc-500 shrink-0" />
+          <span className="text-gray-400 dark:text-zinc-500 shrink-0">CxCs:</span>
+          <span className="text-gray-700 dark:text-zinc-300 font-medium truncate">{cliente.cxConta ?? "—"}</span>
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1 min-w-0">
+          <Briefcase className="h-3 w-3 text-gray-400 dark:text-zinc-500 shrink-0" />
+          <span className="text-gray-400 dark:text-zinc-500 shrink-0">Vendedor:</span>
+          <span className="text-gray-700 dark:text-zinc-300 font-medium truncate">{cliente.vendedor ?? "—"}</span>
+        </span>
+        <span className="text-xs text-gray-600 dark:text-zinc-300 font-medium whitespace-nowrap text-right">
           R {formatCurrency(cliente.valorRAtual)} · P {formatCurrency(cliente.valorPAtual)}
         </span>
-        <span className="text-xs text-gray-500 dark:text-zinc-400 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 whitespace-nowrap">
+        <span className="text-xs text-gray-500 dark:text-zinc-400 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 whitespace-nowrap text-center justify-self-end">
           {oportunidadesVisiveis.length} op
         </span>
       </div>
