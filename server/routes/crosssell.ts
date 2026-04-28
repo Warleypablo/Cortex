@@ -308,7 +308,14 @@ export function registerCrossSellRoutes(app: Express) {
       const { id } = req.params;
       const { operacao, produto, mesGanho, valorR, valorP } = req.body;
 
-      if (!operacao || !produto || !mesGanho) {
+      // Coluna operacao e text[] — aceita string (legado) ou array
+      const operacaoArray: string[] = Array.isArray(operacao)
+        ? operacao.filter((s) => typeof s === "string" && s.trim().length > 0)
+        : typeof operacao === "string" && operacao.trim().length > 0
+          ? [operacao]
+          : [];
+
+      if (operacaoArray.length === 0 || !produto || !mesGanho) {
         return res.status(400).json({ error: "operacao, produto e mesGanho são obrigatórios" });
       }
 
@@ -328,12 +335,12 @@ export function registerCrossSellRoutes(app: Express) {
       const finalValorR = valorR ?? op.valor_r_negociacao;
       const finalValorP = valorP ?? op.valor_p_negociacao;
 
-      // Insert into negocios_ganhos
+      // Insert into negocios_ganhos (operacao como text[])
       const ganhoResult = await db.execute(sql`
         INSERT INTO cortex_core.crosssell_negocios_ganhos
           (oportunidade_id, cliente_nome, cnpj, valor_r, valor_p, cx_responsavel, operacao, produto, mes_ganho)
         VALUES
-          (${Number(id)}, ${op.cliente_nome || 'N/A'}, ${op.cnpj}, ${finalValorR}, ${finalValorP}, ${op.cx_responsavel}, ${operacao}, ${produto}, ${mesGanho})
+          (${Number(id)}, ${op.cliente_nome || 'N/A'}, ${op.cnpj}, ${finalValorR}, ${finalValorP}, ${op.cx_responsavel}, ${operacaoArray}::text[], ${produto}, ${mesGanho})
         RETURNING *
       `);
 
@@ -375,7 +382,8 @@ export function registerCrossSellRoutes(app: Express) {
           .map((s) => s.trim())
           .filter(Boolean)
           .map((s) => `'${s.replace(/'/g, "''")}'`);
-        if (ops.length > 0) conditions.push(`g.operacao IN (${ops.join(",")})`);
+        // Overlap: retorna ganhos cuja operacao (text[]) contem AO MENOS UM dos valores filtrados
+        if (ops.length > 0) conditions.push(`g.operacao && ARRAY[${ops.join(",")}]::text[]`);
       }
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
