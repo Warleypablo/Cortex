@@ -9783,30 +9783,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
       
-      // Buscar próximos eventos (próximos 30 dias)
-      const hoje = new Date();
-      const em30Dias = new Date();
-      em30Dias.setDate(em30Dias.getDate() + 30);
-      
-      const eventosQuery = await db.execute(sql`
-        SELECT id, titulo, tipo, data_inicio, data_fim, local, cor
-        FROM cortex_core.turbo_eventos
-        WHERE data_inicio >= ${hoje.toISOString()}
-          AND data_inicio <= ${em30Dias.toISOString()}
-        ORDER BY data_inicio ASC
-        LIMIT 5
-      `);
-      
-      const proximosEventos = eventosQuery.rows.map((row: any) => ({
-        id: row.id,
-        titulo: row.titulo,
-        tipo: row.tipo,
-        dataInicio: row.data_inicio,
-        dataFim: row.data_fim,
-        local: row.local,
-        cor: row.cor,
-      }));
-      
       // Buscar alertas e pendências (com tratamento de erro para tabelas que podem não existir)
       let alertasRows: any[] = [];
       let contratosVencendoRows: any[] = [];
@@ -9918,7 +9894,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         mrrVariacao,
         ticketMedioVariacao,
         clientes: meusClientes,
-        proximosEventos,
         alertas,
       });
     } catch (error) {
