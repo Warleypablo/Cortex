@@ -335,12 +335,15 @@ export function registerCrossSellRoutes(app: Express) {
       const finalValorR = valorR ?? op.valor_r_negociacao;
       const finalValorP = valorP ?? op.valor_p_negociacao;
 
-      // Insert into negocios_ganhos (operacao como text[])
+      // Insert into negocios_ganhos (operacao como text[] — usa sql.join para
+      // parametrizar cada elemento individualmente; pg-driver nao converte
+      // JS array direto para Postgres array via template literal)
+      const operacaoSql = sql.join(operacaoArray.map((s) => sql`${s}`), sql`, `);
       const ganhoResult = await db.execute(sql`
         INSERT INTO cortex_core.crosssell_negocios_ganhos
           (oportunidade_id, cliente_nome, cnpj, valor_r, valor_p, cx_responsavel, operacao, produto, mes_ganho)
         VALUES
-          (${Number(id)}, ${op.cliente_nome || 'N/A'}, ${op.cnpj}, ${finalValorR}, ${finalValorP}, ${op.cx_responsavel}, ${operacaoArray}::text[], ${produto}, ${mesGanho})
+          (${Number(id)}, ${op.cliente_nome || 'N/A'}, ${op.cnpj}, ${finalValorR}, ${finalValorP}, ${op.cx_responsavel}, ARRAY[${operacaoSql}]::text[], ${produto}, ${mesGanho})
         RETURNING *
       `);
 
