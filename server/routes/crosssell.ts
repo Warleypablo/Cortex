@@ -312,6 +312,12 @@ export function registerCrossSellRoutes(app: Express) {
         return res.status(400).json({ error: "mesGanho é obrigatório" });
       }
 
+      // Aceita "YYYY-MM" (input type=month) ou "YYYY-MM-DD"; normaliza para 1o dia do mes
+      const mesGanhoNorm: string =
+        typeof mesGanho === "string" && /^\d{4}-\d{2}$/.test(mesGanho)
+          ? `${mesGanho}-01`
+          : mesGanho;
+
       // Get oportunidade + client name
       const opResult = await db.execute(sql`
         SELECT o.*, c.nome AS cliente_nome
@@ -347,7 +353,7 @@ export function registerCrossSellRoutes(app: Express) {
         INSERT INTO cortex_core.crosssell_negocios_ganhos
           (oportunidade_id, cliente_nome, cnpj, valor_r, valor_p, cx_responsavel, operacao, produto, mes_ganho)
         VALUES
-          (${Number(id)}, ${op.cliente_nome || 'N/A'}, ${op.cnpj}, ${finalValorR}, ${finalValorP}, ${op.cx_responsavel}, ARRAY[${operacaoSql}]::text[], ${produtoFinal}, ${mesGanho})
+          (${Number(id)}, ${op.cliente_nome || 'N/A'}, ${op.cnpj}, ${finalValorR}, ${finalValorP}, ${op.cx_responsavel}, ARRAY[${operacaoSql}]::text[], ${produtoFinal}, ${mesGanhoNorm})
         RETURNING *
       `);
 
