@@ -878,7 +878,7 @@ function OportunidadeRow({
         className="grid items-center gap-2"
         style={{
           gridTemplateColumns:
-            "16px minmax(160px, 1fr) 140px 100px 100px 32px 56px",
+            "16px 220px 140px 100px 100px 32px 56px",
         }}
       >
         <span className={`h-2 w-2 rounded-full ${dotColor}`} />
