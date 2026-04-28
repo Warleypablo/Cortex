@@ -308,15 +308,8 @@ export function registerCrossSellRoutes(app: Express) {
       const { id } = req.params;
       const { operacao, produto, mesGanho, valorR, valorP } = req.body;
 
-      // Coluna operacao e text[] — aceita string (legado) ou array
-      const operacaoArray: string[] = Array.isArray(operacao)
-        ? operacao.filter((s) => typeof s === "string" && s.trim().length > 0)
-        : typeof operacao === "string" && operacao.trim().length > 0
-          ? [operacao]
-          : [];
-
-      if (operacaoArray.length === 0 || !produto || !mesGanho) {
-        return res.status(400).json({ error: "operacao, produto e mesGanho são obrigatórios" });
+      if (!mesGanho) {
+        return res.status(400).json({ error: "mesGanho é obrigatório" });
       }
 
       // Get oportunidade + client name
@@ -332,6 +325,17 @@ export function registerCrossSellRoutes(app: Express) {
       }
 
       const op = opResult.rows[0] as any;
+
+      // Defaults: operacao default 'CrossSell' (texto[]); produto da propria oportunidade
+      const operacaoArray: string[] = Array.isArray(operacao)
+        ? operacao.filter((s) => typeof s === "string" && s.trim().length > 0)
+        : typeof operacao === "string" && operacao.trim().length > 0
+          ? [operacao]
+          : ["CrossSell"];
+      const produtoFinal: string = (typeof produto === "string" && produto.trim().length > 0)
+        ? produto
+        : op.produto_mapeado;
+
       const finalValorR = valorR ?? op.valor_r_negociacao;
       const finalValorP = valorP ?? op.valor_p_negociacao;
 
@@ -343,7 +347,7 @@ export function registerCrossSellRoutes(app: Express) {
         INSERT INTO cortex_core.crosssell_negocios_ganhos
           (oportunidade_id, cliente_nome, cnpj, valor_r, valor_p, cx_responsavel, operacao, produto, mes_ganho)
         VALUES
-          (${Number(id)}, ${op.cliente_nome || 'N/A'}, ${op.cnpj}, ${finalValorR}, ${finalValorP}, ${op.cx_responsavel}, ARRAY[${operacaoSql}]::text[], ${produto}, ${mesGanho})
+          (${Number(id)}, ${op.cliente_nome || 'N/A'}, ${op.cnpj}, ${finalValorR}, ${finalValorP}, ${op.cx_responsavel}, ARRAY[${operacaoSql}]::text[], ${produtoFinal}, ${mesGanho})
         RETURNING *
       `);
 

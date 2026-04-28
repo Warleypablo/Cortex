@@ -1180,8 +1180,6 @@ function GanhoDialog({
   userName: string;
 }) {
   const queryClient = useQueryClient();
-  const [operacoes, setOperacoes] = useState<string[]>([]);
-  const [produto, setProduto] = useState(op.produto);
   const [mesGanho, setMesGanho] = useState(
     new Date().toISOString().slice(0, 7)
   );
@@ -1192,20 +1190,12 @@ function GanhoDialog({
     op.valorPNegociacao?.toString() ?? ""
   );
 
-  const toggleOp = (o: string) => {
-    setOperacoes((prev) =>
-      prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]
-    );
-  };
-
   const ganhoMut = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/comercial/crosssell/${op.id}/ganho`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          operacao: operacoes,
-          produto,
           mesGanho,
           valorR: valorR ? Number(valorR) : undefined,
           valorP: valorP ? Number(valorP) : undefined,
@@ -1233,45 +1223,13 @@ function GanhoDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-zinc-400">
-            Cliente: <strong className="text-gray-900 dark:text-white">{clienteNome}</strong>
-          </p>
-
-          {/* Operacao badges */}
-          <div className="space-y-2">
-            <Label className="text-gray-700 dark:text-zinc-300">
-              Tipo de Operacao
-            </Label>
-            <div className="flex flex-wrap gap-2">
-              {OPERACOES.map((o) => (
-                <button
-                  key={o}
-                  onClick={() => toggleOp(o)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    operacoes.includes(o)
-                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700"
-                      : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border-gray-200 dark:border-zinc-700"
-                  }`}
-                >
-                  {o}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Product */}
-          <div className="space-y-2">
-            <Label className="text-gray-700 dark:text-zinc-300">Produto</Label>
-            <Select value={produto} onValueChange={setProduto}>
-              <SelectTrigger className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRODUTOS.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="text-sm text-gray-600 dark:text-zinc-400 space-y-0.5">
+            <p>
+              Cliente: <strong className="text-gray-900 dark:text-white">{clienteNome}</strong>
+            </p>
+            <p>
+              Produto: <strong className="text-gray-900 dark:text-white">{op.produto}</strong>
+            </p>
           </div>
 
           {/* Month */}
@@ -1318,7 +1276,7 @@ function GanhoDialog({
           </Button>
           <Button
             onClick={() => ganhoMut.mutate()}
-            disabled={operacoes.length === 0 || ganhoMut.isPending}
+            disabled={!mesGanho || ganhoMut.isPending}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
             {ganhoMut.isPending ? "Registrando..." : "Registrar Ganho"}
