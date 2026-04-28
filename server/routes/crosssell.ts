@@ -11,7 +11,7 @@ export function registerCrossSellRoutes(app: Express) {
     try {
       const { cluster, cx, etapa, produto } = req.query;
 
-      const conditions: string[] = [`o.etapa != 'ganho'`];
+      const conditions: string[] = [];
       const params: any[] = [];
 
       if (cluster && typeof cluster === "string") {
@@ -31,7 +31,7 @@ export function registerCrossSellRoutes(app: Express) {
         conditions.push(`o.produto_mapeado = $${params.length}`);
       }
 
-      const whereClause = `WHERE ${conditions.join(" AND ")}`;
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
       const query = `
         WITH oportunidades_filtradas AS (

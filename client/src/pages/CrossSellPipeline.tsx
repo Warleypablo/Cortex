@@ -60,17 +60,13 @@ const ETAPAS = [
   "em_contato",
   "proposta_enviada",
   "forte_interesse",
+  "ganho",
   "descartado",
 ] as const;
 
 type Etapa = (typeof ETAPAS)[number];
 
-// Etapa terminal — não aparece em filtros/accordion (cards em ganho saem do pipeline),
-// mas aparece no dropdown da row para registrar negócio fechado via GanhoDialog.
-const ETAPAS_DROPDOWN = [...ETAPAS, "ganho"] as const;
-type EtapaDropdown = (typeof ETAPAS_DROPDOWN)[number];
-
-const ETAPA_LABELS: Record<EtapaDropdown, string> = {
+const ETAPA_LABELS: Record<Etapa, string> = {
   sugerido_sistema: "Sugerido",
   fazer_contato: "Fazer Contato",
   tentativa_contato: "Tentativa de Contato",
@@ -78,11 +74,11 @@ const ETAPA_LABELS: Record<EtapaDropdown, string> = {
   em_contato: "Em Contato",
   proposta_enviada: "Proposta Enviada",
   forte_interesse: "Forte Interesse",
-  descartado: "Descartado",
   ganho: "Ganho",
+  descartado: "Descartado",
 };
 
-const ETAPA_COLORS: Record<EtapaDropdown, string> = {
+const ETAPA_COLORS: Record<Etapa, string> = {
   sugerido_sistema: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
   fazer_contato: "bg-gray-200 text-gray-800 dark:bg-zinc-700 dark:text-zinc-200",
   tentativa_contato: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
@@ -90,8 +86,8 @@ const ETAPA_COLORS: Record<EtapaDropdown, string> = {
   em_contato: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
   proposta_enviada: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   forte_interesse: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
-  descartado: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
   ganho: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  descartado: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
 };
 
 const CLUSTERS = ["Regulares", "Imperdiveis", "Chaves", "NFNC"];
@@ -275,7 +271,7 @@ export default function CrossSellPipeline() {
   useEffect(() => {
     if (initializedExpansion.current || clientes.length === 0) return;
     const etapasComCards = ETAPAS.filter(
-      (e) => e !== "sugerido_sistema" && e !== "descartado" && (grupos.get(e)?.length ?? 0) > 0
+      (e) => e !== "sugerido_sistema" && e !== "descartado" && e !== "ganho" && (grupos.get(e)?.length ?? 0) > 0
     );
     setEtapasExpandidas(new Set(etapasComCards.slice(0, 3)));
     initializedExpansion.current = true;
@@ -894,7 +890,7 @@ function OportunidadeRow({
             </Badge>
           </SelectTrigger>
           <SelectContent>
-            {ETAPAS_DROPDOWN.map((e) => (
+            {ETAPAS.map((e) => (
               <SelectItem key={e} value={e}>{ETAPA_LABELS[e]}</SelectItem>
             ))}
           </SelectContent>
