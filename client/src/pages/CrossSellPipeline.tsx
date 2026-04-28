@@ -66,7 +66,12 @@ const ETAPAS = [
 
 type Etapa = (typeof ETAPAS)[number];
 
-const ETAPA_LABELS: Record<Etapa, string> = {
+// Etapa terminal — não aparece em filtros/accordion (cards em ganho saem do pipeline),
+// mas aparece no dropdown da row para registrar negócio fechado via GanhoDialog.
+const ETAPAS_DROPDOWN = [...ETAPAS, "ganho"] as const;
+type EtapaDropdown = (typeof ETAPAS_DROPDOWN)[number];
+
+const ETAPA_LABELS: Record<EtapaDropdown, string> = {
   sugerido_sistema: "Sugerido",
   fazer_contato: "Fazer Contato",
   tentativa_contato: "Tentativa de Contato",
@@ -75,9 +80,10 @@ const ETAPA_LABELS: Record<Etapa, string> = {
   proposta_enviada: "Proposta Enviada",
   forte_interesse: "Forte Interesse",
   descartado: "Descartado",
+  ganho: "Ganho",
 };
 
-const ETAPA_COLORS: Record<Etapa, string> = {
+const ETAPA_COLORS: Record<EtapaDropdown, string> = {
   sugerido_sistema: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
   fazer_contato: "bg-gray-200 text-gray-800 dark:bg-zinc-700 dark:text-zinc-200",
   tentativa_contato: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
@@ -86,6 +92,7 @@ const ETAPA_COLORS: Record<Etapa, string> = {
   proposta_enviada: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   forte_interesse: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
   descartado: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  ganho: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
 };
 
 const CLUSTERS = ["Regulares", "Imperdiveis", "Chaves", "NFNC"];
@@ -717,14 +724,17 @@ function OportunidadeRow({
           {op.produto}
         </span>
 
-        <Select value={etapa} onValueChange={onChangeEtapa}>
+        <Select
+          value={etapa}
+          onValueChange={(v) => (v === "ganho" ? onGanho() : onChangeEtapa(v))}
+        >
           <SelectTrigger className="h-auto py-0.5 px-2 border-0 w-auto gap-1 text-xs">
             <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
               {ETAPA_LABELS[etapa] ?? etapa}
             </Badge>
           </SelectTrigger>
           <SelectContent>
-            {ETAPAS.map((e) => (
+            {ETAPAS_DROPDOWN.filter((e) => !(isSugerido && e === "ganho")).map((e) => (
               <SelectItem key={e} value={e}>{ETAPA_LABELS[e]}</SelectItem>
             ))}
           </SelectContent>
