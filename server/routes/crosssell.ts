@@ -6,16 +6,13 @@ import { mapearOportunidades } from "../services/crosssell-scoring";
 export function registerCrossSellRoutes(app: Express) {
   // ==================== CROSS-SELL MANAGEMENT ====================
 
-  // 1. GET /api/comercial/crosssell — List oportunidades with filters
+  // 1. GET /api/comercial/crosssell — List clientes com oportunidades aninhadas
   app.get("/api/comercial/crosssell", async (req, res) => {
     try {
       const { cluster, cx, etapa, produto } = req.query;
 
-      const conditions: string[] = [];
+      const conditions: string[] = [`o.etapa NOT IN ('ganho', 'descartado')`];
       const params: any[] = [];
-
-      // Default: exclude 'ganho' (only active pipeline)
-      conditions.push(`o.etapa NOT IN ('ganho')`);
 
       if (cluster && typeof cluster === "string") {
         params.push(cluster);
@@ -34,106 +31,143 @@ export function registerCrossSellRoutes(app: Express) {
         conditions.push(`o.produto_mapeado = $${params.length}`);
       }
 
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const whereClause = `WHERE ${conditions.join(" AND ")}`;
 
       const query = `
-        SELECT
-          o.id,
-          o.cliente_id,
-          o.cnpj,
-          c.nome AS cliente_nome,
-          c.status AS cliente_status,
-          c.cluster,
-          c.responsavel AS cx_cliente,
-          o.produto_mapeado,
-          o.etapa,
-          o.valor_r_negociacao,
-          o.valor_p_negociacao,
-          o.cx_responsavel,
-          o.ultimo_contato,
-          o.criado_em,
-          o.atualizado_em,
-          o.origem,
-          o.prioridade,
-          o.score_detalhes,
-          o.motivo,
-          COALESCE(contratos.valor_r_atual, 0) AS valor_r_atual,
-          COALESCE(contratos.valor_p_atual, 0) AS valor_p_atual,
-          contratos.contrato_inicio,
-          COALESCE(comentarios.total, 0) AS total_comentarios
-        FROM cortex_core.crosssell_oportunidades o
-        LEFT JOIN "Clickup".cup_clientes c ON c.cnpj = o.cnpj
-        LEFT JOIN LATERAL (
+        WITH oportunidades_filtradas AS (
           SELECT
-            SUM(ct.valorr) AS valor_r_atual,
-            SUM(ct.valorp) AS valor_p_atual,
-            MIN(ct.data_inicio) AS contrato_inicio
+            o.id,
+            o.cliente_id,
+            o.cnpj,
+            o.produto_mapeado,
+            o.etapa,
+            o.valor_r_negociacao,
+            o.valor_p_negociacao,
+            o.cx_responsavel,
+            o.ultimo_contato,
+            o.atualizado_em,
+            o.origem,
+            o.prioridade,
+            o.score_detalhes,
+            o.motivo,
+            c.nome AS cliente_nome,
+            c.cluster,
+            c.status AS cliente_status,
+            c.responsavel AS cx_conta,
+            c.vendedor AS vendedor,
+            (SELECT COUNT(*)::int FROM cortex_core.crosssell_comentarios cm
+             WHERE cm.oportunidade_id = o.id) AS total_comentarios
+          FROM cortex_core.crosssell_oportunidades o
+          LEFT JOIN "Clickup".cup_clientes c ON c.cnpj = o.cnpj
+          ${whereClause}
+        ),
+        contratos_cliente AS (
+          SELECT
+            cl.cnpj,
+            COALESCE(SUM(ct.valorr), 0)::float AS valor_r_atual,
+            COALESCE(SUM(ct.valorp), 0)::float AS valor_p_atual,
+            MIN(ct.data_inicio) AS contrato_inicio,
+            COALESCE(
+              array_agg(DISTINCT ct.produto) FILTER (WHERE ct.produto IS NOT NULL AND ct.produto != ''),
+              ARRAY[]::text[]
+            ) AS servicos_ativos
           FROM "Clickup".cup_contratos ct
           JOIN "Clickup".cup_clientes cl ON cl.task_id = ct.id_task
-          WHERE cl.cnpj = o.cnpj AND ct.status IN ('ativo', 'Ativo', 'ATIVO')
-        ) contratos ON true
-        LEFT JOIN LATERAL (
-          SELECT COUNT(*)::int AS total
-          FROM cortex_core.crosssell_comentarios cm
-          WHERE cm.oportunidade_id = o.id
-        ) comentarios ON true
-        ${whereClause}
-        ORDER BY o.atualizado_em DESC
+          WHERE ct.status IN ('ativo', 'Ativo', 'ATIVO')
+            AND cl.cnpj IN (SELECT DISTINCT cnpj FROM oportunidades_filtradas)
+          GROUP BY cl.cnpj
+        )
+        SELECT
+          of_.cnpj,
+          MAX(of_.cliente_id) AS cliente_id,
+          MAX(of_.cliente_nome) AS cliente_nome,
+          MAX(of_.cluster) AS cluster,
+          MAX(of_.cliente_status) AS cliente_status,
+          MAX(of_.cx_conta) AS cx_conta,
+          MAX(of_.vendedor) AS vendedor,
+          COALESCE(MAX(cc.valor_r_atual), 0) AS valor_r_atual,
+          COALESCE(MAX(cc.valor_p_atual), 0) AS valor_p_atual,
+          MAX(cc.contrato_inicio) AS contrato_inicio,
+          COALESCE(MAX(cc.servicos_ativos), ARRAY[]::text[]) AS servicos_ativos,
+          COALESCE(MAX((of_.score_detalhes->>'total')::float), 0) AS score_maximo,
+          json_agg(json_build_object(
+            'id', of_.id,
+            'produto', of_.produto_mapeado,
+            'etapa', of_.etapa,
+            'valorRNegociacao', of_.valor_r_negociacao,
+            'valorPNegociacao', of_.valor_p_negociacao,
+            'cxResponsavel', of_.cx_responsavel,
+            'ultimoContato', of_.ultimo_contato,
+            'origem', COALESCE(of_.origem, 'manual'),
+            'prioridade', of_.prioridade,
+            'motivo', of_.motivo,
+            'totalComentarios', of_.total_comentarios,
+            'atualizadoEm', of_.atualizado_em
+          ) ORDER BY of_.atualizado_em DESC) AS oportunidades
+        FROM oportunidades_filtradas of_
+        LEFT JOIN contratos_cliente cc ON cc.cnpj = of_.cnpj
+        GROUP BY of_.cnpj
+        ORDER BY score_maximo DESC NULLS LAST
       `;
 
-      const result = await db.execute(sql.raw(
-        params.length > 0
-          ? params.reduce((q, val, i) => q.replace(`$${i + 1}`, `'${String(val).replace(/'/g, "''")}'`), query)
-          : query
-      ));
+      const finalQuery = params.length > 0
+        ? params.reduce((q, val, i) => q.replace(new RegExp(`\\$${i + 1}\\b`, 'g'), `'${String(val).replace(/'/g, "''")}'`), query)
+        : query;
+
+      const result = await db.execute(sql.raw(finalQuery));
 
       const rows = (result.rows as any[]).map((r) => ({
-        id: r.id,
-        clienteId: r.cliente_id,
         cnpj: r.cnpj,
-        clienteNome: r.cliente_nome,
-        clienteStatus: r.cliente_status,
+        clienteId: r.cliente_id,
+        nome: r.cliente_nome,
         cluster: r.cluster,
-        cxCliente: r.cx_cliente,
-        produtoMapeado: r.produto_mapeado,
-        etapa: r.etapa,
-        valorRNegociacao: r.valor_r_negociacao ? Number(r.valor_r_negociacao) : null,
-        valorPNegociacao: r.valor_p_negociacao ? Number(r.valor_p_negociacao) : null,
-        cxResponsavel: r.cx_responsavel,
-        ultimoContato: r.ultimo_contato,
-        criadoEm: r.criado_em,
-        atualizadoEm: r.atualizado_em,
-        origem: r.origem ?? "manual",
-        prioridade: r.prioridade,
-        scoreDetalhes: r.score_detalhes,
-        motivo: r.motivo,
+        status: r.cliente_status,
+        cxConta: r.cx_conta,
+        vendedor: r.vendedor,
         valorRAtual: Number(r.valor_r_atual),
         valorPAtual: Number(r.valor_p_atual),
         contratoInicio: r.contrato_inicio,
-        totalComentarios: Number(r.total_comentarios),
+        servicosAtivos: r.servicos_ativos ?? [],
+        scoreMaximo: Number(r.score_maximo),
+        oportunidades: (r.oportunidades ?? []).map((op: any) => ({
+          id: op.id,
+          produto: op.produto,
+          etapa: op.etapa,
+          valorRNegociacao: op.valorRNegociacao != null ? Number(op.valorRNegociacao) : null,
+          valorPNegociacao: op.valorPNegociacao != null ? Number(op.valorPNegociacao) : null,
+          cxResponsavel: op.cxResponsavel,
+          ultimoContato: op.ultimoContato,
+          origem: op.origem ?? "manual",
+          prioridade: op.prioridade,
+          motivo: op.motivo,
+          totalComentarios: Number(op.totalComentarios ?? 0),
+          atualizadoEm: op.atualizadoEm,
+        })),
       }));
 
       res.json(rows);
     } catch (error) {
-      console.error("[crosssell] Error listing oportunidades:", error);
-      res.status(500).json({ error: "Failed to list oportunidades" });
+      console.error("[crosssell] Error listing clientes:", error);
+      res.status(500).json({ error: "Failed to list clientes" });
     }
   });
 
   // 2. POST /api/comercial/crosssell — Create oportunidade
   app.post("/api/comercial/crosssell", async (req, res) => {
     try {
-      const { clienteId, cnpj, produtoMapeado, cxResponsavel, valorRNegociacao, valorPNegociacao } = req.body;
+      const { clienteId, cnpj, produtoMapeado, cxResponsavel, valorRNegociacao, valorPNegociacao, etapa } = req.body;
 
       if (!clienteId || !cnpj || !produtoMapeado || !cxResponsavel) {
         return res.status(400).json({ error: "clienteId, cnpj, produtoMapeado, cxResponsavel são obrigatórios" });
       }
 
+      const etapaInicial = typeof etapa === "string" && etapa.length > 0 ? etapa : "fazer_contato";
+
       const result = await db.execute(sql`
         INSERT INTO cortex_core.crosssell_oportunidades
           (cliente_id, cnpj, produto_mapeado, cx_responsavel, valor_r_negociacao, valor_p_negociacao, etapa)
         VALUES
-          (${clienteId}, ${cnpj}, ${produtoMapeado}, ${cxResponsavel}, ${valorRNegociacao || null}, ${valorPNegociacao || null}, 'fazer_contato')
+          (${clienteId}, ${cnpj}, ${produtoMapeado}, ${cxResponsavel}, ${valorRNegociacao || null}, ${valorPNegociacao || null}, ${etapaInicial})
         RETURNING *
       `);
 
@@ -384,7 +418,15 @@ export function registerCrossSellRoutes(app: Express) {
         opDateFilter = `AND EXTRACT(YEAR FROM o.criado_em) = ${Number(ano)}`;
       }
 
-      const [kpisResult, funilResult, reunioesPorCxResult, rankingValorResult, rankingReunioesResult] = await Promise.all([
+      const [
+        kpisResult,
+        funilResult,
+        reunioesPorCxResult,
+        rankingValorResult,
+        rankingReunioesResult,
+        clientesNegociacaoResult,
+        coberturaResult,
+      ] = await Promise.all([
         // KPIs
         db.execute(sql.raw(`
           SELECT
@@ -436,6 +478,25 @@ export function registerCrossSellRoutes(app: Express) {
           GROUP BY o.cx_responsavel
           ORDER BY total_reunioes DESC
         `)),
+
+        // Clientes em negociação ativa (distinct cnpj com oportunidades em etapas ativas)
+        db.execute(sql.raw(`
+          SELECT COUNT(DISTINCT cnpj)::int AS total
+          FROM cortex_core.crosssell_oportunidades
+          WHERE etapa NOT IN ('ganho', 'descartado', 'sugerido_sistema')
+        `)),
+
+        // Cobertura: clientes com oportunidades / total clientes ativos
+        db.execute(sql.raw(`
+          SELECT
+            (SELECT COUNT(DISTINCT cnpj)::int
+             FROM cortex_core.crosssell_oportunidades
+             WHERE etapa NOT IN ('ganho', 'descartado')) AS com_oportunidade,
+            (SELECT COUNT(*)::int
+             FROM "Clickup".cup_clientes
+             WHERE status IN ('ativo', 'Ativo', 'ATIVO')
+               AND cnpj IS NOT NULL AND cnpj != '') AS total_ativos
+        `)),
       ]);
 
       const kpis = kpisResult.rows[0] as any;
@@ -453,6 +514,14 @@ export function registerCrossSellRoutes(app: Express) {
           taxaAceitacao: Number(kpis.sugestoes_total_transicoes) > 0
             ? Number(((Number(kpis.sugestoes_aceitas) / Number(kpis.sugestoes_total_transicoes)) * 100).toFixed(1))
             : 0,
+          clientesEmNegociacao: Number((clientesNegociacaoResult.rows[0] as any).total),
+          coberturaBase: (() => {
+            const r = coberturaResult.rows[0] as any;
+            const total = Number(r.total_ativos);
+            return total > 0
+              ? Number(((Number(r.com_oportunidade) / total) * 100).toFixed(1))
+              : 0;
+          })(),
         },
         funilEtapas: (funilResult.rows as any[]).map((r) => ({
           etapa: r.etapa,
