@@ -11697,6 +11697,36 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
   
+  app.get("/api/unavailability-requests/today", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          ur.id,
+          ur.colaborador_id,
+          ur.colaborador_nome,
+          ur.colaborador_email,
+          ur.data_fim
+        FROM cortex_core.unavailability_requests ur
+        WHERE ur.status = 'aprovado'
+          AND CURRENT_DATE BETWEEN ur.data_inicio AND ur.data_fim
+        ORDER BY ur.colaborador_nome ASC
+      `);
+
+      const items = result.rows.map((row: any) => ({
+        id: row.id,
+        colaboradorId: row.colaborador_id,
+        nome: row.colaborador_nome,
+        email: row.colaborador_email,
+        dataFim: row.data_fim,
+      }));
+
+      res.json(items);
+    } catch (error) {
+      console.error("[unavailability-today] Error fetching today list:", error);
+      res.status(500).json({ error: "Failed to fetch unavailability today" });
+    }
+  });
+
   app.get("/api/unavailability-requests", isAuthenticated, async (req, res) => {
     try {
       const { status, colaboradorId, squadNome } = req.query;
