@@ -138,4 +138,59 @@ describe('syncInternalTrainings', () => {
     expect(report.ok).toBe(false);
     expect(report.erros[0].mensagem).toMatch(/INTERNAL_TRAININGS_DRIVE_FOLDER_ID/);
   });
+
+  it('não desativa trilha que erra durante sync (preserva dados)', async () => {
+    // Subpastas
+    mockFilesList.mockResolvedValueOnce({
+      data: { files: [{ id: 'folder-perf', name: 'Performance' }] },
+    });
+    // Track upsert sucede
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'tr-perf-uuid' }] });
+    // Listar vídeos da Performance falha (transient error)
+    mockFilesList.mockRejectedValueOnce(new Error('Network timeout'));
+    // Reconciliação trilhas: existem 2 trilhas (a errada + uma órfã antiga)
+    mockExecute.mockResolvedValueOnce({ rows: [
+      { id: 'tr-perf-uuid', drive_folder_id: 'folder-perf' },
+      { id: 'tr-old-uuid', drive_folder_id: 'folder-old' },
+    ]});
+    // UPDATE deactivates só a tr-old (não a tr-perf-uuid que errou)
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    // Query auxiliar de vídeos em trilhas erradas
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'vid-perf-existing' }] });
+    // Reconciliação vídeos
+    mockExecute.mockResolvedValueOnce({ rows: [
+      { id: 'vid-perf-existing', drive_file_id: 'vid-perf' },
+      { id: 'vid-other', drive_file_id: 'vid-other-id' },
+    ]});
+    // UPDATE de vídeos
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+
+    const report = await syncInternalTrainings();
+
+    // Trilha Performance NÃO foi desativada apesar de ter errado.
+    // Apenas a tr-old foi (1 desativação).
+    expect(report.trilhasDesativadas).toBe(1);
+    // Vídeo da Performance NÃO foi desativado (vid-perf-existing está em trilha errada).
+    // Apenas vid-other foi.
+    expect(report.videosDesativados).toBe(1);
+    expect(report.erros.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('reconciliação que falha não invalida sync inteiro', async () => {
+    mockFilesList.mockResolvedValueOnce({
+      data: { files: [{ id: 'folder-perf', name: 'Performance' }] },
+    });
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'tr-perf-uuid' }] });
+    mockFilesList.mockResolvedValueOnce({ data: { files: [] } });
+    // Reconciliação trilhas falha
+    mockExecute.mockRejectedValueOnce(new Error('DB connection lost'));
+    // Reconciliação vídeos sucede mesmo assim (executa com lista vazia ou similar)
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+
+    const report = await syncInternalTrainings();
+
+    expect(report.ok).toBe(true);
+    expect(report.trilhasAtivas).toBe(1);
+    expect(report.erros.some(e => e.contexto.includes('reconciliação'))).toBe(true);
+  });
 });

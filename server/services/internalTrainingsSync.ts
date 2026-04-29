@@ -50,19 +50,28 @@ export async function syncInternalTrainings(): Promise<SyncReport> {
   const erros: Array<{ contexto: string; mensagem: string }> = [];
   const seenFolderIds = new Set<string>();
   const seenFileIds = new Set<string>();
+  const erroredFolderIds = new Set<string>();
   let trilhasAtivas = 0;
   let videosAtivos = 0;
+  let trilhasDesativadas = 0;
+  let videosDesativados = 0;
 
   try {
     const drive = getDriveClient();
 
-    // 1. Listar subpastas
-    const foldersResp = await drive.files.list({
-      q: `'${rootFolderId}' in parents and mimeType='${FOLDER_MIME}' and trashed=false`,
-      fields: 'files(id, name)',
-      pageSize: 1000,
-    });
-    const folders = foldersResp.data.files || [];
+    // 1. Listar subpastas (com paginação)
+    const folders: Array<{ id?: string | null; name?: string | null }> = [];
+    let folderPageToken: string | undefined = undefined;
+    do {
+      const foldersResp: any = await drive.files.list({
+        q: `'${rootFolderId}' in parents and mimeType='${FOLDER_MIME}' and trashed=false`,
+        fields: 'nextPageToken, files(id, name)',
+        pageSize: 1000,
+        pageToken: folderPageToken,
+      });
+      folders.push(...(foldersResp.data.files || []));
+      folderPageToken = foldersResp.data.nextPageToken || undefined;
+    } while (folderPageToken);
 
     // 2. Para cada subpasta: upsert track + listar vídeos
     for (const folder of folders) {
@@ -95,6 +104,9 @@ export async function syncInternalTrainings(): Promise<SyncReport> {
 
           for (const file of files) {
             if (!file.id || !file.name) continue;
+            // Defensive: garantir que é mesmo um vídeo (filtro do Drive é server-side
+            // mas blindamos contra leaks)
+            if (!file.mimeType?.startsWith('video/')) continue;
             try {
               const duracaoMs = file.videoMediaMetadata?.durationMillis
                 ? Number(file.videoMediaMetadata.durationMillis)
@@ -130,43 +142,65 @@ export async function syncInternalTrainings(): Promise<SyncReport> {
           pageToken = filesResp.data.nextPageToken || undefined;
         } while (pageToken);
       } catch (e: any) {
+        if (folder.id) erroredFolderIds.add(folder.id);
         erros.push({ contexto: `trilha "${folder.name}"`, mensagem: e.message || String(e) });
       }
     }
 
-    // 3. Reconciliação (soft-delete)
-    const allTracksResult = await db.execute(sql`
-      SELECT id, drive_folder_id FROM cortex_core.internal_video_tracks WHERE is_active = TRUE
-    `);
-    const tracksToDeactivate = (allTracksResult.rows as Array<{ id: string; drive_folder_id: string }>)
-      .filter((t) => !seenFolderIds.has(t.drive_folder_id))
-      .map((t) => t.id);
-
-    let trilhasDesativadas = 0;
-    if (tracksToDeactivate.length > 0) {
-      await db.execute(sql`
-        UPDATE cortex_core.internal_video_tracks
-        SET is_active = FALSE, updated_at = NOW()
-        WHERE id = ANY(${tracksToDeactivate})
+    // 3. Reconciliação de trilhas (soft-delete)
+    // Excluímos trilhas que erraram durante o sync para evitar perda transitória de dados.
+    try {
+      const allTracksResult = await db.execute(sql`
+        SELECT id, drive_folder_id FROM cortex_core.internal_video_tracks WHERE is_active = TRUE
       `);
-      trilhasDesativadas = tracksToDeactivate.length;
+      const tracksToDeactivate = (allTracksResult.rows as Array<{ id: string; drive_folder_id: string }>)
+        .filter((t) => !seenFolderIds.has(t.drive_folder_id) && !erroredFolderIds.has(t.drive_folder_id))
+        .map((t) => t.id);
+
+      if (tracksToDeactivate.length > 0) {
+        await db.execute(sql`
+          UPDATE cortex_core.internal_video_tracks
+          SET is_active = FALSE, updated_at = NOW()
+          WHERE id = ANY(${tracksToDeactivate})
+        `);
+        trilhasDesativadas = tracksToDeactivate.length;
+      }
+    } catch (e: any) {
+      erros.push({ contexto: 'reconciliação trilhas', mensagem: e.message || String(e) });
     }
 
-    const allVideosResult = await db.execute(sql`
-      SELECT id, drive_file_id FROM cortex_core.internal_videos WHERE is_active = TRUE
-    `);
-    const videosToDeactivate = (allVideosResult.rows as Array<{ id: string; drive_file_id: string }>)
-      .filter((v) => !seenFileIds.has(v.drive_file_id))
-      .map((v) => v.id);
+    // 4. Reconciliação de vídeos (soft-delete)
+    // Excluímos vídeos cujo track corresponde a folder que errou no sync.
+    try {
+      let videosFromErroredFolders = new Set<string>();
+      if (erroredFolderIds.size > 0) {
+        const erroredArr = Array.from(erroredFolderIds);
+        const result = await db.execute(sql`
+          SELECT v.id
+          FROM cortex_core.internal_videos v
+          JOIN cortex_core.internal_video_tracks t ON t.id = v.track_id
+          WHERE t.drive_folder_id = ANY(${erroredArr}) AND v.is_active = TRUE
+        `);
+        videosFromErroredFolders = new Set((result.rows as Array<{ id: string }>).map((r) => r.id));
+      }
 
-    let videosDesativados = 0;
-    if (videosToDeactivate.length > 0) {
-      await db.execute(sql`
-        UPDATE cortex_core.internal_videos
-        SET is_active = FALSE, updated_at = NOW()
-        WHERE id = ANY(${videosToDeactivate})
+      const allVideosResult = await db.execute(sql`
+        SELECT id, drive_file_id FROM cortex_core.internal_videos WHERE is_active = TRUE
       `);
-      videosDesativados = videosToDeactivate.length;
+      const videosToDeactivate = (allVideosResult.rows as Array<{ id: string; drive_file_id: string }>)
+        .filter((v) => !seenFileIds.has(v.drive_file_id) && !videosFromErroredFolders.has(v.id))
+        .map((v) => v.id);
+
+      if (videosToDeactivate.length > 0) {
+        await db.execute(sql`
+          UPDATE cortex_core.internal_videos
+          SET is_active = FALSE, updated_at = NOW()
+          WHERE id = ANY(${videosToDeactivate})
+        `);
+        videosDesativados = videosToDeactivate.length;
+      }
+    } catch (e: any) {
+      erros.push({ contexto: 'reconciliação vídeos', mensagem: e.message || String(e) });
     }
 
     return { ok: true, trilhasAtivas, videosAtivos, trilhasDesativadas, videosDesativados, erros };
