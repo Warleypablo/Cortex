@@ -1,6 +1,7 @@
 import type { Express, Request } from 'express';
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
+import { syncInternalTrainings } from '../services/internalTrainingsSync';
 
 function getUserEmail(req: Request): string | null {
   const user = (req as any).user;
@@ -304,6 +305,20 @@ export function registerInternalTrainingsRoutes(app: Express) {
     } catch (error: any) {
       console.error('[treinamentos-internos] DELETE /comentarios error:', error);
       res.status(500).json({ error: 'Erro ao excluir comentário' });
+    }
+  });
+
+  // POST /api/treinamentos-internos/sync (manual trigger)
+  app.post('/api/treinamentos-internos/sync', async (req, res) => {
+    try {
+      const userEmail = getUserEmail(req);
+      if (!userEmail) return res.status(401).json({ error: 'Não autenticado' });
+
+      const report = await syncInternalTrainings();
+      res.json(report);
+    } catch (error: any) {
+      console.error('[treinamentos-internos] POST /sync error:', error);
+      res.status(500).json({ error: 'Erro ao sincronizar' });
     }
   });
 }
