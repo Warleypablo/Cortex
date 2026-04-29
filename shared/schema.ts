@@ -3363,7 +3363,7 @@ export const internalVideoCompletions = cortexCoreSchema.table("internal_video_c
   userEmail: varchar("user_email", { length: 100 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
-  uniqueUserVideo: unique("uq_completion_user_video").on(t.videoId, t.userEmail),
+  uniqueCompletionUserVideo: unique("uq_completion_user_video").on(t.videoId, t.userEmail),
 }));
 
 export const internalVideoLikes = cortexCoreSchema.table("internal_video_likes", {
@@ -3372,7 +3372,7 @@ export const internalVideoLikes = cortexCoreSchema.table("internal_video_likes",
   userEmail: varchar("user_email", { length: 100 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
-  uniqueUserVideo: unique("uq_like_user_video").on(t.videoId, t.userEmail),
+  uniqueLikeUserVideo: unique("uq_like_user_video").on(t.videoId, t.userEmail),
 }));
 
 export const internalVideoComments = cortexCoreSchema.table("internal_video_comments", {
@@ -3390,3 +3390,8 @@ export type InternalVideo = typeof internalVideos.$inferSelect;
 export type InternalVideoCompletion = typeof internalVideoCompletions.$inferSelect;
 export type InternalVideoLike = typeof internalVideoLikes.$inferSelect;
 export type InternalVideoComment = typeof internalVideoComments.$inferSelect;
+export type InsertInternalVideoTrack = typeof internalVideoTracks.$inferInsert;
+export type InsertInternalVideo = typeof internalVideos.$inferInsert;
+export type InsertInternalVideoCompletion = typeof internalVideoCompletions.$inferInsert;
+export type InsertInternalVideoLike = typeof internalVideoLikes.$inferInsert;
+export type InsertInternalVideoComment = typeof internalVideoComments.$inferInsert;
