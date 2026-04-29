@@ -81,6 +81,8 @@ interface DashboardData {
     taxaConversao: number;
     sugestoesAtivas: number;
     taxaAceitacao: number;
+    clientesEmNegociacao: number;
+    coberturaBase: number;
   };
   funilEtapas: Array<{ etapa: string; total: number }>;
   reunioesPorCx: Array<{ cxResponsavel: string; total: number }>;
@@ -164,13 +166,13 @@ export default function CrossSellDashboard() {
 
       {/* KPI Cards */}
       {isLoading ? (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-          {Array.from({ length: 7 }).map((_, i) => (
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-4">
+          {Array.from({ length: 9 }).map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-9 gap-4">
           <KpiCard
             title="Reunioes Agendadas"
             value={String(data?.kpis.reunioesAgendadas ?? 0)}
@@ -210,6 +212,18 @@ export default function CrossSellDashboard() {
             value={`${data?.kpis.taxaAceitacao ?? 0}%`}
             icon={<TrendingUp className="h-5 w-5 text-cyan-500" />}
             accent="text-cyan-600 dark:text-cyan-400"
+          />
+          <KpiCard
+            title="Clientes em Negociacao"
+            value={String(data?.kpis.clientesEmNegociacao ?? 0)}
+            icon={<BarChart3 className="h-5 w-5 text-pink-500" />}
+            accent="text-pink-600 dark:text-pink-400"
+          />
+          <KpiCard
+            title="Cobertura da Base"
+            value={`${data?.kpis.coberturaBase ?? 0}%`}
+            icon={<TrendingUp className="h-5 w-5 text-orange-500" />}
+            accent="text-orange-600 dark:text-orange-400"
           />
         </div>
       )}

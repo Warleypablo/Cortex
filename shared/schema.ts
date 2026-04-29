@@ -1441,6 +1441,25 @@ export const negativacaoAcoes = cortexCoreSchema.table("negativacao_acoes", {
   index("idx_neg_etapa").on(table.etapa),
 ]);
 
+// Notificações Extrajudiciais Enviadas - Auditoria de emails enviados
+export const notificacoesExtrajudiciaisEnviadas = cortexCoreSchema.table(
+  "notificacoes_extrajudiciais_enviadas",
+  {
+    id: serial("id").primaryKey(),
+    clienteId: text("cliente_id").notNull(),
+    clienteNome: text("cliente_nome"),
+    emailDestino: text("email_destino").notNull(),
+    assunto: text("assunto").notNull(),
+    corpoTexto: text("corpo_texto").notNull(),
+    corpoHtml: text("corpo_html").notNull(),
+    enviadoPor: text("enviado_por").notNull(),
+    enviadoEm: timestamp("enviado_em", { withTimezone: true }).defaultNow().notNull(),
+    sendgridMessageId: text("sendgrid_message_id"),
+    status: text("status").notNull().default("enviado"),
+    erro: text("erro"),
+  },
+);
+
 // Metric Formatting Rules - Conditional coloring system
 export const metricRulesets = pgTable("metric_rulesets", {
   id: integer("id").primaryKey(),
@@ -3286,3 +3305,27 @@ export const crosssellEtapaLog = cortexCoreSchema.table("crosssell_etapa_log", {
 });
 
 export type CrosssellEtapaLog = typeof crosssellEtapaLog.$inferSelect;
+
+// Triagem Inteligente - Análise de risco pré-onboarding
+export const triagemAnalises = cortexCoreSchema.table("triagem_analises", {
+  id: serial("id").primaryKey(),
+  clienteId: text("cliente_id"),
+  clienteNome: text("cliente_nome").notNull(),
+  squad: text("squad"),
+  vendedor: text("vendedor"),
+  produto: text("produto"),
+  valorContrato: decimal("valor_contrato", { precision: 12, scale: 2 }),
+  transcricaoUrl: text("transcricao_url"),
+  transcricaoTexto: text("transcricao_texto"),
+  score: text("score"),
+  scoreNumerico: integer("score_numerico"),
+  analiseJson: jsonb("analise_json"),
+  status: text("status").notNull().default("pendente"),
+  decisaoPor: text("decisao_por"),
+  decisaoObservacoes: text("decisao_observacoes"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export type TriagemAnalise = typeof triagemAnalises.$inferSelect;
+export type InsertTriagemAnalise = typeof triagemAnalises.$inferInsert;

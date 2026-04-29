@@ -149,6 +149,7 @@ const PortalCliente = PortalClientePage;
 const PortalCreator = lazyWithRetry(() => import("@/pages/PortalCreator"));
 const TestWorkflow = lazyWithRetry(() => import("@/pages/TestWorkflow"));
 const Negativacao = lazyWithRetry(() => import("@/pages/Negativacao"));
+const Triagem = lazyWithRetry(() => import("@/pages/Triagem"));
 const CrossSellPipeline = lazyWithRetry(() => import("@/pages/CrossSellPipeline"));
 const CrossSellDashboard = lazyWithRetry(() => import("@/pages/CrossSellDashboard"));
 const ReceitaRecorrente = lazyWithRetry(() => import("@/pages/financeiro/ReceitaRecorrente"));
@@ -320,6 +321,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/dre">{() => <ProtectedRoute path="/dashboard/dre" component={DRE} />}</Route>
       <Route path="/dashboard/notas-fiscais">{() => <ProtectedRoute path="/dashboard/notas-fiscais" component={NotasFiscais} />}</Route>
       <Route path="/financeiro/negativacao">{() => <ProtectedRoute path="/financeiro/negativacao" component={Negativacao} />}</Route>
+      <Route path="/triagem">{() => <ProtectedRoute path="/triagem" component={Triagem} />}</Route>
       <Route path="/financeiro/receita-recorrente">{() => <ProtectedRoute path="/financeiro/receita-recorrente" component={ReceitaRecorrente} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       

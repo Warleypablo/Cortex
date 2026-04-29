@@ -1,9 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCurrency } from "@/lib/utils";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -35,11 +34,9 @@ import {
   MessageSquare,
   Trophy,
   Search,
-  ChevronDown,
   Send,
-  Calendar,
   User,
-  Package,
+  Briefcase,
   Clock,
   Sparkles,
 } from "lucide-react";
@@ -63,6 +60,7 @@ const ETAPAS = [
   "em_contato",
   "proposta_enviada",
   "forte_interesse",
+  "ganho",
   "descartado",
 ] as const;
 
@@ -76,6 +74,7 @@ const ETAPA_LABELS: Record<Etapa, string> = {
   em_contato: "Em Contato",
   proposta_enviada: "Proposta Enviada",
   forte_interesse: "Forte Interesse",
+  ganho: "Ganho",
   descartado: "Descartado",
 };
 
@@ -87,6 +86,7 @@ const ETAPA_COLORS: Record<Etapa, string> = {
   em_contato: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
   proposta_enviada: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
   forte_interesse: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  ganho: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
   descartado: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
 };
 
@@ -94,53 +94,39 @@ const CLUSTERS = ["Regulares", "Imperdiveis", "Chaves", "NFNC"];
 
 const OPERACOES = ["Upsell", "CrossSell", "Renovacao", "Upgrade"];
 
-const PRIORIDADE_COLORS: Record<string, string> = {
-  alta: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  media: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
-  baixa: "bg-gray-100 text-gray-600 dark:bg-zinc-700 dark:text-zinc-400",
-};
-
-const PRIORIDADE_LABELS: Record<string, string> = {
-  alta: "Alta",
-  media: "Média",
-  baixa: "Baixa",
-};
-
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 interface Oportunidade {
   id: number;
-  clienteId: string;
-  cnpj: string;
-  clienteNome: string | null;
-  clienteStatus: string | null;
-  cluster: string | null;
-  cxCliente: string | null;
-  produtoMapeado: string;
+  produto: string;
   etapa: string;
   valorRNegociacao: number | null;
   valorPNegociacao: number | null;
   cxResponsavel: string;
   ultimoContato: string | null;
-  criadoEm: string;
+  origem: "manual" | "sistema";
+  prioridade: "alta" | "media" | "baixa" | null;
+  motivo: string | null;
+  totalComentarios: number;
   atualizadoEm: string;
+}
+
+interface ClienteCrossSell {
+  cnpj: string;
+  clienteId: string;
+  nome: string;
+  cluster: string | null;
+  status: string | null;
+  cxConta: string | null;
+  vendedor: string | null;
   valorRAtual: number;
   valorPAtual: number;
   contratoInicio: string | null;
-  totalComentarios: number;
-  origem: string | null;
-  prioridade: string | null;
-  scoreDetalhes: {
-    afinidade: number;
-    gap: number;
-    financeiro: number;
-    tenure: number;
-    churn: number;
-    total: number;
-  } | null;
-  motivo: string | null;
+  servicosAtivos: string[];
+  scoreMaximo: number;
+  oportunidades: Oportunidade[];
 }
 
 interface ClienteSearch {
@@ -154,10 +140,10 @@ interface ClienteSearch {
 
 interface Comentario {
   id: number;
-  oportunidade_id: number;
+  oportunidadeId: number;
   autor: string;
   texto: string;
-  criado_em: string;
+  criadoEm: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +171,39 @@ function formatDate(d: string | null): string {
   return new Date(d).toLocaleDateString("pt-BR");
 }
 
+function formatCurrencyCompact(value: number | null | undefined): string {
+  if (value == null || value === 0) return "—";
+  if (value >= 1000) {
+    const k = value / 1000;
+    return `R$ ${k.toFixed(k >= 10 ? 0 : 1)}k`;
+  }
+  return `R$ ${value.toFixed(0)}`;
+}
+
+type ClienteEtapaGroup = {
+  cliente: ClienteCrossSell;
+  oportunidades: Oportunidade[];
+};
+
+function groupClientesByEtapa(
+  clientes: ClienteCrossSell[]
+): Map<Etapa, ClienteEtapaGroup[]> {
+  const groups = new Map<Etapa, ClienteEtapaGroup[]>();
+  for (const cliente of clientes) {
+    const byEtapa = new Map<Etapa, Oportunidade[]>();
+    for (const op of cliente.oportunidades) {
+      const e = op.etapa as Etapa;
+      if (!byEtapa.has(e)) byEtapa.set(e, []);
+      byEtapa.get(e)!.push(op);
+    }
+    for (const [e, ops] of byEtapa) {
+      if (!groups.has(e)) groups.set(e, []);
+      groups.get(e)!.push({ cliente, oportunidades: ops });
+    }
+  }
+  return groups;
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -194,42 +213,83 @@ export default function CrossSellPipeline() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // View tabs
+  const [view, setView] = useState<"pipeline" | "ganhos">("pipeline");
+
   // Filters
   const [cluster, setCluster] = useState("todos");
   const [cxResp, setCxResp] = useState("todos");
   const [etapaFilter, setEtapaFilter] = useState("todas");
   const [produtoFilter, setProdutoFilter] = useState("todos");
-  const [origemFilter, setOrigemFilter] = useState("todas");
-  const [prioridadeFilter, setPrioridadeFilter] = useState("todas");
+  const [ordenacao, setOrdenacao] = useState<"score" | "mrr" | "recente" | "nome">("score");
 
   // Modals
-  const [showNew, setShowNew] = useState(false);
-  const [ganhoOp, setGanhoOp] = useState<Oportunidade | null>(null);
-  const [commentOp, setCommentOp] = useState<Oportunidade | null>(null);
+  const [newOpEtapa, setNewOpEtapa] = useState<Etapa | null>(null);
+  const [ganhoCtx, setGanhoCtx] = useState<{ op: Oportunidade; clienteNome: string } | null>(null);
+  const [commentCtx, setCommentCtx] = useState<{ op: Oportunidade; clienteNome: string } | null>(null);
+
+  // Accordion expansion
+  const [etapasExpandidas, setEtapasExpandidas] = useState<Set<Etapa>>(new Set());
+  const initializedExpansion = useRef(false);
+
+  // Build query string for backend filters
+  const queryString = useMemo(() => {
+    const p = new URLSearchParams();
+    if (cluster !== "todos") p.set("cluster", cluster);
+    if (cxResp !== "todos") p.set("cx", cxResp);
+    if (etapaFilter !== "todas") p.set("etapa", etapaFilter);
+    if (produtoFilter !== "todos") p.set("produto", produtoFilter);
+    return p.toString();
+  }, [cluster, cxResp, etapaFilter, produtoFilter]);
 
   // Query
-  const { data: oportunidades = [], isLoading } = useQuery<Oportunidade[]>({
-    queryKey: ["/api/comercial/crosssell"],
+  const { data: clientes = [], isLoading } = useQuery<ClienteCrossSell[]>({
+    queryKey: ["/api/comercial/crosssell", queryString],
+    queryFn: async () => {
+      const url = queryString
+        ? `/api/comercial/crosssell?${queryString}`
+        : `/api/comercial/crosssell`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erro ao carregar clientes");
+      return res.json();
+    },
   });
 
-  // Derived filters
+  // Derived: list of distinct CX responsáveis (entre todas oportunidades)
   const cxResponsaveis = useMemo(() => {
-    const set = new Set(oportunidades.map((o) => o.cxResponsavel));
+    const set = new Set<string>();
+    for (const c of clientes) {
+      for (const op of c.oportunidades) set.add(op.cxResponsavel);
+    }
     return Array.from(set).sort();
-  }, [oportunidades]);
+  }, [clientes]);
 
-  const filtered = useMemo(() => {
-    return oportunidades.filter((o) => {
-      if (cluster !== "todos" && o.cluster !== cluster) return false;
-      if (cxResp !== "todos" && o.cxResponsavel !== cxResp) return false;
-      if (etapaFilter !== "todas" && o.etapa !== etapaFilter) return false;
-      if (produtoFilter !== "todos" && o.produtoMapeado !== produtoFilter)
-        return false;
-      if (origemFilter !== "todas" && (o.origem ?? "manual") !== origemFilter) return false;
-      if (prioridadeFilter !== "todas" && o.prioridade !== prioridadeFilter) return false;
-      return true;
-    });
-  }, [oportunidades, cluster, cxResp, etapaFilter, produtoFilter, origemFilter, prioridadeFilter]);
+  // Group clientes by etapa (each cliente appears in N sections, one per etapa where they have ≥1 op)
+  const grupos = useMemo(() => groupClientesByEtapa(clientes), [clientes]);
+
+  // Initialize default expansion: 3 first etapas with cards (excluding sugerido_sistema/descartado)
+  useEffect(() => {
+    if (initializedExpansion.current || clientes.length === 0) return;
+    const etapasComCards = ETAPAS.filter(
+      (e) => e !== "sugerido_sistema" && e !== "descartado" && e !== "ganho" && (grupos.get(e)?.length ?? 0) > 0
+    );
+    setEtapasExpandidas(new Set(etapasComCards.slice(0, 3)));
+    initializedExpansion.current = true;
+  }, [clientes, grupos]);
+
+  const totalOportunidades = useMemo(
+    () => clientes.reduce((s, c) => s + c.oportunidades.length, 0),
+    [clientes]
+  );
+  const totalRNegociacao = useMemo(
+    () =>
+      clientes.reduce(
+        (s, c) =>
+          s + c.oportunidades.reduce((s2, op) => s2 + (op.valorRNegociacao ?? 0), 0),
+        0
+      ),
+    [clientes]
+  );
 
   const mapear = useMutation({
     mutationFn: async () => {
@@ -252,7 +312,6 @@ export default function CrossSellPipeline() {
     },
   });
 
-  // Mutation: change etapa
   const changeEtapa = useMutation({
     mutationFn: async ({ id, etapa }: { id: number; etapa: string }) => {
       const res = await fetch(`/api/comercial/crosssell/${id}`, {
@@ -261,6 +320,21 @@ export default function CrossSellPipeline() {
         body: JSON.stringify({ etapa, alteradoPor: user?.name }),
       });
       if (!res.ok) throw new Error("Erro ao atualizar etapa");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/comercial/crosssell"] });
+    },
+  });
+
+  const changeValor = useMutation({
+    mutationFn: async ({ id, field, value }: { id: number; field: "valorRNegociacao" | "valorPNegociacao"; value: number }) => {
+      const res = await fetch(`/api/comercial/crosssell/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value, alteradoPor: user?.name }),
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar valor");
       return res.json();
     },
     onSuccess: () => {
@@ -278,7 +352,7 @@ export default function CrossSellPipeline() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-64 w-full rounded-xl" />
+            <Skeleton key={i} className="h-72 w-full rounded-xl" />
           ))}
         </div>
       </div>
@@ -287,6 +361,34 @@ export default function CrossSellPipeline() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200 dark:border-zinc-700">
+        <button
+          onClick={() => setView("pipeline")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            view === "pipeline"
+              ? "border-indigo-500 text-indigo-700 dark:text-indigo-300"
+              : "border-transparent text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+          }`}
+        >
+          Pipeline
+        </button>
+        <button
+          onClick={() => setView("ganhos")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            view === "ganhos"
+              ? "border-indigo-500 text-indigo-700 dark:text-indigo-300"
+              : "border-transparent text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200"
+          }`}
+        >
+          Ganhos
+        </button>
+      </div>
+
+      {view === "ganhos" && <GanhosList />}
+
+      {view === "pipeline" && (
+      <>
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={cluster} onValueChange={setCluster}>
@@ -337,26 +439,15 @@ export default function CrossSellPipeline() {
           </SelectContent>
         </Select>
 
-        <Select value={origemFilter} onValueChange={setOrigemFilter}>
-          <SelectTrigger className="w-36 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <SelectValue placeholder="Origem" />
+        <Select value={ordenacao} onValueChange={(v) => setOrdenacao(v as any)}>
+          <SelectTrigger className="w-52 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue placeholder="Ordenar por" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas Origens</SelectItem>
-            <SelectItem value="manual">Manual</SelectItem>
-            <SelectItem value="sistema">Sistema</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={prioridadeFilter} onValueChange={setPrioridadeFilter}>
-          <SelectTrigger className="w-40 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-            <SelectValue placeholder="Prioridade" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas Prioridades</SelectItem>
-            <SelectItem value="alta">Alta</SelectItem>
-            <SelectItem value="media">Média</SelectItem>
-            <SelectItem value="baixa">Baixa</SelectItem>
+            <SelectItem value="score">Maior potencial</SelectItem>
+            <SelectItem value="mrr">Maior MRR atual</SelectItem>
+            <SelectItem value="recente">Mais recentes</SelectItem>
+            <SelectItem value="nome">Alfabético</SelectItem>
           </SelectContent>
         </Select>
 
@@ -372,7 +463,7 @@ export default function CrossSellPipeline() {
           {mapear.isPending ? "Mapeando..." : "Mapear Oportunidades"}
         </Button>
 
-        <Button onClick={() => setShowNew(true)} className="gap-2">
+        <Button onClick={() => setNewOpEtapa("fazer_contato")} className="gap-2">
           <Plus className="h-4 w-4" />
           Nova Oportunidade
         </Button>
@@ -380,61 +471,76 @@ export default function CrossSellPipeline() {
 
       {/* Summary */}
       <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-zinc-400">
-        <span>{filtered.length} oportunidades</span>
-        <span>|</span>
-        <span>
-          Valor R em negociacao:{" "}
-          {formatCurrency(
-            filtered.reduce((s, o) => s + (o.valorRNegociacao ?? 0), 0)
-          )}
-        </span>
-        <span>
-          Valor P em negociacao:{" "}
-          {formatCurrency(
-            filtered.reduce((s, o) => s + (o.valorPNegociacao ?? 0), 0)
-          )}
-        </span>
+        <span>{clientes.length} clientes únicos</span>
+        <span>·</span>
+        <span>{totalOportunidades} oportunidades</span>
+        <span>·</span>
+        <span>{formatCurrency(totalRNegociacao)} em negociação</span>
       </div>
 
-      {/* Card grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map((op) => (
-          <OpCard
-            key={op.id}
-            op={op}
-            onChangeEtapa={(etapa) => changeEtapa.mutate({ id: op.id, etapa })}
-            onGanho={() => setGanhoOp(op)}
-            onComments={() => setCommentOp(op)}
+      {/* Etapas accordion */}
+      <div className="space-y-1">
+        {ETAPAS.filter((e) => (grupos.get(e)?.length ?? 0) > 0).map((etapa) => (
+          <EtapaSection
+            key={etapa}
+            etapa={etapa}
+            grupos={grupos.get(etapa) ?? []}
+            expanded={etapasExpandidas.has(etapa)}
+            onToggle={() =>
+              setEtapasExpandidas((prev) => {
+                const next = new Set(prev);
+                if (next.has(etapa)) next.delete(etapa);
+                else next.add(etapa);
+                return next;
+              })
+            }
+            onNewOpForEtapa={(e) => setNewOpEtapa(e)}
+            ordenacao={ordenacao}
+            onChangeEtapa={(opId, e) => changeEtapa.mutate({ id: opId, etapa: e })}
+            onChangeValor={(opId, field, value) => changeValor.mutate({ id: opId, field, value })}
+            onGanho={(op) => {
+              const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
+              if (grupo) setGanhoCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
+            }}
+            onComments={(op) => {
+              const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
+              if (grupo) setCommentCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
+            }}
           />
         ))}
-        {filtered.length === 0 && (
-          <div className="col-span-full text-center py-16 text-gray-400 dark:text-zinc-500">
-            Nenhuma oportunidade encontrada com os filtros selecionados.
+        {grupos.size === 0 && (
+          <div className="text-center py-16 text-gray-400 dark:text-zinc-500">
+            Nenhum cliente encontrado com os filtros selecionados.
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Modals */}
-      {showNew && (
+      {newOpEtapa && (
         <NewOpDialog
-          open={showNew}
-          onClose={() => setShowNew(false)}
+          open={!!newOpEtapa}
+          etapaInicial={newOpEtapa}
+          onClose={() => setNewOpEtapa(null)}
           userName={user?.name ?? ""}
         />
       )}
-      {ganhoOp && (
+      {ganhoCtx && (
         <GanhoDialog
-          open={!!ganhoOp}
-          op={ganhoOp}
-          onClose={() => setGanhoOp(null)}
+          open={!!ganhoCtx}
+          op={ganhoCtx.op}
+          clienteNome={ganhoCtx.clienteNome}
+          onClose={() => setGanhoCtx(null)}
           userName={user?.name ?? ""}
         />
       )}
-      {commentOp && (
+      {commentCtx && (
         <CommentsSheet
-          open={!!commentOp}
-          op={commentOp}
-          onClose={() => setCommentOp(null)}
+          open={!!commentCtx}
+          op={commentCtx.op}
+          clienteNome={commentCtx.clienteNome}
+          onClose={() => setCommentCtx(null)}
           userName={user?.name ?? ""}
         />
       )}
@@ -443,163 +549,418 @@ export default function CrossSellPipeline() {
 }
 
 // ---------------------------------------------------------------------------
-// OpCard
+// EtapaSection
 // ---------------------------------------------------------------------------
 
-function OpCard({
+function EtapaSection({
+  etapa,
+  grupos,
+  expanded,
+  onToggle,
+  onNewOpForEtapa,
+  ordenacao,
+  onChangeEtapa,
+  onChangeValor,
+  onGanho,
+  onComments,
+}: {
+  etapa: Etapa;
+  grupos: ClienteEtapaGroup[];
+  expanded: boolean;
+  onToggle: () => void;
+  onNewOpForEtapa: (etapa: Etapa) => void;
+  ordenacao: "score" | "mrr" | "recente" | "nome";
+  onChangeEtapa: (opId: number, etapa: string) => void;
+  onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
+  onGanho: (op: Oportunidade) => void;
+  onComments: (op: Oportunidade) => void;
+}) {
+  const sorted = useMemo(() => {
+    const arr = [...grupos];
+    switch (ordenacao) {
+      case "mrr":
+        arr.sort((a, b) => b.cliente.valorRAtual - a.cliente.valorRAtual);
+        break;
+      case "recente":
+        arr.sort((a, b) => {
+          const aMax = a.oportunidades.reduce((m, op) => Math.max(m, new Date(op.atualizadoEm).getTime()), 0);
+          const bMax = b.oportunidades.reduce((m, op) => Math.max(m, new Date(op.atualizadoEm).getTime()), 0);
+          return bMax - aMax;
+        });
+        break;
+      case "nome":
+        arr.sort((a, b) => (a.cliente.nome ?? "").localeCompare(b.cliente.nome ?? ""));
+        break;
+      case "score":
+      default:
+        arr.sort((a, b) => b.cliente.scoreMaximo - a.cliente.scoreMaximo);
+        break;
+    }
+    return arr;
+  }, [grupos, ordenacao]);
+
+  const [clientesExpandidos, setClientesExpandidos] = useState<Set<string>>(new Set());
+
+  return (
+    <section>
+      <div
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-900/50 rounded px-1"
+      >
+        <span className={`text-gray-500 dark:text-zinc-400 transition-transform inline-block ${expanded ? "rotate-90" : ""}`}>▸</span>
+        <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
+          {ETAPA_LABELS[etapa] ?? etapa}
+        </Badge>
+        <span className="text-sm text-gray-500 dark:text-zinc-400">{grupos.length}</span>
+        <div className="flex-1" />
+        <button
+          onClick={(e) => { e.stopPropagation(); onNewOpForEtapa(etapa); }}
+          className="text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 px-2 py-0.5 text-sm"
+          title={`Nova oportunidade em ${ETAPA_LABELS[etapa]}`}
+        >
+          +
+        </button>
+      </div>
+
+      {expanded && etapa === "ganho" && (
+        <div className="mt-2 mb-4 ml-6">
+          <GanhosList embedded />
+        </div>
+      )}
+
+      {expanded && etapa !== "ganho" && (
+        <div className="mt-2 mb-4 ml-6 border border-gray-200 dark:border-zinc-700/60 rounded-md divide-y divide-gray-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900 overflow-x-auto">
+          {sorted.map(({ cliente, oportunidades }) => (
+            <ClienteRow
+              key={`${etapa}-${cliente.cnpj}`}
+              cliente={cliente}
+              oportunidadesFiltradas={oportunidades}
+              expanded={clientesExpandidos.has(cliente.cnpj)}
+              onToggle={() => {
+                setClientesExpandidos((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(cliente.cnpj)) next.delete(cliente.cnpj);
+                  else next.add(cliente.cnpj);
+                  return next;
+                });
+              }}
+              onChangeEtapa={onChangeEtapa}
+              onChangeValor={onChangeValor}
+              onGanho={onGanho}
+              onComments={onComments}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ClienteRow — linha compacta (colapsada) que expande in-place revelando
+// serviços ativos + oportunidades editáveis
+// ---------------------------------------------------------------------------
+
+function ClienteRow({
+  cliente,
+  oportunidadesFiltradas,
+  expanded,
+  onToggle,
+  onChangeEtapa,
+  onChangeValor,
+  onGanho,
+  onComments,
+}: {
+  cliente: ClienteCrossSell;
+  oportunidadesFiltradas?: Oportunidade[];
+  expanded: boolean;
+  onToggle: () => void;
+  onChangeEtapa: (opId: number, etapa: string) => void;
+  onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
+  onGanho: (op: Oportunidade) => void;
+  onComments: (op: Oportunidade) => void;
+}) {
+  const oportunidadesVisiveis = oportunidadesFiltradas ?? cliente.oportunidades;
+  return (
+    <div>
+      {/* Linha colapsada — grid de 9 colunas alinhadas para todas as linhas */}
+      <div
+        onClick={onToggle}
+        className="w-full grid items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50 text-sm"
+        style={{
+          gridTemplateColumns:
+            "16px minmax(160px, 1.5fr) 80px 110px 56px minmax(140px, 1.2fr) minmax(140px, 1.2fr) 200px 64px",
+        }}
+      >
+        <span
+          className={`text-gray-400 dark:text-zinc-500 transition-transform inline-block ${expanded ? "rotate-90" : ""}`}
+        >
+          ▸
+        </span>
+        <span className="font-semibold text-gray-900 dark:text-white truncate">
+          {cliente.nome ?? cliente.cnpj}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+          {cliente.cluster ?? "—"}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
+          {cliente.status ?? "—"}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1 whitespace-nowrap">
+          <Clock className="h-3 w-3 shrink-0" />
+          <span className="truncate">{calcLifetime(cliente.contratoInicio)}</span>
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1 min-w-0">
+          <User className="h-3 w-3 text-gray-400 dark:text-zinc-500 shrink-0" />
+          <span className="text-gray-400 dark:text-zinc-500 shrink-0">CxCs:</span>
+          <span className="text-gray-700 dark:text-zinc-300 font-medium truncate">{cliente.cxConta ?? "—"}</span>
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1 min-w-0">
+          <Briefcase className="h-3 w-3 text-gray-400 dark:text-zinc-500 shrink-0" />
+          <span className="text-gray-400 dark:text-zinc-500 shrink-0">Vendedor:</span>
+          <span className="text-gray-700 dark:text-zinc-300 font-medium truncate">{cliente.vendedor ?? "—"}</span>
+        </span>
+        <span className="text-xs text-gray-600 dark:text-zinc-300 font-medium whitespace-nowrap text-right">
+          R {formatCurrency(cliente.valorRAtual)} · P {formatCurrency(cliente.valorPAtual)}
+        </span>
+        <span className="text-xs text-gray-500 dark:text-zinc-400 px-2 py-0.5 rounded-md bg-gray-100 dark:bg-zinc-800 whitespace-nowrap text-center justify-self-end">
+          {oportunidadesVisiveis.length} op
+        </span>
+      </div>
+
+      {/* Conteúdo expandido — side-by-side: serviços (esquerda fixa) + oportunidades (resto) */}
+      {expanded && (
+        <div className="px-3 pb-3 pt-1 bg-gray-50/40 dark:bg-zinc-900/40">
+          <div className="grid gap-6" style={{ gridTemplateColumns: "minmax(180px, 240px) 1fr" }}>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-1.5">
+                Serviços ativos
+              </p>
+              {cliente.servicosAtivos.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {cliente.servicosAtivos.map((s) => (
+                    <span
+                      key={s}
+                      className="px-2 py-0.5 rounded-md bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-[11px] text-gray-700 dark:text-zinc-300"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 dark:text-zinc-600 italic">Nenhum serviço ativo</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
+                Oportunidades mapeadas ({oportunidadesVisiveis.length})
+              </p>
+              <div className="divide-y divide-gray-100 dark:divide-zinc-800">
+                {oportunidadesVisiveis.map((op) => (
+                  <OportunidadeRow
+                    key={op.id}
+                    op={op}
+                    onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
+                    onChangeValor={(field, value) => onChangeValor(op.id, field, value)}
+                    onGanho={() => onGanho(op)}
+                    onComments={() => onComments(op)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// InlineValorInput — input numerico inline (somente leitura quando nao editavel)
+// ---------------------------------------------------------------------------
+
+function InlineValorInput({
+  label,
+  value,
+  editable,
+  onSave,
+}: {
+  label: string;
+  value: number | null;
+  editable: boolean;
+  onSave: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string>(value != null ? String(value) : "");
+
+  useEffect(() => {
+    setDraft(value != null ? String(value) : "");
+  }, [value]);
+
+  if (!editable) {
+    return (
+      <span className="text-xs text-gray-500 dark:text-zinc-500 whitespace-nowrap">
+        <span className="text-gray-400 dark:text-zinc-600">{label}:</span>{" "}
+        {formatCurrencyCompact(value)}
+      </span>
+    );
+  }
+
+  const commit = () => {
+    const cleaned = draft.replace(/\./g, "").replace(",", ".").trim();
+    const parsed = cleaned === "" ? 0 : Number(cleaned);
+    if (!Number.isFinite(parsed)) {
+      setDraft(value != null ? String(value) : "");
+      return;
+    }
+    if (parsed === (value ?? 0)) return;
+    onSave(parsed);
+  };
+
+  return (
+    <span className="flex items-center gap-1 text-xs text-gray-600 dark:text-zinc-400 whitespace-nowrap">
+      <span className="text-gray-400 dark:text-zinc-500">{label}:</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") {
+            setDraft(value != null ? String(value) : "");
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-16 px-1 py-0.5 bg-transparent border border-transparent hover:border-gray-300 dark:hover:border-zinc-600 focus:border-blue-400 dark:focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-800 rounded text-xs text-left outline-none"
+        placeholder="0"
+      />
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// OportunidadeRow
+// ---------------------------------------------------------------------------
+
+function OportunidadeRow({
   op,
   onChangeEtapa,
+  onChangeValor,
   onGanho,
   onComments,
 }: {
   op: Oportunidade;
   onChangeEtapa: (etapa: string) => void;
+  onChangeValor: (field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
   onGanho: () => void;
   onComments: () => void;
 }) {
   const etapa = op.etapa as Etapa;
+  const isSugerido = etapa === "sugerido_sistema";
   const isDescartado = etapa === "descartado";
+  const valoresEditaveis = !isSugerido && !isDescartado;
+
+  // Cor da bolinha: prioridade (se sistema) ou neutra (manual)
+  const dotColor = isSugerido && op.prioridade
+    ? op.prioridade === "alta"
+      ? "bg-green-500"
+      : op.prioridade === "media"
+        ? "bg-yellow-500"
+        : "bg-gray-400"
+    : "bg-blue-400";
 
   return (
-    <Card
-      className={`bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 ${
-        isDescartado ? "opacity-60" : ""
-      } ${op.origem === "sistema" ? "border-l-4 border-l-indigo-400 dark:border-l-indigo-500" : ""}`}
-    >
-      <CardContent className="p-4 space-y-3">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-              {op.clienteNome ?? op.cnpj}
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-zinc-400 flex items-center gap-1">
-              <User className="h-3 w-3" />
-              {op.cxResponsavel}
-            </p>
-          </div>
-          <Select value={etapa} onValueChange={onChangeEtapa}>
-            <SelectTrigger className="h-auto py-0.5 px-2 border-0 w-auto gap-1">
-              <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
-                {ETAPA_LABELS[etapa] ?? etapa}
-              </Badge>
-            </SelectTrigger>
-            <SelectContent>
-              {ETAPAS.map((e) => (
-                <SelectItem key={e} value={e}>
-                  {ETAPA_LABELS[e]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <div className={`flex flex-col gap-1 py-2 ${isDescartado ? "opacity-50" : ""}`}>
+      <div
+        className="grid items-center gap-2"
+        style={{
+          gridTemplateColumns:
+            "16px 220px 140px 100px 100px 32px 56px",
+        }}
+      >
+        <span className={`h-2 w-2 rounded-full ${dotColor}`} />
+        <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+          {op.produto}
+        </span>
 
-        {/* System scoring info */}
-        {op.origem === "sistema" && op.prioridade && (
-          <div className="flex items-center gap-2">
-            <Badge className={`text-xs ${PRIORIDADE_COLORS[op.prioridade] ?? ""}`}>
-              {PRIORIDADE_LABELS[op.prioridade] ?? op.prioridade}
+        <Select
+          value={etapa}
+          onValueChange={(v) => (v === "ganho" ? onGanho() : onChangeEtapa(v))}
+        >
+          <SelectTrigger className="h-auto py-0.5 px-2 border-0 w-auto gap-1 text-xs justify-self-start">
+            <Badge className={`text-xs ${ETAPA_COLORS[etapa] ?? "bg-gray-200 text-gray-800"}`}>
+              {ETAPA_LABELS[etapa] ?? etapa}
             </Badge>
-            {op.motivo && (
-              <span className="text-xs text-gray-500 dark:text-zinc-400 truncate">
-                {op.motivo}
-              </span>
-            )}
+          </SelectTrigger>
+          <SelectContent>
+            {ETAPAS.map((e) => (
+              <SelectItem key={e} value={e}>{ETAPA_LABELS[e]}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <InlineValorInput
+          label="R"
+          value={op.valorRNegociacao}
+          editable={valoresEditaveis}
+          onSave={(v) => onChangeValor("valorRNegociacao", v)}
+        />
+        <InlineValorInput
+          label="P"
+          value={op.valorPNegociacao}
+          editable={valoresEditaveis}
+          onSave={(v) => onChangeValor("valorPNegociacao", v)}
+        />
+
+        <button
+          className="text-gray-400 hover:text-gray-700 dark:hover:text-zinc-200 flex items-center gap-0.5 text-xs justify-self-center"
+          onClick={onComments}
+          title="Comentários"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          {op.totalComentarios > 0 && <span>{op.totalComentarios}</span>}
+        </button>
+
+        {!isDescartado && !isSugerido && (
+          <button
+            className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 justify-self-center"
+            onClick={onGanho}
+            title="Marcar como ganho"
+          >
+            <Trophy className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {isSugerido && (
+          <div className="flex items-center gap-1 justify-self-center">
+            <button
+              className="text-green-600 hover:text-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 rounded hover:bg-green-50 dark:hover:bg-green-900/30"
+              onClick={() => onChangeEtapa("fazer_contato")}
+              title="Aceitar sugestão"
+            >
+              ✓
+            </button>
+            <button
+              className="text-red-500 hover:text-red-600 dark:text-red-400 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
+              onClick={() => onChangeEtapa("descartado")}
+              title="Descartar sugestão"
+            >
+              ✗
+            </button>
           </div>
         )}
 
-        {/* Data grid */}
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-          <DataCell
-            icon={<Package className="h-3 w-3" />}
-            label="Produto"
-            value={op.produtoMapeado}
-          />
-          <DataCell label="Status Conta" value={op.clienteStatus ?? "-"} />
-          <DataCell
-            label="Valor R Atual"
-            value={formatCurrency(op.valorRAtual)}
-          />
-          <DataCell
-            label="Valor P Atual"
-            value={formatCurrency(op.valorPAtual)}
-          />
-          <DataCell
-            label="Valor R Neg."
-            value={
-              op.valorRNegociacao != null
-                ? formatCurrency(op.valorRNegociacao)
-                : "-"
-            }
-          />
-          <DataCell
-            label="Valor P Neg."
-            value={
-              op.valorPNegociacao != null
-                ? formatCurrency(op.valorPNegociacao)
-                : "-"
-            }
-          />
-          <DataCell
-            icon={<Clock className="h-3 w-3" />}
-            label="Lifetime"
-            value={calcLifetime(op.contratoInicio)}
-          />
-          <DataCell
-            icon={<Calendar className="h-3 w-3" />}
-            label="Ultimo Contato"
-            value={formatDate(op.ultimoContato)}
-          />
-        </div>
+        {isDescartado && <span />}
+      </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-zinc-800">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-gray-500 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-white"
-            onClick={onComments}
-          >
-            <MessageSquare className="h-4 w-4" />
-            {op.totalComentarios > 0 && (
-              <span className="text-xs">{op.totalComentarios}</span>
-            )}
-          </Button>
-          {!isDescartado && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300"
-              onClick={onGanho}
-            >
-              <Trophy className="h-4 w-4" />
-              Ganho
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DataCell({
-  icon,
-  label,
-  value,
-}: {
-  icon?: React.ReactNode;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 flex items-center gap-1">
-        {icon}
-        {label}
-      </p>
-      <p className="text-gray-900 dark:text-white font-medium truncate">
-        {value}
-      </p>
+      {isSugerido && op.motivo && (
+        <p className="text-[11px] text-gray-500 dark:text-zinc-500 pl-4 truncate">
+          {op.motivo}
+        </p>
+      )}
     </div>
   );
 }
@@ -610,10 +971,12 @@ function DataCell({
 
 function NewOpDialog({
   open,
+  etapaInicial,
   onClose,
   userName,
 }: {
   open: boolean;
+  etapaInicial?: Etapa;
   onClose: () => void;
   userName: string;
 }) {
@@ -650,6 +1013,7 @@ function NewOpDialog({
           cxResponsavel: userName || selectedCliente.responsavel,
           valorRNegociacao: valorR ? Number(valorR) : undefined,
           valorPNegociacao: valorP ? Number(valorP) : undefined,
+          etapa: etapaInicial,
         }),
       });
       if (!res.ok) {
@@ -671,6 +1035,11 @@ function NewOpDialog({
           <DialogTitle className="text-gray-900 dark:text-white">
             Nova Oportunidade de CrossSell
           </DialogTitle>
+          {etapaInicial && etapaInicial !== "fazer_contato" && (
+            <p className="text-sm text-gray-500 dark:text-zinc-400 mt-1">
+              Será criada em: <strong className="text-gray-900 dark:text-white">{ETAPA_LABELS[etapaInicial]}</strong>
+            </p>
+          )}
         </DialogHeader>
 
         <div className="space-y-4">
@@ -802,17 +1171,17 @@ function NewOpDialog({
 function GanhoDialog({
   open,
   op,
+  clienteNome,
   onClose,
   userName,
 }: {
   open: boolean;
   op: Oportunidade;
+  clienteNome: string;
   onClose: () => void;
   userName: string;
 }) {
   const queryClient = useQueryClient();
-  const [operacoes, setOperacoes] = useState<string[]>([]);
-  const [produto, setProduto] = useState(op.produtoMapeado);
   const [mesGanho, setMesGanho] = useState(
     new Date().toISOString().slice(0, 7)
   );
@@ -823,20 +1192,12 @@ function GanhoDialog({
     op.valorPNegociacao?.toString() ?? ""
   );
 
-  const toggleOp = (o: string) => {
-    setOperacoes((prev) =>
-      prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]
-    );
-  };
-
   const ganhoMut = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/comercial/crosssell/${op.id}/ganho`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          operacao: operacoes,
-          produto,
           mesGanho,
           valorR: valorR ? Number(valorR) : undefined,
           valorP: valorP ? Number(valorP) : undefined,
@@ -864,45 +1225,13 @@ function GanhoDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <p className="text-sm text-gray-600 dark:text-zinc-400">
-            Cliente: <strong className="text-gray-900 dark:text-white">{op.clienteNome ?? op.cnpj}</strong>
-          </p>
-
-          {/* Operacao badges */}
-          <div className="space-y-2">
-            <Label className="text-gray-700 dark:text-zinc-300">
-              Tipo de Operacao
-            </Label>
-            <div className="flex flex-wrap gap-2">
-              {OPERACOES.map((o) => (
-                <button
-                  key={o}
-                  onClick={() => toggleOp(o)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    operacoes.includes(o)
-                      ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700"
-                      : "bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 border-gray-200 dark:border-zinc-700"
-                  }`}
-                >
-                  {o}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Product */}
-          <div className="space-y-2">
-            <Label className="text-gray-700 dark:text-zinc-300">Produto</Label>
-            <Select value={produto} onValueChange={setProduto}>
-              <SelectTrigger className="bg-white dark:bg-zinc-800 border-gray-200 dark:border-zinc-700">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRODUTOS.map((p) => (
-                  <SelectItem key={p} value={p}>{p}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="text-sm text-gray-600 dark:text-zinc-400 space-y-0.5">
+            <p>
+              Cliente: <strong className="text-gray-900 dark:text-white">{clienteNome}</strong>
+            </p>
+            <p>
+              Produto: <strong className="text-gray-900 dark:text-white">{op.produto}</strong>
+            </p>
           </div>
 
           {/* Month */}
@@ -949,7 +1278,7 @@ function GanhoDialog({
           </Button>
           <Button
             onClick={() => ganhoMut.mutate()}
-            disabled={operacoes.length === 0 || ganhoMut.isPending}
+            disabled={!mesGanho || ganhoMut.isPending}
             className="bg-green-600 hover:bg-green-700 text-white"
           >
             {ganhoMut.isPending ? "Registrando..." : "Registrar Ganho"}
@@ -973,11 +1302,13 @@ function GanhoDialog({
 function CommentsSheet({
   open,
   op,
+  clienteNome,
   onClose,
   userName,
 }: {
   open: boolean;
   op: Oportunidade;
+  clienteNome: string;
   onClose: () => void;
   userName: string;
 }) {
@@ -1018,7 +1349,7 @@ function CommentsSheet({
       <SheetContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 w-full sm:max-w-md flex flex-col">
         <SheetHeader>
           <SheetTitle className="text-gray-900 dark:text-white">
-            Comentarios - {op.clienteNome ?? op.cnpj}
+            Comentários — {clienteNome}
           </SheetTitle>
         </SheetHeader>
 
@@ -1046,7 +1377,7 @@ function CommentsSheet({
                   {c.autor}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-zinc-500">
-                  {new Date(c.criado_em).toLocaleString("pt-BR")}
+                  {new Date(c.criadoEm).toLocaleString("pt-BR")}
                 </span>
               </div>
               <p className="text-sm text-gray-700 dark:text-zinc-300">
@@ -1081,5 +1412,209 @@ function CommentsSheet({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// GanhosList — visualizacao em tabela dos negocios ganhos
+// ---------------------------------------------------------------------------
+
+interface Ganho {
+  id: number;
+  oportunidadeId: number;
+  clienteNome: string;
+  cnpj: string;
+  valorR: number | null;
+  valorP: number | null;
+  cxResponsavel: string | null;
+  vendedor: string | null;
+  operacao: string[];
+  produto: string;
+  mesGanho: string;
+  criadoEm: string;
+}
+
+const MESES_LABEL = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+];
+
+function formatMesGanho(d: string | null): string {
+  if (!d) return "—";
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return "—";
+  return `${MESES_LABEL[dt.getMonth()]}/${dt.getFullYear()}`;
+}
+
+const GANHOS_GRID_TEMPLATE =
+  "minmax(180px, 2fr) 110px 110px minmax(140px, 1.2fr) minmax(140px, 1.2fr) 120px minmax(140px, 1.2fr) 100px";
+
+function GanhosList({ embedded = false }: { embedded?: boolean }) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const [ano, setAno] = useState<string>(embedded ? "todos" : String(currentYear));
+  const [mes, setMes] = useState<string>("todos");
+  const [operacoesFilter, setOperacoesFilter] = useState<string[]>([]);
+
+  const queryString = useMemo(() => {
+    const p = new URLSearchParams();
+    if (ano !== "todos") p.set("ano", ano);
+    if (mes !== "todos") p.set("mes", mes);
+    if (operacoesFilter.length > 0) p.set("operacao", operacoesFilter.join(","));
+    return p.toString();
+  }, [ano, mes, operacoesFilter]);
+
+  const { data: ganhos = [], isLoading } = useQuery<Ganho[]>({
+    queryKey: ["/api/comercial/crosssell/ganhos", queryString],
+    queryFn: async () => {
+      const url = queryString
+        ? `/api/comercial/crosssell/ganhos?${queryString}`
+        : `/api/comercial/crosssell/ganhos`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Erro ao carregar ganhos");
+      return res.json();
+    },
+  });
+
+  const totalR = ganhos.reduce((s, g) => s + (g.valorR ?? 0), 0);
+  const totalP = ganhos.reduce((s, g) => s + (g.valorP ?? 0), 0);
+
+  const toggleOperacao = (op: string) => {
+    setOperacoesFilter((prev) =>
+      prev.includes(op) ? prev.filter((x) => x !== op) : [...prev, op]
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      {!embedded && (
+      <>
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={ano} onValueChange={setAno}>
+          <SelectTrigger className="w-32 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue placeholder="Ano" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos anos</SelectItem>
+            {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={mes} onValueChange={setMes}>
+          <SelectTrigger className="w-32 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <SelectValue placeholder="Mês" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos meses</SelectItem>
+            {MESES_LABEL.map((m, i) => (
+              <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-xs text-gray-400 dark:text-zinc-500 mr-1">Operação:</span>
+          {OPERACOES.map((op) => {
+            const active = operacoesFilter.includes(op);
+            return (
+              <button
+                key={op}
+                onClick={() => toggleOperacao(op)}
+                className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                  active
+                    ? "bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-zinc-900 dark:text-zinc-400 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                }`}
+              >
+                {op}
+              </button>
+            );
+          })}
+          {operacoesFilter.length > 0 && (
+            <button
+              onClick={() => setOperacoesFilter([])}
+              className="ml-1 text-xs text-gray-400 hover:text-gray-700 dark:text-zinc-500 dark:hover:text-zinc-200"
+            >
+              limpar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-zinc-400">
+        <span>{ganhos.length} ganhos</span>
+        <span>·</span>
+        <span>R total: {formatCurrency(totalR)}</span>
+        <span>·</span>
+        <span>P total: {formatCurrency(totalP)}</span>
+      </div>
+      </>
+      )}
+
+      {/* Tabela */}
+      <div className="border border-gray-200 dark:border-zinc-700/60 rounded-md overflow-x-auto">
+        {/* Header */}
+        <div
+          className="grid items-center gap-3 px-3 py-2 bg-gray-50 dark:bg-zinc-900/80 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-zinc-400 border-b border-gray-200 dark:border-zinc-700/60"
+          style={{ gridTemplateColumns: GANHOS_GRID_TEMPLATE }}
+        >
+          <span>Cliente</span>
+          <span className="text-right">Valor R</span>
+          <span className="text-right">Valor P</span>
+          <span>CX</span>
+          <span>Vendedor</span>
+          <span>Operação</span>
+          <span>Produto</span>
+          <span>Mês ganho</span>
+        </div>
+
+        {/* Rows */}
+        <div className="divide-y divide-gray-100 dark:divide-zinc-800 bg-white dark:bg-zinc-900">
+          {isLoading && (
+            <div className="px-3 py-8 text-center text-gray-400 dark:text-zinc-500">
+              Carregando...
+            </div>
+          )}
+          {!isLoading && ganhos.length === 0 && (
+            <div className="px-3 py-8 text-center text-gray-400 dark:text-zinc-500">
+              Nenhum ganho registrado para os filtros selecionados.
+            </div>
+          )}
+          {ganhos.map((g) => (
+            <div
+              key={g.id}
+              className="grid items-center gap-3 px-3 py-2.5 text-sm hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+              style={{ gridTemplateColumns: GANHOS_GRID_TEMPLATE }}
+            >
+              <span className="font-medium text-gray-900 dark:text-white truncate">{g.clienteNome}</span>
+              <span className="text-right text-gray-700 dark:text-zinc-300 whitespace-nowrap">
+                {formatCurrency(g.valorR ?? 0)}
+              </span>
+              <span className="text-right text-gray-700 dark:text-zinc-300 whitespace-nowrap">
+                {formatCurrency(g.valorP ?? 0)}
+              </span>
+              <span className="text-gray-700 dark:text-zinc-300 truncate">{g.cxResponsavel ?? "—"}</span>
+              <span className="text-gray-700 dark:text-zinc-300 truncate">{g.vendedor ?? "—"}</span>
+              <span className="flex flex-wrap gap-1">
+                {(g.operacao ?? []).map((op) => (
+                  <Badge
+                    key={op}
+                    className="text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  >
+                    {op}
+                  </Badge>
+                ))}
+              </span>
+              <span className="text-gray-700 dark:text-zinc-300 truncate">{g.produto}</span>
+              <span className="text-gray-700 dark:text-zinc-300 whitespace-nowrap">{formatMesGanho(g.mesGanho)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

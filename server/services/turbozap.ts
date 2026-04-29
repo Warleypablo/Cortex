@@ -594,24 +594,19 @@ export async function executarEnvioMassa(
         )
       `);
 
-      // Auto-create negativação action when collection reaches legal stages
-      const negativacaoMap: Record<string, string> = {
-        "D+30": "notificacao",
-        "D+40": "protesto",
-        "D+50": "negativacao",
-      };
-      const etapaNeg = negativacaoMap[tipoCobranca];
-      if (etapaNeg) {
+      // Toda nova ação criada pelo TurboZap entra em "notificacao".
+      // Avanço para protesto/negativação/judicial é manual, e só permitido
+      // depois que a notificação extrajudicial for efetivamente enviada.
+      if (["D+30", "D+40", "D+50"].includes(tipoCobranca)) {
         try {
-          // Check if client already has an action for this etapa
           const existing = await db.execute(sql`
             SELECT id FROM cortex_core.negativacao_acoes
             WHERE cliente_id = ${cliente.id_cliente}
-              AND etapa = ${etapaNeg}
+              AND etapa = 'notificacao'
+              AND status IN ('pendente', 'em_andamento')
             LIMIT 1
           `);
           if (existing.rows.length === 0) {
-            // Calculate days overdue
             const diasAtraso = cliente.data_vencimento
               ? Math.floor((Date.now() - new Date(cliente.data_vencimento).getTime()) / 86400000)
               : 0;
@@ -621,13 +616,13 @@ export async function executarEnvioMassa(
                 valor_inadimplente, dias_atraso, data_acao, criado_por, observacoes
               ) VALUES (
                 ${cliente.id_cliente}, ${cliente.cliente_nome}, ${cliente.cnpj || ""},
-                ${etapaNeg}, 'pendente',
+                'notificacao', 'pendente',
                 ${Number(cliente.total)}, ${diasAtraso},
                 CURRENT_DATE, 'turbozap-auto',
                 ${"Criado automaticamente via TurboZap (" + tipoCobranca + ")"}
               )
             `);
-            console.log(`[TurboZap→Negativação] Cliente ${cliente.cliente_nome} adicionado à etapa ${etapaNeg}`);
+            console.log(`[TurboZap→Negativação] Cliente ${cliente.cliente_nome} adicionado à etapa notificacao`);
           }
         } catch (negErr: any) {
           console.warn(`[TurboZap→Negativação] Erro ao criar ação: ${negErr.message}`);

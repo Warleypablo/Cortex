@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import PDFDocument from "pdfkit";
 import { validateBody } from "../middleware/validate";
 import { upsertInadimplenciaContextoSchema } from "../middleware/schemas";
+import { runSnapshotJob } from "../services/inadimplenciaSnapshotJob";
 
 export function registerInadimplenciaRoutes(app: Express) {
   // ============== INADIMPLÊNCIA ==============
@@ -18,6 +19,25 @@ export function registerInadimplenciaRoutes(app: Express) {
     } catch (error) {
       console.error("[api] Error fetching inadimplencia resumo:", error);
       res.status(500).json({ error: "Failed to fetch inadimplencia resumo" });
+    }
+  });
+
+  app.post("/api/inadimplencia/snapshot/run", async (req, res) => {
+    try {
+      const mesReferencia =
+        typeof req.body?.mesReferencia === "string" &&
+        /^\d{4}-\d{2}$/.test(req.body.mesReferencia)
+          ? req.body.mesReferencia
+          : undefined;
+
+      const record = await runSnapshotJob(mesReferencia);
+      res.json({ ok: true, snapshot: record });
+    } catch (error: any) {
+      console.error("[api] Error running inadimplencia snapshot:", error);
+      res.status(500).json({
+        ok: false,
+        error: error?.message ?? "Failed to run snapshot",
+      });
     }
   });
 
