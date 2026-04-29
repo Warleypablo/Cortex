@@ -15,3 +15,4 @@ credentials/
 .superpowers/
 contracts.db/
 attached_assets/
+.claude/worktrees/
