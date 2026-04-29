@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean, jsonb, index, uniqueIndex, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, pgSchema, text, varchar, timestamp, decimal, integer, date, serial, boolean, jsonb, index, uniqueIndex, doublePrecision, bigint, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -3329,3 +3329,64 @@ export const triagemAnalises = cortexCoreSchema.table("triagem_analises", {
 
 export type TriagemAnalise = typeof triagemAnalises.$inferSelect;
 export type InsertTriagemAnalise = typeof triagemAnalises.$inferInsert;
+
+// ============================================
+// Treinamento Interno Module
+// ============================================
+
+export const internalVideoTracks = cortexCoreSchema.table("internal_video_tracks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driveFolderId: text("drive_folder_id").notNull().unique(),
+  nome: text("nome").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const internalVideos = cortexCoreSchema.table("internal_videos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  trackId: varchar("track_id").notNull().references(() => internalVideoTracks.id),
+  driveFileId: text("drive_file_id").notNull().unique(),
+  nome: text("nome").notNull(),
+  mimeType: text("mime_type"),
+  thumbnailUrl: text("thumbnail_url"),
+  duracaoMs: bigint("duracao_ms", { mode: "number" }),
+  driveModifiedTime: timestamp("drive_modified_time"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const internalVideoCompletions = cortexCoreSchema.table("internal_video_completions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  videoId: varchar("video_id").notNull().references(() => internalVideos.id, { onDelete: "cascade" }),
+  userEmail: varchar("user_email", { length: 100 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueUserVideo: unique("uq_completion_user_video").on(t.videoId, t.userEmail),
+}));
+
+export const internalVideoLikes = cortexCoreSchema.table("internal_video_likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  videoId: varchar("video_id").notNull().references(() => internalVideos.id, { onDelete: "cascade" }),
+  userEmail: varchar("user_email", { length: 100 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  uniqueUserVideo: unique("uq_like_user_video").on(t.videoId, t.userEmail),
+}));
+
+export const internalVideoComments = cortexCoreSchema.table("internal_video_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  videoId: varchar("video_id").notNull().references(() => internalVideos.id, { onDelete: "cascade" }),
+  userEmail: varchar("user_email", { length: 100 }).notNull(),
+  userNome: text("user_nome").notNull(),
+  conteudo: text("conteudo").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type InternalVideoTrack = typeof internalVideoTracks.$inferSelect;
+export type InternalVideo = typeof internalVideos.$inferSelect;
+export type InternalVideoCompletion = typeof internalVideoCompletions.$inferSelect;
+export type InternalVideoLike = typeof internalVideoLikes.$inferSelect;
+export type InternalVideoComment = typeof internalVideoComments.$inferSelect;
