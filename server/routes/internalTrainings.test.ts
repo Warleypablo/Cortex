@@ -164,3 +164,78 @@ describe('POST /api/treinamentos-internos/videos/:id/like', () => {
     expect(res.body.totalLikes).toBe(6);
   });
 });
+
+describe('POST /api/treinamentos-internos/videos/:id/comentarios', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('cria comentário com userNome do auth', async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [{
+        id: 'c-1',
+        userEmail: 'warley@cortex.com',
+        userNome: 'Warley Pablo',
+        conteudo: 'massa demais',
+        createdAt: '2026-04-29T12:00:00Z',
+      }],
+    });
+
+    const res = await request(buildApp('warley@cortex.com', 'Warley Pablo'))
+      .post('/api/treinamentos-internos/videos/vid-1/comentarios')
+      .send({ conteudo: 'massa demais' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.userNome).toBe('Warley Pablo');
+    expect(res.body.isOwner).toBe(true);
+  });
+
+  it('rejeita conteúdo vazio', async () => {
+    const res = await request(buildApp())
+      .post('/api/treinamentos-internos/videos/vid-1/comentarios')
+      .send({ conteudo: '' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('rejeita conteúdo > 5000 chars', async () => {
+    const res = await request(buildApp())
+      .post('/api/treinamentos-internos/videos/vid-1/comentarios')
+      .send({ conteudo: 'x'.repeat(5001) });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('DELETE /api/treinamentos-internos/comentarios/:id', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('apaga comentário do próprio usuário', async () => {
+    // SELECT do comentário: userEmail bate
+    mockExecute.mockResolvedValueOnce({
+      rows: [{ user_email: 'warley@cortex.com' }],
+    });
+    // DELETE
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(buildApp('warley@cortex.com')).delete('/api/treinamentos-internos/comentarios/c-1');
+
+    expect(res.status).toBe(200);
+  });
+
+  it('retorna 403 ao tentar apagar comentário de outro', async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [{ user_email: 'outro@cortex.com' }],
+    });
+
+    const res = await request(buildApp('warley@cortex.com')).delete('/api/treinamentos-internos/comentarios/c-1');
+
+    expect(res.status).toBe(403);
+  });
+
+  it('retorna 404 se comentário não existe', async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(buildApp()).delete('/api/treinamentos-internos/comentarios/inexistente');
+
+    expect(res.status).toBe(404);
+  });
+});

@@ -243,4 +243,67 @@ export function registerInternalTrainingsRoutes(app: Express) {
       res.status(500).json({ error: 'Erro ao curtir vídeo' });
     }
   });
+
+  // POST /api/treinamentos-internos/videos/:id/comentarios
+  app.post('/api/treinamentos-internos/videos/:id/comentarios', async (req, res) => {
+    try {
+      const userEmail = getUserEmail(req);
+      if (!userEmail) return res.status(401).json({ error: 'Não autenticado' });
+
+      const userNome = getUserNome(req);
+      const { id } = req.params;
+      const { conteudo } = req.body || {};
+
+      if (!conteudo || typeof conteudo !== 'string' || conteudo.trim().length === 0) {
+        return res.status(400).json({ error: 'Conteúdo obrigatório' });
+      }
+      if (conteudo.length > 5000) {
+        return res.status(400).json({ error: 'Conteúdo excede 5000 caracteres' });
+      }
+
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.internal_video_comments (video_id, user_email, user_nome, conteudo)
+        VALUES (${id}, ${userEmail}, ${userNome}, ${conteudo})
+        RETURNING id, user_email AS "userEmail", user_nome AS "userNome",
+                  conteudo, created_at AS "createdAt"
+      `);
+
+      const row = result.rows[0] as any;
+      res.status(201).json({ ...row, isOwner: true });
+    } catch (error: any) {
+      console.error('[treinamentos-internos] POST /comentarios error:', error);
+      res.status(500).json({ error: 'Erro ao criar comentário' });
+    }
+  });
+
+  // DELETE /api/treinamentos-internos/comentarios/:id
+  app.delete('/api/treinamentos-internos/comentarios/:id', async (req, res) => {
+    try {
+      const userEmail = getUserEmail(req);
+      if (!userEmail) return res.status(401).json({ error: 'Não autenticado' });
+
+      const { id } = req.params;
+
+      const existsResult = await db.execute(sql`
+        SELECT user_email FROM cortex_core.internal_video_comments WHERE id = ${id}
+      `);
+
+      if (existsResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Comentário não encontrado' });
+      }
+
+      const ownerEmail = (existsResult.rows[0] as any).user_email;
+      if (ownerEmail !== userEmail) {
+        return res.status(403).json({ error: 'Sem permissão para apagar comentário de outro usuário' });
+      }
+
+      await db.execute(sql`
+        DELETE FROM cortex_core.internal_video_comments WHERE id = ${id}
+      `);
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error('[treinamentos-internos] DELETE /comentarios error:', error);
+      res.status(500).json({ error: 'Erro ao excluir comentário' });
+    }
+  });
 }
