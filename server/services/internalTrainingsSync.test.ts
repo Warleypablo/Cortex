@@ -1,0 +1,141 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// Mock de googleapis
+const mockFilesList = vi.fn();
+vi.mock('../autoreport/credentials', () => ({
+  getDriveClient: () => ({
+    files: { list: (...args: any[]) => mockFilesList(...args) },
+  }),
+}));
+
+// Mock do db
+const mockExecute = vi.fn();
+vi.mock('../db', () => ({
+  db: { execute: (...args: any[]) => mockExecute(...args) },
+}));
+
+import { syncInternalTrainings, _resetSyncLockForTest } from './internalTrainingsSync';
+
+describe('syncInternalTrainings', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.INTERNAL_TRAININGS_DRIVE_FOLDER_ID = 'root-folder-id';
+    _resetSyncLockForTest();
+
+    // db.execute padrão: retorna { rows: [] }
+    mockExecute.mockResolvedValue({ rows: [] });
+  });
+
+  it('lista subpastas e vídeos, fazendo upsert nas trilhas e vídeos', async () => {
+    // 1ª chamada: listar subpastas de TREINAMENTOS
+    mockFilesList.mockResolvedValueOnce({
+      data: {
+        files: [
+          { id: 'folder-perf', name: 'Performance' },
+          { id: 'folder-ia', name: 'IA' },
+        ],
+      },
+    });
+    // Upsert da trilha Performance retorna o id
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'tr-perf-uuid' }] });
+    // 2ª chamada: vídeos de Performance
+    mockFilesList.mockResolvedValueOnce({
+      data: {
+        files: [
+          {
+            id: 'vid-1',
+            name: 'Aula 1.mp4',
+            mimeType: 'video/mp4',
+            videoMediaMetadata: { durationMillis: '600000' },
+            modifiedTime: '2026-04-25T10:00:00Z',
+          },
+        ],
+      },
+    });
+    // Insert do vídeo (sem RETURNING aqui mas mock OK)
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    // Upsert da trilha IA retorna o id
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'tr-ia-uuid' }] });
+    // 3ª chamada: vídeos de IA (vazio)
+    mockFilesList.mockResolvedValueOnce({ data: { files: [] } });
+    // Reconciliação: SELECT all tracks
+    mockExecute.mockResolvedValueOnce({ rows: [
+      { id: 'tr-perf-uuid', drive_folder_id: 'folder-perf' },
+      { id: 'tr-ia-uuid', drive_folder_id: 'folder-ia' },
+    ]});
+    // Reconciliação: SELECT all videos
+    mockExecute.mockResolvedValueOnce({ rows: [
+      { id: 'vid-uuid', drive_file_id: 'vid-1' },
+    ]});
+
+    const report = await syncInternalTrainings();
+
+    expect(report.ok).toBe(true);
+    expect(report.trilhasAtivas).toBe(2);
+    expect(report.videosAtivos).toBe(1);
+    expect(report.trilhasDesativadas).toBe(0);
+    expect(report.videosDesativados).toBe(0);
+  });
+
+  it('passa filtro de mimeType=video/ no query do Drive', async () => {
+    mockFilesList.mockResolvedValueOnce({
+      data: { files: [{ id: 'folder-perf', name: 'Performance' }] },
+    });
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'tr-perf-uuid' }] });
+    mockFilesList.mockResolvedValueOnce({ data: { files: [] } });
+
+    await syncInternalTrainings();
+
+    // Verifica que a 2ª chamada (vídeos) usou filtro mimeType contains 'video/'
+    expect(mockFilesList).toHaveBeenCalledTimes(2);
+    const videosCall = mockFilesList.mock.calls[1][0];
+    expect(videosCall.q).toContain("mimeType contains 'video/'");
+  });
+
+  it('continua processando outras trilhas quando uma falha', async () => {
+    mockFilesList.mockResolvedValueOnce({
+      data: {
+        files: [
+          { id: 'folder-perf', name: 'Performance' },
+          { id: 'folder-ia', name: 'IA' },
+        ],
+      },
+    });
+    // Performance: upsert track sucede, mas listar vídeos falha
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'tr-perf-uuid' }] });
+    mockFilesList.mockRejectedValueOnce(new Error('Quota exceeded'));
+    // IA sucede
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'tr-ia-uuid' }] });
+    mockFilesList.mockResolvedValueOnce({ data: { files: [] } });
+
+    const report = await syncInternalTrainings();
+
+    expect(report.ok).toBe(true);
+    expect(report.erros.length).toBeGreaterThanOrEqual(1);
+    expect(report.erros.some(e => e.contexto.toLowerCase().includes('performance'))).toBe(true);
+  });
+
+  it('retorna alreadyRunning se sync já está em andamento', async () => {
+    // Primeira chamada nunca resolve (mantém lock)
+    mockFilesList.mockReturnValueOnce(new Promise(() => {}));
+    const inflight = syncInternalTrainings();
+    // dá uma microtask para a primeira invocação adquirir o lock
+    await Promise.resolve();
+
+    const second = await syncInternalTrainings();
+
+    expect(second.ok).toBe(true);
+    expect(second.alreadyRunning).toBe(true);
+    // Não consumimos o inflight para o teste não esperar para sempre
+    void inflight;
+  });
+
+  it('falha cedo se INTERNAL_TRAININGS_DRIVE_FOLDER_ID não estiver setada', async () => {
+    delete process.env.INTERNAL_TRAININGS_DRIVE_FOLDER_ID;
+
+    const report = await syncInternalTrainings();
+
+    expect(report.ok).toBe(false);
+    expect(report.erros[0].mensagem).toMatch(/INTERNAL_TRAININGS_DRIVE_FOLDER_ID/);
+  });
+});
