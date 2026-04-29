@@ -48,7 +48,7 @@ export function ComentarioItem({ comentario, videoId }: ComentarioItemProps) {
       await apiRequest('DELETE', `/api/treinamentos-internos/comentarios/${comentario.id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/videos', videoId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/videos'] });
       setConfirmOpen(false);
       toast({ title: 'Comentário excluído' });
     },

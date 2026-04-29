@@ -24,7 +24,7 @@ export function ComentariosThread({ videoId, comentarios }: ComentariosThreadPro
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/videos', videoId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/videos'] });
       setConteudo('');
     },
     onError: (err: Error) => {
