@@ -59,7 +59,10 @@ export async function syncInternalTrainings(): Promise<SyncReport> {
   try {
     const drive = getDriveClient();
 
-    // 1. Listar subpastas (com paginação)
+    // 1. Listar subpastas (com paginação).
+    // supportsAllDrives + includeItemsFromAllDrives são necessários porque a
+    // pasta TREINAMENTOS vive num Shared Drive (Drive de Equipe). Sem isso, a
+    // API retorna "File not found" / lista vazia mesmo com permissão.
     const folders: Array<{ id?: string | null; name?: string | null }> = [];
     let folderPageToken: string | undefined = undefined;
     do {
@@ -68,6 +71,8 @@ export async function syncInternalTrainings(): Promise<SyncReport> {
         fields: 'nextPageToken, files(id, name)',
         pageSize: 1000,
         pageToken: folderPageToken,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
       });
       folders.push(...(foldersResp.data.files || []));
       folderPageToken = foldersResp.data.nextPageToken || undefined;
@@ -99,6 +104,8 @@ export async function syncInternalTrainings(): Promise<SyncReport> {
             fields: 'nextPageToken, files(id, name, mimeType, videoMediaMetadata(durationMillis), modifiedTime)',
             pageSize: 1000,
             pageToken,
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
           });
           const files = filesResp.data.files || [];
 
