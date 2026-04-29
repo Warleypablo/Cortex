@@ -55,6 +55,7 @@ import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
+import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
@@ -7999,6 +8000,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Negativação Module
   registerNegativacaoRoutes(app, db);
 
+  // Triagem Inteligente Module
+  registerTriagemRoutes(app, db);
+
   // Predictions Module - Análise Preditiva
   registerPredictionRoutes(app);
 
@@ -9783,30 +9787,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
       
-      // Buscar próximos eventos (próximos 30 dias)
-      const hoje = new Date();
-      const em30Dias = new Date();
-      em30Dias.setDate(em30Dias.getDate() + 30);
-      
-      const eventosQuery = await db.execute(sql`
-        SELECT id, titulo, tipo, data_inicio, data_fim, local, cor
-        FROM cortex_core.turbo_eventos
-        WHERE data_inicio >= ${hoje.toISOString()}
-          AND data_inicio <= ${em30Dias.toISOString()}
-        ORDER BY data_inicio ASC
-        LIMIT 5
-      `);
-      
-      const proximosEventos = eventosQuery.rows.map((row: any) => ({
-        id: row.id,
-        titulo: row.titulo,
-        tipo: row.tipo,
-        dataInicio: row.data_inicio,
-        dataFim: row.data_fim,
-        local: row.local,
-        cor: row.cor,
-      }));
-      
       // Buscar alertas e pendências (com tratamento de erro para tabelas que podem não existir)
       let alertasRows: any[] = [];
       let contratosVencendoRows: any[] = [];
@@ -9918,7 +9898,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         mrrVariacao,
         ticketMedioVariacao,
         clientes: meusClientes,
-        proximosEventos,
         alertas,
       });
     } catch (error) {
@@ -11697,6 +11676,35 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
   
+  app.get("/api/unavailability-requests/today", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          ur.id,
+          ur.colaborador_nome,
+          ur.colaborador_email,
+          ur.data_fim
+        FROM cortex_core.unavailability_requests ur
+        WHERE ur.status_rh = 'aprovado'
+          AND ur.status_lider = 'aprovado'
+          AND CURRENT_DATE BETWEEN ur.data_inicio AND ur.data_fim
+        ORDER BY ur.colaborador_nome ASC
+      `);
+
+      const items = result.rows.map((row: any) => ({
+        id: row.id,
+        nome: row.colaborador_nome,
+        email: row.colaborador_email,
+        dataFim: row.data_fim,
+      }));
+
+      res.json(items);
+    } catch (error: any) {
+      console.error("[unavailability-today] Error fetching today list:", error);
+      res.json([]);
+    }
+  });
+
   app.get("/api/unavailability-requests", isAuthenticated, async (req, res) => {
     try {
       const { status, colaboradorId, squadNome } = req.query;

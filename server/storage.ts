@@ -209,9 +209,9 @@ export interface IStorage {
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
   getTopClientesByLTV(limit?: number): Promise<{ nome: string; ltv: number; ltMeses: number; servicos: string }[]>;
   getDfc(dataInicio?: string, dataFim?: string, empresa?: string): Promise<DfcHierarchicalResponse>;
-  getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
-  getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
-  getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
+  getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
+  getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
+  getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
   getGegTempoPromocao(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
   getGegAniversariantesMes(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
   getGegAniversariosEmpresa(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
@@ -832,15 +832,15 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
+  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
+  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
+  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -4835,7 +4835,7 @@ export class DbStorage implements IStorage {
     
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
     
-    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status IN ('QUITADO', 'RECEBIDO_PARCIAL')"];
+    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status = 'QUITADO'"];
 
     // Filtrar por empresa se especificado
     if (empresa && empresa !== 'todas') {
@@ -4941,7 +4941,7 @@ export class DbStorage implements IStorage {
 
         const categoriaId = codeMatch[1];
         const categoriaNome = codeMatch[2];
-        
+        
         const twoDigitPrefix = categoriaId.substring(0, 2);
         const isCategoriaReceita = (twoDigitPrefix === '03' || twoDigitPrefix === '04');
         const isCategoriaDespesa = (twoDigitPrefix === '05' || twoDigitPrefix === '06' || twoDigitPrefix === '07' || twoDigitPrefix === '08');
@@ -5019,8 +5019,8 @@ export class DbStorage implements IStorage {
     return result;
   }
 
-  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
-    const { dataInicio, dataFim } = this.calcularPeriodo(periodo);
+  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicioCustom?: string, dataFimCustom?: string): Promise<any> {
+    const { dataInicio, dataFim } = this.calcularPeriodo(periodo, dataInicioCustom, dataFimCustom);
     
     let whereCurrentConditions = [sql`status = 'Ativo'`];
     if (squad !== 'todos') {
@@ -5131,8 +5131,8 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
-    const { dataInicio } = this.calcularPeriodo(periodo);
+  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicioCustom?: string, dataFimCustom?: string): Promise<any> {
+    const { dataInicio } = this.calcularPeriodo(periodo, dataInicioCustom, dataFimCustom);
     
     let joinConditions = [sql`1=1`];
     if (squad !== 'todos') {
@@ -5193,8 +5193,8 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
-    const { dataInicio } = this.calcularPeriodo(periodo);
+  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicioCustom?: string, dataFimCustom?: string): Promise<any> {
+    const { dataInicio } = this.calcularPeriodo(periodo, dataInicioCustom, dataFimCustom);
     
     let joinConditions = [sql`1=1`];
     if (squad !== 'todos') {
@@ -7072,11 +7072,15 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  private calcularPeriodo(periodo: string): { dataInicio: string; dataFim: string } {
+  private calcularPeriodo(periodo: string, dataInicioCustom?: string, dataFimCustom?: string): { dataInicio: string; dataFim: string } {
+    if (periodo === 'custom' && dataInicioCustom && dataFimCustom) {
+      return { dataInicio: dataInicioCustom, dataFim: dataFimCustom };
+    }
+
     const hoje = new Date();
     const ano = hoje.getFullYear();
     const mes = hoje.getMonth();
-    
+
     let dataInicio: Date;
     let dataFim: Date = hoje;
 
@@ -9176,6 +9180,8 @@ export class DbStorage implements IStorage {
       diasAtrasoMax: number;
       empresa: string;
       cnpj: string | null;
+      email: string | null;
+      endereco: string | null;
       statusClickup: string | null;
       responsavel: string | null;
       cluster: string | null;
@@ -9274,6 +9280,8 @@ export class DbStorage implements IStorage {
         SELECT DISTINCT ON (TRIM(cc.ids::text))
           TRIM(cc.ids::text) as id_cliente,
           cc.cnpj,
+          cc.email,
+          cc.endereco,
           cup.nome as nome_clickup,
           cup.status as status_clickup,
           cup.responsavel,
@@ -9281,7 +9289,7 @@ export class DbStorage implements IStorage {
           cup.task_id,
           cup.telefone
         FROM "Conta Azul".caz_clientes cc
-        LEFT JOIN "Clickup".cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
+        LEFT JOIN "Clickup".cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
@@ -9307,7 +9315,7 @@ export class DbStorage implements IStorage {
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
         ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
       )
-      SELECT 
+      SELECT
         parcelas.id_cliente,
         caz.nome_caz as nome_cliente,
         parcelas.valor_total,
@@ -9316,6 +9324,8 @@ export class DbStorage implements IStorage {
         parcelas.dias_atraso_max,
         parcelas.empresa,
         cliente_info.cnpj,
+        cliente_info.email,
+        cliente_info.endereco,
         cliente_info.nome_clickup,
         cliente_info.status_clickup,
         cliente_info.responsavel,
@@ -9343,6 +9353,8 @@ export class DbStorage implements IStorage {
       diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
       empresa: row.empresa || '',
       cnpj: row.cnpj || null,
+      email: row.email || null,
+      endereco: row.endereco || null,
       statusClickup: row.status_clickup || null,
       responsavel: row.responsavel || null,
       cluster: row.cluster || null,
