@@ -58,7 +58,7 @@ export default function TreinamentoInternoVideo() {
       return (await res.json()) as { concluido: boolean };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/videos', videoId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/videos'] });
       queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/trilhas'] });
     },
     onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
@@ -70,7 +70,7 @@ export default function TreinamentoInternoVideo() {
       return (await res.json()) as { curtiu: boolean; totalLikes: number };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/videos', videoId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/treinamentos-internos/videos'] });
     },
     onError: (err: Error) => toast({ title: 'Erro', description: err.message, variant: 'destructive' }),
   });
