@@ -51,7 +51,7 @@ export function registerInternalTrainingsRoutes(app: Express) {
       res.json(result.rows);
     } catch (error: any) {
       console.error('[treinamentos-internos] GET /trilhas error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: 'Erro ao buscar trilhas' });
     }
   });
 
@@ -90,7 +90,7 @@ export function registerInternalTrainingsRoutes(app: Express) {
       res.json(result.rows);
     } catch (error: any) {
       console.error('[treinamentos-internos] GET /videos error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: 'Erro ao buscar vídeos' });
     }
   });
 
@@ -166,7 +166,7 @@ export function registerInternalTrainingsRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error('[treinamentos-internos] GET /videos/:id error:', error);
-      res.status(500).json({ error: error.message });
+      res.status(500).json({ error: 'Erro ao buscar vídeo' });
     }
   });
 }
