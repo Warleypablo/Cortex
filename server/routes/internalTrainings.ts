@@ -194,6 +194,7 @@ export function registerInternalTrainingsRoutes(app: Express) {
       await db.execute(sql`
         INSERT INTO cortex_core.internal_video_completions (video_id, user_email)
         VALUES (${id}, ${userEmail})
+        ON CONFLICT (video_id, user_email) DO NOTHING
       `);
       res.json({ concluido: true });
     } catch (error: any) {
@@ -226,6 +227,7 @@ export function registerInternalTrainingsRoutes(app: Express) {
         await db.execute(sql`
           INSERT INTO cortex_core.internal_video_likes (video_id, user_email)
           VALUES (${id}, ${userEmail})
+          ON CONFLICT (video_id, user_email) DO NOTHING
         `);
         curtiu = true;
       }
