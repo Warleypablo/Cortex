@@ -169,4 +169,76 @@ export function registerInternalTrainingsRoutes(app: Express) {
       res.status(500).json({ error: 'Erro ao buscar vídeo' });
     }
   });
+
+  // POST /api/treinamentos-internos/videos/:id/concluir (toggle)
+  app.post('/api/treinamentos-internos/videos/:id/concluir', async (req, res) => {
+    try {
+      const userEmail = getUserEmail(req);
+      if (!userEmail) return res.status(401).json({ error: 'Não autenticado' });
+
+      const { id } = req.params;
+
+      const existsResult = await db.execute(sql`
+        SELECT id FROM cortex_core.internal_video_completions
+        WHERE video_id = ${id} AND user_email = ${userEmail}
+      `);
+
+      if (existsResult.rows.length > 0) {
+        await db.execute(sql`
+          DELETE FROM cortex_core.internal_video_completions
+          WHERE video_id = ${id} AND user_email = ${userEmail}
+        `);
+        return res.json({ concluido: false });
+      }
+
+      await db.execute(sql`
+        INSERT INTO cortex_core.internal_video_completions (video_id, user_email)
+        VALUES (${id}, ${userEmail})
+      `);
+      res.json({ concluido: true });
+    } catch (error: any) {
+      console.error('[treinamentos-internos] POST /concluir error:', error);
+      res.status(500).json({ error: 'Erro ao marcar conclusão' });
+    }
+  });
+
+  // POST /api/treinamentos-internos/videos/:id/like (toggle)
+  app.post('/api/treinamentos-internos/videos/:id/like', async (req, res) => {
+    try {
+      const userEmail = getUserEmail(req);
+      if (!userEmail) return res.status(401).json({ error: 'Não autenticado' });
+
+      const { id } = req.params;
+
+      const existsResult = await db.execute(sql`
+        SELECT id FROM cortex_core.internal_video_likes
+        WHERE video_id = ${id} AND user_email = ${userEmail}
+      `);
+
+      let curtiu: boolean;
+      if (existsResult.rows.length > 0) {
+        await db.execute(sql`
+          DELETE FROM cortex_core.internal_video_likes
+          WHERE video_id = ${id} AND user_email = ${userEmail}
+        `);
+        curtiu = false;
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.internal_video_likes (video_id, user_email)
+          VALUES (${id}, ${userEmail})
+        `);
+        curtiu = true;
+      }
+
+      const totalResult = await db.execute(sql`
+        SELECT COUNT(*)::int AS total FROM cortex_core.internal_video_likes
+        WHERE video_id = ${id}
+      `);
+
+      res.json({ curtiu, totalLikes: (totalResult.rows[0] as any).total });
+    } catch (error: any) {
+      console.error('[treinamentos-internos] POST /like error:', error);
+      res.status(500).json({ error: 'Erro ao curtir vídeo' });
+    }
+  });
 }

@@ -102,3 +102,65 @@ describe('GET /api/treinamentos-internos/videos', () => {
     expect(res.body).toHaveLength(1);
   });
 });
+
+describe('POST /api/treinamentos-internos/videos/:id/concluir', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('cria registro de conclusão na primeira chamada', async () => {
+    // SELECT 1 FROM completions: vazio → vai inserir
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    // INSERT
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'comp-1' }] });
+
+    const res = await request(buildApp()).post('/api/treinamentos-internos/videos/vid-1/concluir');
+
+    expect(res.status).toBe(200);
+    expect(res.body.concluido).toBe(true);
+  });
+
+  it('deleta registro na segunda chamada (toggle off)', async () => {
+    // SELECT 1: já existe
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'comp-1' }] });
+    // DELETE
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(buildApp()).post('/api/treinamentos-internos/videos/vid-1/concluir');
+
+    expect(res.status).toBe(200);
+    expect(res.body.concluido).toBe(false);
+  });
+});
+
+describe('POST /api/treinamentos-internos/videos/:id/like', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('toggle like e retorna totalLikes', async () => {
+    // SELECT 1: vazio → insere
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    // INSERT
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'l-1' }] });
+    // SELECT count
+    mockExecute.mockResolvedValueOnce({ rows: [{ total: 7 }] });
+
+    const res = await request(buildApp()).post('/api/treinamentos-internos/videos/vid-1/like');
+
+    expect(res.status).toBe(200);
+    expect(res.body.curtiu).toBe(true);
+    expect(res.body.totalLikes).toBe(7);
+  });
+
+  it('toggle like off retorna curtiu=false', async () => {
+    // SELECT 1: já existe → vai deletar
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 'l-1' }] });
+    // DELETE
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    // SELECT count
+    mockExecute.mockResolvedValueOnce({ rows: [{ total: 6 }] });
+
+    const res = await request(buildApp()).post('/api/treinamentos-internos/videos/vid-1/like');
+
+    expect(res.status).toBe(200);
+    expect(res.body.curtiu).toBe(false);
+    expect(res.body.totalLikes).toBe(6);
+  });
+});
