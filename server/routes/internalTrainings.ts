@@ -2,6 +2,7 @@ import type { Express, Request } from 'express';
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
 import { syncInternalTrainings } from '../services/internalTrainingsSync';
+import { getDriveClient } from '../autoreport/credentials';
 
 function getUserEmail(req: Request): string | null {
   const user = (req as any).user;
@@ -72,7 +73,7 @@ export function registerInternalTrainingsRoutes(app: Express) {
           v.id,
           v.nome,
           v.drive_file_id AS "driveFileId",
-          v.thumbnail_url AS "thumbnailUrl",
+          '/api/treinamentos-internos/thumbnail/' || v.drive_file_id AS "thumbnailUrl",
           v.duracao_ms AS "duracaoMs",
           v.drive_modified_time AS "driveModifiedTime",
           (c.id IS NOT NULL) AS "userConcluiu",
@@ -108,7 +109,7 @@ export function registerInternalTrainingsRoutes(app: Express) {
           v.id,
           v.nome,
           v.drive_file_id AS "driveFileId",
-          v.thumbnail_url AS "thumbnailUrl",
+          '/api/treinamentos-internos/thumbnail/' || v.drive_file_id AS "thumbnailUrl",
           v.duracao_ms AS "duracaoMs",
           v.drive_modified_time AS "driveModifiedTime",
           v.track_id AS "trackId",
@@ -305,6 +306,41 @@ export function registerInternalTrainingsRoutes(app: Express) {
     } catch (error: any) {
       console.error('[treinamentos-internos] DELETE /comentarios error:', error);
       res.status(500).json({ error: 'Erro ao excluir comentário' });
+    }
+  });
+
+  // Cache de thumbnailLinks: evita uma chamada Drive por request
+  const thumbCache = new Map<string, { url: string; expiresAt: number }>();
+
+  // GET /api/treinamentos-internos/thumbnail/:fileId
+  // Busca thumbnailLink via Drive API (service account) e redireciona
+  app.get('/api/treinamentos-internos/thumbnail/:fileId', async (req, res) => {
+    const { fileId } = req.params;
+    if (!/^[a-zA-Z0-9_-]+$/.test(fileId)) return res.status(400).end();
+
+    const cached = thumbCache.get(fileId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.redirect(302, cached.url);
+    }
+
+    try {
+      const drive = getDriveClient();
+      const fileData = await drive.files.get({
+        fileId,
+        fields: 'thumbnailLink',
+        supportsAllDrives: true,
+      });
+
+      const thumbUrl = fileData.data.thumbnailLink;
+      if (!thumbUrl) return res.status(404).end();
+
+      // thumbnailLink expira em ~1h; cache por 55min
+      thumbCache.set(fileId, { url: thumbUrl, expiresAt: Date.now() + 55 * 60 * 1000 });
+      res.set('Cache-Control', 'public, max-age=3300');
+      res.redirect(302, thumbUrl);
+    } catch (e: any) {
+      console.error('[treinamentos-internos] GET /thumbnail error:', e);
+      res.status(500).end();
     }
   });
 

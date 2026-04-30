@@ -21,6 +21,13 @@ export function _resetSyncLockForTest() {
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 
+// Remove o sufixo de gravação do Zoom: " - YYYY_MM_DD HH_MM GMT±HH_MM - Recording.ext"
+function cleanVideoName(raw: string): string {
+  let name = raw.replace(/\s*-\s*\d{4}_\d{2}_\d{2}\s+\d{2}_\d{2}\s+GMT[+-]\d{2}_\d{2}\s*-\s*Recording\b.*/i, '');
+  name = name.replace(/\.(mp4|mov|avi|mkv|webm|m4v)$/i, '');
+  return name.trim();
+}
+
 export async function syncInternalTrainings(): Promise<SyncReport> {
   if (isSyncing) {
     return {
@@ -120,16 +127,17 @@ export async function syncInternalTrainings(): Promise<SyncReport> {
                 : null;
               const modifiedTime = file.modifiedTime ? new Date(file.modifiedTime) : null;
               const thumbnailUrl = `https://drive.google.com/thumbnail?id=${file.id}&sz=w400`;
+              const nomeClean = cleanVideoName(file.name);
 
               await db.execute(sql`
                 INSERT INTO cortex_core.internal_videos
                   (track_id, drive_file_id, nome, mime_type, thumbnail_url, duracao_ms, drive_modified_time, is_active)
                 VALUES
-                  (${trackId}, ${file.id}, ${file.name}, ${file.mimeType || null},
+                  (${trackId}, ${file.id}, ${nomeClean}, ${file.mimeType || null},
                    ${thumbnailUrl}, ${duracaoMs}, ${modifiedTime}, TRUE)
                 ON CONFLICT (drive_file_id) DO UPDATE
                   SET track_id = EXCLUDED.track_id,
-                      nome = EXCLUDED.nome,
+                      nome = EXCLUDED.nome,  -- já vem limpo via cleanVideoName
                       mime_type = EXCLUDED.mime_type,
                       thumbnail_url = EXCLUDED.thumbnail_url,
                       duracao_ms = EXCLUDED.duracao_ms,
