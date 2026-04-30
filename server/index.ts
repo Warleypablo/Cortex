@@ -534,6 +534,35 @@ app.use((req, res, next) => {
   setInterval(() => runGoogleAdsSync(), GOOGLE_ADS_SYNC_INTERVAL);
   console.log(`[google-ads-sync-job] Scheduled every ${GOOGLE_ADS_SYNC_INTERVAL / 3600000}h`);
 
+  // Internal Trainings auto-sync a cada 1 hora
+  const INTERNAL_TRAININGS_SYNC_INTERVAL = 60 * 60 * 1000; // 1h
+  const runInternalTrainingsSync = async () => {
+    try {
+      console.log("[internal-trainings-sync-job] Starting scheduled sync...");
+      const { syncInternalTrainings } = await import('./services/internalTrainingsSync');
+      const report = await syncInternalTrainings();
+      console.log(
+        `[internal-trainings-sync-job] Done: ${report.trilhasAtivas} trilhas, ` +
+        `${report.videosAtivos} vídeos, ${report.erros.length} erros`
+      );
+      (globalThis as any).__internalTrainingsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        report,
+      };
+    } catch (err: any) {
+      console.error("[internal-trainings-sync-job] Failed:", err.message);
+      (globalThis as any).__internalTrainingsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  // Primeira execução 60s após startup, depois a cada 1h
+  setTimeout(() => runInternalTrainingsSync(), 60000);
+  setInterval(() => runInternalTrainingsSync(), INTERNAL_TRAININGS_SYNC_INTERVAL);
+  console.log(`[internal-trainings-sync-job] Scheduled every ${INTERNAL_TRAININGS_SYNC_INTERVAL / 60000} min`);
+
   // Agendar snapshot diário às 00:05
   const scheduleNextSnapshot = () => {
     const now = new Date();
