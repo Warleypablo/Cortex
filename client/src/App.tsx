@@ -122,6 +122,7 @@ const InvestorsReport = lazyWithRetry(() => import("@/pages/InvestorsReport"));
 const RelatorioMensal = lazyWithRetry(() => import("@/pages/RelatorioMensal"));
 const Acessos = lazyWithRetry(() => import("@/pages/Acessos"));
 const Conhecimentos = lazyWithRetry(() => import("@/pages/Conhecimentos"));
+const TreinamentoInternoVideo = lazyWithRetry(() => import("@/pages/TreinamentoInternoVideo"));
 const Beneficios = lazyWithRetry(() => import("@/pages/Beneficios"));
 const OKR2026 = lazyWithRetry(() => import("@/pages/OKR2026"));
 const BpProdutos = lazyWithRetry(() => import("@/pages/BpProdutos"));
@@ -292,6 +293,9 @@ function ProtectedRouter() {
       <Route path="/chat-clientes">{() => <ProtectedRoute path="/chat-clientes" component={ChatAtendimento} />}</Route>
       <Route path="/acessos">{() => <ProtectedRoute path="/acessos" component={Acessos} />}</Route>
       <Route path="/conhecimentos">{() => <ProtectedRoute path="/conhecimentos" component={Conhecimentos} />}</Route>
+      <Route path="/conhecimentos/treinamentos/:videoId">
+        {() => <ProtectedRoute path="/conhecimentos/treinamentos/:videoId" component={TreinamentoInternoVideo} />}
+      </Route>
       <Route path="/beneficios">{() => <ProtectedRoute path="/beneficios" component={Beneficios} />}</Route>
       <Route path="/sugestoes">{() => <ProtectedRoute path="/sugestoes" component={Sugestoes} />}</Route>
       <Route path="/processos-internos">{() => <ProtectedRoute path="/processos-internos" component={ProcessosInternos} />}</Route>
