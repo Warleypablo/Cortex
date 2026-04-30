@@ -2,7 +2,7 @@ import type { Express, Request } from 'express';
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
 import { syncInternalTrainings } from '../services/internalTrainingsSync';
-import { getGoogleAuth } from '../autoreport/credentials';
+import { getDriveClient } from '../autoreport/credentials';
 
 function getUserEmail(req: Request): string | null {
   const user = (req as any).user;
@@ -309,29 +309,35 @@ export function registerInternalTrainingsRoutes(app: Express) {
     }
   });
 
-  // GET /api/treinamentos-internos/thumbnail/:fileId — proxy autenticado via service account
+  // Cache de thumbnailLinks: evita uma chamada Drive por request
+  const thumbCache = new Map<string, { url: string; expiresAt: number }>();
+
+  // GET /api/treinamentos-internos/thumbnail/:fileId
+  // Busca thumbnailLink via Drive API (service account) e redireciona
   app.get('/api/treinamentos-internos/thumbnail/:fileId', async (req, res) => {
     const { fileId } = req.params;
-    if (!/^[a-zA-Z0-9_-]+$/.test(fileId)) {
-      return res.status(400).end();
-    }
-    try {
-      const auth = getGoogleAuth();
-      const tokenResp = await auth.getAccessToken();
-      const token = tokenResp.token;
-      if (!token) return res.status(502).end();
+    if (!/^[a-zA-Z0-9_-]+$/.test(fileId)) return res.status(400).end();
 
-      const url = `https://drive.google.com/thumbnail?id=${fileId}&sz=w400`;
-      const upstream = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+    const cached = thumbCache.get(fileId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.redirect(302, cached.url);
+    }
+
+    try {
+      const drive = getDriveClient();
+      const fileData = await drive.files.get({
+        fileId,
+        fields: 'thumbnailLink',
+        supportsAllDrives: true,
       });
 
-      if (!upstream.ok) return res.status(upstream.status).end();
+      const thumbUrl = fileData.data.thumbnailLink;
+      if (!thumbUrl) return res.status(404).end();
 
-      res.set('Content-Type', upstream.headers.get('content-type') || 'image/jpeg');
-      res.set('Cache-Control', 'public, max-age=86400');
-      const buf = await upstream.arrayBuffer();
-      res.send(Buffer.from(buf));
+      // thumbnailLink expira em ~1h; cache por 55min
+      thumbCache.set(fileId, { url: thumbUrl, expiresAt: Date.now() + 55 * 60 * 1000 });
+      res.set('Cache-Control', 'public, max-age=3300');
+      res.redirect(302, thumbUrl);
     } catch (e: any) {
       console.error('[treinamentos-internos] GET /thumbnail error:', e);
       res.status(500).end();
