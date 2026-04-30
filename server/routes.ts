@@ -22,6 +22,7 @@ import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
+import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMetasRoutes } from "./routes/metas";
@@ -7907,6 +7908,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth — Orçamento por Campanha
   registerOrcamentoCampanhasRoutes(app, db);
+
+  // Growth — Evolução Temporal (matriz métricas × meses/semanas)
+  registerGrowthTimeseriesRoutes(app, db);
 
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
