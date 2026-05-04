@@ -837,6 +837,19 @@ app.use((req, res, next) => {
     );
   }
 
+  // Saldo diário — snapshot às 18h todos os dias
+  try {
+    const { setupSaldoDiarioSnapshotJob } = await import(
+      "./services/saldoDiarioSnapshotJob"
+    );
+    setupSaldoDiarioSnapshotJob();
+  } catch (err) {
+    console.error(
+      "[saldo-diario-snapshot] Falha ao registrar job:",
+      err,
+    );
+  }
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
