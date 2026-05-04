@@ -39,7 +39,8 @@ export async function runSnapshotJob(
     WHERE ativo = true
   `);
 
-  const saldoTotal = Number((result.rows[0] as any)?.saldo_total || 0);
+  const row = result.rows[0] as { saldo_total: string | number };
+  const saldoTotal = Number(row.saldo_total) || 0;
 
   await db.execute(sql`
     INSERT INTO cortex_core.saldo_diario_snapshots (data, saldo_total)
