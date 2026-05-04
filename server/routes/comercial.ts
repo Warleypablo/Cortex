@@ -1784,7 +1784,7 @@ export function registerComercialRoutes(app: Express) {
           COALESCE(AVG(EXTRACT(EPOCH FROM (d.data_fechamento - d.date_create)) / 86400), 0) as ciclo_medio_dias,
           COUNT(DISTINCT d.company_name) as empresas_unicas,
           COUNT(DISTINCT c.nome) as closers_ativos,
-          COUNT(CASE WHEN d.valor_recorrente > 0 THEN 1 END) as negocios_recorrentes,
+          COUNT(CASE WHEN d.valor_recorrente > 0 AND (d.valor_pontual IS NULL OR d.valor_pontual = 0) THEN 1 END) as negocios_recorrentes,
           COUNT(CASE WHEN d.valor_pontual > 0 AND (d.valor_recorrente IS NULL OR d.valor_recorrente = 0) THEN 1 END) as negocios_pontuais,
           COUNT(CASE WHEN d.valor_recorrente > 0 AND d.valor_pontual > 0 THEN 1 END) as negocios_mistos,
           COALESCE(AVG(d.valor_recorrente), 0) as mrr_medio,
