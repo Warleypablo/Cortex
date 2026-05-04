@@ -1936,6 +1936,21 @@ export async function initializeDfcSnapshotsTable(): Promise<void> {
   }
 }
 
+export async function initializeSaldoDiarioSnapshotsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.saldo_diario_snapshots (
+        data        DATE            PRIMARY KEY,
+        saldo_total NUMERIC(15,2)   NOT NULL,
+        criado_em   TIMESTAMPTZ     DEFAULT NOW()
+      )
+    `);
+    console.log('[database] saldo_diario_snapshots table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing saldo_diario_snapshots:', error);
+  }
+}
+
 export async function initializeSalesGoalsTable(): Promise<void> {
   try {
     await db.execute(sql`
