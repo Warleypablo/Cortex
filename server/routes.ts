@@ -38,6 +38,7 @@ import { registerJuridicoAssistenteRoutes } from "./routes/juridico-assistente";
 import { registerIaHubRoutes } from "./routes/ia-hub";
 import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
 import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
+import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
 import { registerCrossSellRoutes } from "./routes/crosssell";
@@ -7961,6 +7962,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Inadimplência Module - registered from separate file
   registerInadimplenciaRoutes(app);
+
+  // Saldo Diário Snapshot - registered from separate file
+  registerSaldoDiarioRoutes(app, isAuthenticated, isAdmin);
 
   // GEG (Gestão Estratégica de Gente) - registered from separate file
   registerGEGRoutes(app, db, storage);
