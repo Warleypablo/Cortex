@@ -116,6 +116,7 @@ const TIPO_COLORS: Record<string, { bg: string; text: string; border: string }> 
   "D+3": { bg: "bg-yellow-50 dark:bg-yellow-950/30", text: "text-yellow-700 dark:text-yellow-300", border: "border-yellow-200 dark:border-yellow-800" },
   "D+7": { bg: "bg-orange-50 dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-300", border: "border-orange-200 dark:border-orange-800" },
   "D+10": { bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-700 dark:text-red-300", border: "border-red-200 dark:border-red-800" },
+  "D+14": { bg: "bg-red-50 dark:bg-red-950/40", text: "text-red-800 dark:text-red-200", border: "border-red-300 dark:border-red-700" },
   "D+15": { bg: "bg-rose-50 dark:bg-rose-950/30", text: "text-rose-700 dark:text-rose-300", border: "border-rose-200 dark:border-rose-800" },
   "D+20": { bg: "bg-purple-50 dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-300", border: "border-purple-200 dark:border-purple-800" },
   "D+30": { bg: "bg-violet-50 dark:bg-violet-950/30", text: "text-violet-700 dark:text-violet-300", border: "border-violet-200 dark:border-violet-800" },
@@ -506,6 +507,7 @@ function HistoricoTab() {
             <SelectItem value="D+3">D+3</SelectItem>
             <SelectItem value="D+7">D+7</SelectItem>
             <SelectItem value="D+10">D+10</SelectItem>
+            <SelectItem value="D+14">D+14</SelectItem>
             <SelectItem value="D+15">D+15</SelectItem>
             <SelectItem value="D+20">D+20</SelectItem>
           </SelectContent>
@@ -706,7 +708,7 @@ function ConfiguracoesTab() {
     );
   }
 
-  const templateKeysFinanceiro = ["D-3", "D+0", "D+3", "D+7", "D+10", "D+15", "D+20"];
+  const templateKeysFinanceiro = ["D-3", "D+0", "D+3", "D+7", "D+10", "D+14", "D+15", "D+20"];
   const templateKeysJuridico = ["D+30", "D+40", "D+45", "D+50", "D+55"];
   const skipNumerosRaw = getVal("skip_numeros");
   let skipNumeros: string[] = [];
@@ -973,6 +975,7 @@ const TEMPLATE_OPTIONS = [
   { value: "D+3", label: "D+3 (3 dias)" },
   { value: "D+7", label: "D+7 (Suspensão)" },
   { value: "D+10", label: "D+10 (Rescisão)" },
+  { value: "D+14", label: "D+14 (Cancelamento)" },
   { value: "D+15", label: "D+15 (Encerramento)" },
   { value: "D+20", label: "D+20 (Cancelado)" },
   { value: "D+30", label: "D+30 (Formalização Jurídica)" },
