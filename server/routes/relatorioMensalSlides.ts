@@ -559,7 +559,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND h.squad IS NOT NULL
             AND TRIM(h.squad) != ''
           GROUP BY h.squad
-          ORDER BY (mrr + pontual) DESC
+          ORDER BY (
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) +
+            COALESCE(SUM(CASE WHEN COALESCE(h.valorp, '0')::numeric > 0 THEN h.valorp::numeric END), 0)
+          ) DESC
         `),
 
         // 16. Churn por squad no mês de dados (usa cup_churn - tabela curada)
