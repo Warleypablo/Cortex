@@ -166,7 +166,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
           </div>
         </SecondaryCard>
 
-        {/* MRR Add / Cancel / Pausado + Cross-sell */}
+        {/* MRR Add / Cancel / Pausado */}
         <SecondaryCard className="p-3 flex flex-col justify-center">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
