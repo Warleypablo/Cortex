@@ -14,6 +14,7 @@ import SlideNovosAniversariantes from "./relatorio-mensal/SlideNovosAniversarian
 import SlideAniversarioEmpresa from "./relatorio-mensal/SlideAniversarioEmpresa";
 import SlideFaturamentoYtd from "./relatorio-mensal/SlideFaturamentoYtd";
 import SlideVendasYtd from "./relatorio-mensal/SlideVendasYtd";
+import SlideVendasCxUpsell from "./relatorio-mensal/SlideVendasCxUpsell";
 import SlideKRs from "./relatorio-mensal/SlideKRs";
 import SlideCapaCommerce from "./relatorio-mensal/SlideCapaCommerce";
 import SlideCapaComercial from "./relatorio-mensal/SlideCapaComercial";
@@ -35,7 +36,7 @@ import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
-  "Faturamento YTD", "Vendas YTD",
+  "Faturamento YTD", "Vendas YTD", "Vendas CX & Upsell",
   "KRs", "Capa Comercial", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Squad Details", "Ranking Squads", "Turbo Commerce",
   "Pontual", "Entregas Pontuais Commerce",
@@ -44,7 +45,7 @@ const FIXED_SLIDE_NAMES = [
   "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 23
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 24
 
 type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
 
@@ -258,23 +259,24 @@ export default function RelatorioMensal() {
       case 3:  return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
       case 4:  return <SlideFaturamentoYtd data={data.faturamentoYtd} mesLabel={data.mesDadosLabel} />;
       case 5:  return <SlideVendasYtd vendasSeries={data.contratosMes.vendasSeries} mesLabel={data.mesDadosLabel} />;
-      case 6:  return <SlideKRs objectives={data.okrObjectives} />;
-      case 7:  return <SlideCapaComercial />;
-      case 8:  return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
-      case 9:  return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
-      case 10: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
-      case 11: return <SlideCapaCommerce />;
-      case 12: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
-      case 13: return <SlideRankingSquads ranking={data.rankingSquads} />;
-      case 14: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 15: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
-      case 16: return <SlideEntregasPontuaisCommerce pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
-      case 17: return <SlideCapaTech />;
-      case 18: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 19: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 20: return <SlideTopicosDiscussao />;
-      case 21: return <SlideFraseEncerramento />;
-      case 22: return <SlideQRCode />;
+      case 6:  return <SlideVendasCxUpsell metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 7:  return <SlideKRs objectives={data.okrObjectives} />;
+      case 8:  return <SlideCapaComercial />;
+      case 9:  return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
+      case 10: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
+      case 11: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
+      case 12: return <SlideCapaCommerce />;
+      case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
+      case 14: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 15: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 16: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
+      case 17: return <SlideEntregasPontuaisCommerce pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
+      case 18: return <SlideCapaTech />;
+      case 19: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 20: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 21: return <SlideTopicosDiscussao />;
+      case 22: return <SlideFraseEncerramento />;
+      case 23: return <SlideQRCode />;
       default: return null;
     }
   };
