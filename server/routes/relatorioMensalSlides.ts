@@ -165,6 +165,9 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         pontualTempoMedioResult,
         faturamentoYtdResult,
         dfcRecebimentoYtdResult,
+        topMrrResult,
+        topMenorChurnResult,
+        topEntregasResult,
       ] = await Promise.all([
         // 1. Novos colaboradores (admitidos no mês de dados)
         db.execute(sql`
@@ -899,6 +902,56 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           GROUP BY TO_CHAR(data_quitacao::date, 'YYYY-MM')
           ORDER BY month
         `),
+
+        // 24a. Top 3 MRR Ativo por responsável (contratos ativos)
+        db.execute(sql`
+          SELECT
+            responsavel as nome,
+            COALESCE(SUM(
+              CASE WHEN valorrec ~ '^[0-9.]+$' THEN valorrec::numeric ELSE 0 END
+            ), 0) as valor
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(status) IN ('ativo', 'onboarding', 'triagem')
+            AND responsavel IS NOT NULL
+            AND TRIM(responsavel) != ''
+          GROUP BY responsavel
+          ORDER BY valor DESC
+          LIMIT 3
+        `),
+
+        // 24b. Top 3 Menor Churn por responsavel_geral (churn do mês)
+        db.execute(sql`
+          SELECT
+            responsavel_geral as nome,
+            COALESCE(SUM(valor_r), 0)::numeric as valor
+          FROM "Clickup".cup_churn
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= ${dataStart}
+            AND data_solicitacao_encerramento < ${dataEnd}
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+            AND responsavel_geral IS NOT NULL
+            AND TRIM(responsavel_geral) != ''
+          GROUP BY responsavel_geral
+          ORDER BY valor ASC
+          LIMIT 3
+        `),
+
+        // 24c. Top 3 Projetos Entregues por responsável (entregas no mês)
+        db.execute(sql`
+          SELECT
+            responsavel as nome,
+            COUNT(*)::int as valor
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(status) = 'entregue'
+            AND data_entrega >= ${dataStart}::date
+            AND data_entrega < ${dataEnd}::date
+            AND responsavel IS NOT NULL
+            AND TRIM(responsavel) != ''
+          GROUP BY responsavel
+          ORDER BY valor DESC
+          LIMIT 3
+        `),
       ]);
 
       // Build closer photo map
@@ -1360,6 +1413,21 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         dfcRecebimentoMensal,
       };
 
+      const topOperadores = {
+        topMrr: (topMrrResult.rows as any[]).map((row: any) => ({
+          nome: row.nome as string,
+          valor: parseFloat(row.valor) || 0,
+        })),
+        topMenorChurn: (topMenorChurnResult.rows as any[]).map((row: any) => ({
+          nome: row.nome as string,
+          valor: parseFloat(row.valor) || 0,
+        })),
+        topEntregas: (topEntregasResult.rows as any[]).map((row: any) => ({
+          nome: row.nome as string,
+          valor: parseInt(row.valor) || 0,
+        })),
+      };
+
       res.json({
         mesReferencia: mesParam,
         mesLabel,
@@ -1399,6 +1467,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         indicacoes,
         pontualData,
         faturamentoYtd,
+        topOperadores,
       });
 
     } catch (error: any) {
