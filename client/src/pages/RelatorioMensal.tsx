@@ -12,6 +12,7 @@ import SlideCapa from "./relatorio-mensal/SlideCapa";
 import SlideQRCode from "./relatorio-mensal/SlideQRCode";
 import SlideNovosAniversariantes from "./relatorio-mensal/SlideNovosAniversariantes";
 import SlideAniversarioEmpresa from "./relatorio-mensal/SlideAniversarioEmpresa";
+import SlideFaturamentoYtd from "./relatorio-mensal/SlideFaturamentoYtd";
 import SlideKRs from "./relatorio-mensal/SlideKRs";
 import SlideCapaCommerce from "./relatorio-mensal/SlideCapaCommerce";
 import SlideCapaComercial from "./relatorio-mensal/SlideCapaComercial";
@@ -31,6 +32,7 @@ import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
+  "Faturamento YTD",
   "KRs", "Capa Comercial", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Squad Details", "Ranking Squads", "Turbo Commerce",
   "Pontual",
@@ -247,25 +249,26 @@ export default function RelatorioMensal() {
   const renderFixedSlide = (fixedIndex: number) => {
     if (!data) return null;
     switch (fixedIndex) {
-      case 0: return <SlideCapa mesLabel={data.mesLabel} />;
-      case 1: return <SlideQRCode />;
-      case 2: return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
-      case 3: return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
-      case 4: return <SlideKRs objectives={data.okrObjectives} />;
-      case 5: return <SlideCapaComercial />;
-      case 6: return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
-      case 7: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
-      case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
-      case 9: return <SlideCapaCommerce />;
-      case 10: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
-      case 11: return <SlideRankingSquads ranking={data.rankingSquads} />;
-      case 12: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 13: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
-      case 14: return <SlideCapaTech />;
-      case 15: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 16: return <SlideTopicosDiscussao />;
-      case 17: return <SlideFraseEncerramento />;
-      case 18: return <SlideQRCode />;
+      case 0:  return <SlideCapa mesLabel={data.mesLabel} />;
+      case 1:  return <SlideQRCode />;
+      case 2:  return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
+      case 3:  return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
+      case 4:  return <SlideFaturamentoYtd data={data.faturamentoYtd} mesLabel={data.mesDadosLabel} />;
+      case 5:  return <SlideKRs objectives={data.okrObjectives} />;
+      case 6:  return <SlideCapaComercial />;
+      case 7:  return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
+      case 8:  return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
+      case 9:  return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
+      case 10: return <SlideCapaCommerce />;
+      case 11: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
+      case 12: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 13: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 14: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
+      case 15: return <SlideCapaTech />;
+      case 16: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 17: return <SlideTopicosDiscussao />;
+      case 18: return <SlideFraseEncerramento />;
+      case 19: return <SlideQRCode />;
       default: return null;
     }
   };
