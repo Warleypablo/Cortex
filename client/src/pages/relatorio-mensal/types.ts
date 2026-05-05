@@ -95,6 +95,13 @@ export interface ContratosMes {
   vendasSeries: VendasMes[];
 }
 
+export interface CrosssellCloser {
+  nome: string;
+  mrr: number;
+  pontual: number;
+  contratos: number;
+}
+
 export interface TurboMetrics {
   mrrAtivo: number;
   ticketMedioContrato: number;
@@ -110,6 +117,8 @@ export interface TurboMetrics {
   pausadosCount: number;
   crosssellMrr: number;
   crosssellPontual: number;
+  crosssellContratos: number;
+  crosssellPorCloser: CrosssellCloser[];
   cxcsSolicitacoes: number;
   faturamentoPontual: number;
   pontualCommerceQtr: number;
