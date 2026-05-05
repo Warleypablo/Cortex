@@ -116,6 +116,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
 
       const dataStart = `${anoDados}-${String(mesDados).padStart(2, '0')}-01`;
       const dataEnd = `${nextAnoDados}-${String(nextMesDados).padStart(2, '0')}-01`;
+      const ytdStart = `${anoDados}-01-01`;
 
       // Run all queries in parallel
       const [
@@ -161,6 +162,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         pontualEntregasSquadResult,
         pontualEntregasProdutoMesResult,
         pontualTempoMedioResult,
+        faturamentoYtdResult,
+        dfcRecebimentoYtdResult,
       ] = await Promise.all([
         // 1. Novos colaboradores (admitidos no mês de dados)
         db.execute(sql`
@@ -852,6 +855,31 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           HAVING COUNT(*) >= 2
           ORDER BY dias_medio ASC
         `),
+
+        // Faturamento Bruto YTD + Inadimplência YTD
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(valor_bruto::numeric), 0) AS faturamento_bruto_ytd,
+            COALESCE(SUM(CASE WHEN nao_pago::numeric > 0 THEN nao_pago::numeric ELSE 0 END), 0) AS inadimplencia_ytd
+          FROM "Conta Azul".caz_parcelas
+          WHERE tipo_evento = 'RECEITA'
+            AND data_vencimento >= ${ytdStart}::date
+            AND data_vencimento < ${dataEnd}::date
+        `),
+
+        // Imposto sobre Receita YTD (05.05) + DFC Recebimento mensal agrupado por mês
+        db.execute(sql`
+          SELECT
+            TO_CHAR(data_quitacao::date, 'YYYY-MM') AS month,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' AND categoria_nome LIKE '05.05%' THEN valor_pago::numeric ELSE 0 END), 0) AS imposto,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) AS recebido
+          FROM "Conta Azul".caz_parcelas
+          WHERE status = 'QUITADO'
+            AND data_quitacao::date >= ${ytdStart}::date
+            AND data_quitacao::date < ${dataEnd}::date
+          GROUP BY TO_CHAR(data_quitacao::date, 'YYYY-MM')
+          ORDER BY month
+        `),
       ]);
 
       // Build closer photo map
@@ -1283,6 +1311,29 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         tempoMedioEntrega,
       };
 
+      // ── Faturamento YTD ──
+      const ytdRow = (faturamentoYtdResult.rows as any[])[0] || {};
+      const faturamentoBrutoYtd = parseFloat(ytdRow.faturamento_bruto_ytd) || 0;
+      const inadimplenciaYtd = parseFloat(ytdRow.inadimplencia_ytd) || 0;
+
+      let impostoYtd = 0;
+      const dfcRecebimentoMensal = (dfcRecebimentoYtdResult.rows as any[]).map((row: any) => {
+        const m = parseInt(row.month.split("-")[1]) - 1;
+        impostoYtd += parseFloat(row.imposto) || 0;
+        return {
+          month: row.month as string,
+          label: MESES_SHORT[m] || row.month,
+          recebido: parseFloat(row.recebido) || 0,
+        };
+      });
+
+      const faturamentoYtd = {
+        faturamentoBrutoYtd,
+        inadimplenciaYtd,
+        impostoYtd,
+        dfcRecebimentoMensal,
+      };
+
       res.json({
         mesReferencia: mesParam,
         mesLabel,
@@ -1321,6 +1372,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         techData,
         indicacoes,
         pontualData,
+        faturamentoYtd,
       });
 
     } catch (error: any) {
