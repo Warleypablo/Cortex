@@ -39,7 +39,7 @@ function PodiumCol({ title, items, formatValue }: PodiumColProps) {
         </div>
       ) : (
         items.slice(0, 3).map((item, i) => (
-          <div key={item.nome} className="flex items-start gap-2.5">
+          <div key={`${i}-${item.nome}`} className="flex items-start gap-2.5">
             <span className="text-2xl leading-none mt-0.5">{MEDALS[i]}</span>
             <div className="flex-1 min-w-0">
               <p className={`truncate ${RANK_STYLES[i].size} ${RANK_STYLES[i].text}`}>
