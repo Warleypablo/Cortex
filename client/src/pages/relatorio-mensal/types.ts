@@ -254,6 +254,17 @@ export interface FaturamentoYtdData {
   dfcRecebimentoMensal: DfcRecebimentoMes[];
 }
 
+export interface OperadorRanking {
+  nome: string;
+  valor: number;
+}
+
+export interface TopOperadores {
+  topMrr: OperadorRanking[];
+  topMenorChurn: OperadorRanking[];
+  topEntregas: OperadorRanking[];
+}
+
 export interface RelatorioMensalData {
   mesReferencia: string;
   mesLabel: string;
@@ -274,4 +285,5 @@ export interface RelatorioMensalData {
   indicacoes: Indicacoes;
   pontualData: PontualData;
   faturamentoYtd: FaturamentoYtdData;
+  topOperadores: TopOperadores;
 }
