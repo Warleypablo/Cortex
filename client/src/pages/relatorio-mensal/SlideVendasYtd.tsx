@@ -27,7 +27,7 @@ function fmtBarLabel(v: number): string {
   return `${Math.round(v)}`;
 }
 
-function makeBarLabel(data: VendasMes[], dataKey: "vendasMrr" | "vendasPontual") {
+function makeBarLabel(data: any[], dataKey: string) {
   return ({ x, y, width, height, index }: any) => {
     if (index == null || height < 16) return null;
     const val = data[index]?.[dataKey] || 0;
