@@ -1184,6 +1184,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       const rankingSquads = (rankingSquadsResult.rows as any[]).map((row: any, i: number) => ({
         squad: row.squad,
         mrr: parseFloat(row.mrr) || 0,
+        pontual: parseFloat(row.pontual) || 0,
         contratos: parseInt(row.contratos) || 0,
         clientes: parseInt(row.clientes) || 0,
         posicao: i + 1,
