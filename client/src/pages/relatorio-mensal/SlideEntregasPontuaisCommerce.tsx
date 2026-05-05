@@ -196,6 +196,7 @@ export default function SlideEntregasPontuaisCommerce({ pontualData, mesLabel }:
                   barSize={28}
                   fill={PRODUTO_COLORS[idx]}
                   fillOpacity={0.85}
+                  radius={!hasOutros && idx === topProdutos.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                 />
               ))}
               {hasOutros && (
