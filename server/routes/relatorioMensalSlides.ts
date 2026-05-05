@@ -911,7 +911,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
               CASE WHEN valorrec ~ '^[0-9.]+$' THEN valorrec::numeric ELSE 0 END
             ), 0) as valor
           FROM "Clickup".cup_contratos
-          WHERE LOWER(status) IN ('ativo', 'onboarding', 'triagem')
+          WHERE LOWER(TRIM(status)) IN ('ativo', 'onboarding', 'triagem')
             AND responsavel IS NOT NULL
             AND TRIM(responsavel) != ''
           GROUP BY responsavel
@@ -943,7 +943,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             responsavel as nome,
             COUNT(*)::int as valor
           FROM "Clickup".cup_contratos
-          WHERE LOWER(status) = 'entregue'
+          WHERE LOWER(TRIM(status)) = 'entregue'
             AND data_entrega >= ${dataStart}::date
             AND data_entrega < ${dataEnd}::date
             AND responsavel IS NOT NULL
