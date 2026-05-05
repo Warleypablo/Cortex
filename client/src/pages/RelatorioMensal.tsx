@@ -316,9 +316,7 @@ export default function RelatorioMensal() {
       return renderFixedSlide(slot.fixedIndex);
     }
     if (slot.type === "squad") {
-      const squadData = data.squadDetails[slot.squadIndex];
-      if (!squadData) return null;
-      return <SlideSquadSingle squad={squadData} mesLabel={data.mesDadosLabel} />;
+      return <SlideSquadSingle details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.mesDadosLabel} />;
     }
     return (
       <SlideCustom
