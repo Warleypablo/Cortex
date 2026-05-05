@@ -41,7 +41,7 @@ const FIXED_SLIDE_NAMES = [
   "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 19
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 20
 
 type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
 
