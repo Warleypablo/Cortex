@@ -79,6 +79,7 @@ const NIVEIS_COBRANCA: NivelCobranca[] = [
   { tipo: "D+3", label: "D+3 (3 dias)", dias: 3, instancia: "financeiro" },
   { tipo: "D+7", label: "D+7 (Suspensão)", dias: 7, instancia: "financeiro" },
   { tipo: "D+10", label: "D+10 (Rescisão)", dias: 10, instancia: "financeiro" },
+  { tipo: "D+14", label: "D+14 (Cancelamento)", dias: 14, instancia: "financeiro" },
   { tipo: "D+15", label: "D+15 (Encerramento)", dias: 15, instancia: "financeiro" },
   { tipo: "D+20", label: "D+20 (Cancelado)", dias: 20, instancia: "financeiro" },
   { tipo: "D+30", label: "D+30 (Formalização Jurídica)", dias: 30, instancia: "juridico" },
@@ -137,6 +138,12 @@ Caso haja interesse na regularização do débito, segue abaixo o boleto atualiz
 Qualquer dúvida, estamos à disposição.\n
 
 — Time Financeiro | Turbo Partners`,
+
+  "D+14": `Olá, {nome} tudo bem?\n
+Identificamos que o pagamento de R$ {valor}, com vencimento em {vencimento} referente ao contrato em aberto permanece pendente há 14 dias. Até o momento, não houve a regularização do débito.\n
+Diante disso, informamos que, conforme previsto em contrato, diante da ausência de regularização do pagamento, estamos procedendo com o cancelamento do contrato por inadimplência.\n
+Caso tenha interesse em regularizar a situação ou verificar a possibilidade de reativação, pedimos que entre em contato o quanto antes.\n
+Permanecemos à disposição.`,
 
   "D+15": `Prezado(a), {nome}\n
 
@@ -265,6 +272,7 @@ export async function initTurboZapTables(): Promise<void> {
       { chave: "template_D+3", valor: DEFAULT_TEMPLATES["D+3"] },
       { chave: "template_D+7", valor: DEFAULT_TEMPLATES["D+7"] },
       { chave: "template_D+10", valor: DEFAULT_TEMPLATES["D+10"] },
+      { chave: "template_D+14", valor: DEFAULT_TEMPLATES["D+14"] },
       { chave: "template_D+15", valor: DEFAULT_TEMPLATES["D+15"] },
       { chave: "template_D+20", valor: DEFAULT_TEMPLATES["D+20"] },
       { chave: "delay_min", valor: "10" },
