@@ -38,7 +38,7 @@ function PodiumCol({ title, items, formatValue }: PodiumColProps) {
           <p className="text-zinc-600 text-sm">Sem dados no mês</p>
         </div>
       ) : (
-        items.map((item, i) => (
+        items.slice(0, 3).map((item, i) => (
           <div key={item.nome} className="flex items-start gap-2.5">
             <span className="text-2xl leading-none mt-0.5">{MEDALS[i]}</span>
             <div className="flex-1 min-w-0">
