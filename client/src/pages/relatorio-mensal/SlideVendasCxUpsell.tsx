@@ -99,7 +99,7 @@ export default function SlideVendasCxUpsell({ metrics, mesLabel }: Props) {
               <span className="text-xs text-zinc-500">MRR</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-sm bg-purple-500" />
+              <div className="w-2.5 h-2.5 rounded-sm bg-purple-400" />
               <span className="text-xs text-zinc-500">Pontual</span>
             </div>
           </div>
@@ -134,7 +134,7 @@ export default function SlideVendasCxUpsell({ metrics, mesLabel }: Props) {
                 />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
                 <Bar dataKey="mrr" name="MRR" stackId="cx" fill="#34d399" fillOpacity={0.85} />
-                <Bar dataKey="pontual" name="Pontual" stackId="cx" fill="#a855f7" fillOpacity={0.8} radius={[0, 4, 4, 0]} />
+                <Bar dataKey="pontual" name="Pontual" stackId="cx" fill="#c084fc" fillOpacity={0.8} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
