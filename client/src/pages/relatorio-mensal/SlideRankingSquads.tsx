@@ -140,11 +140,12 @@ export default function SlideRankingSquads({ ranking }: Props) {
                 )}
               </div>
 
-              {/* Squad name + MRR */}
+              {/* Squad name + MRR + Pontual */}
               <p className={`font-bold text-white text-center ${isFirst ? "text-base" : "text-sm"}`}>
                 {name}
               </p>
-              <p className="text-xs text-zinc-400 mb-2">{fmtBRL(squad.mrr)}</p>
+              <p className="text-xs text-zinc-400">{fmtBRL(squad.mrr)}</p>
+              <p className="text-xs text-cyan-400 mb-2">{fmtBRL(squad.pontual)}</p>
 
               {/* Colored bar */}
               <div

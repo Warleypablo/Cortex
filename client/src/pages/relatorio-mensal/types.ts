@@ -154,6 +154,7 @@ export interface SquadDetail {
 export interface SquadRanking {
   squad: string;
   mrr: number;
+  pontual: number;
   contratos: number;
   clientes: number;
   posicao: number;
