@@ -135,6 +135,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         turboClientesResult,
         turboChurnResult,
         turboCxcsResult,
+        crosssellPorCloserResult,
         turboFaturamentoResult,
         turboRetencoesResult,
         indicacoesResult,
@@ -396,6 +397,24 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND d.source = 'PARTNER'
             AND d.data_fechamento >= ${dataStart}
             AND d.data_fechamento < ${dataEnd}
+        `),
+
+        // 12b. Cross-sell por closer (source PARTNER, mês de dados)
+        db.execute(sql`
+          SELECT
+            COALESCE(c.nome, 'Sem Responsável') as nome,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as mrr,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as pontual,
+            COUNT(*)::int as contratos
+          FROM "Bitrix".crm_deal d
+          LEFT JOIN "Bitrix".crm_closers c
+            ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.source = 'PARTNER'
+            AND d.data_fechamento >= ${dataStart}
+            AND d.data_fechamento < ${dataEnd}
+          GROUP BY COALESCE(c.nome, 'Sem Responsável')
+          ORDER BY (COALESCE(SUM(d.valor_recorrente), 0) + COALESCE(SUM(d.valor_pontual), 0)) DESC
         `),
 
         // 13. Faturamento pontual do mês (cup_contratos — data_entrega no mês)
@@ -1093,6 +1112,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         crosssellMrr: parseFloat(turboCxcs.crosssell_mrr) || 0,
         crosssellPontual: parseFloat(turboCxcs.crosssell_pontual) || 0,
         cxcsSolicitacoes: parseInt(turboCxcs.solicitacoes) || 0,
+        crosssellContratos: parseInt(turboCxcs.solicitacoes) || 0,
+        crosssellPorCloser: (crosssellPorCloserResult.rows as any[]).map((row: any) => ({
+          nome: row.nome,
+          mrr: parseFloat(row.mrr) || 0,
+          pontual: parseFloat(row.pontual) || 0,
+          contratos: parseInt(row.contratos) || 0,
+        })),
         faturamentoPontual: parseFloat(turboFat.faturamento_pontual) || 0,
         pontualCommerceQtr: parseFloat((pontualCommerceQtrResult.rows as any[])[0]?.pontual_commerce_qtr) || 0,
         churnMetaMensal,
