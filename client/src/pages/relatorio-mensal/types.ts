@@ -232,6 +232,19 @@ export interface PontualData {
   tempoMedioEntrega: PontualTempoMedio[];
 }
 
+export interface DfcRecebimentoMes {
+  month: string;   // "YYYY-MM"
+  label: string;   // "Jan", "Fev", ...
+  recebido: number;
+}
+
+export interface FaturamentoYtdData {
+  faturamentoBrutoYtd: number;
+  inadimplenciaYtd: number;
+  impostoYtd: number;
+  dfcRecebimentoMensal: DfcRecebimentoMes[];
+}
+
 export interface RelatorioMensalData {
   mesReferencia: string;
   mesLabel: string;
@@ -251,4 +264,5 @@ export interface RelatorioMensalData {
   techData: TechSlideData;
   indicacoes: Indicacoes;
   pontualData: PontualData;
+  faturamentoYtd: FaturamentoYtdData;
 }
