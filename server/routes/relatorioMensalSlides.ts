@@ -907,9 +907,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         db.execute(sql`
           SELECT
             responsavel as nome,
-            COALESCE(SUM(
-              CASE WHEN valorrec ~ '^[0-9.]+$' THEN valorrec::numeric ELSE 0 END
-            ), 0) as valor
+            COALESCE(SUM(COALESCE(valorr::numeric, 0)), 0) as valor
           FROM "Clickup".cup_contratos
           WHERE LOWER(TRIM(status)) IN ('ativo', 'onboarding', 'triagem')
             AND responsavel IS NOT NULL
