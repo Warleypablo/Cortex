@@ -13,6 +13,7 @@ import SlideQRCode from "./relatorio-mensal/SlideQRCode";
 import SlideNovosAniversariantes from "./relatorio-mensal/SlideNovosAniversariantes";
 import SlideAniversarioEmpresa from "./relatorio-mensal/SlideAniversarioEmpresa";
 import SlideFaturamentoYtd from "./relatorio-mensal/SlideFaturamentoYtd";
+import SlideVendasYtd from "./relatorio-mensal/SlideVendasYtd";
 import SlideKRs from "./relatorio-mensal/SlideKRs";
 import SlideCapaCommerce from "./relatorio-mensal/SlideCapaCommerce";
 import SlideCapaComercial from "./relatorio-mensal/SlideCapaComercial";
@@ -32,7 +33,7 @@ import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
-  "Faturamento YTD",
+  "Faturamento YTD", "Vendas YTD",
   "KRs", "Capa Comercial", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Squad Details", "Ranking Squads", "Turbo Commerce",
   "Pontual",
@@ -41,7 +42,7 @@ const FIXED_SLIDE_NAMES = [
   "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 20
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 21
 
 type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
 
@@ -254,21 +255,22 @@ export default function RelatorioMensal() {
       case 2:  return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
       case 3:  return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
       case 4:  return <SlideFaturamentoYtd data={data.faturamentoYtd} mesLabel={data.mesDadosLabel} />;
-      case 5:  return <SlideKRs objectives={data.okrObjectives} />;
-      case 6:  return <SlideCapaComercial />;
-      case 7:  return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
-      case 8:  return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
-      case 9:  return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
-      case 10: return <SlideCapaCommerce />;
-      case 11: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
-      case 12: return <SlideRankingSquads ranking={data.rankingSquads} />;
-      case 13: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 14: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
-      case 15: return <SlideCapaTech />;
-      case 16: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 17: return <SlideTopicosDiscussao />;
-      case 18: return <SlideFraseEncerramento />;
-      case 19: return <SlideQRCode />;
+      case 5:  return <SlideVendasYtd vendasSeries={data.contratosMes.vendasSeries} mesLabel={data.mesDadosLabel} />;
+      case 6:  return <SlideKRs objectives={data.okrObjectives} />;
+      case 7:  return <SlideCapaComercial />;
+      case 8:  return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
+      case 9:  return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
+      case 10: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
+      case 11: return <SlideCapaCommerce />;
+      case 12: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
+      case 13: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 14: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 15: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
+      case 16: return <SlideCapaTech />;
+      case 17: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 18: return <SlideTopicosDiscussao />;
+      case 19: return <SlideFraseEncerramento />;
+      case 20: return <SlideQRCode />;
       default: return null;
     }
   };
