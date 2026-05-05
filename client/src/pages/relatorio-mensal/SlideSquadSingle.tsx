@@ -1,10 +1,10 @@
 import { LayoutGrid } from "lucide-react";
 import type { SquadDetail } from "./types";
 import SlideLayout from "./SlideLayout";
-import { SlideHeader, SecondaryCard } from "./SlideComponents";
+import { SlideHeader } from "./SlideComponents";
 
 interface Props {
-  squad: SquadDetail;
+  details: SquadDetail[];
   mesLabel: string;
 }
 
@@ -47,57 +47,89 @@ function fmtBRL(v: number): string {
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
-export default function SlideSquadSingle({ squad, mesLabel }: Props) {
-  const { emoji, name } = parseSquadName(squad.squad);
-  const color = getColor(name);
-  const churnColor = squad.churnPct >= 8 ? "#ef4444" : "#22c55e";
-  const evolColor = squad.evolucaoMrr >= 0 ? "#22c55e" : "#ef4444";
-  const evolSign = squad.evolucaoMrr >= 0 ? "+" : "";
-  const title = `${emoji ? emoji + " " : ""}${name.toUpperCase()} — ${mesLabel}`;
+export default function SlideSquadSingle({ details, mesLabel }: Props) {
+  if (details.length === 0) {
+    return (
+      <SlideLayout section="commerce">
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-zinc-500">Sem dados de squads para este período</p>
+        </div>
+      </SlideLayout>
+    );
+  }
+
+  const cols = details.length <= 4 ? 2 : 3;
 
   return (
     <SlideLayout section="commerce" padding="28px 36px">
       <SlideHeader
         icon={LayoutGrid}
-        iconColor="text-zinc-300"
-        title={title}
-        gradientColor={color}
+        iconColor="text-purple-400"
+        title={`Detalhes por Squad — ${mesLabel}`}
+        gradientColor="#a855f7"
       />
 
-      <div className="flex-1 grid grid-cols-4 gap-4 min-h-0 content-start pt-2">
-        {/* MRR Ativo */}
-        <SecondaryCard className="p-5 flex flex-col justify-center gap-2" borderColor={color}>
-          <p className="text-[11px] text-zinc-500 uppercase tracking-wide">MRR Ativo</p>
-          <p className="text-3xl font-black" style={{ color }}>{fmtBRL(squad.mrr)}</p>
-          <p className="text-[11px] text-zinc-600">{squad.clientes} cliente{squad.clientes !== 1 ? "s" : ""}</p>
-        </SecondaryCard>
+      <div className={`flex-1 grid gap-4 min-h-0 ${cols === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {details.map((sq) => {
+          const { emoji, name } = parseSquadName(sq.squad);
+          const color = getColor(name);
+          const churnColor = sq.churnPct >= 8 ? "#ef4444" : "#22c55e";
+          const evolColor = sq.evolucaoMrr >= 0 ? "#22c55e" : "#ef4444";
+          const evolSign = sq.evolucaoMrr >= 0 ? "+" : "";
 
-        {/* Pontual Entregue */}
-        <SecondaryCard className="p-5 flex flex-col justify-center gap-2">
-          <p className="text-[11px] text-zinc-500 uppercase tracking-wide">Pontual Entregue</p>
-          <p className="text-3xl font-black text-cyan-400">{fmtBRL(squad.pontual)}</p>
-          <p className="text-[11px] text-zinc-600">{mesLabel}</p>
-        </SecondaryCard>
+          return (
+            <div
+              key={sq.squad}
+              className="rounded-xl flex flex-col shadow-lg shadow-black/20"
+              style={{
+                background: "rgba(255, 255, 255, 0.04)",
+                border: `1px solid ${color}25`,
+              }}
+            >
+              {/* Card header */}
+              <div
+                className="px-5 py-3 rounded-t-xl"
+                style={{ borderBottom: `2px solid ${color}40` }}
+              >
+                <span className="text-xl font-black tracking-wide" style={{ color }}>
+                  {emoji && <span className="mr-1.5">{emoji}</span>}
+                  {name.toUpperCase()}
+                </span>
+              </div>
 
-        {/* Churn */}
-        <SecondaryCard className="p-5 flex flex-col justify-center gap-2">
-          <p className="text-[11px] text-zinc-500 uppercase tracking-wide">Churn</p>
-          <p className="text-3xl font-black" style={{ color: churnColor }}>
-            {squad.churnPct.toFixed(1).replace(".", ",")}%
-          </p>
-          <p className="text-[11px] text-zinc-600">
-            {fmtBRL(squad.churnBrl)} / {fmtBRL(squad.mrrBase || 0)}
-          </p>
-        </SecondaryCard>
-
-        {/* Evolução MRR */}
-        <SecondaryCard className="p-5 flex flex-col justify-center gap-2">
-          <p className="text-[11px] text-zinc-500 uppercase tracking-wide">Evolução MRR</p>
-          <p className="text-3xl font-black" style={{ color: evolColor }}>
-            {evolSign}{fmtBRL(squad.evolucaoMrr)}
-          </p>
-          <p className="text-[11px] text-zinc-600">vs. mês anterior</p>
-        </SecondaryCard>
+              {/* Metrics */}
+              <div className="px-5 py-3 flex-1 flex flex-col justify-center">
+                <ul className="space-y-1.5 text-sm">
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
+                    <span className="text-zinc-400">MRR Ativo:</span>
+                    <span className="font-bold">{fmtBRL(sq.mrr)}</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
+                    <span className="text-zinc-400">Pontual Entregue:</span>
+                    <span className="font-bold">{fmtBRL(sq.pontual)}</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
+                    <span className="text-zinc-400">Churn:</span>
+                    <span className="font-bold" style={{ color: churnColor }}>
+                      {sq.churnPct.toFixed(1).replace(".", ",")}%
+                    </span>
+                    <span className="text-zinc-500 text-xs">({fmtBRL(sq.churnBrl)} / {fmtBRL(sq.mrrBase || 0)})</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/40 shrink-0" />
+                    <span className="text-zinc-400">Evolução MRR:</span>
+                    <span className="font-bold" style={{ color: evolColor }}>
+                      R$ {evolSign}{Math.round(sq.evolucaoMrr).toLocaleString("pt-BR")}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </SlideLayout>
   );
