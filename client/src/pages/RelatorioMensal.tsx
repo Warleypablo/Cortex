@@ -24,6 +24,8 @@ import SlideGraficoContratos from "./relatorio-mensal/SlideGraficoContratos";
 
 import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
 import SlidePontual from "./relatorio-mensal/SlidePontual";
+import SlideEntregasPontuaisCommerce from "./relatorio-mensal/SlideEntregasPontuaisCommerce";
+import SlideEntregasPontuaisTech from "./relatorio-mensal/SlideEntregasPontuaisTech";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
 import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
@@ -36,13 +38,13 @@ const FIXED_SLIDE_NAMES = [
   "Faturamento YTD", "Vendas YTD",
   "KRs", "Capa Comercial", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Squad Details", "Ranking Squads", "Turbo Commerce",
-  "Pontual",
-  "Capa Tech", "Area Tech",
+  "Pontual", "Entregas Pontuais Commerce",
+  "Capa Tech", "Area Tech", "Entregas Pontuais Tech",
   "Tópicos",
   "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 21
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 23
 
 type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
 
@@ -266,11 +268,13 @@ export default function RelatorioMensal() {
       case 13: return <SlideRankingSquads ranking={data.rankingSquads} />;
       case 14: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
       case 15: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
-      case 16: return <SlideCapaTech />;
-      case 17: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 18: return <SlideTopicosDiscussao />;
-      case 19: return <SlideFraseEncerramento />;
-      case 20: return <SlideQRCode />;
+      case 16: return <SlideEntregasPontuaisCommerce pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
+      case 17: return <SlideCapaTech />;
+      case 18: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 19: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 20: return <SlideTopicosDiscussao />;
+      case 21: return <SlideFraseEncerramento />;
+      case 22: return <SlideQRCode />;
       default: return null;
     }
   };
