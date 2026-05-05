@@ -61,6 +61,16 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 export default function SlideEntregasPontuaisTech({ techData, mesLabel }: Props) {
+  if (!techData) {
+    return (
+      <SlideLayout section="tech">
+        <div className="flex-1 flex items-center justify-center text-zinc-500">
+          Carregando dados Tech...
+        </div>
+      </SlideLayout>
+    );
+  }
+
   const { kpis, entregasPorTipo, receitaPorTipo } = techData;
 
   const mesLabelParts = mesLabel.split(" ");
@@ -124,7 +134,7 @@ export default function SlideEntregasPontuaisTech({ techData, mesLabel }: Props)
 
         <SecondaryCard className="p-4 flex flex-col justify-center gap-1">
           <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Tempo Médio / Projeto</p>
-          <p className="text-2xl font-black text-cyan-400">{kpis.tempoMedio}</p>
+          <p className="text-2xl font-black text-cyan-400">{kpis.tempoMedio} dias</p>
           <p className="text-[10px] text-zinc-600">{mesAtual}</p>
         </SecondaryCard>
       </div>
