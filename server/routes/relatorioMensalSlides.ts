@@ -116,6 +116,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
 
       const dataStart = `${anoDados}-${String(mesDados).padStart(2, '0')}-01`;
       const dataEnd = `${nextAnoDados}-${String(nextMesDados).padStart(2, '0')}-01`;
+      const ytdStart = `${anoDados}-01-01`;
 
       // Run all queries in parallel
       const [
@@ -134,6 +135,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         turboClientesResult,
         turboChurnResult,
         turboCxcsResult,
+        crosssellPorCloserResult,
         turboFaturamentoResult,
         turboRetencoesResult,
         indicacoesResult,
@@ -161,6 +163,11 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         pontualEntregasSquadResult,
         pontualEntregasProdutoMesResult,
         pontualTempoMedioResult,
+        faturamentoYtdResult,
+        dfcRecebimentoYtdResult,
+        topMrrResult,
+        topMenorChurnResult,
+        topEntregasResult,
       ] = await Promise.all([
         // 1. Novos colaboradores (admitidos no mês de dados)
         db.execute(sql`
@@ -395,6 +402,24 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND d.data_fechamento < ${dataEnd}
         `),
 
+        // 12b. Cross-sell por closer (source PARTNER, mês de dados)
+        db.execute(sql`
+          SELECT
+            COALESCE(c.nome, 'Sem Responsável') as nome,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as mrr,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as pontual,
+            COUNT(*)::int as contratos
+          FROM "Bitrix".crm_deal d
+          LEFT JOIN "Bitrix".crm_closers c
+            ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.source = 'PARTNER'
+            AND d.data_fechamento >= ${dataStart}
+            AND d.data_fechamento < ${dataEnd}
+          GROUP BY COALESCE(c.nome, 'Sem Responsável')
+          ORDER BY (COALESCE(SUM(d.valor_recorrente), 0) + COALESCE(SUM(d.valor_pontual), 0)) DESC
+        `),
+
         // 13. Faturamento pontual do mês (cup_contratos — data_entrega no mês)
         db.execute(sql`
           SELECT
@@ -513,7 +538,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY m.month
         `),
 
-        // 15. Ranking Squads por MRR (snapshot do dia 1 do mês seguinte)
+        // 15. Ranking Squads por MRR + Pontual (snapshot do dia 1 do mês seguinte)
         db.execute(sql`
           WITH ultimo_snapshot AS (
             SELECT COALESCE(
@@ -534,7 +559,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND h.squad IS NOT NULL
             AND TRIM(h.squad) != ''
           GROUP BY h.squad
-          ORDER BY mrr DESC
+          ORDER BY (
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) +
+            COALESCE(SUM(CASE WHEN COALESCE(h.valorp, '0')::numeric > 0 THEN h.valorp::numeric END), 0)
+          ) DESC
         `),
 
         // 16. Churn por squad no mês de dados (usa cup_churn - tabela curada)
@@ -852,6 +880,79 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           HAVING COUNT(*) >= 2
           ORDER BY dias_medio ASC
         `),
+
+        // Faturamento Bruto YTD + Inadimplência YTD
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(valor_bruto::numeric), 0) AS faturamento_bruto_ytd,
+            COALESCE(SUM(CASE WHEN nao_pago::numeric > 0 THEN nao_pago::numeric ELSE 0 END), 0) AS inadimplencia_ytd
+          FROM "Conta Azul".caz_parcelas
+          WHERE tipo_evento = 'RECEITA'
+            AND data_vencimento >= ${ytdStart}::date
+            AND data_vencimento < ${dataEnd}::date
+        `),
+
+        // Imposto sobre Receita YTD (05.05) + DFC Recebimento mensal agrupado por mês
+        db.execute(sql`
+          SELECT
+            TO_CHAR(data_quitacao::date, 'YYYY-MM') AS month,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' AND categoria_nome LIKE '05.05%' THEN valor_pago::numeric ELSE 0 END), 0) AS imposto,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) AS recebido
+          FROM "Conta Azul".caz_parcelas
+          WHERE status = 'QUITADO'
+            AND data_quitacao::date >= ${ytdStart}::date
+            AND data_quitacao::date < ${dataEnd}::date
+          GROUP BY TO_CHAR(data_quitacao::date, 'YYYY-MM')
+          ORDER BY month
+        `),
+
+        // 24a. Top 3 MRR Ativo por responsável (contratos ativos)
+        db.execute(sql`
+          SELECT
+            responsavel as nome,
+            COALESCE(SUM(COALESCE(valorr::numeric, 0)), 0) as valor
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(TRIM(status)) IN ('ativo', 'onboarding', 'triagem')
+            AND responsavel IS NOT NULL
+            AND TRIM(responsavel) != ''
+          GROUP BY responsavel
+          ORDER BY valor DESC
+          LIMIT 3
+        `),
+
+        // 24b. Top 3 Menor Churn por responsavel_geral (churn do mês)
+        db.execute(sql`
+          SELECT
+            responsavel_geral as nome,
+            COALESCE(SUM(valor_r), 0)::numeric as valor
+          FROM "Clickup".cup_churn
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= ${dataStart}
+            AND data_solicitacao_encerramento < ${dataEnd}
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+            AND responsavel_geral IS NOT NULL
+            AND TRIM(responsavel_geral) != ''
+          GROUP BY responsavel_geral
+          ORDER BY valor ASC
+          LIMIT 3
+        `),
+
+        // 24c. Top 3 Projetos Entregues por responsável (entregas no mês)
+        db.execute(sql`
+          SELECT
+            responsavel as nome,
+            COUNT(*)::int as valor
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(TRIM(status)) = 'entregue'
+            AND data_entrega >= ${dataStart}::date
+            AND data_entrega < ${dataEnd}::date
+            AND responsavel IS NOT NULL
+            AND TRIM(responsavel) != ''
+          GROUP BY responsavel
+          ORDER BY valor DESC
+          LIMIT 3
+        `),
       ]);
 
       // Build closer photo map
@@ -1065,6 +1166,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         crosssellMrr: parseFloat(turboCxcs.crosssell_mrr) || 0,
         crosssellPontual: parseFloat(turboCxcs.crosssell_pontual) || 0,
         cxcsSolicitacoes: parseInt(turboCxcs.solicitacoes) || 0,
+        crosssellContratos: parseInt(turboCxcs.solicitacoes) || 0,
+        crosssellPorCloser: (crosssellPorCloserResult.rows as any[]).map((row: any) => ({
+          nome: row.nome,
+          mrr: parseFloat(row.mrr) || 0,
+          pontual: parseFloat(row.pontual) || 0,
+          contratos: parseInt(row.contratos) || 0,
+        })),
         faturamentoPontual: parseFloat(turboFat.faturamento_pontual) || 0,
         pontualCommerceQtr: parseFloat((pontualCommerceQtrResult.rows as any[])[0]?.pontual_commerce_qtr) || 0,
         churnMetaMensal,
@@ -1079,6 +1187,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       const rankingSquads = (rankingSquadsResult.rows as any[]).map((row: any, i: number) => ({
         squad: row.squad,
         mrr: parseFloat(row.mrr) || 0,
+        pontual: parseFloat(row.pontual) || 0,
         contratos: parseInt(row.contratos) || 0,
         clientes: parseInt(row.clientes) || 0,
         posicao: i + 1,
@@ -1283,6 +1392,44 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         tempoMedioEntrega,
       };
 
+      // ── Faturamento YTD ──
+      const ytdRow = (faturamentoYtdResult.rows as any[])[0] || {};
+      const faturamentoBrutoYtd = parseFloat(ytdRow.faturamento_bruto_ytd) || 0;
+      const inadimplenciaYtd = parseFloat(ytdRow.inadimplencia_ytd) || 0;
+
+      let impostoYtd = 0;
+      const dfcRecebimentoMensal = (dfcRecebimentoYtdResult.rows as any[]).map((row: any) => {
+        const m = parseInt(row.month.split("-")[1]) - 1;
+        impostoYtd += parseFloat(row.imposto) || 0;
+        return {
+          month: row.month as string,
+          label: MESES_SHORT[m] || row.month,
+          recebido: parseFloat(row.recebido) || 0,
+        };
+      });
+
+      const faturamentoYtd = {
+        faturamentoBrutoYtd,
+        inadimplenciaYtd,
+        impostoYtd,
+        dfcRecebimentoMensal,
+      };
+
+      const topOperadores = {
+        topMrr: (topMrrResult.rows as any[]).map((row: any) => ({
+          nome: row.nome as string,
+          valor: parseFloat(row.valor) || 0,
+        })),
+        topMenorChurn: (topMenorChurnResult.rows as any[]).map((row: any) => ({
+          nome: row.nome as string,
+          valor: parseFloat(row.valor) || 0,
+        })),
+        topEntregas: (topEntregasResult.rows as any[]).map((row: any) => ({
+          nome: row.nome as string,
+          valor: parseInt(row.valor) || 0,
+        })),
+      };
+
       res.json({
         mesReferencia: mesParam,
         mesLabel,
@@ -1321,6 +1468,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         techData,
         indicacoes,
         pontualData,
+        faturamentoYtd,
+        topOperadores,
       });
 
     } catch (error: any) {

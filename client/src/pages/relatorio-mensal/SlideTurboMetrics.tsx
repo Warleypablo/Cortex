@@ -1,4 +1,4 @@
-import { Activity, Users, TrendingUp, TrendingDown, Pause, CreditCard, Target, Handshake } from "lucide-react";
+import { Activity, Users, TrendingUp, TrendingDown, Pause, CreditCard, Target } from "lucide-react";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { TurboMetrics } from "./types";
 import SlideLayout from "./SlideLayout";
@@ -85,7 +85,6 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
   const faturamentoPontual = metrics.faturamentoPontual;
   const faturamentoTotal = metrics.mrrAtivo + faturamentoPontual;
   const faturamentoVariavel = 0;
-  const crosssellTotal = metrics.crosssellMrr + metrics.crosssellPontual;
   const retencaoPct = metrics.retencoesSolicitacoesCount > 0
     ? ((metrics.retencoesCount / metrics.retencoesSolicitacoesCount) * 100).toFixed(1)
     : "0.0";
@@ -167,7 +166,7 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
           </div>
         </SecondaryCard>
 
-        {/* MRR Add / Cancel / Pausado + Cross-sell */}
+        {/* MRR Add / Cancel / Pausado */}
         <SecondaryCard className="p-3 flex flex-col justify-center">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
@@ -190,24 +189,6 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
                 <span className="text-xs text-amber-400 font-bold">Pausados</span>
               </div>
               <span className="text-sm font-bold text-amber-400">{fmtBRL(metrics.pausadosMrr)}</span>
-            </div>
-          </div>
-          <div className="border-t border-white/[0.06] pt-1.5 mt-1.5 space-y-0.5">
-            <div className="flex items-center gap-1 mb-0.5">
-              <Handshake className="h-3 w-3 text-purple-400" />
-              <span className="text-xs text-purple-400 font-bold">Cross-sell</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-zinc-400">Rec:</span>
-              <span className="text-sm font-bold text-emerald-400">{fmtBRL(metrics.crosssellMrr)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-zinc-400">Pont:</span>
-              <span className="text-sm font-bold text-purple-400">{fmtBRL(metrics.crosssellPontual)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-xs text-zinc-400">Total:</span>
-              <span className="text-sm font-bold text-cyan-400">{fmtBRL(crosssellTotal)}</span>
             </div>
           </div>
         </SecondaryCard>

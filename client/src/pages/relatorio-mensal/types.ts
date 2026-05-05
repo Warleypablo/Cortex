@@ -95,6 +95,13 @@ export interface ContratosMes {
   vendasSeries: VendasMes[];
 }
 
+export interface CrosssellCloser {
+  nome: string;
+  mrr: number;
+  pontual: number;
+  contratos: number;
+}
+
 export interface TurboMetrics {
   mrrAtivo: number;
   ticketMedioContrato: number;
@@ -110,6 +117,8 @@ export interface TurboMetrics {
   pausadosCount: number;
   crosssellMrr: number;
   crosssellPontual: number;
+  crosssellContratos: number;
+  crosssellPorCloser: CrosssellCloser[];
   cxcsSolicitacoes: number;
   faturamentoPontual: number;
   pontualCommerceQtr: number;
@@ -145,6 +154,7 @@ export interface SquadDetail {
 export interface SquadRanking {
   squad: string;
   mrr: number;
+  pontual: number;
   contratos: number;
   clientes: number;
   posicao: number;
@@ -232,6 +242,30 @@ export interface PontualData {
   tempoMedioEntrega: PontualTempoMedio[];
 }
 
+export interface DfcRecebimentoMes {
+  month: string;   // "YYYY-MM"
+  label: string;   // "Jan", "Fev", ...
+  recebido: number;
+}
+
+export interface FaturamentoYtdData {
+  faturamentoBrutoYtd: number;
+  inadimplenciaYtd: number;
+  impostoYtd: number;
+  dfcRecebimentoMensal: DfcRecebimentoMes[];
+}
+
+export interface OperadorRanking {
+  nome: string;
+  valor: number;
+}
+
+export interface TopOperadores {
+  topMrr: OperadorRanking[];
+  topMenorChurn: OperadorRanking[];
+  topEntregas: OperadorRanking[];
+}
+
 export interface RelatorioMensalData {
   mesReferencia: string;
   mesLabel: string;
@@ -251,4 +285,6 @@ export interface RelatorioMensalData {
   techData: TechSlideData;
   indicacoes: Indicacoes;
   pontualData: PontualData;
+  faturamentoYtd: FaturamentoYtdData;
+  topOperadores: TopOperadores;
 }

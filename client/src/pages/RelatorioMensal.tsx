@@ -7,11 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRelatorioMensal } from "./relatorio-mensal/useRelatorioMensal";
 import { useCustomSlides, type CustomSlide } from "./relatorio-mensal/useCustomSlides";
+import type { SquadDetail } from "./relatorio-mensal/types";
 import { useUpload } from "@/hooks/use-upload";
 import SlideCapa from "./relatorio-mensal/SlideCapa";
 import SlideQRCode from "./relatorio-mensal/SlideQRCode";
 import SlideNovosAniversariantes from "./relatorio-mensal/SlideNovosAniversariantes";
 import SlideAniversarioEmpresa from "./relatorio-mensal/SlideAniversarioEmpresa";
+import SlideFaturamentoYtd from "./relatorio-mensal/SlideFaturamentoYtd";
+import SlideVendasYtd from "./relatorio-mensal/SlideVendasYtd";
+import SlideVendasCxUpsell from "./relatorio-mensal/SlideVendasCxUpsell";
 import SlideKRs from "./relatorio-mensal/SlideKRs";
 import SlideCapaCommerce from "./relatorio-mensal/SlideCapaCommerce";
 import SlideCapaComercial from "./relatorio-mensal/SlideCapaComercial";
@@ -22,8 +26,11 @@ import SlideGraficoContratos from "./relatorio-mensal/SlideGraficoContratos";
 
 import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
 import SlidePontual from "./relatorio-mensal/SlidePontual";
+import SlideEntregasPontuaisCommerce from "./relatorio-mensal/SlideEntregasPontuaisCommerce";
+import SlideEntregasPontuaisTech from "./relatorio-mensal/SlideEntregasPontuaisTech";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
-import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
+import SlideSquadSingle from "./relatorio-mensal/SlideSquadSingle";
+import SlideTopOperadores from "./relatorio-mensal/SlideTopOperadores";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
 import SlideTopicosDiscussao from "./relatorio-mensal/SlideTopicosDiscussao";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
@@ -31,17 +38,21 @@ import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
+  "Faturamento YTD", "Vendas YTD", "Vendas CX & Upsell",
   "KRs", "Capa Comercial", "Ranking Closers",
-  "Ranking SDRs", "Contratos", "Capa Commerce", "Squad Details", "Ranking Squads", "Turbo Commerce",
-  "Pontual",
-  "Capa Tech", "Area Tech",
+  "Ranking SDRs", "Contratos", "Capa Commerce", "Squad Details", "Ranking Squads", "Top Operadores", "Turbo Commerce",
+  "Pontual", "Entregas Pontuais Commerce",
+  "Capa Tech", "Area Tech", "Entregas Pontuais Tech",
   "Tópicos",
   "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 19
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 25
 
-type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
+type SlotEntry =
+  | { type: "fixed"; fixedIndex: number; name: string }
+  | { type: "custom"; data: CustomSlide }
+  | { type: "squad"; squadIndex: number; name: string };
 
 const MESES_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -65,10 +76,26 @@ function getMonthOptions(): { value: string; label: string }[] {
   return options;
 }
 
-function buildSlotArray(customSlides: CustomSlide[]): SlotEntry[] {
+function parseSquadNameMinimal(raw: string): { emoji: string; name: string } {
+  const trimmed = raw.trim();
+  const idx = trimmed.search(/[A-Za-z]/);
+  if (idx > 0) return { emoji: trimmed.slice(0, idx).trim(), name: trimmed.slice(idx).trim() };
+  return { emoji: "", name: trimmed };
+}
+
+function buildSlotArray(customSlides: CustomSlide[], squadDetails: SquadDetail[]): SlotEntry[] {
   const slots: SlotEntry[] = [];
   for (let i = 0; i < STATIC_SLIDES; i++) {
-    slots.push({ type: "fixed", fixedIndex: i, name: FIXED_SLIDE_NAMES[i] });
+    if (i === 13) {
+      // Replace "Squad Details" with individual squad slides
+      for (let s = 0; s < squadDetails.length; s++) {
+        const { emoji, name } = parseSquadNameMinimal(squadDetails[s].squad);
+        const label = emoji ? `${emoji} ${name}` : name;
+        slots.push({ type: "squad", squadIndex: s, name: label });
+      }
+    } else {
+      slots.push({ type: "fixed", fixedIndex: i, name: FIXED_SLIDE_NAMES[i] });
+    }
     // Insert custom slides that go after fixed slide i
     const customs = customSlides
       .filter((c) => c.posicao === i)
@@ -137,11 +164,18 @@ export default function RelatorioMensal() {
     onSuccess: (response) => setNewImageUrl(response.objectPath),
   });
 
-  const slots = useMemo(() => buildSlotArray(customSlides), [customSlides]);
+  const slots = useMemo(
+    () => buildSlotArray(customSlides, data?.squadDetails ?? []),
+    [customSlides, data]
+  );
   const totalSlides = slots.length;
 
   const slideNames = useMemo(
-    () => slots.map((s) => s.type === "fixed" ? s.name : (s.data.titulo || "Slide Custom")),
+    () => slots.map((s) =>
+      s.type === "fixed"  ? s.name :
+      s.type === "squad"  ? s.name :
+      (s.data.titulo || "Slide Custom")
+    ),
     [slots]
   );
 
@@ -247,25 +281,31 @@ export default function RelatorioMensal() {
   const renderFixedSlide = (fixedIndex: number) => {
     if (!data) return null;
     switch (fixedIndex) {
-      case 0: return <SlideCapa mesLabel={data.mesLabel} />;
-      case 1: return <SlideQRCode />;
-      case 2: return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
-      case 3: return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
-      case 4: return <SlideKRs objectives={data.okrObjectives} />;
-      case 5: return <SlideCapaComercial />;
-      case 6: return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
-      case 7: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
-      case 8: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
-      case 9: return <SlideCapaCommerce />;
-      case 10: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
-      case 11: return <SlideRankingSquads ranking={data.rankingSquads} />;
-      case 12: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 13: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
-      case 14: return <SlideCapaTech />;
-      case 15: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 16: return <SlideTopicosDiscussao />;
-      case 17: return <SlideFraseEncerramento />;
-      case 18: return <SlideQRCode />;
+      case 0:  return <SlideCapa mesLabel={data.mesLabel} />;
+      case 1:  return <SlideQRCode />;
+      case 2:  return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
+      case 3:  return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
+      case 4:  return <SlideFaturamentoYtd data={data.faturamentoYtd} mesLabel={data.mesDadosLabel} />;
+      case 5:  return <SlideVendasYtd vendasSeries={data.contratosMes.vendasSeries} mesLabel={data.mesDadosLabel} />;
+      case 6:  return <SlideVendasCxUpsell metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 7:  return <SlideKRs objectives={data.okrObjectives} />;
+      case 8:  return <SlideCapaComercial />;
+      case 9:  return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
+      case 10: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
+      case 11: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
+      case 12: return <SlideCapaCommerce />;
+      case 13: return null; // replaced by individual squad slides
+      case 14: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 15: return <SlideTopOperadores topOperadores={data.topOperadores} mesLabel={data.mesDadosLabel} />;
+      case 16: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
+      case 17: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
+      case 18: return <SlideEntregasPontuaisCommerce pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
+      case 19: return <SlideCapaTech />;
+      case 20: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 21: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 22: return <SlideTopicosDiscussao />;
+      case 23: return <SlideFraseEncerramento />;
+      case 24: return <SlideQRCode />;
       default: return null;
     }
   };
@@ -276,6 +316,9 @@ export default function RelatorioMensal() {
     if (!slot) return null;
     if (slot.type === "fixed") {
       return renderFixedSlide(slot.fixedIndex);
+    }
+    if (slot.type === "squad") {
+      return <SlideSquadSingle details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.mesDadosLabel} />;
     }
     return (
       <SlideCustom
