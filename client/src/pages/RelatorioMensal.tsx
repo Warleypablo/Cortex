@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRelatorioMensal } from "./relatorio-mensal/useRelatorioMensal";
 import { useCustomSlides, type CustomSlide } from "./relatorio-mensal/useCustomSlides";
+import type { SquadDetail } from "./relatorio-mensal/types";
 import { useUpload } from "@/hooks/use-upload";
 import SlideCapa from "./relatorio-mensal/SlideCapa";
 import SlideQRCode from "./relatorio-mensal/SlideQRCode";
@@ -28,7 +29,7 @@ import SlidePontual from "./relatorio-mensal/SlidePontual";
 import SlideEntregasPontuaisCommerce from "./relatorio-mensal/SlideEntregasPontuaisCommerce";
 import SlideEntregasPontuaisTech from "./relatorio-mensal/SlideEntregasPontuaisTech";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
-import SlideSquadDetails from "./relatorio-mensal/SlideSquadDetails";
+import SlideSquadSingle from "./relatorio-mensal/SlideSquadSingle";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
 import SlideTopicosDiscussao from "./relatorio-mensal/SlideTopicosDiscussao";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
@@ -47,7 +48,10 @@ const FIXED_SLIDE_NAMES = [
 
 const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 24
 
-type SlotEntry = { type: "fixed"; fixedIndex: number; name: string } | { type: "custom"; data: CustomSlide };
+type SlotEntry =
+  | { type: "fixed"; fixedIndex: number; name: string }
+  | { type: "custom"; data: CustomSlide }
+  | { type: "squad"; squadIndex: number; name: string };
 
 const MESES_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -71,10 +75,26 @@ function getMonthOptions(): { value: string; label: string }[] {
   return options;
 }
 
-function buildSlotArray(customSlides: CustomSlide[]): SlotEntry[] {
+function parseSquadNameMinimal(raw: string): { emoji: string; name: string } {
+  const trimmed = raw.trim();
+  const idx = trimmed.search(/[A-Za-z]/);
+  if (idx > 0) return { emoji: trimmed.slice(0, idx).trim(), name: trimmed.slice(idx).trim() };
+  return { emoji: "", name: trimmed };
+}
+
+function buildSlotArray(customSlides: CustomSlide[], squadDetails: SquadDetail[]): SlotEntry[] {
   const slots: SlotEntry[] = [];
   for (let i = 0; i < STATIC_SLIDES; i++) {
-    slots.push({ type: "fixed", fixedIndex: i, name: FIXED_SLIDE_NAMES[i] });
+    if (i === 13) {
+      // Replace "Squad Details" with individual squad slides
+      for (let s = 0; s < squadDetails.length; s++) {
+        const { emoji, name } = parseSquadNameMinimal(squadDetails[s].squad);
+        const label = emoji ? `${emoji} ${name}` : name;
+        slots.push({ type: "squad", squadIndex: s, name: label });
+      }
+    } else {
+      slots.push({ type: "fixed", fixedIndex: i, name: FIXED_SLIDE_NAMES[i] });
+    }
     // Insert custom slides that go after fixed slide i
     const customs = customSlides
       .filter((c) => c.posicao === i)
@@ -143,11 +163,18 @@ export default function RelatorioMensal() {
     onSuccess: (response) => setNewImageUrl(response.objectPath),
   });
 
-  const slots = useMemo(() => buildSlotArray(customSlides), [customSlides]);
+  const slots = useMemo(
+    () => buildSlotArray(customSlides, data?.squadDetails ?? []),
+    [customSlides, data?.squadDetails]
+  );
   const totalSlides = slots.length;
 
   const slideNames = useMemo(
-    () => slots.map((s) => s.type === "fixed" ? s.name : (s.data.titulo || "Slide Custom")),
+    () => slots.map((s) =>
+      s.type === "fixed"  ? s.name :
+      s.type === "squad"  ? s.name :
+      (s.data.titulo || "Slide Custom")
+    ),
     [slots]
   );
 
@@ -266,7 +293,7 @@ export default function RelatorioMensal() {
       case 10: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
       case 11: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
       case 12: return <SlideCapaCommerce />;
-      case 13: return <SlideSquadDetails details={data.squadDetails} mesLabel={data.mesDadosLabel} />;
+      case 13: return null; // replaced by individual squad slides
       case 14: return <SlideRankingSquads ranking={data.rankingSquads} />;
       case 15: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
       case 16: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
@@ -287,6 +314,9 @@ export default function RelatorioMensal() {
     if (!slot) return null;
     if (slot.type === "fixed") {
       return renderFixedSlide(slot.fixedIndex);
+    }
+    if (slot.type === "squad") {
+      return <SlideSquadSingle squad={data.squadDetails[slot.squadIndex]} mesLabel={data.mesDadosLabel} />;
     }
     return (
       <SlideCustom
