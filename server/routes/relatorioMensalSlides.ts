@@ -538,7 +538,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY m.month
         `),
 
-        // 15. Ranking Squads por MRR (snapshot do dia 1 do mês seguinte)
+        // 15. Ranking Squads por MRR + Pontual (snapshot do dia 1 do mês seguinte)
         db.execute(sql`
           WITH ultimo_snapshot AS (
             SELECT COALESCE(
@@ -559,7 +559,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND h.squad IS NOT NULL
             AND TRIM(h.squad) != ''
           GROUP BY h.squad
-          ORDER BY mrr DESC
+          ORDER BY (mrr + pontual) DESC
         `),
 
         // 16. Churn por squad no mês de dados (usa cup_churn - tabela curada)
