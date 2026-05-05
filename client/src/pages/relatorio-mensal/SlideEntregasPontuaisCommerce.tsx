@@ -13,8 +13,8 @@ const MESES_ALL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set"
 const MESES_PT_FULL = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 const PRODUTO_COLORS = [
-  "#a855f7", // purple
   "#06b6d4", // cyan
+  "#a855f7", // purple
   "#10b981", // emerald
   "#f59e0b", // amber
   "#ec4899", // pink
@@ -62,15 +62,16 @@ export default function SlideEntregasPontuaisCommerce({ pontualData, mesLabel }:
   const { entregasPorProdutoMes, entregasMes } = pontualData;
 
   const mesLabelParts = mesLabel.split(" ");
-  const reportYear = parseInt(mesLabelParts[mesLabelParts.length - 1] || "0");
+  const reportYear = parseInt(mesLabelParts[mesLabelParts.length - 1] || "0") || new Date().getFullYear();
   const reportMesNome = mesLabelParts[0] || "";
   const reportMesIdx = MESES_PT_FULL.findIndex(m => m.toLowerCase() === reportMesNome.toLowerCase());
-  const mesAtual = MESES_ALL[reportMesIdx] || mesLabel;
+  const safeMesIdx = reportMesIdx >= 0 ? reportMesIdx : 11;
+  const mesAtual = MESES_ALL[safeMesIdx] || mesLabel;
 
   // Filtrar Jan → mês selecionado
   const ytdMeses = entregasPorProdutoMes.filter(m => {
     const parts = m.month.split("-").map(Number);
-    return parts[0] === reportYear && parts[1] <= (reportMesIdx + 1);
+    return parts[0] === reportYear && parts[1] <= (safeMesIdx + 1);
   });
 
   // Total YTD
@@ -94,7 +95,7 @@ export default function SlideEntregasPontuaisCommerce({ pontualData, mesLabel }:
   const ticketMedio = contratosMonth > 0 ? entregasMes.total / contratosMonth : 0;
 
   // Chart data
-  const chartData = MESES_ALL.slice(0, reportMesIdx + 1).map((lbl, i) => {
+  const chartData = MESES_ALL.slice(0, safeMesIdx + 1).map((lbl, i) => {
     const monthKey = `${reportYear}-${String(i + 1).padStart(2, "0")}`;
     const found = entregasPorProdutoMes.find(m => m.month === monthKey);
     const row: any = { label: lbl, total: 0 };
@@ -112,6 +113,8 @@ export default function SlideEntregasPontuaisCommerce({ pontualData, mesLabel }:
     }
     return row;
   });
+
+  const hasOutros = chartData.some(row => (row["Outros"] as number) > 0);
 
   return (
     <SlideLayout section="commerce" padding="24px 32px">
@@ -152,12 +155,18 @@ export default function SlideEntregasPontuaisCommerce({ pontualData, mesLabel }:
         <div className="flex items-center justify-between mb-2">
           <p className="text-sm font-bold text-zinc-300">Entregas por Produto × Mês — Jan → {mesAtual}</p>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {[...topProdutos, "Outros"].map((prod, idx) => (
+            {topProdutos.map((prod, idx) => (
               <div key={prod} className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: PRODUTO_COLORS[idx] }} />
                 <span className="text-[9px] text-zinc-500">{prod}</span>
               </div>
             ))}
+            {hasOutros && (
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: PRODUTO_COLORS[5] }} />
+                <span className="text-[9px] text-zinc-500">Outros</span>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex-1 min-h-0">
@@ -189,15 +198,17 @@ export default function SlideEntregasPontuaisCommerce({ pontualData, mesLabel }:
                   fillOpacity={0.85}
                 />
               ))}
-              <Bar
-                dataKey="Outros"
-                name="Outros"
-                stackId="a"
-                barSize={28}
-                fill={PRODUTO_COLORS[5]}
-                fillOpacity={0.7}
-                radius={[4, 4, 0, 0]}
-              />
+              {hasOutros && (
+                <Bar
+                  dataKey="Outros"
+                  name="Outros"
+                  stackId="a"
+                  barSize={28}
+                  fill={PRODUTO_COLORS[5]}
+                  fillOpacity={0.7}
+                  radius={[4, 4, 0, 0]}
+                />
+              )}
             </BarChart>
           </ResponsiveContainer>
         </div>
