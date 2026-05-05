@@ -165,7 +165,7 @@ export default function RelatorioMensal() {
 
   const slots = useMemo(
     () => buildSlotArray(customSlides, data?.squadDetails ?? []),
-    [customSlides, data?.squadDetails]
+    [customSlides, data]
   );
   const totalSlides = slots.length;
 
@@ -316,7 +316,9 @@ export default function RelatorioMensal() {
       return renderFixedSlide(slot.fixedIndex);
     }
     if (slot.type === "squad") {
-      return <SlideSquadSingle squad={data.squadDetails[slot.squadIndex]} mesLabel={data.mesDadosLabel} />;
+      const squadData = data.squadDetails[slot.squadIndex];
+      if (!squadData) return null;
+      return <SlideSquadSingle squad={squadData} mesLabel={data.mesDadosLabel} />;
     }
     return (
       <SlideCustom
