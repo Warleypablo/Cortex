@@ -325,12 +325,12 @@ export function registerTurboZapRoutes(app: Express) {
       const user = req.user as any;
       const { dias } = req.body;
 
-      if (dias === undefined || dias === null || !Number.isInteger(Number(dias))) {
+      if (typeof dias !== "number" || !Number.isInteger(dias)) {
         return res.status(400).json({ message: "Campo 'dias' deve ser um número inteiro" });
       }
 
       const nivel = await createNivelCustomizado(
-        Number(dias),
+        dias,
         user?.email || user?.name || "sistema",
       );
       res.status(201).json(nivel);
