@@ -1088,7 +1088,7 @@ export async function toggleNivel(
   const desativados = await getNiveisDesativados();
   const updated = ativo
     ? desativados.filter((t) => t !== tipo)
-    : [...new Set([...desativados, tipo])];
+    : Array.from(new Set([...desativados, tipo]));
   await updateConfiguracao("niveis_desativados", JSON.stringify(updated), atualizadoPor);
   return updated;
 }
