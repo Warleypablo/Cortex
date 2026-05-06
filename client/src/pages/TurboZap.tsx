@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +9,7 @@ import {
   Zap, Send, History, Settings, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, SkipForward, Search, Loader2,
   MessageSquare, TrendingUp, AlertTriangle, Phone, X, Scale, Calendar,
+  Plus, Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,38 @@ interface PipelineJuridico {
   atualizado_por: string | null;
   criado_em: string;
   atualizado_em: string;
+}
+
+interface TurboZapTemplate {
+  id: number;
+  nome: string;
+  conteudo: string;
+  criado_por: string | null;
+  criado_em: string;
+}
+
+const VARIAVEIS = ["{nome}", "{valor}", "{vencimento}", "{link_pagamento}"];
+
+function insertarVariavel(
+  variavel: string,
+  ref: React.RefObject<HTMLTextAreaElement>,
+  value: string,
+  onChange: (v: string) => void,
+) {
+  const ta = ref.current;
+  if (!ta) {
+    onChange(value + variavel);
+    return;
+  }
+  const start = ta.selectionStart ?? value.length;
+  const end = ta.selectionEnd ?? value.length;
+  const newVal = value.slice(0, start) + variavel + value.slice(end);
+  onChange(newVal);
+  requestAnimationFrame(() => {
+    ta.selectionStart = start + variavel.length;
+    ta.selectionEnd = start + variavel.length;
+    ta.focus();
+  });
 }
 
 const ETAPAS_PIPELINE = [
@@ -621,6 +654,179 @@ function HistoricoTab() {
 }
 
 // ============================================
+// Biblioteca de Templates
+// ============================================
+
+function BibliotecaTemplates() {
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [nomeNovo, setNomeNovo] = useState("");
+  const [conteudoNovo, setConteudoNovo] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<TurboZapTemplate | null>(null);
+  const formTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: templates = [] } = useQuery<TurboZapTemplate[]>({
+    queryKey: ["/api/turbozap/templates"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/turbozap/templates", {
+        nome: nomeNovo,
+        conteudo: conteudoNovo,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/templates"] });
+      toast({ title: "Template criado!" });
+      setShowForm(false);
+      setNomeNovo("");
+      setConteudoNovo("");
+    },
+    onError: () => {
+      toast({ title: "Erro ao criar template", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/turbozap/templates/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/templates"] });
+      toast({ title: "Template excluído!" });
+      setDeleteTarget(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir template", variant: "destructive" });
+      setDeleteTarget(null);
+    },
+  });
+
+  return (
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <CardTitle className="text-gray-900 dark:text-white text-lg">
+          Biblioteca de Templates
+        </CardTitle>
+        {!showForm && (
+          <Button size="sm" variant="outline" onClick={() => setShowForm(true)} className="gap-1">
+            <Plus className="w-3 h-3" /> Novo Template
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {showForm && (
+          <div className="border border-dashed border-gray-300 dark:border-zinc-700 rounded-lg p-4 space-y-3">
+            <Input
+              placeholder="Nome do template (ex: Lembrete Amigável)"
+              value={nomeNovo}
+              onChange={(e) => setNomeNovo(e.target.value)}
+              className="bg-gray-50 dark:bg-zinc-800"
+            />
+            <Textarea
+              ref={formTextareaRef}
+              placeholder="Conteúdo da mensagem..."
+              value={conteudoNovo}
+              onChange={(e) => setConteudoNovo(e.target.value)}
+              className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
+            />
+            <div className="flex flex-wrap gap-1">
+              {VARIAVEIS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertarVariavel(v, formTextareaRef, conteudoNovo, setConteudoNovo)}
+                  className="px-2 py-0.5 text-xs rounded border border-dashed border-gray-300 dark:border-zinc-600 text-gray-500 dark:text-zinc-400 hover:border-primary hover:text-primary transition-colors font-mono"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => createMutation.mutate()}
+                disabled={!nomeNovo.trim() || !conteudoNovo.trim() || createMutation.isPending}
+              >
+                {createMutation.isPending ? "Salvando..." : "Salvar Template"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowForm(false);
+                  setNomeNovo("");
+                  setConteudoNovo("");
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {templates.length === 0 && !showForm && (
+          <p className="text-sm text-gray-400 dark:text-zinc-500">
+            Nenhum template salvo ainda. Crie o primeiro clicando em "Novo Template".
+          </p>
+        )}
+
+        <div className="space-y-2">
+          {templates.map((tpl) => (
+            <div
+              key={tpl.id}
+              className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-zinc-800"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">{tpl.nome}</p>
+                <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5 line-clamp-2">
+                  {tpl.conteudo}
+                </p>
+              </div>
+              <button
+                onClick={() => setDeleteTarget(tpl)}
+                className="shrink-0 p-1 text-gray-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 transition-colors"
+                title="Excluir template"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-900 dark:text-white">
+              Excluir template
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-500 dark:text-zinc-400">
+              Tem certeza que deseja excluir "{deleteTarget?.nome}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="dark:bg-zinc-800 dark:text-white dark:border-zinc-700">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
+
+// ============================================
 // Configurações Tab
 // ============================================
 
@@ -748,6 +954,9 @@ function ConfiguracoesTab() {
           </Button>
         </div>
       )}
+
+      {/* Biblioteca de Templates */}
+      <BibliotecaTemplates />
 
       {/* Templates Financeiro */}
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
