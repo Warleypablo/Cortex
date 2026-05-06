@@ -65,6 +65,7 @@ export interface TurboZapTemplate {
   id: number;
   nome: string;
   conteudo: string;
+  nivel: string | null;
   criado_por: string | null;
   criado_em: string;
 }
@@ -292,6 +293,7 @@ export async function initTurboZapTables(): Promise<void> {
       { chave: "template_D+50", valor: DEFAULT_TEMPLATES["D+50"] },
       { chave: "template_D+55", valor: DEFAULT_TEMPLATES["D+55"] },
       { chave: "dry_run_juridico", valor: "true" },
+      { chave: "niveis_desativados", valor: "[]" },
     ];
 
     for (const cfg of seedConfigs) {
@@ -458,9 +460,12 @@ export async function previewCobrancas(): Promise<PreviewNivel[]> {
     skipNumerosRaw ? JSON.parse(skipNumerosRaw) : DEFAULT_SKIP_NUMEROS,
   );
 
+  const desativados = await getNiveisDesativados();
+  const niveisAtivos = NIVEIS_COBRANCA.filter((n) => !desativados.includes(n.tipo));
+
   const niveis: PreviewNivel[] = [];
 
-  for (const nivel of NIVEIS_COBRANCA) {
+  for (const nivel of niveisAtivos) {
     const dataVencimento = calcularDataVencimento(nivel.dias);
     let clientes = await buscarClientesPorVencimento(dataVencimento);
 
@@ -1041,7 +1046,7 @@ export async function updatePipelineJuridico(
 
 export async function getTemplates(): Promise<TurboZapTemplate[]> {
   const result = await db.execute(sql`
-    SELECT id, nome, conteudo, criado_por, criado_em
+    SELECT id, nome, conteudo, nivel, criado_por, criado_em
     FROM cortex_core.turbozap_templates
     ORDER BY criado_em DESC
   `);
@@ -1052,16 +1057,40 @@ export async function createTemplate(
   nome: string,
   conteudo: string,
   criadoPor: string | null,
+  nivel: string | null,
 ): Promise<TurboZapTemplate> {
   const result = await db.execute(sql`
-    INSERT INTO cortex_core.turbozap_templates (nome, conteudo, criado_por)
-    VALUES (${nome}, ${conteudo}, ${criadoPor})
-    RETURNING id, nome, conteudo, criado_por, criado_em
+    INSERT INTO cortex_core.turbozap_templates (nome, conteudo, criado_por, nivel)
+    VALUES (${nome}, ${conteudo}, ${criadoPor}, ${nivel})
+    RETURNING id, nome, conteudo, nivel, criado_por, criado_em
   `);
   if (result.rows.length === 0) {
     throw new Error("Falha ao criar template");
   }
   return result.rows[0] as TurboZapTemplate;
+}
+
+export async function getNiveisDesativados(): Promise<string[]> {
+  const raw = await getConfiguracao("niveis_desativados");
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as string[];
+  } catch {
+    return [];
+  }
+}
+
+export async function toggleNivel(
+  tipo: string,
+  ativo: boolean,
+  atualizadoPor: string,
+): Promise<string[]> {
+  const desativados = await getNiveisDesativados();
+  const updated = ativo
+    ? desativados.filter((t) => t !== tipo)
+    : [...new Set([...desativados, tipo])];
+  await updateConfiguracao("niveis_desativados", JSON.stringify(updated), atualizadoPor);
+  return updated;
 }
 
 export async function deleteTemplate(id: number): Promise<void> {
