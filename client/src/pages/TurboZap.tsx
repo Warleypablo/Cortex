@@ -112,6 +112,9 @@ interface NivelInfo {
   tipo: string;
   label: string;
   ativo: boolean;
+  instancia: string;
+  is_custom: boolean;
+  dias: number;
 }
 
 const VARIAVEIS = ["{nome}", "{valor}", "{vencimento}", "{link_pagamento}"];
@@ -666,6 +669,9 @@ function HistoricoTab() {
 
 function GerenciarNiveis() {
   const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [diasNovo, setDiasNovo] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const { data: niveis = [], isLoading } = useQuery<NivelInfo[]>({
     queryKey: ["/api/turbozap/niveis"],
@@ -690,12 +696,93 @@ function GerenciarNiveis() {
     },
   });
 
+  const createMutation = useMutation({
+    mutationFn: async (dias: number) => {
+      const res = await apiRequest("POST", "/api/turbozap/niveis", { dias });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/niveis"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/configuracoes"] });
+      toast({ title: "Nível criado!" });
+      setShowForm(false);
+      setDiasNovo("");
+    },
+    onError: (err: any) => {
+      toast({ title: err?.message || "Erro ao criar nível", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (tipo: string) => {
+      await apiRequest("DELETE", `/api/turbozap/niveis/${encodeURIComponent(tipo)}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/niveis"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/configuracoes"] });
+      toast({ title: "Nível removido!" });
+      setDeleteTarget(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao remover nível", variant: "destructive" });
+      setDeleteTarget(null);
+    },
+  });
+
+  const diasNum = parseInt(diasNovo, 10);
+  const tipoPreview = !isNaN(diasNum)
+    ? diasNum >= 0 ? `D+${diasNum}` : `D${diasNum}`
+    : null;
+  const conflito = tipoPreview ? niveis.some((n) => n.tipo === tipoPreview) : false;
+
   return (
     <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
         <CardTitle className="text-gray-900 dark:text-white text-lg">Gerenciar Níveis</CardTitle>
+        {!showForm && (
+          <Button size="sm" variant="outline" onClick={() => setShowForm(true)} className="gap-1">
+            <Plus className="w-3 h-3" /> Novo Nível
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
+        {showForm && (
+          <div className="border border-dashed border-gray-300 dark:border-zinc-700 rounded-lg p-4 mb-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Input
+                  type="number"
+                  placeholder="Dias (ex: 1, -1, 21)"
+                  value={diasNovo}
+                  onChange={(e) => setDiasNovo(e.target.value)}
+                  className="bg-gray-50 dark:bg-zinc-800"
+                />
+              </div>
+              {tipoPreview && (
+                <span className={`font-mono text-sm font-semibold px-2 py-1 rounded ${conflito ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"}`}>
+                  {conflito ? `${tipoPreview} (já existe)` : tipoPreview}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => !isNaN(diasNum) && createMutation.mutate(diasNum)}
+                disabled={!tipoPreview || conflito || createMutation.isPending}
+              >
+                {createMutation.isPending ? "Criando..." : "Criar Nível"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setShowForm(false); setDiasNovo(""); }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex items-center gap-2 py-2">
             <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
@@ -717,19 +804,60 @@ function GerenciarNiveis() {
                   <span className="text-xs text-gray-400 dark:text-zinc-500">
                     {nivel.label.replace(`${nivel.tipo} `, "")}
                   </span>
+                  {nivel.is_custom && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                      Custom
+                    </span>
+                  )}
                 </div>
-                <Switch
-                  checked={nivel.ativo}
-                  onCheckedChange={(checked) =>
-                    toggleMutation.mutate({ tipo: nivel.tipo, ativo: checked })
-                  }
-                  disabled={toggleMutation.isPending}
-                />
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={nivel.ativo}
+                    onCheckedChange={(checked) =>
+                      toggleMutation.mutate({ tipo: nivel.tipo, ativo: checked })
+                    }
+                    disabled={toggleMutation.isPending}
+                  />
+                  {nivel.is_custom && (
+                    <button
+                      onClick={() => setDeleteTarget(nivel.tipo)}
+                      className="p-1 text-gray-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 transition-colors"
+                      title="Remover nível"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
       </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-900 dark:text-white">
+              Remover nível customizado
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-500 dark:text-zinc-400">
+              Tem certeza que deseja remover o nível <strong className="text-gray-900 dark:text-white font-mono">{deleteTarget}</strong>? O template associado também será apagado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="dark:bg-zinc-800 dark:text-white dark:border-zinc-700">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Removendo..." : "Remover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
@@ -1183,10 +1311,12 @@ function ConfiguracoesTab() {
     );
   }
 
-  const templateKeysFinanceiro = ["D-3", "D+0", "D+3", "D+7", "D+10", "D+14", "D+15", "D+20"]
-    .filter((tipo) => !niveisDesativados.includes(tipo));
-  const templateKeysJuridico = ["D+30", "D+40", "D+45", "D+50", "D+55"]
-    .filter((tipo) => !niveisDesativados.includes(tipo));
+  const templateKeysFinanceiro = niveisInfo
+    .filter((n) => n.ativo && n.instancia === "financeiro")
+    .map((n) => n.tipo);
+  const templateKeysJuridico = niveisInfo
+    .filter((n) => n.ativo && n.instancia === "juridico")
+    .map((n) => n.tipo);
   const skipNumerosRaw = getVal("skip_numeros");
   let skipNumeros: string[] = [];
   try {
