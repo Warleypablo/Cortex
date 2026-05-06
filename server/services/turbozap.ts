@@ -70,6 +70,16 @@ export interface TurboZapTemplate {
   criado_em: string;
 }
 
+export interface NivelCustomizado {
+  id: number;
+  tipo: string;
+  label: string;
+  dias: number;
+  instancia: "financeiro" | "juridico";
+  criado_por: string | null;
+  criado_em: string;
+}
+
 // ============================================
 // Níveis de escalação
 // ============================================
@@ -320,6 +330,19 @@ export async function initTurboZapTables(): Promise<void> {
         ADD COLUMN IF NOT EXISTS nivel TEXT
     `);
 
+    // Create custom levels table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.turbozap_niveis_customizados (
+        id         SERIAL PRIMARY KEY,
+        tipo       TEXT NOT NULL UNIQUE,
+        label      TEXT NOT NULL,
+        dias       INTEGER NOT NULL,
+        instancia  TEXT NOT NULL DEFAULT 'financeiro',
+        criado_por TEXT,
+        criado_em  TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
     // Create pipeline juridico table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS cortex_core.turbozap_pipeline_juridico (
@@ -466,7 +489,17 @@ export async function previewCobrancas(): Promise<PreviewNivel[]> {
   );
 
   const desativados = await getNiveisDesativados();
-  const niveisAtivos = NIVEIS_COBRANCA.filter((n) => !desativados.includes(n.tipo));
+  const customizados = await getNiveisCustomizados();
+  const todosOsNiveis: NivelCobranca[] = [
+    ...NIVEIS_COBRANCA,
+    ...customizados.map((c) => ({
+      tipo: c.tipo,
+      label: c.label,
+      dias: c.dias,
+      instancia: c.instancia as "financeiro" | "juridico",
+    })),
+  ];
+  const niveisAtivos = todosOsNiveis.filter((n) => !desativados.includes(n.tipo));
 
   const niveis: PreviewNivel[] = [];
 
@@ -1046,6 +1079,87 @@ export async function updatePipelineJuridico(
 }
 
 // ============================================
+// Níveis customizados
+// ============================================
+
+export async function getNiveisCustomizados(): Promise<NivelCustomizado[]> {
+  const result = await db.execute(sql`
+    SELECT id, tipo, label, dias, instancia, criado_por, criado_em
+    FROM cortex_core.turbozap_niveis_customizados
+    ORDER BY dias
+  `);
+  return result.rows as NivelCustomizado[];
+}
+
+export function getNiveisInfo(
+  customizados: NivelCustomizado[],
+  desativados: string[],
+): Array<{ tipo: string; label: string; ativo: boolean; instancia: string; is_custom: boolean; dias: number }> {
+  const sistema = NIVEIS_COBRANCA.map((n) => ({
+    tipo: n.tipo,
+    label: n.label,
+    ativo: !desativados.includes(n.tipo),
+    instancia: n.instancia as string,
+    is_custom: false,
+    dias: n.dias,
+  }));
+  const custom = customizados.map((c) => ({
+    tipo: c.tipo,
+    label: c.label,
+    ativo: !desativados.includes(c.tipo),
+    instancia: c.instancia as string,
+    is_custom: true,
+    dias: c.dias,
+  }));
+  return [...sistema, ...custom].sort((a, b) => a.dias - b.dias);
+}
+
+export async function createNivelCustomizado(
+  dias: number,
+  criadoPor: string | null,
+): Promise<NivelCustomizado> {
+  const tipo = dias >= 0 ? `D+${dias}` : `D${dias}`;
+  if (NIVEIS_COBRANCA.some((n) => n.tipo === tipo)) {
+    throw new Error(`Nível ${tipo} já existe como nível de sistema`);
+  }
+  const label = `${tipo} (Customizado)`;
+  const result = await db.execute(sql`
+    INSERT INTO cortex_core.turbozap_niveis_customizados (tipo, label, dias, instancia, criado_por)
+    VALUES (${tipo}, ${label}, ${dias}, 'financeiro', ${criadoPor})
+    RETURNING id, tipo, label, dias, instancia, criado_por, criado_em
+  `);
+  if (result.rows.length === 0) {
+    throw new Error("Falha ao criar nível");
+  }
+  const chave = `template_${tipo}`;
+  await db.execute(sql`
+    INSERT INTO cortex_core.turbozap_configuracoes (chave, valor)
+    VALUES (${chave}, '')
+    ON CONFLICT (chave) DO NOTHING
+  `);
+  return result.rows[0] as NivelCustomizado;
+}
+
+export async function deleteNivelCustomizado(tipo: string): Promise<void> {
+  if (NIVEIS_COBRANCA.some((n) => n.tipo === tipo)) {
+    throw new Error(`Nível ${tipo} é um nível de sistema e não pode ser deletado`);
+  }
+  const result = await db.execute(sql`
+    DELETE FROM cortex_core.turbozap_niveis_customizados
+    WHERE tipo = ${tipo}
+    RETURNING id
+  `);
+  if (result.rows.length === 0) {
+    throw new Error(`Nível customizado ${tipo} não encontrado`);
+  }
+  const chave = `template_${tipo}`;
+  await db.execute(sql`
+    DELETE FROM cortex_core.turbozap_configuracoes
+    WHERE chave = ${chave}
+  `);
+}
+
+// ============================================
 // Templates biblioteca
 // ============================================
 
@@ -1091,7 +1205,12 @@ export async function toggleNivel(
   ativo: boolean,
   atualizadoPor: string,
 ): Promise<string[]> {
-  if (!NIVEIS_COBRANCA.some((n) => n.tipo === tipo)) {
+  const customizados = await getNiveisCustomizados();
+  const todosOsTipos = [
+    ...NIVEIS_COBRANCA.map((n) => n.tipo),
+    ...customizados.map((c) => c.tipo),
+  ];
+  if (!todosOsTipos.includes(tipo)) {
     throw new Error(`Nível desconhecido: ${tipo}`);
   }
   const desativados = await getNiveisDesativados();
