@@ -1453,7 +1453,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
       if (pipeline) {
         conditions.push(sql`category_name = ${pipeline}`);
@@ -1512,7 +1512,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
       if (pipeline) {
         conditions.push(sql`category_name = ${pipeline}`);
@@ -1561,7 +1561,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`d.data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date`);
       }
       if (pipeline) {
         conditions.push(sql`d.category_name = ${pipeline}`);
@@ -1611,7 +1611,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`d.data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date`);
       }
       if (pipeline) {
         conditions.push(sql`d.category_name = ${pipeline}`);
@@ -1661,7 +1661,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
       if (pipeline) {
         conditions.push(sql`category_name = ${pipeline}`);
@@ -1712,7 +1712,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
       if (pipeline) {
         conditions.push(sql`category_name = ${pipeline}`);
@@ -1760,7 +1760,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`d.data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date`);
       }
       if (source && source !== 'all') {
         conditions.push(sql`d.source = ${source}`);
@@ -1834,7 +1834,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`d.data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date`);
       }
       if (source && source !== 'all') {
         conditions.push(sql`d.source = ${source}`);
@@ -1921,7 +1921,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
@@ -1967,7 +1967,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`d.data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`d.data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`d.data_fechamento <= ${dataFim}::date`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
@@ -2017,7 +2017,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
@@ -2065,7 +2065,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
 
       // safe: utmColumn is whitelist-derived, not user input
@@ -2146,7 +2146,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
@@ -2232,7 +2232,7 @@ export function registerComercialRoutes(app: Express) {
         conditions.push(sql`data_fechamento >= ${dataInicio}::date`);
       }
       if (dataFim) {
-        conditions.push(sql`data_fechamento <= ${dataFim}::date + interval '1 day'`);
+        conditions.push(sql`data_fechamento <= ${dataFim}::date`);
       }
 
       const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;

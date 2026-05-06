@@ -222,15 +222,15 @@ export function registerTurboZapRoutes(app: Express) {
         return res.status(401).json({ message: "Não autenticado" });
       const user = req.user as any;
       const { nome, conteudo } = req.body;
-      if (!nome || !conteudo) {
+      if (!nome?.trim() || !conteudo?.trim()) {
         return res.status(400).json({ message: "Campos 'nome' e 'conteudo' são obrigatórios" });
       }
-      if (nome.length > 100) {
+      if (nome.trim().length > 100) {
         return res.status(400).json({ message: "Nome do template deve ter no máximo 100 caracteres" });
       }
       const template = await createTemplate(
-        nome,
-        conteudo,
+        nome.trim(),
+        conteudo.trim(),
         user?.email || user?.name || "sistema",
       );
       res.status(201).json(template);
