@@ -4468,7 +4468,7 @@ export class DbStorage implements IStorage {
         WHERE data_solicitacao_encerramento >= ${inicioMes}::timestamp
           AND data_solicitacao_encerramento <= ${fimMes}::timestamp
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       `);
       churnBase = parseFloat((cupChurnQuery.rows[0] as any)?.churn_total || '0');
     }

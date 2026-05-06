@@ -665,7 +665,7 @@ function BibliotecaTemplates() {
   const [deleteTarget, setDeleteTarget] = useState<TurboZapTemplate | null>(null);
   const formTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const { data: templates = [] } = useQuery<TurboZapTemplate[]>({
+  const { data: templates = [], isLoading: templatesLoading } = useQuery<TurboZapTemplate[]>({
     queryKey: ["/api/turbozap/templates"],
   });
 
@@ -768,11 +768,16 @@ function BibliotecaTemplates() {
           </div>
         )}
 
-        {templates.length === 0 && !showForm && (
+        {templatesLoading ? (
+          <div className="flex items-center gap-2 py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            <span className="text-sm text-gray-400 dark:text-zinc-500">Carregando...</span>
+          </div>
+        ) : templates.length === 0 && !showForm ? (
           <p className="text-sm text-gray-400 dark:text-zinc-500">
             Nenhum template salvo ainda. Crie o primeiro clicando em "Novo Template".
           </p>
-        )}
+        ) : null}
 
         <div className="space-y-2">
           {templates.map((tpl) => (

@@ -176,38 +176,43 @@ app.use((req, res, next) => {
     try {
       const { db } = await import('./db');
       const { sql } = await import('drizzle-orm');
-      
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Verificar se já existe snapshot para hoje
+
+      // Use yesterday's date when running after midnight (scheduled at 00:05),
+      // otherwise use today (manual/startup trigger)
+      const now = new Date();
+      const snapshotDate = now.getHours() < 6
+        ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString().split('T')[0]
+        : now.toISOString().split('T')[0];
+
+      // Verificar se já existe snapshot para esta data
       const existingSnapshot = await db.execute(sql`
-        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist 
-        WHERE DATE(data_snapshot) = ${today}::date
+        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist
+        WHERE data_snapshot = ${snapshotDate}::date
       `);
-      
+
       if (parseInt((existingSnapshot.rows[0] as any)?.count || '0') > 0) {
-        console.log(`[snapshot-job] Snapshot já existe para ${today}, pulando...`);
+        console.log(`[snapshot-job] Snapshot já existe para ${snapshotDate}, pulando...`);
         return;
       }
-      
+
       // Inserir snapshot dos contratos atuais usando colunas existentes na tabela
       await db.execute(sql`
-        INSERT INTO "Clickup".cup_data_hist (data_snapshot, servico, status, valorr, valorp, id_task, id_subtask, 
+        INSERT INTO "Clickup".cup_data_hist (data_snapshot, servico, status, valorr, valorp, id_task, id_subtask,
                                    data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor)
-        SELECT 
-          CURRENT_TIMESTAMP,
+        SELECT
+          ${snapshotDate}::date,
           servico, status, valorr, valorp, id_task, id_subtask,
           data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor
         FROM "Clickup".cup_contratos
       `);
-      
+
       const countResult = await db.execute(sql`
-        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist 
-        WHERE DATE(data_snapshot) = CURRENT_DATE
+        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist
+        WHERE data_snapshot = ${snapshotDate}::date
       `);
-      
+
       const recordCount = parseInt((countResult.rows[0] as any)?.count || '0');
-      console.log(`[snapshot-job] Snapshot criado para ${today} com ${recordCount} contratos`);
+      console.log(`[snapshot-job] Snapshot criado para ${snapshotDate} com ${recordCount} contratos`);
     } catch (error) {
       console.error('[snapshot-job] Erro ao criar snapshot diário:', error);
     }
