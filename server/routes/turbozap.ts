@@ -14,6 +14,8 @@ import {
   getTemplates,
   createTemplate,
   deleteTemplate,
+  getNiveisDesativados,
+  toggleNivel,
 } from "../services/turbozap";
 
 export function registerTurboZapRoutes(app: Express) {
@@ -254,6 +256,66 @@ export function registerTurboZapRoutes(app: Express) {
       console.error("[turbozap] Error deleting template:", error);
       const status = error.message?.includes("não encontrado") ? 404 : 500;
       res.status(status).json({ message: error.message || "Erro ao deletar template" });
+    }
+  });
+
+  // GET /api/turbozap/niveis - Lista níveis com estado ativo/desativado
+  app.get("/api/turbozap/niveis", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+
+      const desativados = await getNiveisDesativados();
+      const NIVEIS_LABELS: Record<string, string> = {
+        "D-3": "D-3 (Lembrete)",
+        "D+0": "D+0 (Vencimento)",
+        "D+3": "D+3 (3 dias)",
+        "D+7": "D+7 (Suspensão)",
+        "D+10": "D+10 (Rescisão)",
+        "D+14": "D+14 (Cancelamento)",
+        "D+15": "D+15 (Encerramento)",
+        "D+20": "D+20 (Cancelado)",
+        "D+30": "D+30 (Formalização Jurídica)",
+        "D+40": "D+40 (Comunicação Protesto)",
+        "D+45": "D+45 (Protesto Efetivado)",
+        "D+50": "D+50 (Aviso Negativação)",
+        "D+55": "D+55 (Negativação Efetivada)",
+      };
+      const TODOS_TIPOS = ["D-3","D+0","D+3","D+7","D+10","D+14","D+15","D+20","D+30","D+40","D+45","D+50","D+55"];
+      const niveis = TODOS_TIPOS.map((tipo) => ({
+        tipo,
+        label: NIVEIS_LABELS[tipo] ?? tipo,
+        ativo: !desativados.includes(tipo),
+      }));
+      res.json(niveis);
+    } catch (error) {
+      console.error("[turbozap] Error fetching niveis:", error);
+      res.status(500).json({ message: "Erro ao buscar níveis" });
+    }
+  });
+
+  // PUT /api/turbozap/niveis/toggle - Ativa/desativa um nível
+  app.put("/api/turbozap/niveis/toggle", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+
+      const user = req.user as any;
+      const { tipo, ativo } = req.body;
+
+      if (!tipo || typeof ativo !== "boolean") {
+        return res.status(400).json({ message: "Campos 'tipo' (string) e 'ativo' (boolean) são obrigatórios" });
+      }
+
+      const updated = await toggleNivel(
+        tipo,
+        ativo,
+        user?.email || user?.name || "sistema",
+      );
+      res.json({ niveis_desativados: updated });
+    } catch (error: any) {
+      console.error("[turbozap] Error toggling nivel:", error);
+      res.status(500).json({ message: error.message || "Erro ao alterar nível" });
     }
   });
 }
