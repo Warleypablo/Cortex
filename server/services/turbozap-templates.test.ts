@@ -127,9 +127,11 @@ describe('toggleNivel', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('adiciona nivel ao array quando ativo=false', async () => {
-    // 1st call: reads niveis_desativados (empty)
+    // 1st call: getNiveisCustomizados (empty)
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    // 2nd call: reads niveis_desativados (empty)
     mockExecute.mockResolvedValueOnce({ rows: [{ valor: '[]' }] });
-    // 2nd call: UPDATE configuracao
+    // 3rd call: UPDATE configuracao
     mockExecute.mockResolvedValueOnce({ rows: [{ id: 1, chave: 'niveis_desativados', valor: '["D+14"]', atualizado_por: 'user', atualizado_em: '2026-05-06' }] });
 
     const result = await toggleNivel('D+14', false, 'user');
@@ -137,9 +139,11 @@ describe('toggleNivel', () => {
   });
 
   it('remove nivel do array quando ativo=true', async () => {
-    // 1st call: reads niveis_desativados with D+14 present
+    // 1st call: getNiveisCustomizados (empty)
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    // 2nd call: reads niveis_desativados with D+14 present
     mockExecute.mockResolvedValueOnce({ rows: [{ valor: '["D+14","D+20"]' }] });
-    // 2nd call: UPDATE configuracao
+    // 3rd call: UPDATE configuracao
     mockExecute.mockResolvedValueOnce({ rows: [{ id: 1, chave: 'niveis_desativados', valor: '["D+20"]', atualizado_por: 'user', atualizado_em: '2026-05-06' }] });
 
     const result = await toggleNivel('D+14', true, 'user');
@@ -148,6 +152,8 @@ describe('toggleNivel', () => {
   });
 
   it('lança erro para nivel desconhecido', async () => {
+    // 1st call: getNiveisCustomizados (empty — so INVALIDO won't be found)
+    mockExecute.mockResolvedValueOnce({ rows: [] });
     await expect(toggleNivel('INVALIDO', false, 'user')).rejects.toThrow('Nível desconhecido: INVALIDO');
   });
 });
