@@ -827,6 +827,144 @@ function BibliotecaTemplates() {
 }
 
 // ============================================
+// TemplateNivelEditor
+// ============================================
+
+interface TemplateNivelEditorProps {
+  tipo: string;
+  value: string;
+  isDirty: boolean;
+  onValueChange: (v: string) => void;
+  onSave: () => void;
+  savePending: boolean;
+  colors: { bg: string; text: string; border: string };
+}
+
+function TemplateNivelEditor({
+  tipo,
+  value,
+  isDirty,
+  onValueChange,
+  onSave,
+  savePending,
+  colors,
+}: TemplateNivelEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [pendingTemplate, setPendingTemplate] = useState<TurboZapTemplate | null>(null);
+  const [selectKey, setSelectKey] = useState(0);
+
+  const { data: templates = [] } = useQuery<TurboZapTemplate[]>({
+    queryKey: ["/api/turbozap/templates"],
+  });
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Badge className={`${colors.bg} ${colors.text} border-0`}>{tipo}</Badge>
+          {isDirty && (
+            <span className="text-xs text-yellow-600 dark:text-yellow-400">modificado</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {templates.length > 0 && (
+            <Select
+              key={selectKey}
+              onValueChange={(v) => {
+                const tpl = templates.find((t) => String(t.id) === v);
+                if (tpl) setPendingTemplate(tpl);
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs w-[200px] bg-gray-50 dark:bg-zinc-800">
+                <SelectValue placeholder="Aplicar template..." />
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={String(t.id)}>
+                    {t.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {isDirty && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onSave}
+              disabled={savePending}
+            >
+              Salvar
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onValueChange(e.target.value)}
+        className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
+        placeholder={`Template para ${tipo}...`}
+      />
+
+      <div className="flex flex-wrap gap-1">
+        {VARIAVEIS.map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => insertarVariavel(v, textareaRef, value, onValueChange)}
+            className="px-2 py-0.5 text-xs rounded border border-dashed border-gray-300 dark:border-zinc-600 text-gray-500 dark:text-zinc-400 hover:border-primary hover:text-primary transition-colors font-mono"
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+
+      <AlertDialog
+        open={!!pendingTemplate}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingTemplate(null);
+            setSelectKey((k) => k + 1);
+          }
+        }}
+      >
+        <AlertDialogContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-900 dark:text-white">
+              Aplicar template
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-500 dark:text-zinc-400">
+              Substituir o texto atual de{" "}
+              <strong className="text-gray-900 dark:text-white">{tipo}</strong> pelo template{" "}
+              <strong className="text-gray-900 dark:text-white">"{pendingTemplate?.nome}"</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="dark:bg-zinc-800 dark:text-white dark:border-zinc-700"
+              onClick={() => setSelectKey((k) => k + 1)}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingTemplate) onValueChange(pendingTemplate.conteudo);
+                setPendingTemplate(null);
+                setSelectKey((k) => k + 1);
+              }}
+            >
+              Aplicar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ============================================
 // Configurações Tab
 // ============================================
 
@@ -969,37 +1107,17 @@ function ConfiguracoesTab() {
           {templateKeysFinanceiro.map((tipo) => {
             const chave = `template_${tipo}`;
             const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D-3"];
-            const isDirty = dirty.has(chave);
             return (
-              <div key={tipo} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge className={`${colors.bg} ${colors.text} border-0`}>{tipo}</Badge>
-                    {isDirty && (
-                      <span className="text-xs text-yellow-600 dark:text-yellow-400">modificado</span>
-                    )}
-                  </div>
-                  {isDirty && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => saveMutation.mutate(chave)}
-                      disabled={saveMutation.isPending}
-                    >
-                      Salvar
-                    </Button>
-                  )}
-                </div>
-                <Textarea
-                  value={getVal(chave)}
-                  onChange={(e) => setVal(chave, e.target.value)}
-                  className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
-                  placeholder={`Template para ${tipo}...`}
-                />
-                <p className="text-xs text-gray-400 dark:text-zinc-500">
-                  Variáveis: {"{nome}"}, {"{valor}"}, {"{vencimento}"}, {"{link_pagamento}"}
-                </p>
-              </div>
+              <TemplateNivelEditor
+                key={tipo}
+                tipo={tipo}
+                value={getVal(chave)}
+                isDirty={dirty.has(chave)}
+                onValueChange={(v) => setVal(chave, v)}
+                onSave={() => saveMutation.mutate(chave)}
+                savePending={saveMutation.isPending}
+                colors={colors}
+              />
             );
           })}
         </CardContent>
@@ -1019,37 +1137,17 @@ function ConfiguracoesTab() {
           {templateKeysJuridico.map((tipo) => {
             const chave = `template_${tipo}`;
             const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D+30"];
-            const isDirty = dirty.has(chave);
             return (
-              <div key={tipo} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge className={`${colors.bg} ${colors.text} border-0`}>{tipo}</Badge>
-                    {isDirty && (
-                      <span className="text-xs text-yellow-600 dark:text-yellow-400">modificado</span>
-                    )}
-                  </div>
-                  {isDirty && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => saveMutation.mutate(chave)}
-                      disabled={saveMutation.isPending}
-                    >
-                      Salvar
-                    </Button>
-                  )}
-                </div>
-                <Textarea
-                  value={getVal(chave)}
-                  onChange={(e) => setVal(chave, e.target.value)}
-                  className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
-                  placeholder={`Template para ${tipo}...`}
-                />
-                <p className="text-xs text-gray-400 dark:text-zinc-500">
-                  Variáveis: {"{nome}"}, {"{valor}"}, {"{vencimento}"}, {"{link_pagamento}"}
-                </p>
-              </div>
+              <TemplateNivelEditor
+                key={tipo}
+                tipo={tipo}
+                value={getVal(chave)}
+                isDirty={dirty.has(chave)}
+                onValueChange={(v) => setVal(chave, v)}
+                onSave={() => saveMutation.mutate(chave)}
+                savePending={saveMutation.isPending}
+                colors={colors}
+              />
             );
           })}
         </CardContent>
