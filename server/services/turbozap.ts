@@ -310,9 +310,14 @@ export async function initTurboZapTables(): Promise<void> {
         id         SERIAL PRIMARY KEY,
         nome       TEXT NOT NULL,
         conteudo   TEXT NOT NULL,
+        nivel      TEXT,
         criado_por TEXT,
         criado_em  TIMESTAMP DEFAULT NOW()
       )
+    `);
+    await db.execute(sql`
+      ALTER TABLE cortex_core.turbozap_templates
+        ADD COLUMN IF NOT EXISTS nivel TEXT
     `);
 
     // Create pipeline juridico table
@@ -1074,7 +1079,8 @@ export async function getNiveisDesativados(): Promise<string[]> {
   const raw = await getConfiguracao("niveis_desativados");
   if (!raw) return [];
   try {
-    return JSON.parse(raw) as string[];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -1085,6 +1091,9 @@ export async function toggleNivel(
   ativo: boolean,
   atualizadoPor: string,
 ): Promise<string[]> {
+  if (!NIVEIS_COBRANCA.some((n) => n.tipo === tipo)) {
+    throw new Error(`Nível desconhecido: ${tipo}`);
+  }
   const desativados = await getNiveisDesativados();
   const updated = ativo
     ? desativados.filter((t) => t !== tipo)

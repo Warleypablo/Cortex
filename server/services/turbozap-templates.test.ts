@@ -114,6 +114,12 @@ describe('getNiveisDesativados', () => {
     const result = await getNiveisDesativados();
     expect(result).toEqual([]);
   });
+
+  it('retorna array vazio se JSON é válido mas não é array', async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ valor: 'null' }] });
+    const result = await getNiveisDesativados();
+    expect(result).toEqual([]);
+  });
 });
 
 // ---- toggleNivel ----
@@ -139,5 +145,9 @@ describe('toggleNivel', () => {
     const result = await toggleNivel('D+14', true, 'user');
     expect(result).not.toContain('D+14');
     expect(result).toContain('D+20');
+  });
+
+  it('lança erro para nivel desconhecido', async () => {
+    await expect(toggleNivel('INVALIDO', false, 'user')).rejects.toThrow('Nível desconhecido: INVALIDO');
   });
 });
