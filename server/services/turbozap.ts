@@ -301,7 +301,7 @@ export async function initTurboZapTables(): Promise<void> {
         nome       TEXT NOT NULL,
         conteudo   TEXT NOT NULL,
         criado_por TEXT,
-        criado_em  TIMESTAMPTZ DEFAULT NOW()
+        criado_em  TIMESTAMP DEFAULT NOW()
       )
     `);
 
