@@ -221,7 +221,7 @@ export function registerTurboZapRoutes(app: Express) {
       if (!req.isAuthenticated())
         return res.status(401).json({ message: "Não autenticado" });
       const user = req.user as any;
-      const { nome, conteudo } = req.body;
+      const { nome, conteudo, nivel } = req.body;
       if (!nome?.trim() || !conteudo?.trim()) {
         return res.status(400).json({ message: "Campos 'nome' e 'conteudo' são obrigatórios" });
       }
@@ -232,6 +232,7 @@ export function registerTurboZapRoutes(app: Express) {
         nome.trim(),
         conteudo.trim(),
         user?.email || user?.name || "sistema",
+        nivel ?? null,
       );
       res.status(201).json(template);
     } catch (error) {
