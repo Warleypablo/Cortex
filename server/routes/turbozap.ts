@@ -11,6 +11,9 @@ import {
   updateConfiguracao,
   getPipelineJuridico,
   updatePipelineJuridico,
+  getTemplates,
+  createTemplate,
+  deleteTemplate,
 } from "../services/turbozap";
 
 export function registerTurboZapRoutes(app: Express) {
@@ -196,6 +199,57 @@ export function registerTurboZapRoutes(app: Express) {
     } catch (error: any) {
       console.error("[turbozap] Error updating pipeline juridico:", error);
       res.status(500).json({ message: error.message || "Erro ao atualizar pipeline" });
+    }
+  });
+
+  // GET /api/turbozap/templates - Lista biblioteca de templates
+  app.get("/api/turbozap/templates", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+      const templates = await getTemplates();
+      res.json(templates);
+    } catch (error) {
+      console.error("[turbozap] Error fetching templates:", error);
+      res.status(500).json({ message: "Erro ao buscar templates" });
+    }
+  });
+
+  // POST /api/turbozap/templates - Cria template na biblioteca
+  app.post("/api/turbozap/templates", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+      const user = req.user as any;
+      const { nome, conteudo } = req.body;
+      if (!nome || !conteudo) {
+        return res.status(400).json({ message: "Campos 'nome' e 'conteudo' são obrigatórios" });
+      }
+      const template = await createTemplate(
+        nome,
+        conteudo,
+        user?.email || user?.name || "sistema",
+      );
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("[turbozap] Error creating template:", error);
+      res.status(500).json({ message: "Erro ao criar template" });
+    }
+  });
+
+  // DELETE /api/turbozap/templates/:id - Remove template da biblioteca
+  app.delete("/api/turbozap/templates/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) return res.status(400).json({ message: "ID inválido" });
+      await deleteTemplate(id);
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("[turbozap] Error deleting template:", error);
+      const status = error.message?.includes("não encontrado") ? 404 : 500;
+      res.status(status).json({ message: error.message || "Erro ao deletar template" });
     }
   });
 }
