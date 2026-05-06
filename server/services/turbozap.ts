@@ -1094,12 +1094,12 @@ export async function getNiveisCustomizados(): Promise<NivelCustomizado[]> {
 export function getNiveisInfo(
   customizados: NivelCustomizado[],
   desativados: string[],
-): Array<{ tipo: string; label: string; ativo: boolean; instancia: string; is_custom: boolean; dias: number }> {
+): Array<{ tipo: string; label: string; ativo: boolean; instancia: "financeiro" | "juridico"; is_custom: boolean; dias: number }> {
   const sistema = NIVEIS_COBRANCA.map((n) => ({
     tipo: n.tipo,
     label: n.label,
     ativo: !desativados.includes(n.tipo),
-    instancia: n.instancia as string,
+    instancia: n.instancia,
     is_custom: false,
     dias: n.dias,
   }));
@@ -1107,7 +1107,7 @@ export function getNiveisInfo(
     tipo: c.tipo,
     label: c.label,
     ativo: !desativados.includes(c.tipo),
-    instancia: c.instancia as string,
+    instancia: c.instancia,
     is_custom: true,
     dias: c.dias,
   }));
