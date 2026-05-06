@@ -1051,13 +1051,16 @@ export async function getTemplates(): Promise<TurboZapTemplate[]> {
 export async function createTemplate(
   nome: string,
   conteudo: string,
-  criadoPor: string,
+  criadoPor: string | null,
 ): Promise<TurboZapTemplate> {
   const result = await db.execute(sql`
     INSERT INTO cortex_core.turbozap_templates (nome, conteudo, criado_por)
     VALUES (${nome}, ${conteudo}, ${criadoPor})
     RETURNING id, nome, conteudo, criado_por, criado_em
   `);
+  if (result.rows.length === 0) {
+    throw new Error("Falha ao criar template");
+  }
   return result.rows[0] as TurboZapTemplate;
 }
 
@@ -1068,6 +1071,6 @@ export async function deleteTemplate(id: number): Promise<void> {
     RETURNING id
   `);
   if (result.rows.length === 0) {
-    throw new Error("Template não encontrado");
+    throw new Error(`Template #${id} não encontrado`);
   }
 }

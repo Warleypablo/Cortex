@@ -40,6 +40,19 @@ describe('createTemplate', () => {
     expect(result.nome).toBe('Novo');
     expect(result.conteudo).toBe('Texto {valor}');
   });
+
+  it('lança erro se INSERT retorna vazio', async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    await expect(createTemplate('Novo', 'Texto', 'user')).rejects.toThrow('Falha ao criar template');
+  });
+
+  it('permite criadoPor null', async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [{ id: 3, nome: 'Template Anonimo', conteudo: 'Conteúdo', criado_por: null, criado_em: '2026-05-01T00:00:00Z' }],
+    });
+    const result = await createTemplate('Template Anonimo', 'Conteúdo', null);
+    expect(result.criado_por).toBeNull();
+  });
 });
 
 describe('deleteTemplate', () => {
@@ -47,7 +60,7 @@ describe('deleteTemplate', () => {
 
   it('lança erro se template não existe', async () => {
     mockExecute.mockResolvedValueOnce({ rows: [] });
-    await expect(deleteTemplate(999)).rejects.toThrow('Template não encontrado');
+    await expect(deleteTemplate(999)).rejects.toThrow('Template #999 não encontrado');
   });
 
   it('resolve sem erro quando template existe', async () => {
