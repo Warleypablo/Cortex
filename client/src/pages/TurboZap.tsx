@@ -972,6 +972,10 @@ function TemplateNivelEditor({
     queryKey: ["/api/turbozap/templates"],
   });
 
+  const templatesForLevel = templates.filter(
+    (t) => t.nivel === tipo || t.nivel === null,
+  );
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -982,11 +986,11 @@ function TemplateNivelEditor({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {templates.length > 0 && (
+          {templatesForLevel.length > 0 && (
             <Select
               key={selectKey}
               onValueChange={(v) => {
-                const tpl = templates.find((t) => String(t.id) === v);
+                const tpl = templatesForLevel.find((t) => String(t.id) === v);
                 if (tpl) setPendingTemplate(tpl);
               }}
             >
@@ -994,7 +998,7 @@ function TemplateNivelEditor({
                 <SelectValue placeholder="Aplicar template..." />
               </SelectTrigger>
               <SelectContent>
-                {templates.map((t) => (
+                {templatesForLevel.map((t) => (
                   <SelectItem key={t.id} value={String(t.id)}>
                     {t.nome}
                   </SelectItem>
