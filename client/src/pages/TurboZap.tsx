@@ -103,8 +103,15 @@ interface TurboZapTemplate {
   id: number;
   nome: string;
   conteudo: string;
+  nivel: string | null;
   criado_por: string | null;
   criado_em: string;
+}
+
+interface NivelInfo {
+  tipo: string;
+  label: string;
+  ativo: boolean;
 }
 
 const VARIAVEIS = ["{nome}", "{valor}", "{vencimento}", "{link_pagamento}"];
@@ -662,6 +669,7 @@ function BibliotecaTemplates() {
   const [showForm, setShowForm] = useState(false);
   const [nomeNovo, setNomeNovo] = useState("");
   const [conteudoNovo, setConteudoNovo] = useState("");
+  const [nivelNovo, setNivelNovo] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TurboZapTemplate | null>(null);
   const formTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -674,6 +682,7 @@ function BibliotecaTemplates() {
       const res = await apiRequest("POST", "/api/turbozap/templates", {
         nome: nomeNovo,
         conteudo: conteudoNovo,
+        nivel: nivelNovo,
       });
       return res.json();
     },
@@ -683,6 +692,7 @@ function BibliotecaTemplates() {
       setShowForm(false);
       setNomeNovo("");
       setConteudoNovo("");
+      setNivelNovo(null);
     },
     onError: () => {
       toast({ title: "Erro ao criar template", variant: "destructive" });
@@ -726,6 +736,20 @@ function BibliotecaTemplates() {
               className="bg-gray-50 dark:bg-zinc-800"
               maxLength={100}
             />
+            <Select
+              value={nivelNovo ?? "generico"}
+              onValueChange={(v) => setNivelNovo(v === "generico" ? null : v)}
+            >
+              <SelectTrigger className="bg-gray-50 dark:bg-zinc-800 h-9 text-sm">
+                <SelectValue placeholder="Nível (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="generico">Genérico (todos os níveis)</SelectItem>
+                {(["D-3","D+0","D+3","D+7","D+10","D+14","D+15","D+20","D+30","D+40","D+45","D+50","D+55"] as const).map((tipo) => (
+                  <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Textarea
               ref={formTextareaRef}
               placeholder="Conteúdo da mensagem..."
@@ -760,6 +784,7 @@ function BibliotecaTemplates() {
                   setShowForm(false);
                   setNomeNovo("");
                   setConteudoNovo("");
+                  setNivelNovo(null);
                 }}
               >
                 Cancelar
@@ -786,7 +811,18 @@ function BibliotecaTemplates() {
               className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-zinc-800"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">{tpl.nome}</p>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{tpl.nome}</p>
+                  {tpl.nivel ? (
+                    <span className="inline-block text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-mono">
+                      {tpl.nivel}
+                    </span>
+                  ) : (
+                    <span className="inline-block text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-700 text-gray-400 dark:text-zinc-400">
+                      Genérico
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5 line-clamp-2">
                   {tpl.conteudo}
                 </p>
