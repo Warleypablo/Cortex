@@ -16,7 +16,9 @@ import {
   deleteTemplate,
   getNiveisDesativados,
   toggleNivel,
+  NIVEIS_COBRANCA,
 } from "../services/turbozap";
+import type { NivelCobranca } from "../services/turbozap";
 
 export function registerTurboZapRoutes(app: Express) {
   // GET /api/turbozap/stats - KPIs para dashboard
@@ -230,6 +232,10 @@ export function registerTurboZapRoutes(app: Express) {
       if (nome.trim().length > 100) {
         return res.status(400).json({ message: "Nome do template deve ter no máximo 100 caracteres" });
       }
+      const NIVEIS_VALIDOS = NIVEIS_COBRANCA.map((n) => n.tipo);
+      if (nivel !== null && nivel !== undefined && !NIVEIS_VALIDOS.includes(nivel)) {
+        return res.status(400).json({ message: `Nível inválido: ${nivel}` });
+      }
       const template = await createTemplate(
         nome.trim(),
         conteudo.trim(),
@@ -266,26 +272,10 @@ export function registerTurboZapRoutes(app: Express) {
         return res.status(401).json({ message: "Não autenticado" });
 
       const desativados = await getNiveisDesativados();
-      const NIVEIS_LABELS: Record<string, string> = {
-        "D-3": "D-3 (Lembrete)",
-        "D+0": "D+0 (Vencimento)",
-        "D+3": "D+3 (3 dias)",
-        "D+7": "D+7 (Suspensão)",
-        "D+10": "D+10 (Rescisão)",
-        "D+14": "D+14 (Cancelamento)",
-        "D+15": "D+15 (Encerramento)",
-        "D+20": "D+20 (Cancelado)",
-        "D+30": "D+30 (Formalização Jurídica)",
-        "D+40": "D+40 (Comunicação Protesto)",
-        "D+45": "D+45 (Protesto Efetivado)",
-        "D+50": "D+50 (Aviso Negativação)",
-        "D+55": "D+55 (Negativação Efetivada)",
-      };
-      const TODOS_TIPOS = ["D-3","D+0","D+3","D+7","D+10","D+14","D+15","D+20","D+30","D+40","D+45","D+50","D+55"];
-      const niveis = TODOS_TIPOS.map((tipo) => ({
-        tipo,
-        label: NIVEIS_LABELS[tipo] ?? tipo,
-        ativo: !desativados.includes(tipo),
+      const niveis = NIVEIS_COBRANCA.map((n) => ({
+        tipo: n.tipo,
+        label: n.label,
+        ativo: !desativados.includes(n.tipo),
       }));
       res.json(niveis);
     } catch (error) {
@@ -301,7 +291,8 @@ export function registerTurboZapRoutes(app: Express) {
         return res.status(401).json({ message: "Não autenticado" });
 
       const user = req.user as any;
-      const { tipo, ativo } = req.body;
+      const { tipo: tipoRaw, ativo } = req.body;
+      const tipo = typeof tipoRaw === "string" ? tipoRaw.trim() : tipoRaw;
 
       if (!tipo || typeof ativo !== "boolean") {
         return res.status(400).json({ message: "Campos 'tipo' (string) e 'ativo' (boolean) são obrigatórios" });
@@ -314,8 +305,11 @@ export function registerTurboZapRoutes(app: Express) {
       );
       res.json({ niveis_desativados: updated });
     } catch (error: any) {
+      if (error.message?.startsWith("Nível desconhecido:")) {
+        return res.status(400).json({ message: error.message });
+      }
       console.error("[turbozap] Error toggling nivel:", error);
-      res.status(500).json({ message: error.message || "Erro ao alterar nível" });
+      res.status(500).json({ message: "Erro ao alterar nível" });
     }
   });
 }

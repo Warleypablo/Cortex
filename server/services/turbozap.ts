@@ -74,7 +74,7 @@ export interface TurboZapTemplate {
 // Níveis de escalação
 // ============================================
 
-interface NivelCobranca {
+export interface NivelCobranca {
   tipo: string;
   label: string;
   dias: number;
@@ -82,7 +82,7 @@ interface NivelCobranca {
   condicional?: string;
 }
 
-const NIVEIS_COBRANCA: NivelCobranca[] = [
+export const NIVEIS_COBRANCA: NivelCobranca[] = [
   { tipo: "D-3", label: "D-3 (Lembrete)", dias: -3, instancia: "financeiro" },
   { tipo: "D+0", label: "D+0 (Vencimento)", dias: 0, instancia: "financeiro" },
   { tipo: "D+3", label: "D+3 (3 dias)", dias: 3, instancia: "financeiro" },
