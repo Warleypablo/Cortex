@@ -294,6 +294,17 @@ export async function initTurboZapTables(): Promise<void> {
       `);
     }
 
+    // Create templates library table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.turbozap_templates (
+        id         SERIAL PRIMARY KEY,
+        nome       TEXT NOT NULL,
+        conteudo   TEXT NOT NULL,
+        criado_por TEXT,
+        criado_em  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
     // Create pipeline juridico table
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS cortex_core.turbozap_pipeline_juridico (
