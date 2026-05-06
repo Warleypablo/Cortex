@@ -661,6 +661,80 @@ function HistoricoTab() {
 }
 
 // ============================================
+// Gerenciar Níveis
+// ============================================
+
+function GerenciarNiveis() {
+  const { toast } = useToast();
+
+  const { data: niveis = [], isLoading } = useQuery<NivelInfo[]>({
+    queryKey: ["/api/turbozap/niveis"],
+    queryFn: async () => {
+      const res = await fetch("/api/turbozap/niveis", { credentials: "include" });
+      if (!res.ok) throw new Error("Erro ao buscar níveis");
+      return res.json();
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ tipo, ativo }: { tipo: string; ativo: boolean }) => {
+      const res = await apiRequest("PUT", "/api/turbozap/niveis/toggle", { tipo, ativo });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/niveis"] });
+      toast({ title: "Nível atualizado!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao alterar nível", variant: "destructive" });
+    },
+  });
+
+  return (
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+      <CardHeader>
+        <CardTitle className="text-gray-900 dark:text-white text-lg">Gerenciar Níveis</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center gap-2 py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            <span className="text-sm text-gray-400 dark:text-zinc-500">Carregando...</span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {niveis.map((nivel) => (
+              <div
+                key={nivel.tipo}
+                className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 dark:bg-zinc-800"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`font-mono text-sm font-medium ${nivel.ativo ? "text-gray-900 dark:text-white" : "text-gray-400 dark:text-zinc-500 line-through"}`}
+                  >
+                    {nivel.tipo}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-zinc-500">
+                    {nivel.label.replace(`${nivel.tipo} `, "")}
+                  </span>
+                </div>
+                <Switch
+                  checked={nivel.ativo}
+                  onCheckedChange={(checked) =>
+                    toggleMutation.mutate({ tipo: nivel.tipo, ativo: checked })
+                  }
+                  disabled={toggleMutation.isPending}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================
 // Biblioteca de Templates
 // ============================================
 
@@ -1035,6 +1109,20 @@ function ConfiguracoesTab() {
     return map;
   }, [configs]);
 
+  const { data: niveisInfo = [] } = useQuery<NivelInfo[]>({
+    queryKey: ["/api/turbozap/niveis"],
+    queryFn: async () => {
+      const res = await fetch("/api/turbozap/niveis", { credentials: "include" });
+      if (!res.ok) throw new Error("Erro ao buscar níveis");
+      return res.json();
+    },
+  });
+
+  const niveisDesativados = useMemo(
+    () => niveisInfo.filter((n) => !n.ativo).map((n) => n.tipo),
+    [niveisInfo],
+  );
+
   function getVal(chave: string): string {
     return localConfigs[chave] ?? configMap[chave] ?? "";
   }
@@ -1091,8 +1179,10 @@ function ConfiguracoesTab() {
     );
   }
 
-  const templateKeysFinanceiro = ["D-3", "D+0", "D+3", "D+7", "D+10", "D+14", "D+15", "D+20"];
-  const templateKeysJuridico = ["D+30", "D+40", "D+45", "D+50", "D+55"];
+  const templateKeysFinanceiro = ["D-3", "D+0", "D+3", "D+7", "D+10", "D+14", "D+15", "D+20"]
+    .filter((tipo) => !niveisDesativados.includes(tipo));
+  const templateKeysJuridico = ["D+30", "D+40", "D+45", "D+50", "D+55"]
+    .filter((tipo) => !niveisDesativados.includes(tipo));
   const skipNumerosRaw = getVal("skip_numeros");
   let skipNumeros: string[] = [];
   try {
@@ -1135,62 +1225,69 @@ function ConfiguracoesTab() {
       {/* Biblioteca de Templates */}
       <BibliotecaTemplates />
 
+      {/* Gerenciar Níveis */}
+      <GerenciarNiveis />
+
       {/* Templates Financeiro */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-gray-900 dark:text-white text-lg">
-            Templates — Financeiro
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {templateKeysFinanceiro.map((tipo) => {
-            const chave = `template_${tipo}`;
-            const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D-3"];
-            return (
-              <TemplateNivelEditor
-                key={tipo}
-                tipo={tipo}
-                value={getVal(chave)}
-                isDirty={dirty.has(chave)}
-                onValueChange={(v) => setVal(chave, v)}
-                onSave={() => saveMutation.mutate(chave)}
-                savePending={saveMutation.isPending}
-                colors={colors}
-              />
-            );
-          })}
-        </CardContent>
-      </Card>
+      {templateKeysFinanceiro.length > 0 && (
+        <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <CardHeader>
+            <CardTitle className="text-gray-900 dark:text-white text-lg">
+              Templates — Financeiro
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {templateKeysFinanceiro.map((tipo) => {
+              const chave = `template_${tipo}`;
+              const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D-3"];
+              return (
+                <TemplateNivelEditor
+                  key={tipo}
+                  tipo={tipo}
+                  value={getVal(chave)}
+                  isDirty={dirty.has(chave)}
+                  onValueChange={(v) => setVal(chave, v)}
+                  onSave={() => saveMutation.mutate(chave)}
+                  savePending={saveMutation.isPending}
+                  colors={colors}
+                />
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Templates Jurídico */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-gray-900 dark:text-white text-lg flex items-center gap-2">
-            Templates — Jurídico
-            <Badge variant="outline" className="text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700">
-              Instância Jurídico
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {templateKeysJuridico.map((tipo) => {
-            const chave = `template_${tipo}`;
-            const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D+30"];
-            return (
-              <TemplateNivelEditor
-                key={tipo}
-                tipo={tipo}
-                value={getVal(chave)}
-                isDirty={dirty.has(chave)}
-                onValueChange={(v) => setVal(chave, v)}
-                onSave={() => saveMutation.mutate(chave)}
-                savePending={saveMutation.isPending}
-                colors={colors}
-              />
-            );
-          })}
-        </CardContent>
-      </Card>
+      {templateKeysJuridico.length > 0 && (
+        <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <CardHeader>
+            <CardTitle className="text-gray-900 dark:text-white text-lg flex items-center gap-2">
+              Templates — Jurídico
+              <Badge variant="outline" className="text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700">
+                Instância Jurídico
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {templateKeysJuridico.map((tipo) => {
+              const chave = `template_${tipo}`;
+              const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D+30"];
+              return (
+                <TemplateNivelEditor
+                  key={tipo}
+                  tipo={tipo}
+                  value={getVal(chave)}
+                  isDirty={dirty.has(chave)}
+                  onValueChange={(v) => setVal(chave, v)}
+                  onSave={() => saveMutation.mutate(chave)}
+                  savePending={saveMutation.isPending}
+                  colors={colors}
+                />
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Skip Numbers */}
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
