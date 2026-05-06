@@ -691,8 +691,7 @@ function BibliotecaTemplates() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/turbozap/templates/${id}`);
-      return res.json();
+      await apiRequest("DELETE", `/api/turbozap/templates/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/turbozap/templates"] });
@@ -725,6 +724,7 @@ function BibliotecaTemplates() {
               value={nomeNovo}
               onChange={(e) => setNomeNovo(e.target.value)}
               className="bg-gray-50 dark:bg-zinc-800"
+              maxLength={100}
             />
             <Textarea
               ref={formTextareaRef}

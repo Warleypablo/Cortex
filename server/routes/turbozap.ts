@@ -225,6 +225,9 @@ export function registerTurboZapRoutes(app: Express) {
       if (!nome || !conteudo) {
         return res.status(400).json({ message: "Campos 'nome' e 'conteudo' são obrigatórios" });
       }
+      if (nome.length > 100) {
+        return res.status(400).json({ message: "Nome do template deve ter no máximo 100 caracteres" });
+      }
       const template = await createTemplate(
         nome,
         conteudo,
