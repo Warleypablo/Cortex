@@ -944,7 +944,6 @@ function TemplateNivelEditor({
           <AlertDialogFooter>
             <AlertDialogCancel
               className="dark:bg-zinc-800 dark:text-white dark:border-zinc-700"
-              onClick={() => setSelectKey((k) => k + 1)}
             >
               Cancelar
             </AlertDialogCancel>
@@ -952,7 +951,6 @@ function TemplateNivelEditor({
               onClick={() => {
                 if (pendingTemplate) onValueChange(pendingTemplate.conteudo);
                 setPendingTemplate(null);
-                setSelectKey((k) => k + 1);
               }}
             >
               Aplicar
