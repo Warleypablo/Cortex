@@ -17,6 +17,10 @@ import {
   getNiveisDesativados,
   toggleNivel,
   NIVEIS_COBRANCA,
+  getNiveisCustomizados,
+  getNiveisInfo,
+  createNivelCustomizado,
+  deleteNivelCustomizado,
 } from "../services/turbozap";
 import type { NivelCobranca } from "../services/turbozap";
 
@@ -271,12 +275,11 @@ export function registerTurboZapRoutes(app: Express) {
       if (!req.isAuthenticated())
         return res.status(401).json({ message: "Não autenticado" });
 
-      const desativados = await getNiveisDesativados();
-      const niveis = NIVEIS_COBRANCA.map((n) => ({
-        tipo: n.tipo,
-        label: n.label,
-        ativo: !desativados.includes(n.tipo),
-      }));
+      const [desativados, customizados] = await Promise.all([
+        getNiveisDesativados(),
+        getNiveisCustomizados(),
+      ]);
+      const niveis = getNiveisInfo(customizados, desativados);
       res.json(niveis);
     } catch (error) {
       console.error("[turbozap] Error fetching niveis:", error);
@@ -310,6 +313,54 @@ export function registerTurboZapRoutes(app: Express) {
       }
       console.error("[turbozap] Error toggling nivel:", error);
       res.status(500).json({ message: "Erro ao alterar nível" });
+    }
+  });
+
+  // POST /api/turbozap/niveis - Cria nível customizado
+  app.post("/api/turbozap/niveis", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+
+      const user = req.user as any;
+      const { dias } = req.body;
+
+      if (dias === undefined || dias === null || !Number.isInteger(Number(dias))) {
+        return res.status(400).json({ message: "Campo 'dias' deve ser um número inteiro" });
+      }
+
+      const nivel = await createNivelCustomizado(
+        Number(dias),
+        user?.email || user?.name || "sistema",
+      );
+      res.status(201).json(nivel);
+    } catch (error: any) {
+      if (error.message?.includes("nível de sistema") || error.message?.includes("já existe")) {
+        return res.status(400).json({ message: error.message });
+      }
+      console.error("[turbozap] Error creating nivel:", error);
+      res.status(500).json({ message: error.message || "Erro ao criar nível" });
+    }
+  });
+
+  // DELETE /api/turbozap/niveis/:tipo - Deleta nível customizado
+  app.delete("/api/turbozap/niveis/:tipo", async (req, res) => {
+    try {
+      if (!req.isAuthenticated())
+        return res.status(401).json({ message: "Não autenticado" });
+
+      const tipo = req.params.tipo;
+      await deleteNivelCustomizado(tipo);
+      res.json({ ok: true });
+    } catch (error: any) {
+      if (error.message?.includes("nível de sistema")) {
+        return res.status(400).json({ message: error.message });
+      }
+      if (error.message?.includes("não encontrado")) {
+        return res.status(404).json({ message: error.message });
+      }
+      console.error("[turbozap] Error deleting nivel:", error);
+      res.status(500).json({ message: error.message || "Erro ao deletar nível" });
     }
   });
 }
