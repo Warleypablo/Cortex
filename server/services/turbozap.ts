@@ -61,6 +61,14 @@ export interface TurboZapConfiguracao {
   atualizado_em: string;
 }
 
+export interface TurboZapTemplate {
+  id: number;
+  nome: string;
+  conteudo: string;
+  criado_por: string | null;
+  criado_em: string;
+}
+
 // ============================================
 // Níveis de escalação
 // ============================================
@@ -1025,4 +1033,41 @@ export async function updatePipelineJuridico(
     throw new Error(`Pipeline record #${id} não encontrado`);
   }
   return result.rows[0] as PipelineJuridico;
+}
+
+// ============================================
+// Templates biblioteca
+// ============================================
+
+export async function getTemplates(): Promise<TurboZapTemplate[]> {
+  const result = await db.execute(sql`
+    SELECT id, nome, conteudo, criado_por, criado_em
+    FROM cortex_core.turbozap_templates
+    ORDER BY criado_em DESC
+  `);
+  return result.rows as TurboZapTemplate[];
+}
+
+export async function createTemplate(
+  nome: string,
+  conteudo: string,
+  criadoPor: string,
+): Promise<TurboZapTemplate> {
+  const result = await db.execute(sql`
+    INSERT INTO cortex_core.turbozap_templates (nome, conteudo, criado_por)
+    VALUES (${nome}, ${conteudo}, ${criadoPor})
+    RETURNING id, nome, conteudo, criado_por, criado_em
+  `);
+  return result.rows[0] as TurboZapTemplate;
+}
+
+export async function deleteTemplate(id: number): Promise<void> {
+  const result = await db.execute(sql`
+    DELETE FROM cortex_core.turbozap_templates
+    WHERE id = ${id}
+    RETURNING id
+  `);
+  if (result.rows.length === 0) {
+    throw new Error("Template não encontrado");
+  }
 }
