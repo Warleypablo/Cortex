@@ -258,11 +258,12 @@ export interface FaturamentoYtdData {
 export interface OperadorRanking {
   nome: string;
   valor: number;
+  fotoUrl?: string | null;
+  cargo?: string | null;
 }
 
 export interface TopOperadores {
   topMrr: OperadorRanking[];
-  topMenorChurn: OperadorRanking[];
   topEntregas: OperadorRanking[];
 }
 

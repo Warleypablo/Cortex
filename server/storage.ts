@@ -4464,7 +4464,7 @@ export class DbStorage implements IStorage {
     if (mesAno >= '2026-02') {
       const cupChurnQuery = await db.execute(sql`
         SELECT COALESCE(SUM(valor_r), 0) as churn_total
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${inicioMes}::timestamp
           AND data_solicitacao_encerramento <= ${fimMes}::timestamp
           AND COALESCE(abonar_churn, '') != 'Sim'
