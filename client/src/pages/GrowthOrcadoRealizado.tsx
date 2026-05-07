@@ -1849,23 +1849,24 @@ export default function GrowthOrcadoRealizado() {
   const heroDealsRealizado = clientesRealizado;
   const heroContratosRealizado = (mqlData?.contratosGanhos ?? 0) + (naoMqlData?.contratosGanhos ?? 0);
 
-  // Faturamento: usa apenas dados de tráfego pago (utm_source = facebook/google)
-  const faturamentoRealizado = (mqlData?.faturamentoAceleracaoTrafego ?? 0) + (mqlData?.faturamentoImplantacaoTrafego ?? 0)
-    + (naoMqlData?.faturamentoAceleracaoTrafego ?? 0) + (naoMqlData?.faturamentoImplantacaoTrafego ?? 0);
+  // Faturamento: todo faturamento inbound (Negócio Ganho no período, qualquer canal).
+  // Filtros de Produto/Plataforma narrow ortogonalmente — quem quiser só pago, filtra Plataforma=Meta+Google.
+  const faturamentoRealizado = (mqlData?.faturamentoAceleracao ?? 0) + (mqlData?.faturamentoImplantacao ?? 0)
+    + (naoMqlData?.faturamentoAceleracao ?? 0) + (naoMqlData?.faturamentoImplantacao ?? 0);
   const faturamentoOrcado = ORCADO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao
     + ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoImplantacao;
   const faturamentoPerc = faturamentoOrcado > 0 ? (faturamentoRealizado / faturamentoOrcado) * 100 : 0;
 
   // Breakdown recorrente vs pontual (para exibir no card)
-  const fatRecorrenteRealizado = (mqlData?.faturamentoAceleracaoTrafego ?? 0) + (naoMqlData?.faturamentoAceleracaoTrafego ?? 0);
-  const fatPontualRealizado = (mqlData?.faturamentoImplantacaoTrafego ?? 0) + (naoMqlData?.faturamentoImplantacaoTrafego ?? 0);
+  const fatRecorrenteRealizado = (mqlData?.faturamentoAceleracao ?? 0) + (naoMqlData?.faturamentoAceleracao ?? 0);
+  const fatPontualRealizado = (mqlData?.faturamentoImplantacao ?? 0) + (naoMqlData?.faturamentoImplantacao ?? 0);
 
   // Previous period values for hero cards
   const prevInvestimento = prevAdsData?.investimento ?? 0;
   const prevLeads = prevAdsData?.leads ?? 0;
   const prevClientes = (prevMqlData?.dealsGanhos ?? 0) + (prevNaoMqlData?.dealsGanhos ?? 0);
-  const prevFaturamento = (prevMqlData?.faturamentoAceleracaoTrafego ?? 0) + (prevMqlData?.faturamentoImplantacaoTrafego ?? 0)
-    + (prevNaoMqlData?.faturamentoAceleracaoTrafego ?? 0) + (prevNaoMqlData?.faturamentoImplantacaoTrafego ?? 0);
+  const prevFaturamento = (prevMqlData?.faturamentoAceleracao ?? 0) + (prevMqlData?.faturamentoImplantacao ?? 0)
+    + (prevNaoMqlData?.faturamentoAceleracao ?? 0) + (prevNaoMqlData?.faturamentoImplantacao ?? 0);
 
   const prevCac = prevClientes > 0 ? prevInvestimento / prevClientes : 0;
 
@@ -2168,7 +2169,7 @@ export default function GrowthOrcadoRealizado() {
         <Card className="border bg-card flex flex-col">
           <CardContent className="pt-4 pb-3 px-4 flex flex-col flex-1">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Faturamento (Tráfego Pago)</span>
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Faturamento</span>
               <Badge variant="outline" className={cn("text-[10px] font-mono tabular-nums",
                 faturamentoPerc >= 100 ? "text-emerald-600 border-emerald-200 bg-emerald-50 dark:text-emerald-400 dark:border-emerald-800 dark:bg-emerald-950" :
                 faturamentoPerc >= 80 ? "text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:bg-amber-950" :
