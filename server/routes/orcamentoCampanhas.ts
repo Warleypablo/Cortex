@@ -66,7 +66,9 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       const monthStart = firstDay; // DATE, primeiro dia do mês
 
       // ===== Meta Ads =====
-      // Mostra apenas campanhas relevantes: ACTIVE, ou com spend no mês, ou com meta definida.
+      // Mostra campanhas relevantes: ACTIVE, ou com spend no mês, ou com meta definida.
+      // Inclui campanhas arquivadas/deletadas que tiveram gasto no mês — sem filtro
+      // por effective_status no CTE, o WHERE final (spend > 0 OR ACTIVE OR meta) decide.
       // Para ABO, soma o daily_budget dos adsets com effective_status ACTIVE.
       const metaRes = await db.execute(sql`
         WITH campaign_budget AS (
@@ -85,7 +87,6 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
             ) AS daily_budget_atual
           FROM meta_ads.meta_campaigns c
           WHERE c.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-            AND c.effective_status IN ('ACTIVE', 'PAUSED')
         ),
         spend_agg AS (
           SELECT campaign_id, SUM(spend)::float AS investido_total
