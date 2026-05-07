@@ -209,27 +209,6 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
               <span className="text-sm font-bold">{fmtBRL(metrics.ticketMedioCliente)}</span>
             </div>
           </div>
-          <div className="border-t border-white/[0.06] pt-1.5 mt-1.5 space-y-0.5">
-            <div className="flex items-center gap-1 mb-0.5">
-              <span className="text-xs text-emerald-400 font-bold">Vl Retido CXCS</span>
-            </div>
-            {[
-              { nome: "Palha Nordestina", valor: 2497 },
-              { nome: "Mosh", valor: 1997 },
-              { nome: "Artesanal Chef", valor: 2997 },
-              { nome: "Sim Cervejaria", valor: 3997 },
-              { nome: "Monvitta", valor: 17487 },
-            ].map(c => (
-              <div key={c.nome} className="flex justify-between">
-                <span className="text-[10px] text-zinc-400 truncate max-w-[110px]" title={c.nome}>{c.nome}</span>
-                <span className="text-[11px] font-bold text-emerald-400">{fmtBRL(c.valor)}</span>
-              </div>
-            ))}
-            <div className="flex justify-between border-t border-white/[0.06] pt-0.5 mt-0.5">
-              <span className="text-[10px] text-zinc-500 font-bold">Total:</span>
-              <span className="text-xs font-bold text-emerald-400">{fmtBRL(2497 + 1997 + 2997 + 3997 + 17487)}</span>
-            </div>
-          </div>
         </SecondaryCard>
       </div>
 
