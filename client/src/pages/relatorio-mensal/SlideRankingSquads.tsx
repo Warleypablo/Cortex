@@ -140,12 +140,18 @@ export default function SlideRankingSquads({ ranking }: Props) {
                 )}
               </div>
 
-              {/* Squad name + MRR + Pontual */}
+              {/* Squad name + Total + Recorrente + Pontual */}
               <p className={`font-bold text-white text-center ${isFirst ? "text-base" : "text-sm"}`}>
                 {name}
               </p>
-              <p className="text-xs text-zinc-400">{fmtBRL(squad.mrr)}</p>
-              <p className="text-xs text-cyan-400 mb-2">{fmtBRL(squad.pontual)}</p>
+              <div className="grid grid-cols-[auto_auto] gap-x-1.5 gap-y-0 mt-0.5 mb-2 text-[11px] leading-tight">
+                <span className="text-zinc-500 text-right">Total</span>
+                <span className="text-white font-semibold tabular-nums text-right">{fmtBRL(squad.mrr + squad.pontual)}</span>
+                <span className="text-zinc-500 text-right">Rec.</span>
+                <span className="text-cyan-400 tabular-nums text-right">{fmtBRL(squad.mrr)}</span>
+                <span className="text-zinc-500 text-right">Pont.</span>
+                <span className="text-amber-400 tabular-nums text-right">{fmtBRL(squad.pontual)}</span>
+              </div>
 
               {/* Colored bar */}
               <div
