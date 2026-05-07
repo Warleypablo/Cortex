@@ -264,6 +264,7 @@ export interface OperadorRanking {
 
 export interface TopOperadores {
   topMrr: OperadorRanking[];
+  topMrrPontual: OperadorRanking[];
   topEntregas: OperadorRanking[];
 }
 
