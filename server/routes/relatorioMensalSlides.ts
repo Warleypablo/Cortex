@@ -208,11 +208,11 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY EXTRACT(DAY FROM r.aniversario)
         `),
 
-        // 3. Aniversários de empresa no mês de dados (work anniversaries)
+        // 3. Aniversários de empresa no mês VIGENTE (work anniversaries — alinhado com query #2 aniversariantes)
         db.execute(sql`
           SELECT
             r.id, r.nome, r.cargo, r.squad, r.admissao::text,
-            (${anoDados} - EXTRACT(YEAR FROM r.admissao))::int as "anosDeEmpresa",
+            (${nextAnoDados} - EXTRACT(YEAR FROM r.admissao))::int as "anosDeEmpresa",
             COALESCE(
               NULLIF(a_id.picture, ''),
               NULLIF(a_turbo.picture, ''),
@@ -222,10 +222,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           LEFT JOIN cortex_core.auth_users a_id ON r.user_id IS NOT NULL AND r.user_id = a_id.id
           LEFT JOIN cortex_core.auth_users a_turbo ON r.email_turbo IS NOT NULL AND LOWER(TRIM(r.email_turbo)) = LOWER(TRIM(a_turbo.email))
           LEFT JOIN cortex_core.auth_users a_pessoal ON r.email_pessoal IS NOT NULL AND LOWER(TRIM(r.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
-          WHERE EXTRACT(MONTH FROM r.admissao) = ${mesDados}
+          WHERE EXTRACT(MONTH FROM r.admissao) = ${nextMesDados}
             AND r.status = 'Ativo'
             AND r.admissao IS NOT NULL
-            AND EXTRACT(YEAR FROM r.admissao) < ${anoDados}
+            AND EXTRACT(YEAR FROM r.admissao) < ${nextAnoDados}
           ORDER BY EXTRACT(DAY FROM r.admissao)
         `),
 
