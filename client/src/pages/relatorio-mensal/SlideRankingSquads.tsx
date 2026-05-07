@@ -19,7 +19,7 @@ const SQUAD_COLORS: Record<string, string> = {
   "Aurea":      "#fbbf24",
   "Supreme":    "#8b5cf6",
   "Bloomfield": "#10b981",
-  "Black":      "#475569",
+  "Black":      "#94a3b8",
   "Ventures":   "#f59e0b",
   "Vendas":     "#f97316",
   "CX&CS":      "#14b8a6",
