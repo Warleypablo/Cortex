@@ -2,9 +2,57 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { format } from "date-fns";
+import { getLinktreeMetrics } from "../services/linktreeGa4";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
+
+/**
+ * Expressão SQL que classifica um deal do Bitrix em plataforma de marketing.
+ *
+ * Instagram inclui:
+ *  - utm_source contendo 'instagram' ou igual a 'ig' (UTM marcação correta)
+ *  - utm_campaign='linktree' AND utm_content='linktree' (links da bio do IG, mesmo se utm_source veio errado como facebook)
+ *  - source='WEB' (fonte do Bitrix "Contato - Instagram")
+ *  - source='UC_4VCKGM' (fonte do Bitrix "Social Selling - Instagram")
+ *
+ * Mapping confirmado via crm.status.list?filter[ENTITY_ID]=SOURCE.
+ * NB: WEB e UC_4VCKGM são checados ANTES dos UTMs porque alguns leads de
+ * "Contato - Instagram" chegaram com utm_source=facebook por bug de marcação.
+ */
+const PLATFORM_CASE_SQL = `CASE
+  WHEN source = 'UC_4VCKGM' THEN 'instagram'
+  WHEN source = 'WEB' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' THEN 'linkedin_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin_social'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' THEN 'tiktok_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%email%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%e-mail%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%mailchimp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%rdstation%' THEN 'email'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%whatsapp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%wpp%' THEN 'whatsapp'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%evento%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%event%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%webinar%' THEN 'eventos'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('organic', 'organico', 'direct', '(direct)', '(none)', '') THEN 'organico'
+  ELSE 'outros'
+END`;
+
+/**
+ * Versão simplificada usada em /funnel-by-platform (sem split linkedin_ads/social,
+ * sem tiktok/email/whatsapp/eventos/organico — agrupa tudo isso em 'outros').
+ */
+const PLATFORM_CASE_SQL_BASIC = `CASE
+  WHEN source = 'UC_4VCKGM' THEN 'instagram'
+  WHEN source = 'WEB' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
+  ELSE 'outros'
+END`;
 
 // Funnel name aliases: normalized name → all DB variations
 const FUNNEL_ALIASES: Record<string, string[]> = {
@@ -1309,22 +1357,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         },
       };
 
-      // Montar CASE WHEN SQL para classificar utm_source em plataforma (usando LIKE para substring match)
-      // Ordem importa: plataformas mais específicas primeiro para evitar matches errados
-      const platformCaseExpr = `CASE
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' THEN 'linkedin_ads'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin_social'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' THEN 'tiktok_ads'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%email%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%e-mail%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%mailchimp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%rdstation%' THEN 'email'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%whatsapp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%wpp%' THEN 'whatsapp'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%evento%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%event%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%webinar%' THEN 'eventos'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('organic', 'organico', 'direct', '(direct)', '(none)', '') THEN 'organico'
-        ELSE 'outros'
-      END`;
+      // Classificação de plataforma centralizada (ver constante PLATFORM_CASE_SQL no topo do arquivo)
+      const platformCaseExpr = PLATFORM_CASE_SQL;
 
       // Query 1: CRM deals agrupados por plataforma (com splits MQL/NMQL)
       const RA_STAGES = `'reunião marcada', 'rm', 'rm - reunião marcada', 'agendado', 'reunião agendada', 'agendamento direto',
@@ -2515,20 +2549,35 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const leadsRow = leadsResult.rows[0] as any;
       const leads = parseInt(leadsRow.total_leads) || 0;
       const mqls = parseInt(leadsRow.total_mqls) || 0;
-      const cpl = leads > 0 ? investimento / leads : 0;
-      const cpmql = mqls > 0 ? investimento / mqls : 0;
+
+      // Quando o filtro é EXATAMENTE Instagram (sozinho), não atribuímos investimento
+      // pago à plataforma — gasto agregado fica na seção "Meta Ads". Visualizações/Alcance
+      // pagos do IG continuam aparecendo nos cards específicos do Instagram.
+      const utmValuesNorm = (utmSourceParam || '').split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
+      const onlyInstagram = utmValuesNorm.length === 1 && utmValuesNorm[0] === 'instagram';
+      const investimentoExposto = onlyInstagram ? 0 : investimento;
+      const impressoesExposto = onlyInstagram ? 0 : impressoes;
+      const cliquesExposto = onlyInstagram ? 0 : cliques;
+      const cliquesSaidaExposto = onlyInstagram ? 0 : cliquesSaida;
+      const cpmExposto = onlyInstagram ? 0 : cpm;
+      const ctrExposto = onlyInstagram ? 0 : ctr;
+      const cpsExposto = onlyInstagram ? 0 : cps;
+      const connectRateExposto = onlyInstagram ? 0 : connectRate;
+      const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPagina;
+      const cpl = onlyInstagram ? 0 : (leads > 0 ? investimento / leads : 0);
+      const cpmql = onlyInstagram ? 0 : (mqls > 0 ? investimento / mqls : 0);
       const percMqls = leads > 0 ? (mqls / leads) : 0;
 
       res.json({
-        investimento,
-        impressoes,
-        cliques,
-        cliquesSaida,
-        cpm,
-        ctr,
-        cps,
-        connectRate,
-        visualizacoesPagina,
+        investimento: investimentoExposto,
+        impressoes: impressoesExposto,
+        cliques: cliquesExposto,
+        cliquesSaida: cliquesSaidaExposto,
+        cpm: cpmExposto,
+        ctr: ctrExposto,
+        cps: cpsExposto,
+        connectRate: connectRateExposto,
+        visualizacoesPagina: visualizacoesPaginaExposto,
         leads,
         mqls,
         cpl,
@@ -2786,21 +2835,45 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const alcanceTotal = snapshots.reduce((s, r) => s + (parseInt(r.reach_day) || 0), 0);
       // profile_views is deprecated in IG API v22+, use accounts_engaged as proxy
       const visitasPerfil = snapshots.reduce((s, r) => s + (parseInt(r.profile_views) || parseInt(r.accounts_engaged) || 0), 0);
-      // profile_links_taps is the current API field; website_clicks is legacy fallback
-      const cliquesLinkBio = snapshots.reduce((s, r) => s + (parseInt(r.profile_links_taps) || parseInt(r.website_clicks) || 0), 0);
+      // Cliques no link da bio: prioridade GA4 do Linktree (host=linktr.ee, event=click)
+      // — porque o Linktree não tem API pública e profile_links_taps do Instagram tem
+      // limitações no histórico. Fallback: profile_links_taps / website_clicks.
+      const igLinkTapsFallback = snapshots.reduce(
+        (s, r) => s + (parseInt(r.profile_links_taps) || parseInt(r.website_clicks) || 0),
+        0,
+      );
+      const linktreePropertyId = process.env.LINKTREE_GA4_PROPERTY_ID || "";
+      let cliquesLinkBio = igLinkTapsFallback;
+      let cliquesLinkBioFonte: "linktree_ga4" | "instagram_profile_taps" = "instagram_profile_taps";
+      let cliquesPorLink: Array<{ linkUrl: string; linkDomain: string; clicks: number }> = [];
+      let cliquesPorDominio: Array<{ domain: string; clicks: number }> = [];
+      if (linktreePropertyId) {
+        const linktreeMetrics = await getLinktreeMetrics(
+          linktreePropertyId,
+          new Date(`${startDate}T00:00:00Z`),
+          new Date(`${endDate}T23:59:59Z`),
+        );
+        if (linktreeMetrics.available) {
+          cliquesLinkBio = linktreeMetrics.totalClicks;
+          cliquesLinkBioFonte = "linktree_ga4";
+          cliquesPorLink = linktreeMetrics.byLink;
+          cliquesPorDominio = linktreeMetrics.byDomain;
+        }
+      }
       // Use account-level total_interactions from snapshots (more accurate than post-level)
       const interacoes = snapshots.reduce((s, r) => s + (parseInt(r.total_interactions) || 0), 0);
 
-      // Paid impressions/reach/spend from Meta Ads — Instagram publisher_platform only
+      // Visualizações/Alcance pagos: tudo que veio do pago Meta no IG (qualquer objetivo).
+      // Investimento pago NÃO é atribuído ao Instagram aqui — gasto agregado fica na seção
+      // "Meta Ads" do dashboard, FB+IG juntos.
       let visualizacoesPagas = 0;
       let alcancePago = 0;
-      let investimentoPago = 0;
+      const investimentoPago = 0;
       try {
         const metaIgResult = await db.execute(sql`
           SELECT
             COALESCE(SUM(impressions), 0) as impressoes_pagas,
-            COALESCE(SUM(reach), 0) as alcance_pago,
-            COALESCE(SUM(spend), 0) as investimento_pago
+            COALESCE(SUM(reach), 0) as alcance_pago
           FROM meta_ads.meta_insights_by_platform_daily
           WHERE date_start >= ${startDate}::date
             AND date_start <= ${endDate}::date
@@ -2810,31 +2883,39 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const mRow = metaIgResult.rows[0] as any;
         visualizacoesPagas = parseInt(mRow.impressoes_pagas) || 0;
         alcancePago = parseInt(mRow.alcance_pago) || 0;
-        investimentoPago = parseFloat(mRow.investimento_pago) || 0;
-      } catch {
-        // Table may not exist yet (before first sync runs ensureByPlatformTable)
+      } catch (err: any) {
+        console.warn("[orcado-realizado/instagram] meta_insights_by_platform_daily query failed:", err?.message || err);
       }
 
-      const visualizacoesOrganicas = Math.max(0, visualizacoesTotais - visualizacoesPagas);
-      const alcanceOrganico = Math.max(0, alcanceTotal - alcancePago);
-      const percVisualizacoesOrganicas = visualizacoesTotais > 0 ? visualizacoesOrganicas / visualizacoesTotais : 0;
-      const percVisualizacoesPagas = visualizacoesTotais > 0 ? visualizacoesPagas / visualizacoesTotais : 0;
-      const frequenciaAlcance = alcanceTotal > 0 ? visualizacoesTotais / alcanceTotal : 0;
+      // Guard: o "views" da Graph API IG inclui ad impressions, então o Total deveria ser
+      // >= Pago. Se vier menor, é sinal de snapshot incompleto (sync histórico ainda não
+      // populou todos os dias) — clampar Total = Pago pra evitar % > 100% e Orgânico negativo.
+      // Após rodar o backfill (~90 dias), os números convergem naturalmente.
+      const visualizacoesTotaisAjustado = Math.max(visualizacoesTotais, visualizacoesPagas);
+      const alcanceTotalAjustado = Math.max(alcanceTotal, alcancePago);
+      const visualizacoesOrganicas = Math.max(0, visualizacoesTotaisAjustado - visualizacoesPagas);
+      const alcanceOrganico = Math.max(0, alcanceTotalAjustado - alcancePago);
+      const percVisualizacoesOrganicas = visualizacoesTotaisAjustado > 0 ? visualizacoesOrganicas / visualizacoesTotaisAjustado : 0;
+      const percVisualizacoesPagas = visualizacoesTotaisAjustado > 0 ? visualizacoesPagas / visualizacoesTotaisAjustado : 0;
+      const frequenciaAlcance = alcanceTotalAjustado > 0 ? visualizacoesTotaisAjustado / alcanceTotalAjustado : 0;
 
-      const ctrAlcanceVisitas = alcanceTotal > 0 ? visitasPerfil / alcanceTotal : 0;
-      const percEngajamento = alcanceTotal > 0 ? interacoes / alcanceTotal : 0;
-      const ctrAlcanceCliques = alcanceTotal > 0 ? cliquesLinkBio / alcanceTotal : 0;
+      const ctrAlcanceVisitas = alcanceTotalAjustado > 0 ? visitasPerfil / alcanceTotalAjustado : 0;
+      const percEngajamento = alcanceTotalAjustado > 0 ? interacoes / alcanceTotalAjustado : 0;
+      const ctrAlcanceCliques = alcanceTotalAjustado > 0 ? cliquesLinkBio / alcanceTotalAjustado : 0;
       const ctrVisitasCliques = visitasPerfil > 0 ? cliquesLinkBio / visitasPerfil : 0;
 
       res.json({
         comecaramSeguir, deixaramSeguir, percPerdaSeguidores,
         deltaSeguidores, totalSeguidores: lastFollowers, percCrescimentoSeguidores,
-        visualizacoesTotais, percVisualizacoesOrganicas, visualizacoesOrganicas,
+        visualizacoesTotais: visualizacoesTotaisAjustado, percVisualizacoesOrganicas, visualizacoesOrganicas,
         percVisualizacoesPagas, visualizacoesPagas,
-        alcanceTotal, alcanceOrganico, alcancePago,
+        alcanceTotal: alcanceTotalAjustado, alcanceOrganico, alcancePago,
         frequenciaAlcance, ctrAlcanceVisitas, visitasPerfil,
         percEngajamento, interacoes, ctrAlcanceCliques,
         ctrVisitasCliques, cliquesLinkBio,
+        cliquesLinkBioFonte,
+        cliquesPorLink,
+        cliquesPorDominio,
         investimentoPago,
         hasConnection: true,
         snapshotCount: snapshots.length,
@@ -2854,14 +2935,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "startDate and endDate are required" });
       }
 
-      const platformCaseExpr = `CASE
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
-        WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
-        ELSE 'outros'
-      END`;
+      // Classificação de plataforma centralizada (ver constante PLATFORM_CASE_SQL_BASIC no topo do arquivo)
+      const platformCaseExpr = PLATFORM_CASE_SQL_BASIC;
 
       const RA_STAGES = `'reunião marcada', 'rm', 'rm - reunião marcada', 'agendado', 'reunião agendada', 'agendamento direto',
             'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
