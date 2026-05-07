@@ -7,7 +7,7 @@ import {
   Loader2, LogOut, Sun, Moon, FileText, Upload, Download, User, Briefcase, Check,
   Clock, ChevronRight, X,
 } from "lucide-react";
-import turboLogo from "@assets/logo-turbo-branca.svg";
+import turboLogo from "@assets/logo-branca.png";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

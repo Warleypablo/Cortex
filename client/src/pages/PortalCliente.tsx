@@ -6,7 +6,7 @@ import {
   Loader2, LogOut, Sun, Moon, AlertCircle, Lock, Eye, EyeOff,
   LayoutDashboard, BarChart3, CircleDollarSign, Briefcase, MessageSquare, Settings, X,
 } from "lucide-react";
-import turboLogo from "@assets/logo-turbo-branca.svg";
+import turboLogo from "@assets/logo-branca.png";
 
 import { PortalChat } from "@/components/portal/PortalChat";
 
