@@ -72,7 +72,7 @@ function fmtBRL(v: number): string {
 }
 
 export default function SlideRankingSquads({ ranking }: Props) {
-  const top = ranking.slice(0, 7);
+  const top = ranking.slice(0, 5);
 
   if (top.length === 0) {
     return (
@@ -84,16 +84,12 @@ export default function SlideRankingSquads({ ranking }: Props) {
     );
   }
 
-  // Podium display order (centro = 1°, ordens menores estendendo para fora)
-  const podiumOrder = top.length >= 7
-    ? [top[5], top[3], top[1], top[0], top[2], top[4], top[6]]  // 6 4 2 1 3 5 7
-    : top.length >= 6
-      ? [top[5], top[3], top[1], top[0], top[2], top[4]]         // 6 4 2 1 3 5
-      : top.length >= 5
-        ? [top[3], top[1], top[0], top[2], top[4]]               // 4 2 1 3 5
-        : top.length >= 3
-          ? [top[1], top[0], top[2]]                              // 2 1 3
-          : top;
+  // Podium display order: 4° 2° 1° 3° 5° (centro = 1°)
+  const podiumOrder = top.length >= 5
+    ? [top[3], top[1], top[0], top[2], top[4]]
+    : top.length >= 3
+      ? [top[1], top[0], top[2]]
+      : top;
 
   const heightMap: Record<number, number> = { 1: 260, 2: 215, 3: 180, 4: 145, 5: 115, 6: 90, 7: 75 };
   const iconSize: Record<number, number> = { 1: 80, 2: 68, 3: 64, 4: 60, 5: 56, 6: 52, 7: 48 };
