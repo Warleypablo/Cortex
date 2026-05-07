@@ -44,6 +44,7 @@ const MEDAL_COLORS: Record<number, { ring: string; text: string }> = {
   4: { ring: "#71717a", text: "text-zinc-400" },
   5: { ring: "#71717a", text: "text-zinc-400" },
   6: { ring: "#71717a", text: "text-zinc-400" },
+  7: { ring: "#71717a", text: "text-zinc-400" },
 };
 
 /** Extract emoji prefix and base name from squad name like "🪖 Selva" */
@@ -71,7 +72,7 @@ function fmtBRL(v: number): string {
 }
 
 export default function SlideRankingSquads({ ranking }: Props) {
-  const top = ranking.slice(0, 6);
+  const top = ranking.slice(0, 7);
 
   if (top.length === 0) {
     return (
@@ -84,17 +85,19 @@ export default function SlideRankingSquads({ ranking }: Props) {
   }
 
   // Podium display order (centro = 1°, ordens menores estendendo para fora)
-  const podiumOrder = top.length >= 6
-    ? [top[5], top[3], top[1], top[0], top[2], top[4]]   // 6 4 2 1 3 5
-    : top.length >= 5
-      ? [top[3], top[1], top[0], top[2], top[4]]          // 4 2 1 3 5
-      : top.length >= 3
-        ? [top[1], top[0], top[2]]                        // 2 1 3
-        : top;
+  const podiumOrder = top.length >= 7
+    ? [top[5], top[3], top[1], top[0], top[2], top[4], top[6]]  // 6 4 2 1 3 5 7
+    : top.length >= 6
+      ? [top[5], top[3], top[1], top[0], top[2], top[4]]         // 6 4 2 1 3 5
+      : top.length >= 5
+        ? [top[3], top[1], top[0], top[2], top[4]]               // 4 2 1 3 5
+        : top.length >= 3
+          ? [top[1], top[0], top[2]]                              // 2 1 3
+          : top;
 
-  const heightMap: Record<number, number> = { 1: 260, 2: 215, 3: 180, 4: 145, 5: 115, 6: 90 };
-  const iconSize: Record<number, number> = { 1: 80, 2: 68, 3: 64, 4: 60, 5: 56, 6: 52 };
-  const emojiSize: Record<number, number> = { 1: 42, 2: 34, 3: 32, 4: 28, 5: 26, 6: 24 };
+  const heightMap: Record<number, number> = { 1: 260, 2: 215, 3: 180, 4: 145, 5: 115, 6: 90, 7: 75 };
+  const iconSize: Record<number, number> = { 1: 80, 2: 68, 3: 64, 4: 60, 5: 56, 6: 52, 7: 48 };
+  const emojiSize: Record<number, number> = { 1: 42, 2: 34, 3: 32, 4: 28, 5: 26, 6: 24, 7: 22 };
 
   return (
     <SlideLayout section="commerce" className="items-center justify-center">
