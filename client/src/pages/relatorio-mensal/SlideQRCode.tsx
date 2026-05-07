@@ -1,4 +1,4 @@
-import turboLogo from "@assets/logo-preta.png";
+import turboLogo from "@assets/logo-branca.png";
 import qrCode from "@assets/qr-code-qa.png";
 import SlideLayout from "./SlideLayout";
 
