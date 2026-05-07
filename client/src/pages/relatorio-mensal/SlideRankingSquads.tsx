@@ -43,6 +43,7 @@ const MEDAL_COLORS: Record<number, { ring: string; text: string }> = {
   3: { ring: "#f97316", text: "text-orange-400" },
   4: { ring: "#71717a", text: "text-zinc-400" },
   5: { ring: "#71717a", text: "text-zinc-400" },
+  6: { ring: "#71717a", text: "text-zinc-400" },
 };
 
 /** Extract emoji prefix and base name from squad name like "🪖 Selva" */
@@ -70,7 +71,7 @@ function fmtBRL(v: number): string {
 }
 
 export default function SlideRankingSquads({ ranking }: Props) {
-  const top = ranking.slice(0, 5);
+  const top = ranking.slice(0, 6);
 
   if (top.length === 0) {
     return (
@@ -82,16 +83,18 @@ export default function SlideRankingSquads({ ranking }: Props) {
     );
   }
 
-  // Podium display order: 4th, 2nd, 1st, 3rd, 5th
-  const podiumOrder = top.length >= 5
-    ? [top[3], top[1], top[0], top[2], top[4]]
-    : top.length >= 3
-      ? [top[1], top[0], top[2]]
-      : top;
+  // Podium display order (centro = 1°, ordens menores estendendo para fora)
+  const podiumOrder = top.length >= 6
+    ? [top[5], top[3], top[1], top[0], top[2], top[4]]   // 6 4 2 1 3 5
+    : top.length >= 5
+      ? [top[3], top[1], top[0], top[2], top[4]]          // 4 2 1 3 5
+      : top.length >= 3
+        ? [top[1], top[0], top[2]]                        // 2 1 3
+        : top;
 
-  const heightMap: Record<number, number> = { 1: 260, 2: 215, 3: 180, 4: 145, 5: 115 };
-  const iconSize: Record<number, number> = { 1: 80, 2: 68, 3: 64, 4: 60, 5: 56 };
-  const emojiSize: Record<number, number> = { 1: 42, 2: 34, 3: 32, 4: 28, 5: 26 };
+  const heightMap: Record<number, number> = { 1: 260, 2: 215, 3: 180, 4: 145, 5: 115, 6: 90 };
+  const iconSize: Record<number, number> = { 1: 80, 2: 68, 3: 64, 4: 60, 5: 56, 6: 52 };
+  const emojiSize: Record<number, number> = { 1: 42, 2: 34, 3: 32, 4: 28, 5: 26, 6: 24 };
 
   return (
     <SlideLayout section="commerce" className="items-center justify-center">
@@ -104,7 +107,7 @@ export default function SlideRankingSquads({ ranking }: Props) {
       </div>
 
       {/* Podium */}
-      <div className="flex items-end justify-center" style={{ gap: 14 }}>
+      <div className="flex items-end justify-center" style={{ gap: 12 }}>
         {podiumOrder.map((squad) => {
           const { emoji, name } = parseSquadName(squad.squad);
           const color = getSquadColor(name);
