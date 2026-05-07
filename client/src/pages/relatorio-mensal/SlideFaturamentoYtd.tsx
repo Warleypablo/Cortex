@@ -1,4 +1,4 @@
-import { TrendingUp, AlertTriangle, CheckCircle, Receipt } from "lucide-react";
+import { TrendingUp, AlertTriangle, CheckCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { FaturamentoYtdData } from "./types";
 import SlideLayout from "./SlideLayout";
@@ -49,7 +49,7 @@ export default function SlideFaturamentoYtd({ data, mesLabel }: Props) {
       />
 
       {/* KPI cards */}
-      <div className="grid grid-cols-4 gap-3 mb-3 shrink-0">
+      <div className="grid grid-cols-3 gap-3 mb-3 shrink-0">
         <SecondaryCard className="p-3 flex flex-col justify-center gap-1">
           <div className="flex items-center gap-1.5 mb-1">
             <TrendingUp className="h-3.5 w-3.5 text-cyan-400" />
@@ -79,15 +79,6 @@ export default function SlideFaturamentoYtd({ data, mesLabel }: Props) {
           </div>
           <p className="text-xl font-black text-emerald-400">{fmtBRL(faturamentoLiquidoYtd)}</p>
           <p className="text-[10px] text-zinc-600">Bruto − Inadimplência</p>
-        </SecondaryCard>
-
-        <SecondaryCard className="p-3 flex flex-col justify-center gap-1">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Receipt className="h-3.5 w-3.5 text-amber-400" />
-            <p className="text-[10px] text-zinc-500 uppercase tracking-wide">Imposto Receita YTD</p>
-          </div>
-          <p className="text-xl font-black text-amber-400">{fmtBRL(data.impostoYtd)}</p>
-          <p className="text-[10px] text-zinc-600">Categoria 05.05 quitado</p>
         </SecondaryCard>
       </div>
 
