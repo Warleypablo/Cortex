@@ -39,7 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { DealCelebration } from "@/components/DealCelebration";
 import { formatCurrency, formatCurrencyCompact, formatDecimal, formatPercent } from "@/lib/utils";
-import turboLogo from "@assets/logo-turbo-branca.svg";
+import turboLogo from "@assets/logo-branca.png";
 
 interface CloserMetrics {
   mrrObtido: number;
