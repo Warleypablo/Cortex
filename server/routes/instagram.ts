@@ -447,9 +447,14 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           },
         });
 
-      // 3b. Sync historical daily insights (last 30 days)
+      // 3b. Sync historical daily insights (default 90 days, override via ?days=N up to 180)
+      const requestedDays = parseInt(String(req.query.days || ''), 10);
+      const historicalDays = Number.isFinite(requestedDays) && requestedDays > 0
+        ? Math.min(requestedDays, 180)
+        : 90;
       try {
-        const historical = await syncInsightsHistorical(conn.igUserId, token, 30);
+        console.log(`[Instagram] Sync histórico: ${historicalDays} dias`);
+        const historical = await syncInsightsHistorical(conn.igUserId, token, historicalDays);
 
         // follower_count in time_series is daily delta, not absolute.
         // Reconstruct absolute values: current total - sum of future deltas
