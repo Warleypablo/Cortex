@@ -2165,7 +2165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           responsavel_geral as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
@@ -2274,7 +2274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           responsavel_geral as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
@@ -4613,7 +4613,7 @@ Estruture sua resposta em:
           c.evitabilidade_churn,
           c.reteve,
           c.abonar_churn
-        FROM "Clickup".cup_churn c
+        FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND ${dateFilter}
@@ -4946,7 +4946,7 @@ Estruture sua resposta em:
           'Q' || EXTRACT(QUARTER FROM ultimo_dia_operacao)::int || ' ' || EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS label,
           COUNT(*) AS total_churns,
           SUM(COALESCE(valor_r, 0)) AS valor_total
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE ultimo_dia_operacao IS NOT NULL
           AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
@@ -4962,7 +4962,7 @@ Estruture sua resposta em:
       // = ativos atuais + tudo que churou DEPOIS do início desse trimestre
       const mrrAtualResult = await db.execute(sql`
         SELECT squad, SUM(COALESCE(valor_r, 0)) AS mrr_ativo
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE squad IS NOT NULL AND status = 'ativo' AND valor_r > 0
         GROUP BY squad
       `);
@@ -4975,7 +4975,7 @@ Estruture sua resposta em:
           EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS ano,
           EXTRACT(QUARTER FROM ultimo_dia_operacao)::int AS trimestre,
           SUM(COALESCE(valor_r, 0)) AS valor_churn_posterior
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE ultimo_dia_operacao IS NOT NULL AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND valor_r > 0
@@ -5048,7 +5048,7 @@ Estruture sua resposta em:
           ultimo_dia_operacao,
           EXTRACT(MONTH FROM ultimo_dia_operacao)::int AS mes,
           TO_CHAR(ultimo_dia_operacao, 'Mon') AS mes_label
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE squad = ${squad}
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND ultimo_dia_operacao IS NOT NULL
@@ -6230,7 +6230,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
@@ -6286,7 +6286,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
@@ -6451,7 +6451,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
@@ -6521,7 +6521,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesAnteriorStr}::date
           AND data_solicitacao_encerramento <= ${fimMesAnteriorStr}::date
@@ -6625,7 +6625,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           END as lt_meses,
           COALESCE(NULLIF(TRIM(c.tipo_negocio), ''), '') as tipo_negocio,
           c.parent_id
-        FROM "Clickup".cup_churn c
+        FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND c.data_solicitacao_encerramento >= ${evolucaoStartStr}::date
@@ -6679,7 +6679,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const evolucaoChurnResult = await db.execute(sql`
         SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           COUNT(*) as churns, COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
@@ -6693,7 +6693,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           COALESCE(NULLIF(TRIM(motivo_cancelamento), ''), 'Sem Motivo') as motivo,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
