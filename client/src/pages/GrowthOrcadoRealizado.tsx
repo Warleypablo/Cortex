@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Pencil, Save, X, Copy, Camera, Play, Briefcase, AlertCircle, Download, FileText, FileSpreadsheet } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Pencil, Save, X, Copy, Camera, Play, Briefcase, AlertCircle, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
@@ -161,6 +161,26 @@ interface ExportParams {
   produtos: string;
   origem: string;
   contagem: string;
+}
+
+// Converte URL do Linktree em rótulo curto e legível.
+// Linktree não envia link_text via GA4, então a melhor heurística é usar
+// hostname + pathname (sem query/UTMs), com casos especiais nos domínios mais comuns.
+function humanizeLinktreeLink(url: string): string {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, '');
+    const path = u.pathname.replace(/\/$/, '');
+    if (host === 'forms.clickup.com') return 'Formulário ClickUp';
+    if (host === 'api.whatsapp.com') return 'WhatsApp';
+    if (host.endsWith('youtube.com')) {
+      const channel = path.match(/^\/(@[\w.-]+)/)?.[1];
+      return channel ? `YouTube ${channel}` : 'YouTube';
+    }
+    return path && path !== '' ? `${host}${path}` : host;
+  } catch {
+    return url;
+  }
 }
 
 function buildOrcadoRealizadoExportRows(
@@ -531,6 +551,7 @@ export default function GrowthOrcadoRealizado() {
     return { from: prevStart, to: prevEnd };
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [expandedLinkBio, setExpandedLinkBio] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, number>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [showCopyFrom, setShowCopyFrom] = useState(false);
@@ -816,13 +837,36 @@ export default function GrowthOrcadoRealizado() {
             return desvio >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
           })();
 
+          const isLinkBio = m.id === 'ig_cliquesLinkBio';
+          const linkBioBreakdown = instagramDetailData?.cliquesPorLink ?? [];
+          const linkBioByDomain = instagramDetailData?.cliquesPorDominio ?? [];
+          const linkBioFonte = instagramDetailData?.cliquesLinkBioFonte;
+          const showExpand = isLinkBio && (linkBioBreakdown.length > 0 || linkBioByDomain.length > 0);
+          const expanded = isLinkBio && expandedLinkBio;
+
           return (
-            <TableRow key={m.id} className={cn(
+            <Fragment key={m.id}>
+            <TableRow className={cn(
               "hover:bg-muted/30 transition-colors",
               !isPercent && "bg-blue-500/[0.04] dark:bg-blue-400/[0.03]"
             )}>
               <TableCell className="text-sm font-medium">
-                {m.name}
+                {showExpand ? (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedLinkBio(v => !v)}
+                    className="inline-flex items-center gap-1.5 text-left hover:text-primary transition-colors"
+                    data-testid="toggle-clicks-breakdown"
+                  >
+                    {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    <span>{m.name}</span>
+                    {linkBioFonte === 'linktree_ga4' && (
+                      <span className="text-[10px] font-normal text-muted-foreground ml-1 px-1.5 py-0.5 rounded bg-muted">via Linktree</span>
+                    )}
+                  </button>
+                ) : (
+                  m.name
+                )}
               </TableCell>
               <TableCell className="text-right text-sm text-muted-foreground">
                 {renderOrcadoCell(m)}
@@ -860,6 +904,35 @@ export default function GrowthOrcadoRealizado() {
                 })()}
               </TableCell>
             </TableRow>
+            {expanded && linkBioBreakdown.slice(0, 15).map((row, idx) => (
+              <TableRow key={`linkbio-${idx}`} className="bg-muted/20 hover:bg-muted/30" data-testid="row-clicks-breakdown-link">
+                <TableCell className="text-sm pl-10 text-muted-foreground">
+                  <a
+                    href={row.linkUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={row.linkUrl}
+                    className="hover:text-primary hover:underline"
+                  >
+                    {humanizeLinktreeLink(row.linkUrl)}
+                  </a>
+                </TableCell>
+                <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                <TableCell className="text-right text-sm font-medium">{row.clicks.toLocaleString('pt-BR')}</TableCell>
+                <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+                <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+                <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+                <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+              </TableRow>
+            ))}
+            {expanded && linkBioFonte !== 'linktree_ga4' && (
+              <TableRow className="bg-muted/20 hover:bg-muted/20">
+                <TableCell colSpan={7} className="text-[11px] text-muted-foreground italic pl-10 py-2">
+                  Fonte: Instagram (profile_links_taps). Detalhamento por link disponível apenas via Linktree GA4.
+                </TableCell>
+              </TableRow>
+            )}
+            </Fragment>
           );
         })}
         {/* Section separator */}
@@ -974,6 +1047,9 @@ export default function GrowthOrcadoRealizado() {
     frequenciaAlcance: number; ctrAlcanceVisitas: number; visitasPerfil: number;
     percEngajamento: number; interacoes: number; ctrAlcanceCliques: number;
     ctrVisitasCliques: number; cliquesLinkBio: number;
+    cliquesLinkBioFonte?: 'linktree_ga4' | 'instagram_profile_taps';
+    cliquesPorLink?: Array<{ linkUrl: string; linkDomain: string; clicks: number }>;
+    cliquesPorDominio?: Array<{ domain: string; clicks: number }>;
     investimentoPago: number;
     hasConnection: boolean;
     snapshotCount: number;
