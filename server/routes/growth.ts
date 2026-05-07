@@ -2530,18 +2530,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // Leads e MQLs em Ads são sempre COUNT (não dependem de contagem contrato/cliente)
 
-      // Se um funil específico está selecionado, não filtrar por UTM (o funil já delimita o escopo)
-      const utmFilter = funilValues.length > 0
-        ? sql``
-        : sql`AND (
-            LOWER(d.utm_source) LIKE '%facebook%' OR LOWER(d.utm_source) LIKE '%fb%'
-            OR LOWER(d.utm_source) LIKE '%meta%' OR LOWER(d.utm_source) = 'ig'
-            OR LOWER(d.utm_source) LIKE '%instagram%'
-            OR LOWER(d.utm_source) LIKE '%google%' OR LOWER(d.utm_source) LIKE '%adwords%'
-            OR LOWER(d.utm_source) = 'gads'
-          )`;
-
-      // UTM Source filter for Ads leads (reuses utmValues parsed at top of handler)
+      // Filtros ortogonais: o universo base é "todo lead inbound" (source IN ...).
+      // Cada filtro selecionado na UI estreita uma dimensão independente:
+      //   - funilFilter (produto)  → estreita por fnl_ngc do Bitrix
+      //   - utmSourceFilter (plataforma) → estreita por utm_source LIKE
+      // Sem filtro = universo completo. Sem switch de semântica.
       let utmSourceFilter = sql``;
       if (utmValues.length === 1) {
         utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
@@ -2557,7 +2550,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
           AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-          ${utmFilter}
           ${funilFilter}
           ${utmSourceFilter}
       `);
