@@ -2400,6 +2400,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const hasVazio = funilValues.includes('(Vazio)');
       const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
 
+      // Parse utmSource filter (comma-separated). Empty/'todos' means "all platforms".
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      const utmValues = utmSourceParam && utmSourceParam !== 'todos'
+        ? utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const includeMeta = utmValues.length === 0
+        || utmValues.some(v => v.includes('facebook') || v === 'meta' || v.includes('instagram') || v === 'ig' || v === 'fb');
+      const includeGoogle = utmValues.length === 0
+        || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
+
       // Build campaign filter: match campaign names containing [funil] pattern
       // Campaign naming convention: [TP] [Leads] [ABO] [Odonto] - ...
       let campaignFilter = sql``;
@@ -2425,34 +2435,41 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         )`;
       }
 
-      // Query Meta Ads
-      const metaResult = await db.execute(sql`
-        SELECT
-          COALESCE(SUM(mid.spend), 0) as investimento,
-          COALESCE(SUM(mid.impressions), 0) as impressoes,
-          COALESCE(SUM(mid.clicks), 0) as cliques,
-          COALESCE(SUM(mid.outbound_clicks), 0) as cliques_saida,
-          COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina
-        FROM meta_ads.meta_insights_daily mid
-        WHERE mid.date_start >= ${startDate}::date
-          AND mid.date_start <= ${endDate}::date
-          AND mid.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-          ${campaignFilter}
-      `);
+      // Query Meta Ads (skip when platform filter excludes Meta)
+      let metaInvestimento = 0;
+      let metaImpressoes = 0;
+      let metaCliques = 0;
+      let cliquesSaida = 0;
+      let visualizacoesPagina = 0;
+      if (includeMeta) {
+        const metaResult = await db.execute(sql`
+          SELECT
+            COALESCE(SUM(mid.spend), 0) as investimento,
+            COALESCE(SUM(mid.impressions), 0) as impressoes,
+            COALESCE(SUM(mid.clicks), 0) as cliques,
+            COALESCE(SUM(mid.outbound_clicks), 0) as cliques_saida,
+            COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina
+          FROM meta_ads.meta_insights_daily mid
+          WHERE mid.date_start >= ${startDate}::date
+            AND mid.date_start <= ${endDate}::date
+            AND mid.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+            ${campaignFilter}
+        `);
+        const metaRow = metaResult.rows[0] as any;
+        metaInvestimento = parseFloat(metaRow.investimento) || 0;
+        metaImpressoes = parseInt(metaRow.impressoes) || 0;
+        metaCliques = parseInt(metaRow.cliques) || 0;
+        cliquesSaida = parseInt(metaRow.cliques_saida) || 0;
+        visualizacoesPagina = parseInt(metaRow.visualizacoes_pagina) || 0;
+      }
 
-      const metaRow = metaResult.rows[0] as any;
-      const metaInvestimento = parseFloat(metaRow.investimento) || 0;
-      const metaImpressoes = parseInt(metaRow.impressoes) || 0;
-      const metaCliques = parseInt(metaRow.cliques) || 0;
-      const cliquesSaida = parseInt(metaRow.cliques_saida) || 0;
-      const visualizacoesPagina = parseInt(metaRow.visualizacoes_pagina) || 0;
-
-      // Query Google Ads (skip when funnel is selected — no campaign-to-funnel mapping available)
+      // Query Google Ads (skip when funnel is selected — no campaign-to-funnel mapping available;
+      // also skip when platform filter excludes Google)
       let googleInvestimento = 0;
       let googleImpressoes = 0;
       let googleCliques = 0;
-      if (funilValues.length > 0) {
-        // Skip Google Ads when filtering by funnel — UTM mapping not available for Google campaigns
+      if (funilValues.length > 0 || !includeGoogle) {
+        // Skip Google Ads when filtering by funnel or when platform filter excludes Google
       } else try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
@@ -2521,16 +2538,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             OR LOWER(d.utm_source) = 'gads'
           )`;
 
-      // UTM Source filter for Ads leads (supports comma-separated values for multi-platform)
-      const utmSourceParam = req.query.utmSource as string | undefined;
+      // UTM Source filter for Ads leads (reuses utmValues parsed at top of handler)
       let utmSourceFilter = sql``;
-      if (utmSourceParam && utmSourceParam !== 'todos') {
-        const utmValues = utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
-        if (utmValues.length === 1) {
-          utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
-        } else if (utmValues.length > 1) {
-          utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
-        }
+      if (utmValues.length === 1) {
+        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
+      } else if (utmValues.length > 1) {
+        utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
       }
 
       const leadsResult = await db.execute(sql`
@@ -2599,6 +2612,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const endDate = req.query.endDate as string;
       if (!startDate || !endDate) {
         return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Platform filter: if utmSource is set and excludes Meta-compatible platforms, return zeros
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      const utmValues = utmSourceParam && utmSourceParam !== 'todos'
+        ? utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const includeMeta = utmValues.length === 0
+        || utmValues.some(v => v.includes('facebook') || v === 'meta' || v.includes('instagram') || v === 'ig' || v === 'fb');
+      if (!includeMeta) {
+        return res.json({
+          investimento: 0, impressoes: 0, alcance: 0, frequencia: 0,
+          cpm: 0, ctr: 0, videoHook: null, videoHold: null,
+          visualizacoesPagina: 0, connectRate: 0,
+        });
       }
 
       const funilNgcRaw = req.query.funilNgc as string | undefined;
@@ -2688,6 +2716,29 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const endDate = req.query.endDate as string;
       if (!startDate || !endDate) {
         return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Platform filter: if utmSource is set and excludes Google, return zeros
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      const utmValues = utmSourceParam && utmSourceParam !== 'todos'
+        ? utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const includeGoogle = utmValues.length === 0
+        || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
+
+      // Funnel filter: Google Ads has no campaign→funnel mapping, so any funnel selection
+      // means we cannot match Google spend to that funnel — return zeros (matches /ads behavior).
+      const funilNgcRaw = req.query.funilNgc as string | undefined;
+      const hasFunilFilter = !!(funilNgcRaw && funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean).length > 0);
+
+      const zeroResponse = {
+        investimento: 0, impressoes: 0, cliques: 0,
+        cpm: 0, cpc: 0, ctr: 0,
+        visualizacoesPagina: 0, connectRate: 0,
+        conversoes: 0, valorConversoes: 0, custoConversao: 0,
+      };
+      if (!includeGoogle || hasFunilFilter) {
+        return res.json(zeroResponse);
       }
 
       let investimento = 0;
