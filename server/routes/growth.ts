@@ -1912,7 +1912,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT DISTINCT fnl_ngc
         FROM "Bitrix".crm_deal
         WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
-          AND LOWER(fnl_ngc) NOT IN ('cross sell', 'commerce', 'indicação', 'lead')
+          AND LOWER(fnl_ngc) NOT IN (
+            'cross sell', 'commerce', 'indicação', 'lead',
+            'ifv', 'odonto', 'bootcamp vendas', 'bootcamp performance'
+          )
         ORDER BY fnl_ngc
       `);
       // Normalize: merge ecommerce/E-commerce/Ecommerce into single "Ecommerce"
