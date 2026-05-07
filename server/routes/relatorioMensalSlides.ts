@@ -1268,7 +1268,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       });
 
       // Squads ocultos do slide "Detalhes por Squad" (não impacta ranking nem totais)
-      const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno"]);
+      const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno", "squad x"]);
       const normalizeSquadName = (s: string): string =>
         (s || "").replace(/^[^A-Za-z]+/, "").replace(/\s*\(OFF\)\s*$/i, "").trim().toLowerCase();
 
