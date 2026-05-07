@@ -40,7 +40,7 @@ const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
   "Faturamento YTD", "Vendas YTD", "Vendas CX & Upsell",
   "KRs", "Capa Comercial", "Ranking Closers",
-  "Ranking SDRs", "Contratos", "Capa Commerce", "Squad Details", "Ranking Squads", "Top Operadores", "Turbo Commerce",
+  "Ranking SDRs", "Contratos", "Capa Commerce", "Ranking Squads", "Squad Details", "Top Operadores", "Turbo Commerce",
   "Pontual", "Entregas Pontuais Commerce",
   "Capa Tech", "Area Tech", "Entregas Pontuais Tech",
   "Tópicos",
@@ -86,7 +86,7 @@ function parseSquadNameMinimal(raw: string): { emoji: string; name: string } {
 function buildSlotArray(customSlides: CustomSlide[], squadDetails: SquadDetail[]): SlotEntry[] {
   const slots: SlotEntry[] = [];
   for (let i = 0; i < STATIC_SLIDES; i++) {
-    if (i === 13) {
+    if (i === 14) {
       // Replace "Squad Details" with individual squad slides
       for (let s = 0; s < squadDetails.length; s++) {
         const { emoji, name } = parseSquadNameMinimal(squadDetails[s].squad);
@@ -294,8 +294,8 @@ export default function RelatorioMensal() {
       case 10: return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
       case 11: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
       case 12: return <SlideCapaCommerce />;
-      case 13: return null; // replaced by individual squad slides
-      case 14: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 13: return <SlideRankingSquads ranking={data.rankingSquads} />;
+      case 14: return null; // replaced by individual squad slides
       case 15: return <SlideTopOperadores topOperadores={data.topOperadores} mesLabel={data.mesDadosLabel} />;
       case 16: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
       case 17: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;

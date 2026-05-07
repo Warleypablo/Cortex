@@ -1,4 +1,4 @@
-import { Trophy } from "lucide-react";
+import { Trophy, Crown } from "lucide-react";
 import type { TopOperadores, OperadorRanking } from "./types";
 import SlideLayout from "./SlideLayout";
 import { SlideHeader, SecondaryCard } from "./SlideComponents";
@@ -15,42 +15,133 @@ function fmtBRL(v: number): string {
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
-const MEDALS = ["🥇", "🥈", "🥉"];
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
-const RANK_STYLES = [
-  { text: "text-amber-400", size: "text-lg font-black" },
-  { text: "text-zinc-300", size: "text-base font-bold" },
-  { text: "text-zinc-500", size: "text-sm font-semibold" },
-] as const;
+interface AvatarProps {
+  fotoUrl?: string | null;
+  nome: string;
+  size: number;
+  ringColor: string;
+}
 
-interface PodiumColProps {
+function Avatar({ fotoUrl, nome, size, ringColor }: AvatarProps) {
+  const fontSize = Math.round(size * 0.34);
+  return (
+    <div
+      className="rounded-full flex items-center justify-center overflow-hidden shrink-0"
+      style={{
+        width: size,
+        height: size,
+        background: `linear-gradient(135deg, ${ringColor}33, ${ringColor}11)`,
+        border: `3px solid ${ringColor}`,
+        boxShadow: `0 0 24px ${ringColor}55, 0 0 48px ${ringColor}22`,
+      }}
+    >
+      {fotoUrl ? (
+        <img
+          src={fotoUrl}
+          alt={nome}
+          className="w-full h-full object-cover"
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+        />
+      ) : (
+        <span className="font-black text-white" style={{ fontSize }}>
+          {getInitials(nome)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+interface RankingPanelProps {
   title: string;
+  accent: string;
   items: OperadorRanking[];
   formatValue: (v: number) => string;
 }
 
-function PodiumCol({ title, items, formatValue }: PodiumColProps) {
+const PODIUM_COLORS = ["#f59e0b", "#a1a1aa", "#f97316"];
+const MEDALS = ["🥇", "🥈", "🥉"];
+
+function RankingPanel({ title, accent, items, formatValue }: RankingPanelProps) {
+  const top = items.slice(0, 3);
+  const champion = top[0];
+  const runners = top.slice(1, 3);
+
   return (
-    <SecondaryCard className="flex flex-col gap-3">
-      <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{title}</p>
-      {items.length === 0 ? (
+    <SecondaryCard className="flex flex-col gap-4 h-full">
+      <div className="flex items-center gap-2">
+        <div className="w-1 h-5 rounded-full" style={{ background: accent }} />
+        <p className="text-xs text-zinc-400 uppercase tracking-widest font-semibold">{title}</p>
+      </div>
+
+      {top.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-zinc-600 text-sm">Sem dados no mês</p>
         </div>
       ) : (
-        items.slice(0, 3).map((item, i) => (
-          <div key={`${i}-${item.nome}`} className="flex items-start gap-2.5">
-            <span className="text-2xl leading-none mt-0.5">{MEDALS[i]}</span>
-            <div className="flex-1 min-w-0">
-              <p className={`truncate ${RANK_STYLES[i].size} ${RANK_STYLES[i].text}`}>
-                {item.nome}
-              </p>
-              <p className={`text-xs ${RANK_STYLES[i].text} opacity-70`}>
-                {formatValue(item.valor)}
+        <>
+          {/* Champion (1st place) — large highlight */}
+          {champion && (
+            <div className="flex flex-col items-center text-center">
+              <Crown className="text-amber-400 mb-1" style={{ width: 24, height: 24 }} />
+              <Avatar
+                fotoUrl={champion.fotoUrl}
+                nome={champion.nome}
+                size={96}
+                ringColor={PODIUM_COLORS[0]}
+              />
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="text-xl leading-none">{MEDALS[0]}</span>
+                <p className="text-lg font-black text-white truncate max-w-[200px]">
+                  {champion.nome}
+                </p>
+              </div>
+              {champion.cargo && (
+                <p className="text-[11px] text-zinc-500 truncate max-w-[220px]">{champion.cargo}</p>
+              )}
+              <p className="text-2xl font-black text-amber-400 mt-1 tabular-nums">
+                {formatValue(champion.valor)}
               </p>
             </div>
-          </div>
-        ))
+          )}
+
+          {/* Runners-up (2nd & 3rd) */}
+          {runners.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 mt-auto pt-3 border-t border-white/5">
+              {runners.map((item, i) => {
+                const rank = i + 1; // 1 -> 2nd, 2 -> 3rd
+                const color = PODIUM_COLORS[rank];
+                return (
+                  <div key={`${rank}-${item.nome}`} className="flex flex-col items-center text-center">
+                    <Avatar
+                      fotoUrl={item.fotoUrl}
+                      nome={item.nome}
+                      size={56}
+                      ringColor={color}
+                    />
+                    <div className="mt-1.5 flex items-center gap-1">
+                      <span className="text-base leading-none">{MEDALS[rank]}</span>
+                      <p className="text-sm font-bold text-white truncate max-w-[110px]">
+                        {item.nome}
+                      </p>
+                    </div>
+                    <p className="text-sm font-semibold tabular-nums" style={{ color }}>
+                      {formatValue(item.valor)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </SecondaryCard>
   );
@@ -66,19 +157,16 @@ export default function SlideTopOperadores({ topOperadores, mesLabel }: Props) {
         gradientColor="#f59e0b"
       />
 
-      <div className="grid grid-cols-3 gap-4 flex-1 min-h-0">
-        <PodiumCol
+      <div className="grid grid-cols-2 gap-6 flex-1 min-h-0">
+        <RankingPanel
           title="MRR Ativo"
+          accent="#22d3ee"
           items={topOperadores.topMrr}
           formatValue={fmtBRL}
         />
-        <PodiumCol
-          title="Menor Churn"
-          items={topOperadores.topMenorChurn}
-          formatValue={fmtBRL}
-        />
-        <PodiumCol
+        <RankingPanel
           title="Projetos Entregues"
+          accent="#f59e0b"
           items={topOperadores.topEntregas}
           formatValue={(v) => `${v} entrega${v !== 1 ? "s" : ""}`}
         />

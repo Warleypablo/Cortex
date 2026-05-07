@@ -143,6 +143,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         receitaChurnResult,
         rankingSquadsResult,
         churnSquadsResult,
+        pontualEntregueSquadResult,
         mrrAnteriorSquadsResult,
         mrrAnteriorTotalResult,
         techKpisEntreguesResult,
@@ -166,7 +167,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         faturamentoYtdResult,
         dfcRecebimentoYtdResult,
         topMrrResult,
-        topMenorChurnResult,
         topEntregasResult,
       ] = await Promise.all([
         // 1. Novos colaboradores (admitidos no mês de dados)
@@ -332,17 +332,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // 9. MRR ativo + Ticket Médio ao final do mês de dados (snapshot do dia 1 do mês seguinte)
         db.execute(sql`
           WITH ultimo_snapshot AS (
-<<<<<<< Updated upstream
             SELECT COALESCE(
               (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
             ) as snap
-=======
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE data_snapshot >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}::date
-              AND data_snapshot <= ${dataEnd}::date
->>>>>>> Stashed changes
           )
           SELECT
             COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_ativo,
@@ -358,17 +351,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // 10. Clientes totais + Contratos totais ao final do mês de dados
         db.execute(sql`
           WITH ultimo_snapshot AS (
-<<<<<<< Updated upstream
             SELECT COALESCE(
               (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
             ) as snap
-=======
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE data_snapshot >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}::date
-              AND data_snapshot <= ${dataEnd}::date
->>>>>>> Stashed changes
           )
           SELECT
             COUNT(DISTINCT h.id_task)::int as clientes_totais,
@@ -383,7 +369,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             SELECT
               COALESCE(SUM(valor_r), 0)::numeric as churn_mrr,
               COUNT(*)::int as churn_count
-            FROM "Clickup".cup_churn
+            FROM cortex_core.vw_cup_churn_ajustado
             WHERE data_solicitacao_encerramento IS NOT NULL
               AND data_solicitacao_encerramento >= ${dataStart}
               AND data_solicitacao_encerramento < ${dataEnd}
@@ -452,7 +438,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             COALESCE(SUM(valor_r), 0)::numeric as solicitacoes_valor,
             COUNT(CASE WHEN reteve = 'Sim' THEN 1 END)::int as retencoes_count,
             COALESCE(SUM(CASE WHEN reteve = 'Sim' THEN valor_r ELSE 0 END), 0)::numeric as retencoes_valor
-          FROM "Clickup".cup_churn
+          FROM cortex_core.vw_cup_churn_ajustado
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
@@ -504,7 +490,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ),
           monthly_snapshots AS (
             SELECT
-<<<<<<< Updated upstream
               TO_CHAR(m.month_start, 'YYYY-MM') as month,
               COALESCE(
                 (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (m.month_start + INTERVAL '1 month')::date LIMIT 1),
@@ -512,14 +497,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
               ) as last_snapshot
             FROM date_range dr,
               generate_series(dr.range_start, dr.range_end - INTERVAL '1 day', INTERVAL '1 month') as m(month_start)
-=======
-              ms.month,
-              MAX(h.data_snapshot) as last_snapshot
-            FROM month_series ms
-            JOIN "Clickup".cup_data_hist h
-              ON h.data_snapshot >= ms.month_start AND h.data_snapshot <= ms.next_month_start
-            GROUP BY ms.month
->>>>>>> Stashed changes
           ),
           mrr_mensal AS (
             SELECT
@@ -536,7 +513,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             SELECT
               TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as month,
               COALESCE(SUM(valor_r), 0) as churn_brl
-            FROM "Clickup".cup_churn, date_range dr
+            FROM cortex_core.vw_cup_churn_ajustado, date_range dr
             WHERE data_solicitacao_encerramento IS NOT NULL
               AND data_solicitacao_encerramento >= dr.range_start
               AND data_solicitacao_encerramento < dr.range_end
@@ -570,17 +547,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // 15. Ranking Squads por MRR + Pontual (snapshot do dia 1 do mês seguinte)
         db.execute(sql`
           WITH ultimo_snapshot AS (
-<<<<<<< Updated upstream
             SELECT COALESCE(
               (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
             ) as snap
-=======
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE data_snapshot >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}::date
-              AND data_snapshot <= ${dataEnd}::date
->>>>>>> Stashed changes
           )
           SELECT
             h.squad,
@@ -607,16 +577,27 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             squad,
             COALESCE(SUM(valor_r), 0)::numeric as churn_brl,
             COUNT(*)::int as churn_count
-          FROM "Clickup".cup_churn
+          FROM cortex_core.vw_cup_churn_ajustado
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
             AND COALESCE(abonar_churn, '') != 'Sim'
-<<<<<<< Updated upstream
             AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
-=======
-              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
->>>>>>> Stashed changes
+            AND squad IS NOT NULL
+            AND TRIM(squad) != ''
+          GROUP BY squad
+        `),
+
+        // 16b. Pontual entregue no mês por squad (cup_contratos com data_entrega no mês)
+        db.execute(sql`
+          SELECT
+            squad,
+            COALESCE(SUM(valorp::numeric), 0)::numeric as pontual
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(TRIM(status)) = 'entregue'
+            AND data_entrega >= ${dataStart}::date
+            AND data_entrega < ${dataEnd}::date
+            AND COALESCE(valorp, 0) > 0
             AND squad IS NOT NULL
             AND TRIM(squad) != ''
           GROUP BY squad
@@ -753,17 +734,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           SELECT
             EXTRACT(MONTH FROM data_solicitacao_encerramento)::int as month,
             COALESCE(SUM(valor_r), 0)::numeric as valor
-          FROM "Clickup".cup_churn
+          FROM cortex_core.vw_cup_churn_ajustado
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND EXTRACT(YEAR FROM data_solicitacao_encerramento) = ${anoDados}
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) >= ${quarterStartMonth}
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) <= ${mesDados}
             AND COALESCE(abonar_churn, '') != 'Sim'
-<<<<<<< Updated upstream
             AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
-=======
-              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
->>>>>>> Stashed changes
           GROUP BY EXTRACT(MONTH FROM data_solicitacao_encerramento)
         `),
 
@@ -950,52 +927,77 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY month
         `),
 
-        // 24a. Top 3 MRR Ativo por responsável (contratos ativos)
+        // 24a. Top 3 MRR Ativo por responsável no snapshot do final do mês de dados + foto via rh_pessoal -> auth_users
         db.execute(sql`
+          WITH ultimo_snapshot AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
+            ) as snap
+          ),
+          ranking AS (
+            SELECT
+              h.responsavel as nome,
+              COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as valor
+            FROM "Clickup".cup_data_hist h
+            JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
+            WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+              AND h.valorr IS NOT NULL
+              AND h.responsavel IS NOT NULL
+              AND TRIM(h.responsavel) != ''
+            GROUP BY h.responsavel
+            ORDER BY valor DESC
+            LIMIT 3
+          )
           SELECT
-            responsavel as nome,
-            COALESCE(SUM(COALESCE(valorr::numeric, 0)), 0) as valor
-          FROM "Clickup".cup_contratos
-          WHERE LOWER(TRIM(status)) IN ('ativo', 'onboarding', 'triagem')
-            AND responsavel IS NOT NULL
-            AND TRIM(responsavel) != ''
-          GROUP BY responsavel
-          ORDER BY valor DESC
-          LIMIT 3
+            r.nome,
+            r.valor,
+            COALESCE(
+              NULLIF(a_id.picture, ''),
+              NULLIF(a_turbo.picture, ''),
+              NULLIF(a_pessoal.picture, '')
+            ) as "fotoUrl",
+            p.cargo
+          FROM ranking r
+          LEFT JOIN "Inhire".rh_pessoal p ON LOWER(TRIM(p.nome)) = LOWER(TRIM(r.nome))
+          LEFT JOIN cortex_core.auth_users a_id ON p.user_id IS NOT NULL AND p.user_id = a_id.id
+          LEFT JOIN cortex_core.auth_users a_turbo ON p.email_turbo IS NOT NULL AND LOWER(TRIM(p.email_turbo)) = LOWER(TRIM(a_turbo.email))
+          LEFT JOIN cortex_core.auth_users a_pessoal ON p.email_pessoal IS NOT NULL AND LOWER(TRIM(p.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+          ORDER BY r.valor DESC
         `),
 
-        // 24b. Top 3 Menor Churn por responsavel_geral (churn do mês)
+        // 24c. Top 3 Projetos Entregues por responsável (entregas no mês) + foto
+        // COUNT(DISTINCT id_task): consolida múltiplas subtarefas (ex.: 1ª/2ª/3ª Entrega) do mesmo contrato em 1 projeto
         db.execute(sql`
+          WITH ranking AS (
+            SELECT
+              responsavel as nome,
+              COUNT(DISTINCT id_task)::int as valor
+            FROM "Clickup".cup_contratos
+            WHERE LOWER(TRIM(status)) = 'entregue'
+              AND data_entrega >= ${dataStart}::date
+              AND data_entrega < ${dataEnd}::date
+              AND responsavel IS NOT NULL
+              AND TRIM(responsavel) != ''
+            GROUP BY responsavel
+            ORDER BY valor DESC
+            LIMIT 3
+          )
           SELECT
-            responsavel_geral as nome,
-            COALESCE(SUM(valor_r), 0)::numeric as valor
-          FROM "Clickup".cup_churn
-          WHERE data_solicitacao_encerramento IS NOT NULL
-            AND data_solicitacao_encerramento >= ${dataStart}
-            AND data_solicitacao_encerramento < ${dataEnd}
-            AND COALESCE(abonar_churn, '') != 'Sim'
-            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
-            AND responsavel_geral IS NOT NULL
-            AND TRIM(responsavel_geral) != ''
-          GROUP BY responsavel_geral
-          ORDER BY valor ASC
-          LIMIT 3
-        `),
-
-        // 24c. Top 3 Projetos Entregues por responsável (entregas no mês)
-        db.execute(sql`
-          SELECT
-            responsavel as nome,
-            COUNT(*)::int as valor
-          FROM "Clickup".cup_contratos
-          WHERE LOWER(TRIM(status)) = 'entregue'
-            AND data_entrega >= ${dataStart}::date
-            AND data_entrega < ${dataEnd}::date
-            AND responsavel IS NOT NULL
-            AND TRIM(responsavel) != ''
-          GROUP BY responsavel
-          ORDER BY valor DESC
-          LIMIT 3
+            r.nome,
+            r.valor,
+            COALESCE(
+              NULLIF(a_id.picture, ''),
+              NULLIF(a_turbo.picture, ''),
+              NULLIF(a_pessoal.picture, '')
+            ) as "fotoUrl",
+            p.cargo
+          FROM ranking r
+          LEFT JOIN "Inhire".rh_pessoal p ON LOWER(TRIM(p.nome)) = LOWER(TRIM(r.nome))
+          LEFT JOIN cortex_core.auth_users a_id ON p.user_id IS NOT NULL AND p.user_id = a_id.id
+          LEFT JOIN cortex_core.auth_users a_turbo ON p.email_turbo IS NOT NULL AND LOWER(TRIM(p.email_turbo)) = LOWER(TRIM(a_turbo.email))
+          LEFT JOIN cortex_core.auth_users a_pessoal ON p.email_pessoal IS NOT NULL AND LOWER(TRIM(p.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+          ORDER BY r.valor DESC
         `),
       ]);
 
@@ -1227,15 +1229,29 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         retencoesValor: parseFloat(turboRetencoes.retencoes_valor) || 0,
       };
 
-      // Build ranking squads
-      const rankingSquads = (rankingSquadsResult.rows as any[]).map((row: any, i: number) => ({
-        squad: row.squad,
-        mrr: parseFloat(row.mrr) || 0,
-        pontual: parseFloat(row.pontual) || 0,
-        contratos: parseInt(row.contratos) || 0,
-        clientes: parseInt(row.clientes) || 0,
-        posicao: i + 1,
-      }));
+      // Pontual entregue no mês por squad (cup_contratos.data_entrega no mês)
+      // Substitui o "pontual" vindo do snapshot (que era backlog em aberto)
+      const pontualEntregueBySquad: Record<string, number> = {};
+      (pontualEntregueSquadResult.rows as any[]).forEach((row: any) => {
+        pontualEntregueBySquad[row.squad] = parseFloat(row.pontual) || 0;
+      });
+
+      // Build ranking squads — ordena por (mrr + pontual entregue no mês) desc
+      const rankingSquads = (rankingSquadsResult.rows as any[])
+        .map((row: any) => {
+          const mrr = parseFloat(row.mrr) || 0;
+          const pontual = pontualEntregueBySquad[row.squad] || 0;
+          return {
+            squad: row.squad,
+            mrr,
+            pontual,
+            contratos: parseInt(row.contratos) || 0,
+            clientes: parseInt(row.clientes) || 0,
+            _total: mrr + pontual,
+          };
+        })
+        .sort((a, b) => b._total - a._total)
+        .map(({ _total, ...rest }, i) => ({ ...rest, posicao: i + 1 }));
 
       // Build squad details (merge ranking + churn + evolução)
       const churnBySquad: Record<string, { brl: number; count: number }> = {};
@@ -1251,16 +1267,25 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         mrrAnteriorBySquad[row.squad] = parseFloat(row.mrr) || 0;
       });
 
-      const squadDetails = (rankingSquadsResult.rows as any[]).map((row: any) => {
+      // Squads ocultos do slide "Detalhes por Squad" (não impacta ranking nem totais)
+      const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno"]);
+      const normalizeSquadName = (s: string): string =>
+        (s || "").replace(/^[^A-Za-z]+/, "").replace(/\s*\(OFF\)\s*$/i, "").trim().toLowerCase();
+
+      const squadDetails = (rankingSquadsResult.rows as any[])
+        .filter((row: any) => !SQUADS_OCULTOS_DETALHES.has(normalizeSquadName(row.squad)))
+        .map((row: any) => {
         const mrr = parseFloat(row.mrr) || 0;
-        const pontual = parseFloat(row.pontual) || 0;
+        const pontual = pontualEntregueBySquad[row.squad] || 0;  // pontual entregue no mês (não em aberto)
         const contratos = parseInt(row.contratos) || 0;
         const clientes = parseInt(row.clientes) || 0;
         const churn = churnBySquad[row.squad] || { brl: 0, count: 0 };
         const mrrAnt = mrrAnteriorBySquad[row.squad] || 0;
         const ticketMedio = contratos > 0 ? mrr / contratos : 0;
-        // Churn % = churn do mês / MRR do mês anterior (base real)
-        const churnPct = mrrAnt > 0 ? (churn.brl / mrrAnt) * 100 : 0;
+        // Churn % = churn do mês / MRR do mês anterior.
+        // Squad novo (sem base no mês anterior): usa MRR do próprio mês como base.
+        const churnBase = mrrAnt > 0 ? mrrAnt : mrr;
+        const churnPct = churnBase > 0 ? (churn.brl / churnBase) * 100 : 0;
 
         return {
           squad: row.squad,
@@ -1270,7 +1295,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           clientes,
           churnPct: Math.round(churnPct * 10) / 10,
           churnBrl: churn.brl,
-          mrrBase: mrrAnt,
+          mrrBase: churnBase,
           evolucaoMrr: mrr - mrrAnt,
         };
       });
@@ -1463,14 +1488,14 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         topMrr: (topMrrResult.rows as any[]).map((row: any) => ({
           nome: row.nome as string,
           valor: parseFloat(row.valor) || 0,
-        })),
-        topMenorChurn: (topMenorChurnResult.rows as any[]).map((row: any) => ({
-          nome: row.nome as string,
-          valor: parseFloat(row.valor) || 0,
+          fotoUrl: row.fotoUrl || null,
+          cargo: row.cargo || null,
         })),
         topEntregas: (topEntregasResult.rows as any[]).map((row: any) => ({
           nome: row.nome as string,
           valor: parseInt(row.valor) || 0,
+          fotoUrl: row.fotoUrl || null,
+          cargo: row.cargo || null,
         })),
       };
 
