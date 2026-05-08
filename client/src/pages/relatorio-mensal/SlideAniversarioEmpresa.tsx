@@ -33,8 +33,9 @@ const COLABORADORES_OCULTOS = new Set([
   "fabiely laurett gums",
 ]);
 
+// Range U+0300–U+036F: Combining Diacritical Marks
 const normalize = (s: string): string =>
-  (s || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").trim().toLowerCase();
+  (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 
 export default function SlideAniversarioEmpresa({ aniversarios }: Props) {
   const visiveis = aniversarios.filter((c) => !COLABORADORES_OCULTOS.has(normalize(c.nome)));
