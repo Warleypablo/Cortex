@@ -105,6 +105,7 @@ interface Oportunidade {
   valorRNegociacao: number | null;
   valorPNegociacao: number | null;
   cxResponsavel: string;
+  vendedor: string | null;
   ultimoContato: string | null;
   origem: "manual" | "sistema";
   prioridade: "alta" | "media" | "baixa" | null;
@@ -255,6 +256,17 @@ export default function CrossSellPipeline() {
     },
   });
 
+  // Lista unificada de vendedores (cup_clientes.vendedor ∪ responsavel_geral ∪ responsavel)
+  const { data: vendedoresList = [] } = useQuery<string[]>({
+    queryKey: ["/api/comercial/crosssell/vendedores"],
+    queryFn: async () => {
+      const res = await fetch("/api/comercial/crosssell/vendedores");
+      if (!res.ok) throw new Error("Erro ao carregar vendedores");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 min — dado quase estático
+  });
+
   // Derived: list of distinct CX responsáveis (entre todas oportunidades)
   const cxResponsaveis = useMemo(() => {
     const set = new Set<string>();
@@ -335,6 +347,21 @@ export default function CrossSellPipeline() {
         body: JSON.stringify({ [field]: value, alteradoPor: user?.name }),
       });
       if (!res.ok) throw new Error("Erro ao atualizar valor");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/comercial/crosssell"] });
+    },
+  });
+
+  const changeVendedor = useMutation({
+    mutationFn: async ({ id, vendedor }: { id: number; vendedor: string | null }) => {
+      const res = await fetch(`/api/comercial/crosssell/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendedor, alteradoPor: user?.name }),
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar vendedor");
       return res.json();
     },
     onSuccess: () => {
