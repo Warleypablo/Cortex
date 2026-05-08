@@ -1,4 +1,3 @@
-// client/src/pages/auto-report/tokens.ts
 import type { AutoReportCliente } from './types';
 import { classifyClientStatus } from './utils';
 
@@ -53,6 +52,9 @@ export const STATUS_CLASSES: Record<StatusKind, {
 
 export type PlatformKind = 'GA4' | 'Ads' | 'Meta';
 
+const NOT_CONFIGURED_CHIP =
+  'border border-dashed border-gray-300 text-gray-400 bg-transparent dark:border-zinc-700 dark:text-zinc-600';
+
 export const PLATFORM_CLASSES: Record<PlatformKind, {
   configured: string;
   notConfigured: string;
@@ -60,20 +62,17 @@ export const PLATFORM_CLASSES: Record<PlatformKind, {
   GA4: {
     configured:
       'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800',
-    notConfigured:
-      'border border-dashed border-gray-300 text-gray-400 bg-transparent dark:border-zinc-700 dark:text-zinc-600',
+    notConfigured: NOT_CONFIGURED_CHIP,
   },
   Ads: {
     configured:
       'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800',
-    notConfigured:
-      'border border-dashed border-gray-300 text-gray-400 bg-transparent dark:border-zinc-700 dark:text-zinc-600',
+    notConfigured: NOT_CONFIGURED_CHIP,
   },
   Meta: {
     configured:
       'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800',
-    notConfigured:
-      'border border-dashed border-gray-300 text-gray-400 bg-transparent dark:border-zinc-700 dark:text-zinc-600',
+    notConfigured: NOT_CONFIGURED_CHIP,
   },
 };
 
@@ -82,7 +81,9 @@ export const PLATFORM_CLASSES: Record<PlatformKind, {
  * - 'pendentes' -> 'pendente'
  * - 'gerados' -> 'gerado'
  * - 'com_erro' -> 'erro'
- * - 'todos' (sem categoria) -> 'inativo'
+ *
+ * Note: classifyClientStatus today only returns those 3 values, but we keep
+ * a defensive default of 'inativo' for type-safety should StatusTab change.
  */
 export function clientStatusKind(
   cliente: AutoReportCliente,
