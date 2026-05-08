@@ -83,7 +83,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
         }`}
         style={{ gridAutoRows: details.length <= 2 ? "1fr" : "min-content" }}
       >
-        {details.map((sq) => {
+        {details.map((sq, idx) => {
           const { emoji, name } = parseSquadName(sq.squad);
           const color = getColor(name);
           const churnHigh = sq.churnPct >= 8;
@@ -93,14 +93,22 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
           const evolSign = evolUp ? "+" : "−";
           const evolAbs = Math.abs(Math.round(sq.evolucaoMrr));
           const churnPctDisplay = sq.churnPct.toFixed(1).replace(".", ",");
+          // O último card é o "novo" no build-up — anima mais marcadamente
+          const isLast = idx === details.length - 1;
 
           return (
             <div
               key={sq.squad}
-              className="rounded-2xl flex flex-col overflow-hidden shadow-xl shadow-black/30"
+              className={`rounded-2xl flex flex-col overflow-hidden shadow-xl shadow-black/30 animate-in fade-in ${
+                isLast ? "slide-in-from-bottom-6 zoom-in-95" : "slide-in-from-bottom-2"
+              }`}
               style={{
                 background: `linear-gradient(135deg, ${color}14 0%, rgba(255,255,255,0.02) 60%)`,
                 border: `1px solid ${color}30`,
+                animationDelay: `${idx * 90}ms`,
+                animationDuration: isLast ? "550ms" : "380ms",
+                animationTimingFunction: "cubic-bezier(0.22, 1, 0.36, 1)",
+                animationFillMode: "backwards",
               }}
             >
               {/* Header com avatar colorido */}
