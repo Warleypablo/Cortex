@@ -540,6 +540,8 @@ export default function CrossSellPipeline() {
             ordenacao={ordenacao}
             onChangeEtapa={(opId, e) => changeEtapa.mutate({ id: opId, etapa: e })}
             onChangeValor={(opId, field, value) => changeValor.mutate({ id: opId, field, value })}
+            onChangeVendedor={(opId, vendedor) => changeVendedor.mutate({ id: opId, vendedor })}
+            vendedoresList={vendedoresList}
             onGanho={(op) => {
               const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
               if (grupo) setGanhoCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
@@ -603,6 +605,8 @@ function EtapaSection({
   ordenacao,
   onChangeEtapa,
   onChangeValor,
+  onChangeVendedor,
+  vendedoresList,
   onGanho,
   onComments,
 }: {
@@ -614,6 +618,8 @@ function EtapaSection({
   ordenacao: "score" | "mrr" | "recente" | "nome";
   onChangeEtapa: (opId: number, etapa: string) => void;
   onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
+  onChangeVendedor: (opId: number, vendedor: string | null) => void;
+  vendedoresList: string[];
   onGanho: (op: Oportunidade) => void;
   onComments: (op: Oportunidade) => void;
 }) {
@@ -688,6 +694,8 @@ function EtapaSection({
               }}
               onChangeEtapa={onChangeEtapa}
               onChangeValor={onChangeValor}
+              onChangeVendedor={onChangeVendedor}
+              vendedoresList={vendedoresList}
               onGanho={onGanho}
               onComments={onComments}
             />
@@ -710,6 +718,8 @@ function ClienteRow({
   onToggle,
   onChangeEtapa,
   onChangeValor,
+  onChangeVendedor,
+  vendedoresList,
   onGanho,
   onComments,
 }: {
@@ -719,6 +729,8 @@ function ClienteRow({
   onToggle: () => void;
   onChangeEtapa: (opId: number, etapa: string) => void;
   onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
+  onChangeVendedor: (opId: number, vendedor: string | null) => void;
+  vendedoresList: string[];
   onGanho: (op: Oportunidade) => void;
   onComments: (op: Oportunidade) => void;
 }) {
@@ -805,6 +817,8 @@ function ClienteRow({
                     op={op}
                     onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
                     onChangeValor={(field, value) => onChangeValor(op.id, field, value)}
+                    onChangeVendedor={(vendedor) => onChangeVendedor(op.id, vendedor)}
+                    vendedoresList={vendedoresList}
                     onGanho={() => onGanho(op)}
                     onComments={() => onComments(op)}
                   />
@@ -973,12 +987,16 @@ function OportunidadeRow({
   op,
   onChangeEtapa,
   onChangeValor,
+  onChangeVendedor,
+  vendedoresList,
   onGanho,
   onComments,
 }: {
   op: Oportunidade;
   onChangeEtapa: (etapa: string) => void;
   onChangeValor: (field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
+  onChangeVendedor: (vendedor: string | null) => void;
+  vendedoresList: string[];
   onGanho: () => void;
   onComments: () => void;
 }) {
@@ -1002,13 +1020,19 @@ function OportunidadeRow({
         className="grid items-center gap-2"
         style={{
           gridTemplateColumns:
-            "16px 220px 140px 100px 100px 32px 56px",
+            "16px 200px 130px 130px 90px 90px 32px 56px",
         }}
       >
         <span className={`h-2 w-2 rounded-full ${dotColor}`} />
         <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
           {op.produto}
         </span>
+
+        <VendedorCombobox
+          value={op.vendedor}
+          options={vendedoresList}
+          onChange={onChangeVendedor}
+        />
 
         <Select
           value={etapa}
