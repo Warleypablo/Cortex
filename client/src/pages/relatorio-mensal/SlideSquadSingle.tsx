@@ -68,6 +68,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
     4;
 
   const isHero = details.length === 1;
+  const isCompact = details.length >= 7;
 
   return (
     <SlideLayout section="commerce" padding="28px 36px">
@@ -117,105 +118,111 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
             >
               {/* Header com avatar colorido */}
               <div
-                className="flex items-center gap-3 px-5 py-4"
+                className={`flex items-center gap-3 ${isCompact ? "px-3 py-2" : "px-5 py-4"}`}
                 style={{ borderBottom: `1px solid ${color}25` }}
               >
                 <div
                   className="rounded-full flex items-center justify-center shrink-0"
                   style={{
-                    width: isHero ? 64 : 48,
-                    height: isHero ? 64 : 48,
+                    width: isHero ? 64 : isCompact ? 36 : 48,
+                    height: isHero ? 64 : isCompact ? 36 : 48,
                     background: `radial-gradient(circle at 30% 30%, ${color}50, ${color}20)`,
                     border: `2px solid ${color}`,
                     boxShadow: `0 0 24px ${color}40`,
                   }}
                 >
                   {emoji ? (
-                    <span style={{ fontSize: isHero ? 32 : 24, lineHeight: 1 }}>{emoji}</span>
+                    <span style={{ fontSize: isHero ? 32 : isCompact ? 18 : 24, lineHeight: 1 }}>{emoji}</span>
                   ) : (
-                    <span className="font-black text-white" style={{ fontSize: isHero ? 22 : 18 }}>
+                    <span className="font-black text-white" style={{ fontSize: isHero ? 22 : isCompact ? 14 : 18 }}>
                       {name.slice(0, 2).toUpperCase()}
                     </span>
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <h3
-                    className={`font-black tracking-wide truncate ${isHero ? "text-3xl" : "text-xl"}`}
+                    className={`font-black tracking-wide truncate ${isHero ? "text-3xl" : isCompact ? "text-base" : "text-xl"}`}
                     style={{ color }}
                   >
                     {name.toUpperCase()}
                   </h3>
-                  <p className="text-[11px] text-zinc-500 uppercase tracking-widest mt-0.5">
-                    Performance · {mesLabel}
-                  </p>
+                  {!isCompact && (
+                    <p className="text-[11px] text-zinc-500 uppercase tracking-widest mt-0.5">
+                      Performance · {mesLabel}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* KPIs em grid 2x2 */}
-              <div className={`grid grid-cols-2 gap-3 p-4 ${isHero ? "p-6 gap-5" : ""}`}>
+              <div className={`grid grid-cols-2 ${isHero ? "p-6 gap-5" : isCompact ? "p-2 gap-2" : "p-4 gap-3"}`}>
                 {/* MRR Ativo */}
-                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 flex flex-col gap-1">
+                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"}`}>
                   <div className="flex items-center gap-1.5">
                     <Activity className="h-3 w-3 text-zinc-500" />
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">MRR Ativo</p>
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">MRR Ativo</p>
                   </div>
-                  <p className={`font-black tabular-nums ${isHero ? "text-3xl" : "text-xl"}`} style={{ color: "#fff" }}>
+                  <p className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`} style={{ color: "#fff" }}>
                     {fmtBRL(sq.mrr)}
                   </p>
                 </div>
 
                 {/* Pontual Entregue */}
-                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 flex flex-col gap-1">
+                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"}`}>
                   <div className="flex items-center gap-1.5">
                     <Sparkles className="h-3 w-3 text-zinc-500" />
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Pontual Entregue</p>
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Pontual" : "Pontual Entregue"}</p>
                   </div>
-                  <p className={`font-black tabular-nums ${isHero ? "text-3xl" : "text-xl"}`} style={{ color: "#fff" }}>
+                  <p className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`} style={{ color: "#fff" }}>
                     {fmtBRL(sq.pontual)}
                   </p>
                 </div>
 
                 {/* Churn */}
-                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 flex flex-col gap-1">
+                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"}`}>
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="h-3 w-3 text-zinc-500" />
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Churn</p>
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">Churn</p>
                   </div>
                   <div className="flex items-baseline gap-2">
                     <p
-                      className={`font-black tabular-nums ${isHero ? "text-3xl" : "text-xl"}`}
+                      className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`}
                       style={{ color: churnColor }}
                     >
                       {churnPctDisplay}%
                     </p>
                   </div>
-                  <p className="text-[10px] text-zinc-600 tabular-nums">
-                    {fmtBRL(sq.churnBrl)} / {fmtBRL(sq.mrrBase || 0)}
-                  </p>
-                  {/* Mini progress bar */}
-                  <div className="h-1 rounded-full bg-white/5 overflow-hidden mt-1">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${Math.min(sq.churnPct * 5, 100)}%`,
-                        background: churnColor,
-                      }}
-                    />
-                  </div>
+                  {!isCompact && (
+                    <p className="text-[10px] text-zinc-600 tabular-nums">
+                      {fmtBRL(sq.churnBrl)} / {fmtBRL(sq.mrrBase || 0)}
+                    </p>
+                  )}
+                  {/* Mini progress bar — só fora do compact */}
+                  {!isCompact && (
+                    <div className="h-1 rounded-full bg-white/5 overflow-hidden mt-1">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${Math.min(sq.churnPct * 5, 100)}%`,
+                          background: churnColor,
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Evolução MRR */}
-                <div className="rounded-xl bg-white/[0.03] border border-white/5 p-3 flex flex-col gap-1">
+                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"}`}>
                   <div className="flex items-center gap-1.5">
                     {evolUp ? (
                       <TrendingUp className="h-3 w-3 text-zinc-500" />
                     ) : (
                       <TrendingDown className="h-3 w-3 text-zinc-500" />
                     )}
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Evolução MRR</p>
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Evol. MRR" : "Evolução MRR"}</p>
                   </div>
                   <p
-                    className={`font-black tabular-nums ${isHero ? "text-3xl" : "text-xl"}`}
+                    className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`}
                     style={{ color: evolColor }}
                   >
                     {evolSign} R$ {evolAbs.toLocaleString("pt-BR")}
