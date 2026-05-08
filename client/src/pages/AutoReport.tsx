@@ -397,6 +397,13 @@ export default function AutoReport() {
         isError={isError}
         onRetryLoad={() => refetchClientes()}
         totalClientes={clientesValidos.length}
+        periodStart={dateRange?.from}
+        onClearAllFilters={() => {
+          setSearchTerm('');
+          setFiltroGestor('todos');
+          setFiltroSquad('todos');
+          setActiveTab('todos');
+        }}
       />
 
       <AutoReportActionBar
