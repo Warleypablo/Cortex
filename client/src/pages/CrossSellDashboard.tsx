@@ -116,6 +116,47 @@ function medal(index: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Delta helper
+// ---------------------------------------------------------------------------
+
+type DeltaDirection = "up" | "down" | "flat";
+
+interface Delta {
+  text: string;
+  direction: DeltaDirection;
+}
+
+/**
+ * Computes a delta string between current and previous values.
+ * - "currency" / "count": shows percentage change.
+ * - "percent": shows percentage-point difference (pp).
+ *
+ * Special cases:
+ * - prev === 0 && curr > 0 → "novo" (up)
+ * - prev === 0 && curr === 0 → "—" (flat)
+ */
+function formatDelta(
+  curr: number,
+  prev: number,
+  type: "currency" | "count" | "percent",
+): Delta {
+  if (prev === 0) {
+    return curr > 0
+      ? { text: "novo", direction: "up" }
+      : { text: "—", direction: "flat" };
+  }
+  const diff = curr - prev;
+  const direction: DeltaDirection = diff > 0 ? "up" : diff < 0 ? "down" : "flat";
+  const arrow = diff > 0 ? "↑" : diff < 0 ? "↓" : "";
+  if (type === "percent") {
+    const pp = Math.abs(diff).toFixed(1);
+    return { text: `${arrow} ${pp}pp vs mês ant.`, direction };
+  }
+  const pct = Math.abs((diff / prev) * 100).toFixed(0);
+  return { text: `${arrow} ${pct}% vs mês ant.`, direction };
+}
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
