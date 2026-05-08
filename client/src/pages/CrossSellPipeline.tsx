@@ -810,6 +810,22 @@ function ClienteRow({
               <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
                 Oportunidades mapeadas ({oportunidadesVisiveis.length})
               </p>
+              <div
+                className="grid items-center gap-2 px-1 pb-1 text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500"
+                style={{
+                  gridTemplateColumns:
+                    "16px 200px 130px 130px 90px 90px 32px 56px",
+                }}
+              >
+                <span />
+                <span>Produto</span>
+                <span>Vendedor</span>
+                <span>Etapa</span>
+                <span className="text-right">R</span>
+                <span className="text-right">P</span>
+                <span />
+                <span />
+              </div>
               <div className="divide-y divide-gray-100 dark:divide-zinc-800">
                 {oportunidadesVisiveis.map((op) => (
                   <OportunidadeRow
@@ -920,9 +936,10 @@ function VendedorCombobox({
         <button
           onClick={(e) => e.stopPropagation()}
           aria-label="Selecionar vendedor"
-          className="flex items-center gap-1 text-xs text-left w-full max-w-[130px] px-1 py-0.5 rounded border border-transparent hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-800 transition-colors"
+          className="flex items-center gap-1 text-xs text-left w-full max-w-[130px] px-1.5 py-0.5 rounded border border-transparent hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-800 transition-colors"
           title={value ?? "Selecionar vendedor"}
         >
+          <User className="h-3 w-3 text-gray-400 dark:text-zinc-500 shrink-0" />
           <span
             className={`truncate ${
               value
