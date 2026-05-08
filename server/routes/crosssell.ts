@@ -486,6 +486,7 @@ export function registerCrossSellRoutes(app: Express) {
         rankingReunioesResult,
         clientesNegociacaoResult,
         coberturaResult,
+        topClientesResult,
       ] = await Promise.all([
         // KPIs
         db.execute(sql.raw(`
@@ -567,6 +568,23 @@ export function registerCrossSellRoutes(app: Express) {
              WHERE status IN ('ativo', 'Ativo', 'ATIVO')
                AND cnpj IS NOT NULL AND cnpj != '') AS total_ativos
         `)),
+
+        // Top 5 clientes em negociação (por valor R, etapas ativas)
+        db.execute(sql.raw(`
+          SELECT
+            o.cnpj,
+            c.nome AS cliente_nome,
+            o.etapa,
+            o.valor_r_negociacao,
+            o.id AS oportunidade_id
+          FROM cortex_core.crosssell_oportunidades o
+          LEFT JOIN "Clickup".cup_clientes c ON c.cnpj = o.cnpj
+          WHERE o.etapa NOT IN ('ganho', 'descartado', 'sugerido_sistema')
+            AND o.valor_r_negociacao IS NOT NULL
+            AND o.valor_r_negociacao > 0
+          ORDER BY o.valor_r_negociacao DESC NULLS LAST
+          LIMIT 5
+        `)),
       ]);
 
       const kpis = kpisResult.rows[0] as any;
@@ -635,6 +653,13 @@ export function registerCrossSellRoutes(app: Express) {
         rankingReunioes: (rankingReunioesResult.rows as any[]).map((r) => ({
           cxResponsavel: r.cx_responsavel,
           totalReunioes: r.total_reunioes,
+        })),
+        topClientes: (topClientesResult.rows as any[]).map((r) => ({
+          cnpj: r.cnpj,
+          clienteNome: r.cliente_nome,
+          etapa: r.etapa,
+          valorR: Number(r.valor_r_negociacao) || 0,
+          oportunidadeId: r.oportunidade_id,
         })),
       });
     } catch (error) {
