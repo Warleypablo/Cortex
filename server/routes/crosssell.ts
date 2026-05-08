@@ -220,7 +220,7 @@ export function registerCrossSellRoutes(app: Express) {
   app.patch("/api/comercial/crosssell/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { etapa, valorRNegociacao, valorPNegociacao, ultimoContato, alteradoPor } = req.body;
+      const { etapa, valorRNegociacao, valorPNegociacao, ultimoContato, vendedor, alteradoPor } = req.body;
 
       // If etapa is changing, log the transition
       if (etapa) {
@@ -258,6 +258,10 @@ export function registerCrossSellRoutes(app: Express) {
       if (ultimoContato !== undefined) {
         values.push(ultimoContato);
         setClauses.push(`ultimo_contato = $${values.length}`);
+      }
+      if (vendedor !== undefined) {
+        values.push(vendedor);
+        setClauses.push(`vendedor = $${values.length}`);
       }
 
       const setClause = setClauses.join(", ");
