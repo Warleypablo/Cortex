@@ -491,3 +491,40 @@ function EmptyState() {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// HeroKpi — KPI gigante com gradiente. O número que importa.
+// ---------------------------------------------------------------------------
+
+function HeroKpi({
+  label,
+  value,
+  delta,
+}: {
+  label: string;
+  value: string;
+  delta: Delta;
+}) {
+  return (
+    <div className="rounded-2xl p-6 text-white relative overflow-hidden
+                    bg-gradient-to-br from-indigo-600 via-purple-600 to-purple-500
+                    dark:from-indigo-700 dark:via-purple-700 dark:to-purple-600">
+      <div
+        className="absolute -right-10 -top-10 w-44 h-44 rounded-full bg-white/15 blur-3xl pointer-events-none"
+        aria-hidden="true"
+      />
+      <p className="text-xs font-semibold tracking-widest text-white/85 relative">
+        {label}
+      </p>
+      <p className="text-4xl font-extrabold mt-1.5 leading-tight relative">
+        {value}
+      </p>
+      <span
+        className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full
+                   bg-white/20 text-white text-xs font-semibold relative"
+      >
+        {delta.text}
+      </span>
+    </div>
+  );
+}
