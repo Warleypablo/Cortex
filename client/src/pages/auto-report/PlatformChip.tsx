@@ -16,7 +16,7 @@ export default function PlatformChip({ platform, configured, id }: PlatformChipP
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold ${classes}`}
+          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${classes}`}
         >
           {platform}
         </span>

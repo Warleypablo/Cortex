@@ -68,7 +68,7 @@ function KpiCard({ label, count, kind, icon, active, onClick }: KpiCardProps) {
       <div className="flex items-center gap-2 mb-1">
         <span className={tokens.iconColor}>{icon}</span>
       </div>
-      <div className={`text-3xl font-bold ${tokens.numberColor}`}>{count}</div>
+      <div className={`text-xl sm:text-3xl font-bold ${tokens.numberColor}`}>{count}</div>
       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-1">
         {label}
       </div>
