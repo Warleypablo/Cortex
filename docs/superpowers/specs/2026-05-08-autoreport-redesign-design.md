@@ -135,7 +135,7 @@ A página passa de 4 cards verticais (Toolbar / Filters / Table / ActionBar) + D
   - GA4: `bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-400 dark:border-orange-800`
   - Ads: `bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800`
   - Meta: `bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-400 dark:border-indigo-800`
-- **Não configurado**: `border-dashed text-muted-foreground bg-transparent` (mesmo formato, mas "fantasma"). Conteúdo: três pontos `···` ou label apagada.
+- **Não configurado**: `border-dashed text-muted-foreground bg-transparent` (mesmo formato, mas "fantasma"). Conteúdo: a label da plataforma (`GA4` / `Ads` / `Meta`) em cor apagada — fica óbvio que é o slot da plataforma, mas visualmente ausente.
 - Tooltip: mantém comportamento atual (mostra ID quando configurado, "Não configurado" quando não).
 
 #### 3.3 Última Geração como chip
@@ -153,7 +153,7 @@ A página passa de 4 cards verticais (Toolbar / Filters / Table / ActionBar) + D
   - `<Button variant="ghost" size="sm" className="h-8">` com ícone `FileText` ou `Play` + label "Gerar".
   - Remover `opacity-0 group-hover:opacity-100`.
 - Hover na linha: `bg-muted/40` (mais sutil que o atual).
-- Selecionado: `bg-primary/10` + side bar com cor mais saturada e leve glow `shadow-[inset_3px_0_0_0_currentColor]`.
+- Selecionado: `bg-primary/10` + side bar engrossa de `border-l-[3px]` para `border-l-[5px]` (sem adicionar shadow inset; a barra mais grossa já transmite a seleção sem competir com a cor do status).
 
 #### 3.5 Status badge (refinado)
 Mantém a função `getStatusBadge` mas com paleta unificada:
@@ -304,8 +304,12 @@ Mantém o componente `AutoReportToolbar` como container único; apenas reorganiz
 
 ### 6b. Tokens em `tokens.ts` (novo arquivo)
 
+Imports necessários: `AutoReportCliente` e `StatusTab` de `./types`, `classifyClientStatus` de `./utils`.
+
 ```typescript
 // client/src/pages/auto-report/tokens.ts
+import type { AutoReportCliente, StatusTab } from './types';
+import { classifyClientStatus } from './utils';
 
 export type StatusKind = 'pendente' | 'gerado' | 'erro' | 'inativo';
 
