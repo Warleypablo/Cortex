@@ -44,6 +44,7 @@ export function registerCrossSellRoutes(app: Express) {
             o.valor_r_negociacao,
             o.valor_p_negociacao,
             o.cx_responsavel,
+            o.vendedor AS vendedor_op,
             o.ultimo_contato,
             o.atualizado_em,
             o.origem,
@@ -97,6 +98,7 @@ export function registerCrossSellRoutes(app: Express) {
             'valorRNegociacao', of_.valor_r_negociacao,
             'valorPNegociacao', of_.valor_p_negociacao,
             'cxResponsavel', of_.cx_responsavel,
+            'vendedor', of_.vendedor_op,
             'ultimoContato', of_.ultimo_contato,
             'origem', COALESCE(of_.origem, 'manual'),
             'prioridade', of_.prioridade,
@@ -136,6 +138,7 @@ export function registerCrossSellRoutes(app: Express) {
           valorRNegociacao: op.valorRNegociacao != null ? Number(op.valorRNegociacao) : null,
           valorPNegociacao: op.valorPNegociacao != null ? Number(op.valorPNegociacao) : null,
           cxResponsavel: op.cxResponsavel,
+          vendedor: op.vendedor ?? null,
           ultimoContato: op.ultimoContato,
           origem: op.origem ?? "manual",
           prioridade: op.prioridade,
@@ -149,6 +152,30 @@ export function registerCrossSellRoutes(app: Express) {
     } catch (error) {
       console.error("[crosssell] Error listing clientes:", error);
       res.status(500).json({ error: "Failed to list clientes" });
+    }
+  });
+
+  // 1b. GET /api/comercial/crosssell/vendedores — Lista unificada de vendedores
+  // (DISTINCT união de cup_clientes.vendedor / responsavel_geral / responsavel)
+  // IMPORTANTE: precisa estar registrada ANTES de qualquer rota com :id
+  app.get("/api/comercial/crosssell/vendedores", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT pessoa
+        FROM (
+          SELECT vendedor          AS pessoa FROM "Clickup".cup_clientes WHERE vendedor IS NOT NULL AND vendedor <> ''
+          UNION
+          SELECT responsavel_geral AS pessoa FROM "Clickup".cup_clientes WHERE responsavel_geral IS NOT NULL AND responsavel_geral <> ''
+          UNION
+          SELECT responsavel       AS pessoa FROM "Clickup".cup_clientes WHERE responsavel IS NOT NULL AND responsavel <> ''
+        ) t
+        ORDER BY pessoa ASC
+      `);
+      const vendedores = (result.rows as any[]).map((r) => r.pessoa as string);
+      res.json(vendedores);
+    } catch (error) {
+      console.error("[crosssell] Error listing vendedores:", error);
+      res.status(500).json({ error: "Failed to list vendedores" });
     }
   });
 
@@ -193,7 +220,7 @@ export function registerCrossSellRoutes(app: Express) {
   app.patch("/api/comercial/crosssell/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { etapa, valorRNegociacao, valorPNegociacao, ultimoContato, alteradoPor } = req.body;
+      const { etapa, valorRNegociacao, valorPNegociacao, ultimoContato, vendedor, alteradoPor } = req.body;
 
       // If etapa is changing, log the transition
       if (etapa) {
@@ -231,6 +258,10 @@ export function registerCrossSellRoutes(app: Express) {
       if (ultimoContato !== undefined) {
         values.push(ultimoContato);
         setClauses.push(`ultimo_contato = $${values.length}`);
+      }
+      if (vendedor !== undefined) {
+        values.push(vendedor);
+        setClauses.push(`vendedor = $${values.length}`);
       }
 
       const setClause = setClauses.join(", ");
