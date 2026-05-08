@@ -84,6 +84,20 @@ interface DashboardData {
     clientesEmNegociacao: number;
     coberturaBase: number;
   };
+  kpisAnterior: {
+    totalRNegociacao: number;
+    totalPNegociacao: number;
+    reunioesAgendadas: number;
+    taxaConversao: number;
+    coberturaBase: number;
+  };
+  topClientes: Array<{
+    cnpj: string;
+    clienteNome: string | null;
+    etapa: string;
+    valorR: number;
+    oportunidadeId: number;
+  }>;
   funilEtapas: Array<{ etapa: string; total: number }>;
   reunioesPorCx: Array<{ cxResponsavel: string; total: number }>;
   rankingValor: Array<{ cxResponsavel: string; totalR: number; totalP: number; totalDeals: number }>;
