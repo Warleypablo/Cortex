@@ -152,6 +152,30 @@ export function registerCrossSellRoutes(app: Express) {
     }
   });
 
+  // 1b. GET /api/comercial/crosssell/vendedores — Lista unificada de vendedores
+  // (DISTINCT união de cup_clientes.vendedor / responsavel_geral / responsavel)
+  // IMPORTANTE: precisa estar registrada ANTES de qualquer rota com :id
+  app.get("/api/comercial/crosssell/vendedores", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT DISTINCT pessoa
+        FROM (
+          SELECT vendedor          AS pessoa FROM "Clickup".cup_clientes WHERE vendedor IS NOT NULL AND vendedor <> ''
+          UNION
+          SELECT responsavel_geral AS pessoa FROM "Clickup".cup_clientes WHERE responsavel_geral IS NOT NULL AND responsavel_geral <> ''
+          UNION
+          SELECT responsavel       AS pessoa FROM "Clickup".cup_clientes WHERE responsavel IS NOT NULL AND responsavel <> ''
+        ) t
+        ORDER BY pessoa ASC
+      `);
+      const vendedores = (result.rows as any[]).map((r) => r.pessoa as string);
+      res.json(vendedores);
+    } catch (error) {
+      console.error("[crosssell] Error listing vendedores:", error);
+      res.status(500).json({ error: "Failed to list vendedores" });
+    }
+  });
+
   // 2. POST /api/comercial/crosssell — Create oportunidade
   app.post("/api/comercial/crosssell", async (req, res) => {
     try {
