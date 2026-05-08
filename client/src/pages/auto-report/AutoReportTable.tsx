@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,7 +10,7 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   ArrowUp,
   ArrowDown,
@@ -103,7 +104,7 @@ function UltimaGeracaoChip({ value }: { value: string }) {
   const absoluteDate = date ? format(date, 'dd/MM/yyyy HH:mm') : 'Nunca gerado';
 
   let chipClasses = '';
-  let icon: React.ReactNode = <Clock className="w-3 h-3" />;
+  let icon: ReactNode = <Clock className="w-3 h-3" />;
 
   if (relTime === 'nunca') {
     chipClasses =
@@ -205,9 +206,8 @@ export default function AutoReportTable({
   };
 
   return (
-    <TooltipProvider>
-      <div className="rounded-lg border border-gray-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900/30">
-        <Table>
+    <div className="rounded-lg border border-gray-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900/30">
+      <Table>
           <TableHeader>
             <TableRow>
               <TableHead style={{ width: 40 }}>
@@ -357,8 +357,7 @@ export default function AutoReportTable({
               );
             })}
           </TableBody>
-        </Table>
-      </div>
-    </TooltipProvider>
+      </Table>
+    </div>
   );
 }
