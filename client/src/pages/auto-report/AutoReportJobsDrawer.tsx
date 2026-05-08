@@ -232,10 +232,10 @@ export default function AutoReportJobsDrawer({
     if (jobsInGroup.length === 0) return null;
     return (
       <div key={label} className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-1 sticky top-0 bg-background">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-1 sticky top-0 z-10 bg-background">
           {label}
         </h3>
-        {jobsInGroup
+        {[...jobsInGroup]
           .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime())
           .map((job) => (
             <JobCard key={job.id} job={job} onRetryJob={onRetryJob} onCopyLink={handleCopyLink} />
@@ -261,6 +261,7 @@ export default function AutoReportJobsDrawer({
               size="sm"
               variant={timeFilter === f ? 'default' : 'outline'}
               onClick={() => setTimeFilter(f)}
+              aria-pressed={timeFilter === f}
               data-testid={`time-filter-${f}`}
             >
               {f === 'hoje' ? 'Hoje' : f === 'semana' ? 'Esta semana' : 'Tudo'}
