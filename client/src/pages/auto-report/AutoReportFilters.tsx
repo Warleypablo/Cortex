@@ -1,13 +1,16 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, CheckCircle, XCircle } from "lucide-react";
-import type { StatusTab } from "./types";
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Search, X } from 'lucide-react';
+import type { StatusTab } from './types';
 
 interface AutoReportFiltersProps {
-  activeTab: StatusTab;
-  onTabChange: (tab: StatusTab) => void;
-  tabCounts: Record<StatusTab, number>;
   searchTerm: string;
   onSearchChange: (term: string) => void;
   filtroGestor: string;
@@ -16,19 +19,18 @@ interface AutoReportFiltersProps {
   onSquadChange: (squad: string) => void;
   gestores: string[];
   squads: string[];
+  activeTab: StatusTab;
+  onClearStatusFilter: () => void;
 }
 
-const TAB_CONFIG: { key: StatusTab; label: string; icon?: 'check' | 'error'; hideWhenZero?: boolean }[] = [
-  { key: 'todos', label: 'Todos' },
-  { key: 'pendentes', label: 'Pendentes' },
-  { key: 'gerados', label: 'Gerados', icon: 'check' },
-  { key: 'com_erro', label: 'Com Erro', icon: 'error', hideWhenZero: true },
-];
+const STATUS_LABELS: Record<StatusTab, string> = {
+  todos: '',
+  pendentes: 'Pendentes',
+  gerados: 'Gerados',
+  com_erro: 'Com Erro',
+};
 
 export default function AutoReportFilters({
-  activeTab,
-  onTabChange,
-  tabCounts,
   searchTerm,
   onSearchChange,
   filtroGestor,
@@ -37,54 +39,50 @@ export default function AutoReportFilters({
   onSquadChange,
   gestores,
   squads,
+  activeTab,
+  onClearStatusFilter,
 }: AutoReportFiltersProps) {
   return (
     <Card>
-      <CardContent className="p-4">
-        {/* Status tabs row */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {TAB_CONFIG.map((tab) => {
-            if (tab.hideWhenZero && tabCounts[tab.key] === 0) return null;
-
-            const isActive = activeTab === tab.key;
-
-            return (
+      <CardContent className="p-4 space-y-3">
+        {activeTab !== 'todos' && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Filtrando:</span>
+            <span
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-primary/20 text-xs font-medium text-primary"
+              data-testid="active-filter-chip"
+            >
+              {STATUS_LABELS[activeTab]}
               <button
-                key={tab.key}
-                onClick={() => onTabChange(tab.key)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-                  isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/50 hover:bg-muted text-foreground'
-                }`}
+                type="button"
+                onClick={onClearStatusFilter}
+                className="hover:bg-primary/10 rounded-full p-0.5 transition-colors"
+                aria-label="Limpar filtro de status"
               >
-                {tab.icon === 'check' && <CheckCircle className="w-3.5 h-3.5" />}
-                {tab.icon === 'error' && <XCircle className="w-3.5 h-3.5" />}
-                {tab.label}
-                <span className="opacity-80">({tabCounts[tab.key]})</span>
+                <X className="w-3 h-3" />
               </button>
-            );
-          })}
-        </div>
+            </span>
+          </div>
+        )}
 
-        {/* Filters row */}
-        <div className="flex items-center gap-3 flex-wrap mt-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar cliente..."
+              placeholder="Buscar por nome do cliente..."
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-8 w-[200px]"
+              className="pl-8 w-[280px]"
+              data-testid="input-search"
             />
           </div>
 
           <Select value={filtroGestor} onValueChange={onGestorChange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Todos os Gestores" />
+            <SelectTrigger className="w-[180px]" data-testid="select-gestor">
+              <SelectValue placeholder="Todos os gestores" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos os Gestores</SelectItem>
+              <SelectItem value="todos">Todos os gestores</SelectItem>
               {gestores.map((gestor) => (
                 <SelectItem key={gestor} value={gestor}>
                   {gestor}
@@ -94,11 +92,11 @@ export default function AutoReportFilters({
           </Select>
 
           <Select value={filtroSquad} onValueChange={onSquadChange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Todos os Squads" />
+            <SelectTrigger className="w-[180px]" data-testid="select-squad">
+              <SelectValue placeholder="Todos os squads" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">Todos os Squads</SelectItem>
+              <SelectItem value="todos">Todos os squads</SelectItem>
               {squads.map((squad) => (
                 <SelectItem key={squad} value={squad}>
                   {squad}
