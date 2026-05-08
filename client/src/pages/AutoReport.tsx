@@ -366,12 +366,12 @@ export default function AutoReport() {
         }}
         onOpenJobs={() => setJobsDrawerOpen(true)}
         isRefreshing={isLoading}
+        tabCounts={tabCounts}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       <AutoReportFilters
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        tabCounts={tabCounts}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         filtroGestor={filtroGestor}
@@ -380,6 +380,8 @@ export default function AutoReport() {
         onSquadChange={setFiltroSquad}
         gestores={gestores}
         squads={squads}
+        activeTab={activeTab}
+        onClearStatusFilter={() => setActiveTab('todos')}
       />
 
       <AutoReportTable
