@@ -25,6 +25,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,6 +52,8 @@ import {
   Briefcase,
   Clock,
   Sparkles,
+  Check,
+  X,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -865,6 +880,88 @@ function InlineValorInput({
         placeholder="0"
       />
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VendedorCombobox — combobox pesquisável para selecionar vendedor da
+// oportunidade. Lista vinda da união de cup_clientes (vendedor, responsavel_geral,
+// responsavel). Aceita null (mostra "—").
+// ---------------------------------------------------------------------------
+
+function VendedorCombobox({
+  value,
+  options,
+  onChange,
+}: {
+  value: string | null;
+  options: string[];
+  onChange: (v: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Selecionar vendedor"
+          className="flex items-center gap-1 text-xs text-left w-full max-w-[130px] px-1 py-0.5 rounded border border-transparent hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-800 transition-colors"
+          title={value ?? "Selecionar vendedor"}
+        >
+          <span
+            className={`truncate ${
+              value
+                ? "text-gray-700 dark:text-zinc-300"
+                : "text-gray-400 dark:text-zinc-600"
+            }`}
+          >
+            {value ?? "—"}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="p-0 w-64 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700"
+        align="start"
+      >
+        <Command className="bg-transparent">
+          <CommandInput placeholder="Buscar vendedor..." className="h-9" />
+          <CommandList>
+            <CommandEmpty>Nenhum vendedor encontrado.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="__limpar__"
+                onSelect={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+                className="text-gray-500 dark:text-zinc-400"
+              >
+                <X className="mr-2 h-3.5 w-3.5" />
+                Limpar
+              </CommandItem>
+              {options.map((nome) => (
+                <CommandItem
+                  key={nome}
+                  value={nome}
+                  onSelect={() => {
+                    onChange(nome === value ? null : nome);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={`mr-2 h-3.5 w-3.5 ${
+                      value === nome ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  {nome}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
 
