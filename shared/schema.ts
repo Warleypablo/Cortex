@@ -3261,6 +3261,7 @@ export const crosssellOportunidades = cortexCoreSchema.table("crosssell_oportuni
   valorRNegociacao: decimal("valor_r_negociacao", { precision: 12, scale: 2 }).default("0"),
   valorPNegociacao: decimal("valor_p_negociacao", { precision: 12, scale: 2 }).default("0"),
   cxResponsavel: text("cx_responsavel").notNull(),
+  vendedor: text("vendedor"),
   ultimoContato: date("ultimo_contato"),
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
