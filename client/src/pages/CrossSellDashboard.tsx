@@ -528,3 +528,38 @@ function HeroKpi({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// SecondaryKpiCard — card branco/zinc com label, valor e delta colorido.
+// ---------------------------------------------------------------------------
+
+function SecondaryKpiCard({
+  label,
+  value,
+  delta,
+}: {
+  label: string;
+  value: string;
+  delta: Delta;
+}) {
+  const deltaColor =
+    delta.direction === "up"
+      ? "text-green-600 dark:text-green-400"
+      : delta.direction === "down"
+        ? "text-red-600 dark:text-red-400"
+        : "text-gray-400 dark:text-zinc-500";
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-xl p-4">
+      <p className="text-[10px] uppercase tracking-wider font-semibold text-gray-500 dark:text-zinc-400">
+        {label}
+      </p>
+      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+        {value}
+      </p>
+      <p className={`text-xs font-semibold mt-1 ${deltaColor}`}>
+        {delta.text}
+      </p>
+    </div>
+  );
+}
