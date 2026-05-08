@@ -23,8 +23,7 @@ interface AutoReportFiltersProps {
   onClearStatusFilter: () => void;
 }
 
-const STATUS_LABELS: Record<StatusTab, string> = {
-  todos: '',
+const STATUS_LABELS: Record<Exclude<StatusTab, 'todos'>, string> = {
   pendentes: 'Pendentes',
   gerados: 'Gerados',
   com_erro: 'Com Erro',
@@ -48,11 +47,13 @@ export default function AutoReportFilters({
         {activeTab !== 'todos' && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Filtrando:</span>
-            <span
+            <div
+              role="group"
+              aria-label={`Filtro ativo: ${STATUS_LABELS[activeTab as Exclude<StatusTab, 'todos'>]}`}
               className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 border border-primary/20 text-xs font-medium text-primary"
               data-testid="active-filter-chip"
             >
-              {STATUS_LABELS[activeTab]}
+              <span>{STATUS_LABELS[activeTab as Exclude<StatusTab, 'todos'>]}</span>
               <button
                 type="button"
                 onClick={onClearStatusFilter}
@@ -61,7 +62,7 @@ export default function AutoReportFilters({
               >
                 <X className="w-3 h-3" />
               </button>
-            </span>
+            </div>
           </div>
         )}
 
