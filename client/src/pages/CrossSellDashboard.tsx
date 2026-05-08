@@ -701,3 +701,91 @@ function TopClientesList({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// PodiumRanking — top 3 em formato pódio + linhas 4º a 7º em lista compacta.
+// Suporta 2 métricas: "valor" (R$) ou "reunioes" (número).
+// ---------------------------------------------------------------------------
+
+interface PodiumPerson {
+  name: string;
+  primaryValue: number;     // valor R em "valor", número de reuniões em "reunioes"
+  secondaryDeals?: number;  // só para "valor": número de deals
+  secondaryP?: number;      // só para "valor": valor P
+}
+
+function PodiumRanking({
+  data,
+  metric,
+}: {
+  data: PodiumPerson[];
+  metric: "valor" | "reunioes";
+}) {
+  if (!data || data.length === 0) {
+    return <EmptyState />;
+  }
+
+  const formatVal = (v: number) =>
+    metric === "valor" ? formatCurrency(v) : `${v}`;
+
+  const top3 = data.slice(0, 3);
+  const rest = data.slice(3, 7); // 4º a 7º
+
+  // Pódio order: 2nd left, 1st center (bigger), 3rd right
+  const podiumDisplayOrder = [top3[1], top3[0], top3[2]].filter(Boolean) as PodiumPerson[];
+
+  return (
+    <div>
+      <div className="grid gap-2 items-end" style={{ gridTemplateColumns: "1fr 1.2fr 1fr" }}>
+        {podiumDisplayOrder.map((p) => {
+          // Determine actual rank (top3 index) by lookup
+          const rank = top3.indexOf(p) + 1;
+          const isFirst = rank === 1;
+          const medalEmoji = rank === 1 ? "🥇" : rank === 2 ? "🥈" : "🥉";
+          return (
+            <div
+              key={p.name}
+              className={`text-center rounded-xl border bg-white dark:bg-zinc-900 ${
+                isFirst
+                  ? "border-amber-300 shadow-[0_0_0_2px_rgba(251,191,36,0.25)] dark:border-amber-500 py-4"
+                  : "border-gray-200 dark:border-zinc-700 py-3"
+              } px-2`}
+            >
+              <div className={isFirst ? "text-3xl leading-none" : "text-xl leading-none"}>
+                {medalEmoji}
+              </div>
+              <div className="text-xs font-semibold text-gray-900 dark:text-white mt-1.5 truncate">
+                {p.name || "—"}
+              </div>
+              <div
+                className={`font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 ${
+                  isFirst ? "text-base" : "text-sm"
+                }`}
+              >
+                {formatVal(p.primaryValue)}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {rest.length > 0 && (
+        <div className="mt-3 space-y-0.5">
+          {rest.map((p, i) => (
+            <div
+              key={p.name}
+              className="grid items-center gap-2 px-2 py-1 text-xs"
+              style={{ gridTemplateColumns: "20px 1fr 80px" }}
+            >
+              <span className="text-gray-400 dark:text-zinc-500">{i + 4}º</span>
+              <span className="text-gray-700 dark:text-zinc-300 truncate">{p.name || "—"}</span>
+              <span className="text-right font-semibold text-gray-900 dark:text-white">
+                {formatVal(p.primaryValue)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
