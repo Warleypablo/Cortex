@@ -419,6 +419,8 @@ export default function AutoReport() {
         onVerDetalhes={() => setJobsDrawerOpen(true)}
         onDismiss={handleDismissBatch}
         outputFormat={outputFormat}
+        jobs={jobs}
+        batchClientNames={batchClientNames}
       />
 
       <AutoReportJobsDrawer
