@@ -1,11 +1,12 @@
-import { MessageSquare, Workflow, Handshake, Cpu } from "lucide-react";
+import { MessageSquare, Workflow, Handshake, Cpu, Rocket } from "lucide-react";
 import SlideLayout from "./SlideLayout";
 import { SlideHeader } from "./SlideComponents";
 
 const TOPICOS = [
-  { icon: Workflow,  label: "Novo Modelo Operação", color: "text-cyan-400",   bg: "bg-cyan-500/10",   border: "border-cyan-500/30" },
+  { icon: Workflow,  label: "Novo Modelo Operação", color: "text-cyan-400",    bg: "bg-cyan-500/10",    border: "border-cyan-500/30" },
   { icon: Handshake, label: "Partnership",          color: "text-emerald-400", bg: "bg-emerald-500/10", border: "border-emerald-500/30" },
   { icon: Cpu,       label: "IA",                   color: "text-violet-400",  bg: "bg-violet-500/10",  border: "border-violet-500/30" },
+  { icon: Rocket,    label: "Ventures",             color: "text-amber-400",   bg: "bg-amber-500/10",   border: "border-amber-500/30" },
 ];
 
 export default function SlideTopicosDiscussao() {
