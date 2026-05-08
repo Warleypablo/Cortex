@@ -93,7 +93,7 @@ function applyTimeFilter(jobs: AutoReportJob[], filter: TimeFilter): AutoReportJ
   return jobs.filter((j) => {
     const date = new Date(j.criadoEm);
     if (filter === 'hoje') return isToday(date);
-    if (filter === 'semana') return isThisWeek(date, { weekStartsOn: 1 });
+    if (filter === 'semana') return isToday(date) || isYesterday(date) || isThisWeek(date, { weekStartsOn: 1 });
     return true;
   });
 }
