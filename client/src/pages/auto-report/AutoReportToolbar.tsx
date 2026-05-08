@@ -26,7 +26,7 @@ import type { DateRange } from 'react-day-picker';
 import type { OutputFormat, PageSelection, StatusTab } from './types';
 import { PAGE_OPTIONS } from './types';
 import { formatDateRange, getDefaultDateRange } from './utils';
-import { STATUS_CLASSES } from './tokens';
+import { STATUS_CLASSES, type StatusKind } from './tokens';
 
 interface AutoReportToolbarProps {
   dateRange: DateRange | undefined;
@@ -46,7 +46,7 @@ interface AutoReportToolbarProps {
 interface KpiCardProps {
   label: string;
   count: number;
-  kind: 'pendente' | 'gerado' | 'erro';
+  kind: Exclude<StatusKind, 'inativo'>;
   icon: React.ReactNode;
   active: boolean;
   onClick: () => void;
