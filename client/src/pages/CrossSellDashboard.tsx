@@ -644,3 +644,60 @@ function ConversionFunnel({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// TopClientesList — top 5 clientes em negociação por valor R.
+// Cada linha: badge da etapa, nome, valor R. Background com gradient.
+// ---------------------------------------------------------------------------
+
+function TopClientesList({
+  data,
+}: {
+  data: Array<{
+    cnpj: string;
+    clienteNome: string | null;
+    etapa: string;
+    valorR: number;
+    oportunidadeId: number;
+  }>;
+}) {
+  if (!data || data.length === 0) {
+    return <EmptyState />;
+  }
+
+  const max = Math.max(...data.map((d) => d.valorR), 1);
+
+  return (
+    <div className="space-y-1.5">
+      {data.map((c) => {
+        const widthPct = (c.valorR / max) * 100;
+        const etapaLabel = ETAPA_LABELS[c.etapa] ?? c.etapa;
+        const etapaColor = ETAPA_COLORS[c.etapa] ?? "#6b7280";
+        return (
+          <div
+            key={c.oportunidadeId}
+            className="grid items-center gap-2 px-2.5 py-2 rounded-lg
+                       text-sm"
+            style={{
+              gridTemplateColumns: "auto 1fr auto",
+              backgroundImage: `linear-gradient(90deg, rgba(99,102,241,0.08) ${widthPct}%, transparent ${widthPct}%)`,
+            }}
+          >
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded-full text-white font-semibold whitespace-nowrap"
+              style={{ backgroundColor: etapaColor }}
+            >
+              {etapaLabel}
+            </span>
+            <span className="text-gray-900 dark:text-white font-medium truncate">
+              {c.clienteNome ?? c.cnpj}
+            </span>
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold whitespace-nowrap">
+              {formatCurrency(c.valorR)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
