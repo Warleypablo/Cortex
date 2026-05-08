@@ -59,12 +59,13 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
   }
 
   // Layout density baseado em quantos squads aparecem ao mesmo tempo
-  // 1 squad = card único largo;  2 = lado a lado;  3-4 = 2 cols;  5+ = 3 cols
+  // 1 = hero;  2 = lado a lado;  3-4 = 2 cols;  5-6 = 3 cols;  7-8 = 4 cols
   const cols =
     details.length === 1 ? 1 :
     details.length === 2 ? 2 :
     details.length <= 4 ? 2 :
-    3;
+    details.length <= 6 ? 3 :
+    4;
 
   const isHero = details.length === 1;
 
@@ -79,7 +80,10 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
 
       <div
         className={`flex-1 grid gap-4 min-h-0 content-start ${
-          cols === 3 ? "grid-cols-3" : cols === 2 ? "grid-cols-2" : "grid-cols-1"
+          cols === 4 ? "grid-cols-4" :
+          cols === 3 ? "grid-cols-3" :
+          cols === 2 ? "grid-cols-2" :
+          "grid-cols-1"
         }`}
         style={{ gridAutoRows: details.length <= 2 ? "1fr" : "min-content" }}
       >
