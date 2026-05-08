@@ -42,8 +42,8 @@ const FIXED_SLIDE_NAMES = [
   "Capa Comercial", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Ranking Squads", "Squad Details", "Top Operadores", "Turbo Commerce",
   "Pontual", "Entregas Pontuais Commerce",
-  "Capa Tech", "Area Tech", "Entregas Pontuais Tech",
   "NPS",
+  "Capa Tech", "Area Tech", "Entregas Pontuais Tech",
   "Tópicos",
   "Frase", "Q&A"
 ];
@@ -300,10 +300,10 @@ export default function RelatorioMensal() {
       case 15: return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
       case 16: return <SlidePontual pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
       case 17: return <SlideEntregasPontuaisCommerce pontualData={data.pontualData} mesLabel={data.mesDadosLabel} />;
-      case 18: return <SlideCapaTech />;
-      case 19: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 20: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 21: return <SlideNPS mesLabel={data.mesDadosLabel} />;
+      case 18: return <SlideNPS mesLabel={data.mesDadosLabel} />;
+      case 19: return <SlideCapaTech />;
+      case 20: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
+      case 21: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
       case 22: return <SlideTopicosDiscussao />;
       case 23: return <SlideFraseEncerramento />;
       case 24: return <SlideQRCode />;
