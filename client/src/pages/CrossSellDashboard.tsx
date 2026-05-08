@@ -563,3 +563,84 @@ function SecondaryKpiCard({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// ConversionFunnel — funil custom em divs. Mostra cada etapa em ordem,
+// barra proporcional ao topo, e taxa de conversão entre etapas consecutivas.
+// 'descartado' é omitido (ramo lateral, não conversão).
+// ---------------------------------------------------------------------------
+
+const FUNNEL_ORDER = [
+  "sugerido_sistema",
+  "fazer_contato",
+  "tentativa_contato",
+  "em_contato",
+  "reuniao_agendada",
+  "proposta_enviada",
+  "forte_interesse",
+  "ganho",
+] as const;
+
+function ConversionFunnel({
+  data,
+}: {
+  data: Array<{ etapa: string; total: number }>;
+}) {
+  // Build a lookup and project onto FUNNEL_ORDER (zero for missing)
+  const counts: Record<string, number> = {};
+  for (const d of data) counts[d.etapa] = Number(d.total);
+
+  const stages = FUNNEL_ORDER.map((etapa) => ({
+    etapa,
+    label: ETAPA_LABELS[etapa] ?? etapa,
+    color: ETAPA_COLORS[etapa] ?? "#6b7280",
+    count: counts[etapa] ?? 0,
+  }));
+
+  const max = Math.max(...stages.map((s) => s.count), 1);
+
+  if (stages.every((s) => s.count === 0)) {
+    return <EmptyState />;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {stages.map((s, i) => {
+        const widthPct = max > 0 ? (s.count / max) * 100 : 0;
+        const prev = i > 0 ? stages[i - 1].count : null;
+        const conv = prev != null && prev > 0 ? (s.count / prev) * 100 : null;
+        return (
+          <div
+            key={s.etapa}
+            className="grid items-center gap-2"
+            style={{ gridTemplateColumns: "110px 1fr 50px" }}
+          >
+            <span className="text-xs text-gray-700 dark:text-zinc-300 font-medium truncate">
+              {s.label}
+            </span>
+            <div className="relative h-7">
+              {conv !== null && (
+                <span
+                  className="absolute -top-3 right-0 text-[9px] text-gray-400 dark:text-zinc-500 px-1
+                             bg-white dark:bg-zinc-900"
+                >
+                  ↓ {conv.toFixed(0)}%
+                </span>
+              )}
+              <div
+                className="h-full rounded flex items-center px-2 text-white text-xs font-semibold
+                           transition-[width] duration-300"
+                style={{ width: `${Math.max(widthPct, 2)}%`, backgroundColor: s.color }}
+              >
+                {s.count > 0 ? s.count : ""}
+              </div>
+            </div>
+            <span className="text-xs font-semibold text-gray-900 dark:text-white text-right">
+              {s.count}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
