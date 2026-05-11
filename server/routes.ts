@@ -7471,6 +7471,28 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
+  // Meta Ads Backfill — detects and fills gaps in the last 14 days
+  app.post("/api/meta-ads/backfill", async (req, res) => {
+    try {
+      const { backfillMetaInsightsGaps } = await import("./services/metaAdsSync");
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'dados_turbo',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
+        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+      });
+      const result = await backfillMetaInsightsGaps(pool);
+      await pool.end();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[api] Error running Meta Ads backfill:", error);
+      res.status(500).json({ error: error.message || "Failed to run backfill" });
+    }
+  });
+
   // Meta Ads Sync status (freshness indicator)
   app.get("/api/meta-ads/sync-status", async (req, res) => {
     try {
