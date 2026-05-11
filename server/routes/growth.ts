@@ -948,6 +948,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(i.video_p50_watched_actions) as video_p50,
           SUM(i.video_p75_watched_actions) as video_p75,
           SUM(i.video_p100_watched_actions) as video_p100,
+          COALESCE(SUM(i.video_3_sec_watched_actions), 0) as video_3sec,
+          COALESCE(SUM(i.video_thruplay_watched_actions), 0) as video_thruplay,
           COALESCE(SUM(i.landing_page_views), 0) as landing_page_views
         FROM meta_ads.meta_insights_daily i
         LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
@@ -1055,6 +1057,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           0 as investimento, 0 as impressions, 0 as clicks, 0 as reach,
           0 as outbound_clicks, 0 as cpm, 0 as video_plays,
           0 as video_p25, 0 as video_p50, 0 as video_p75, 0 as video_p100,
+          0 as video_3sec, 0 as video_thruplay,
           0 as landing_page_views
         FROM meta_ads.meta_ads a
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
@@ -1080,8 +1083,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const impressions = parseInt(row.impressions) || 0;
           const clicks = parseInt(row.clicks) || 0;
           const reach = parseInt(row.reach) || 0;
-          const videoP25 = parseInt(row.video_p25) || 0;
-          const videoP75 = parseInt(row.video_p75) || 0;
           const landingPageViews = parseInt(row.landing_page_views) || 0;
 
           const outboundClicks = parseInt(row.outbound_clicks) || 0;
@@ -1089,11 +1090,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const ctr = impressions > 0 && outboundClicks > 0 ? (outboundClicks / impressions) * 100 : null;
           const cpm = parseFloat(row.cpm) || (impressions > 0 ? (investimento / impressions) * 1000 : null);
 
-          // Vídeo Hook = % de plays que passaram 3s (p25 / video_plays)
-          const videoPlays = parseInt(row.video_plays) || 0;
-          const videoHook = videoPlays > 0 && videoP25 > 0 ? (videoP25 / videoPlays) * 100 : null;
-          // Vídeo HOLD = % de quem passou 3s que viu 75% (p75 / p25)
-          const videoHold = videoP25 > 0 && videoP75 > 0 ? (videoP75 / videoP25) * 100 : null;
+          // Vídeo Hook = video_3_sec_watched_actions / impressões (definição Meta / Andre)
+          // Vídeo Hold = video_thruplay_watched_actions / impressões
+          const video3Sec = parseInt(row.video_3sec) || 0;
+          const videoThruplay = parseInt(row.video_thruplay) || 0;
+          const videoHook = impressions > 0 && video3Sec > 0 ? (video3Sec / impressions) * 100 : null;
+          const videoHold = impressions > 0 && videoThruplay > 0 ? (videoThruplay / impressions) * 100 : null;
           // Connect rate = landing_page_views / outbound_clicks
           const connectRate = outboundClicks > 0 && landingPageViews > 0 ? (landingPageViews / outboundClicks) * 100 : null;
 
@@ -2659,7 +2661,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(SUM(mid.video_p25_watched_actions), 0) as video_p25,
           COALESCE(SUM(mid.video_p50_watched_actions), 0) as video_p50,
           COALESCE(SUM(mid.video_p75_watched_actions), 0) as video_p75,
-          COALESCE(SUM(mid.video_play_actions), 0) as video_plays
+          COALESCE(SUM(mid.video_play_actions), 0) as video_plays,
+          COALESCE(SUM(mid.video_3_sec_watched_actions), 0) as video_3sec,
+          COALESCE(SUM(mid.video_thruplay_watched_actions), 0) as video_thruplay
         FROM meta_ads.meta_insights_daily mid
         WHERE mid.date_start >= ${startDate}::date
           AND mid.date_start <= ${endDate}::date
@@ -2674,17 +2678,17 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const visualizacoesPagina = parseInt(row.visualizacoes_pagina) || 0;
       const alcance = parseInt(row.alcance) || 0;
       const frequencia = parseFloat(row.frequencia) || 0;
-      const videoPlays = parseInt(row.video_plays) || 0;
-      const videoP25 = parseInt(row.video_p25) || 0;
-      const videoP75 = parseInt(row.video_p75) || 0;
+      const video3Sec = parseInt(row.video_3sec) || 0;
+      const videoThruplay = parseInt(row.video_thruplay) || 0;
 
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = outbound_clicks / impressions
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
       const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
-      // Vídeo Hook = p25 / plays; Vídeo Hold = p75 / p25 (retenção condicional)
-      const videoHook = videoPlays > 0 ? (videoP25 / videoPlays) : null;
-      const videoHold = videoP25 > 0 ? (videoP75 / videoP25) : null;
+      // Vídeo Hook = 3sec / impressões; Vídeo Hold = thruplay / impressões (definição Meta / Andre).
+      // Escala 0–100 (percentual) — alinhada com o endpoint de Criativos.
+      const videoHook = impressoes > 0 && video3Sec > 0 ? (video3Sec / impressoes) * 100 : null;
+      const videoHold = impressoes > 0 && videoThruplay > 0 ? (videoThruplay / impressoes) * 100 : null;
 
       res.json({
         investimento,
