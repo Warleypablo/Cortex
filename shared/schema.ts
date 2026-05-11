@@ -891,6 +891,7 @@ export const metaInsightsDaily = pgTable("meta_insights_daily", {
   videoP50WatchedActions: integer("video_p50_watched_actions"),
   videoP75WatchedActions: integer("video_p75_watched_actions"),
   videoP100WatchedActions: integer("video_p100_watched_actions"),
+  video3SecWatchedActions: integer("video_3_sec_watched_actions"),
   videoThruplayWatchedActions: integer("video_thruplay_watched_actions"),
   videoAvgTimeWatchedActions: decimal("video_avg_time_watched_actions", { precision: 10, scale: 2 }),
   purchaseRoas: decimal("purchase_roas", { precision: 10, scale: 4 }),
