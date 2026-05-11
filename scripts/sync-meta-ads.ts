@@ -220,7 +220,6 @@ async function createTables(pool: Pool) {
       video_p50_watched_actions INTEGER,
       video_p75_watched_actions INTEGER,
       video_p100_watched_actions INTEGER,
-      video_3_sec_watched_actions BIGINT DEFAULT 0,
       video_thruplay_watched_actions BIGINT DEFAULT 0,
       video_avg_time_watched_actions DECIMAL(10,2),
       purchase_roas DECIMAL(10,4),

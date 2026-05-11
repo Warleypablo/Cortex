@@ -46,7 +46,6 @@ interface ParsedInsightRow {
   videoP50: number;
   videoP75: number;
   videoP100: number;
-  video3Sec: number;
   videoThruplay: number;
   conversions: number;
   landingPageViews: number;
@@ -96,7 +95,6 @@ function parseInsightRow(row: any): ParsedInsightRow {
     videoP50: getVideoMetric(row.video_p50_watched_actions),
     videoP75: getVideoMetric(row.video_p75_watched_actions),
     videoP100: getVideoMetric(row.video_p100_watched_actions),
-    video3Sec: getVideoMetric(row.video_3_sec_watched_actions),
     videoThruplay: getVideoMetric(row.video_thruplay_watched_actions),
     conversions: actionsLead + actionsPurchase,
     landingPageViews,
@@ -129,7 +127,6 @@ async function ensureByPlatformTable(pool: Pool): Promise<void> {
       video_p50_watched_actions INTEGER DEFAULT 0,
       video_p75_watched_actions INTEGER DEFAULT 0,
       video_p100_watched_actions INTEGER DEFAULT 0,
-      video_3_sec_watched_actions BIGINT DEFAULT 0,
       video_thruplay_watched_actions BIGINT DEFAULT 0,
       conversions INTEGER DEFAULT 0,
       landing_page_views INTEGER DEFAULT 0,
@@ -358,7 +355,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
 
   const timeRange = JSON.stringify({ since, until });
   const insights = await fetchAllPages(`${TURBO_ACCOUNT_ID}/insights`, {
-    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_3_sec_watched_actions,video_thruplay_watched_actions',
+    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_thruplay_watched_actions',
     time_range: timeRange,
     level: 'ad',
     time_increment: '1',
@@ -374,9 +371,9 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         inline_link_clicks, outbound_clicks,
         video_play_actions, video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
-        video_3_sec_watched_actions, video_thruplay_watched_actions,
+        video_thruplay_watched_actions,
         conversions, landing_page_views, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_daily_account_id_campaign_id_adset_id_ad_id_d_key
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
@@ -388,7 +385,6 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
         video_p75_watched_actions=EXCLUDED.video_p75_watched_actions,
         video_p100_watched_actions=EXCLUDED.video_p100_watched_actions,
-        video_3_sec_watched_actions=EXCLUDED.video_3_sec_watched_actions,
         video_thruplay_watched_actions=EXCLUDED.video_thruplay_watched_actions,
         conversions=EXCLUDED.conversions, landing_page_views=EXCLUDED.landing_page_views,
         data_importacao=NOW()
@@ -400,7 +396,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
       p.inlineLinkClicks, p.outboundClicks,
       p.videoPlay,
       p.videoP25, p.videoP50, p.videoP75, p.videoP100,
-      p.video3Sec, p.videoThruplay,
+      p.videoThruplay,
       p.conversions, p.landingPageViews,
     ]);
     count++;
@@ -415,7 +411,7 @@ async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: str
 
   const timeRange = JSON.stringify({ since, until });
   const insights = await fetchAllPages(`${TURBO_ACCOUNT_ID}/insights`, {
-    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_3_sec_watched_actions,video_thruplay_watched_actions',
+    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_thruplay_watched_actions',
     time_range: timeRange,
     level: 'ad',
     time_increment: '1',
@@ -433,9 +429,9 @@ async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: str
         inline_link_clicks, outbound_clicks,
         video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
-        video_3_sec_watched_actions, video_thruplay_watched_actions,
+        video_thruplay_watched_actions,
         conversions, landing_page_views, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_by_platform_unique
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
@@ -446,7 +442,6 @@ async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: str
         video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
         video_p75_watched_actions=EXCLUDED.video_p75_watched_actions,
         video_p100_watched_actions=EXCLUDED.video_p100_watched_actions,
-        video_3_sec_watched_actions=EXCLUDED.video_3_sec_watched_actions,
         video_thruplay_watched_actions=EXCLUDED.video_thruplay_watched_actions,
         conversions=EXCLUDED.conversions, landing_page_views=EXCLUDED.landing_page_views,
         data_importacao=NOW()
@@ -457,7 +452,7 @@ async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: str
       p.frequency, p.cpm, p.cpc, p.ctr,
       p.inlineLinkClicks, p.outboundClicks,
       p.videoP25, p.videoP50, p.videoP75, p.videoP100,
-      p.video3Sec, p.videoThruplay,
+      p.videoThruplay,
       p.conversions, p.landingPageViews,
     ]);
     count++;
