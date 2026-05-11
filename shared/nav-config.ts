@@ -32,6 +32,7 @@ export const PERMISSION_KEYS = {
     DRE: 'fin.dre',
     NOTAS_FISCAIS: 'fin.notas_fiscais',
     RECEITA_RECORRENTE: 'fin.receita_recorrente',
+    MIX_RECEITA: 'fin.mix_receita',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -220,6 +221,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/notas-fiscais': PERMISSION_KEYS.FIN.NOTAS_FISCAIS,
   '/financeiro/negativacao': PERMISSION_KEYS.FIN.INADIMPLENCIA,
   '/financeiro/receita-recorrente': PERMISSION_KEYS.FIN.RECEITA_RECORRENTE,
+  '/financeiro/mix-receita': PERMISSION_KEYS.FIN.MIX_RECEITA,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
@@ -433,6 +435,7 @@ export const NAV_CONFIG = {
         { title: 'Notas Fiscais', url: '/dashboard/notas-fiscais', icon: 'FileText', permissionKey: PERMISSION_KEYS.FIN.NOTAS_FISCAIS },
         { title: 'Negativacao', url: '/financeiro/negativacao', icon: 'Scale', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
         { title: 'Receita Recorrente', url: '/financeiro/receita-recorrente', icon: 'Repeat', permissionKey: PERMISSION_KEYS.FIN.RECEITA_RECORRENTE },
+        { title: 'Mix de Receita', url: '/financeiro/mix-receita', icon: 'PieChart', permissionKey: PERMISSION_KEYS.FIN.MIX_RECEITA },
       ],
     },
     {
