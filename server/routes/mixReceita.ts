@@ -150,4 +150,174 @@ export function registerMixReceitaRoutes(app: Express, db: any) {
       res.status(500).json({ error: "Failed to fetch mix de receita" });
     }
   });
+
+  // Análise temporal: vendido (data_inicio) ou realizado (caz_parcelas com rateio)
+  app.get("/api/financeiro/mix-receita/temporal", async (req, res) => {
+    try {
+      const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
+      const modo = ((req.query.modo as string) || "vendido") as "vendido" | "realizado";
+      const squadQuery = (req.query.squad as string) || "";
+      const squadFilter = squadQuery && squadQuery !== "todos"
+        ? sql` AND co.squad = ${squadQuery}`
+        : sql``;
+
+      let rows: any[] = [];
+
+      if (modo === "vendido") {
+        // Vendido = contratos com data_inicio no ano, agrupados por mês + produto
+        const result = await db.execute(sql`
+          SELECT
+            EXTRACT(MONTH FROM co.data_inicio::date)::int AS mes,
+            COALESCE(NULLIF(TRIM(co.produto), ''), '(sem produto)') AS produto,
+            COUNT(*)::int AS contratos,
+            COALESCE(SUM(co.valorr::numeric), 0)::float AS mrr_recorrente,
+            COALESCE(SUM(co.valorp::numeric), 0)::float AS total_pontual
+          FROM "Clickup".cup_contratos co
+          WHERE co.data_inicio IS NOT NULL
+            AND EXTRACT(YEAR FROM co.data_inicio::date) = ${ano}
+            ${squadFilter}
+          GROUP BY 1, 2
+          ORDER BY 1, 2
+        `);
+        rows = result.rows;
+      } else {
+        // Realizado = caz_parcelas rateada por produto (peso = receita_produto/receita_total_cliente)
+        const result = await db.execute(sql`
+          WITH carteira AS (
+            SELECT
+              cc.task_id,
+              COALESCE(NULLIF(TRIM(co.produto), ''), '(sem produto)') AS produto,
+              SUM(COALESCE(co.valorr::numeric, 0)) AS mrr_produto,
+              SUM(COALESCE(co.valorp::numeric, 0)) AS pontual_produto
+            FROM "Clickup".cup_clientes cc
+            JOIN "Clickup".cup_contratos co ON co.id_task = cc.task_id
+            WHERE 1=1 ${squadFilter}
+            GROUP BY cc.task_id, COALESCE(NULLIF(TRIM(co.produto), ''), '(sem produto)')
+          ),
+          totais AS (
+            SELECT task_id, SUM(mrr_produto + pontual_produto) AS total_carteira
+            FROM carteira GROUP BY task_id
+          ),
+          pesos AS (
+            SELECT
+              c.task_id,
+              c.produto,
+              CASE WHEN t.total_carteira > 0
+                   THEN (c.mrr_produto + c.pontual_produto) / t.total_carteira
+                   ELSE 0 END AS peso_produto,
+              CASE WHEN (c.mrr_produto + c.pontual_produto) > 0
+                   THEN c.mrr_produto / (c.mrr_produto + c.pontual_produto)
+                   ELSE 0 END AS pct_recorrente
+            FROM carteira c
+            JOIN totais t ON t.task_id = c.task_id
+          ),
+          parcelas_mes AS (
+            SELECT
+              cc.task_id,
+              EXTRACT(MONTH FROM p.data_quitacao::date)::int AS mes,
+              SUM(p.valor_pago::numeric) AS receita
+            FROM "Conta Azul".caz_parcelas p
+            JOIN "Conta Azul".caz_clientes ca ON p.id_cliente::text = ca.ids
+            JOIN "Clickup".cup_clientes cc ON cc.cnpj = ca.cnpj::text
+            WHERE p.status = 'QUITADO'
+              AND p.tipo_evento = 'RECEITA'
+              AND EXTRACT(YEAR FROM p.data_quitacao::date) = ${ano}
+            GROUP BY cc.task_id, EXTRACT(MONTH FROM p.data_quitacao::date)
+          )
+          SELECT
+            pm.mes,
+            pe.produto,
+            COUNT(DISTINCT pm.task_id)::int AS contratos,
+            SUM(pm.receita * pe.peso_produto * pe.pct_recorrente)::float AS mrr_recorrente,
+            SUM(pm.receita * pe.peso_produto * (1 - pe.pct_recorrente))::float AS total_pontual
+          FROM parcelas_mes pm
+          JOIN pesos pe ON pe.task_id = pm.task_id
+          GROUP BY pm.mes, pe.produto
+          ORDER BY pm.mes, pe.produto
+        `);
+        rows = result.rows;
+      }
+
+      // Estrutura: produtos com 12 meses
+      const produtosMap = new Map<string, {
+        produto: string;
+        meses: Record<number, { mrr: number; pontual: number; contratos: number }>;
+        total_mrr: number;
+        total_pontual: number;
+        total_contratos: number;
+      }>();
+      const totaisMensais: Record<number, { mrr: number; pontual: number; contratos: number }> = {};
+      const mesesComDados = new Set<number>();
+
+      for (const r of rows) {
+        const mes = Number(r.mes);
+        const produto = r.produto as string;
+        const mrr = Number(r.mrr_recorrente) || 0;
+        const pontual = Number(r.total_pontual) || 0;
+        const contratos = Number(r.contratos) || 0;
+
+        if (mrr === 0 && pontual === 0) continue;
+        mesesComDados.add(mes);
+
+        if (!produtosMap.has(produto)) {
+          produtosMap.set(produto, {
+            produto,
+            meses: {},
+            total_mrr: 0,
+            total_pontual: 0,
+            total_contratos: 0,
+          });
+        }
+        const p = produtosMap.get(produto)!;
+        p.meses[mes] = { mrr, pontual, contratos };
+        p.total_mrr += mrr;
+        p.total_pontual += pontual;
+        p.total_contratos += contratos;
+
+        if (!totaisMensais[mes]) totaisMensais[mes] = { mrr: 0, pontual: 0, contratos: 0 };
+        totaisMensais[mes].mrr += mrr;
+        totaisMensais[mes].pontual += pontual;
+        totaisMensais[mes].contratos += contratos;
+      }
+
+      const produtos = Array.from(produtosMap.values()).sort(
+        (a, b) => (b.total_mrr + b.total_pontual) - (a.total_mrr + a.total_pontual)
+      );
+
+      // Squads disponíveis para filtro
+      const squadsResult = await db.execute(sql`
+        SELECT DISTINCT TRIM(squad) AS squad FROM "Clickup".cup_contratos
+        WHERE squad IS NOT NULL AND TRIM(squad) != ''
+        ORDER BY squad
+      `);
+
+      // Anos disponíveis (com base no modo)
+      const anosResult = modo === "vendido"
+        ? await db.execute(sql`
+            SELECT DISTINCT EXTRACT(YEAR FROM data_inicio::date)::int AS ano
+            FROM "Clickup".cup_contratos
+            WHERE data_inicio IS NOT NULL
+            ORDER BY ano DESC
+          `)
+        : await db.execute(sql`
+            SELECT DISTINCT EXTRACT(YEAR FROM data_quitacao::date)::int AS ano
+            FROM "Conta Azul".caz_parcelas
+            WHERE status='QUITADO' AND data_quitacao IS NOT NULL
+            ORDER BY ano DESC
+          `);
+
+      res.json({
+        ano,
+        modo,
+        meses_com_dados: Array.from(mesesComDados).sort((a, b) => a - b),
+        produtos,
+        totais_mensais: totaisMensais,
+        anos_disponiveis: anosResult.rows.map((r: any) => Number(r.ano)),
+        squads_disponiveis: squadsResult.rows.map((r: any) => r.squad as string),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching mix-receita temporal:", error);
+      res.status(500).json({ error: "Failed to fetch evolução temporal" });
+    }
+  });
 }

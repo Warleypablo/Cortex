@@ -13,6 +13,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
 import { Repeat, Zap, TrendingUp, Package, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { EvolucaoTemporal } from "./mix-receita/EvolucaoTemporal";
 
 interface MixReceitaItem {
   produto: string;
@@ -214,6 +215,7 @@ export default function MixReceita() {
         <TabsList>
           <TabsTrigger value="produto">Por Produto</TabsTrigger>
           <TabsTrigger value="squad">Por Squad x Produto</TabsTrigger>
+          <TabsTrigger value="evolucao">Evolução temporal</TabsTrigger>
         </TabsList>
 
         <TabsContent value="produto" className="space-y-6 mt-4">
@@ -365,6 +367,10 @@ export default function MixReceita() {
               <SquadProdutoMatrix data={data} isLoading={isLoading} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="evolucao" className="mt-4">
+          <EvolucaoTemporal squad={squad} />
         </TabsContent>
       </Tabs>
 
