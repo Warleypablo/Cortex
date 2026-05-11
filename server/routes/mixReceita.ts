@@ -50,6 +50,11 @@ export function registerMixReceitaRoutes(app: Express, db: any) {
         ? sql` AND squad = ${squadQuery}`
         : sql``;
 
+      const statusList = sql.join(
+        statusFiltro.map((s) => sql`${s}`),
+        sql`, `
+      );
+
       // 1. Mix por produto
       const itensResult = await db.execute(sql`
         SELECT
@@ -60,7 +65,7 @@ export function registerMixReceitaRoutes(app: Express, db: any) {
           COALESCE(SUM(valorr::numeric), 0)::float AS mrr_recorrente,
           COALESCE(SUM(valorp::numeric), 0)::float AS total_pontual
         FROM "Clickup".cup_contratos
-        WHERE status = ANY(${statusFiltro})
+        WHERE status IN (${statusList})
           ${squadFilter}
         GROUP BY 1
         ORDER BY (COALESCE(SUM(valorr::numeric), 0) + COALESCE(SUM(valorp::numeric), 0)) DESC
@@ -91,7 +96,7 @@ export function registerMixReceitaRoutes(app: Express, db: any) {
           COALESCE(SUM(valorr::numeric), 0)::float AS mrr_recorrente,
           COALESCE(SUM(valorp::numeric), 0)::float AS total_pontual
         FROM "Clickup".cup_contratos
-        WHERE status = ANY(${statusFiltro})
+        WHERE status IN (${statusList})
           ${squadFilter}
         GROUP BY 1, 2
         ORDER BY (COALESCE(SUM(valorr::numeric), 0) + COALESCE(SUM(valorp::numeric), 0)) DESC
