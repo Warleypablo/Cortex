@@ -1,23 +1,40 @@
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { SkeletonTable } from "@/components/ui/skeleton";
+import type { ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   ArrowUp,
   ArrowDown,
-  FileText,
+  Play,
   XCircle,
   CheckCircle,
   Clock,
   Loader2,
-  AlertTriangle,
-  Search,
-} from "lucide-react";
-import { format } from "date-fns";
-import type { AutoReportCliente, SortState, SortColumn } from "./types";
-import { formatRelativeTime, isOverdue, parseUltimaGeracao, getCategoriaLabel, getCategoriaBadgeVariant } from "./utils";
+  CloudOff,
+  FileWarning,
+  SearchX,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import type { AutoReportCliente, SortState, SortColumn } from './types';
+import {
+  formatRelativeTime,
+  isOverdue,
+  parseUltimaGeracao,
+  getCategoriaLabel,
+  getCategoriaBadgeVariant,
+} from './utils';
+import { STATUS_CLASSES, clientStatusKind } from './tokens';
+import PlatformChip from './PlatformChip';
+import AutoReportTableSkeleton from './AutoReportTableSkeleton';
 
 interface AutoReportTableProps {
   clientes: AutoReportCliente[];
@@ -32,6 +49,8 @@ interface AutoReportTableProps {
   isError: boolean;
   onRetryLoad: () => void;
   totalClientes: number;
+  periodStart: Date | undefined;
+  onClearAllFilters: () => void;
 }
 
 function SortIcon({ column, sortState }: { column: SortColumn; sortState: SortState }) {
@@ -45,7 +64,7 @@ function getStatusBadge(status: string) {
 
   if (s.includes('conclu') || s.includes('sucesso')) {
     return (
-      <Badge className="bg-green-600 hover:bg-green-600 text-white border-transparent">
+      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-950/30">
         <CheckCircle className="w-3 h-3 mr-1" />
         OK
       </Badge>
@@ -53,7 +72,7 @@ function getStatusBadge(status: string) {
   }
   if (s.includes('process')) {
     return (
-      <Badge variant="secondary">
+      <Badge className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-950/30">
         <Loader2 className="w-3 h-3 mr-1 animate-spin" />
         ...
       </Badge>
@@ -61,7 +80,7 @@ function getStatusBadge(status: string) {
   }
   if (s.includes('erro')) {
     return (
-      <Badge variant="destructive">
+      <Badge className="bg-red-100 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-950/30">
         <XCircle className="w-3 h-3 mr-1" />
         Erro
       </Badge>
@@ -69,40 +88,47 @@ function getStatusBadge(status: string) {
   }
   if (s.includes('pend')) {
     return (
-      <Badge variant="outline">
+      <Badge className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-950/30">
         <Clock className="w-3 h-3 mr-1" />
         Pendente
       </Badge>
     );
   }
-  return (
-    <Badge variant="outline">
-      {status || '\u2014'}
-    </Badge>
-  );
+  return <Badge variant="outline">{status || '—'}</Badge>;
 }
 
-function PlatformDot({
-  configured,
-  label,
-  id,
-}: {
-  configured: boolean;
-  label: string;
-  id: string;
-}) {
+function UltimaGeracaoChip({ value }: { value: string }) {
+  const date = parseUltimaGeracao(value);
+  const relTime = formatRelativeTime(value);
+  const overdue = isOverdue(value);
+  const absoluteDate = date ? format(date, 'dd/MM/yyyy HH:mm') : 'Nunca gerado';
+
+  let chipClasses = '';
+  let icon: ReactNode = <Clock className="w-3 h-3" />;
+
+  if (relTime === 'nunca') {
+    chipClasses =
+      'bg-gray-100 text-gray-500 border-gray-200 dark:bg-zinc-800 dark:text-zinc-400 dark:border-zinc-700';
+  } else if (overdue) {
+    chipClasses =
+      'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800';
+  } else {
+    chipClasses =
+      'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800';
+    icon = <CheckCircle className="w-3 h-3" />;
+  }
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
-          className={`w-2.5 h-2.5 rounded-full inline-block ${
-            configured ? 'bg-green-500' : 'bg-gray-300 dark:bg-zinc-600'
-          }`}
-        />
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border ${chipClasses}`}
+        >
+          {icon}
+          {relTime}
+        </span>
       </TooltipTrigger>
-      <TooltipContent>
-        {configured ? `${label}: Configurado (ID: ${id})` : `${label}: Nao configurado`}
-      </TooltipContent>
+      <TooltipContent>{absoluteDate}</TooltipContent>
     </Tooltip>
   );
 }
@@ -120,18 +146,19 @@ export default function AutoReportTable({
   isError,
   onRetryLoad,
   totalClientes,
+  periodStart,
+  onClearAllFilters,
 }: AutoReportTableProps) {
-  // Loading state
   if (isLoading) {
-    return <SkeletonTable rows={6} />;
+    return <AutoReportTableSkeleton rows={6} />;
   }
 
-  // Error state
   if (isError) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <XCircle className="w-12 h-12 text-red-500" />
-        <p className="text-lg font-medium text-foreground">Erro ao carregar clientes</p>
+      <div className="flex flex-col items-center justify-center py-16 gap-3 rounded-lg border border-dashed border-gray-200 dark:border-zinc-800">
+        <CloudOff className="w-12 h-12 text-red-500/70" />
+        <p className="text-lg font-semibold text-foreground">Erro ao carregar clientes</p>
+        <p className="text-sm text-muted-foreground">Verifique a conexão e tente novamente.</p>
         <Button variant="outline" onClick={onRetryLoad}>
           Tentar Novamente
         </Button>
@@ -139,29 +166,35 @@ export default function AutoReportTable({
     );
   }
 
-  // Empty state: no clients in spreadsheet at all
   if (totalClientes === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <AlertTriangle className="w-12 h-12 text-amber-500" />
-        <p className="text-lg font-medium text-foreground">Nenhum cliente encontrado na planilha central.</p>
-        <p className="text-sm text-muted-foreground">Verifique se a planilha esta configurada.</p>
+      <div className="flex flex-col items-center justify-center py-16 gap-3 rounded-lg border border-dashed border-gray-200 dark:border-zinc-800">
+        <FileWarning className="w-12 h-12 text-amber-500/70" />
+        <p className="text-lg font-semibold text-foreground">Nenhum cliente configurado ainda</p>
+        <p className="text-sm text-muted-foreground">
+          Verifique se a planilha central está configurada com clientes ativos.
+        </p>
       </div>
     );
   }
 
-  // Empty state: filters yielded no results
   if (clientes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <Search className="w-12 h-12 text-muted-foreground" />
-        <p className="text-lg font-medium text-foreground">Nenhum cliente corresponde aos filtros aplicados.</p>
+      <div className="flex flex-col items-center justify-center py-16 gap-3 rounded-lg border border-dashed border-gray-200 dark:border-zinc-800">
+        <SearchX className="w-12 h-12 text-muted-foreground/50" />
+        <p className="text-lg font-semibold text-foreground">
+          Nenhum cliente bate com esses filtros
+        </p>
+        <Button variant="outline" onClick={onClearAllFilters}>
+          Limpar filtros
+        </Button>
       </div>
     );
   }
 
   const allVisibleIndexes = clientes.map((c) => c.rowIndex);
-  const allSelected = allVisibleIndexes.length > 0 && allVisibleIndexes.every((idx) => selectedClientes.has(idx));
+  const allSelected =
+    allVisibleIndexes.length > 0 && allVisibleIndexes.every((idx) => selectedClientes.has(idx));
   const someSelected = !allSelected && allVisibleIndexes.some((idx) => selectedClientes.has(idx));
 
   const handleSelectAll = () => {
@@ -173,190 +206,158 @@ export default function AutoReportTable({
   };
 
   return (
-    <TooltipProvider>
+    <div className="rounded-lg border border-gray-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-900/30">
       <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead style={{ width: 40 }}>
-              <Checkbox
-                checked={allSelected}
-                ref={(el) => {
-                  if (el) {
-                    (el as unknown as HTMLButtonElement).dataset.state = someSelected ? 'indeterminate' : allSelected ? 'checked' : 'unchecked';
-                  }
-                }}
-                onCheckedChange={handleSelectAll}
-                aria-label="Selecionar todos"
-              />
-            </TableHead>
-            <TableHead
-              className="cursor-pointer hover:text-foreground"
-              onClick={() => onSort('nome')}
-            >
-              Nome
-              <SortIcon column="nome" sortState={sortState} />
-            </TableHead>
-            <TableHead
-              className="hidden md:table-cell cursor-pointer hover:text-foreground"
-              style={{ width: 120 }}
-              onClick={() => onSort('gestor')}
-            >
-              Gestor
-              <SortIcon column="gestor" sortState={sortState} />
-            </TableHead>
-            <TableHead
-              className="hidden lg:table-cell cursor-pointer hover:text-foreground"
-              style={{ width: 100 }}
-              onClick={() => onSort('squad')}
-            >
-              Squad
-              <SortIcon column="squad" sortState={sortState} />
-            </TableHead>
-            <TableHead
-              className="hidden md:table-cell"
-              style={{ width: 100 }}
-            >
-              Plataformas
-            </TableHead>
-            <TableHead
-              className="hidden md:table-cell cursor-pointer hover:text-foreground"
-              style={{ width: 120 }}
-              onClick={() => onSort('ultimaGeracao')}
-            >
-              Ultima Geracao
-              <SortIcon column="ultimaGeracao" sortState={sortState} />
-            </TableHead>
-            <TableHead style={{ width: 80 }}>
-              Status
-            </TableHead>
-            <TableHead style={{ width: 40 }} />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {clientes.map((cliente) => {
-            const isSelected = selectedClientes.has(cliente.rowIndex);
-            const relTime = formatRelativeTime(cliente.ultimaGeracao);
-            const overdue = isOverdue(cliente.ultimaGeracao);
-            const parsedDate = parseUltimaGeracao(cliente.ultimaGeracao);
-            const absoluteDate = parsedDate ? format(parsedDate, 'dd/MM/yyyy HH:mm') : 'Nunca gerado';
-
-            return (
-              <TableRow
-                key={cliente.rowIndex}
-                className={`group cursor-pointer ${isSelected ? 'bg-primary/5' : ''}`}
-                onClick={() => onToggleCliente(cliente.rowIndex)}
+          <TableHeader>
+            <TableRow>
+              <TableHead style={{ width: 40 }}>
+                <Checkbox
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) {
+                      (el as unknown as HTMLButtonElement).dataset.state = someSelected
+                        ? 'indeterminate'
+                        : allSelected
+                          ? 'checked'
+                          : 'unchecked';
+                    }
+                  }}
+                  onCheckedChange={handleSelectAll}
+                  aria-label="Selecionar todos"
+                />
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:text-foreground"
+                onClick={() => onSort('nome')}
               >
-                {/* Checkbox */}
-                <TableCell>
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={() => onToggleCliente(cliente.rowIndex)}
-                    onClick={(e) => e.stopPropagation()}
-                    aria-label={`Selecionar ${cliente.cliente}`}
-                  />
-                </TableCell>
+                Nome
+                <SortIcon column="nome" sortState={sortState} />
+              </TableHead>
+              <TableHead
+                className="hidden md:table-cell cursor-pointer hover:text-foreground"
+                style={{ width: 120 }}
+                onClick={() => onSort('gestor')}
+              >
+                Gestor
+                <SortIcon column="gestor" sortState={sortState} />
+              </TableHead>
+              <TableHead
+                className="hidden lg:table-cell cursor-pointer hover:text-foreground"
+                style={{ width: 100 }}
+                onClick={() => onSort('squad')}
+              >
+                Squad
+                <SortIcon column="squad" sortState={sortState} />
+              </TableHead>
+              <TableHead className="hidden md:table-cell" style={{ width: 160 }}>
+                Plataformas
+              </TableHead>
+              <TableHead
+                className="hidden md:table-cell cursor-pointer hover:text-foreground"
+                style={{ width: 140 }}
+                onClick={() => onSort('ultimaGeracao')}
+              >
+                Última Geração
+                <SortIcon column="ultimaGeracao" sortState={sortState} />
+              </TableHead>
+              <TableHead style={{ width: 100 }}>Status</TableHead>
+              <TableHead style={{ width: 100 }} />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {clientes.map((cliente) => {
+              const isSelected = selectedClientes.has(cliente.rowIndex);
+              const kind = clientStatusKind(cliente, periodStart);
+              const tokens = STATUS_CLASSES[kind];
+              const borderClass = isSelected
+                ? `border-l-[5px] ${tokens.borderLeftSelected}`
+                : `border-l-[3px] ${tokens.borderLeft}`;
 
-                {/* Nome */}
-                <TableCell>
-                  <div>
-                    <span className="font-medium">{cliente.cliente}</span>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Badge
-                        variant={getCategoriaBadgeVariant(cliente.categoria)}
-                        className="text-xs"
-                      >
-                        {getCategoriaLabel(cliente.categoria)}
-                      </Badge>
-                      {cliente.gerar && (
-                        <span className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
-                          Auto
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </TableCell>
-
-                {/* Gestor */}
-                <TableCell className="hidden md:table-cell">
-                  <span className="text-sm text-muted-foreground truncate max-w-[120px] block">
-                    {cliente.gestor || '\u2014'}
-                  </span>
-                </TableCell>
-
-                {/* Squad */}
-                <TableCell className="hidden lg:table-cell">
-                  <span className="text-sm text-muted-foreground">
-                    {cliente.squad || '\u2014'}
-                  </span>
-                </TableCell>
-
-                {/* Plataformas */}
-                <TableCell className="hidden md:table-cell">
-                  <div className="flex items-center gap-1.5">
-                    <PlatformDot
-                      configured={!!cliente.idGa4}
-                      label="GA4"
-                      id={cliente.idGa4}
+              return (
+                <TableRow
+                  key={cliente.rowIndex}
+                  className={`group cursor-pointer ${borderClass} ${
+                    isSelected ? 'bg-primary/10' : 'hover:bg-muted/40'
+                  }`}
+                  onClick={() => onToggleCliente(cliente.rowIndex)}
+                >
+                  <TableCell className="py-4">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => onToggleCliente(cliente.rowIndex)}
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Selecionar ${cliente.cliente}`}
                     />
-                    <PlatformDot
-                      configured={!!cliente.idGoogleAds}
-                      label="Google Ads"
-                      id={cliente.idGoogleAds}
-                    />
-                    <PlatformDot
-                      configured={!!cliente.idMetaAds}
-                      label="Meta Ads"
-                      id={cliente.idMetaAds}
-                    />
-                  </div>
-                </TableCell>
+                  </TableCell>
 
-                {/* Ultima Geracao */}
-                <TableCell className="hidden md:table-cell">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span
-                        className={`text-sm ${
-                          relTime === 'nunca'
-                            ? 'text-muted-foreground'
-                            : overdue
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-foreground'
-                        }`}
-                      >
-                        {relTime}
+                  <TableCell className="py-4">
+                    <div>
+                      <span className="text-base font-semibold text-foreground">
+                        {cliente.cliente}
                       </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{absoluteDate}</TooltipContent>
-                  </Tooltip>
-                </TableCell>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Badge
+                          variant={getCategoriaBadgeVariant(cliente.categoria)}
+                          className="text-[10px]"
+                        >
+                          {getCategoriaLabel(cliente.categoria)}
+                        </Badge>
+                        {cliente.gerar && (
+                          <span className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800">
+                            Auto
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </TableCell>
 
-                {/* Status */}
-                <TableCell>
-                  {getStatusBadge(cliente.status)}
-                </TableCell>
+                  <TableCell className="hidden md:table-cell py-4">
+                    <span className="text-sm text-muted-foreground truncate max-w-[120px] block">
+                      {cliente.gestor || '—'}
+                    </span>
+                  </TableCell>
 
-                {/* Actions */}
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity md:opacity-0 sm:opacity-100 h-8 w-8"
-                    disabled={isGenerating}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onGerarIndividual(cliente);
-                    }}
-                    title="Gerar relatorio"
-                  >
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
+                  <TableCell className="hidden lg:table-cell py-4">
+                    <span className="text-sm text-muted-foreground">
+                      {cliente.squad || '—'}
+                    </span>
+                  </TableCell>
+
+                  <TableCell className="hidden md:table-cell py-4">
+                    <div className="flex items-center gap-1">
+                      <PlatformChip platform="GA4" configured={!!cliente.idGa4} id={cliente.idGa4} />
+                      <PlatformChip platform="Ads" configured={!!cliente.idGoogleAds} id={cliente.idGoogleAds} />
+                      <PlatformChip platform="Meta" configured={!!cliente.idMetaAds} id={cliente.idMetaAds} />
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="hidden md:table-cell py-4">
+                    <UltimaGeracaoChip value={cliente.ultimaGeracao} />
+                  </TableCell>
+
+                  <TableCell className="py-4">{getStatusBadge(cliente.status)}</TableCell>
+
+                  <TableCell className="py-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8"
+                      disabled={isGenerating}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onGerarIndividual(cliente);
+                      }}
+                      data-testid={`button-gerar-${cliente.rowIndex}`}
+                    >
+                      <Play className="w-3 h-3 mr-1" />
+                      Gerar
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
       </Table>
-    </TooltipProvider>
+    </div>
   );
 }

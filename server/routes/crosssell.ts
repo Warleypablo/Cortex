@@ -468,6 +468,22 @@ export function registerCrossSellRoutes(app: Express) {
     try {
       const { mes, ano } = req.query;
 
+      // Compute previous-month period for delta calculation.
+      // Falls back to no-prev when month/year are missing.
+      let mesPrev: number | null = null;
+      let anoPrev: number | null = null;
+      if (mes && ano) {
+        const m = Number(mes);
+        const y = Number(ano);
+        if (m === 1) {
+          mesPrev = 12;
+          anoPrev = y - 1;
+        } else {
+          mesPrev = m - 1;
+          anoPrev = y;
+        }
+      }
+
       // Build date filter for ganhos
       let ganhoDateFilter = "";
       if (mes && ano) {
@@ -484,14 +500,24 @@ export function registerCrossSellRoutes(app: Express) {
         opDateFilter = `AND EXTRACT(YEAR FROM o.criado_em) = ${Number(ano)}`;
       }
 
+      // Same filters but for previous month
+      let ganhoDateFilterPrev = "";
+      let opDateFilterPrev = "";
+      if (mesPrev !== null && anoPrev !== null) {
+        ganhoDateFilterPrev = `AND EXTRACT(MONTH FROM ng.mes_ganho) = ${mesPrev} AND EXTRACT(YEAR FROM ng.mes_ganho) = ${anoPrev}`;
+        opDateFilterPrev = `AND EXTRACT(MONTH FROM o.criado_em) = ${mesPrev} AND EXTRACT(YEAR FROM o.criado_em) = ${anoPrev}`;
+      }
+
       const [
         kpisResult,
+        kpisPrevResult,
         funilResult,
         reunioesPorCxResult,
         rankingValorResult,
         rankingReunioesResult,
         clientesNegociacaoResult,
         coberturaResult,
+        topClientesResult,
       ] = await Promise.all([
         // KPIs
         db.execute(sql.raw(`
@@ -505,6 +531,16 @@ export function registerCrossSellRoutes(app: Express) {
             ,(SELECT COUNT(*)::int FROM cortex_core.crosssell_oportunidades o WHERE o.etapa = 'sugerido_sistema') AS sugestoes_ativas
             ,(SELECT COUNT(*)::int FROM cortex_core.crosssell_etapa_log el WHERE el.etapa_anterior = 'sugerido_sistema' AND el.etapa_nova != 'descartado') AS sugestoes_aceitas
             ,(SELECT COUNT(*)::int FROM cortex_core.crosssell_etapa_log el WHERE el.etapa_anterior = 'sugerido_sistema') AS sugestoes_total_transicoes
+        `)),
+
+        // KPIs do mês anterior — apenas os 5 que serão exibidos com delta no front
+        db.execute(sql.raw(`
+          SELECT
+            (SELECT COUNT(*)::int FROM cortex_core.crosssell_oportunidades o WHERE o.etapa = 'reuniao_agendada' ${opDateFilterPrev}) AS reunioes_agendadas,
+            (SELECT COALESCE(SUM(o.valor_r_negociacao), 0) FROM cortex_core.crosssell_oportunidades o WHERE o.etapa NOT IN ('ganho', 'perdido') ${opDateFilterPrev}) AS total_r_negociacao,
+            (SELECT COALESCE(SUM(o.valor_p_negociacao), 0) FROM cortex_core.crosssell_oportunidades o WHERE o.etapa NOT IN ('ganho', 'perdido') ${opDateFilterPrev}) AS total_p_negociacao,
+            (SELECT COUNT(*)::int FROM cortex_core.crosssell_negocios_ganhos ng WHERE 1=1 ${ganhoDateFilterPrev}) AS total_ganhos,
+            (SELECT COUNT(*)::int FROM cortex_core.crosssell_oportunidades o WHERE 1=1 ${opDateFilterPrev}) AS total_oportunidades
         `)),
 
         // Funil por etapa
@@ -563,10 +599,27 @@ export function registerCrossSellRoutes(app: Express) {
              WHERE status IN ('ativo', 'Ativo', 'ATIVO')
                AND cnpj IS NOT NULL AND cnpj != '') AS total_ativos
         `)),
+
+        // Top 5 clientes em negociação (por valor R, etapas ativas)
+        db.execute(sql.raw(`
+          SELECT
+            o.cnpj,
+            c.nome AS cliente_nome,
+            o.etapa,
+            o.valor_r_negociacao,
+            o.id AS oportunidade_id
+          FROM cortex_core.crosssell_oportunidades o
+          LEFT JOIN "Clickup".cup_clientes c ON c.cnpj = o.cnpj
+          WHERE o.etapa NOT IN ('ganho', 'descartado', 'sugerido_sistema')
+            AND o.valor_r_negociacao IS NOT NULL
+            AND o.valor_r_negociacao > 0
+          ORDER BY o.valor_r_negociacao DESC NULLS LAST
+          LIMIT 5
+        `)),
       ]);
 
       const kpis = kpisResult.rows[0] as any;
-      const totalOps = Number(kpis.total_oportunidades) || 1;
+      const totalOps = Number(kpis.total_oportunidades);
       const totalGanhos = Number(kpis.total_ganhos);
 
       res.json({
@@ -575,7 +628,9 @@ export function registerCrossSellRoutes(app: Express) {
           reunioesRealizadas: Number(kpis.reunioes_realizadas),
           totalRNegociacao: Number(kpis.total_r_negociacao),
           totalPNegociacao: Number(kpis.total_p_negociacao),
-          taxaConversao: Number(((totalGanhos / totalOps) * 100).toFixed(1)),
+          taxaConversao: totalOps > 0
+            ? Number(((totalGanhos / totalOps) * 100).toFixed(1))
+            : 0,
           sugestoesAtivas: Number(kpis.sugestoes_ativas),
           taxaAceitacao: Number(kpis.sugestoes_total_transicoes) > 0
             ? Number(((Number(kpis.sugestoes_aceitas) / Number(kpis.sugestoes_total_transicoes)) * 100).toFixed(1))
@@ -589,6 +644,29 @@ export function registerCrossSellRoutes(app: Express) {
               : 0;
           })(),
         },
+        kpisAnterior: (() => {
+          const prev = kpisPrevResult.rows[0] as any;
+          if (!prev) {
+            return {
+              totalRNegociacao: 0,
+              totalPNegociacao: 0,
+              reunioesAgendadas: 0,
+              taxaConversao: 0,
+              coberturaBase: 0,
+            };
+          }
+          const totalOpsPrev = Number(prev.total_oportunidades) || 0;
+          const totalGanhosPrev = Number(prev.total_ganhos) || 0;
+          return {
+            totalRNegociacao: Number(prev.total_r_negociacao) || 0,
+            totalPNegociacao: Number(prev.total_p_negociacao) || 0,
+            reunioesAgendadas: Number(prev.reunioes_agendadas) || 0,
+            taxaConversao: totalOpsPrev > 0
+              ? Number(((totalGanhosPrev / totalOpsPrev) * 100).toFixed(1))
+              : 0,
+            coberturaBase: 0,
+          };
+        })(),
         funilEtapas: (funilResult.rows as any[]).map((r) => ({
           etapa: r.etapa,
           total: r.total,
@@ -606,6 +684,13 @@ export function registerCrossSellRoutes(app: Express) {
         rankingReunioes: (rankingReunioesResult.rows as any[]).map((r) => ({
           cxResponsavel: r.cx_responsavel,
           totalReunioes: r.total_reunioes,
+        })),
+        topClientes: (topClientesResult.rows as any[]).map((r) => ({
+          cnpj: r.cnpj,
+          clienteNome: r.cliente_nome,
+          etapa: r.etapa,
+          valorR: Number(r.valor_r_negociacao) || 0,
+          oportunidadeId: r.oportunidade_id,
         })),
       });
     } catch (error) {
