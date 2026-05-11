@@ -226,7 +226,7 @@ app.use((req, res, next) => {
   const runMetaSync = async () => {
     try {
       console.log("[meta-sync-job] Starting scheduled Meta Ads sync...");
-      const { syncMetaAds } = await import("./services/metaAdsSync");
+      const { syncMetaAds, backfillMetaInsightsGaps } = await import("./services/metaAdsSync");
       const { Pool } = await import("pg");
       const pool = new Pool({
         host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
@@ -234,9 +234,21 @@ app.use((req, res, next) => {
         database: process.env.DB_NAME || 'dados_turbo',
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
-        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
       });
       const result = await syncMetaAds(pool, { since: undefined, until: undefined });
+      // Backfill any gaps detected in the last 14 days after the regular sync
+      try {
+        const backfill = await backfillMetaInsightsGaps(pool);
+        if (backfill.filled.length > 0) {
+          console.log(`[meta-sync-job] Backfill filled ${backfill.filled.length} missing dates: ${backfill.filled.join(', ')}`);
+        }
+        if (backfill.errors.length > 0) {
+          result.errors.push(...backfill.errors.map(e => `backfill: ${e}`));
+        }
+      } catch (backfillErr: any) {
+        console.error("[meta-sync-job] Backfill failed:", backfillErr.message);
+      }
       await pool.end();
       // Store last sync result globally
       (globalThis as any).__metaSyncStatus = {
@@ -515,7 +527,7 @@ app.use((req, res, next) => {
         database: process.env.DB_NAME || 'dados_turbo',
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
-        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
       });
       const result = await syncGoogleAdsKeywords(pool);
       await pool.end();
