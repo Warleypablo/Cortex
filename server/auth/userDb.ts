@@ -171,6 +171,8 @@ const ALL_ROUTES = [
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/apresentacao',
   '/dashboard/comercial/sdr-assistant',
+  '/dashboard/comercial/crosssell',
+  '/dashboard/comercial/crosssell-dashboard',
   '/presentation',
   '/growth/visao-geral',
   '/growth/criativos',
@@ -226,6 +228,8 @@ const DEFAULT_USER_ROUTES = [
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/apresentacao',
   '/dashboard/comercial/sdr-assistant',
+  '/dashboard/comercial/crosssell',
+  '/dashboard/comercial/crosssell-dashboard',
   '/presentation',
   // Growth
   '/growth/visao-geral',
@@ -285,6 +289,16 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
   // Auto-adicionar /conhecimentos para todos os usuários
   if (!migratedRoutes.includes('/conhecimentos')) {
     migratedRoutes.push('/conhecimentos');
+  }
+
+  // Auto-adicionar crosssell para todos os usuários com rotas comerciais
+  if (migratedRoutes.some(r => r.includes('/dashboard/comercial/'))) {
+    if (!migratedRoutes.includes('/dashboard/comercial/crosssell')) {
+      migratedRoutes.push('/dashboard/comercial/crosssell');
+    }
+    if (!migratedRoutes.includes('/dashboard/comercial/crosssell-dashboard')) {
+      migratedRoutes.push('/dashboard/comercial/crosssell-dashboard');
+    }
   }
 
   // Migrar Contratos Freelancers de Jurídico → Social
