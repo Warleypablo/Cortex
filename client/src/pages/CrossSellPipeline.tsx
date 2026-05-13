@@ -146,7 +146,7 @@ interface ClienteCrossSell {
 }
 
 interface ClienteSearch {
-  task_id: string;
+  taskId: string;
   cnpj: string;
   nome: string;
   status: string;
@@ -1172,7 +1172,7 @@ function NewOpDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clienteId: selectedCliente.task_id,
+          clienteId: selectedCliente.taskId,
           cnpj: selectedCliente.cnpj,
           produtoMapeado: produto,
           cxResponsavel: userName || selectedCliente.responsavel,
@@ -1242,7 +1242,7 @@ function NewOpDialog({
                   <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg">
                     {clientes.map((c) => (
                       <button
-                        key={c.task_id}
+                        key={c.taskId}
                         className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-800 text-sm"
                         onClick={() => {
                           setSelectedCliente(c);
