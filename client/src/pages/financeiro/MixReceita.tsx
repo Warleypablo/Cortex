@@ -66,13 +66,6 @@ function pctClass(pct: number) {
   return "text-rose-600 dark:text-rose-400";
 }
 
-function perfilLabel(pct: number) {
-  if (pct >= 85) return { label: "Assinatura", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" };
-  if (pct >= 50) return { label: "Misto", color: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" };
-  if (pct > 0) return { label: "Projeto+", color: "bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400" };
-  return { label: "Projeto", color: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400" };
-}
-
 export default function MixReceita() {
   usePageTitle("Mix Receita por Produto");
   useSetPageInfo(
@@ -307,21 +300,19 @@ export default function MixReceita() {
                       <Th onClick={() => toggleSort("pct_recorrente")} align="right">
                         <div className="flex items-center justify-end gap-1">% Recorrente <SortIcon k="pct_recorrente" /></div>
                       </Th>
-                      <Th align="center">Perfil</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading ? (
                       [...Array(8)].map((_, i) => (
                         <tr key={i} className="border-b border-gray-100 dark:border-zinc-900">
-                          <td colSpan={8} className="p-3"><Skeleton className="h-5 w-full" /></td>
+                          <td colSpan={7} className="p-3"><Skeleton className="h-5 w-full" /></td>
                         </tr>
                       ))
                     ) : itensOrdenados.length === 0 ? (
-                      <tr><td colSpan={8} className="p-8 text-center text-gray-500 dark:text-zinc-400">Sem dados para os filtros selecionados</td></tr>
+                      <tr><td colSpan={7} className="p-8 text-center text-gray-500 dark:text-zinc-400">Sem dados para os filtros selecionados</td></tr>
                     ) : (
                       itensOrdenados.map((item) => {
-                        const perfil = perfilLabel(item.pct_recorrente);
                         const isExpanded = expandedProdutos.has(item.produto);
                         return (
                           <Fragment key={item.produto}>
@@ -346,15 +337,10 @@ export default function MixReceita() {
                               <td className={`p-3 text-right tabular-nums font-semibold ${pctClass(item.pct_recorrente)}`}>
                                 {item.pct_recorrente.toFixed(1)}%
                               </td>
-                              <td className="p-3 text-center">
-                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${perfil.color}`}>
-                                  {perfil.label}
-                                </span>
-                              </td>
                             </tr>
                             {isExpanded && (
                               <tr key={`${item.produto}__expanded`}>
-                                <td colSpan={8} className="p-0">
+                                <td colSpan={7} className="p-0">
                                   <ContratosCliente
                                     produto={item.produto}
                                     statusFiltro={statusListResolved}
@@ -384,7 +370,6 @@ export default function MixReceita() {
                         <td className={`p-3 text-right tabular-nums ${pctClass(data.totais.pct_recorrente)}`}>
                           {data.totais.pct_recorrente.toFixed(1)}%
                         </td>
-                        <td />
                       </tr>
                     </tfoot>
                   )}
