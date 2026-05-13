@@ -34,6 +34,29 @@ interface MixReceitaResponse {
   status_filtro: string[];
 }
 
+interface ContratoCliente {
+  cliente_nome: string;
+  id_task: string;
+  id_subtask: string;
+  mrr_recorrente: number;
+  total_pontual: number;
+  total: number;
+  squad: string;
+  responsavel: string;
+  status: string;
+}
+
+interface ClientesPorProdutoResponse {
+  produto: string;
+  contratos: ContratoCliente[];
+  totais: {
+    contratos: number;
+    mrr_recorrente: number;
+    total_pontual: number;
+    receita_total: number;
+  };
+}
+
 const STATUS_PADRAO = ["ativo", "em cancelamento", "pausado", "entregue", "onboarding"];
 
 export function registerMixReceitaRoutes(app: Express, db: any) {
@@ -148,6 +171,81 @@ export function registerMixReceitaRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching mix-receita:", error);
       res.status(500).json({ error: "Failed to fetch mix de receita" });
+    }
+  });
+
+  app.get("/api/financeiro/mix-receita/clientes", async (req, res) => {
+    try {
+      const produto = (req.query.produto as string) || "";
+      if (!produto) {
+        return res.status(400).json({ error: "produto é obrigatório" });
+      }
+
+      const statusQuery = (req.query.status as string) || "";
+      const squadQuery = (req.query.squad as string) || "";
+
+      const statusFiltro = statusQuery
+        ? statusQuery.split(",").map((s) => s.trim()).filter(Boolean)
+        : STATUS_PADRAO;
+
+      const squadFilter = squadQuery && squadQuery !== "todos"
+        ? sql` AND co.squad = ${squadQuery}`
+        : sql``;
+
+      const statusList = sql.join(
+        statusFiltro.map((s) => sql`${s}`),
+        sql`, `
+      );
+
+      const result = await db.execute(sql`
+        SELECT
+          COALESCE(NULLIF(TRIM(cc.nome), ''), '(cliente não identificado)') AS cliente_nome,
+          co.id_task,
+          co.id_subtask,
+          COALESCE(co.valorr::numeric, 0)::float AS mrr_recorrente,
+          COALESCE(co.valorp::numeric, 0)::float AS total_pontual,
+          (COALESCE(co.valorr::numeric, 0) + COALESCE(co.valorp::numeric, 0))::float AS total,
+          COALESCE(NULLIF(TRIM(co.squad), ''), '(sem squad)') AS squad,
+          COALESCE(NULLIF(TRIM(co.responsavel), ''), '(sem responsável)') AS responsavel,
+          co.status
+        FROM "Clickup".cup_contratos co
+        LEFT JOIN "Clickup".cup_clientes cc ON co.id_task = cc.task_id
+        WHERE COALESCE(NULLIF(TRIM(co.produto), ''), '(sem produto)') = ${produto}
+          AND co.status IN (${statusList})
+          ${squadFilter}
+        ORDER BY total DESC, cliente_nome ASC
+      `);
+
+      const contratos: ContratoCliente[] = result.rows.map((r: any) => ({
+        cliente_nome: r.cliente_nome,
+        id_task: r.id_task,
+        id_subtask: r.id_subtask,
+        mrr_recorrente: Number(r.mrr_recorrente) || 0,
+        total_pontual: Number(r.total_pontual) || 0,
+        total: Number(r.total) || 0,
+        squad: r.squad,
+        responsavel: r.responsavel,
+        status: r.status,
+      }));
+
+      const totalMrr = contratos.reduce((s, c) => s + c.mrr_recorrente, 0);
+      const totalPontual = contratos.reduce((s, c) => s + c.total_pontual, 0);
+
+      const response: ClientesPorProdutoResponse = {
+        produto,
+        contratos,
+        totais: {
+          contratos: contratos.length,
+          mrr_recorrente: totalMrr,
+          total_pontual: totalPontual,
+          receita_total: totalMrr + totalPontual,
+        },
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error("[api] Error fetching mix-receita clientes:", error);
+      res.status(500).json({ error: "Failed to fetch clientes por produto" });
     }
   });
 
