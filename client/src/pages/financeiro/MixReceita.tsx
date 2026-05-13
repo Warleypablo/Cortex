@@ -55,7 +55,7 @@ type SortKey = "produto" | "contratos" | "mrr_recorrente" | "total_pontual" | "r
 type SortDir = "asc" | "desc";
 
 const STATUS_PRESETS: Record<string, string[]> = {
-  ativos: ["ativo", "em cancelamento", "pausado", "entregue", "onboarding"],
+  ativos: ["ativo", "em cancelamento", "pausado", "onboarding"],
   somente_ativos: ["ativo"],
   todos: [],
 };
@@ -169,7 +169,7 @@ export default function MixReceita() {
           <Select value={statusPreset} onValueChange={(v) => setStatusPreset(v as keyof typeof STATUS_PRESETS)}>
             <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="ativos">Carteira viva (ativo + onboarding + pausado + entregue + em cancelamento)</SelectItem>
+              <SelectItem value="ativos">Carteira viva (ativo + onboarding + pausado + em cancelamento)</SelectItem>
               <SelectItem value="somente_ativos">Somente ativos</SelectItem>
               <SelectItem value="todos">Todos os status</SelectItem>
             </SelectContent>

@@ -57,7 +57,7 @@ interface ClientesPorProdutoResponse {
   };
 }
 
-const STATUS_PADRAO = ["ativo", "em cancelamento", "pausado", "entregue", "onboarding"];
+const STATUS_PADRAO = ["ativo", "em cancelamento", "pausado", "onboarding"];
 
 export function registerMixReceitaRoutes(app: Express, db: any) {
   app.get("/api/financeiro/mix-receita", async (req, res) => {
