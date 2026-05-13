@@ -25,6 +25,7 @@ import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
+import { registerMixReceitaRoutes } from "./routes/mixReceita";
 import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
@@ -7946,6 +7947,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // DRE (Demonstrativo de Resultado) - registered from separate file
   registerDRERoutes(app, db, storage);
+
+  // Mix de Receita por Produto (Pontual vs Recorrente)
+  registerMixReceitaRoutes(app, db);
 
   // Metas & Notifications Module - registered from separate file
   await registerMetasRoutes(app, db, storage);
