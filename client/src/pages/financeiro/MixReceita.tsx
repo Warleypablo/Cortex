@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -12,8 +12,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
-import { Repeat, Zap, TrendingUp, Package, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Repeat, Zap, TrendingUp, Package, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from "lucide-react";
 import { EvolucaoTemporal } from "./mix-receita/EvolucaoTemporal";
+import { ContratosCliente } from "./mix-receita/ContratosCliente";
 
 interface MixReceitaItem {
   produto: string;
@@ -83,6 +84,19 @@ export default function MixReceita() {
   const [squad, setSquad] = useState<string>("todos");
   const [sortKey, setSortKey] = useState<SortKey>("receita_total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  const [expandedProdutos, setExpandedProdutos] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (produto: string) => {
+    setExpandedProdutos((prev) => {
+      const next = new Set(prev);
+      if (next.has(produto)) next.delete(produto);
+      else next.add(produto);
+      return next;
+    });
+  };
+
+  const statusListResolved = STATUS_PRESETS[statusPreset];
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -276,6 +290,7 @@ export default function MixReceita() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-zinc-900/50 border-b border-gray-200 dark:border-zinc-800">
                     <tr>
+                      <th className="w-8 p-3" aria-label="Expandir"></th>
                       <Th onClick={() => toggleSort("produto")}>
                         <div className="flex items-center gap-1">Produto <SortIcon k="produto" /></div>
                       </Th>
@@ -299,39 +314,56 @@ export default function MixReceita() {
                     {isLoading ? (
                       [...Array(8)].map((_, i) => (
                         <tr key={i} className="border-b border-gray-100 dark:border-zinc-900">
-                          <td colSpan={7} className="p-3"><Skeleton className="h-5 w-full" /></td>
+                          <td colSpan={8} className="p-3"><Skeleton className="h-5 w-full" /></td>
                         </tr>
                       ))
                     ) : itensOrdenados.length === 0 ? (
-                      <tr><td colSpan={7} className="p-8 text-center text-gray-500 dark:text-zinc-400">Sem dados para os filtros selecionados</td></tr>
+                      <tr><td colSpan={8} className="p-8 text-center text-gray-500 dark:text-zinc-400">Sem dados para os filtros selecionados</td></tr>
                     ) : (
                       itensOrdenados.map((item) => {
                         const perfil = perfilLabel(item.pct_recorrente);
+                        const isExpanded = expandedProdutos.has(item.produto);
                         return (
-                          <tr
-                            key={item.produto}
-                            className="border-b border-gray-100 dark:border-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-900/30"
-                          >
-                            <td className="p-3 font-medium text-gray-900 dark:text-white">{item.produto}</td>
-                            <td className="p-3 text-right tabular-nums text-gray-700 dark:text-zinc-300">{item.contratos}</td>
-                            <td className="p-3 text-right tabular-nums text-emerald-700 dark:text-emerald-400 font-medium">
-                              {formatCurrencyNoDecimals(item.mrr_recorrente)}
-                            </td>
-                            <td className="p-3 text-right tabular-nums text-orange-700 dark:text-orange-400 font-medium">
-                              {formatCurrencyNoDecimals(item.total_pontual)}
-                            </td>
-                            <td className="p-3 min-w-[140px]">
-                              <MixBar pctRecorrente={item.pct_recorrente} />
-                            </td>
-                            <td className={`p-3 text-right tabular-nums font-semibold ${pctClass(item.pct_recorrente)}`}>
-                              {item.pct_recorrente.toFixed(1)}%
-                            </td>
-                            <td className="p-3 text-center">
-                              <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${perfil.color}`}>
-                                {perfil.label}
-                              </span>
-                            </td>
-                          </tr>
+                          <Fragment key={item.produto}>
+                            <tr
+                              className="border-b border-gray-100 dark:border-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-900/30 cursor-pointer"
+                              onClick={() => toggleExpand(item.produto)}
+                            >
+                              <td className="w-8 p-3 text-gray-500 dark:text-zinc-400">
+                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              </td>
+                              <td className="p-3 font-medium text-gray-900 dark:text-white">{item.produto}</td>
+                              <td className="p-3 text-right tabular-nums text-gray-700 dark:text-zinc-300">{item.contratos}</td>
+                              <td className="p-3 text-right tabular-nums text-emerald-700 dark:text-emerald-400 font-medium">
+                                {formatCurrencyNoDecimals(item.mrr_recorrente)}
+                              </td>
+                              <td className="p-3 text-right tabular-nums text-orange-700 dark:text-orange-400 font-medium">
+                                {formatCurrencyNoDecimals(item.total_pontual)}
+                              </td>
+                              <td className="p-3 min-w-[140px]">
+                                <MixBar pctRecorrente={item.pct_recorrente} />
+                              </td>
+                              <td className={`p-3 text-right tabular-nums font-semibold ${pctClass(item.pct_recorrente)}`}>
+                                {item.pct_recorrente.toFixed(1)}%
+                              </td>
+                              <td className="p-3 text-center">
+                                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${perfil.color}`}>
+                                  {perfil.label}
+                                </span>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr key={`${item.produto}__expanded`}>
+                                <td colSpan={8} className="p-0">
+                                  <ContratosCliente
+                                    produto={item.produto}
+                                    statusFiltro={statusListResolved}
+                                    squad={squad}
+                                  />
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
                         );
                       })
                     )}
@@ -339,6 +371,7 @@ export default function MixReceita() {
                   {data && itensOrdenados.length > 0 && (
                     <tfoot className="bg-gray-50 dark:bg-zinc-900/50 border-t-2 border-gray-200 dark:border-zinc-800 font-semibold">
                       <tr>
+                        <td />
                         <td className="p-3 text-gray-900 dark:text-white">Total</td>
                         <td className="p-3 text-right tabular-nums text-gray-900 dark:text-white">{data.totais.contratos}</td>
                         <td className="p-3 text-right tabular-nums text-emerald-700 dark:text-emerald-400">
