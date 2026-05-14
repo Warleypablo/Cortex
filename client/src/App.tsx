@@ -154,6 +154,7 @@ const Triagem = lazyWithRetry(() => import("@/pages/Triagem"));
 const CrossSellPipeline = lazyWithRetry(() => import("@/pages/CrossSellPipeline"));
 const CrossSellDashboard = lazyWithRetry(() => import("@/pages/CrossSellDashboard"));
 const ReceitaRecorrente = lazyWithRetry(() => import("@/pages/financeiro/ReceitaRecorrente"));
+const MixReceita = lazyWithRetry(() => import("@/pages/financeiro/MixReceita"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
 // Error boundary to catch silent crashes in the portal.
@@ -327,6 +328,7 @@ function ProtectedRouter() {
       <Route path="/financeiro/negativacao">{() => <ProtectedRoute path="/financeiro/negativacao" component={Negativacao} />}</Route>
       <Route path="/triagem">{() => <ProtectedRoute path="/triagem" component={Triagem} />}</Route>
       <Route path="/financeiro/receita-recorrente">{() => <ProtectedRoute path="/financeiro/receita-recorrente" component={ReceitaRecorrente} />}</Route>
+      <Route path="/financeiro/mix-receita">{() => <ProtectedRoute path="/financeiro/mix-receita" component={MixReceita} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}

@@ -167,6 +167,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         faturamentoYtdResult,
         dfcRecebimentoYtdResult,
         topMrrResult,
+        topMrrPontualResult,
         topEntregasResult,
       ] = await Promise.all([
         // 1. Novos colaboradores (admitidos no mês de dados)
@@ -208,11 +209,11 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY EXTRACT(DAY FROM r.aniversario)
         `),
 
-        // 3. Aniversários de empresa no mês de dados (work anniversaries)
+        // 3. Aniversários de empresa no mês VIGENTE (work anniversaries — alinhado com query #2 aniversariantes)
         db.execute(sql`
           SELECT
             r.id, r.nome, r.cargo, r.squad, r.admissao::text,
-            (${anoDados} - EXTRACT(YEAR FROM r.admissao))::int as "anosDeEmpresa",
+            (${nextAnoDados} - EXTRACT(YEAR FROM r.admissao))::int as "anosDeEmpresa",
             COALESCE(
               NULLIF(a_id.picture, ''),
               NULLIF(a_turbo.picture, ''),
@@ -222,10 +223,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           LEFT JOIN cortex_core.auth_users a_id ON r.user_id IS NOT NULL AND r.user_id = a_id.id
           LEFT JOIN cortex_core.auth_users a_turbo ON r.email_turbo IS NOT NULL AND LOWER(TRIM(r.email_turbo)) = LOWER(TRIM(a_turbo.email))
           LEFT JOIN cortex_core.auth_users a_pessoal ON r.email_pessoal IS NOT NULL AND LOWER(TRIM(r.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
-          WHERE EXTRACT(MONTH FROM r.admissao) = ${mesDados}
+          WHERE EXTRACT(MONTH FROM r.admissao) = ${nextMesDados}
             AND r.status = 'Ativo'
             AND r.admissao IS NOT NULL
-            AND EXTRACT(YEAR FROM r.admissao) < ${anoDados}
+            AND EXTRACT(YEAR FROM r.admissao) < ${nextAnoDados}
           ORDER BY EXTRACT(DAY FROM r.admissao)
         `),
 
@@ -966,6 +967,59 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ORDER BY r.valor DESC
         `),
 
+        // 24b. Top 3 (MRR Ativo + Pontual Entregue) por responsável + foto
+        db.execute(sql`
+          WITH ultimo_snapshot AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
+            ) as snap
+          ),
+          mrr_por_resp AS (
+            SELECT h.responsavel as nome,
+                   COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr
+            FROM "Clickup".cup_data_hist h
+            JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
+            WHERE h.status IN ('ativo','onboarding','triagem')
+              AND h.responsavel IS NOT NULL AND TRIM(h.responsavel) != ''
+            GROUP BY h.responsavel
+          ),
+          pontual_por_resp AS (
+            SELECT responsavel as nome,
+                   COALESCE(SUM(valorp::numeric), 0) as pontual
+            FROM "Clickup".cup_contratos
+            WHERE LOWER(TRIM(status)) = 'entregue'
+              AND data_entrega >= ${dataStart}::date
+              AND data_entrega < ${dataEnd}::date
+              AND COALESCE(valorp, 0) > 0
+              AND responsavel IS NOT NULL AND TRIM(responsavel) != ''
+            GROUP BY responsavel
+          ),
+          ranking AS (
+            SELECT COALESCE(m.nome, p.nome) as nome,
+                   COALESCE(m.mrr, 0) + COALESCE(p.pontual, 0) as valor
+            FROM mrr_por_resp m
+            FULL OUTER JOIN pontual_por_resp p ON m.nome = p.nome
+            ORDER BY valor DESC
+            LIMIT 3
+          )
+          SELECT
+            r.nome,
+            r.valor,
+            COALESCE(
+              NULLIF(a_id.picture, ''),
+              NULLIF(a_turbo.picture, ''),
+              NULLIF(a_pessoal.picture, '')
+            ) as "fotoUrl",
+            p.cargo
+          FROM ranking r
+          LEFT JOIN "Inhire".rh_pessoal p ON LOWER(TRIM(p.nome)) = LOWER(TRIM(r.nome))
+          LEFT JOIN cortex_core.auth_users a_id ON p.user_id IS NOT NULL AND p.user_id = a_id.id
+          LEFT JOIN cortex_core.auth_users a_turbo ON p.email_turbo IS NOT NULL AND LOWER(TRIM(p.email_turbo)) = LOWER(TRIM(a_turbo.email))
+          LEFT JOIN cortex_core.auth_users a_pessoal ON p.email_pessoal IS NOT NULL AND LOWER(TRIM(p.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+          ORDER BY r.valor DESC
+        `),
+
         // 24c. Top 3 Projetos Entregues por responsável (entregas no mês) + foto
         // COUNT(DISTINCT id_task): consolida múltiplas subtarefas (ex.: 1ª/2ª/3ª Entrega) do mesmo contrato em 1 projeto
         db.execute(sql`
@@ -1486,6 +1540,12 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
 
       const topOperadores = {
         topMrr: (topMrrResult.rows as any[]).map((row: any) => ({
+          nome: row.nome as string,
+          valor: parseFloat(row.valor) || 0,
+          fotoUrl: row.fotoUrl || null,
+          cargo: row.cargo || null,
+        })),
+        topMrrPontual: (topMrrPontualResult.rows as any[]).map((row: any) => ({
           nome: row.nome as string,
           valor: parseFloat(row.valor) || 0,
           fotoUrl: row.fotoUrl || null,

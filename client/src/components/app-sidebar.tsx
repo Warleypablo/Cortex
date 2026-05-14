@@ -9,8 +9,7 @@ import {
   Star, Gauge, Bot
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import turboLogoLight from "@assets/logo-turbo-light.svg";
-import turboLogoDark from "@assets/logo-turbo-dark.svg";
+import turboLogo from "@assets/logo-branca.png";
 import {
   Sidebar,
   SidebarContent,
@@ -57,7 +56,6 @@ export function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
   const { state, setOpen } = useSidebar();
   const isCollapsed = state === "collapsed";
-  const turboLogo = theme === "dark" ? turboLogoDark : turboLogoLight;
 
   // Track open categories - all closed by default on page load
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});

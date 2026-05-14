@@ -34,6 +34,7 @@ interface Campanha {
   investimentoMensalMeta: number | null;
   orcamentoDiarioMeta: number | null;
   projecaoAsIs: number;
+  isDelivering: boolean;
 }
 
 interface ApiResponse {
@@ -250,6 +251,11 @@ export default function GrowthOrcamentoCampanhas() {
           <PlatformIcon platform={c.platform} />
           <span className="truncate max-w-[360px]" title={c.name}>{c.name}</span>
           {c.status === "PAUSED" && <Badge variant="outline" className="text-xs">Pausada</Badge>}
+          {c.status !== "PAUSED" && !c.isDelivering && (
+            <Badge variant="outline" className="text-xs" title="Sem gasto nos últimos 3 dias — projeção não extrapola.">
+              Sem entrega
+            </Badge>
+          )}
         </div>
       </TableCell>
       <TableCell className="text-right font-mono">{formatCurrency(c.dailyBudgetAtual)}</TableCell>

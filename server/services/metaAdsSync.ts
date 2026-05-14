@@ -178,27 +178,32 @@ async function fetchMetaApi(endpoint: string, params: Record<string, string> = {
 }
 
 /**
- * Fetch all pages from a paginated Meta API endpoint
+ * Fetch all pages from a paginated Meta API endpoint.
+ * Throws on pagination errors — silent breaks would return partial data and cause data gaps.
  */
 async function fetchAllPages(endpoint: string, params: Record<string, string> = {}, pageLimit = 200): Promise<any[]> {
   const allData: any[] = [];
-  let url: string | null = null;
+  let pageCount = 0;
 
-  // First request
   const firstPage = await fetchMetaApi(endpoint, { ...params, limit: String(pageLimit) });
   allData.push(...(firstPage.data || []));
+  pageCount++;
 
-  url = firstPage.paging?.next || null;
+  let url: string | null = firstPage.paging?.next || null;
 
-  // Paginate
   while (url) {
     const response = await fetch(url);
-    if (!response.ok) break;
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      throw new Error(`Meta API pagination failed on page ${pageCount + 1} (HTTP ${response.status}): ${errorBody.slice(0, 200)}`);
+    }
     const data = await response.json();
     allData.push(...(data.data || []));
     url = data.paging?.next || null;
+    pageCount++;
   }
 
+  console.log(`[MetaSync] fetchAllPages: ${pageCount} pages, ${allData.length} total rows`);
   return allData;
 }
 
@@ -479,10 +484,10 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
   const errors: string[] = [];
   const result: SyncResult = { accounts: 0, campaigns: 0, adsets: 0, ads: 0, creatives: 0, insights: 0, byPlatformInsights: 0, errors: [], duration_ms: 0 };
 
-  // Default: last 90 days
+  // Default: last 7 days for insights (90/30 days caused too many API pages → HTTP 500 on page 8+)
   const today = new Date();
   const defaultSince = new Date(today);
-  defaultSince.setDate(today.getDate() - 90);
+  defaultSince.setDate(today.getDate() - 7);
 
   const since = options?.since || defaultSince.toISOString().split('T')[0];
   const until = options?.until || today.toISOString().split('T')[0];
@@ -562,4 +567,53 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
   if (errors.length > 0) console.log(`[MetaSync] Errors: ${errors.join('; ')}`);
 
   return result;
+}
+
+/**
+ * Detects gaps in meta_insights_daily and backfills them from the Meta API.
+ * Scans the last `lookbackDays` days and syncs any date that is missing data.
+ */
+export async function backfillMetaInsightsGaps(pool: Pool, lookbackDays = 14): Promise<{ filled: string[]; errors: string[] }> {
+  const today = new Date();
+  const filled: string[] = [];
+  const errors: string[] = [];
+
+  // Find which dates have data in the last N days
+  const result = await pool.query(`
+    SELECT DISTINCT date_start::text FROM meta_ads.meta_insights_daily
+    WHERE date_start >= (CURRENT_DATE - INTERVAL '${lookbackDays} days')::date
+    ORDER BY date_start
+  `);
+  const datesWithData = new Set(result.rows.map((r: any) => r.date_start));
+
+  // Find missing dates (including today)
+  const missingDates: string[] = [];
+  for (let i = lookbackDays; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    if (!datesWithData.has(dateStr)) missingDates.push(dateStr);
+  }
+
+  if (missingDates.length === 0) {
+    console.log('[MetaSync] Backfill: no gaps detected');
+    return { filled, errors };
+  }
+
+  console.log(`[MetaSync] Backfill: found ${missingDates.length} missing dates: ${missingDates.join(', ')}`);
+
+  // Sync each missing date individually to avoid large API windows
+  for (const date of missingDates) {
+    try {
+      const count = await syncInsightsDaily(pool, date, date);
+      const countPlatform = await syncInsightsDailyByPlatform(pool, date, date);
+      console.log(`[MetaSync] Backfill ${date}: ${count} insight rows, ${countPlatform} by-platform rows`);
+      filled.push(date);
+    } catch (e: any) {
+      console.error(`[MetaSync] Backfill ${date} failed:`, e.message);
+      errors.push(`${date}: ${e.message}`);
+    }
+  }
+
+  return { filled, errors };
 }
