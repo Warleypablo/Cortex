@@ -333,17 +333,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // 9. MRR ativo + Ticket Médio ao final do mês de dados (snapshot do dia 1 do mês seguinte)
         db.execute(sql`
           WITH ultimo_snapshot AS (
-<<<<<<< Updated upstream
             SELECT COALESCE(
               (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
             ) as snap
-=======
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE data_snapshot >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}::date
-              AND data_snapshot <= ${dataEnd}::date
->>>>>>> Stashed changes
           )
           SELECT
             COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_ativo,
@@ -359,17 +352,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // 10. Clientes totais + Contratos totais ao final do mês de dados
         db.execute(sql`
           WITH ultimo_snapshot AS (
-<<<<<<< Updated upstream
             SELECT COALESCE(
               (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
             ) as snap
-=======
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE data_snapshot >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}::date
-              AND data_snapshot <= ${dataEnd}::date
->>>>>>> Stashed changes
           )
           SELECT
             COUNT(DISTINCT h.id_task)::int as clientes_totais,
@@ -505,7 +491,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ),
           monthly_snapshots AS (
             SELECT
-<<<<<<< Updated upstream
               TO_CHAR(m.month_start, 'YYYY-MM') as month,
               COALESCE(
                 (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = (m.month_start + INTERVAL '1 month')::date LIMIT 1),
@@ -513,14 +498,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
               ) as last_snapshot
             FROM date_range dr,
               generate_series(dr.range_start, dr.range_end - INTERVAL '1 day', INTERVAL '1 month') as m(month_start)
-=======
-              ms.month,
-              MAX(h.data_snapshot) as last_snapshot
-            FROM month_series ms
-            JOIN "Clickup".cup_data_hist h
-              ON h.data_snapshot >= ms.month_start AND h.data_snapshot <= ms.next_month_start
-            GROUP BY ms.month
->>>>>>> Stashed changes
           ),
           mrr_mensal AS (
             SELECT
@@ -571,17 +548,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // 15. Ranking Squads por MRR + Pontual (snapshot do dia 1 do mês seguinte)
         db.execute(sql`
           WITH ultimo_snapshot AS (
-<<<<<<< Updated upstream
             SELECT COALESCE(
               (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataEnd}::date LIMIT 1),
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${`${anoDados}-${String(mesDados).padStart(2, '0')}`})
             ) as snap
-=======
-            SELECT MAX(data_snapshot) as snap
-            FROM "Clickup".cup_data_hist
-            WHERE data_snapshot >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}::date
-              AND data_snapshot <= ${dataEnd}::date
->>>>>>> Stashed changes
           )
           SELECT
             h.squad,
@@ -613,11 +583,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
             AND COALESCE(abonar_churn, '') != 'Sim'
-<<<<<<< Updated upstream
             AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
-=======
-              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
->>>>>>> Stashed changes
             AND squad IS NOT NULL
             AND TRIM(squad) != ''
           GROUP BY squad
@@ -775,11 +741,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) >= ${quarterStartMonth}
             AND EXTRACT(MONTH FROM data_solicitacao_encerramento) <= ${mesDados}
             AND COALESCE(abonar_churn, '') != 'Sim'
-<<<<<<< Updated upstream
             AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
-=======
-              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
->>>>>>> Stashed changes
           GROUP BY EXTRACT(MONTH FROM data_solicitacao_encerramento)
         `),
 
