@@ -400,6 +400,9 @@ export function gerarTextosClausulas(data: ContratoCreatorPDFData): ClausulaText
         ...(contrato.qtd_videos ? [`- ${contrato.qtd_videos} (${numeroPorExtenso(contrato.qtd_videos)}) vídeo(s) de conteúdo`] : []),
         ...(contrato.qtd_variacoes_gancho ? [`- ${contrato.qtd_variacoes_gancho} (${numeroPorExtenso(contrato.qtd_variacoes_gancho)}) variação(ões) de gancho`] : []),
         ...entregas.map(e => `- ${e}`),
+        ...(entregas.length === 0 && !contrato.qtd_videos && !contrato.qtd_variacoes_gancho
+          ? ['- Conteúdo conforme briefing de campanha.']
+          : []),
       ].join('\n\n'),
     },
     {
