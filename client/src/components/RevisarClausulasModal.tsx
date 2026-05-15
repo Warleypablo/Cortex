@@ -45,7 +45,7 @@ export function RevisarClausulasModal({
   const [clausulaEditando, setClausulaEditando] = useState<number | null>(null);
   const [textoRascunho, setTextoRascunho] = useState("");
 
-  const { data: clausulas = [], isLoading } = useQuery<ClausulaTexto[]>({
+  const { data: clausulas = [], isLoading, isError } = useQuery<ClausulaTexto[]>({
     queryKey: ["/api/creators/contratos", contratoId, "clausulas"],
     queryFn: async () => {
       const res = await fetch(`/api/creators/contratos/${contratoId}/clausulas`, {
@@ -55,6 +55,7 @@ export function RevisarClausulasModal({
       return res.json();
     },
     enabled: open && contratoId !== null,
+    staleTime: 0,
   });
 
   const iniciarEdicao = (clausula: ClausulaTexto) => {
@@ -79,6 +80,7 @@ export function RevisarClausulasModal({
   const handleClose = () => {
     setTextosEditados({});
     setClausulaEditando(null);
+    setTextoRascunho("");
     onClose();
   };
 
@@ -95,6 +97,10 @@ export function RevisarClausulasModal({
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : isError ? (
+            <div className="text-center text-muted-foreground py-6 text-sm">
+              Erro ao carregar cláusulas. Feche e tente novamente.
             </div>
           ) : (
             <Accordion type="multiple" className="w-full">
