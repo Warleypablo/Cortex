@@ -883,6 +883,75 @@ export function registerCreatorsRoutes(app: Express) {
     }
   });
 
+  // GET /api/creators/contratos/:id/pdf — PDF do contrato (Assinafy se enviado, preview local se rascunho)
+  app.get("/api/creators/contratos/:id/pdf", async (req, res) => {
+    try {
+      const contratoId = parseInt(req.params.id);
+
+      const result = await db.execute(sql`
+        SELECT cc.*, c.nome, c.cpf, c.cnpj, c.email, c.endereco, c.cidade, c.estado, c.cep
+        FROM cortex_core.contratos_creators cc
+        JOIN cortex_core.creators c ON c.id = cc.creator_id
+        WHERE cc.id = ${contratoId}
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+
+      const row = result.rows[0] as any;
+
+      // Se foi enviado para assinatura, baixar o PDF real do Assinafy
+      if (row.assinafy_document_id) {
+        const configResult = await db.execute(sql`
+          SELECT api_key, api_url FROM cortex_core.assinafy_config WHERE ativo = true AND tipo = 'creators' LIMIT 1
+        `);
+        const config = configResult.rows[0] as any;
+
+        if (config?.api_key) {
+          const downloadUrl = `${config.api_url}/documents/${row.assinafy_document_id}/download/certificated`;
+          let response = await fetch(`${downloadUrl}?api_key=${config.api_key}`, { headers: { Accept: '*/*' } });
+          if (!response.ok) response = await fetch(downloadUrl, { headers: { 'X-Api-Key': config.api_key, Accept: '*/*' } });
+          if (!response.ok) response = await fetch(downloadUrl, { headers: { Authorization: `Bearer ${config.api_key}`, Accept: '*/*' } });
+
+          if (response.ok) {
+            const contentType = response.headers.get('content-type') || 'application/pdf';
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Content-Disposition', `inline; filename=contrato_creator_${contratoId}.pdf`);
+            const buffer = await response.arrayBuffer();
+            return res.send(Buffer.from(buffer));
+          }
+          console.warn(`[creators] Assinafy download falhou para doc ${row.assinafy_document_id}, usando preview local`);
+        }
+      }
+
+      // Fallback: gerar PDF localmente (rascunho ou Assinafy indisponível)
+      const pdfBuffer = await gerarContratoCreatorPDF({
+        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco },
+        contrato: {
+          cargo: row.cargo || 'prestador de serviços',
+          descricao_servicos: row.descricao_servicos || 'conforme acordado entre as partes',
+          valor_remuneracao: row.valor_remuneracao?.toString() || '0',
+          duracao_meses: row.duracao_meses || 6,
+          data_inicio: row.data_inicio || '',
+          data_fim: row.data_fim || '',
+          qtd_videos: row.qtd_videos || undefined,
+          qtd_variacoes_gancho: row.qtd_variacoes_gancho || undefined,
+          unidade_prazo: row.unidade_prazo || 'meses',
+          cliente_nome: row.cliente_nome || undefined,
+          prazo_entrega_dias: row.prazo_entrega_dias || undefined,
+        }
+      });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=contrato_creator_${contratoId}.pdf`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("[creators] Erro ao servir PDF:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // GET /api/creators/contratos/:id/preview-pdf — Preview PDF
   app.get("/api/creators/contratos/:id/preview-pdf", async (req, res) => {
     try {
