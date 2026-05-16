@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Pencil, X, Check, Send } from "lucide-react";
+import { Loader2, Pencil, X, Check, Send, Eye } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -44,6 +44,7 @@ export function RevisarClausulasModal({
   const [textosEditados, setTextosEditados] = useState<Record<number, string>>({});
   const [clausulaEditando, setClausulaEditando] = useState<number | null>(null);
   const [textoRascunho, setTextoRascunho] = useState("");
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const { data: clausulas = [], isLoading, isError } = useQuery<ClausulaTexto[]>({
     queryKey: ["/api/creators/contratos", contratoId, "clausulas"],
@@ -73,8 +74,38 @@ export function RevisarClausulasModal({
     setTextoRascunho("");
   };
 
+  const getTextosFinais = () => {
+    if (clausulaEditando !== null && textoRascunho) {
+      return { ...textosEditados, [clausulaEditando]: textoRascunho };
+    }
+    return textosEditados;
+  };
+
   const handleConfirmar = () => {
-    onConfirmar(textosEditados);
+    onConfirmar(getTextosFinais());
+  };
+
+  const handlePrevisualizar = async () => {
+    if (!contratoId) return;
+    setLoadingPreview(true);
+    try {
+      const textos = getTextosFinais();
+      const body = Object.keys(textos).length > 0 ? { clausulasEditadas: textos } : {};
+      const res = await fetch(`/api/creators/contratos/${contratoId}/preview-pdf-with-overrides`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error("Erro ao gerar preview");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch {
+      // silently ignore — user will see no tab open
+    } finally {
+      setLoadingPreview(false);
+    }
   };
 
   const handleClose = () => {
@@ -173,6 +204,18 @@ export function RevisarClausulasModal({
         <DialogFooter className="border-t pt-4 mt-2">
           <Button variant="outline" onClick={handleClose} disabled={isPending}>
             Cancelar
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handlePrevisualizar}
+            disabled={isPending || isLoading || loadingPreview}
+          >
+            {loadingPreview ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Eye className="w-4 h-4 mr-2" />
+            )}
+            Pré-visualizar
           </Button>
           <Button onClick={handleConfirmar} disabled={isPending || isLoading}>
             {isPending ? (

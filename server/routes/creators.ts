@@ -926,6 +926,50 @@ export function registerCreatorsRoutes(app: Express) {
     }
   });
 
+  // POST /api/creators/contratos/:id/preview-pdf-with-overrides — Preview PDF com edições
+  app.post("/api/creators/contratos/:id/preview-pdf-with-overrides", async (req, res) => {
+    try {
+      const contratoId = parseInt(req.params.id);
+      const clausulasEditadas: Record<number, string> | undefined = req.body?.clausulasEditadas;
+
+      const result = await db.execute(sql`
+        SELECT cc.*, c.nome, c.cpf, c.cnpj, c.email, c.endereco, c.cidade, c.estado, c.cep
+        FROM cortex_core.contratos_creators cc
+        JOIN cortex_core.creators c ON c.id = cc.creator_id
+        WHERE cc.id = ${contratoId}
+      `);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
+
+      const row = result.rows[0] as any;
+      const pdfBuffer = await gerarContratoCreatorPDF({
+        creator: { nome: row.nome, cpf: row.cpf, cnpj: row.cnpj, email: row.email || undefined, endereco: row.endereco },
+        contrato: {
+          cargo: row.cargo || 'prestador de serviços',
+          descricao_servicos: row.descricao_servicos || 'conforme acordado entre as partes',
+          valor_remuneracao: row.valor_remuneracao?.toString() || '0',
+          duracao_meses: row.duracao_meses || 6,
+          data_inicio: row.data_inicio || '',
+          data_fim: row.data_fim || '',
+          qtd_videos: row.qtd_videos || undefined,
+          qtd_variacoes_gancho: row.qtd_variacoes_gancho || undefined,
+          unidade_prazo: row.unidade_prazo || 'meses',
+          cliente_nome: row.cliente_nome || undefined,
+          prazo_entrega_dias: row.prazo_entrega_dias || undefined,
+        }
+      }, clausulasEditadas);
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename=contrato_creator_${contratoId}_preview.pdf`);
+      res.send(pdfBuffer);
+    } catch (error: any) {
+      console.error("[creators] Erro ao gerar preview com overrides:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // POST /api/creators/contratos/:id/enviar-assinatura — Gerar PDF + enviar Assinafy
   app.post("/api/creators/contratos/:id/enviar-assinatura", async (req, res) => {
     const contratoId = parseInt(req.params.id);
