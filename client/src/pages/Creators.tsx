@@ -747,7 +747,7 @@ export default function Creators() {
                           variant="outline"
                           size="sm"
                           className="gap-1"
-                          onClick={() => window.open(`/api/creators/contratos/${ct.id}/preview-pdf`, "_blank")}
+                          onClick={() => window.open(`/api/creators/contratos/${ct.id}/pdf`, "_blank")}
                         >
                           <Eye className="w-3.5 h-3.5" />
                           PDF
@@ -894,7 +894,7 @@ export default function Creators() {
                               variant="outline"
                               size="sm"
                               className="gap-1"
-                              onClick={() => window.open(`/api/creators/contratos/${ct.id}/preview-pdf`, '_blank')}
+                              onClick={() => window.open(`/api/creators/contratos/${ct.id}/pdf`, '_blank')}
                             >
                               <Eye className="w-3.5 h-3.5" />
                               PDF
@@ -1054,7 +1054,7 @@ export default function Creators() {
                 <Button
                   variant="outline"
                   className="gap-2 h-auto py-4 flex-col"
-                  onClick={() => window.open(`/api/creators/contratos/${contratoCriadoId}/preview-pdf`, '_blank')}
+                  onClick={() => window.open(`/api/creators/contratos/${contratoCriadoId}/pdf`, '_blank')}
                 >
                   <Eye className="w-5 h-5" />
                   Visualizar PDF
