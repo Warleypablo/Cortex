@@ -5,6 +5,8 @@ import type {
   SquadCrescimento,
   MetaFaturamento,
   RankingPessoa,
+  KpisGlobais,
+  BadgePessoa,
 } from '@/components/tv-leaderboard/types';
 import { getSquadColor } from '@/lib/squadColors';
 
@@ -190,6 +192,8 @@ type PessoaStats = {
   squad: string;
   mrrAtivo: number;
   mrrChurnAcum: number;
+  // Serie histórica MRR por mês (chave YYYY-MM)
+  serieMrr: Map<string, number>;
 };
 
 const MIN_BASE_ATIVA = 1000;
@@ -239,6 +243,16 @@ function isInvalidResponsavel(r: string | null | undefined): boolean {
   return lower === 'sem responsável' || lower === 'sem responsavel' || lower === 'não atribuído' || lower === 'nao atribuido';
 }
 
+function novoStats(responsavel: string, squad: string | null): PessoaStats {
+  return {
+    responsavel,
+    squad: squad ?? '',
+    mrrAtivo: 0,
+    mrrChurnAcum: 0,
+    serieMrr: new Map(),
+  };
+}
+
 function aggregateByOperador(
   evo: EvolucaoMensalResp | undefined,
   mesAtual: string,
@@ -246,13 +260,14 @@ function aggregateByOperador(
   const map = new Map<string, PessoaStats>();
   if (!evo) return map;
 
-  // MRR ativo: apenas o mês corrente (base atual sob responsabilidade)
+  // Constrói série mensal completa de MRR por pessoa e marca MRR atual
   for (const row of evo.mrr ?? []) {
-    if (row.mes !== mesAtual) continue;
     if (isInvalidResponsavel(row.responsavel)) continue;
     const key = row.responsavel!.trim();
-    const prev = map.get(key) ?? { responsavel: key, squad: row.squad ?? '', mrrAtivo: 0, mrrChurnAcum: 0 };
-    prev.mrrAtivo += Number(row.mrr_total) || 0;
+    const prev = map.get(key) ?? novoStats(key, row.squad);
+    const valor = Number(row.mrr_total) || 0;
+    prev.serieMrr.set(row.mes, (prev.serieMrr.get(row.mes) ?? 0) + valor);
+    if (row.mes === mesAtual) prev.mrrAtivo += valor;
     if (!prev.squad && row.squad) prev.squad = row.squad;
     map.set(key, prev);
   }
@@ -261,7 +276,7 @@ function aggregateByOperador(
   for (const row of evo.churns ?? []) {
     if (isInvalidResponsavel(row.responsavel)) continue;
     const key = row.responsavel!.trim();
-    const prev = map.get(key) ?? { responsavel: key, squad: row.squad ?? '', mrrAtivo: 0, mrrChurnAcum: 0 };
+    const prev = map.get(key) ?? novoStats(key, row.squad);
     prev.mrrChurnAcum += Number(row.mrr_churn) || 0;
     if (!prev.squad && row.squad) prev.squad = row.squad;
     map.set(key, prev);
@@ -270,68 +285,116 @@ function aggregateByOperador(
   return map;
 }
 
+function serieParaSparkline(serie: Map<string, number>): number[] {
+  return Array.from(serie.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => v);
+}
+
+function tendenciaPct(serie: number[]): number {
+  if (serie.length < 2) return 0;
+  const ultimo = serie[serie.length - 1];
+  const anterior = serie[serie.length - 2];
+  if (!anterior) return 0;
+  return ((ultimo - anterior) / anterior) * 100;
+}
+
+function buildKpisGlobais(stats: PessoaStats[]): KpisGlobais {
+  const operadoresAtivos = stats.filter((s) => s.mrrAtivo > 0).length;
+  const mrrTotalBase = stats.reduce((acc, s) => acc + s.mrrAtivo, 0);
+  const churnAcumulado6m = stats.reduce((acc, s) => acc + s.mrrChurnAcum, 0);
+  return { operadoresAtivos, mrrTotalBase, churnAcumulado6m };
+}
+
+function badgesPara(
+  s: PessoaStats,
+  spark: number[],
+  tend: number,
+  topCrescimento: Set<string>,
+): BadgePessoa[] {
+  const badges: BadgePessoa[] = [];
+  if (s.mrrChurnAcum === 0 && s.mrrAtivo > 0) badges.push('sem-churn');
+  // streak: subiu nos últimos 3 meses consecutivos
+  if (spark.length >= 3) {
+    const ultimos = spark.slice(-3);
+    if (ultimos[2] > ultimos[1] && ultimos[1] > ultimos[0]) badges.push('streak');
+  }
+  if (topCrescimento.has(s.responsavel) && tend > 0) badges.push('top-crescimento');
+  return badges;
+}
+
+const RANKING_LIMITE = 15;
+
+function topCrescimentoSet(stats: PessoaStats[]): Set<string> {
+  const comTendencia = stats
+    .filter((s) => s.mrrAtivo >= MIN_BASE_ATIVA)
+    .map((s) => ({
+      responsavel: s.responsavel,
+      tend: tendenciaPct(serieParaSparkline(s.serieMrr)),
+    }))
+    .filter((x) => x.tend > 0)
+    .sort((a, b) => b.tend - a.tend)
+    .slice(0, 3);
+  return new Set(comTendencia.map((x) => x.responsavel));
+}
+
+function montaPessoa(
+  s: PessoaStats,
+  i: number,
+  valor: number,
+  prefix: string,
+  topGrowth: Set<string>,
+): RankingPessoa {
+  const sparkline = serieParaSparkline(s.serieMrr);
+  const tend = tendenciaPct(sparkline);
+  return {
+    id: `${prefix}-${s.responsavel}`,
+    nome: s.responsavel,
+    avatarUrl: null,
+    squad: s.squad,
+    corSquad: getSquadColor(s.squad, i),
+    valor,
+    posicaoAtual: i + 1,
+    posicaoAnterior: null,
+    sparkline,
+    tendenciaPct: tend,
+    badges: badgesPara(s, sparkline, tend, topGrowth),
+  };
+}
+
 function buildRankingMrrAtivo(stats: PessoaStats[]): RankingPessoa[] {
+  const top = topCrescimentoSet(stats);
   return stats
-    .filter(s => s.mrrAtivo >= MIN_BASE_ATIVA)
+    .filter((s) => s.mrrAtivo >= MIN_BASE_ATIVA)
     .sort((a, b) => b.mrrAtivo - a.mrrAtivo)
-    .slice(0, 10)
-    .map((s, i) => ({
-      id: `mrr-${s.responsavel}`,
-      nome: s.responsavel,
-      avatarUrl: null,
-      squad: s.squad,
-      corSquad: getSquadColor(s.squad, i),
-      valor: s.mrrAtivo,
-      posicaoAtual: i + 1,
-      posicaoAnterior: null,
-    }));
+    .slice(0, RANKING_LIMITE)
+    .map((s, i) => montaPessoa(s, i, s.mrrAtivo, 'mrr', top));
 }
 
 function buildRankingAntiChurn(stats: PessoaStats[]): RankingPessoa[] {
-  // Anti-churn: churn acumulado 12m absoluto (R$). Tie-breaker: maior MRR ativo (mais mérito).
+  const top = topCrescimentoSet(stats);
   return stats
-    .filter(s => s.mrrAtivo >= MIN_BASE_ATIVA)
+    .filter((s) => s.mrrAtivo >= MIN_BASE_ATIVA)
     .sort((a, b) => {
       const diff = a.mrrChurnAcum - b.mrrChurnAcum;
       if (diff !== 0) return diff;
       return b.mrrAtivo - a.mrrAtivo;
     })
-    .slice(0, 10)
-    .map((s, i) => ({
-      id: `anti-churn-${s.responsavel}`,
-      nome: s.responsavel,
-      avatarUrl: null,
-      squad: s.squad,
-      corSquad: getSquadColor(s.squad, i),
-      valor: s.mrrChurnAcum,
-      posicaoAtual: i + 1,
-      posicaoAnterior: null,
-    }));
+    .slice(0, RANKING_LIMITE)
+    .map((s, i) => montaPessoa(s, i, s.mrrChurnAcum, 'anti-churn', top));
 }
 
 function buildRankingNrr(stats: PessoaStats[]): RankingPessoa[] {
-  // Retenção % = base atual / (base atual + churn acumulado 12m). Sem expansion data, é a melhor proxy.
+  const top = topCrescimentoSet(stats);
   return stats
-    .filter(s => s.mrrAtivo >= MIN_BASE_ATIVA)
-    .map(s => ({
-      ...s,
-      nrr: (s.mrrAtivo / (s.mrrAtivo + s.mrrChurnAcum)) * 100,
-    }))
+    .filter((s) => s.mrrAtivo >= MIN_BASE_ATIVA)
+    .map((s) => ({ s, nrr: (s.mrrAtivo / (s.mrrAtivo + s.mrrChurnAcum)) * 100 }))
     .sort((a, b) => {
       if (b.nrr !== a.nrr) return b.nrr - a.nrr;
-      return b.mrrAtivo - a.mrrAtivo;
+      return b.s.mrrAtivo - a.s.mrrAtivo;
     })
-    .slice(0, 10)
-    .map((s, i) => ({
-      id: `nrr-${s.responsavel}`,
-      nome: s.responsavel,
-      avatarUrl: null,
-      squad: s.squad,
-      corSquad: getSquadColor(s.squad, i),
-      valor: s.nrr,
-      posicaoAtual: i + 1,
-      posicaoAnterior: null,
-    }));
+    .slice(0, RANKING_LIMITE)
+    .map((x, i) => montaPessoa(x.s, i, x.nrr, 'nrr', top));
 }
 
 // ---------- hook ----------
@@ -430,6 +493,7 @@ export function useTvLeaderboardData() {
       rankingMrr: aplicarAvatar(buildRankingMrrAtivo(stats)),
       rankingNrr: aplicarAvatar(buildRankingNrr(stats)),
       rankingAntiChurn: aplicarAvatar(buildRankingAntiChurn(stats)),
+      kpisGlobais: buildKpisGlobais(stats),
     };
   }
 

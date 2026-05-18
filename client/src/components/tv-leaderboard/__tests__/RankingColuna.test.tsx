@@ -12,6 +12,9 @@ const fakePessoa = (i: number): RankingPessoa => ({
   valor: 1000 - i * 100,
   posicaoAtual: i,
   posicaoAnterior: i,
+  sparkline: [100, 120, 140, 130, 150, 160],
+  tendenciaPct: 5,
+  badges: [],
 });
 
 describe('RankingColuna', () => {
