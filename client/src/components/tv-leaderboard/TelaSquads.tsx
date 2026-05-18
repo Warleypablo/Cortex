@@ -1,3 +1,4 @@
+import { ChurnGlobalHero } from './ChurnGlobalHero';
 import { MetaFaturamentoHero } from './MetaFaturamentoHero';
 import { SquadKpiCard } from './SquadKpiCard';
 import { SquadPodium } from './SquadPodium';
@@ -13,7 +14,10 @@ export function TelaSquads({ data }: { data: TvLeaderboardData }) {
 
   return (
     <div className="grid grid-rows-[15%_60%_25%] h-full gap-4 p-6 bg-zinc-950">
-      <MetaFaturamentoHero data={data.meta} />
+      <div className="grid grid-cols-2 gap-4">
+        <MetaFaturamentoHero data={data.meta} />
+        <ChurnGlobalHero squads={visiveis} />
+      </div>
 
       <div
         className="grid gap-4"
