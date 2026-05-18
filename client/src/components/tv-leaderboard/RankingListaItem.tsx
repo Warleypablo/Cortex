@@ -22,6 +22,14 @@ const BADGE_INFO: Record<BadgePessoa, { icone: string; titulo: string; cor: stri
   'top-crescimento': { icone: '🚀', titulo: 'Top crescimento', cor: 'text-amber-400' },
 };
 
+function corDaPosicao(pos: number): string {
+  // Gradiente do azul (4º) ao roxo (15º) — visualiza distância do topo
+  if (pos <= 5) return 'from-cyan-500 to-blue-600';
+  if (pos <= 8) return 'from-blue-500 to-indigo-600';
+  if (pos <= 11) return 'from-indigo-500 to-purple-600';
+  return 'from-purple-500 to-fuchsia-600';
+}
+
 export function RankingListaItem({
   pessoa,
   metrica,
@@ -31,13 +39,21 @@ export function RankingListaItem({
 }) {
   const tend = tendenciaTexto(pessoa.tendenciaPct);
   const sparkData = pessoa.sparkline.map((v, i) => ({ i, v }));
+  const corBadge = corDaPosicao(pessoa.posicaoAtual);
 
   return (
-    <li className="flex items-center gap-3 py-2 border-b border-zinc-800/60">
-      <span className="text-zinc-500 w-6 text-right font-bold text-sm">{pessoa.posicaoAtual}</span>
+    <li className="group flex items-center gap-3 px-2 py-2 rounded-lg odd:bg-zinc-900/40 even:bg-transparent hover:bg-zinc-800/40 border-b border-zinc-800/40 transition-colors">
+      {/* Badge gradiente da posição */}
       <span
-        className="h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden"
-        style={{ backgroundColor: pessoa.corSquad }}
+        className={`flex items-center justify-center h-7 w-7 rounded-full bg-gradient-to-br ${corBadge} text-white text-xs font-black shrink-0 shadow-md`}
+      >
+        {pessoa.posicaoAtual}
+      </span>
+
+      {/* Avatar com ring colorido da squad */}
+      <span
+        className="h-8 w-8 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 overflow-hidden ring-2"
+        style={{ backgroundColor: pessoa.corSquad, boxShadow: `0 0 8px ${pessoa.corSquad}40` }}
         aria-hidden
       >
         {pessoa.avatarUrl ? (
@@ -46,24 +62,29 @@ export function RankingListaItem({
           iniciais(pessoa.nome)
         )}
       </span>
-      <span className="flex-1 text-white truncate text-sm">{pessoa.nome}</span>
 
-      <span className="flex items-center gap-0.5 w-16 justify-end" aria-label="conquistas">
+      <span className="flex-1 text-white truncate text-sm font-medium">{pessoa.nome}</span>
+
+      <span className="flex items-center gap-1 w-20 justify-end" aria-label="conquistas">
         {pessoa.badges.map((b) => (
-          <span key={b} className={`text-base ${BADGE_INFO[b].cor}`} title={BADGE_INFO[b].titulo}>
+          <span
+            key={b}
+            className={`text-lg ${BADGE_INFO[b].cor} drop-shadow-[0_0_6px_currentColor]`}
+            title={BADGE_INFO[b].titulo}
+          >
             {BADGE_INFO[b].icone}
           </span>
         ))}
       </span>
 
       <span
-        className="text-[10px] px-2 py-0.5 rounded-full text-white whitespace-nowrap max-w-[110px] truncate"
+        className="text-[10px] px-2 py-0.5 rounded-full text-white whitespace-nowrap max-w-[110px] truncate font-medium"
         style={{ backgroundColor: pessoa.corSquad }}
       >
         {pessoa.squad}
       </span>
 
-      <div className="w-16 h-6 shrink-0">
+      <div className="w-16 h-7 shrink-0">
         {sparkData.length >= 2 ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={sparkData}>
@@ -71,7 +92,7 @@ export function RankingListaItem({
                 type="monotone"
                 dataKey="v"
                 stroke={pessoa.tendenciaPct >= 0 ? '#34d399' : '#f87171'}
-                strokeWidth={1.5}
+                strokeWidth={2}
                 dot={false}
               />
             </LineChart>
@@ -81,11 +102,11 @@ export function RankingListaItem({
         )}
       </div>
 
-      <span className={`text-xs w-14 text-right ${tend?.cor ?? 'text-zinc-600'}`}>
+      <span className={`text-xs w-14 text-right font-bold ${tend?.cor ?? 'text-zinc-600'}`}>
         {tend?.texto ?? '—'}
       </span>
 
-      <span className="text-white font-bold w-24 text-right text-sm">
+      <span className="text-white font-black w-24 text-right text-sm tracking-tight">
         {formatValor(metrica, pessoa.valor)}
       </span>
     </li>

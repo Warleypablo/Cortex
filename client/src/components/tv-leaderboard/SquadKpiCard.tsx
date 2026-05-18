@@ -27,11 +27,19 @@ export function SquadKpiCard({ kpi, isLider }: { kpi: SquadKpi; isLider: boolean
 
   return (
     <div
-      className={`flex flex-col gap-3 rounded-2xl border bg-zinc-900 p-5 h-full transition-shadow ${
-        isLider ? 'border-2 shadow-[0_0_30px_rgba(59,130,246,0.4)] animate-pulse' : 'border-zinc-800'
+      className={`relative flex flex-col gap-3 rounded-2xl border bg-gradient-to-br from-zinc-900 via-zinc-900/80 to-zinc-950 p-5 h-full overflow-hidden transition-shadow ${
+        isLider ? 'border-2 shadow-[0_0_40px_rgba(59,130,246,0.5)]' : 'border-zinc-800'
       }`}
-      style={{ borderColor: isLider ? kpi.cor : undefined }}
+      style={{
+        borderColor: isLider ? kpi.cor : undefined,
+        boxShadow: isLider ? `0 0 32px ${kpi.cor}66` : undefined,
+      }}
     >
+      <div
+        className="pointer-events-none absolute -top-16 -right-16 h-32 w-32 rounded-full blur-3xl"
+        style={{ backgroundColor: `${kpi.cor}33` }}
+        aria-hidden
+      />
       <div className="flex items-center gap-2">
         <span className="h-3 w-3 rounded-full" style={{ backgroundColor: kpi.cor }} />
         <span className="text-white font-bold text-xl">{kpi.squad}</span>
