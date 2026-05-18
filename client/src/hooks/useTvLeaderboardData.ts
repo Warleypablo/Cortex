@@ -194,6 +194,43 @@ type PessoaStats = {
 
 const MIN_BASE_ATIVA = 1000;
 
+function normalizeNome(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+type Colaborador = {
+  nome?: string | null;
+  emailTurbo?: string | null;
+  email_turbo?: string | null;
+  picture?: string | null;
+};
+
+function buildAvatarResolver(
+  colaboradores: Colaborador[] | undefined,
+  userPhotos: Record<string, string> | undefined,
+): (nome: string) => string | null {
+  const byNome = new Map<string, string>();
+  const lista = Array.isArray(colaboradores) ? colaboradores : [];
+  for (const c of lista) {
+    const nome = c.nome ?? '';
+    if (!nome) continue;
+    if (c.picture) {
+      byNome.set(normalizeNome(nome), c.picture);
+      continue;
+    }
+    const email = (c.emailTurbo ?? c.email_turbo ?? '').toLowerCase().trim();
+    if (email && userPhotos?.[email]) {
+      byNome.set(normalizeNome(nome), userPhotos[email]);
+    }
+  }
+  return (nome: string) => byNome.get(normalizeNome(nome)) ?? null;
+}
+
 function isInvalidResponsavel(r: string | null | undefined): boolean {
   if (!r) return true;
   const t = r.trim();
@@ -345,10 +382,20 @@ export function useTvLeaderboardData() {
           fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=6`),
         staleTime: STALE_MS,
       },
+      {
+        queryKey: ['tv', 'colaboradores'],
+        queryFn: () => fetchJson<any[]>('/api/colaboradores'),
+        staleTime: STALE_MS,
+      },
+      {
+        queryKey: ['tv', 'user-photos'],
+        queryFn: () => fetchJson<Record<string, string>>('/api/user-photos'),
+        staleTime: STALE_MS,
+      },
     ],
   });
 
-  const [okrQ, squadsCurQ, squadsPrevQ, nrrCurQ, nrrPrevQ, evoQ] = queries;
+  const [okrQ, squadsCurQ, squadsPrevQ, nrrCurQ, nrrPrevQ, evoQ, colabQ, photosQ] = queries;
 
   // Bloqueia loading apenas nas queries críticas; secundárias podem demorar/falhar sem travar TV
   const isLoading = okrQ.isLoading || squadsCurQ.isLoading;
@@ -372,13 +419,17 @@ export function useTvLeaderboardData() {
     const statsMap = aggregateByOperador(evoQ.data, mesAtual);
     const stats = Array.from(statsMap.values());
 
+    const resolveAvatar = buildAvatarResolver(colabQ.data, photosQ.data);
+    const aplicarAvatar = (lista: RankingPessoa[]) =>
+      lista.map((p) => ({ ...p, avatarUrl: resolveAvatar(p.nome) }));
+
     data = {
       meta,
       squads,
       crescimentoSquads,
-      rankingMrr: buildRankingMrrAtivo(stats),
-      rankingNrr: buildRankingNrr(stats),
-      rankingAntiChurn: buildRankingAntiChurn(stats),
+      rankingMrr: aplicarAvatar(buildRankingMrrAtivo(stats)),
+      rankingNrr: aplicarAvatar(buildRankingNrr(stats)),
+      rankingAntiChurn: aplicarAvatar(buildRankingAntiChurn(stats)),
     };
   }
 
