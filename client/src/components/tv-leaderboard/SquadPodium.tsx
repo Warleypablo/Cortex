@@ -9,19 +9,13 @@ const ALTURA_BARRA_PCT = { 1: 100, 2: 70, 3: 45 } as const;
 const fmtBRL = (v: number) =>
   Math.abs(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
-function fmtDelta(v: number): { texto: string; cor: string } {
-  if (v > 0) return { texto: `+${fmtBRL(v)}`, cor: 'text-emerald-400' };
-  if (v < 0) return { texto: `−${fmtBRL(v)}`, cor: 'text-red-400' };
-  return { texto: fmtBRL(0), cor: 'text-zinc-300' };
-}
-
 export function SquadPodium({ squads }: { squads: SquadCrescimento[] }) {
   const porPosicao = new Map(squads.map((s) => [s.posicao, s]));
 
   return (
     <div className="flex flex-col h-full rounded-2xl bg-zinc-900/40 border border-zinc-800 px-6 py-3">
       <div className="text-zinc-400 text-xs uppercase tracking-[0.2em] font-bold mb-2 text-center">
-        🚀 Maior crescimento do mês
+        🏆 Ranking MRR Ativo
       </div>
       <div className="flex items-end justify-center gap-8 flex-1 min-h-0">
         {ORDEM_VISUAL.map((pos) => {
@@ -43,14 +37,13 @@ export function SquadPodium({ squads }: { squads: SquadCrescimento[] }) {
               >
                 {s.squad}
               </div>
-              {(() => {
-                const d = fmtDelta(s.delta);
-                return (
-                  <div className={`font-bold ${d.cor} ${isLider ? 'text-4xl' : 'text-3xl'}`}>
-                    {d.texto}
-                  </div>
-                );
-              })()}
+              <div
+                className={`font-bold ${
+                  isLider ? 'text-emerald-300 text-4xl' : 'text-zinc-100 text-3xl'
+                }`}
+              >
+                {fmtBRL(s.delta)}
+              </div>
               <div
                 className={`w-full rounded-t-xl ${isLider ? 'shadow-[0_0_24px_rgba(251,191,36,0.35)]' : ''}`}
                 style={{

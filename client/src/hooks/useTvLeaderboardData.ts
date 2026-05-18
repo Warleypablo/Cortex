@@ -134,15 +134,19 @@ function buildSquadsAndCrescimento(
   });
 
   const ordered = [...current.squads].filter(s => s.squad !== 'Sem Squad');
-  const crescimento = ordered
+  // Pódio passa a refletir MRR Ativo absoluto (ranking principal da operação)
+  const rankingMrrAtivo = ordered
     .map((s, i) => ({
       squad: s.squad,
       cor: getSquadColor(s.squad, i),
-      delta: s.mrr - (prevMrrBySquad.get(s.squad) ?? s.mrr),
+      delta: s.mrr,
     }))
     .sort((a, b) => b.delta - a.delta);
-
-  const topGrowthSquad = crescimento[0]?.squad;
+  // topGrowthSquad continua sendo quem mais cresceu m/m (uso interno: badge "crescimento")
+  const crescimentoMM = ordered
+    .map((s) => ({ squad: s.squad, delta: s.mrr - (prevMrrBySquad.get(s.squad) ?? s.mrr) }))
+    .sort((a, b) => b.delta - a.delta);
+  const topGrowthSquad = crescimentoMM[0]?.squad;
   const lowestChurnSquad = [...ordered]
     .filter(s => s.mrr > 0)
     .sort((a, b) => a.mrrChurn - b.mrrChurn)[0]?.squad;
@@ -172,8 +176,8 @@ function buildSquadsAndCrescimento(
     };
   });
 
-  // Devolve TODOS já ordenados; UI corta top 3 após aplicar filtros visuais
-  const crescimentoSquads: SquadCrescimento[] = crescimento.map((c, idx) => ({
+  // Devolve TODOS já ordenados por MRR Ativo desc; UI corta top 3 após aplicar filtros visuais
+  const crescimentoSquads: SquadCrescimento[] = rankingMrrAtivo.map((c, idx) => ({
     squad: c.squad,
     cor: c.cor,
     delta: c.delta,
