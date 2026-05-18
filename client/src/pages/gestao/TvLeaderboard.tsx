@@ -34,7 +34,8 @@ function useFullscreen() {
 export default function TvLeaderboard() {
   const now = useRelogio();
   const { isFullscreen, toggle } = useFullscreen();
-  const { data, isLoading, error, dataUpdatedAt } = useTvLeaderboardData();
+  const { data, isLoading, error, dataUpdatedAt, rankingsLoading, rankingsError } =
+    useTvLeaderboardData();
 
   return (
     <div className="dark fixed inset-0 z-[100] bg-zinc-950 text-white flex flex-col overflow-hidden">
@@ -73,7 +74,14 @@ export default function TvLeaderboard() {
         {data && (
           <TvRotator
             intervalMs={30000}
-            screens={[<TelaSquads data={data} />, <TelaPessoas data={data} />]}
+            screens={[
+              <TelaSquads data={data} />,
+              <TelaPessoas
+                data={data}
+                rankingsLoading={rankingsLoading}
+                rankingsError={rankingsError}
+              />,
+            ]}
           />
         )}
       </main>

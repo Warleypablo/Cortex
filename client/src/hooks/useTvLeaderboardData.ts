@@ -433,10 +433,17 @@ export function useTvLeaderboardData() {
     };
   }
 
+  if (evoQ.error) {
+    // eslint-disable-next-line no-console
+    console.error('[tv-leaderboard] evolucao-mensal falhou:', evoQ.error);
+  }
+
   return {
     data,
     isLoading,
     error,
     dataUpdatedAt: dataUpdatedAt || Date.now(),
+    rankingsLoading: evoQ.isLoading || evoQ.isFetching,
+    rankingsError: evoQ.error as Error | undefined,
   };
 }
