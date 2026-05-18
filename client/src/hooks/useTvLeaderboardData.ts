@@ -188,8 +188,10 @@ type PessoaStats = {
   responsavel: string;
   squad: string;
   mrrAtivo: number;
-  mrrChurn: number;
+  mrrChurnAcum: number;
 };
+
+const MIN_BASE_ATIVA = 1000;
 
 function isInvalidResponsavel(r: string | null | undefined): boolean {
   if (!r) return true;
@@ -206,22 +208,23 @@ function aggregateByOperador(
   const map = new Map<string, PessoaStats>();
   if (!evo) return map;
 
+  // MRR ativo: apenas o mês corrente (base atual sob responsabilidade)
   for (const row of evo.mrr ?? []) {
     if (row.mes !== mesAtual) continue;
     if (isInvalidResponsavel(row.responsavel)) continue;
     const key = row.responsavel!.trim();
-    const prev = map.get(key) ?? { responsavel: key, squad: row.squad ?? '', mrrAtivo: 0, mrrChurn: 0 };
+    const prev = map.get(key) ?? { responsavel: key, squad: row.squad ?? '', mrrAtivo: 0, mrrChurnAcum: 0 };
     prev.mrrAtivo += Number(row.mrr_total) || 0;
     if (!prev.squad && row.squad) prev.squad = row.squad;
     map.set(key, prev);
   }
 
+  // Churn: acumulado em toda a janela retornada (até 12 meses) para gerar variância
   for (const row of evo.churns ?? []) {
-    if (row.mes !== mesAtual) continue;
     if (isInvalidResponsavel(row.responsavel)) continue;
     const key = row.responsavel!.trim();
-    const prev = map.get(key) ?? { responsavel: key, squad: row.squad ?? '', mrrAtivo: 0, mrrChurn: 0 };
-    prev.mrrChurn += Number(row.mrr_churn) || 0;
+    const prev = map.get(key) ?? { responsavel: key, squad: row.squad ?? '', mrrAtivo: 0, mrrChurnAcum: 0 };
+    prev.mrrChurnAcum += Number(row.mrr_churn) || 0;
     if (!prev.squad && row.squad) prev.squad = row.squad;
     map.set(key, prev);
   }
@@ -231,7 +234,7 @@ function aggregateByOperador(
 
 function buildRankingMrrAtivo(stats: PessoaStats[]): RankingPessoa[] {
   return stats
-    .filter(s => s.mrrAtivo > 0)
+    .filter(s => s.mrrAtivo >= MIN_BASE_ATIVA)
     .sort((a, b) => b.mrrAtivo - a.mrrAtivo)
     .slice(0, 10)
     .map((s, i) => ({
@@ -247,10 +250,14 @@ function buildRankingMrrAtivo(stats: PessoaStats[]): RankingPessoa[] {
 }
 
 function buildRankingAntiChurn(stats: PessoaStats[]): RankingPessoa[] {
-  // Anti-churn: operadores com menor churn no mes (mrrAtivo > 0 para garantir base real)
+  // Anti-churn: churn acumulado 12m absoluto (R$). Tie-breaker: maior MRR ativo (mais mérito).
   return stats
-    .filter(s => s.mrrAtivo > 0)
-    .sort((a, b) => a.mrrChurn - b.mrrChurn)
+    .filter(s => s.mrrAtivo >= MIN_BASE_ATIVA)
+    .sort((a, b) => {
+      const diff = a.mrrChurnAcum - b.mrrChurnAcum;
+      if (diff !== 0) return diff;
+      return b.mrrAtivo - a.mrrAtivo;
+    })
     .slice(0, 10)
     .map((s, i) => ({
       id: `anti-churn-${s.responsavel}`,
@@ -258,20 +265,24 @@ function buildRankingAntiChurn(stats: PessoaStats[]): RankingPessoa[] {
       avatarUrl: null,
       squad: s.squad,
       corSquad: getSquadColor(s.squad, i),
-      valor: s.mrrChurn,
+      valor: s.mrrChurnAcum,
       posicaoAtual: i + 1,
       posicaoAnterior: null,
     }));
 }
 
 function buildRankingNrr(stats: PessoaStats[]): RankingPessoa[] {
+  // Retenção % = base atual / (base atual + churn acumulado 12m). Sem expansion data, é a melhor proxy.
   return stats
-    .filter(s => s.mrrAtivo > 0)
+    .filter(s => s.mrrAtivo >= MIN_BASE_ATIVA)
     .map(s => ({
       ...s,
-      nrr: ((s.mrrAtivo - s.mrrChurn) / s.mrrAtivo) * 100,
+      nrr: (s.mrrAtivo / (s.mrrAtivo + s.mrrChurnAcum)) * 100,
     }))
-    .sort((a, b) => b.nrr - a.nrr)
+    .sort((a, b) => {
+      if (b.nrr !== a.nrr) return b.nrr - a.nrr;
+      return b.mrrAtivo - a.mrrAtivo;
+    })
     .slice(0, 10)
     .map((s, i) => ({
       id: `nrr-${s.responsavel}`,
@@ -328,9 +339,9 @@ export function useTvLeaderboardData() {
         staleTime: STALE_MS,
       },
       {
-        queryKey: ['tv', 'evolucao-mensal', 1],
+        queryKey: ['tv', 'evolucao-mensal', 12],
         queryFn: () =>
-          fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=1`),
+          fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=12`),
         staleTime: STALE_MS,
       },
     ],
