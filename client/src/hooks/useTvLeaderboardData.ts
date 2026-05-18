@@ -372,16 +372,15 @@ function buildRankingMrrAtivo(stats: PessoaStats[]): RankingPessoa[] {
 }
 
 function buildRankingAntiChurn(stats: PessoaStats[]): RankingPessoa[] {
+  // MRR Retido = base ativa − churn acumulado 6m. Combina "proteger base grande" com "evitar churn":
+  // base 285k com 0 churn ⇒ 285k; base 200k com 2k churn ⇒ 198k; base 5k com 0 churn ⇒ 5k.
   const top = topCrescimentoSet(stats);
   return stats
     .filter((s) => s.mrrAtivo >= MIN_BASE_ATIVA)
-    .sort((a, b) => {
-      const diff = a.mrrChurnAcum - b.mrrChurnAcum;
-      if (diff !== 0) return diff;
-      return b.mrrAtivo - a.mrrAtivo;
-    })
+    .map((s) => ({ s, retido: s.mrrAtivo - s.mrrChurnAcum }))
+    .sort((a, b) => b.retido - a.retido)
     .slice(0, RANKING_LIMITE)
-    .map((s, i) => montaPessoa(s, i, s.mrrChurnAcum, 'anti-churn', top));
+    .map((x, i) => montaPessoa(x.s, i, x.retido, 'mrr-retido', top));
 }
 
 function buildRankingNrr(stats: PessoaStats[]): RankingPessoa[] {

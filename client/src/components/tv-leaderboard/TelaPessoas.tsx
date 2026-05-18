@@ -53,7 +53,7 @@ export function TelaPessoas({ data, rankingsLoading, rankingsError }: Props) {
       {placeholder ?? (
         <div className="grid grid-cols-2 gap-4 min-h-0">
           <RankingColuna titulo="MRR Ativo" icone="💰" ranking={data.rankingMrr} metrica="mrr" />
-          <RankingColuna titulo="Anti-Churn" icone="🛡️" ranking={data.rankingAntiChurn} metrica="anti-churn" />
+          <RankingColuna titulo="MRR Retido" icone="🛡️" ranking={data.rankingAntiChurn} metrica="anti-churn" />
         </div>
       )}
     </div>
