@@ -150,9 +150,10 @@ function buildSquadsAndCrescimento(
   const squads: SquadKpi[] = ordered.map((s, i) => {
     const spark = sparklineBySquad.get(s.squad) ?? [];
     const sparkline = spark.length > 0 ? spark : Array(6).fill(s.mrr);
-    // Revenue churn: MRR perdido / MRR ativo do squad (mesmo método de ChurnDetalhamento).
-    // Ignoramos o churnRate do API (que é churns/contratos, não receita).
-    const churnPct = s.mrr > 0 ? (s.mrrChurn / s.mrr) * 100 : 0;
+    // Revenue churn = MRR perdido no mês / MRR base do início do mês (= MRR ativo do mês anterior).
+    // Fallback: MRR atual se não tiver snapshot do mês anterior.
+    const mrrBase = prevMrrBySquad.get(s.squad) ?? s.mrr;
+    const churnPct = mrrBase > 0 ? (s.mrrChurn / mrrBase) * 100 : 0;
     const badges: SquadKpi['badges'] = [];
     if (s.squad === topGrowthSquad) badges.push('crescimento');
     if (s.squad === lowestChurnSquad) badges.push('menor-churn');
@@ -161,6 +162,7 @@ function buildSquadsAndCrescimento(
       squad: s.squad,
       cor: getSquadColor(s.squad, i),
       mrrAtivo: s.mrr,
+      mrrBaseInicio: mrrBase,
       nrrPct: nrrGlobalPct,
       nrrDeltaPct: nrrGlobalDelta,
       churnValor: s.mrrChurn,

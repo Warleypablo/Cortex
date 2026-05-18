@@ -18,9 +18,11 @@ function labelDoChurn(pct: number) {
 }
 
 export function ChurnGlobalHero({ squads }: { squads: SquadKpi[] }) {
+  // Revenue churn consolidado = Σ MRR perdido / Σ MRR base do início do mês.
+  const baseInicioMes = squads.reduce((acc, s) => acc + s.mrrBaseInicio, 0);
   const baseAtiva = squads.reduce((acc, s) => acc + s.mrrAtivo, 0);
   const churnTotal = squads.reduce((acc, s) => acc + s.churnValor, 0);
-  const pct = baseAtiva > 0 ? (churnTotal / baseAtiva) * 100 : 0;
+  const pct = baseInicioMes > 0 ? (churnTotal / baseInicioMes) * 100 : 0;
   const pctClamp = Math.min(CHURN_MAX, Math.max(0, pct));
   const fillPct = (pctClamp / CHURN_MAX) * 100;
   const cor = corDoChurn(pct);
