@@ -387,7 +387,7 @@ Em ordem de gravidade:
 - [ ] E-mail templates / WhatsApp broadcast reconfigurados
 
 **Ichino (você):**
-- [ ] Política de privacidade da Turbo atualizada (LGPD — IP)
+- [x] Política de privacidade da Turbo atualizada (LGPD — IP) ✅
 - [ ] Material de treinamento escrito
 - [ ] Treinamento agendado/realizado com Lucas, Amanda, Aline, Caio Malini
 - [ ] Captura `referrer`/`fbclid`/`gclid` adicionada nas LPs + envio dos novos campos pro Bitrix (Etapa 5 — pendente investigação do repo das LPs)
