@@ -21,7 +21,9 @@ export function TelaSquads({ data }: { data: TvLeaderboardData }) {
     .map((s, idx) => ({ ...s, posicao: (idx + 1) as 1 | 2 | 3 }));
 
   return (
-    <div className="grid grid-rows-[12%_50%_38%] h-full gap-4 p-6 bg-zinc-950">
+    <div className="relative grid grid-rows-[12%_50%_38%] h-full gap-4 p-6 bg-zinc-950 overflow-hidden">
+      <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-emerald-500/10 blur-3xl" aria-hidden />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-blue-500/10 blur-3xl" aria-hidden />
       <div className="grid grid-cols-2 gap-4">
         <MetaFaturamentoHero data={data.meta} />
         <ChurnGlobalHero squads={visiveis} />

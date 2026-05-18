@@ -36,11 +36,16 @@ export function TelaPessoas({ data, rankingsLoading, rankingsError }: Props) {
   }
 
   return (
-    <div className="grid grid-rows-[auto_auto_1fr] h-full bg-zinc-950 p-6 gap-4">
-      <header className="text-center">
-        <h1 className="text-white text-3xl font-bold tracking-wider">
-          RANKING INDIVIDUAL — MAIO/2026
+    <div className="relative grid grid-rows-[auto_auto_1fr] h-full bg-zinc-950 p-6 gap-4 overflow-hidden">
+      {/* Glow ambiente */}
+      <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" aria-hidden />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl" aria-hidden />
+
+      <header className="relative text-center">
+        <h1 className="text-4xl font-black tracking-[0.25em] bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-300 bg-clip-text text-transparent drop-shadow-[0_0_24px_rgba(251,191,36,0.4)]">
+          🏆 RANKING INDIVIDUAL — MAIO/2026
         </h1>
+        <div className="mt-1 mx-auto h-px w-48 bg-gradient-to-r from-transparent via-amber-400/60 to-transparent" />
       </header>
 
       <KpisGlobaisHeader kpis={data.kpisGlobais} />
