@@ -12,7 +12,8 @@ const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
  *
  * Instagram inclui:
  *  - utm_source contendo 'instagram' ou igual a 'ig' (UTM marcação correta)
- *  - utm_campaign='linktree' AND utm_content='linktree' (links da bio do IG, mesmo se utm_source veio errado como facebook)
+ *  - utm_term='linktree' (Constituição UTM v1, vigência 21/05/2026 — Esther configura)
+ *  - utm_campaign='linktree' AND utm_content='linktree' (LEGADO — links da bio do IG pré-21/05)
  *  - source='WEB' (fonte do Bitrix "Contato - Instagram")
  *  - source='UC_4VCKGM' (fonte do Bitrix "Social Selling - Instagram")
  *
@@ -23,6 +24,7 @@ const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
 const PLATFORM_CASE_SQL = `CASE
   WHEN source = 'UC_4VCKGM' THEN 'instagram'
   WHEN source = 'WEB' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' THEN 'linkedin_ads'
@@ -45,6 +47,7 @@ END`;
 const PLATFORM_CASE_SQL_BASIC = `CASE
   WHEN source = 'UC_4VCKGM' THEN 'instagram'
   WHEN source = 'WEB' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
