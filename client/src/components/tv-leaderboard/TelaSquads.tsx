@@ -21,7 +21,7 @@ export function TelaSquads({ data }: { data: TvLeaderboardData }) {
     .map((s, idx) => ({ ...s, posicao: (idx + 1) as 1 | 2 | 3 }));
 
   return (
-    <div className="relative grid grid-rows-[auto_minmax(0,12%)_minmax(0,32%)_minmax(0,1fr)] h-full gap-4 p-6 bg-zinc-950 overflow-hidden">
+    <div className="relative grid grid-rows-[auto_minmax(0,12%)_minmax(0,1fr)_minmax(0,32%)] h-full gap-4 p-6 bg-zinc-950 overflow-hidden">
       <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" aria-hidden />
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-purple-500/10 blur-3xl" aria-hidden />
 
@@ -37,6 +37,8 @@ export function TelaSquads({ data }: { data: TvLeaderboardData }) {
         <ChurnGlobalHero squads={visiveis} />
       </div>
 
+      <SquadPodium squads={crescimentoVisivel} />
+
       <div
         className="grid gap-4"
         style={{ gridTemplateColumns: `repeat(${ordenadas.length}, minmax(0, 1fr))` }}
@@ -45,8 +47,6 @@ export function TelaSquads({ data }: { data: TvLeaderboardData }) {
           <SquadKpiCard key={s.squad} kpi={s} isLider={s.squad === liderId} />
         ))}
       </div>
-
-      <SquadPodium squads={crescimentoVisivel} />
     </div>
   );
 }
