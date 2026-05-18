@@ -340,9 +340,9 @@ export function useTvLeaderboardData() {
         staleTime: STALE_MS,
       },
       {
-        queryKey: ['tv', 'evolucao-mensal', 12],
+        queryKey: ['tv', 'evolucao-mensal', 6],
         queryFn: () =>
-          fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=12`),
+          fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=6`),
         staleTime: STALE_MS,
       },
     ],
@@ -350,12 +350,13 @@ export function useTvLeaderboardData() {
 
   const [okrQ, squadsCurQ, squadsPrevQ, nrrCurQ, nrrPrevQ, evoQ] = queries;
 
-  const isLoading = queries.some(q => q.isLoading);
+  // Bloqueia loading apenas nas queries críticas; secundárias podem demorar/falhar sem travar TV
+  const isLoading = okrQ.isLoading || squadsCurQ.isLoading;
   const error = queries.find(q => q.error)?.error as Error | undefined;
   const dataUpdatedAt = Math.max(...queries.map(q => q.dataUpdatedAt || 0));
 
   let data: TvLeaderboardData | undefined;
-  if (!isLoading && okrQ.data && squadsCurQ.data) {
+  if (okrQ.data && squadsCurQ.data) {
     const receitaYtd = Number(okrQ.data?.metrics?.receita_total_ytd) || 0;
     const nrrCur = Number(nrrCurQ.data?.nrr_pct) || 0;
     const nrrPrev = Number(nrrPrevQ.data?.nrr_pct) || 0;
