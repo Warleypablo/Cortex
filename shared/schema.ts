@@ -953,6 +953,12 @@ export const crmDeal = bitrixSchema.table("crm_deal", {
   utmCampaign: varchar("utm_campaign", { length: 255 }),
   utmTerm: varchar("utm_term", { length: 255 }),
   utmContent: varchar("utm_content", { length: 255 }),
+  utmMedium: varchar("utm_medium", { length: 64 }),
+  fbclid: varchar("fbclid", { length: 255 }),
+  gclid: varchar("gclid", { length: 255 }),
+  referrer: text("referrer"),
+  userAgent: text("user_agent"),
+  ip: varchar("ip", { length: 45 }),
   fnlNgc: text("fnl_ngc"),
 });
 
