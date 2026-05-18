@@ -19,7 +19,6 @@ function churnTermometroCor(pct: number) {
 }
 
 export function SquadKpiCard({ kpi, isLider }: { kpi: SquadKpi; isLider: boolean }) {
-  const seta = kpi.nrrDeltaPct >= 0 ? '⬆️' : '⬇️';
   const churnPctClamp = Math.min(CHURN_MAX, Math.max(0, kpi.churnPct));
   const churnFillPct = (churnPctClamp / CHURN_MAX) * 100;
   const churnAcimaMax = kpi.churnPct >= CHURN_MAX;
@@ -48,13 +47,6 @@ export function SquadKpiCard({ kpi, isLider }: { kpi: SquadKpi; isLider: boolean
       <div>
         <div className="text-zinc-400 text-xs uppercase">MRR Ativo</div>
         <div className="text-white text-5xl font-bold">{fmtBRL(kpi.mrrAtivo)}</div>
-      </div>
-
-      <div>
-        <div className="text-zinc-400 text-xs uppercase">NRR</div>
-        <div className="text-white text-2xl font-bold">
-          {kpi.nrrPct.toFixed(1)}% <span className="text-base">{seta}</span>
-        </div>
       </div>
 
       <div>
