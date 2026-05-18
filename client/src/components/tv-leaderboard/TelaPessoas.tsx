@@ -9,7 +9,7 @@ type Props = {
 };
 
 export function TelaPessoas({ data, rankingsLoading, rankingsError }: Props) {
-  const totalLinhas = data.rankingMrr.length + data.rankingAntiChurn.length;
+  const totalLinhas = data.rankingMrr.length + data.rankingCrescimento.length;
 
   let placeholder: React.ReactNode = null;
   if (totalLinhas === 0) {
@@ -53,7 +53,7 @@ export function TelaPessoas({ data, rankingsLoading, rankingsError }: Props) {
       {placeholder ?? (
         <div className="grid grid-cols-2 gap-4 min-h-0">
           <RankingColuna titulo="MRR Ativo" icone="💰" ranking={data.rankingMrr} metrica="mrr" />
-          <RankingColuna titulo="MRR Retido" icone="🛡️" ranking={data.rankingAntiChurn} metrica="anti-churn" />
+          <RankingColuna titulo="Crescimento" icone="🚀" ranking={data.rankingCrescimento} metrica="crescimento" />
         </div>
       )}
     </div>

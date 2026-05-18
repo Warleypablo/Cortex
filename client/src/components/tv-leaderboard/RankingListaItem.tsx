@@ -1,9 +1,21 @@
 import { Line, LineChart, ResponsiveContainer } from 'recharts';
 import type { BadgePessoa, RankingPessoa, RankingMetrica } from './types';
 
-function formatValor(metrica: RankingMetrica, valor: number) {
-  if (metrica === 'nrr') return `${valor.toFixed(1)}%`;
-  return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+function fmtBRLAbs(v: number) {
+  return Math.abs(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+}
+
+function formatValor(metrica: RankingMetrica, valor: number): { texto: string; cor: string } {
+  if (metrica === 'nrr') return { texto: `${valor.toFixed(1)}%`, cor: 'text-white' };
+  if (metrica === 'crescimento') {
+    if (valor > 0) return { texto: `+${fmtBRLAbs(valor)}`, cor: 'text-emerald-400' };
+    if (valor < 0) return { texto: `−${fmtBRLAbs(valor)}`, cor: 'text-red-400' };
+    return { texto: fmtBRLAbs(0), cor: 'text-zinc-400' };
+  }
+  return {
+    texto: valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }),
+    cor: 'text-white',
+  };
 }
 
 function iniciais(nome: string) {
@@ -106,9 +118,14 @@ export function RankingListaItem({
         {tend?.texto ?? '—'}
       </span>
 
-      <span className="text-white font-black w-24 text-right text-sm tracking-tight">
-        {formatValor(metrica, pessoa.valor)}
-      </span>
+      {(() => {
+        const v = formatValor(metrica, pessoa.valor);
+        return (
+          <span className={`font-black w-24 text-right text-sm tracking-tight ${v.cor}`}>
+            {v.texto}
+          </span>
+        );
+      })()}
     </li>
   );
 }

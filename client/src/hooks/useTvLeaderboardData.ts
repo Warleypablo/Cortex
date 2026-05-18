@@ -396,6 +396,28 @@ function buildRankingNrr(stats: PessoaStats[]): RankingPessoa[] {
     .map((x, i) => montaPessoa(x.s, i, x.nrr, 'nrr', top));
 }
 
+function ultimosDoisMeses(serie: Map<string, number>): { atual: number; anterior: number } {
+  const ordenado = Array.from(serie.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const n = ordenado.length;
+  return {
+    atual: n >= 1 ? ordenado[n - 1][1] : 0,
+    anterior: n >= 2 ? ordenado[n - 2][1] : 0,
+  };
+}
+
+function buildRankingCrescimento(stats: PessoaStats[]): RankingPessoa[] {
+  const top = topCrescimentoSet(stats);
+  return stats
+    .map((s) => {
+      const { atual, anterior } = ultimosDoisMeses(s.serieMrr);
+      return { s, atual, anterior, delta: atual - anterior };
+    })
+    .filter((x) => x.anterior >= MIN_BASE_ATIVA && x.atual >= MIN_BASE_ATIVA) // sem new joiners distorcendo
+    .sort((a, b) => b.delta - a.delta)
+    .slice(0, RANKING_LIMITE)
+    .map((x, i) => montaPessoa(x.s, i, x.delta, 'cresc', top));
+}
+
 // ---------- hook ----------
 export function useTvLeaderboardData() {
   const mesAtual = getCurrentMesAno();
@@ -492,6 +514,7 @@ export function useTvLeaderboardData() {
       rankingMrr: aplicarAvatar(buildRankingMrrAtivo(stats)),
       rankingNrr: aplicarAvatar(buildRankingNrr(stats)),
       rankingAntiChurn: aplicarAvatar(buildRankingAntiChurn(stats)),
+      rankingCrescimento: aplicarAvatar(buildRankingCrescimento(stats)),
       kpisGlobais: buildKpisGlobais(stats),
     };
   }
