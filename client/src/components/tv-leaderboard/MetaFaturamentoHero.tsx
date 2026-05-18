@@ -20,10 +20,14 @@ export function MetaFaturamentoHero({ data }: { data: MetaFaturamento }) {
   const cor = STATUS_COLORS[data.status];
 
   return (
-    <div className="flex items-center gap-6 rounded-xl bg-zinc-900 border border-zinc-800 px-5 py-3 h-full">
+    <div className="relative overflow-hidden flex items-center gap-6 rounded-xl bg-gradient-to-br from-emerald-500/20 via-emerald-500/5 to-transparent border border-zinc-800 ring-1 ring-emerald-500/40 px-5 py-3 h-full">
       <div className="flex flex-col">
-        <span className="text-zinc-400 text-[11px] uppercase tracking-wider">Faturamento YTD</span>
-        <span className="text-white text-2xl font-bold leading-tight">{fmtBRL(data.realizadoYtd)}</span>
+        <span className="text-zinc-400 text-[11px] uppercase tracking-[0.15em] font-semibold">
+          Faturamento YTD
+        </span>
+        <span className="text-2xl font-black leading-tight bg-gradient-to-r from-emerald-300 to-emerald-100 bg-clip-text text-transparent">
+          {fmtBRL(data.realizadoYtd)}
+        </span>
       </div>
 
       <div className="flex-1 flex flex-col gap-1">
