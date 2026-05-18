@@ -229,6 +229,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
+  '/gestao/tv-leaderboard': PERMISSION_KEYS.GESTAO.TV_LEADERBOARD,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
   '/triagem': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
