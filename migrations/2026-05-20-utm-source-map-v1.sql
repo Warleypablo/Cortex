@@ -34,8 +34,8 @@ CREATE TABLE public.utm_source_map (
   updated_at  timestamptz NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_utm_source_map_canonical ON public.utm_source_map(canonical);
-CREATE INDEX idx_utm_source_map_medium    ON public.utm_source_map(medium);
+CREATE INDEX IF NOT EXISTS idx_utm_source_map_canonical ON public.utm_source_map(canonical);
+CREATE INDEX IF NOT EXISTS idx_utm_source_map_medium    ON public.utm_source_map(medium);
 
 -- ------------------------------------------------------------
 -- 2. Seeds — legado (observado em Bitrix.crm_deal pré-21/05/2026)
@@ -53,7 +53,15 @@ INSERT INTO public.utm_source_map (raw, canonical, medium, paid, is_legacy, enti
   ('teste-n8n',      'test',        'test',     false, true,  NULL,            'Teste de fluxo n8n.'),
   ('claude-test',    'test',        'test',     false, true,  NULL,            'Teste de automação via Claude.'),
   ('ssource',        'test',        'test',     false, true,  NULL,            'Typo de "source".'),
-  ('source',         'test',        'test',     false, true,  NULL,            'Placeholder mal preenchido.');
+  ('source',         'test',        'test',     false, true,  NULL,            'Placeholder mal preenchido.')
+ON CONFLICT (raw) DO UPDATE SET
+  canonical   = EXCLUDED.canonical,
+  medium      = EXCLUDED.medium,
+  paid        = EXCLUDED.paid,
+  is_legacy   = EXCLUDED.is_legacy,
+  entity_from = EXCLUDED.entity_from,
+  notes       = EXCLUDED.notes,
+  updated_at  = NOW();
 
 -- ------------------------------------------------------------
 -- 3. Seeds — Constituição UTM Turbo v1 (vocabulário fechado)
@@ -86,7 +94,15 @@ INSERT INTO public.utm_source_map (raw, canonical, medium, paid, is_legacy, enti
   ('email-frio',        'email-frio',        'outbound', false, false, NULL, 'Cold email via Apollo/Reply/Lemlist.'),
   ('linkedin-outreach', 'linkedin-outreach', 'outbound', false, false, NULL, 'Conexão + DM via LinkedIn (Sales Navigator etc).'),
   ('whatsapp-frio',     'whatsapp-frio',     'outbound', false, false, NULL, 'Abordagem direta no WhatsApp do prospect.'),
-  ('ligacao',           'ligacao',           'outbound', false, false, NULL, 'Follow-up via cold call com link enviado depois.');
+  ('ligacao',           'ligacao',           'outbound', false, false, NULL, 'Follow-up via cold call com link enviado depois.')
+ON CONFLICT (raw) DO UPDATE SET
+  canonical   = EXCLUDED.canonical,
+  medium      = EXCLUDED.medium,
+  paid        = EXCLUDED.paid,
+  is_legacy   = EXCLUDED.is_legacy,
+  entity_from = EXCLUDED.entity_from,
+  notes       = EXCLUDED.notes,
+  updated_at  = NOW();
 
 -- Nota: eventos ficam fora da tabela — vocabulário aberto (nome-do-evento em slug).
 -- Qualquer deal com utm_medium='eventos' é tratado como evento na view.
