@@ -187,6 +187,17 @@ type EvolucaoMensalResp = {
   operadores: string[];
 };
 
+type TvOperadoresResp = {
+  operadores: Array<{
+    responsavel: string;
+    squad: string;
+    mrrAtual: number;
+    mrrMesAtualInicio: number;
+    mrrMesAnteriorInicio: number;
+    churn3m: number;
+  }>;
+};
+
 type PessoaStats = {
   responsavel: string;
   squad: string;
@@ -260,7 +271,6 @@ function aggregateByOperador(
   const map = new Map<string, PessoaStats>();
   if (!evo) return map;
 
-  // Constrói série mensal completa de MRR por pessoa e marca MRR atual
   for (const row of evo.mrr ?? []) {
     if (isInvalidResponsavel(row.responsavel)) continue;
     const key = row.responsavel!.trim();
@@ -272,7 +282,6 @@ function aggregateByOperador(
     map.set(key, prev);
   }
 
-  // Churn: acumulado em toda a janela retornada (até 12 meses) para gerar variância
   for (const row of evo.churns ?? []) {
     if (isInvalidResponsavel(row.responsavel)) continue;
     const key = row.responsavel!.trim();
@@ -282,6 +291,24 @@ function aggregateByOperador(
     map.set(key, prev);
   }
 
+  return map;
+}
+
+function aggregateFromTvEndpoint(resp: TvOperadoresResp | undefined): Map<string, PessoaStats> {
+  const map = new Map<string, PessoaStats>();
+  if (!resp) return map;
+  for (const row of resp.operadores ?? []) {
+    if (isInvalidResponsavel(row.responsavel)) continue;
+    const key = row.responsavel.trim();
+    const stats = novoStats(key, row.squad);
+    stats.mrrAtivo = row.mrrAtual;
+    stats.mrrChurnAcum = row.churn3m;
+    // Série: [3 meses atrás (sem snapshot, usamos início do mês anterior), início do mês atual, atual]
+    stats.serieMrr.set('mes-anterior', row.mrrMesAnteriorInicio);
+    stats.serieMrr.set('mes-atual-inicio', row.mrrMesAtualInicio);
+    stats.serieMrr.set('atual', row.mrrAtual);
+    map.set(key, stats);
+  }
   return map;
 }
 
@@ -461,9 +488,8 @@ export function useTvLeaderboardData() {
         staleTime: STALE_MS,
       },
       {
-        queryKey: ['tv', 'evolucao-mensal', 3],
-        queryFn: () =>
-          fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=3`),
+        queryKey: ['tv', 'operadores'],
+        queryFn: () => fetchJson<TvOperadoresResp>('/api/tv-leaderboard/operadores'),
         staleTime: STALE_MS,
       },
       {
@@ -500,7 +526,7 @@ export function useTvLeaderboardData() {
       nrrCur - nrrPrev,
     );
 
-    const statsMap = aggregateByOperador(evoQ.data, mesAtual);
+    const statsMap = aggregateFromTvEndpoint(evoQ.data as TvOperadoresResp | undefined);
     const stats = Array.from(statsMap.values());
 
     const resolveAvatar = buildAvatarResolver(colabQ.data, photosQ.data);
