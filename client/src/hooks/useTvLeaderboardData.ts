@@ -461,9 +461,9 @@ export function useTvLeaderboardData() {
         staleTime: STALE_MS,
       },
       {
-        queryKey: ['tv', 'evolucao-mensal', 6],
+        queryKey: ['tv', 'evolucao-mensal', 3],
         queryFn: () =>
-          fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=6`),
+          fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=3`),
         staleTime: STALE_MS,
       },
       {
