@@ -66,25 +66,19 @@ describe('useTvLeaderboardData', () => {
     const now = new Date();
     const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const evolucaoMensal = {
-      mrr: [
-        { mes: mesAtual, squad: 'Squad A', responsavel: 'Alice', mrr_total: 50_000 },
-        { mes: mesAtual, squad: 'Squad A', responsavel: 'Bob', mrr_total: 35_000 },
-        { mes: mesAtual, squad: 'Squad B', responsavel: 'Carla', mrr_total: 150_000 },
-        { mes: mesAtual, squad: 'Squad B', responsavel: 'Diego', mrr_total: 100_000 },
-        { mes: mesAtual, squad: 'Squad A', responsavel: 'Sem Responsável', mrr_total: 9_000 },
+    const tvOperadores = {
+      operadores: [
+        { responsavel: 'Alice', squad: 'Squad A', mrrAtual: 50_000, mrrMesAtualInicio: 48_000, mrrMesAnteriorInicio: 45_000, churn3m: 0 },
+        { responsavel: 'Bob', squad: 'Squad A', mrrAtual: 35_000, mrrMesAtualInicio: 36_000, mrrMesAnteriorInicio: 38_000, churn3m: 0 },
+        { responsavel: 'Carla', squad: 'Squad B', mrrAtual: 150_000, mrrMesAtualInicio: 148_000, mrrMesAnteriorInicio: 140_000, churn3m: 3_000 },
+        { responsavel: 'Diego', squad: 'Squad B', mrrAtual: 100_000, mrrMesAtualInicio: 95_000, mrrMesAnteriorInicio: 88_000, churn3m: 1_000 },
+        { responsavel: 'Sem Responsável', squad: 'Squad A', mrrAtual: 9_000, mrrMesAtualInicio: 8_000, mrrMesAnteriorInicio: 7_000, churn3m: 0 },
       ],
-      churns: [
-        { mes: mesAtual, squad: 'Squad B', responsavel: 'Carla', mrr_churn: 3_000, churns: 2 },
-        { mes: mesAtual, squad: 'Squad B', responsavel: 'Diego', mrr_churn: 1_000, churns: 1 },
-      ],
-      squads: ['Squad A', 'Squad B'],
-      operadores: ['Alice', 'Bob', 'Carla', 'Diego'],
     };
 
     global.fetch = mockFetchByUrl((url) => {
       if (url.includes('/api/okr2026/summary')) return okrSummary;
-      if (url.includes('/api/dashboard/evolucao-mensal')) return evolucaoMensal;
+      if (url.includes('/api/tv-leaderboard/operadores')) return tvOperadores;
       if (url.includes('/api/analise-squads')) return analiseSquads;
       if (url.includes('/api/analytics/nrr')) return { nrr_pct: 105 };
       return {};

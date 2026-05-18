@@ -6506,8 +6506,8 @@ export class DbStorage implements IStorage {
         GROUP BY a.adset_id, a.adset_name, a.status, a.optimization_goal, a.targeting_age_min, a.targeting_age_max, c.campaign_name
       ),
       adset_crm AS (
-        -- SPLIT_PART suporta Constituição UTM v1: utm_term = `{{adset.id}}-{{placement}}`.
-        -- Sem hífen, retorna o valor cru — compatível com legado.
+        -- SPLIT_PART suporta Constituicao UTM v1: utm_term no formato adsetId-placement.
+        -- Sem hifen, retorna o valor cru, compativel com legado.
         SELECT
           SPLIT_PART(utm_term, '-', 1) as adset_id,
           COUNT(*) as leads,
