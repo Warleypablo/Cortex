@@ -166,11 +166,12 @@ function buildSquadsAndCrescimento(
     };
   });
 
-  const crescimentoSquads: SquadCrescimento[] = crescimento.slice(0, 3).map((c, idx) => ({
+  // Devolve TODOS já ordenados; UI corta top 3 após aplicar filtros visuais
+  const crescimentoSquads: SquadCrescimento[] = crescimento.map((c, idx) => ({
     squad: c.squad,
     cor: c.cor,
     delta: c.delta,
-    posicao: (idx + 1) as 1 | 2 | 3,
+    posicao: Math.min(idx + 1, 3) as 1 | 2 | 3,
   }));
 
   return { squads, crescimentoSquads };
