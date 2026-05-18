@@ -117,9 +117,8 @@ function buildSquadsAndCrescimento(
   const prevMrrBySquad = new Map<string, number>();
   for (const s of prev?.squads ?? []) prevMrrBySquad.set(s.squad, s.mrr);
 
-  // Construir sparkline (últimos 6 pontos de evolução.mrr por squad)
   const sparklineBySquad = new Map<string, number[]>();
-  const evoMap = new Map<string, Map<string, number>>(); // squad -> mes -> mrr
+  const evoMap = new Map<string, Map<string, number>>();
   for (const row of current.evolucao?.mrr ?? []) {
     const sqMap = evoMap.get(row.squad) ?? new Map<string, number>();
     sqMap.set(row.mes, Number(row.mrr_total) || 0);
@@ -132,7 +131,6 @@ function buildSquadsAndCrescimento(
     sparklineBySquad.set(squad, sorted.slice(-6));
   });
 
-  // Identificar squads especiais para badges
   const ordered = [...current.squads].filter(s => s.squad !== 'Sem Squad');
   const crescimento = ordered
     .map((s, i) => ({
@@ -178,73 +176,110 @@ function buildSquadsAndCrescimento(
   return { squads, crescimentoSquads };
 }
 
-type MrrPorCloserRow = { closer: string; mrr: number; pontual: number; contratos: number };
-
-function buildRankingMrr(rows: MrrPorCloserRow[] | undefined): RankingPessoa[] {
-  if (!rows) return [];
-  return rows
-    .filter(r => r.closer && r.closer !== 'Não Atribuído' && r.mrr > 0)
-    .sort((a, b) => b.mrr - a.mrr)
-    .slice(0, 10)
-    .map((r, i) => ({
-      id: `mrr-${r.closer}`,
-      nome: r.closer,
-      avatarUrl: null,
-      squad: '',
-      corSquad: getSquadColor('', i),
-      valor: r.mrr,
-      posicaoAtual: i + 1,
-      posicaoAnterior: null,
-    }));
-}
-
-type ChurnPorResponsavelRow = {
-  responsavel: string;
-  quantidadeContratos: number;
-  valorTotal: number;
-  percentualChurn: number;
-  valorAtivoTotal: number;
+// ---------- agregação por operador (responsavel_geral) ----------
+type EvolucaoMensalResp = {
+  mrr: Array<{ mes: string; squad: string | null; responsavel: string | null; mrr_total: number | string }>;
+  churns: Array<{ mes: string; squad: string | null; responsavel: string | null; mrr_churn: number | string; churns: number | string }>;
+  squads: string[];
+  operadores: string[];
 };
 
-function buildRankingAntiChurn(rows: ChurnPorResponsavelRow[] | undefined): RankingPessoa[] {
-  if (!rows) return [];
-  return rows
-    .filter(r => r.responsavel && r.responsavel !== 'Sem responsável')
-    .sort((a, b) => a.valorTotal - b.valorTotal)
+type PessoaStats = {
+  responsavel: string;
+  squad: string;
+  mrrAtivo: number;
+  mrrChurn: number;
+};
+
+function isInvalidResponsavel(r: string | null | undefined): boolean {
+  if (!r) return true;
+  const t = r.trim();
+  if (!t) return true;
+  const lower = t.toLowerCase();
+  return lower === 'sem responsável' || lower === 'sem responsavel' || lower === 'não atribuído' || lower === 'nao atribuido';
+}
+
+function aggregateByOperador(
+  evo: EvolucaoMensalResp | undefined,
+  mesAtual: string,
+): Map<string, PessoaStats> {
+  const map = new Map<string, PessoaStats>();
+  if (!evo) return map;
+
+  for (const row of evo.mrr ?? []) {
+    if (row.mes !== mesAtual) continue;
+    if (isInvalidResponsavel(row.responsavel)) continue;
+    const key = row.responsavel!.trim();
+    const prev = map.get(key) ?? { responsavel: key, squad: row.squad ?? '', mrrAtivo: 0, mrrChurn: 0 };
+    prev.mrrAtivo += Number(row.mrr_total) || 0;
+    if (!prev.squad && row.squad) prev.squad = row.squad;
+    map.set(key, prev);
+  }
+
+  for (const row of evo.churns ?? []) {
+    if (row.mes !== mesAtual) continue;
+    if (isInvalidResponsavel(row.responsavel)) continue;
+    const key = row.responsavel!.trim();
+    const prev = map.get(key) ?? { responsavel: key, squad: row.squad ?? '', mrrAtivo: 0, mrrChurn: 0 };
+    prev.mrrChurn += Number(row.mrr_churn) || 0;
+    if (!prev.squad && row.squad) prev.squad = row.squad;
+    map.set(key, prev);
+  }
+
+  return map;
+}
+
+function buildRankingMrrAtivo(stats: PessoaStats[]): RankingPessoa[] {
+  return stats
+    .filter(s => s.mrrAtivo > 0)
+    .sort((a, b) => b.mrrAtivo - a.mrrAtivo)
     .slice(0, 10)
-    .map((r, i) => ({
-      id: `anti-churn-${r.responsavel}`,
-      nome: r.responsavel,
+    .map((s, i) => ({
+      id: `mrr-${s.responsavel}`,
+      nome: s.responsavel,
       avatarUrl: null,
-      squad: '',
-      corSquad: getSquadColor('', i),
-      valor: r.valorTotal,
+      squad: s.squad,
+      corSquad: getSquadColor(s.squad, i),
+      valor: s.mrrAtivo,
       posicaoAtual: i + 1,
       posicaoAnterior: null,
     }));
 }
 
-function buildRankingNrr(rows: ChurnPorResponsavelRow[] | undefined): RankingPessoa[] {
-  if (!rows) return [];
-  // NRR per pessoa aproximado: (valorAtivo - churn) / valorAtivo * 100
-  // Filtro pragmatico: requer pelo menos 1 contrato churn registrado E valorAtivo > 0
-  // Observação: nao temos contagem de clientes ativos por pessoa, entao MIN_CLIENTES_NRR
-  // foi aproximado por quantidadeContratos (churned) >= 1. Ver concerns no relatório da task.
-  return rows
-    .filter(r => r.responsavel && r.responsavel !== 'Sem responsável' && r.valorAtivoTotal > 0)
-    .map(r => ({
-      ...r,
-      nrr: ((r.valorAtivoTotal - r.valorTotal) / r.valorAtivoTotal) * 100,
+function buildRankingAntiChurn(stats: PessoaStats[]): RankingPessoa[] {
+  // Anti-churn: operadores com menor churn no mes (mrrAtivo > 0 para garantir base real)
+  return stats
+    .filter(s => s.mrrAtivo > 0)
+    .sort((a, b) => a.mrrChurn - b.mrrChurn)
+    .slice(0, 10)
+    .map((s, i) => ({
+      id: `anti-churn-${s.responsavel}`,
+      nome: s.responsavel,
+      avatarUrl: null,
+      squad: s.squad,
+      corSquad: getSquadColor(s.squad, i),
+      valor: s.mrrChurn,
+      posicaoAtual: i + 1,
+      posicaoAnterior: null,
+    }));
+}
+
+function buildRankingNrr(stats: PessoaStats[]): RankingPessoa[] {
+  return stats
+    .filter(s => s.mrrAtivo > 0)
+    .map(s => ({
+      ...s,
+      nrr: ((s.mrrAtivo - s.mrrChurn) / s.mrrAtivo) * 100,
     }))
     .sort((a, b) => b.nrr - a.nrr)
     .slice(0, 10)
-    .map((r, i) => ({
-      id: `nrr-${r.responsavel}`,
-      nome: r.responsavel,
+    .map((s, i) => ({
+      id: `nrr-${s.responsavel}`,
+      nome: s.responsavel,
       avatarUrl: null,
-      squad: '',
-      corSquad: getSquadColor('', i),
-      valor: r.nrr,
+      squad: s.squad,
+      corSquad: getSquadColor(s.squad, i),
+      valor: s.nrr,
       posicaoAtual: i + 1,
       posicaoAnterior: null,
     }));
@@ -293,25 +328,15 @@ export function useTvLeaderboardData() {
         staleTime: STALE_MS,
       },
       {
-        queryKey: ['tv', 'mrr-por-closer', dataInicio, dataFim],
+        queryKey: ['tv', 'evolucao-mensal', 1],
         queryFn: () =>
-          fetchJson<MrrPorCloserRow[]>(
-            `/api/vendas/mrr-por-closer?dataInicio=${dataInicio}&dataFim=${dataFim}`,
-          ),
-        staleTime: STALE_MS,
-      },
-      {
-        queryKey: ['tv', 'churn-por-responsavel', mesAtual],
-        queryFn: () =>
-          fetchJson<ChurnPorResponsavelRow[]>(
-            `/api/churn-por-responsavel?mesInicio=${mesAtual}&mesFim=${mesAtual}`,
-          ),
+          fetchJson<EvolucaoMensalResp>(`/api/dashboard/evolucao-mensal?meses=1`),
         staleTime: STALE_MS,
       },
     ],
   });
 
-  const [okrQ, squadsCurQ, squadsPrevQ, nrrCurQ, nrrPrevQ, mrrCloserQ, churnRespQ] = queries;
+  const [okrQ, squadsCurQ, squadsPrevQ, nrrCurQ, nrrPrevQ, evoQ] = queries;
 
   const isLoading = queries.some(q => q.isLoading);
   const error = queries.find(q => q.error)?.error as Error | undefined;
@@ -331,13 +356,16 @@ export function useTvLeaderboardData() {
       nrrCur - nrrPrev,
     );
 
+    const statsMap = aggregateByOperador(evoQ.data, mesAtual);
+    const stats = Array.from(statsMap.values());
+
     data = {
       meta,
       squads,
       crescimentoSquads,
-      rankingMrr: buildRankingMrr(mrrCloserQ.data),
-      rankingNrr: buildRankingNrr(churnRespQ.data),
-      rankingAntiChurn: buildRankingAntiChurn(churnRespQ.data),
+      rankingMrr: buildRankingMrrAtivo(stats),
+      rankingNrr: buildRankingNrr(stats),
+      rankingAntiChurn: buildRankingAntiChurn(stats),
     };
   }
 

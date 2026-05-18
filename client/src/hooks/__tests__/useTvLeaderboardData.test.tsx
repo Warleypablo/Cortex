@@ -63,35 +63,30 @@ describe('useTvLeaderboardData', () => {
       metrics: { receita_total_ytd: 9_800_000, nrr_pct: 105 },
     };
 
-    const mrrCloser = [
-      { closer: 'Alice', mrr: 50_000, pontual: 0, contratos: 3 },
-      { closer: 'Bob', mrr: 35_000, pontual: 0, contratos: 2 },
-      { closer: 'Não Atribuído', mrr: 1000, pontual: 0, contratos: 1 },
-    ];
+    const now = new Date();
+    const mesAtual = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    const churnResp = [
-      {
-        responsavel: 'Carla',
-        quantidadeContratos: 2,
-        valorTotal: 3_000,
-        percentualChurn: 2.1,
-        valorAtivoTotal: 150_000,
-      },
-      {
-        responsavel: 'Diego',
-        quantidadeContratos: 1,
-        valorTotal: 1_000,
-        percentualChurn: 1.0,
-        valorAtivoTotal: 100_000,
-      },
-    ];
+    const evolucaoMensal = {
+      mrr: [
+        { mes: mesAtual, squad: 'Squad A', responsavel: 'Alice', mrr_total: 50_000 },
+        { mes: mesAtual, squad: 'Squad A', responsavel: 'Bob', mrr_total: 35_000 },
+        { mes: mesAtual, squad: 'Squad B', responsavel: 'Carla', mrr_total: 150_000 },
+        { mes: mesAtual, squad: 'Squad B', responsavel: 'Diego', mrr_total: 100_000 },
+        { mes: mesAtual, squad: 'Squad A', responsavel: 'Sem Responsável', mrr_total: 9_000 },
+      ],
+      churns: [
+        { mes: mesAtual, squad: 'Squad B', responsavel: 'Carla', mrr_churn: 3_000, churns: 2 },
+        { mes: mesAtual, squad: 'Squad B', responsavel: 'Diego', mrr_churn: 1_000, churns: 1 },
+      ],
+      squads: ['Squad A', 'Squad B'],
+      operadores: ['Alice', 'Bob', 'Carla', 'Diego'],
+    };
 
     global.fetch = mockFetchByUrl((url) => {
       if (url.includes('/api/okr2026/summary')) return okrSummary;
+      if (url.includes('/api/dashboard/evolucao-mensal')) return evolucaoMensal;
       if (url.includes('/api/analise-squads')) return analiseSquads;
       if (url.includes('/api/analytics/nrr')) return { nrr_pct: 105 };
-      if (url.includes('/api/vendas/mrr-por-closer')) return mrrCloser;
-      if (url.includes('/api/churn-por-responsavel')) return churnResp;
       return {};
     }) as unknown as typeof fetch;
   });
@@ -110,9 +105,13 @@ describe('useTvLeaderboardData', () => {
     expect(result.current.data!.rankingNrr.length).toBeGreaterThan(0);
     expect(result.current.data!.rankingAntiChurn.length).toBeGreaterThan(0);
     expect(result.current.data!.crescimentoSquads.length).toBeGreaterThan(0);
-    // Não atribuído deve ser filtrado
+    // Sem Responsável deve ser filtrado
     expect(
-      result.current.data!.rankingMrr.find((r) => r.nome === 'Não Atribuído'),
+      result.current.data!.rankingMrr.find((r) => r.nome === 'Sem Responsável'),
     ).toBeUndefined();
+    // MRR ranking deve estar ordenado por MRR ativo desc
+    expect(result.current.data!.rankingMrr[0].nome).toBe('Carla');
+    // Anti-churn: quem nao churnou (Alice/Bob com 0) deve vir antes
+    expect(result.current.data!.rankingAntiChurn[0].valor).toBe(0);
   });
 });
