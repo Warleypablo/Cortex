@@ -6282,13 +6282,15 @@ export class DbStorage implements IStorage {
       ORDER BY name
     `);
 
-    // Get distinct UTM terms (adset IDs) with names from meta_adsets
+    // Get distinct UTM terms (adset IDs) with names from meta_adsets.
+    // SPLIT_PART suporta o novo formato Constituição UTM v1: `{{adset.id}}-{{placement}}`
+    // (ex: `120242625739510450-instagram_stories`). Sem hífen, retorna o valor cru — compatível com legado.
     const utmTermsResult = await db.execute(sql`
-      SELECT DISTINCT 
-        d.utm_term as id,
-        COALESCE(a.adset_name, d.utm_term) as name
+      SELECT DISTINCT
+        SPLIT_PART(d.utm_term, '-', 1) as id,
+        COALESCE(a.adset_name, SPLIT_PART(d.utm_term, '-', 1)) as name
       FROM ${schema.crmDeal} d
-      LEFT JOIN ${schema.metaAdsets} a ON d.utm_term = a.adset_id
+      LEFT JOIN ${schema.metaAdsets} a ON SPLIT_PART(d.utm_term, '-', 1) = a.adset_id
       WHERE d.utm_term IS NOT NULL
       ORDER BY name
     `);
@@ -6504,8 +6506,10 @@ export class DbStorage implements IStorage {
         GROUP BY a.adset_id, a.adset_name, a.status, a.optimization_goal, a.targeting_age_min, a.targeting_age_max, c.campaign_name
       ),
       adset_crm AS (
-        SELECT 
-          utm_term as adset_id,
+        -- SPLIT_PART suporta Constituição UTM v1: utm_term = `{{adset.id}}-{{placement}}`.
+        -- Sem hífen, retorna o valor cru — compatível com legado.
+        SELECT
+          SPLIT_PART(utm_term, '-', 1) as adset_id,
           COUNT(*) as leads,
           COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as won,
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) END), 0) as won_value
@@ -6517,8 +6521,8 @@ export class DbStorage implements IStorage {
           ${leadFilters?.stageNames?.length ? sql`AND stage_name = ANY(${leadFilters.stageNames})` : sql``}
           ${leadFilters?.utmSources?.length ? sql`AND utm_source = ANY(${leadFilters.utmSources})` : sql``}
           ${leadFilters?.utmCampaigns?.length ? sql`AND utm_campaign = ANY(${leadFilters.utmCampaigns})` : sql``}
-          ${leadFilters?.utmTerms?.length ? sql`AND utm_term = ANY(${leadFilters.utmTerms})` : sql``}
-        GROUP BY utm_term
+          ${leadFilters?.utmTerms?.length ? sql`AND SPLIT_PART(utm_term, '-', 1) = ANY(${leadFilters.utmTerms})` : sql``}
+        GROUP BY SPLIT_PART(utm_term, '-', 1)
       )
       SELECT 
         am.adset_id as "adsetId",
