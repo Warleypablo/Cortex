@@ -2210,6 +2210,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint leve dedicado ao TV Leaderboard de Gestão.
+  // Retorna por operador (responsavel_geral): MRR ativo atual, MRR no início do
+  // mês atual (snapshot), MRR no início do mês anterior, e churn acumulado 3m.
+  // Squads internos excluídos.
+  app.get("/api/tv-leaderboard/operadores", async (req, res) => {
+    try {
+      const SQUADS_EXCLUIDOS_LIST = sql`('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')`;
+
+      const result = await db.execute(sql`
+        WITH atual AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        snap_inicio_mes_atual AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot = DATE_TRUNC('month', CURRENT_DATE)::date
+            AND status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        snap_inicio_mes_anterior AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date
+            AND status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        churn_3m AS (
+          SELECT responsavel_geral AS responsavel, squad, SUM(valor_r) AS total
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE data_solicitacao_encerramento >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '2 months')
+            AND valor_r > 0
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel_geral IS NOT NULL
+          GROUP BY responsavel_geral, squad
+        )
+        SELECT
+          COALESCE(a.responsavel, sa.responsavel, sb.responsavel, c.responsavel) AS responsavel,
+          COALESCE(a.squad, sa.squad, sb.squad, c.squad) AS squad,
+          COALESCE(a.mrr, 0) AS mrr_atual,
+          COALESCE(sa.mrr, 0) AS mrr_mes_atual_inicio,
+          COALESCE(sb.mrr, 0) AS mrr_mes_anterior_inicio,
+          COALESCE(c.total, 0) AS churn_3m
+        FROM atual a
+        FULL OUTER JOIN snap_inicio_mes_atual sa
+          ON LOWER(TRIM(a.responsavel)) = LOWER(TRIM(sa.responsavel))
+        FULL OUTER JOIN snap_inicio_mes_anterior sb
+          ON LOWER(TRIM(COALESCE(a.responsavel, sa.responsavel))) = LOWER(TRIM(sb.responsavel))
+        FULL OUTER JOIN churn_3m c
+          ON LOWER(TRIM(COALESCE(a.responsavel, sa.responsavel, sb.responsavel))) = LOWER(TRIM(c.responsavel))
+      `);
+
+      const operadores = result.rows.map((r: any) => ({
+        responsavel: String(r.responsavel ?? '').trim(),
+        squad: String(r.squad ?? '').trim(),
+        mrrAtual: Number(r.mrr_atual) || 0,
+        mrrMesAtualInicio: Number(r.mrr_mes_atual_inicio) || 0,
+        mrrMesAnteriorInicio: Number(r.mrr_mes_anterior_inicio) || 0,
+        churn3m: Number(r.churn_3m) || 0,
+      }));
+
+      res.json({ operadores });
+    } catch (error) {
+      console.error("[api] Error fetching tv-leaderboard/operadores:", error);
+      res.status(500).json({ error: "Failed to fetch tv-leaderboard operadores" });
+    }
+  });
+
   // Gerar insights de IA sobre evolução mensal (SSE streaming)
   app.post("/api/dashboard/evolucao-mensal/insights", async (req, res) => {
     try {
