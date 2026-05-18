@@ -113,5 +113,7 @@ describe('useTvLeaderboardData', () => {
     expect(result.current.data!.rankingMrr[0].nome).toBe('Carla');
     // Anti-churn (MRR Retido = base - churn): maior base com menos churn vence
     expect(result.current.data!.rankingAntiChurn[0].valor).toBeGreaterThan(0);
+    // Crescimento existe (lista pode estar vazia se fixture tem só 1 mês)
+    expect(result.current.data!.rankingCrescimento).toBeDefined();
   });
 });

@@ -30,8 +30,14 @@ function iniciais(nome: string) {
   return nome.split(' ').slice(0, 2).map((p) => p[0]).join('').toUpperCase();
 }
 
-function formatValor(metrica: RankingMetrica, valor: number) {
+function formatValor(metrica: RankingMetrica, valor: number): string {
   if (metrica === 'nrr') return `${valor.toFixed(1)}%`;
+  if (metrica === 'crescimento') {
+    const abs = Math.abs(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+    if (valor > 0) return `+${abs}`;
+    if (valor < 0) return `−${abs}`;
+    return abs;
+  }
   return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
 

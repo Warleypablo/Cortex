@@ -41,7 +41,7 @@ export type RankingPessoa = {
   badges: BadgePessoa[];
 };
 
-export type RankingMetrica = 'mrr' | 'nrr' | 'anti-churn';
+export type RankingMetrica = 'mrr' | 'nrr' | 'anti-churn' | 'crescimento';
 
 export type KpisGlobais = {
   operadoresAtivos: number;
@@ -56,5 +56,6 @@ export type TvLeaderboardData = {
   rankingMrr: RankingPessoa[];
   rankingNrr: RankingPessoa[];
   rankingAntiChurn: RankingPessoa[];
+  rankingCrescimento: RankingPessoa[];
   kpisGlobais: KpisGlobais;
 };
