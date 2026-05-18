@@ -15,7 +15,10 @@ export function TelaSquads({ data }: { data: TvLeaderboardData }) {
   const visiveis = data.squads.filter((s) => !isOculta(s.squad));
   const ordenadas = [...visiveis].sort((a, b) => b.mrrAtivo - a.mrrAtivo);
   const liderId = ordenadas[0]?.squad;
-  const crescimentoVisivel = data.crescimentoSquads.filter((s) => !isOculta(s.squad));
+  const crescimentoVisivel = data.crescimentoSquads
+    .filter((s) => !isOculta(s.squad))
+    .slice(0, 3)
+    .map((s, idx) => ({ ...s, posicao: (idx + 1) as 1 | 2 | 3 }));
 
   return (
     <div className="grid grid-rows-[15%_60%_25%] h-full gap-4 p-6 bg-zinc-950">
