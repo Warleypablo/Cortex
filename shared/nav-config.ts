@@ -46,6 +46,7 @@ export const PERMISSION_KEYS = {
     BP_PRODUTOS: 'gestao.bp_produtos',
     CAPACITY: 'gestao.capacity',
     ANALISE_PREDITIVA: 'gestao.analise_preditiva',
+    TV_LEADERBOARD: 'gestao.tv_leaderboard',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -228,6 +229,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
+  '/gestao/tv-leaderboard': PERMISSION_KEYS.GESTAO.TV_LEADERBOARD,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
   '/triagem': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
@@ -449,6 +451,7 @@ export const NAV_CONFIG = {
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
         { title: 'Triagem Inteligente', url: '/triagem', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
+        { title: 'TV Leaderboard', url: '/gestao/tv-leaderboard', icon: 'Tv', permissionKey: PERMISSION_KEYS.GESTAO.TV_LEADERBOARD },
       ],
     },
     {
