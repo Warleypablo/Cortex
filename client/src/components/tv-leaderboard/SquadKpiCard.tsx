@@ -10,9 +10,20 @@ const BADGE_LABEL: Record<NonNullable<SquadKpi['badges'][number]>, string> = {
   meta: '🎯 Bateu meta',
 };
 
+const CHURN_MAX = 8;
+
+function churnTermometroCor(pct: number) {
+  if (pct <= 3) return 'bg-emerald-500';
+  if (pct <= 5) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
 export function SquadKpiCard({ kpi, isLider }: { kpi: SquadKpi; isLider: boolean }) {
   const seta = kpi.nrrDeltaPct >= 0 ? '⬆️' : '⬇️';
-  const churnAcimaMeta = kpi.churnPct > 3;
+  const churnPctClamp = Math.min(CHURN_MAX, Math.max(0, kpi.churnPct));
+  const churnFillPct = (churnPctClamp / CHURN_MAX) * 100;
+  const churnAcimaMax = kpi.churnPct >= CHURN_MAX;
+  const churnCor = churnTermometroCor(kpi.churnPct);
 
   return (
     <div
@@ -31,18 +42,39 @@ export function SquadKpiCard({ kpi, isLider }: { kpi: SquadKpi; isLider: boolean
         <div className="text-white text-5xl font-bold">{fmtBRL(kpi.mrrAtivo)}</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <div className="text-zinc-400 text-xs uppercase">NRR</div>
-          <div className="text-white text-2xl font-bold">
-            {kpi.nrrPct.toFixed(1)}% <span className="text-base">{seta}</span>
-          </div>
+      <div>
+        <div className="text-zinc-400 text-xs uppercase">NRR</div>
+        <div className="text-white text-2xl font-bold">
+          {kpi.nrrPct.toFixed(1)}% <span className="text-base">{seta}</span>
         </div>
-        <div>
-          <div className="text-zinc-400 text-xs uppercase">Churn</div>
-          <div className={`text-2xl font-bold ${churnAcimaMeta ? 'text-red-400' : 'text-white'}`}>
+      </div>
+
+      <div>
+        <div className="flex items-baseline justify-between">
+          <span className="text-zinc-400 text-xs uppercase">Churn</span>
+          <span className={`text-xl font-bold ${churnAcimaMax ? 'text-red-400' : 'text-white'}`}>
             {kpi.churnPct.toFixed(1)}%
-          </div>
+          </span>
+        </div>
+        <div className="relative h-3 mt-1 rounded-full bg-zinc-800 overflow-hidden">
+          <div
+            className={`h-full ${churnCor} transition-[width] duration-500`}
+            style={{ width: `${churnFillPct}%` }}
+          />
+          <div
+            className="absolute top-0 bottom-0 w-px bg-zinc-500"
+            style={{ left: `${(3 / CHURN_MAX) * 100}%` }}
+            aria-hidden
+          />
+          <div
+            className="absolute top-0 bottom-0 w-px bg-zinc-500"
+            style={{ left: `${(5 / CHURN_MAX) * 100}%` }}
+            aria-hidden
+          />
+        </div>
+        <div className="flex justify-between text-[10px] text-zinc-500 mt-0.5">
+          <span>0%</span>
+          <span>máx {CHURN_MAX}%</span>
         </div>
       </div>
 
