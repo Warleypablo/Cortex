@@ -27,10 +27,14 @@ export function ChurnGlobalHero({ squads }: { squads: SquadKpi[] }) {
   const status = labelDoChurn(pct);
 
   return (
-    <div className="flex items-center gap-6 rounded-xl bg-zinc-900 border border-zinc-800 px-5 py-3 h-full">
+    <div className="relative overflow-hidden flex items-center gap-6 rounded-xl bg-gradient-to-br from-red-500/20 via-red-500/5 to-transparent border border-zinc-800 ring-1 ring-red-500/40 px-5 py-3 h-full">
       <div className="flex flex-col">
-        <span className="text-zinc-400 text-[11px] uppercase tracking-wider">Churn Consolidado</span>
-        <span className="text-white text-2xl font-bold leading-tight">{pct.toFixed(2)}%</span>
+        <span className="text-zinc-400 text-[11px] uppercase tracking-[0.15em] font-semibold">
+          Churn Consolidado
+        </span>
+        <span className="text-2xl font-black leading-tight bg-gradient-to-r from-red-300 to-orange-200 bg-clip-text text-transparent">
+          {pct.toFixed(2)}%
+        </span>
       </div>
 
       <div className="flex-1 flex flex-col gap-1">
