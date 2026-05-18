@@ -111,7 +111,7 @@ describe('useTvLeaderboardData', () => {
     ).toBeUndefined();
     // MRR ranking deve estar ordenado por MRR ativo desc
     expect(result.current.data!.rankingMrr[0].nome).toBe('Carla');
-    // Anti-churn: quem nao churnou (Alice/Bob com 0) deve vir antes
-    expect(result.current.data!.rankingAntiChurn[0].valor).toBe(0);
+    // Anti-churn (MRR Retido = base - churn): maior base com menos churn vence
+    expect(result.current.data!.rankingAntiChurn[0].valor).toBeGreaterThan(0);
   });
 });
