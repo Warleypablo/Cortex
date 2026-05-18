@@ -1,3 +1,4 @@
+import { KpisGlobaisHeader } from './KpisGlobaisHeader';
 import { RankingColuna } from './RankingColuna';
 import type { TvLeaderboardData } from './types';
 
@@ -35,14 +36,17 @@ export function TelaPessoas({ data, rankingsLoading, rankingsError }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950 p-6 gap-4">
+    <div className="grid grid-rows-[auto_auto_1fr] h-full bg-zinc-950 p-6 gap-4">
       <header className="text-center">
         <h1 className="text-white text-3xl font-bold tracking-wider">
           RANKING INDIVIDUAL — MAIO/2026
         </h1>
       </header>
+
+      <KpisGlobaisHeader kpis={data.kpisGlobais} />
+
       {placeholder ?? (
-        <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
+        <div className="grid grid-cols-2 gap-4 min-h-0">
           <RankingColuna titulo="MRR Ativo" icone="💰" ranking={data.rankingMrr} metrica="mrr" />
           <RankingColuna titulo="Anti-Churn" icone="🛡️" ranking={data.rankingAntiChurn} metrica="anti-churn" />
         </div>

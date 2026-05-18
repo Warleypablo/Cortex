@@ -14,16 +14,16 @@ export function RankingColuna({
   metrica: RankingMetrica;
 }) {
   const top3 = ranking.slice(0, 3);
-  const resto = ranking.slice(3, 10);
+  const resto = ranking.slice(3, 15);
 
   return (
-    <section className="flex flex-col rounded-2xl bg-zinc-900 border border-zinc-800 p-5 h-full">
+    <section className="flex flex-col rounded-2xl bg-zinc-900 border border-zinc-800 p-5 h-full min-h-0">
       <header className="flex items-center gap-2 mb-4">
         <span className="text-2xl" aria-hidden>{icone}</span>
         <h2 className="text-white text-xl font-bold uppercase tracking-wider">{titulo}</h2>
       </header>
       <PodiumTop3 top3={top3} metrica={metrica} />
-      <ul className="flex-1 overflow-hidden">
+      <ul className="flex-1 overflow-y-auto pr-1">
         {resto.map((p) => (
           <RankingListaItem key={p.id} pessoa={p} metrica={metrica} />
         ))}

@@ -25,6 +25,8 @@ export type MetaFaturamento = {
   status: 'no-ritmo' | 'atras' | 'critico';
 };
 
+export type BadgePessoa = 'streak' | 'sem-churn' | 'top-crescimento';
+
 export type RankingPessoa = {
   id: string;
   nome: string;
@@ -34,9 +36,18 @@ export type RankingPessoa = {
   valor: number;
   posicaoAtual: number;
   posicaoAnterior: number | null;
+  sparkline: number[];
+  tendenciaPct: number;
+  badges: BadgePessoa[];
 };
 
 export type RankingMetrica = 'mrr' | 'nrr' | 'anti-churn';
+
+export type KpisGlobais = {
+  operadoresAtivos: number;
+  mrrTotalBase: number;
+  churnAcumulado6m: number;
+};
 
 export type TvLeaderboardData = {
   meta: MetaFaturamento;
@@ -45,4 +56,5 @@ export type TvLeaderboardData = {
   rankingMrr: RankingPessoa[];
   rankingNrr: RankingPessoa[];
   rankingAntiChurn: RankingPessoa[];
+  kpisGlobais: KpisGlobais;
 };
