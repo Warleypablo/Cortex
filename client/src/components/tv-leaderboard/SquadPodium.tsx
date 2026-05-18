@@ -7,7 +7,13 @@ const ORDEM_VISUAL = [2, 1, 3] as const;
 const ALTURA_BARRA_PCT = { 1: 100, 2: 70, 3: 45 } as const;
 
 const fmtBRL = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+  Math.abs(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+
+function fmtDelta(v: number): { texto: string; cor: string } {
+  if (v > 0) return { texto: `+${fmtBRL(v)}`, cor: 'text-emerald-400' };
+  if (v < 0) return { texto: `−${fmtBRL(v)}`, cor: 'text-red-400' };
+  return { texto: fmtBRL(0), cor: 'text-zinc-300' };
+}
 
 export function SquadPodium({ squads }: { squads: SquadCrescimento[] }) {
   const porPosicao = new Map(squads.map((s) => [s.posicao, s]));
@@ -37,13 +43,14 @@ export function SquadPodium({ squads }: { squads: SquadCrescimento[] }) {
               >
                 {s.squad}
               </div>
-              <div
-                className={`font-bold ${
-                  isLider ? 'text-emerald-400 text-4xl' : 'text-emerald-300 text-3xl'
-                }`}
-              >
-                +{fmtBRL(s.delta)}
-              </div>
+              {(() => {
+                const d = fmtDelta(s.delta);
+                return (
+                  <div className={`font-bold ${d.cor} ${isLider ? 'text-4xl' : 'text-3xl'}`}>
+                    {d.texto}
+                  </div>
+                );
+              })()}
               <div
                 className={`w-full rounded-t-xl ${isLider ? 'shadow-[0_0_24px_rgba(251,191,36,0.35)]' : ''}`}
                 style={{
