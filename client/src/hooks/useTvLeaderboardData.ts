@@ -506,7 +506,7 @@ export function useTvLeaderboardData() {
     isLoading,
     error,
     dataUpdatedAt: dataUpdatedAt || Date.now(),
-    rankingsLoading: evoQ.isLoading || evoQ.isFetching,
+    rankingsLoading: evoQ.isLoading,
     rankingsError: evoQ.error as Error | undefined,
   };
 }
