@@ -134,15 +134,19 @@ function buildSquadsAndCrescimento(
   });
 
   const ordered = [...current.squads].filter(s => s.squad !== 'Sem Squad');
-  const crescimento = ordered
+  // Pódio passa a refletir MRR Ativo absoluto (ranking principal da operação)
+  const rankingMrrAtivo = ordered
     .map((s, i) => ({
       squad: s.squad,
       cor: getSquadColor(s.squad, i),
-      delta: s.mrr - (prevMrrBySquad.get(s.squad) ?? s.mrr),
+      delta: s.mrr,
     }))
     .sort((a, b) => b.delta - a.delta);
-
-  const topGrowthSquad = crescimento[0]?.squad;
+  // topGrowthSquad continua sendo quem mais cresceu m/m (uso interno: badge "crescimento")
+  const crescimentoMM = ordered
+    .map((s) => ({ squad: s.squad, delta: s.mrr - (prevMrrBySquad.get(s.squad) ?? s.mrr) }))
+    .sort((a, b) => b.delta - a.delta);
+  const topGrowthSquad = crescimentoMM[0]?.squad;
   const lowestChurnSquad = [...ordered]
     .filter(s => s.mrr > 0)
     .sort((a, b) => a.mrrChurn - b.mrrChurn)[0]?.squad;
@@ -150,7 +154,10 @@ function buildSquadsAndCrescimento(
   const squads: SquadKpi[] = ordered.map((s, i) => {
     const spark = sparklineBySquad.get(s.squad) ?? [];
     const sparkline = spark.length > 0 ? spark : Array(6).fill(s.mrr);
-    const churnPct = s.churnRate ?? (s.mrr > 0 ? (s.mrrChurn / s.mrr) * 100 : 0);
+    // Revenue churn = MRR perdido no mês / MRR base do início do mês (= MRR ativo do mês anterior).
+    // Fallback: MRR atual se não tiver snapshot do mês anterior.
+    const mrrBase = prevMrrBySquad.get(s.squad) ?? s.mrr;
+    const churnPct = mrrBase > 0 ? (s.mrrChurn / mrrBase) * 100 : 0;
     const badges: SquadKpi['badges'] = [];
     if (s.squad === topGrowthSquad) badges.push('crescimento');
     if (s.squad === lowestChurnSquad) badges.push('menor-churn');
@@ -159,6 +166,7 @@ function buildSquadsAndCrescimento(
       squad: s.squad,
       cor: getSquadColor(s.squad, i),
       mrrAtivo: s.mrr,
+      mrrBaseInicio: mrrBase,
       nrrPct: nrrGlobalPct,
       nrrDeltaPct: nrrGlobalDelta,
       churnValor: s.mrrChurn,
@@ -168,8 +176,8 @@ function buildSquadsAndCrescimento(
     };
   });
 
-  // Devolve TODOS já ordenados; UI corta top 3 após aplicar filtros visuais
-  const crescimentoSquads: SquadCrescimento[] = crescimento.map((c, idx) => ({
+  // Devolve TODOS já ordenados por MRR Ativo desc; UI corta top 3 após aplicar filtros visuais
+  const crescimentoSquads: SquadCrescimento[] = rankingMrrAtivo.map((c, idx) => ({
     squad: c.squad,
     cor: c.cor,
     delta: c.delta,
