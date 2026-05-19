@@ -84,6 +84,7 @@ export const PERMISSION_KEYS = {
     FUNIL_CONVERSAO: 'growth.funil_conversao',
     INSTAGRAM: 'growth.instagram',
     PLANEJAMENTO_METAS: 'growth.planejamento_metas',
+    UTM_BUILDER: 'growth.utm_builder',
   },
   // G&G (Pessoas)
   GG: {
@@ -266,6 +267,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
   '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
   '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
+  '/utm-builder': PERMISSION_KEYS.GROWTH.UTM_BUILDER,
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
   '/dashboard/recrutamento': PERMISSION_KEYS.GG.RECRUTAMENTO,
@@ -480,6 +482,7 @@ export const NAV_CONFIG = {
         { title: 'Planejamento de Metas', url: '/growth/planejamento-metas', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.GROWTH.PLANEJAMENTO_METAS },
         { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Instagram', url: '/growth/instagram', icon: 'Instagram', permissionKey: PERMISSION_KEYS.GROWTH.INSTAGRAM },
+        { title: 'Gerador de UTMs', url: '/utm-builder', icon: 'Link2', permissionKey: PERMISSION_KEYS.GROWTH.UTM_BUILDER },
       ],
     },
     {

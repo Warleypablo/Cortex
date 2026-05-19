@@ -3398,3 +3398,38 @@ export type InsertInternalVideo = typeof internalVideos.$inferInsert;
 export type InsertInternalVideoCompletion = typeof internalVideoCompletions.$inferInsert;
 export type InsertInternalVideoLike = typeof internalVideoLikes.$inferInsert;
 export type InsertInternalVideoComment = typeof internalVideoComments.$inferInsert;
+
+// ============== UTM BUILDER ==============
+// Constituição UTM Turbo v1 — gerador de UTMs com vocabulário fechado
+
+export const utmVocabulary = cortexCoreSchema.table("utm_vocabulary", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  field: varchar("field", { length: 20 }).notNull(), // 'campaign' | 'term'
+  medium: varchar("medium", { length: 20 }).notNull(),
+  source: varchar("source", { length: 40 }), // NULL = vale pra qualquer source do medium
+  value: varchar("value", { length: 120 }).notNull(),
+  labelPt: text("label_pt").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const generatedUtmLinks = cortexCoreSchema.table("generated_utm_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  baseUrl: text("base_url").notNull(),
+  utmSource: varchar("utm_source", { length: 40 }).notNull(),
+  utmMedium: varchar("utm_medium", { length: 20 }).notNull(),
+  utmCampaign: varchar("utm_campaign", { length: 120 }),
+  utmTerm: varchar("utm_term", { length: 120 }),
+  utmContent: varchar("utm_content", { length: 200 }),
+  fullUrl: text("full_url").notNull(),
+  isAdhoc: boolean("is_adhoc").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type UtmVocabulary = typeof utmVocabulary.$inferSelect;
+export type InsertUtmVocabulary = typeof utmVocabulary.$inferInsert;
+export type GeneratedUtmLink = typeof generatedUtmLinks.$inferSelect;
+export type InsertGeneratedUtmLink = typeof generatedUtmLinks.$inferInsert;
