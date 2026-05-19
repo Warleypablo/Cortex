@@ -53,6 +53,7 @@ import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
+import { registerUtmRoutes } from "./routes/utm";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
@@ -8099,6 +8100,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Favorites Module - registered from separate file
   registerFavoritesRoutes(app);
+
+  // UTM Builder - registered from separate file
+  registerUtmRoutes(app);
 
   // BP Produtos Module
   registerBpProdutosRoutes(app);

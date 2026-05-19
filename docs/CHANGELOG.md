@@ -1,5 +1,43 @@
 # Changelog
 
+## 2026-05-19 | feat(utm): UTM Builder + Constituição UTM Turbo v1.1
+
+**O que foi feito:**
+- Página `/utm-builder` com 3 abas: Gerar link, Histórico, Configurar valores
+- Geração de links com vocabulário fechado de medium/source + dropdowns dependentes de campaign/term
+- Sanitização ao vivo (lowercase, hífen, sem acento) + sanitização final no submit
+- Tabela `cortex_core.utm_vocabulary` (vocabulário oficial de campaign/term) e `cortex_core.generated_utm_links` (auditoria)
+- Aba Histórico mostra todos os links gerados pelo time, com filtros (medium, busca, só não-oficializados) e paginação
+- Aba Configurar valores (admin only) com sub-tabs por medium, edição de label, switch ativo/inativo, oficializar e dispensar valores ad-hoc
+- Documento `docs/utm-constituicao.md` (Constituição UTM Turbo v1.1) — fonte normativa do padrão de UTMs da Turbo
+
+**Por que:**
+- Padronizar 100% da criação de links pelo time, evitando voltar ao caos de 16 variantes de `utm_source` que motivou a auditoria de 07/05/2026
+- Bloquear erros na origem (UI) em vez de tentar consertar no banco depois
+- Dar autonomia ao admin pra cadastrar valores novos (campaign/term) sem PR — só medium/source ficam fixos no código
+
+**Arquivos novos:**
+- `migrations/2026-05-19-utm-builder.sql` - schema + seed v1.1
+- `shared/utm-vocabulary.ts` - vocabulário fechado de medium+source (Constituição)
+- `shared/utm-sanitize.ts` - sanitização e construção de URL
+- `server/routes/utm.ts` - 9 endpoints (geração, histórico, vocabulário, admin)
+- `client/src/pages/UtmBuilder.tsx` - página com 3 abas
+- `scripts/run-utm-builder-migration.ts` - aplica migration em ambientes novos
+- `docs/utm-constituicao.md` - documento normativo v1.1
+
+**Arquivos alterados:**
+- `shared/schema.ts` - tabelas `utmVocabulary` e `generatedUtmLinks` no Drizzle
+- `shared/nav-config.ts` - permission key `growth.utm_builder` + entrada de menu
+- `server/routes.ts` - registro de `registerUtmRoutes`
+- `client/src/App.tsx` - rota `/utm-builder`
+- `client/src/components/app-sidebar.tsx` - ícone `Link2` no menu
+
+**Impacto arquitetural:**
+- Cria 2 tabelas em `cortex_core` (não toca em `Bitrix.crm_deal`)
+- Sem dependência da branch `feature/utm-constituicao-v1` (que cuida do map de normalização legado→canônico) — as 2 features são complementares: gerador (input) + map (output)
+
+---
+
 ## 2026-03-18 | feat(pagamentos): highlight overdue cards in red when delivery deadline exceeded
 
 **O que foi feito:**

@@ -61,6 +61,7 @@ const DetailColaborador = lazyWithRetry(() => import("@/pages/DetailColaborador"
 const Patrimonio = lazyWithRetry(() => import("@/pages/Patrimonio"));
 const PatrimonioDetail = lazyWithRetry(() => import("@/pages/PatrimonioDetail"));
 const Ferramentas = lazyWithRetry(() => import("@/pages/Ferramentas"));
+const UtmBuilder = lazyWithRetry(() => import("@/pages/UtmBuilder"));
 const TurboZap = lazyWithRetry(() => import("@/pages/TurboZap"));
 const Atendimento = lazyWithRetry(() => import("@/pages/Atendimento"));
 const ChatAtendimento = lazyWithRetry(() => import("@/pages/ChatAtendimento"));
@@ -317,7 +318,8 @@ function ProtectedRouter() {
         {() => <ProtectedRoute path="/gestao/tv-leaderboard" component={TvLeaderboard} />}
       </Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
-      
+      <Route path="/utm-builder">{() => <ProtectedRoute path="/utm-builder" component={UtmBuilder} />}</Route>
+
       {/* Financeiro */}
       <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
       <Route path="/dashboard/fluxo-caixa">{() => <ProtectedRoute path="/dashboard/fluxo-caixa" component={FluxoCaixa} />}</Route>
