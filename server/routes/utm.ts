@@ -8,6 +8,7 @@ import {
   type UtmMedium,
 } from "../../shared/utm-vocabulary";
 import { sanitizeUtmValue, sanitizeBaseUrl, buildUtmUrl } from "../../shared/utm-sanitize";
+import { isGrowthTeam } from "../../shared/growth-team";
 
 export function registerUtmRoutes(app: Express) {
   const getUserId = (req: any): string => {
@@ -15,9 +16,12 @@ export function registerUtmRoutes(app: Express) {
     return user?.googleId || user?.id || "";
   };
 
-  const requireAdmin = (req: any, res: any, next: any) => {
-    if (!req.user || req.user.role !== "admin") {
-      return res.status(403).json({ error: "Acesso restrito a admins." });
+  const requireVocabularyEditor = (req: any, res: any, next: any) => {
+    const user = req.user as any;
+    const isAdmin = user?.role === "admin";
+    const isGrowth = isGrowthTeam(user?.email);
+    if (!user || (!isAdmin && !isGrowth)) {
+      return res.status(403).json({ error: "Acesso restrito ao time de Growth e admins." });
     }
     next();
   };
@@ -238,7 +242,7 @@ export function registerUtmRoutes(app: Express) {
   // ==========================================================================
 
   // GET /api/utm/vocabulary/all?field=&medium=&source=&active=
-  app.get("/api/utm/vocabulary/all", requireAdmin, async (req, res) => {
+  app.get("/api/utm/vocabulary/all", requireVocabularyEditor, async (req, res) => {
     try {
       const { field, medium, source, active } = req.query as Record<string, string | undefined>;
       const wheres: string[] = [];
@@ -276,7 +280,7 @@ export function registerUtmRoutes(app: Express) {
   });
 
   // POST /api/utm/vocabulary — cadastrar novo valor
-  app.post("/api/utm/vocabulary", requireAdmin, async (req, res) => {
+  app.post("/api/utm/vocabulary", requireVocabularyEditor, async (req, res) => {
     try {
       const userId = getUserId(req);
       const { field, medium, source, value, labelPt } = req.body as Record<string, string | undefined>;
@@ -313,7 +317,7 @@ export function registerUtmRoutes(app: Express) {
   });
 
   // PATCH /api/utm/vocabulary/:id — editar label / ativar-desativar
-  app.patch("/api/utm/vocabulary/:id", requireAdmin, async (req, res) => {
+  app.patch("/api/utm/vocabulary/:id", requireVocabularyEditor, async (req, res) => {
     try {
       const { id } = req.params;
       const { labelPt, isActive } = req.body as { labelPt?: string; isActive?: boolean };
@@ -351,7 +355,7 @@ export function registerUtmRoutes(app: Express) {
 
   // GET /api/utm/adhoc-pending — lista valores ad-hoc ainda não cadastrados
   // (já cadastrado ATIVO ou INATIVO = não aparece aqui — "dispensar" cria entrada inativa)
-  app.get("/api/utm/adhoc-pending", requireAdmin, async (_req, res) => {
+  app.get("/api/utm/adhoc-pending", requireVocabularyEditor, async (_req, res) => {
     try {
       const result = await pool.query(`
         SELECT DISTINCT
@@ -397,7 +401,7 @@ export function registerUtmRoutes(app: Express) {
 
   // POST /api/utm/adhoc-dismiss — dispensa um valor pendente sem oficializar
   // Cria entrada como inativa em utm_vocabulary (some das pendências, mas não vai pro dropdown)
-  app.post("/api/utm/adhoc-dismiss", requireAdmin, async (req, res) => {
+  app.post("/api/utm/adhoc-dismiss", requireVocabularyEditor, async (req, res) => {
     try {
       const userId = getUserId(req);
       const { field, medium, source, value } = req.body as Record<string, string | null | undefined>;

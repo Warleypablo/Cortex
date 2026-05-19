@@ -28,6 +28,7 @@ import {
   type UtmMedium,
 } from "@shared/utm-vocabulary";
 import { sanitizeUtmValue, sanitizeUtmValueLive, buildUtmUrl } from "@shared/utm-sanitize";
+import { isGrowthTeam } from "@shared/growth-team";
 
 interface VocabularyItem {
   id: string;
@@ -57,9 +58,9 @@ export default function UtmBuilder() {
   usePageTitle("Gerador de UTMs");
   useSetPageInfo("Gerador de UTMs", "Constituição UTM Turbo v1");
 
-  // Badge de pendências — só busca se for admin
+  // Badge de pendências — só busca se for admin ou time de Growth
   const { data: user } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
-  const isAdmin = user?.role === "admin";
+  const canEditVocabulary = user?.role === "admin" || isGrowthTeam(user?.email);
   const { data: adhocs } = useQuery<AdhocPendingItem[]>({
     queryKey: ["/api/utm/adhoc-pending"],
     queryFn: async () => {
@@ -67,7 +68,7 @@ export default function UtmBuilder() {
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: isAdmin,
+    enabled: canEditVocabulary,
   });
   const pendingCount = adhocs?.length || 0;
 
@@ -86,7 +87,7 @@ export default function UtmBuilder() {
           <TabsTrigger value="configurar" data-testid="tab-configurar">
             <Settings className="w-4 h-4 mr-2" />
             Configurar valores
-            {isAdmin && pendingCount > 0 && (
+            {canEditVocabulary && pendingCount > 0 && (
               <Badge variant="default" className="ml-2 bg-amber-500 hover:bg-amber-500 text-white">
                 {pendingCount}
               </Badge>
@@ -709,7 +710,7 @@ function TabConfigurar() {
     queryKey: ["/api/auth/me"],
   });
 
-  const isAdmin = user?.role === "admin";
+  const canEdit = user?.role === "admin" || isGrowthTeam(user?.email);
 
   if (userLoading) {
     return (
@@ -721,7 +722,7 @@ function TabConfigurar() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canEdit) {
     return (
       <Card>
         <CardContent className="p-6">
@@ -729,7 +730,7 @@ function TabConfigurar() {
             <ShieldAlert className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-2xl font-bold mb-2">Acesso restrito</h2>
             <p className="text-muted-foreground max-w-md mx-auto">
-              Esta aba é restrita a admins do Cortex. Se você precisa cadastrar um valor novo de campaign ou term, peça pra um admin.
+              Esta aba é restrita ao time de Growth e admins do Cortex. Se você precisa cadastrar um valor novo de campaign ou term, peça pra alguém do time de Growth.
             </p>
           </div>
         </CardContent>
