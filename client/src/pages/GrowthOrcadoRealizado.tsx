@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Pencil, Save, X, Copy, Camera, Play, Briefcase, AlertCircle, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Pencil, Save, X, Copy, Camera, Play, Briefcase, AlertCircle, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
@@ -25,6 +25,7 @@ interface Metric {
   type: MetricType;
   orcado: number | string | null;
   realizado: number | string | null;
+  realizadoAnterior?: number | null;
   percentual: number | null;
   format: 'currency' | 'number' | 'percent';
   isHeader?: boolean;
@@ -523,6 +524,18 @@ const INVERTED_METRIC_IDS = new Set([
   'ig_percPerdaSeguidores', 'ig_deixaramSeguir',
 ]);
 
+// Merge realizadoAnterior do array `prev` no array `cur` casando por id.
+function mergePrevRealizado(cur: Metric[], prev: Metric[]): Metric[] {
+  const prevMap = new Map<string, number | null>();
+  for (const m of prev) {
+    prevMap.set(m.id, typeof m.realizado === 'number' ? m.realizado : null);
+  }
+  return cur.map(m => ({
+    ...m,
+    realizadoAnterior: prevMap.has(m.id) ? prevMap.get(m.id)! : null,
+  }));
+}
+
 export default function GrowthOrcadoRealizado() {
   usePageTitle("Gestão de Metas");
   useSetPageInfo("Gestão de Metas", "Controle de Métricas de Marketing e Vendas");
@@ -626,6 +639,21 @@ export default function GrowthOrcadoRealizado() {
       endDate: format(compareRange.to, 'yyyy-MM-dd'),
     };
   }, [compareEnabled, compareRange]);
+
+  const compareActive = !!prevDateRange;
+  const [compareColumnsOpen, setCompareColumnsOpen] = useState(false);
+  const showCompareColumns = compareActive && compareColumnsOpen;
+  const compareTableColSpan = showCompareColumns ? 10 : 7;
+
+  // Label dos dois períodos no cabeçalho da tabela (ex.: "01/05/2026 – 19/05/2026")
+  const currentRangeLabel = useMemo(() => {
+    if (!customDateRange?.from || !customDateRange?.to) return null;
+    return `${format(customDateRange.from, 'dd/MM/yyyy')} – ${format(customDateRange.to, 'dd/MM/yyyy')}`;
+  }, [customDateRange]);
+  const compareRangeLabel = useMemo(() => {
+    if (!compareRange?.from || !compareRange?.to) return null;
+    return `${format(compareRange.from, 'dd/MM/yyyy')} – ${format(compareRange.to, 'dd/MM/yyyy')}`;
+  }, [compareRange]);
 
   // Fetch budgets from DB (falls back to defaults)
   const { data: budgetsData } = useQuery<Record<string, any>>({
@@ -778,19 +806,59 @@ export default function GrowthOrcadoRealizado() {
     return formatValue(metric.orcado, metric.format);
   };
 
+  // Helpers para colunas de comparação
+  const renderDeltaAbs = (
+    atual: number | null,
+    anterior: number | null | undefined,
+    format: 'currency' | 'number' | 'percent',
+    isInverted: boolean,
+  ) => {
+    if (atual === null || anterior === null || anterior === undefined) {
+      return <span className="text-muted-foreground">—</span>;
+    }
+    const diff = atual - anterior;
+    const isGood = isInverted ? diff <= 0 : diff >= 0;
+    const color = diff === 0
+      ? ''
+      : isGood
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-red-600 dark:text-red-400';
+    const sign = diff > 0 ? '+' : '';
+    return <span className={color}>{sign}{formatValue(diff, format)}</span>;
+  };
+
+  const renderDeltaPct = (
+    atual: number | null,
+    anterior: number | null | undefined,
+    isInverted: boolean,
+  ) => {
+    if (atual === null || anterior === null || anterior === undefined || anterior === 0) {
+      return <span className="text-muted-foreground">—</span>;
+    }
+    const pct = ((atual - anterior) / Math.abs(anterior)) * 100;
+    const isGood = isInverted ? pct <= 0 : pct >= 0;
+    const color = pct === 0
+      ? ''
+      : isGood
+        ? 'text-emerald-600 dark:text-emerald-400'
+        : 'text-red-600 dark:text-red-400';
+    const sign = pct > 0 ? '+' : '';
+    return <span className={color}>{sign}{pct.toFixed(1)}%</span>;
+  };
+
   // Shared table body renderer for Consolidado & Aprofundado
   const renderMetricTableBody = (sections: MetricSection[]) =>
     sections.map((section, sIdx) => (
       <Fragment key={`section-${section.title}`}>
         {/* Section header */}
         <TableRow className="bg-muted/50 border-l-4 border-l-primary/40">
-          <TableCell colSpan={7} className="text-xs font-semibold uppercase tracking-wide py-2.5 text-muted-foreground">
+          <TableCell colSpan={compareTableColSpan} className="text-xs font-semibold uppercase tracking-wide py-2.5 text-muted-foreground">
             {section.title}
           </TableCell>
         </TableRow>
         {section.banner && (
           <TableRow className="bg-amber-50/50 dark:bg-amber-950/20 border-l-4 border-l-amber-400 dark:border-l-amber-500">
-            <TableCell colSpan={7} className="text-xs py-2 text-amber-900 dark:text-amber-200">
+            <TableCell colSpan={compareTableColSpan} className="text-xs py-2 text-amber-900 dark:text-amber-200">
               {section.banner}
             </TableCell>
           </TableRow>
@@ -874,6 +942,21 @@ export default function GrowthOrcadoRealizado() {
               <TableCell className="text-right text-sm font-medium">
                 {formatValue(m.realizado, m.format)}
               </TableCell>
+              {showCompareColumns && (
+                <>
+                  <TableCell className="text-right text-sm text-muted-foreground">
+                    {m.realizadoAnterior !== null && m.realizadoAnterior !== undefined
+                      ? formatValue(m.realizadoAnterior, m.format)
+                      : <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium">
+                    {renderDeltaAbs(realizadoNum, m.realizadoAnterior, m.format, isInverted)}
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium">
+                    {renderDeltaPct(realizadoNum, m.realizadoAnterior, isInverted)}
+                  </TableCell>
+                </>
+              )}
               <TableCell className={cn("text-right text-sm font-semibold", percColor)}>
                 <div className="flex flex-col items-end gap-0.5">
                   <span>{m.percentual !== null ? `${m.percentual.toFixed(1)}%` : '-'}</span>
@@ -919,6 +1002,13 @@ export default function GrowthOrcadoRealizado() {
                 </TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
                 <TableCell className="text-right text-sm font-medium">{row.clicks.toLocaleString('pt-BR')}</TableCell>
+                {showCompareColumns && (
+                  <>
+                    <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                  </>
+                )}
                 <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
                 <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
@@ -927,7 +1017,7 @@ export default function GrowthOrcadoRealizado() {
             ))}
             {expanded && linkBioFonte !== 'linktree_ga4' && (
               <TableRow className="bg-muted/20 hover:bg-muted/20">
-                <TableCell colSpan={7} className="text-[11px] text-muted-foreground italic pl-10 py-2">
+                <TableCell colSpan={compareTableColSpan} className="text-[11px] text-muted-foreground italic pl-10 py-2">
                   Fonte: Instagram (profile_links_taps). Detalhamento por link disponível apenas via Linktree GA4.
                 </TableCell>
               </TableRow>
@@ -938,7 +1028,7 @@ export default function GrowthOrcadoRealizado() {
         {/* Section separator */}
         {sIdx < sections.length - 1 && (
           <TableRow className="h-2 border-0 hover:bg-transparent">
-            <TableCell colSpan={7} className="p-0 h-2" />
+            <TableCell colSpan={compareTableColSpan} className="p-0 h-2" />
           </TableRow>
         )}
       </Fragment>
@@ -1112,11 +1202,58 @@ export default function GrowthOrcadoRealizado() {
     staleTime: 0,
   });
 
-  const mqlMetrics: Metric[] = useMemo(() => {
-    const data = mqlData || {} as MQLMetrics;
-    return [
-      { 
-        id: 'mql_ra_perc', 
+  // ===== Previous-period queries for platform-specific data (aprofundado view) =====
+  const { data: prevMetaAdsDetailData } = useQuery<MetaAdsDetailMetrics | null>({
+    queryKey: ['/api/growth/orcado-realizado/meta-ads', prevDateRange?.startDate, prevDateRange?.endDate, selectedProdutos, selectedPlataformas, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/meta-ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}${funilParam}${utmSourceParam}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: prevGoogleAdsDetailData } = useQuery<GoogleAdsDetailMetrics | null>({
+    queryKey: ['/api/growth/orcado-realizado/google-ads', prevDateRange?.startDate, prevDateRange?.endDate, selectedProdutos, selectedPlataformas, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/google-ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}${funilParam}${utmSourceParam}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: prevInstagramDetailData } = useQuery<InstagramDetailMetrics | null>({
+    queryKey: ['/api/growth/orcado-realizado/instagram', prevDateRange?.startDate, prevDateRange?.endDate, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/instagram?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: prevFunnelByPlatformData } = useQuery<Record<string, PlatformFunnelData> | null>({
+    queryKey: ['/api/growth/orcado-realizado/funnel-by-platform', prevDateRange?.startDate, prevDateRange?.endDate, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/funnel-by-platform?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const buildMqlMetrics = (data: MQLMetrics): Metric[] => [
+      {
+        id: 'mql_ra_perc',
         name: '%RA MQL', 
         type: 'manual', 
         orcado: ORCADO_MQL.percReuniaoAgendada, 
@@ -1275,12 +1412,15 @@ export default function GrowthOrcadoRealizado() {
         format: 'currency'
       },
     ];
-  }, [mqlData, ORCADO_MQL]);
+
+  const mqlMetrics: Metric[] = useMemo(() => {
+    const cur = buildMqlMetrics(mqlData || {} as MQLMetrics);
+    if (!prevMqlData) return cur;
+    return mergePrevRealizado(cur, buildMqlMetrics(prevMqlData));
+  }, [mqlData, prevMqlData, ORCADO_MQL]);
 
   // Métricas de Marketing (usando dados reais da API)
-  const adsMetrics: Metric[] = useMemo(() => {
-    const data = adsData || {} as AdsMetrics;
-    return [
+  const buildAdsMetrics = (data: AdsMetrics): Metric[] => [
       { id: 'investimento', name: 'Investimento', type: 'manual', orcado: ORCADO_ADS.investimento, realizado: data.investimento ?? 0, percentual: calcPercentual(ORCADO_ADS.investimento, data.investimento), format: 'currency' },
       { id: 'cpm', name: 'CPM', type: 'formula', orcado: ORCADO_ADS.cpm, realizado: data.cpm ?? null, percentual: calcPercentual(ORCADO_ADS.cpm, data.cpm), format: 'currency' },
       { id: 'video_hook', name: 'Vídeo Hook', type: 'formula', orcado: ORCADO_ADS.videoHook, realizado: data.videoHook ?? null, percentual: calcPercentual(ORCADO_ADS.videoHook, data.videoHook), format: 'percent' },
@@ -1295,7 +1435,12 @@ export default function GrowthOrcadoRealizado() {
       { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: ORCADO_ADS.cpmql, realizado: data.cpmql ?? null, percentual: calcPercentual(ORCADO_ADS.cpmql, data.cpmql), format: 'currency' },
       { id: 'perc_mqls', name: '% MQLs', type: 'formula', orcado: ORCADO_ADS.percMqls, realizado: data.percMqls ?? null, percentual: calcPercentual(ORCADO_ADS.percMqls, data.percMqls), format: 'percent' },
     ];
-  }, [adsData, ORCADO_ADS]);
+
+  const adsMetrics: Metric[] = useMemo(() => {
+    const cur = buildAdsMetrics(adsData || {} as AdsMetrics);
+    if (!prevAdsData) return cur;
+    return mergePrevRealizado(cur, buildAdsMetrics(prevAdsData));
+  }, [adsData, prevAdsData, ORCADO_ADS]);
 
   const marketingSections: MetricSection[] = [
     {
@@ -1322,11 +1467,13 @@ export default function GrowthOrcadoRealizado() {
   };
 
   // Meta Ads platform metrics
-  const metaAdsPlatformMetrics: Metric[] = useMemo(() => {
-    const d = metaAdsDetailData || {} as MetaAdsDetailMetrics;
+  const buildMetaAdsMetrics = (
+    d: MetaAdsDetailMetrics,
+    funnel: PlatformFunnelData | undefined,
+  ): Metric[] => {
     const O = ORCADO_META_ADS;
     const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
-      ? ((funnelByPlatformData?.meta_ads?.leads ?? 0) / d.visualizacoesPagina) : 0;
+      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'meta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1337,15 +1484,27 @@ export default function GrowthOrcadoRealizado() {
       { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('meta', funnelByPlatformData?.meta_ads, O, d.investimento ?? null)];
-  }, [metaAdsDetailData, funnelByPlatformData, ORCADO_META_ADS]);
+    return [...topMetrics, ...buildFunnelMetrics('meta', funnel, O, d.investimento ?? null)];
+  };
+
+  const metaAdsPlatformMetrics: Metric[] = useMemo(() => {
+    const cur = buildMetaAdsMetrics(metaAdsDetailData || {} as MetaAdsDetailMetrics, funnelByPlatformData?.meta_ads);
+    if (!prevMetaAdsDetailData && !prevFunnelByPlatformData) return cur;
+    const prev = buildMetaAdsMetrics(
+      prevMetaAdsDetailData || {} as MetaAdsDetailMetrics,
+      prevFunnelByPlatformData?.meta_ads,
+    );
+    return mergePrevRealizado(cur, prev);
+  }, [metaAdsDetailData, funnelByPlatformData, prevMetaAdsDetailData, prevFunnelByPlatformData, ORCADO_META_ADS]);
 
   // Google Ads platform metrics
-  const googleAdsPlatformMetrics: Metric[] = useMemo(() => {
-    const d = googleAdsDetailData || {} as GoogleAdsDetailMetrics;
+  const buildGoogleAdsMetrics = (
+    d: GoogleAdsDetailMetrics,
+    funnel: PlatformFunnelData | undefined,
+  ): Metric[] => {
     const O = ORCADO_GOOGLE_ADS;
     const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
-      ? ((funnelByPlatformData?.google_ads?.leads ?? 0) / d.visualizacoesPagina) : 0;
+      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'gads_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'gads_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1354,12 +1513,24 @@ export default function GrowthOrcadoRealizado() {
       { id: 'gads_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
       { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('gads', funnelByPlatformData?.google_ads, O, d.investimento ?? null)];
-  }, [googleAdsDetailData, funnelByPlatformData, ORCADO_GOOGLE_ADS]);
+    return [...topMetrics, ...buildFunnelMetrics('gads', funnel, O, d.investimento ?? null)];
+  };
+
+  const googleAdsPlatformMetrics: Metric[] = useMemo(() => {
+    const cur = buildGoogleAdsMetrics(googleAdsDetailData || {} as GoogleAdsDetailMetrics, funnelByPlatformData?.google_ads);
+    if (!prevGoogleAdsDetailData && !prevFunnelByPlatformData) return cur;
+    const prev = buildGoogleAdsMetrics(
+      prevGoogleAdsDetailData || {} as GoogleAdsDetailMetrics,
+      prevFunnelByPlatformData?.google_ads,
+    );
+    return mergePrevRealizado(cur, prev);
+  }, [googleAdsDetailData, funnelByPlatformData, prevGoogleAdsDetailData, prevFunnelByPlatformData, ORCADO_GOOGLE_ADS]);
 
   // Instagram platform metrics
-  const instagramPlatformMetrics: Metric[] = useMemo(() => {
-    const d = instagramDetailData || {} as InstagramDetailMetrics;
+  const buildInstagramMetrics = (
+    d: InstagramDetailMetrics,
+    funnel: PlatformFunnelData | undefined,
+  ): Metric[] => {
     const O = ORCADO_INSTAGRAM;
     const topMetrics: Metric[] = [
       { id: 'ig_comecaramSeguir', name: 'Começaram a Seguir', type: 'formula', orcado: O.comecaramSeguir, realizado: d.comecaramSeguir ?? 0, percentual: calcPercentual(O.comecaramSeguir, d.comecaramSeguir), format: 'number' },
@@ -1385,11 +1556,21 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ig_ctrVisitasCliques', name: 'CTR Visitas > Cliques', type: 'formula', orcado: O.ctrVisitasCliques, realizado: d.ctrVisitasCliques ?? null, percentual: calcPercentual(O.ctrVisitasCliques, d.ctrVisitasCliques), format: 'percent' },
       { id: 'ig_cliquesLinkBio', name: 'Cliques no Link Bio', type: 'formula', orcado: O.cliquesLinkBio, realizado: d.cliquesLinkBio ?? 0, percentual: calcPercentual(O.cliquesLinkBio, d.cliquesLinkBio), format: 'number' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('ig', funnelByPlatformData?.instagram, O, d.investimentoPago ?? null)];
-  }, [instagramDetailData, funnelByPlatformData, ORCADO_INSTAGRAM]);
+    return [...topMetrics, ...buildFunnelMetrics('ig', funnel, O, d.investimentoPago ?? null)];
+  };
+
+  const instagramPlatformMetrics: Metric[] = useMemo(() => {
+    const cur = buildInstagramMetrics(instagramDetailData || {} as InstagramDetailMetrics, funnelByPlatformData?.instagram);
+    if (!prevInstagramDetailData && !prevFunnelByPlatformData) return cur;
+    const prev = buildInstagramMetrics(
+      prevInstagramDetailData || {} as InstagramDetailMetrics,
+      prevFunnelByPlatformData?.instagram,
+    );
+    return mergePrevRealizado(cur, prev);
+  }, [instagramDetailData, funnelByPlatformData, prevInstagramDetailData, prevFunnelByPlatformData, ORCADO_INSTAGRAM]);
 
   // YouTube platform metrics (manual only - no integration yet)
-  const youtubePlatformMetrics: Metric[] = useMemo(() => {
+  const buildYoutubeMetrics = (funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_YOUTUBE;
     const topMetrics: Metric[] = [
       { id: 'yt_inscritos', name: 'Inscritos', type: 'manual', orcado: O.inscritos, realizado: null, percentual: null, format: 'number' },
@@ -1403,11 +1584,17 @@ export default function GrowthOrcadoRealizado() {
       { id: 'yt_compartilhamentos', name: 'Compartilhamentos', type: 'manual', orcado: O.compartilhamentos, realizado: null, percentual: null, format: 'number' },
       { id: 'yt_videosPublicados', name: 'Vídeos Publicados', type: 'manual', orcado: O.videosPublicados, realizado: null, percentual: null, format: 'number' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('yt', funnelByPlatformData?.youtube, O, null)];
-  }, [funnelByPlatformData, ORCADO_YOUTUBE]);
+    return [...topMetrics, ...buildFunnelMetrics('yt', funnel, O, null)];
+  };
+
+  const youtubePlatformMetrics: Metric[] = useMemo(() => {
+    const cur = buildYoutubeMetrics(funnelByPlatformData?.youtube);
+    if (!prevFunnelByPlatformData) return cur;
+    return mergePrevRealizado(cur, buildYoutubeMetrics(prevFunnelByPlatformData?.youtube));
+  }, [funnelByPlatformData, prevFunnelByPlatformData, ORCADO_YOUTUBE]);
 
   // LinkedIn platform metrics (manual only - no integration yet)
-  const linkedinPlatformMetrics: Metric[] = useMemo(() => {
+  const buildLinkedinMetrics = (funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_LINKEDIN;
     const topMetrics: Metric[] = [
       { id: 'li_seguidores', name: 'Seguidores', type: 'manual', orcado: O.seguidores, realizado: null, percentual: null, format: 'number' },
@@ -1420,8 +1607,14 @@ export default function GrowthOrcadoRealizado() {
       { id: 'li_comentarios', name: 'Comentários', type: 'manual', orcado: O.comentarios, realizado: null, percentual: null, format: 'number' },
       { id: 'li_compartilhamentos', name: 'Compartilhamentos', type: 'manual', orcado: O.compartilhamentos, realizado: null, percentual: null, format: 'number' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('li', funnelByPlatformData?.linkedin, O, null)];
-  }, [funnelByPlatformData, ORCADO_LINKEDIN]);
+    return [...topMetrics, ...buildFunnelMetrics('li', funnel, O, null)];
+  };
+
+  const linkedinPlatformMetrics: Metric[] = useMemo(() => {
+    const cur = buildLinkedinMetrics(funnelByPlatformData?.linkedin);
+    if (!prevFunnelByPlatformData) return cur;
+    return mergePrevRealizado(cur, buildLinkedinMetrics(prevFunnelByPlatformData?.linkedin));
+  }, [funnelByPlatformData, prevFunnelByPlatformData, ORCADO_LINKEDIN]);
 
   // Instagram empty-state banner: distinguish "no connection" from "connection ok but no data"
   const instagramBanner = useMemo<React.ReactNode | undefined>(() => {
@@ -1444,11 +1637,9 @@ export default function GrowthOrcadoRealizado() {
     { title: 'LinkedIn', icon: <Briefcase className="w-5 h-5" />, metrics: linkedinPlatformMetrics },
   ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, linkedinPlatformMetrics]);
 
-  const naoMqlMetrics: Metric[] = useMemo(() => {
-    const data = naoMqlData || {} as NaoMQLMetrics;
-    return [
-      { 
-        id: 'nmql_ra_perc', 
+  const buildNaoMqlMetrics = (data: NaoMQLMetrics): Metric[] => [
+      {
+        id: 'nmql_ra_perc',
         name: '%RA não-MQL', 
         type: 'manual', 
         orcado: ORCADO_NAO_MQL.percReuniaoAgendada, 
@@ -1607,13 +1798,18 @@ export default function GrowthOrcadoRealizado() {
         format: 'currency'
       },
     ];
-  }, [naoMqlData, ORCADO_NAO_MQL]);
 
-  const totalMetrics: Metric[] = useMemo(() => {
-    const mql = mqlData || {} as MQLMetrics;
-    const naoMql = naoMqlData || {} as NaoMQLMetrics;
-    const ads = adsData || {} as AdsMetrics;
+  const naoMqlMetrics: Metric[] = useMemo(() => {
+    const cur = buildNaoMqlMetrics(naoMqlData || {} as NaoMQLMetrics);
+    if (!prevNaoMqlData) return cur;
+    return mergePrevRealizado(cur, buildNaoMqlMetrics(prevNaoMqlData));
+  }, [naoMqlData, prevNaoMqlData, ORCADO_NAO_MQL]);
 
+  const buildTotalMetrics = (
+    mql: MQLMetrics,
+    naoMql: NaoMQLMetrics,
+    ads: AdsMetrics,
+  ): Metric[] => {
     const totalReunioesAgendadas = (mql.reunioesAgendadas ?? 0) + (naoMql.reunioesAgendadas ?? 0);
     const totalReunioesRealizadas = (mql.reunioesRealizadas ?? 0) + (naoMql.reunioesRealizadas ?? 0);
     const totalContratosAceleracao = (mql.contratosAceleracao ?? 0) + (naoMql.contratosAceleracao ?? 0);
@@ -1683,7 +1879,22 @@ export default function GrowthOrcadoRealizado() {
       { id: 'total_ticket_acel', name: 'Ticket Médio Aceleração', type: 'formula', orcado: ORCADO_TOTAL.ticketMedioAceleracao, realizado: ticketMedioAceleracao, percentual: calcPercentual(ORCADO_TOTAL.ticketMedioAceleracao, ticketMedioAceleracao), format: 'currency' },
       { id: 'total_ticket_impl', name: 'Ticket Médio Implantação', type: 'formula', orcado: ORCADO_TOTAL.ticketMedioImplantacao, realizado: ticketMedioImplantacao, percentual: calcPercentual(ORCADO_TOTAL.ticketMedioImplantacao, ticketMedioImplantacao), format: 'currency' },
     ];
-  }, [mqlData, naoMqlData, adsData, ORCADO_MQL, ORCADO_NAO_MQL, ORCADO_ADS, ORCADO_TOTAL]);
+  };
+
+  const totalMetrics: Metric[] = useMemo(() => {
+    const cur = buildTotalMetrics(
+      mqlData || {} as MQLMetrics,
+      naoMqlData || {} as NaoMQLMetrics,
+      adsData || {} as AdsMetrics,
+    );
+    if (!prevMqlData && !prevNaoMqlData && !prevAdsData) return cur;
+    const prev = buildTotalMetrics(
+      prevMqlData || {} as MQLMetrics,
+      prevNaoMqlData || {} as NaoMQLMetrics,
+      prevAdsData || {} as AdsMetrics,
+    );
+    return mergePrevRealizado(cur, prev);
+  }, [mqlData, naoMqlData, adsData, prevMqlData, prevNaoMqlData, prevAdsData, ORCADO_MQL, ORCADO_NAO_MQL, ORCADO_ADS, ORCADO_TOTAL]);
   
   const totalSection: MetricSection = {
     title: 'Total',
@@ -2277,7 +2488,46 @@ export default function GrowthOrcadoRealizado() {
                 <TableRow className="bg-muted/40">
                   <TableHead className="text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
+                    <div className="flex items-start justify-end gap-1">
+                      <div className="flex flex-col items-end leading-tight">
+                        <span>Realizado</span>
+                        {showCompareColumns && currentRangeLabel && (
+                          <span className="text-[10px] font-normal text-muted-foreground normal-case tracking-normal">
+                            {currentRangeLabel}
+                          </span>
+                        )}
+                      </div>
+                      {compareActive && (
+                        <button
+                          type="button"
+                          onClick={() => setCompareColumnsOpen(v => !v)}
+                          className="inline-flex items-center justify-center w-5 h-5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          title={showCompareColumns ? 'Recolher comparação' : 'Expandir comparação'}
+                          aria-label={showCompareColumns ? 'Recolher comparação' : 'Expandir comparação'}
+                          data-testid="toggle-compare-columns"
+                        >
+                          {showCompareColumns ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </TableHead>
+                  {showCompareColumns && (
+                    <>
+                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
+                        <div className="flex flex-col items-end leading-tight">
+                          <span>Anterior</span>
+                          {compareRangeLabel && (
+                            <span className="text-[10px] font-normal text-muted-foreground normal-case tracking-normal">
+                              {compareRangeLabel}
+                            </span>
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Alteração</TableHead>
+                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Alteração %</TableHead>
+                    </>
+                  )}
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Desvio Meta</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Previsão As Is</TableHead>
@@ -2329,7 +2579,46 @@ export default function GrowthOrcadoRealizado() {
                 <TableRow className="bg-muted/40">
                   <TableHead className="text-xs font-semibold uppercase tracking-wide">Métrica</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Orçado</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Realizado</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
+                    <div className="flex items-start justify-end gap-1">
+                      <div className="flex flex-col items-end leading-tight">
+                        <span>Realizado</span>
+                        {showCompareColumns && currentRangeLabel && (
+                          <span className="text-[10px] font-normal text-muted-foreground normal-case tracking-normal">
+                            {currentRangeLabel}
+                          </span>
+                        )}
+                      </div>
+                      {compareActive && (
+                        <button
+                          type="button"
+                          onClick={() => setCompareColumnsOpen(v => !v)}
+                          className="inline-flex items-center justify-center w-5 h-5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          title={showCompareColumns ? 'Recolher comparação' : 'Expandir comparação'}
+                          aria-label={showCompareColumns ? 'Recolher comparação' : 'Expandir comparação'}
+                          data-testid="toggle-compare-columns"
+                        >
+                          {showCompareColumns ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  </TableHead>
+                  {showCompareColumns && (
+                    <>
+                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">
+                        <div className="flex flex-col items-end leading-tight">
+                          <span>Anterior</span>
+                          {compareRangeLabel && (
+                            <span className="text-[10px] font-normal text-muted-foreground normal-case tracking-normal">
+                              {compareRangeLabel}
+                            </span>
+                          )}
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Alteração</TableHead>
+                      <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Alteração %</TableHead>
+                    </>
+                  )}
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">% Atingido</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Desvio Meta</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide">Previsão As Is</TableHead>
