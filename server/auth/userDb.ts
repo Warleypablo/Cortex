@@ -46,7 +46,8 @@ export function clearUserCache(): void {
 
 const ADMIN_EMAILS = [
   'caio.massaroni@turbopartners.com.br',
-  'warley.silva@turbopartners.com.br'
+  'warley.silva@turbopartners.com.br',
+  'vinicius.ichino@turbopartners.com.br'
 ];
 
 // Emails externos permitidos (investidores, consultores, etc.)
