@@ -141,11 +141,25 @@ function calcPrevisaoAsIs(realizado: number | null, propDias: number): number | 
   return realizado / propDias;
 }
 
+// Recálculo Meta para métricas absolutas: retorna o % de aceleração necessária
+// nos dias restantes em relação ao ritmo planejado. Ex: +80,9% = precisa performar
+// 80,9% acima do ritmo orçado para fechar o mês na meta.
 function calcRecalculoMeta(orcado: number | null, realizado: number | null, diasRestantes: number, totalDias: number): number | null {
-  if (orcado === null || realizado === null || diasRestantes <= 0 || totalDias === 0) return null;
+  if (orcado === null || realizado === null) return null;
+  if (orcado === 0 || totalDias === 0) return null;
+  if (diasRestantes <= 0) return null;
   const falta = orcado - realizado;
   if (falta <= 0) return 0;
-  return (falta / diasRestantes) * totalDias;
+  const esperadoNoRestante = orcado * (diasRestantes / totalDias);
+  if (esperadoNoRestante === 0) return null;
+  return (falta / esperadoNoRestante - 1) * 100;
+}
+
+// Recálculo Meta para métricas-taxa: gap em pontos percentuais (orçado − realizado).
+// Valores armazenados em decimal (0,30 = 30%), então multiplicamos por 100 para retornar pp.
+function calcRecalculoMetaPercent(orcado: number | null, realizado: number | null): number | null {
+  if (orcado === null || realizado === null) return null;
+  return (orcado - realizado) * 100;
 }
 
 // ===== Export helpers =====
@@ -217,6 +231,13 @@ function buildOrcadoRealizadoExportRows(
     return `${val >= 0 ? '+' : ''}${val.toFixed(1)}%`;
   };
 
+  const fmtRecalculo = (val: number | null, isPp: boolean): string | number | null => {
+    if (val === null) return mode === 'csv' ? '-' : null;
+    if (mode === 'xlsx') return val / 100;
+    const suffix = isPp ? 'pp' : '%';
+    return `${val >= 0 ? '+' : ''}${val.toFixed(1)}${suffix}`;
+  };
+
   for (const section of params.sections) {
     rows.push([section.title, '', '', '', '', '', '']);
 
@@ -231,7 +252,9 @@ function buildOrcadoRealizadoExportRows(
             : null)
         : calcDesvioMeta(orcadoNum, realizadoNum, params.propDias);
       const previsao = isPercent ? null : calcPrevisaoAsIs(realizadoNum, params.propDias);
-      const recalculo = isPercent ? null : calcRecalculoMeta(orcadoNum, realizadoNum, params.diasRestantes, params.totalDias);
+      const recalculo = isPercent
+        ? calcRecalculoMetaPercent(orcadoNum, realizadoNum)
+        : calcRecalculoMeta(orcadoNum, realizadoNum, params.diasRestantes, params.totalDias);
 
       rows.push([
         m.name,
@@ -240,7 +263,7 @@ function buildOrcadoRealizadoExportRows(
         fmtPct(m.percentual),
         fmtDesvio(desvio),
         fmt(previsao, m.format),
-        fmt(recalculo, m.format),
+        fmtRecalculo(recalculo, isPercent),
       ]);
     }
 
@@ -979,13 +1002,32 @@ export default function GrowthOrcadoRealizado() {
                   return p !== null ? formatValue(p, m.format) : '-';
                 })()}
               </TableCell>
-              {/* Recálculo Meta — não se aplica a métricas de taxa */}
-              <TableCell className="text-right text-sm font-medium">
-                {isPercent ? '-' : (() => {
-                  const r = calcRecalculoMeta(orcadoNum, realizadoNum, diasRestantes, totalDias);
-                  return r !== null ? formatValue(r, m.format) : '-';
-                })()}
-              </TableCell>
+              {/* Recálculo Meta — % de aceleração necessária a partir de hoje */}
+              {(() => {
+                const r = isPercent
+                  ? calcRecalculoMetaPercent(orcadoNum, realizadoNum)
+                  : calcRecalculoMeta(orcadoNum, realizadoNum, diasRestantes, totalDias);
+                const recalculoColor = (() => {
+                  if (r === null) return '';
+                  if (isPercent) {
+                    if (isInverted) return r >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                    return r <= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+                  }
+                  if (r <= 0) return "text-emerald-600 dark:text-emerald-400";
+                  if (r <= 30) return "text-amber-600 dark:text-amber-400";
+                  return "text-red-600 dark:text-red-400";
+                })();
+                const formatted = r === null
+                  ? '-'
+                  : isPercent
+                    ? `${r >= 0 ? '+' : ''}${r.toFixed(1)}pp`
+                    : `${r >= 0 ? '+' : ''}${r.toFixed(1)}%`;
+                return (
+                  <TableCell className={cn("text-right text-sm font-semibold", recalculoColor)}>
+                    {formatted}
+                  </TableCell>
+                );
+              })()}
             </TableRow>
             {expanded && linkBioBreakdown.slice(0, 15).map((row, idx) => (
               <TableRow key={`linkbio-${idx}`} className="bg-muted/20 hover:bg-muted/30" data-testid="row-clicks-breakdown-link">

@@ -118,11 +118,24 @@ export function calcPrevisaoAsIs(realizado: number | null, propDias: number): nu
   return realizado / propDias;
 }
 
+// Retorna o % de aceleração necessária a partir de hoje para fechar o orçado.
+// Ex: +80,9% significa que precisa performar 80,9% acima do ritmo planejado nos
+// dias restantes para bater a meta no fim do mês.
 export function calcRecalculoMeta(orcado: number | null, realizado: number | null, diasRestantes: number, totalDias: number): number | null {
-  if (orcado === null || realizado === null || diasRestantes <= 0 || totalDias === 0) return null;
+  if (orcado === null || realizado === null) return null;
+  if (orcado === 0 || totalDias === 0) return null;
+  if (diasRestantes <= 0) return null;
   const falta = orcado - realizado;
   if (falta <= 0) return 0;
-  return (falta / diasRestantes) * totalDias;
+  const esperadoNoRestante = orcado * (diasRestantes / totalDias);
+  if (esperadoNoRestante === 0) return null;
+  return (falta / esperadoNoRestante - 1) * 100;
+}
+
+// Gap em pontos percentuais para métricas-taxa. Valores em decimal (0,30 = 30%).
+export function calcRecalculoMetaPercent(orcado: number | null, realizado: number | null): number | null {
+  if (orcado === null || realizado === null) return null;
+  return (orcado - realizado) * 100;
 }
 
 // ===== Platform Config =====
