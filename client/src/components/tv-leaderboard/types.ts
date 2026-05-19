@@ -2,6 +2,7 @@ export type SquadKpi = {
   squad: string;
   cor: string;
   mrrAtivo: number;
+  mrrBaseInicio: number;
   nrrPct: number;
   nrrDeltaPct: number;
   churnValor: number;
