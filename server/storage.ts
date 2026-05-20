@@ -228,7 +228,7 @@ export interface IStorage {
   getGegCustoPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<{ setor: string; custoTotal: number; totalColaboradores: number }[]>;
   getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null }>>;
   getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null } | null>;
-  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
+  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
   upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; tipoInadimplencia?: string; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; tipoInadimplencia: string | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>;
   getGegDemissoesPorTipo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDemissoesPorTipo[]>;
   getGegUltimasDemissoes(squad: string, setor: string, nivel: string, cargo: string, limit?: number): Promise<{ id: number; nome: string; cargo: string | null; squad: string | null; dataDesligamento: string; tempoDeEmpresa: number }[]>;
@@ -1121,7 +1121,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -10053,7 +10053,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
     const result = await db.execute(sql`
       INSERT INTO cortex_core.inadimplencia_contextos (cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em)
       VALUES (${data.clienteId}, ${data.contexto || ''}, ${data.evidencias || ''}, NULLIF(${data.acao || ''}, ''), NULLIF(${data.statusFinanceiro || ''}, ''), NULLIF(${data.detalheFinanceiro || ''}, ''), ${data.atualizadoPor}, NOW())
