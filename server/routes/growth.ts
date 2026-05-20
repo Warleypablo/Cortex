@@ -37,7 +37,7 @@ const PLATFORM_CASE_SQL = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%whatsapp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%wpp%' THEN 'whatsapp'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%evento%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%event%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%webinar%' THEN 'eventos'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('organic', 'organico', 'direct', '(direct)', '(none)', '') THEN 'organico'
-  ELSE 'outros'
+  ELSE COALESCE((SELECT normalized FROM public.utm_source_map WHERE raw_source = LOWER(TRIM(COALESCE(utm_source, '')))), 'outros')
 END`;
 
 /**
@@ -54,7 +54,7 @@ const PLATFORM_CASE_SQL_BASIC = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
-  ELSE 'outros'
+  ELSE COALESCE((SELECT normalized FROM public.utm_source_map WHERE raw_source = LOWER(TRIM(COALESCE(utm_source, '')))), 'outros')
 END`;
 
 // Funnel name aliases: normalized name → all DB variations
