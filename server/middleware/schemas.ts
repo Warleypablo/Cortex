@@ -51,11 +51,11 @@ export const updateStatusContaSchema = z.object({
 // ========== Inadimplência ==========
 
 export const upsertInadimplenciaContextoSchema = z.object({
-  contexto: z.string().max(5000).optional(),
-  evidencias: z.string().max(5000).optional(),
-  acao: z.string().max(2000).optional(),
-  statusFinanceiro: z.string().max(200).optional(),
-  detalheFinanceiro: z.string().max(5000).optional(),
+  contexto: z.string().max(5000).nullable().optional(),
+  evidencias: z.string().max(5000).nullable().optional(),
+  acao: z.string().max(2000).nullable().optional(),
+  statusFinanceiro: z.string().max(200).nullable().optional(),
+  detalheFinanceiro: z.string().max(5000).nullable().optional(),
 });
 
 export const upsertContextoJuridicoSchema = z.object({
