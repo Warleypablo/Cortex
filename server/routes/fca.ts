@@ -457,6 +457,18 @@ async function criarTaskClickUp(args: { funil: string; semanaNum: number; semana
 }
 
 export function registerFcaRoutes(app: Express) {
+  app.get("/api/fca/health", (_req: Request, res: Response) => {
+    res.json({
+      ok: true,
+      version: "v3.14",
+      endpoint: "POST /api/fca/run",
+      auth: "Authorization: Bearer <FCA_API_TOKEN>",
+      funilSuportado: ["Creators"],
+      tokenConfigured: Boolean(FCA_API_TOKEN),
+      time: new Date().toISOString(),
+    });
+  });
+
   app.post("/api/fca/run", bearerAuth, async (req: Request, res: Response) => {
     try {
       const funil = (req.body?.funil || "Creators") as string;
@@ -511,5 +523,5 @@ export function registerFcaRoutes(app: Express) {
     }
   });
 
-  console.log("[fca] Routes registered: POST /api/fca/run");
+  console.log("[fca] Routes registered: GET /api/fca/health, POST /api/fca/run");
 }
