@@ -9,6 +9,7 @@ export const clickupSchema = pgSchema("Clickup");
 export const contaAzulSchema = pgSchema("Conta Azul");
 export const bitrixSchema = pgSchema("Bitrix");
 export const inhireSchema = pgSchema("Inhire");
+export const growthCalendarSchema = pgSchema("growth_calendar");
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
