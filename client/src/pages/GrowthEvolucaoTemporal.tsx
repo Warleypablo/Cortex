@@ -794,7 +794,7 @@ export default function GrowthEvolucaoTemporal() {
               </Select>
             </div>
             <div className="flex flex-col gap-1 min-w-[220px]">
-              <label className="text-xs text-muted-foreground">Produto / Funil</label>
+              <label className="text-xs text-muted-foreground">Produto</label>
               <MultiSelect options={produtoOptions} selected={selectedProdutos} onChange={setSelectedProdutos} placeholder="Todos" />
             </div>
             <div className="flex flex-col gap-1 min-w-[220px]">
