@@ -964,38 +964,46 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       `);
       
       // Buscar dados de conversão do CRM (leads, MQL, NMQL, RM, RR, Vendas com splits) usando utm_content = ad_id
+      // descartados = leads com motivo_perda culpa do marketing (Dropshipping, Nicho Black,
+      // Agencia de Marketing, Infoproduto, Afiliado, Fake) — vindos de cortex_core.deal_motivo_perda
       const dealsDataResult = await db.execute(sql`
         SELECT
-          utm_content as ad_id,
+          d.utm_content as ad_id,
           COUNT(*) as leads,
-          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as nmqls,
-          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
-          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho'
-              AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_mql,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho'
-              AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_nmql,
-          COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho'
-              THEN COALESCE(company_name, contact_name, title) END) as clientes_unicos,
+          SUM(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as nmqls,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho'
+              AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_mql,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho'
+              AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_nmql,
+          COUNT(DISTINCT CASE WHEN d.stage_name = 'Negócio Ganho'
+              THEN COALESCE(d.company_name, d.contact_name, d.title) END) as clientes_unicos,
           NULL::numeric as min_lead_time,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) ELSE 0 END) as valor_pontual,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_recorrente,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN
-            CASE WHEN produtos IS NULL OR produtos = '' OR produtos = '[]' THEN 1
-            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(produtos, '[', ''), ']', ''), ','), 1), 1) END
-          ELSE 0 END) as contratos
-        FROM "Bitrix".crm_deal
-        WHERE utm_content IS NOT NULL
-          AND utm_content != ''
-          AND created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-        GROUP BY utm_content
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) as valor_pontual,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) as valor_recorrente,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
+            CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
+            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+          ELSE 0 END) as contratos,
+          SUM(CASE WHEN dmp.motivo_perda IN ('Dropshipping', 'Nicho Black', 'Agencia de Marketing', 'Infoproduto', 'Afiliado', 'Fake') THEN 1 ELSE 0 END) as descartados,
+          SUM(CASE WHEN dmp.motivo_perda IN ('Dropshipping', 'Nicho Black', 'Agencia de Marketing', 'Infoproduto', 'Afiliado', 'Fake')
+              AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as descartados_mql,
+          SUM(CASE WHEN dmp.motivo_perda IN ('Dropshipping', 'Nicho Black', 'Agencia de Marketing', 'Infoproduto', 'Afiliado', 'Fake')
+              AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as descartados_nmql
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN cortex_core.deal_motivo_perda dmp ON dmp.deal_id = d.id
+        WHERE d.utm_content IS NOT NULL
+          AND d.utm_content != ''
+          AND d.created_at >= ${startDate}::date AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+        GROUP BY d.utm_content
       `);
 
       // Criar mapa de deals por ad_id
@@ -1019,6 +1027,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           valorPontual: parseFloat(row.valor_pontual) || 0,
           valorRecorrente: parseFloat(row.valor_recorrente) || 0,
           contratos: parseInt(row.contratos) || 0,
+          descartados: parseInt(row.descartados) || 0,
+          descartadosMql: parseInt(row.descartados_mql) || 0,
+          descartadosNmql: parseInt(row.descartados_nmql) || 0,
         });
       }
       
@@ -1102,7 +1113,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           // Connect rate = landing_page_views / outbound_clicks
           const connectRate = outboundClicks > 0 && landingPageViews > 0 ? (landingPageViews / outboundClicks) * 100 : null;
 
-          const deal = dealsMap.get(adId) || { leads: 0, mqls: 0, nmqls: 0, rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0, vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, minLeadTime: null, valorPontual: 0, valorRecorrente: 0 };
+          const deal = dealsMap.get(adId) || { leads: 0, mqls: 0, nmqls: 0, rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0, vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, minLeadTime: null, valorPontual: 0, valorRecorrente: 0, contratos: 0, descartados: 0, descartadosMql: 0, descartadosNmql: 0 };
 
           const leads = deal.leads;
           const mqls = deal.mqls;
@@ -1134,6 +1145,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const percRrVendas = rr > 0 ? parseFloat(((vendas / rr) * 100).toFixed(1)) : null;
           const percRrMqlVendas = rrMql > 0 ? parseFloat(((vendasMql / rrMql) * 100).toFixed(1)) : null;
           const percRrNmqlVendas = rrNmql > 0 ? parseFloat(((vendasNmql / rrNmql) * 100).toFixed(1)) : null;
+          const descartadoPerc = leads > 0 ? parseFloat(((deal.descartados / leads) * 100).toFixed(1)) : null;
+          const descartadoMqlPerc = mqls > 0 ? parseFloat(((deal.descartadosMql / mqls) * 100).toFixed(1)) : null;
+          const descartadoNmqlPerc = nmqls > 0 ? parseFloat(((deal.descartadosNmql / nmqls) * 100).toFixed(1)) : null;
           const cacUnico = clientesUnicos > 0 ? investimento / clientesUnicos : null;
           const contratos = deal.contratos;
           const cacContrato = contratos > 0 ? investimento / contratos : null;
@@ -1166,9 +1180,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             mql: mqls,
             cpmql: cpmql ? parseFloat(cpmql.toFixed(2)) : null,
             percMql,
-            descartadoPerc: null,
-            descartadoMqlPerc: null,
-            descartadoNmqlPerc: null,
+            descartadoPerc,
+            descartadoMqlPerc,
+            descartadoNmqlPerc,
             percRa,
             percRaMql,
             percRaNmql,

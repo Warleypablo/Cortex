@@ -514,6 +514,33 @@ app.use((req, res, next) => {
   setInterval(() => runInstagramSync(), IG_SYNC_INTERVAL);
   console.log(`[instagram-sync-job] Scheduled every ${IG_SYNC_INTERVAL / 3600000}h`);
 
+  // Bitrix motivo de perda sync a cada 6 horas
+  const MOTIVO_PERDA_SYNC_INTERVAL = 6 * 60 * 60 * 1000; // 6h
+  const runMotivoPerdaSync = async () => {
+    try {
+      console.log("[motivo-perda-sync-job] Starting scheduled Bitrix motivo_perda sync...");
+      const { syncBitrixMotivoPerda } = await import("../scripts/sync-bitrix-motivo-perda");
+      const { totalSynced, totalSeen } = await syncBitrixMotivoPerda();
+      (globalThis as any).__motivoPerdaSyncStatus = {
+        lastSync: new Date().toISOString(),
+        totalSynced,
+        totalSeen,
+        status: "success",
+      };
+      console.log(`[motivo-perda-sync-job] Sync complete: ${totalSynced}/${totalSeen} deals`);
+    } catch (err: any) {
+      console.error("[motivo-perda-sync-job] Sync failed:", err.message);
+      (globalThis as any).__motivoPerdaSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  setTimeout(() => runMotivoPerdaSync(), 120000); // 2min após boot
+  setInterval(() => runMotivoPerdaSync(), MOTIVO_PERDA_SYNC_INTERVAL);
+  console.log(`[motivo-perda-sync-job] Scheduled every ${MOTIVO_PERDA_SYNC_INTERVAL / 3600000}h`);
+
   // Google Ads keywords sync a cada 12 horas
   const GOOGLE_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
   const runGoogleAdsSync = async () => {
