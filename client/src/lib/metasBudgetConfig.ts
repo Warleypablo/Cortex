@@ -362,7 +362,7 @@ export const PERCENT_METRICS = new Set([
   'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas', 'nmql_rr_perc', 'nmql_taxa_conversao',
   'ctr', 'perc_mqls',
   // Meta Ads
-  'meta_ctr', 'meta_videoHook', 'meta_videoHold', 'meta_videoP75', 'meta_videoP100',
+  'meta_ctr', 'meta_videoP75', 'meta_videoP100',
   'meta_taxaConversaoPagina', 'meta_connectRate', 'meta_percMqls',
   'meta_percRa', 'meta_percRaMql', 'meta_percRaNmql', 'meta_percRr', 'meta_percRrMql', 'meta_percRrNmql',
   'meta_percRrVendas', 'meta_percRrMqlVendas', 'meta_percRrNmqlVendas',
@@ -494,8 +494,6 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'meta_investimento', name: 'Investimento', format: 'currency', tier: 1 },
       { id: 'meta_cpm', name: 'CPM', format: 'currency', tier: 1 },
       { id: 'meta_ctr', name: 'CTR', format: 'percent', tier: 1 },
-      { id: 'meta_videoHook', name: 'Vídeo Hook', format: 'percent', tier: 1 },
-      { id: 'meta_videoHold', name: 'Vídeo Hold', format: 'percent', tier: 1 },
       { id: 'meta_connectRate', name: 'Connect Rate', format: 'percent', tier: 1 },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', format: 'number', tier: 2 },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página', format: 'percent', tier: 1 },
