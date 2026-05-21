@@ -460,31 +460,31 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       // — Vendas MQL
       { id: '_header_mql', name: 'Vendas MQL', format: 'number', isSubHeader: true },
       { id: 'mql_ra_perc', name: '%RA MQL', format: 'percent' },
-      { id: 'mql_noshow', name: '%No-show MQL', format: 'percent' },
+      { id: 'mql_noshow', name: '% No-show MQL', format: 'percent' },
       { id: 'mql_rr_perc', name: '%RR MQL', format: 'percent' },
       { id: 'mql_taxa_vendas', name: 'RR→V% MQL', format: 'percent' },
       { id: 'mql_novos_clientes', name: 'Negócios Ganhos MQL', format: 'number' },
-      { id: 'mql_aov', name: 'AOV MQL', format: 'currency' },
-      { id: 'mql_ticket_impl', name: 'AOV Pontual MQL', format: 'currency' },
-      { id: 'mql_ticket_acel', name: 'AOV Recorrente MQL', format: 'currency' },
-      { id: 'mql_faturamento', name: 'Faturamento MQL', format: 'currency' },
-      { id: 'mql_fat_impl', name: 'Faturamento Pontual MQL', format: 'currency' },
-      { id: 'mql_fat_acel', name: 'Faturamento Recorrente MQL', format: 'currency' },
-      { id: 'mql_taxa_conversao', name: 'Taxa de Conversão MQL', format: 'percent' },
+      { id: 'mql_aov', name: 'Ticket Médio Geral MQL', format: 'currency' },
+      { id: 'mql_ticket_impl', name: 'Ticket Médio Implantação MQL', format: 'currency' },
+      { id: 'mql_ticket_acel', name: 'Ticket Médio Aceleração MQL', format: 'currency' },
+      { id: 'mql_faturamento', name: 'Faturamento Total MQL', format: 'currency' },
+      { id: 'mql_fat_impl', name: 'Faturamento Implantação MQL', format: 'currency' },
+      { id: 'mql_fat_acel', name: 'Faturamento Aceleração (MRR novo) de MQL', format: 'currency' },
+      { id: 'mql_taxa_conversao', name: 'Tx de Conversão MQL', format: 'percent' },
       // — Vendas Não-MQL
-      { id: '_header_nmql', name: 'Vendas Não-MQL', format: 'number', isSubHeader: true },
-      { id: 'nmql_ra_perc', name: '%RA NMQL', format: 'percent' },
-      { id: 'nmql_noshow', name: '%No-show NMQL', format: 'percent' },
-      { id: 'nmql_rr_perc', name: '%RR NMQL', format: 'percent' },
-      { id: 'nmql_taxa_vendas', name: 'RR→V% NMQL', format: 'percent' },
-      { id: 'nmql_novos_clientes', name: 'Negócios Ganhos NMQL', format: 'number' },
-      { id: 'nmql_aov', name: 'AOV NMQL', format: 'currency' },
-      { id: 'nmql_ticket_impl', name: 'AOV Pontual NMQL', format: 'currency' },
-      { id: 'nmql_ticket_acel', name: 'AOV Recorrente NMQL', format: 'currency' },
-      { id: 'nmql_faturamento', name: 'Faturamento NMQL', format: 'currency' },
-      { id: 'nmql_fat_impl', name: 'Faturamento Pontual NMQL', format: 'currency' },
-      { id: 'nmql_fat_acel', name: 'Faturamento Recorrente NMQL', format: 'currency' },
-      { id: 'nmql_taxa_conversao', name: 'Taxa de Conversão NMQL', format: 'percent' },
+      { id: '_header_nmql', name: 'Vendas não-MQL', format: 'number', isSubHeader: true },
+      { id: 'nmql_ra_perc', name: '%RA não-MQL', format: 'percent' },
+      { id: 'nmql_noshow', name: '% No-show não-MQL', format: 'percent' },
+      { id: 'nmql_rr_perc', name: '%RR não-MQL', format: 'percent' },
+      { id: 'nmql_taxa_vendas', name: 'RR→V% não-MQL', format: 'percent' },
+      { id: 'nmql_novos_clientes', name: 'Negócios Ganhos não-MQL', format: 'number' },
+      { id: 'nmql_aov', name: 'Ticket Médio Geral não-MQL', format: 'currency' },
+      { id: 'nmql_ticket_impl', name: 'Ticket Médio Implantação não-MQL', format: 'currency' },
+      { id: 'nmql_ticket_acel', name: 'Ticket Médio Aceleração não-MQL', format: 'currency' },
+      { id: 'nmql_faturamento', name: 'Faturamento Total não-MQL', format: 'currency' },
+      { id: 'nmql_fat_impl', name: 'Faturamento Implantação não-MQL', format: 'currency' },
+      { id: 'nmql_fat_acel', name: 'Faturamento Aceleração (MRR novo) de não-MQL', format: 'currency' },
+      { id: 'nmql_taxa_conversao', name: 'Tx de Conversão não-MQL', format: 'percent' },
     ],
   },
   meta_ads: {
@@ -504,13 +504,13 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'meta_cpmql', name: 'CPMQL', format: 'currency', tier: 2 },
       { id: 'meta_percRa', name: '% RA', format: 'percent', tier: 1 },
       { id: 'meta_percRr', name: '% RR', format: 'percent', tier: 2 },
-      { id: 'meta_percRrVendas', name: '% RR→Vendas', format: 'percent', tier: 1 },
+      { id: 'meta_percRrVendas', name: 'RR→V%', format: 'percent', tier: 1 },
       { id: 'meta_negocioGanho', name: 'Negócios Ganhos', format: 'number', tier: 2 },
       { id: 'meta_leadTime', name: 'Lead Time (dias)', format: 'number', tier: 1 },
-      { id: 'meta_aov', name: 'AOV', format: 'currency', tier: 1 },
-      { id: 'meta_receita', name: 'Receita', format: 'currency', tier: 2 },
-      { id: 'meta_cacUnico', name: 'CAC Único', format: 'currency', tier: 2 },
-      { id: 'meta_cacContrato', name: 'CAC Contrato', format: 'currency', tier: 2 },
+      { id: 'meta_aov', name: 'Ticket Médio Geral', format: 'currency', tier: 1 },
+      { id: 'meta_receita', name: 'Faturamento Total', format: 'currency', tier: 2 },
+      { id: 'meta_cacUnico', name: 'CAC - Negócios', format: 'currency', tier: 2 },
+      { id: 'meta_cacContrato', name: 'CAC - Contrato', format: 'currency', tier: 2 },
     ],
   },
   google_ads: {
@@ -530,31 +530,31 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'gads_cpmql', name: 'CPMQL', format: 'currency', tier: 2 },
       { id: 'gads_percRa', name: '% RA', format: 'percent', tier: 1 },
       { id: 'gads_percRr', name: '% RR', format: 'percent', tier: 2 },
-      { id: 'gads_percRrVendas', name: '% RR→Vendas', format: 'percent', tier: 1 },
+      { id: 'gads_percRrVendas', name: 'RR→V%', format: 'percent', tier: 1 },
       { id: 'gads_negocioGanho', name: 'Negócios Ganhos', format: 'number', tier: 2 },
       { id: 'gads_leadTime', name: 'Lead Time (dias)', format: 'number', tier: 1 },
-      { id: 'gads_aov', name: 'AOV', format: 'currency', tier: 1 },
-      { id: 'gads_receita', name: 'Receita', format: 'currency', tier: 2 },
-      { id: 'gads_cacUnico', name: 'CAC Único', format: 'currency', tier: 2 },
-      { id: 'gads_cacContrato', name: 'CAC Contrato', format: 'currency', tier: 2 },
+      { id: 'gads_aov', name: 'Ticket Médio Geral', format: 'currency', tier: 1 },
+      { id: 'gads_receita', name: 'Faturamento Total', format: 'currency', tier: 2 },
+      { id: 'gads_cacUnico', name: 'CAC - Negócios', format: 'currency', tier: 2 },
+      { id: 'gads_cacContrato', name: 'CAC - Contrato', format: 'currency', tier: 2 },
     ],
   },
   instagram: {
     label: 'Instagram',
     metrics: [
       // Ordem: Seguidores → Engajamento → Alcance → Visitas → Cliques → Leads → MQLs
-      { id: 'ig_totalSeguidores', name: 'Total Seguidores', format: 'number', tier: 1 },
+      { id: 'ig_totalSeguidores', name: 'Total de Seguidores', format: 'number', tier: 1 },
       { id: 'ig_comecaramSeguir', name: 'Começaram a Seguir', format: 'number', tier: 2 },
       { id: 'ig_deixaramSeguir', name: 'Deixaram de Seguir', format: 'number', tier: 3 },
-      { id: 'ig_deltaSeguidores', name: 'Delta Seguidores', format: 'number', tier: 2 },
+      { id: 'ig_deltaSeguidores', name: 'Delta de Seguidores', format: 'number', tier: 2 },
       { id: 'ig_alcanceTotal', name: 'Alcance Total', format: 'number', tier: 3 },
       { id: 'ig_visualizacoesTotais', name: 'Visualizações Totais', format: 'number', tier: 3 },
-      { id: 'ig_percEngajamento', name: '% Engajamento', format: 'percent', tier: 1 },
+      { id: 'ig_percEngajamento', name: '% Engajamento (Alcance > Interações)', format: 'percent', tier: 1 },
       { id: 'ig_interacoes', name: 'Interações', format: 'number', tier: 2 },
       { id: 'ig_ctrAlcanceVisitas', name: 'CTR Alcance > Visitas', format: 'percent', tier: 1 },
       { id: 'ig_ctrAlcanceCliques', name: 'CTR Alcance > Cliques', format: 'percent', tier: 1 },
       { id: 'ig_ctrVisitasCliques', name: 'CTR Visitas > Cliques', format: 'percent', tier: 1 },
-      { id: 'ig_cliquesLinkBio', name: 'Cliques Link Bio', format: 'number', tier: 1 },
+      { id: 'ig_cliquesLinkBio', name: 'Cliques no Link Bio', format: 'number', tier: 1 },
       { id: 'ig_leads', name: 'Leads', format: 'number', tier: 1 },
       { id: 'ig_percMqls', name: '% MQLs', format: 'percent', tier: 2 },
       { id: 'ig_mqls', name: 'MQLs', format: 'number', tier: 1 },
@@ -570,7 +570,7 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'yt_crescimentoInscritos', name: 'Crescimento Inscritos', format: 'number', tier: 2 },
       { id: 'yt_visualizacoes', name: 'Visualizações', format: 'number', tier: 3 },
       { id: 'yt_horasAssistidas', name: 'Horas Assistidas', format: 'number', tier: 3 },
-      { id: 'yt_ctrImpressoes', name: 'CTR Impressões', format: 'percent', tier: 1 },
+      { id: 'yt_ctrImpressoes', name: 'CTR Impressões (Thumbnail)', format: 'percent', tier: 1 },
       { id: 'yt_retencaoMedia', name: 'Retenção Média', format: 'percent', tier: 1 },
       { id: 'yt_leads', name: 'Leads', format: 'number', tier: 1 },
       { id: 'yt_mqls', name: 'MQLs', format: 'number', tier: 1 },
@@ -672,24 +672,9 @@ export const TIER3_METRIC_IDS = new Set<string>([
   'li_reacoes', 'li_comentarios', 'li_compartilhamentos',
 ]);
 
-// ===== Simulation Engine =====
-// Defines which metrics are user inputs vs derived (auto-calculated),
-// and the formulas to compute derived metrics from inputs.
-
-/**
- * Metrics the user sets directly in simulation mode.
- * All other Inbound metrics are derived from these.
- */
-export const SIMULATION_INPUT_METRICS = new Set([
-  // Marketing inputs
-  'investimento', 'visualizacoes_pagina', 'connect_rate', 'taxa_conversao_pagina', 'perc_mqls',
-  // MQL funnel inputs (rates & tickets)
-  'mql_ra_perc', 'mql_noshow', 'mql_taxa_vendas',
-  'mql_ticket_acel', 'mql_ticket_impl',
-  // Não-MQL funnel inputs (rates & tickets)
-  'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas',
-  'nmql_ticket_acel', 'nmql_ticket_impl',
-]);
+// ===== Inbound Derivation Engine =====
+// Formulas to compute derived Inbound metrics from user-input metrics.
+// Used by PlanejamentoMetas to auto-calculate derived values in real-time.
 
 type SimFormulaFn = (v: Record<string, number>) => number;
 
@@ -697,7 +682,7 @@ type SimFormulaFn = (v: Record<string, number>) => number;
  * Evaluation order matters — each formula can reference metrics computed before it.
  * The array defines [metricId, formulaFn] in topological order.
  */
-export const SIMULATION_EVAL_ORDER: Array<[string, SimFormulaFn]> = [
+const INBOUND_EVAL_ORDER: Array<[string, SimFormulaFn]> = [
   // Marketing derived
   ['leads', (v) => Math.round(v.visualizacoes_pagina * v.taxa_conversao_pagina)],
   ['mqls', (v) => Math.round(v.leads * v.perc_mqls)],
@@ -733,17 +718,12 @@ export const SIMULATION_EVAL_ORDER: Array<[string, SimFormulaFn]> = [
   }],
 ];
 
-/** Set of all derived metric IDs (for quick lookup) */
-export const SIMULATION_DERIVED_METRICS = new Set(
-  SIMULATION_EVAL_ORDER.map(([id]) => id)
-);
-
 /**
- * Given a flat map of metric values for one month, recalculate all derived metrics.
+ * Given a flat map of Inbound metric values for one month, recalculate all derived metrics.
  * Mutates and returns the same object for efficiency.
  */
-export function simulateMonth(values: Record<string, number>): Record<string, number> {
-  for (const [metricId, formula] of SIMULATION_EVAL_ORDER) {
+export function deriveInboundMetrics(values: Record<string, number>): Record<string, number> {
+  for (const [metricId, formula] of INBOUND_EVAL_ORDER) {
     values[metricId] = formula(values);
   }
   return values;

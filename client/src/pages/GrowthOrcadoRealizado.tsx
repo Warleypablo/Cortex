@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Target, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Pencil, Save, X, Copy, Camera, Play, Briefcase, AlertCircle, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, AlertCircle, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
@@ -575,7 +575,6 @@ export default function GrowthOrcadoRealizado() {
 
   const [selectedProdutos, setSelectedProdutos] = useState<string[]>([]);
   // Editing is only allowed when at most 1 product and 1 platform is selected
-  const canEdit = selectedProdutos.length <= 1 && selectedPlataformas.length <= 1;
   const [compareEnabled, setCompareEnabled] = useState(true);
   const [compareRange, setCompareRange] = useState<DateRange | undefined>(() => {
     // Default: período anterior
@@ -586,12 +585,7 @@ export default function GrowthOrcadoRealizado() {
     const prevStart = subDays(prevEnd, diff);
     return { from: prevStart, to: prevEnd };
   });
-  const [isEditing, setIsEditing] = useState(false);
   const [expandedLinkBio, setExpandedLinkBio] = useState(false);
-  const [editValues, setEditValues] = useState<Record<string, number>>({});
-  const [isSaving, setIsSaving] = useState(false);
-  const [showCopyFrom, setShowCopyFrom] = useState(false);
-  const [isCopying, setIsCopying] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch dynamic months from API
@@ -732,96 +726,7 @@ export default function GrowthOrcadoRealizado() {
     };
   }, [ORCADO_MQL, ORCADO_NAO_MQL]);
 
-  const startEditing = () => {
-    const values: Record<string, number> = {};
-    const segmentSources: Record<string, any> = {
-      mql: ORCADO_MQL, nao_mql: ORCADO_NAO_MQL, ads: ORCADO_ADS,
-      meta_ads: ORCADO_META_ADS, google_ads: ORCADO_GOOGLE_ADS,
-      instagram: ORCADO_INSTAGRAM, youtube: ORCADO_YOUTUBE, linkedin: ORCADO_LINKEDIN,
-    };
-    for (const [metricId, { segment, key }] of Object.entries(METRIC_BUDGET_MAP)) {
-      const source = segmentSources[segment] || ORCADO_ADS;
-      const raw = (source as any)[key] ?? 0;
-      values[metricId] = PERCENT_METRICS.has(metricId) ? raw * 100 : raw;
-    }
-    setEditValues(values);
-    setIsEditing(true);
-  };
-
-  const cancelEditing = () => {
-    setIsEditing(false);
-    setEditValues({});
-  };
-
-  const saveEdits = async () => {
-    setIsSaving(true);
-    try {
-      const segments: Record<string, Record<string, number>> = {};
-      for (const [metricId, value] of Object.entries(editValues)) {
-        const mapping = METRIC_BUDGET_MAP[metricId];
-        if (!mapping) continue;
-        if (!segments[mapping.segment]) segments[mapping.segment] = {};
-        segments[mapping.segment][mapping.key] = PERCENT_METRICS.has(metricId) ? value / 100 : value;
-      }
-      await Promise.all(
-        Object.entries(segments).map(([segmento, metricas]) =>
-          fetch('/api/growth/orcado-realizado/budgets', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mes: selectedMonth, segmento, funil: selectedProdutos.length === 1 ? selectedProdutos[0] : 'todos', metricas }),
-          })
-        )
-      );
-      queryClient.invalidateQueries({ queryKey: ['/api/growth/orcado-realizado/budgets'] });
-      setIsEditing(false);
-      setEditValues({});
-    } catch (error) {
-      console.error('Failed to save budgets:', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const copyBudgets = async (mesOrigem: string) => {
-    setIsCopying(true);
-    try {
-      const res = await fetch('/api/growth/orcado-realizado/budgets/copy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mesOrigem, mesDestino: selectedMonth, funil: selectedProdutos.length === 1 ? selectedProdutos[0] : 'todos' }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        console.error('Copy failed:', err);
-        return;
-      }
-      queryClient.invalidateQueries({ queryKey: ['/api/growth/orcado-realizado/budgets'] });
-      setShowCopyFrom(false);
-    } catch (error) {
-      console.error('Failed to copy budgets:', error);
-    } finally {
-      setIsCopying(false);
-    }
-  };
-
   const renderOrcadoCell = (metric: Metric) => {
-    if (isEditing && METRIC_BUDGET_MAP[metric.id]) {
-      return (
-        <div className="flex items-center justify-end gap-1">
-          <input
-            type="number"
-            step={PERCENT_METRICS.has(metric.id) ? '0.01' : metric.format === 'currency' ? '0.01' : '1'}
-            value={editValues[metric.id] ?? ''}
-            onChange={(e) => setEditValues(prev => ({
-              ...prev,
-              [metric.id]: parseFloat(e.target.value) || 0,
-            }))}
-            className="w-28 px-2 py-1 text-right text-sm border rounded bg-background text-foreground focus:ring-2 focus:ring-primary/50 focus:border-primary"
-          />
-          {PERCENT_METRICS.has(metric.id) && <span className="text-xs text-muted-foreground">%</span>}
-        </div>
-      );
-    }
     // For Tier 3 metrics with no budget, show "—" instead of 0
     if (TIER3_METRIC_IDS.has(metric.id) && (metric.orcado === 0 || metric.orcado === null)) {
       return '—';
@@ -2134,129 +2039,6 @@ export default function GrowthOrcadoRealizado() {
 
   return (
     <div className="p-6 space-y-6" data-testid="growth-orcado-realizado-page">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Target className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Gestão de Metas</h1>
-            <p className="text-muted-foreground text-sm">Acompanhamento de metas de marketing e vendas</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          {isEditing ? (
-            <>
-              <button
-                onClick={saveEdits}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors"
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Salvar
-              </button>
-              <button
-                onClick={cancelEditing}
-                disabled={isSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50 transition-colors"
-              >
-                <X className="w-4 h-4" />
-                Cancelar
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={startEditing}
-                disabled={!canEdit}
-                title={!canEdit ? 'Selecione apenas um produto e uma plataforma para editar metas' : undefined}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Pencil className="w-4 h-4" />
-                Editar Metas
-              </button>
-              <div className="relative">
-                <button
-                  onClick={() => setShowCopyFrom(!showCopyFrom)}
-                  disabled={isCopying || !canEdit}
-                  title={!canEdit ? 'Selecione apenas um produto e uma plataforma para copiar metas' : undefined}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border border-border hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isCopying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
-                  Copiar Metas
-                </button>
-                {showCopyFrom && (
-                  <div className="absolute right-0 top-full mt-1 z-50 bg-popover border rounded-lg shadow-lg p-2 min-w-[200px]">
-                    <p className="text-xs text-muted-foreground px-2 pb-2">Copiar metas de:</p>
-                    {months.filter(m => m.value !== selectedMonth).map((month) => (
-                      <button
-                        key={month.value}
-                        onClick={() => copyBudgets(month.value)}
-                        disabled={isCopying}
-                        className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-muted transition-colors disabled:opacity-50"
-                      >
-                        {month.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-          <DateRangePicker
-            value={customDateRange}
-            onChange={(range) => {
-              setCustomDateRange(range);
-              if (range?.from) {
-                const newMonth = format(range.from, 'yyyy-MM');
-                if (newMonth !== selectedMonth) {
-                  setSelectedMonth(newMonth);
-                  if (isEditing) cancelEditing();
-                }
-              }
-            }}
-            showCompare
-            compareEnabled={compareEnabled}
-            compareRange={compareRange}
-            onCompareChange={(enabled, range) => {
-              setCompareEnabled(enabled);
-              setCompareRange(range);
-            }}
-          />
-        </div>
-      </div>
-
-      {/* Filtros + Cards de Resumo */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground font-medium">Produto:</span>
-          <MultiSelect
-            options={(funis || []).map(f => ({ value: f, label: f }))}
-            selected={selectedProdutos}
-            onChange={setSelectedProdutos}
-            placeholder="Todos os Produtos"
-            className="w-[180px] text-xs"
-          />
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground font-medium">Plataforma:</span>
-          <MultiSelect
-            options={PLATFORM_MULTISELECT_OPTIONS}
-            selected={selectedPlataformas}
-            onChange={setSelectedPlataformas}
-            placeholder="Todas as Plataformas"
-            className="w-[180px] text-xs"
-          />
-        </div>
-        {selectedPlataformas.some(p => p === 'youtube' || p === 'linkedin') && (
-          <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            Integração pendente
-          </Badge>
-        )}
-      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3 items-stretch">
         {/* Investimento */}
         <Card className="border bg-card flex flex-col">
@@ -2466,8 +2248,8 @@ export default function GrowthOrcadoRealizado() {
         </Card>
       </div>
 
-      {/* Tabs de Seção */}
-      <div className="flex items-center gap-4 flex-wrap">
+      {/* Tabs de Seção + Filtros */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 w-fit">
           {([
             { key: 'consolidado', label: 'Consolidado' },
@@ -2486,6 +2268,54 @@ export default function GrowthOrcadoRealizado() {
               {tab.label}
             </button>
           ))}
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground font-medium">Produto:</span>
+            <MultiSelect
+              options={(funis || []).map(f => ({ value: f, label: f }))}
+              selected={selectedProdutos}
+              onChange={setSelectedProdutos}
+              placeholder="Todos os Produtos"
+              className="w-[180px] text-xs"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground font-medium">Plataforma:</span>
+            <MultiSelect
+              options={PLATFORM_MULTISELECT_OPTIONS}
+              selected={selectedPlataformas}
+              onChange={setSelectedPlataformas}
+              placeholder="Todas as Plataformas"
+              className="w-[180px] text-xs"
+            />
+          </div>
+          {selectedPlataformas.some(p => p === 'youtube' || p === 'linkedin') && (
+            <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+              <AlertCircle className="w-3 h-3 mr-1" />
+              Integração pendente
+            </Badge>
+          )}
+          <DateRangePicker
+            value={customDateRange}
+            onChange={(range) => {
+              setCustomDateRange(range);
+              if (range?.from) {
+                const newMonth = format(range.from, 'yyyy-MM');
+                if (newMonth !== selectedMonth) {
+                  setSelectedMonth(newMonth);
+                }
+              }
+            }}
+            showCompare
+            compareEnabled={compareEnabled}
+            compareRange={compareRange}
+            onCompareChange={(enabled, range) => {
+              setCompareEnabled(enabled);
+              setCompareRange(range);
+            }}
+          />
         </div>
       </div>
 
