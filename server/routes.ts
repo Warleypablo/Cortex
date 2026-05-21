@@ -34,6 +34,7 @@ import { registerRelatorioMensalRoutes } from "./routes/relatorioMensal";
 import { registerRelatorioMensalSlidesRoutes } from "./routes/relatorioMensalSlides";
 import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
+import { registerFcaRoutes } from "./routes/fca";
 import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
 import { registerJuridicoAssistenteRoutes } from "./routes/juridico-assistente";
 import { registerIaHubRoutes } from "./routes/ia-hub";
@@ -439,6 +440,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
   registerInstagramRoutes(app, db, storage);
+
+  // FCA Report — auth via bearer token (não usa sessão)
+  registerFcaRoutes(app);
 
   app.use("/api", isAuthenticated);
 
