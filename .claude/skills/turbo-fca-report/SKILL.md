@@ -622,6 +622,55 @@ Conventional Commits (regra do `CLAUDE.md` do Cortex).
 
 ---
 
+## Execução via endpoint REST (v3.15)
+
+Além da invocação manual via conversa com o Claude, o FCA tem **endpoint HTTP** próprio.
+
+**Endpoints:**
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| `GET` | `/api/fca/health` | nenhum | Retorna versão, endpoint disponível, se token está configurado |
+| `POST` | `/api/fca/run` | Bearer token | Gera relatório + opcionalmente cria task ClickUp |
+
+**Auth:** header `Authorization: Bearer ${FCA_API_TOKEN}`. Token configurado em `.env` do servidor.
+
+**Body do POST:**
+```json
+{
+  "funil": "Creators",
+  "createTask": true
+}
+```
+
+- `funil`: `"Creators"` (default) — `"Ecommerce"` pendente implementação
+- `createTask`: `true` cria task no ClickUp; `false` só retorna markdown
+
+**Response:**
+```json
+{
+  "ok": true,
+  "funil": "Creators",
+  "periodos": { "semana": {...}, "semanaPrev": {...}, "mtd": {...}, "diasMTD": 20, "diasMes": 31 },
+  "task": { "id": "86ahm3dzm", "url": "https://app.clickup.com/t/..." },
+  "markdown": "## Contexto\n..."
+}
+```
+
+**Exemplo curl:**
+```bash
+curl -X POST https://cortex.turbopartners.com.br/api/fca/run \
+  -H "Authorization: Bearer $FCA_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"funil":"Creators"}'
+```
+
+**Quando usar:** automação (schedule cron remoto), integração com outras ferramentas, dispara workflow externamente.
+
+**Quando NÃO usar:** rotina manual (continua mais simples falar "roda o FCA" com o Claude).
+
+---
+
 ## SCHEDULE (configurar depois de validar manual 1× cada modo)
 
 ```
@@ -640,6 +689,7 @@ Alternativa robusta: registrar como cron job em `server/index.ts` chamando endpo
 
 ## CHANGELOG DA SKILL
 
+- **v3.15 (2026-05-21):** Documentação do endpoint REST (`POST /api/fca/run` + `GET /api/fca/health`). Skill agora pode ser executada de 2 formas: (1) conversa com Claude — mesmo gatilhos de antes; (2) requisição HTTPS direto (pra automação/schedule cron). Comportamento idêntico — endpoint usa as mesmas queries e formato de markdown que a skill descreve.
 - **v3.14 (2026-05-21):** (1) **Nomenclatura alinhada à planilha Planejamento de Metas** (`client/src/lib/metasBudgetConfig.ts`): "Novos Clientes" → "Negócios Ganhos"; "Faturamento" → "Faturamento Total"; "Ticket Médio" → "Ticket Médio Geral"; "CAC" desmembrado em **"CAC - Negócios"** (invest/negócios) e **"CAC - Contrato"** (invest/contratos). (2) Adicionadas métricas que faltavam no Consolidado: Faturamento Implantação, Faturamento Aceleração, Ticket Médio Implantação, Ticket Médio Aceleração, Lead Time. (3) **Correção crítica de filtros temporais**: Negócios Ganhos / Faturamento agora filtram só por `data_fechamento BETWEEN` (não por `created_at`); RA / RR / No-show filtram por `data_reuniao_agendada/realizada BETWEEN` (não por `created_at`). Antes, o filtro errado inflava No-show e subestimava Negócios.
 - **v3.13 (2026-05-21):** Ordem Contexto → Resumo executivo → Pacing → resto. Headline `## Contexto`. Pacing focado em CAC. "Limitações" → "Impedimentos".
 - **v3.12 (2026-05-21):** Pacing da meta adicionado. CPMQL como métrica norte de Growth + projeção linear pro fim do mês.
