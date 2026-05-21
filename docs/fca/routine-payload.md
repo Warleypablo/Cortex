@@ -25,12 +25,24 @@ curl -s -X POST https://cortex.turbopartners.com.br/api/fca/run \
 
 Esperado: response JSON com `ok: true` e `task.url` apontando pra task criada no ClickUp.
 
-Se der erro (status != 200, ou ok: false), reporte:
-- O HTTP status
-- A mensagem de erro
-- Se conseguir acessar /api/fca/health (sem auth) pra diagnóstico
+Se der erro (status != 200, ou ok: false):
 
-Não tente debugar nem retentar. Apenas reporte.
+1. Acesse https://cortex.turbopartners.com.br/api/fca/health (sem auth) pra diagnóstico
+2. Crie uma task de alerta no ClickUp via API direta — assim Ichino é notificado pelo canal padrão:
+
+curl -s -X POST https://api.clickup.com/api/v2/list/901322140780/task \
+  -H "Authorization: $CLICKUP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "⚠️ FCA falhou — Creators (semana <YYYY-Www>)",
+    "description": "Routine FCA Creators falhou em <ISO timestamp>.\n\n**HTTP status:** <status>\n**Erro:** <mensagem>\n**Healthcheck:** <ok|fail>\n\nVer logs em https://claude.ai/code/routines",
+    "assignees": [55120346],
+    "priority": 2
+  }'
+
+3. Reporte no output do agente: HTTP status do /api/fca/run, erro, e se a task de alerta foi criada.
+
+Não tente debugar nem retentar o FCA. Apenas reporte e crie o alerta.
 ```
 
 ## Body completo do RemoteTrigger create
@@ -57,7 +69,7 @@ Não tente debugar nem retentar. Apenas reporte.
           "type": "user",
           "parent_tool_use_id": null,
           "message": {
-            "content": "Você é um agente automatizado disparando o relatório FCA semanal do funil Creators.\n\nSua única tarefa: rodar este curl exatamente como está abaixo e reportar o resultado em 2-3 linhas.\n\ncurl -s -X POST https://cortex.turbopartners.com.br/api/fca/run \\\n  -H \"Authorization: Bearer $FCA_API_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"funil\":\"Creators\",\"createTask\":true}' \\\n  --max-time 180\n\nEsperado: response JSON com `ok: true` e `task.url` apontando pra task criada no ClickUp.\n\nSe der erro (status != 200, ou ok: false), reporte:\n- O HTTP status\n- A mensagem de erro\n- Se conseguir acessar /api/fca/health (sem auth) pra diagnóstico\n\nNão tente debugar nem retentar. Apenas reporte.",
+            "content": "Você é um agente automatizado disparando o relatório FCA semanal do funil Creators.\n\nSua única tarefa: rodar este curl exatamente como está abaixo e reportar o resultado em 2-3 linhas.\n\ncurl -s -X POST https://cortex.turbopartners.com.br/api/fca/run \\\n  -H \"Authorization: Bearer $FCA_API_TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"funil\":\"Creators\",\"createTask\":true}' \\\n  --max-time 180\n\nEsperado: response JSON com `ok: true` e `task.url` apontando pra task criada no ClickUp.\n\nSe der erro (status != 200, ou ok: false):\n1. Acesse https://cortex.turbopartners.com.br/api/fca/health pra diagnóstico\n2. Crie uma task de alerta no ClickUp via API direta (lista 901322140780, assignee 55120346):\n\ncurl -s -X POST https://api.clickup.com/api/v2/list/901322140780/task \\\n  -H \"Authorization: $CLICKUP_API_KEY\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"name\":\"⚠️ FCA falhou — Creators\",\"description\":\"<detalhe do erro>\",\"assignees\":[55120346],\"priority\":2}'\n\n3. Reporte: HTTP status, erro, e se a task de alerta foi criada.\n\nNão tente debugar nem retentar. Apenas reporte e alerte.",
             "role": "user"
           }
         }}
@@ -67,13 +79,13 @@ Não tente debugar nem retentar. Apenas reporte.
 }
 ```
 
-**Atenção sobre `$FCA_API_TOKEN`:** o agente remoto NÃO tem essa variável de ambiente automaticamente. Vamos precisar de uma de duas estratégias:
+**Atenção sobre `$FCA_API_TOKEN` e `$CLICKUP_API_KEY`:** o agente remoto NÃO tem essas variáveis de ambiente automaticamente. Vamos precisar de uma de duas estratégias:
 
-1. **Hardcoded no prompt** (menos seguro): substituir `$FCA_API_TOKEN` pelo valor literal no prompt. Risco: token fica visível em logs/histórico de routines.
+1. **Hardcoded no prompt** (menos seguro): substituir `$FCA_API_TOKEN` e `$CLICKUP_API_KEY` pelos valores literais no prompt. Risco: tokens ficam visíveis em logs/histórico de routines.
 
 2. **Via env_vars do job_config** (mais seguro, se suportado): a API do RemoteTrigger pode aceitar `env_vars` no ccr — investigar antes de criar.
 
-Pra primeira run, vai com **hardcoded** e depois investigamos a opção 2. Token tem 64 chars hex, baixíssimo risco se ficar restrito a routines visíveis só pra Ichino.
+Pra primeira run, vai com **hardcoded** e depois investigamos a opção 2. Tokens ficam restritos a routines visíveis só pra Ichino.
 
 ## Pra rodar (depois do deploy)
 

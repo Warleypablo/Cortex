@@ -82,19 +82,23 @@ Estrutura fixa (skill v3.15):
 2. Criar routine via `RemoteTrigger` usando `docs/fca/routine-payload.md` como base
 3. Marcar como completo
 
+### Decisões operacionais do v1 (2026-05-21)
+
+- **Canal de notificação**: ClickUp. Task atribuída a Ichino na lista 901322140780 dispara notificação nativa (push/email/desktop). Sem WhatsApp, sem Discord.
+- **Alerta de falha da routine**: o endpoint cria uma task com prefixo `⚠️ FCA falhou —` na mesma lista, mesmo assignee. Mesmo canal de notificação.
+- **Dono operacional do FCA semanal**: Vinícius Ichino (revisa, valida números, executa ações).
+- **Subtasks atribuídas por responsável**: **descartado** pra não virar gargalo. Ações ficam só na descrição da task pai.
+- **Escalonamento pra comercial quando constraint cai fora de Growth**: **descartado** pra v1. Quando acontecer, Ichino conversa offline com o líder responsável.
+
 ### O que ficou pra próxima iteração (não bloqueante)
 
-1. **Cadastrar metas faltantes** pra Creators Maio 2026 em `/planejamento-metas`:
+1. **Cadastrar metas faltantes** pra Creators Maio 2026 em `/planejamento-metas` — Ichino vai fazer:
    - CAC (alvo)
    - Faturamento Total (alvo)
    - Negócios Ganhos (alvo)
    - Sem essas metas, Pacing fica 🔘 nas linhas principais
 
-2. **Subtasks atribuídas** no ClickUp: cada ação do relatório devia virar uma subtask filha da task pai, atribuída ao responsável (Gestor de Performance, Designer CRO, Dev, etc.). Hoje as ações ficam só na descrição. Falta mapeamento de **pessoa real → tipo de ação**.
-
-3. **Task de escalonamento pra pré-vendas:** quando o constraint é fora de Growth (no-show alto, etc.), criar task separada na lista do comercial com `@menção`. Precisa saber a lista do comercial.
-
-4. **Ecommerce:** replicar a query Creators pra Ecommerce. Esperar 2-3 semanas (conforme decisão de 2026-05-21) ou adiantar.
+2. **Ecommerce:** replicar a query Creators pra Ecommerce. Aguardando Ichino puxar o assunto.
 
 ---
 
