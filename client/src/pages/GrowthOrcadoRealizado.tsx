@@ -498,7 +498,7 @@ const PERCENT_METRICS = new Set([
   'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas', 'nmql_tx_recorrente', 'nmql_tx_implantacao', 'nmql_rr_perc',
   'ctr', 'perc_mqls',
   // Meta Ads
-  'meta_ctr', 'meta_videoHook', 'meta_videoHold', 'meta_videoP75', 'meta_videoP100',
+  'meta_ctr', 'meta_videoP75', 'meta_videoP100',
   'meta_taxaConversaoPagina', 'meta_connectRate', 'meta_percMqls',
   'meta_percRa', 'meta_percRaMql', 'meta_percRaNmql', 'meta_percRr', 'meta_percRrMql', 'meta_percRrNmql',
   'meta_percRrVendas', 'meta_percRrMqlVendas', 'meta_percRrNmqlVendas',
@@ -1519,8 +1519,6 @@ export default function GrowthOrcadoRealizado() {
     const topMetrics: Metric[] = [
       { id: 'meta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
-      { id: 'meta_videoHook', name: 'Vídeo Hook', type: 'formula', orcado: O.videoHook, realizado: d.videoHook ?? null, percentual: calcPercentual(O.videoHook, d.videoHook), format: 'percent' },
-      { id: 'meta_videoHold', name: 'Vídeo Hold', type: 'formula', orcado: O.videoHold, realizado: d.videoHold ?? null, percentual: calcPercentual(O.videoHold, d.videoHold), format: 'percent' },
       { id: 'meta_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
