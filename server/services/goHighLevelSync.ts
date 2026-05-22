@@ -301,6 +301,20 @@ function tsFromUnixMs(v: number | string | undefined | null): Date | null {
   return new Date(n);
 }
 
+// Drizzle's sql template doesn't auto-convert undefined to null, which generates
+// invalid SQL ("syntax error at or near ,"). Use this on any optional field.
+function nz<T>(v: T | undefined): T | null {
+  return v === undefined ? null : v;
+}
+
+// Drizzle binds JS arrays as composite type (record), not as text[]. Build a
+// Postgres array literal and cast explicitly via ${tagsLiteral(...)}::text[].
+function tagsLiteral(tags: string[] | null | undefined): string | null {
+  if (!tags || tags.length === 0) return null;
+  const escaped = tags.map((t) => '"' + String(t).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"').join(",");
+  return "{" + escaped + "}";
+}
+
 export async function upsertContact(c: GhlContactApi): Promise<void> {
   await db.execute(sql`
     INSERT INTO cortex_core.ghl_contacts (
@@ -308,9 +322,9 @@ export async function upsertContact(c: GhlContactApi): Promise<void> {
       company_name, type, source, tags, country, city, state,
       date_added, date_updated, attributions, custom_fields, raw, synced_at
     ) VALUES (
-      ${c.id}, ${c.locationId}, ${c.email}, ${c.phone}, ${c.contactName},
-      ${c.firstName}, ${c.lastName}, ${c.companyName}, ${c.type}, ${c.source},
-      ${c.tags ?? []}, ${c.country}, ${c.city}, ${c.state},
+      ${c.id}, ${c.locationId}, ${nz(c.email)}, ${nz(c.phone)}, ${nz(c.contactName)},
+      ${nz(c.firstName)}, ${nz(c.lastName)}, ${nz(c.companyName)}, ${nz(c.type)}, ${nz(c.source)},
+      ${tagsLiteral(c.tags)}::text[], ${nz(c.country)}, ${nz(c.city)}, ${nz(c.state)},
       ${tsFromUnixMs(c.dateAdded)}, ${tsFromUnixMs(c.dateUpdated)},
       ${JSON.stringify(c.attributions ?? null)}::jsonb,
       ${JSON.stringify(c.customFields ?? null)}::jsonb,
@@ -343,7 +357,7 @@ export async function upsertConversation(c: GhlConversationApi): Promise<void> {
       id, location_id, contact_id, last_message_type, last_message_direction,
       last_message_date, unread_count, date_added, date_updated, raw, synced_at
     ) VALUES (
-      ${c.id}, ${c.locationId}, ${c.contactId}, ${c.lastMessageType}, ${c.lastMessageDirection},
+      ${c.id}, ${c.locationId}, ${nz(c.contactId)}, ${nz(c.lastMessageType)}, ${nz(c.lastMessageDirection)},
       ${tsFromUnixMs(c.lastMessageDate)}, ${c.unreadCount ?? 0},
       ${tsFromUnixMs(c.dateAdded)}, ${tsFromUnixMs(c.dateUpdated)},
       ${JSON.stringify(c)}::jsonb, NOW()
@@ -370,7 +384,7 @@ export async function upsertMessage(m: GhlMessageApi): Promise<void> {
       date_added, meta, synced_at
     ) VALUES (
       ${m.id}, ${m.conversationId ?? null}, ${m.contactId ?? null}, ${m.locationId},
-      ${m.direction}, ${m.messageType}, ${m.status}, ${m.source ?? null},
+      ${nz(m.direction)}, ${nz(m.messageType)}, ${nz(m.status)}, ${m.source ?? null},
       ${m.body ?? null}, ${subject}, ${emailMessageId}, ${m.contentType ?? null},
       ${tsFromUnixMs(m.dateAdded)},
       ${JSON.stringify(m.meta ?? null)}::jsonb, NOW()
@@ -391,7 +405,7 @@ export async function upsertEmailCampaign(c: GhlEmailScheduleApi): Promise<void>
       has_tracking, has_utm_tracking, is_plain_text, scheduled_at, date_added, date_updated,
       raw, synced_at
     ) VALUES (
-      ${c.id}, ${c.locationId}, ${c.name}, ${c.subject}, ${c.campaignType}, ${c.status},
+      ${c.id}, ${c.locationId}, ${nz(c.name)}, ${nz(c.subject)}, ${nz(c.campaignType)}, ${nz(c.status)},
       ${c.templateId ?? null}, ${c.templateType ?? null},
       ${c.totalCount ?? 0}, ${c.successCount ?? c.success ?? 0}, ${c.failed ?? 0}, ${c.error ?? 0},
       ${c.processed ?? 0}, ${c.queuedCount ?? 0},
