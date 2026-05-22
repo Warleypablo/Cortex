@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
+import { getSessionsByPlatform } from "../services/ga4Sessions";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
@@ -2485,13 +2486,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         visualizacoesPagina = parseInt(metaRow.visualizacoes_pagina) || 0;
       }
 
-      // Query Google Ads (skip when funnel is selected — no campaign-to-funnel mapping available;
-      // also skip when platform filter excludes Google)
+      // Query Google Ads (skip when platform filter excludes Google).
+      // Funnel filter aplicado via JOIN com google_ads.campaigns parsing do c.name
+      // (mesmo padrão `[NomeFunil]` usado em Meta).
       let googleInvestimento = 0;
       let googleImpressoes = 0;
       let googleCliques = 0;
-      if (funilValues.length > 0 || !includeGoogle) {
-        // Skip Google Ads when filtering by funnel or when platform filter excludes Google
+      if (!includeGoogle) {
+        // Skip Google Ads when platform filter excludes Google
       } else try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
@@ -2505,13 +2507,30 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                            columns.includes('segments_date') ? 'segments_date' : null;
 
         if (dateColumn && columns.includes('cost_micros')) {
+          // Build funnel filter for Google (parse c.name by [NomeFunil])
+          let googleFunnelFilter = '';
+          const escape = (v: string) => v.replace(/'/g, "''");
+          if (realFunilValues.length > 0) {
+            const conds = realFunilValues
+              .map(v => `c.name ILIKE '%[${escape(v)}]%' OR c.name ILIKE '%${escape(v)}%'`)
+              .join(' OR ');
+            let inner = `(${conds})`;
+            if (hasVazio) {
+              inner = `(${inner} OR c.name NOT LIKE '%[%]%')`;
+            }
+            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE ${inner})`;
+          } else if (hasVazio) {
+            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
+          }
+
           const googleResult = await db.execute(sql.raw(`
             SELECT
               COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
               COALESCE(SUM(impressions), 0) as impressoes,
               COALESCE(SUM(clicks), 0) as cliques
-            FROM google_ads.campaign_daily_metrics
+            FROM google_ads.campaign_daily_metrics m
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+              ${googleFunnelFilter}
           `));
           const gRow = googleResult.rows[0] as any;
           googleInvestimento = parseFloat(gRow.investimento) || 0;
@@ -2522,17 +2541,40 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.log("[api] Google Ads query error in orcado-realizado/ads (may not have data):", googleError);
       }
 
+      // Cliques de saída consolidados: Meta outbound_clicks + Google clicks
+      // (Google clicks são cliques no anúncio que levam à LP — equivalente a outbound).
+      if (includeGoogle) {
+        cliquesSaida += googleCliques;
+      }
+
       // Combine Meta + Google
       const investimento = metaInvestimento + googleInvestimento;
       const impressoes = metaImpressoes + googleImpressoes;
       const cliques = metaCliques + googleCliques;
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
-      const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
+      // CTR consolidado: cliques totais / impressões totais (não cliques_saida Meta-only)
+      const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
 
       // CPS = Custo por Sessão (Investimento / Visualizações de Página)
       const cps = visualizacoesPagina > 0 ? investimento / visualizacoesPagina : 0;
-      // Connect Rate = Visualizações de Página / Cliques de Saída
+      // Connect Rate = Visualizações de Página / Cliques de Saída (Meta Pixel only — semântica preservada)
       const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
+
+      // Sessões (GA4) — métrica universal de chegada na LP cobrindo Meta + Google + orgânico.
+      // Filtro de funil aplicado via sessionCampaignName contains [NomeFunil].
+      const ga4 = await getSessionsByPlatform(
+        new Date(startDate),
+        new Date(endDate),
+        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+      );
+      let sessoes = 0;
+      if (includeMeta && includeGoogle) {
+        sessoes = ga4.total;
+      } else if (includeMeta) {
+        sessoes = ga4.byPlatform.meta_ads;
+      } else if (includeGoogle) {
+        sessoes = ga4.byPlatform.google_ads;
+      }
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
       const contagem = (req.query.contagem as string) || 'contrato';
@@ -2591,6 +2633,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPagina;
+      const sessoesExposto = onlyInstagram ? 0 : sessoes;
       const cpl = onlyInstagram ? 0 : (leads > 0 ? investimento / leads : 0);
       const cpmql = onlyInstagram ? 0 : (mqls > 0 ? investimento / mqls : 0);
       const percMqls = leads > 0 ? (mqls / leads) : 0;
@@ -2605,6 +2648,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cps: cpsExposto,
         connectRate: connectRateExposto,
         visualizacoesPagina: visualizacoesPaginaExposto,
+        sessoes: sessoesExposto,
+        sessoesAvailable: ga4.available,
         leads,
         mqls,
         cpl,
@@ -2640,6 +2685,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           investimento: 0, impressoes: 0, alcance: 0, frequencia: 0,
           cpm: 0, ctr: 0, videoHook: null, videoHold: null,
           visualizacoesPagina: 0, connectRate: 0,
+          sessoes: 0, sessoesAvailable: false,
         });
       }
 
@@ -2708,6 +2754,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const videoHook = impressoes > 0 && video3Sec > 0 ? (video3Sec / impressoes) * 100 : null;
       const videoHold = impressoes > 0 && videoThruplay > 0 ? (videoThruplay / impressoes) * 100 : null;
 
+      const ga4 = await getSessionsByPlatform(
+        new Date(startDate),
+        new Date(endDate),
+        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+      );
+      const sessoes = ga4.byPlatform.meta_ads;
+
       res.json({
         investimento,
         impressoes,
@@ -2719,6 +2772,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         videoHold,
         visualizacoesPagina,
         connectRate,
+        sessoes,
+        sessoesAvailable: ga4.available,
       });
     } catch (error) {
       console.error("[api] Error fetching Meta Ads metrics:", error);
@@ -2743,18 +2798,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const includeGoogle = utmValues.length === 0
         || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
 
-      // Funnel filter: Google Ads has no campaign→funnel mapping, so any funnel selection
-      // means we cannot match Google spend to that funnel — return zeros (matches /ads behavior).
+      // Funnel filter — Google Ads usa o mesmo padrão `[NomeFunil]` no `c.name`
+      // que o Meta. Parseamos via JOIN com google_ads.campaigns.
       const funilNgcRaw = req.query.funilNgc as string | undefined;
-      const hasFunilFilter = !!(funilNgcRaw && funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean).length > 0);
+      const funilValues = funilNgcRaw
+        ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
+        : [];
+      const hasVazio = funilValues.includes('(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
 
       const zeroResponse = {
         investimento: 0, impressoes: 0, cliques: 0,
         cpm: 0, cpc: 0, ctr: 0,
         visualizacoesPagina: 0, connectRate: 0,
         conversoes: 0, valorConversoes: 0, custoConversao: 0,
+        sessoes: 0, sessoesAvailable: false,
       };
-      if (!includeGoogle || hasFunilFilter) {
+      if (!includeGoogle) {
         return res.json(zeroResponse);
       }
 
@@ -2780,6 +2840,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const hasConversions = columns.includes('conversions');
           const hasConversionsValue = columns.includes('conversions_value');
 
+          // Build funnel filter for Google (parse c.name by [NomeFunil])
+          let googleFunnelFilter = '';
+          const escape = (v: string) => v.replace(/'/g, "''");
+          if (realFunilValues.length > 0) {
+            const conds = realFunilValues
+              .map(v => `c.name ILIKE '%[${escape(v)}]%' OR c.name ILIKE '%${escape(v)}%'`)
+              .join(' OR ');
+            let inner = `(${conds})`;
+            if (hasVazio) {
+              inner = `(${inner} OR c.name NOT LIKE '%[%]%')`;
+            }
+            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE ${inner})`;
+          } else if (hasVazio) {
+            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
+          }
+
           const googleResult = await db.execute(sql.raw(`
             SELECT
               COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
@@ -2787,8 +2863,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(clicks), 0) as cliques
               ${hasConversions ? ', COALESCE(SUM(conversions), 0) as conversoes' : ''}
               ${hasConversionsValue ? ', COALESCE(SUM(conversions_value), 0) as valor_conversoes' : ''}
-            FROM google_ads.campaign_daily_metrics
+            FROM google_ads.campaign_daily_metrics m
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+              ${googleFunnelFilter}
           `));
           const gRow = googleResult.rows[0] as any;
           investimento = parseFloat(gRow.investimento) || 0;
@@ -2806,6 +2883,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
       const custoConversao = conversoes > 0 ? (investimento / conversoes) : 0;
 
+      // Sessões GA4 do tráfego Google (sessionSource=google + sessionMedium=cpc)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.google_ads;
+
       res.json({
         investimento,
         impressoes,
@@ -2818,6 +2899,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         conversoes,
         valorConversoes,
         custoConversao,
+        sessoes,
+        sessoesAvailable: ga4.available,
       });
     } catch (error) {
       console.error("[api] Error fetching Google Ads metrics:", error);
