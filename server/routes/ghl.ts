@@ -326,6 +326,110 @@ async function getDiagnostico(req: Request, res: Response) {
 }
 
 /**
+ * GET /api/ghl/messages
+ *   ?from=&to=&channel=TYPE_WHATSAPP|TYPE_EMAIL|all
+ *   &source=workflow,bulk|all
+ *   &direction=outbound|inbound|all
+ *   &base=<base-name>  (opcional — filtra contatos pela base do BASE_TAG_MAP)
+ *   &search=<texto livre, busca em body+subject>
+ *   &limit=50 &offset=0
+ *
+ * Lista mensagens com filtros + paginação.
+ */
+async function listMessages(req: Request, res: Response) {
+  try {
+    const { from, to } = parsePeriod(req);
+    const channel = (req.query.channel as string) || "all";
+    const sourceStr = (req.query.source as string) || "all";
+    const direction = (req.query.direction as string) || "all";
+    const base = (req.query.base as string) || "";
+    const search = ((req.query.search as string) || "").trim();
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const filters: SQL<unknown>[] = [sql`m.date_added BETWEEN ${from} AND ${to}`];
+
+    if (channel === "TYPE_WHATSAPP" || channel === "TYPE_EMAIL" || channel === "TYPE_SMS") {
+      filters.push(sql`m.message_type = ${channel}`);
+    }
+    if (direction === "outbound" || direction === "inbound") {
+      filters.push(sql`m.direction = ${direction}`);
+    }
+    if (sourceStr !== "all") {
+      const sources = sourceStr.split(",").map((s) => s.trim()).filter(Boolean);
+      if (sources.length) {
+        filters.push(sql`m.source = ANY(${sources}::text[])`);
+      }
+    }
+    if (search) {
+      filters.push(sql`(COALESCE(m.body, '') ILIKE ${`%${search}%`} OR COALESCE(m.subject, '') ILIKE ${`%${search}%`})`);
+    }
+
+    // Filtro por base: usa subquery de contatos que satisfazem o BaseFiltro
+    let baseJoin: SQL<unknown> = sql``;
+    if (base && BASE_TAG_MAP[base]) {
+      const baseWhere = buildTagFilterSql(BASE_TAG_MAP[base]);
+      baseJoin = sql`AND m.contact_id IN (SELECT id FROM cortex_core.ghl_contacts WHERE ${baseWhere})`;
+    }
+
+    const whereSql = filters.reduce((acc, f, i) => (i === 0 ? f : sql`${acc} AND ${f}`));
+
+    const total = await db.execute(sql`
+      SELECT COUNT(*)::int AS n
+      FROM cortex_core.ghl_messages m
+      WHERE ${whereSql} ${baseJoin}
+    `);
+    const totalCount = ((total as any).rows?.[0]?.n ?? 0) as number;
+
+    const r = await db.execute(sql`
+      SELECT
+        m.id, m.conversation_id, m.contact_id,
+        m.direction, m.message_type, m.status, m.source,
+        m.subject, m.email_message_id, m.content_type,
+        m.date_added,
+        LEFT(COALESCE(m.body, ''), 240) AS body_preview,
+        LENGTH(COALESCE(m.body, ''))::int AS body_length,
+        c.contact_name, c.email AS contact_email, c.phone AS contact_phone, c.tags AS contact_tags
+      FROM cortex_core.ghl_messages m
+      LEFT JOIN cortex_core.ghl_contacts c ON c.id = m.contact_id
+      WHERE ${whereSql} ${baseJoin}
+      ORDER BY m.date_added DESC NULLS LAST
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+    const messages = (r as any).rows;
+
+    res.json({ messages, total: totalCount, limit, offset, period: { from, to } });
+  } catch (err: any) {
+    console.error("[GHL] listMessages error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * GET /api/ghl/messages/:id — detalhe completo (body inteiro).
+ */
+async function getMessageDetail(req: Request, res: Response) {
+  try {
+    const id = req.params.id;
+    const r = await db.execute(sql`
+      SELECT
+        m.*,
+        c.contact_name, c.email AS contact_email, c.phone AS contact_phone, c.tags AS contact_tags
+      FROM cortex_core.ghl_messages m
+      LEFT JOIN cortex_core.ghl_contacts c ON c.id = m.contact_id
+      WHERE m.id = ${id}
+      LIMIT 1
+    `);
+    const message = (r as any).rows?.[0];
+    if (!message) return res.status(404).json({ error: "Mensagem não encontrada" });
+    res.json({ message });
+  } catch (err: any) {
+    console.error("[GHL] getMessageDetail error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
  * GET /api/ghl/overview
  * Counts gerais + última sync por resource.
  */
@@ -370,4 +474,6 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/tags", getTags);
   app.get("/api/ghl/overview", getOverview);
   app.get("/api/ghl/diagnostico", getDiagnostico);
+  app.get("/api/ghl/messages", listMessages);
+  app.get("/api/ghl/messages/:id", getMessageDetail);
 }

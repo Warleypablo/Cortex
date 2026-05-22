@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSetPageInfo } from "@/contexts/PageContext";
@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2 } from "lucide-react";
+import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
@@ -595,6 +596,253 @@ function DiagnosticoTab({ from, to }: { from: string; to: string }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
+// Tab: Biblioteca (histórico de mensagens com filtros)
+// ────────────────────────────────────────────────────────────────────────
+
+interface MessageRow {
+  id: string;
+  conversation_id: string;
+  contact_id: string | null;
+  direction: string;
+  message_type: string;
+  status: string;
+  source: string | null;
+  subject: string | null;
+  email_message_id: string | null;
+  date_added: string;
+  body_preview: string;
+  body_length: number;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  contact_tags: string[] | null;
+}
+
+function BibliotecaTab({ from, to }: { from: string; to: string }) {
+  const [channel, setChannel] = useState<string>("all");
+  const [direction, setDirection] = useState<string>("outbound");
+  const [source, setSource] = useState<string>("workflow,bulk");
+  const [base, setBase] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [page, setPage] = useState(0);
+  const [detail, setDetail] = useState<MessageRow | null>(null);
+  const limit = 50;
+
+  // Reset page quando filtros mudam
+  useEffect(() => { setPage(0); }, [channel, direction, source, base, search, from, to]);
+
+  const params = new URLSearchParams({ from, to, channel, direction, source, limit: String(limit), offset: String(page * limit) });
+  if (base) params.set("base", base);
+  if (search) params.set("search", search);
+
+  const { data, isLoading, error } = useQuery<{ messages: MessageRow[]; total: number }>({
+    queryKey: ["/api/ghl/messages", params.toString()],
+    queryFn: () => fetchJson(`/api/ghl/messages?${params.toString()}`),
+  });
+
+  const totalPages = data ? Math.ceil(data.total / limit) : 0;
+
+  return (
+    <div className="space-y-4">
+      {/* Filtros */}
+      <Card>
+        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          <div>
+            <Label className="text-xs">Canal</Label>
+            <Select value={channel} onValueChange={setChannel}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="TYPE_WHATSAPP">WhatsApp</SelectItem>
+                <SelectItem value="TYPE_EMAIL">Email</SelectItem>
+                <SelectItem value="TYPE_SMS">SMS</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Direção</Label>
+            <Select value={direction} onValueChange={setDirection}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                <SelectItem value="outbound">Outbound (enviada)</SelectItem>
+                <SelectItem value="inbound">Inbound (recebida)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Origem</Label>
+            <Select value={source} onValueChange={setSource}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="workflow,bulk">Marketing (workflow + bulk)</SelectItem>
+                <SelectItem value="workflow">Workflow só</SelectItem>
+                <SelectItem value="bulk">Bulk só</SelectItem>
+                <SelectItem value="manual">Manual (SDR/closer)</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Base</Label>
+            <Select value={base || "__none__"} onValueChange={(v) => setBase(v === "__none__" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Todas as bases" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Todas as bases</SelectItem>
+                {BASES_DISPONIVEIS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs">Busca</Label>
+            <div className="flex gap-1">
+              <Input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") setSearch(searchInput); }}
+                placeholder="Texto da mensagem..."
+                className="text-sm"
+              />
+              <button onClick={() => setSearch(searchInput)} className="px-2 hover:bg-muted rounded" title="Buscar">
+                <Search className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Resultados */}
+      {isLoading && <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</div>}
+      {error && <div className="text-destructive">Erro: {(error as Error).message}</div>}
+
+      {data && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex justify-between items-baseline">
+              <span>Mensagens ({fmtInt(data.total)})</span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2 text-sm font-normal">
+                  <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-muted-foreground">Página {page + 1} de {totalPages}</span>
+                  <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30">
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Data</TableHead>
+                    <TableHead>Canal</TableHead>
+                    <TableHead>Origem</TableHead>
+                    <TableHead>Contato</TableHead>
+                    <TableHead>Preview</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.messages.map((m) => (
+                    <TableRow key={m.id} onClick={() => setDetail(m)} className="cursor-pointer hover:bg-muted/40">
+                      <TableCell className="text-xs whitespace-nowrap">{format(new Date(m.date_added), "dd/MM/yy HH:mm", { locale: ptBR })}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {m.message_type === "TYPE_WHATSAPP" ? "WA" : m.message_type === "TYPE_EMAIL" ? "Email" : m.message_type === "TYPE_SMS" ? "SMS" : m.message_type}
+                          <span className={cn("ml-1", m.direction === "outbound" ? "text-blue-600" : "text-emerald-600")}>{m.direction === "outbound" ? "↑" : "↓"}</span>
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs"><Badge variant="outline">{m.source ?? "—"}</Badge></TableCell>
+                      <TableCell className="max-w-[180px] truncate text-xs">
+                        <div className="font-medium truncate">{m.contact_name ?? "—"}</div>
+                        <div className="text-muted-foreground truncate">{m.contact_email ?? m.contact_phone ?? ""}</div>
+                      </TableCell>
+                      <TableCell className="max-w-md text-xs">
+                        {m.subject && <div className="font-medium truncate">{m.subject}</div>}
+                        <div className="truncate text-muted-foreground">{m.body_preview?.replace(/\s+/g, " ").slice(0, 120) || "—"}</div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {data.messages.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma mensagem encontrada com esses filtros</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Modal de detalhes */}
+      {detail && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setDetail(null)}>
+          <Card className="max-w-3xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-row justify-between items-start">
+              <div>
+                <CardTitle className="text-base">
+                  {detail.subject || `Mensagem ${detail.message_type}`}
+                </CardTitle>
+                <div className="text-sm text-muted-foreground mt-1">
+                  {format(new Date(detail.date_added), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })} · {detail.contact_name ?? "Sem nome"} · <Badge variant="outline">{detail.source ?? "—"}</Badge>
+                </div>
+              </div>
+              <button onClick={() => setDetail(null)} className="p-1 hover:bg-muted rounded"><X className="w-4 h-4" /></button>
+            </CardHeader>
+            <CardContent>
+              <DetailLoader messageId={detail.id} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailLoader({ messageId }: { messageId: string }) {
+  const { data, isLoading } = useQuery<{ message: any }>({
+    queryKey: ["/api/ghl/messages", messageId],
+    queryFn: () => fetchJson(`/api/ghl/messages/${messageId}`),
+  });
+  if (isLoading) return <div className="flex items-center gap-2 text-muted-foreground py-4"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</div>;
+  if (!data?.message) return <div className="text-muted-foreground py-4">Não foi possível carregar.</div>;
+  const m = data.message;
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div><span className="text-muted-foreground">Direção:</span> <strong>{m.direction}</strong></div>
+        <div><span className="text-muted-foreground">Status:</span> <strong>{m.status}</strong></div>
+        <div><span className="text-muted-foreground">Contato:</span> {m.contact_name ?? "—"}</div>
+        <div><span className="text-muted-foreground">Email:</span> {m.contact_email ?? "—"}</div>
+        <div><span className="text-muted-foreground">Phone:</span> {m.contact_phone ?? "—"}</div>
+        <div><span className="text-muted-foreground">Source:</span> {m.source ?? "—"}</div>
+        {m.email_message_id && <div className="col-span-2"><span className="text-muted-foreground">Email Msg ID:</span> <code className="text-xs">{m.email_message_id}</code></div>}
+      </div>
+      {m.contact_tags && m.contact_tags.length > 0 && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Tags do contato:</div>
+          <div className="flex flex-wrap gap-1">
+            {m.contact_tags.slice(0, 15).map((t: string) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
+            {m.contact_tags.length > 15 && <span className="text-xs text-muted-foreground">+{m.contact_tags.length - 15}</span>}
+          </div>
+        </div>
+      )}
+      <div className="border-t pt-3">
+        <div className="text-xs text-muted-foreground mb-2">Conteúdo da mensagem:</div>
+        {m.content_type === "text/html" ? (
+          <iframe srcDoc={m.body || ""} sandbox="" className="w-full h-96 border rounded bg-white" title="Email content" />
+        ) : (
+          <pre className="whitespace-pre-wrap font-sans text-sm bg-muted/40 p-3 rounded max-h-96 overflow-auto">{m.body || "(sem corpo)"}</pre>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
 // Page
 // ────────────────────────────────────────────────────────────────────────
 
@@ -649,6 +897,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="diagnostico" data-testid="tab-diagnostico">
             <BarChart2 className="w-4 h-4 mr-2" /> Diagnóstico
           </TabsTrigger>
+          <TabsTrigger value="biblioteca" data-testid="tab-biblioteca">
+            <BookOpen className="w-4 h-4 mr-2" /> Biblioteca
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="email" className="mt-6">
@@ -662,6 +913,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="diagnostico" className="mt-6">
           <DiagnosticoTab from={from} to={to} />
+        </TabsContent>
+        <TabsContent value="biblioteca" className="mt-6">
+          <BibliotecaTab from={from} to={to} />
         </TabsContent>
       </Tabs>
     </div>
