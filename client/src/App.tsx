@@ -93,6 +93,7 @@ const AdminUsuarios = lazyWithRetry(() => import("@/pages/AdminUsuarios"));
 const AdminAvisos = lazyWithRetry(() => import("@/pages/AdminAvisos"));
 const AccessDenied = lazyWithRetry(() => import("@/pages/AccessDenied"));
 const Login = lazyWithRetry(() => import("@/pages/Login"));
+const Privacy = lazyWithRetry(() => import("@/pages/Privacy"));
 const DashboardClosers = lazyWithRetry(() => import("@/pages/DashboardClosers"));
 const DashboardSDRs = lazyWithRetry(() => import("@/pages/DashboardSDRs"));
 const DetailClosers = lazyWithRetry(() => import("@/pages/DetailClosers"));
@@ -451,6 +452,8 @@ function Router() {
       <Switch>
         <Route path="/login" component={Login} />
         <Route path="/loginclientes" component={LoginCliente} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/privacidade" component={Privacy} />
         <Route path="/portal-cliente" component={PortalCliente} />
         <Route path="/portal/creator" component={PortalCreator} />
         <Route><ProtectedRouter /></Route>
@@ -472,13 +475,14 @@ function AppLayout() {
   const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation";
   const isPortalCliente = location.startsWith("/portal-cliente");
   const isPortalCreator = location.startsWith("/portal/creator");
+  const isPrivacy = location === "/privacy" || location === "/privacidade";
 
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
-  if (isLoginPage || isLoginCliente || isPortalCliente || isPortalCreator) {
+  if (isLoginPage || isLoginCliente || isPortalCliente || isPortalCreator || isPrivacy) {
     return <PortalErrorBoundary><Router /></PortalErrorBoundary>;
   }
 
