@@ -161,7 +161,9 @@ export const PLATFORM_MULTISELECT_OPTIONS = [
   { value: 'google_ads', label: 'Google Ads' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'youtube', label: 'YouTube' },
-  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'linkedin', label: 'LinkedIn', badge: 'integração pendente' },
+  { value: 'tiktok_ads', label: 'TikTok Ads', badge: 'integração pendente' },
+  { value: 'tiktok', label: 'TikTok', badge: 'integração pendente' },
 ];
 
 export const PLATFORM_TO_UTM: Record<string, string> = {
@@ -170,6 +172,8 @@ export const PLATFORM_TO_UTM: Record<string, string> = {
   instagram: 'instagram',
   youtube: 'youtube',
   linkedin: 'linkedin',
+  tiktok_ads: 'tiktok_ads',
+  tiktok: 'tiktok',
 };
 
 // ===== Default Orçado Values =====
