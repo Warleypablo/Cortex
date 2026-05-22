@@ -1282,33 +1282,57 @@ export default function GrowthOrcadoRealizado() {
     staleTime: 0,
   });
 
-  const buildMqlMetrics = (data: MQLMetrics): Metric[] => [
+  const buildMqlMetrics = (data: MQLMetrics, investimento: number | null = null): Metric[] => {
+    const invest = investimento ?? 0;
+    const raCount = data.reunioesAgendadas ?? 0;
+    const rrCount = data.reunioesRealizadas ?? 0;
+    const cpraMql = invest > 0 && raCount > 0 ? invest / raCount : null;
+    const cprrMql = invest > 0 && rrCount > 0 ? invest / rrCount : null;
+    return [
       {
         id: 'mql_ra_perc',
-        name: '%RA MQL', 
-        type: 'manual', 
-        orcado: ORCADO_MQL.percReuniaoAgendada, 
-        realizado: data.percReuniaoAgendada ?? null, 
-        percentual: calcPercentual(ORCADO_MQL.percReuniaoAgendada, data.percReuniaoAgendada), 
-        format: 'percent' 
+        name: '%RA MQL',
+        type: 'manual',
+        orcado: ORCADO_MQL.percReuniaoAgendada,
+        realizado: data.percReuniaoAgendada ?? null,
+        percentual: calcPercentual(ORCADO_MQL.percReuniaoAgendada, data.percReuniaoAgendada),
+        format: 'percent'
       },
-      { 
-        id: 'mql_ra_num', 
-        name: 'Nº RA MQL', 
-        type: 'formula', 
-        orcado: ORCADO_MQL.reunioesAgendadas, 
-        realizado: data.reunioesAgendadas ?? 0, 
-        percentual: calcPercentual(ORCADO_MQL.reunioesAgendadas, data.reunioesAgendadas), 
-        format: 'number' 
+      {
+        id: 'mql_ra_num',
+        name: 'Nº RA MQL',
+        type: 'formula',
+        orcado: ORCADO_MQL.reunioesAgendadas,
+        realizado: data.reunioesAgendadas ?? 0,
+        percentual: calcPercentual(ORCADO_MQL.reunioesAgendadas, data.reunioesAgendadas),
+        format: 'number'
       },
-      { 
-        id: 'mql_rr_num', 
-        name: 'Nº RR MQL', 
-        type: 'formula', 
-        orcado: ORCADO_MQL.reunioesRealizadas, 
-        realizado: data.reunioesRealizadas ?? 0, 
-        percentual: calcPercentual(ORCADO_MQL.reunioesRealizadas, data.reunioesRealizadas), 
-        format: 'number' 
+      {
+        id: 'mql_cpra',
+        name: 'CPRA MQL',
+        type: 'formula',
+        orcado: (ORCADO_MQL as any).cpraMql ?? null,
+        realizado: cpraMql,
+        percentual: calcPercentual((ORCADO_MQL as any).cpraMql ?? null, cpraMql),
+        format: 'currency',
+      },
+      {
+        id: 'mql_rr_num',
+        name: 'Nº RR MQL',
+        type: 'formula',
+        orcado: ORCADO_MQL.reunioesRealizadas,
+        realizado: data.reunioesRealizadas ?? 0,
+        percentual: calcPercentual(ORCADO_MQL.reunioesRealizadas, data.reunioesRealizadas),
+        format: 'number'
+      },
+      {
+        id: 'mql_cprr',
+        name: 'CPRR MQL',
+        type: 'formula',
+        orcado: (ORCADO_MQL as any).cprrMql ?? null,
+        realizado: cprrMql,
+        percentual: calcPercentual((ORCADO_MQL as any).cprrMql ?? null, cprrMql),
+        format: 'currency',
       },
       {
         id: 'mql_noshow',
@@ -1443,12 +1467,13 @@ export default function GrowthOrcadoRealizado() {
         format: 'currency'
       },
     ];
+  };
 
   const mqlMetrics: Metric[] = useMemo(() => {
-    const cur = buildMqlMetrics(mqlData || {} as MQLMetrics);
+    const cur = buildMqlMetrics(mqlData || {} as MQLMetrics, adsData?.investimento ?? null);
     if (!prevMqlData) return cur;
-    return mergePrevRealizado(cur, buildMqlMetrics(prevMqlData));
-  }, [mqlData, prevMqlData, ORCADO_MQL]);
+    return mergePrevRealizado(cur, buildMqlMetrics(prevMqlData, prevAdsData?.investimento ?? null));
+  }, [mqlData, prevMqlData, adsData, prevAdsData, ORCADO_MQL]);
 
   // Métricas de Marketing (usando dados reais da API)
   const buildAdsMetrics = (data: AdsMetrics): Metric[] => [
@@ -1465,12 +1490,8 @@ export default function GrowthOrcadoRealizado() {
       { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },
       { id: 'cpl', name: 'CPL', type: 'formula', orcado: ORCADO_ADS.cpl, realizado: data.cpl ?? null, percentual: calcPercentual(ORCADO_ADS.cpl, data.cpl), format: 'currency' },
       { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: ORCADO_ADS.cpmql, realizado: data.cpmql ?? null, percentual: calcPercentual(ORCADO_ADS.cpmql, data.cpmql), format: 'currency' },
-      { id: 'cpra', name: 'CPRA', type: 'formula', orcado: ORCADO_ADS.cpra, realizado: data.cpra ?? null, percentual: calcPercentual(ORCADO_ADS.cpra, data.cpra ?? null), format: 'currency' },
-      { id: 'cpra_mql', name: 'CPRA MQL', type: 'formula', orcado: ORCADO_ADS.cpraMql, realizado: data.cpraMql ?? null, percentual: calcPercentual(ORCADO_ADS.cpraMql, data.cpraMql ?? null), format: 'currency' },
-      { id: 'cpra_nmql', name: 'CPRA nMQL', type: 'formula', orcado: ORCADO_ADS.cpraNmql, realizado: data.cpraNmql ?? null, percentual: calcPercentual(ORCADO_ADS.cpraNmql, data.cpraNmql ?? null), format: 'currency' },
-      { id: 'cprr', name: 'CPRR', type: 'formula', orcado: ORCADO_ADS.cprr, realizado: data.cprr ?? null, percentual: calcPercentual(ORCADO_ADS.cprr, data.cprr ?? null), format: 'currency' },
-      { id: 'cprr_mql', name: 'CPRR MQL', type: 'formula', orcado: ORCADO_ADS.cprrMql, realizado: data.cprrMql ?? null, percentual: calcPercentual(ORCADO_ADS.cprrMql, data.cprrMql ?? null), format: 'currency' },
-      { id: 'cprr_nmql', name: 'CPRR nMQL', type: 'formula', orcado: ORCADO_ADS.cprrNmql, realizado: data.cprrNmql ?? null, percentual: calcPercentual(ORCADO_ADS.cprrNmql, data.cprrNmql ?? null), format: 'currency' },
+      // CPRA e CPRR movidos pras seções VENDAS — MQL e VENDAS — não-MQL
+      // (perto de Nº RA / Nº RR), onde fazem mais sentido semanticamente.
       { id: 'perc_mqls', name: '% MQLs', type: 'formula', orcado: ORCADO_ADS.percMqls, realizado: data.percMqls ?? null, percentual: calcPercentual(ORCADO_ADS.percMqls, data.percMqls), format: 'percent' },
     ];
 
@@ -1692,33 +1713,57 @@ export default function GrowthOrcadoRealizado() {
     { title: 'LinkedIn', icon: <Briefcase className="w-5 h-5" />, metrics: linkedinPlatformMetrics },
   ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, linkedinPlatformMetrics]);
 
-  const buildNaoMqlMetrics = (data: NaoMQLMetrics): Metric[] => [
+  const buildNaoMqlMetrics = (data: NaoMQLMetrics, investimento: number | null = null): Metric[] => {
+    const invest = investimento ?? 0;
+    const raCount = data.reunioesAgendadas ?? 0;
+    const rrCount = data.reunioesRealizadas ?? 0;
+    const cpraNmql = invest > 0 && raCount > 0 ? invest / raCount : null;
+    const cprrNmql = invest > 0 && rrCount > 0 ? invest / rrCount : null;
+    return [
       {
         id: 'nmql_ra_perc',
-        name: '%RA não-MQL', 
-        type: 'manual', 
-        orcado: ORCADO_NAO_MQL.percReuniaoAgendada, 
-        realizado: data.percReuniaoAgendada ?? null, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.percReuniaoAgendada, data.percReuniaoAgendada), 
-        format: 'percent' 
+        name: '%RA não-MQL',
+        type: 'manual',
+        orcado: ORCADO_NAO_MQL.percReuniaoAgendada,
+        realizado: data.percReuniaoAgendada ?? null,
+        percentual: calcPercentual(ORCADO_NAO_MQL.percReuniaoAgendada, data.percReuniaoAgendada),
+        format: 'percent'
       },
-      { 
-        id: 'nmql_ra_num', 
-        name: 'Nº RA não-MQL', 
-        type: 'formula', 
-        orcado: ORCADO_NAO_MQL.reunioesAgendadas, 
-        realizado: data.reunioesAgendadas ?? 0, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.reunioesAgendadas, data.reunioesAgendadas), 
-        format: 'number' 
+      {
+        id: 'nmql_ra_num',
+        name: 'Nº RA não-MQL',
+        type: 'formula',
+        orcado: ORCADO_NAO_MQL.reunioesAgendadas,
+        realizado: data.reunioesAgendadas ?? 0,
+        percentual: calcPercentual(ORCADO_NAO_MQL.reunioesAgendadas, data.reunioesAgendadas),
+        format: 'number'
       },
-      { 
-        id: 'nmql_rr_num', 
-        name: 'Nº RR não-MQL', 
-        type: 'formula', 
-        orcado: ORCADO_NAO_MQL.reunioesRealizadas, 
-        realizado: data.reunioesRealizadas ?? 0, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.reunioesRealizadas, data.reunioesRealizadas), 
-        format: 'number' 
+      {
+        id: 'nmql_cpra',
+        name: 'CPRA não-MQL',
+        type: 'formula',
+        orcado: (ORCADO_NAO_MQL as any).cpraNmql ?? null,
+        realizado: cpraNmql,
+        percentual: calcPercentual((ORCADO_NAO_MQL as any).cpraNmql ?? null, cpraNmql),
+        format: 'currency',
+      },
+      {
+        id: 'nmql_rr_num',
+        name: 'Nº RR não-MQL',
+        type: 'formula',
+        orcado: ORCADO_NAO_MQL.reunioesRealizadas,
+        realizado: data.reunioesRealizadas ?? 0,
+        percentual: calcPercentual(ORCADO_NAO_MQL.reunioesRealizadas, data.reunioesRealizadas),
+        format: 'number'
+      },
+      {
+        id: 'nmql_cprr',
+        name: 'CPRR não-MQL',
+        type: 'formula',
+        orcado: (ORCADO_NAO_MQL as any).cprrNmql ?? null,
+        realizado: cprrNmql,
+        percentual: calcPercentual((ORCADO_NAO_MQL as any).cprrNmql ?? null, cprrNmql),
+        format: 'currency',
       },
       {
         id: 'nmql_noshow',
@@ -1853,12 +1898,13 @@ export default function GrowthOrcadoRealizado() {
         format: 'currency'
       },
     ];
+  };
 
   const naoMqlMetrics: Metric[] = useMemo(() => {
-    const cur = buildNaoMqlMetrics(naoMqlData || {} as NaoMQLMetrics);
+    const cur = buildNaoMqlMetrics(naoMqlData || {} as NaoMQLMetrics, adsData?.investimento ?? null);
     if (!prevNaoMqlData) return cur;
-    return mergePrevRealizado(cur, buildNaoMqlMetrics(prevNaoMqlData));
-  }, [naoMqlData, prevNaoMqlData, ORCADO_NAO_MQL]);
+    return mergePrevRealizado(cur, buildNaoMqlMetrics(prevNaoMqlData, prevAdsData?.investimento ?? null));
+  }, [naoMqlData, prevNaoMqlData, adsData, prevAdsData, ORCADO_NAO_MQL]);
 
   const buildTotalMetrics = (
     mql: MQLMetrics,
