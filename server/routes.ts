@@ -60,6 +60,7 @@ import { registerUtmRoutes } from "./routes/utm";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
@@ -446,7 +447,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // FCA Report — auth via bearer token (não usa sessão)
   registerFcaRoutes(app);
 
+  // GHL webhook (público — chamado pelo GHL quando eventos de email/WA acontecem)
+  registerGhlPublicRoutes(app);
+
   app.use("/api", isAuthenticated);
+
+  // GHL APIs internas (sob /api → autenticadas pelo isAuthenticated acima)
+  registerGhlApiRoutes(app);
 
   app.get("/api/debug/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
