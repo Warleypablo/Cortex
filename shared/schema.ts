@@ -3439,3 +3439,124 @@ export type UtmVocabulary = typeof utmVocabulary.$inferSelect;
 export type InsertUtmVocabulary = typeof utmVocabulary.$inferInsert;
 export type GeneratedUtmLink = typeof generatedUtmLinks.$inferSelect;
 export type InsertGeneratedUtmLink = typeof generatedUtmLinks.$inferInsert;
+
+// ============================================================
+// YouTube — sync de dados orgânicos (Data API v3 + Analytics API)
+// Padrão idêntico ao Instagram: schema cortex_core + prefixo youtube_.
+// access_token/refresh_token gravados encriptados (via utils/encryption).
+// ============================================================
+
+export const youtubeCredentials = cortexCoreSchema.table("youtube_credentials", {
+  id: serial("id").primaryKey(),
+  googleUserId: varchar("google_user_id", { length: 100 }).notNull().unique(),
+  googleEmail: varchar("google_email", { length: 255 }),
+  refreshTokenEnc: text("refresh_token_enc").notNull(), // encriptado com encryptToken()
+  scopes: text("scopes").notNull(),
+  authorizedAt: timestamp("authorized_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  active: boolean("active").notNull().default(true),
+});
+
+export const youtubeChannels = cortexCoreSchema.table("youtube_channels", {
+  channelId: varchar("channel_id", { length: 50 }).primaryKey(),
+  title: varchar("title", { length: 255 }),
+  customUrl: varchar("custom_url", { length: 255 }),
+  description: text("description"),
+  thumbnailUrl: text("thumbnail_url"),
+  country: varchar("country", { length: 10 }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  subscriberCount: bigint("subscriber_count", { mode: "number" }),
+  viewCount: bigint("view_count", { mode: "number" }),
+  videoCount: integer("video_count"),
+  hiddenSubscriberCount: boolean("hidden_subscriber_count"),
+  credentialId: integer("credential_id"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const youtubeVideos = cortexCoreSchema.table("youtube_videos", {
+  videoId: varchar("video_id", { length: 50 }).primaryKey(),
+  channelId: varchar("channel_id", { length: 50 }).notNull(),
+  title: varchar("title", { length: 500 }),
+  description: text("description"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  thumbnailUrl: text("thumbnail_url"),
+  durationSeconds: integer("duration_seconds"),
+  tags: jsonb("tags"),
+  categoryId: varchar("category_id", { length: 20 }),
+  defaultLanguage: varchar("default_language", { length: 10 }),
+  liveBroadcastContent: varchar("live_broadcast_content", { length: 20 }),
+  viewCount: bigint("view_count", { mode: "number" }),
+  likeCount: bigint("like_count", { mode: "number" }),
+  commentCount: bigint("comment_count", { mode: "number" }),
+  favoriteCount: bigint("favorite_count", { mode: "number" }),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_yt_videos_channel").on(table.channelId),
+  index("idx_yt_videos_published").on(table.publishedAt),
+]);
+
+export const youtubeVideoDailyMetrics = cortexCoreSchema.table("youtube_video_daily_metrics", {
+  id: serial("id").primaryKey(),
+  videoId: varchar("video_id", { length: 50 }).notNull(),
+  channelId: varchar("channel_id", { length: 50 }).notNull(),
+  reportDate: date("report_date").notNull(),
+  views: integer("views"),
+  estimatedMinutesWatched: integer("estimated_minutes_watched"),
+  averageViewDuration: integer("average_view_duration"),
+  averageViewPercentage: decimal("average_view_percentage", { precision: 5, scale: 2 }),
+  likes: integer("likes"),
+  dislikes: integer("dislikes"),
+  comments: integer("comments"),
+  shares: integer("shares"),
+  subscribersGained: integer("subscribers_gained"),
+  subscribersLost: integer("subscribers_lost"),
+  cardClicks: integer("card_clicks"),
+  cardImpressions: integer("card_impressions"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("uq_yt_video_daily_video_date").on(table.videoId, table.reportDate),
+  index("idx_yt_video_daily_date").on(table.reportDate),
+  index("idx_yt_video_daily_channel").on(table.channelId),
+]);
+
+export const youtubeChannelDailyMetrics = cortexCoreSchema.table("youtube_channel_daily_metrics", {
+  id: serial("id").primaryKey(),
+  channelId: varchar("channel_id", { length: 50 }).notNull(),
+  reportDate: date("report_date").notNull(),
+  views: integer("views"),
+  estimatedMinutesWatched: integer("estimated_minutes_watched"),
+  averageViewDuration: integer("average_view_duration"),
+  subscribersGained: integer("subscribers_gained"),
+  subscribersLost: integer("subscribers_lost"),
+  likes: integer("likes"),
+  comments: integer("comments"),
+  shares: integer("shares"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("uq_yt_channel_daily_channel_date").on(table.channelId, table.reportDate),
+  index("idx_yt_channel_daily_date").on(table.reportDate),
+]);
+
+export const youtubeSyncRuns = cortexCoreSchema.table("youtube_sync_runs", {
+  id: serial("id").primaryKey(),
+  jobType: varchar("job_type", { length: 50 }).notNull(),
+  channelId: varchar("channel_id", { length: 50 }),
+  status: varchar("status", { length: 20 }).notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  itemsProcessed: integer("items_processed"),
+  errorMessage: text("error_message"),
+});
+
+export type YoutubeCredential = typeof youtubeCredentials.$inferSelect;
+export type InsertYoutubeCredential = typeof youtubeCredentials.$inferInsert;
+export type YoutubeChannel = typeof youtubeChannels.$inferSelect;
+export type InsertYoutubeChannel = typeof youtubeChannels.$inferInsert;
+export type YoutubeVideo = typeof youtubeVideos.$inferSelect;
+export type InsertYoutubeVideo = typeof youtubeVideos.$inferInsert;
+export type YoutubeVideoDailyMetric = typeof youtubeVideoDailyMetrics.$inferSelect;
+export type InsertYoutubeVideoDailyMetric = typeof youtubeVideoDailyMetrics.$inferInsert;
+export type YoutubeChannelDailyMetric = typeof youtubeChannelDailyMetrics.$inferSelect;
+export type InsertYoutubeChannelDailyMetric = typeof youtubeChannelDailyMetrics.$inferInsert;
+export type YoutubeSyncRun = typeof youtubeSyncRuns.$inferSelect;
+export type InsertYoutubeSyncRun = typeof youtubeSyncRuns.$inferInsert;
