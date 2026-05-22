@@ -31,7 +31,8 @@ const PLATFORM_CASE_SQL = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' THEN 'linkedin_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin_social'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
-  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' THEN 'tiktok_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'tiktok_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt' THEN 'tiktok_social'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%email%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%e-mail%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%mailchimp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%rdstation%' THEN 'email'
@@ -53,6 +54,8 @@ const PLATFORM_CASE_SQL_BASIC = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'tiktok_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt' THEN 'tiktok'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
   ELSE COALESCE((SELECT normalized FROM public.utm_source_map WHERE raw_source = LOWER(TRIM(COALESCE(utm_source, '')))), 'outros')
@@ -3321,7 +3324,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       // Build result per platform
-      const platforms = ['meta_ads', 'google_ads', 'instagram', 'youtube', 'linkedin'];
+      const platforms = ['meta_ads', 'google_ads', 'instagram', 'youtube', 'linkedin', 'tiktok_ads', 'tiktok'];
       const result: Record<string, any> = {};
 
       for (const platKey of platforms) {
