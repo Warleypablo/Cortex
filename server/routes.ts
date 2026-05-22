@@ -23,6 +23,8 @@ import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
+import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
+import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMixReceitaRoutes } from "./routes/mixReceita";
@@ -8018,6 +8020,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth — Evolução Temporal (matriz métricas × meses/semanas)
   registerGrowthTimeseriesRoutes(app, db);
+
+  // YouTube OAuth (autorização dos canais Turbocast/TurboPartners/André/Vitor)
+  registerYoutubeOAuthRoutes(app, db);
+
+  // Google Ads — admin: sync de campanhas + métricas + status
+  registerGoogleAdsAdminRoutes(app);
 
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
