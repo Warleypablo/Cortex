@@ -588,6 +588,10 @@ export default function GrowthOrcadoRealizado() {
     return { from: prevStart, to: prevEnd };
   });
   const [expandedLinkBio, setExpandedLinkBio] = useState(false);
+  // Expand state pra linhas IG com breakdown por origem (Linktree / Contato IG / Social Selling)
+  const [expandedIgOrigem, setExpandedIgOrigem] = useState<Record<'leads' | 'mqls' | 'negocioGanho' | 'receita', boolean>>({
+    leads: false, mqls: false, negocioGanho: false, receita: false,
+  });
   const queryClient = useQueryClient();
 
   // Fetch dynamic months from API
@@ -842,6 +846,25 @@ export default function GrowthOrcadoRealizado() {
           const showExpand = isLinkBio && (linkBioBreakdown.length > 0 || linkBioByDomain.length > 0);
           const expanded = isLinkBio && expandedLinkBio;
 
+          // IG breakdown por origem (Linktree / Contato Instagram / Social Selling).
+          // Aplica em linhas IG-prefixadas (ig_leads, ig_mqls, ig_negocioGanho) e em
+          // linhas TOTAL quando filtro é único e = Instagram (TOTAL == só IG nesse caso).
+          const isIgOnlyFilter = selectedPlataformas.length === 1 && selectedPlataformas[0] === 'instagram';
+          const igOrigemFieldMap: Record<string, 'leads' | 'mqls' | 'negocioGanho' | 'receita'> = {
+            ig_leads: 'leads',
+            ig_mqls: 'mqls',
+            ig_negocioGanho: 'negocioGanho',
+            ...(isIgOnlyFilter ? {
+              total_novos_clientes: 'negocioGanho' as const,
+              total_faturamento: 'receita' as const,
+            } : {}),
+          };
+          const igOrigemField = igOrigemFieldMap[m.id];
+          const igOrigemRows = instagramDetailData?.leadsPorOrigem ?? [];
+          const igOrigemRowsPrev = prevInstagramDetailData?.leadsPorOrigem ?? [];
+          const showIgOrigemExpand = !!igOrigemField && igOrigemRows.length > 0;
+          const igOrigemExpanded = !!igOrigemField && expandedIgOrigem[igOrigemField as keyof typeof expandedIgOrigem];
+
           return (
             <Fragment key={m.id}>
             <TableRow className={cn(
@@ -861,6 +884,16 @@ export default function GrowthOrcadoRealizado() {
                     {linkBioFonte === 'linktree_ga4' && (
                       <span className="text-[10px] font-normal text-muted-foreground ml-1 px-1.5 py-0.5 rounded bg-muted">via Linktree</span>
                     )}
+                  </button>
+                ) : showIgOrigemExpand ? (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedIgOrigem(prev => ({ ...prev, [igOrigemField!]: !prev[igOrigemField!] }))}
+                    className="inline-flex items-center gap-1.5 text-left hover:text-primary transition-colors"
+                    data-testid={`toggle-ig-origem-${igOrigemField}`}
+                  >
+                    {igOrigemExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                    <span>{m.name}</span>
                   </button>
                 ) : (
                   m.name
@@ -971,6 +1004,38 @@ export default function GrowthOrcadoRealizado() {
                 </TableCell>
               </TableRow>
             )}
+            {igOrigemExpanded && igOrigemField && igOrigemRows.map((row) => {
+              const valorAtual = row[igOrigemField as keyof typeof row] as number;
+              const prevRow = igOrigemRowsPrev.find((p) => p.origem === row.origem);
+              const valorAnterior = prevRow ? (prevRow[igOrigemField as keyof typeof prevRow] as number) : null;
+              const subFormat = igOrigemField === 'receita' ? 'currency' : 'number';
+              return (
+                <TableRow key={`ig-origem-${m.id}-${row.origem}`} className="bg-muted/20 hover:bg-muted/30" data-testid={`row-ig-origem-${igOrigemField}-${row.origem}`}>
+                  <TableCell className="text-sm pl-10 text-muted-foreground">{row.label}</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">—</TableCell>
+                  <TableCell className="text-right text-sm font-medium">{formatValue(valorAtual, subFormat)}</TableCell>
+                  {showCompareColumns && (
+                    <>
+                      <TableCell className="text-right text-sm text-muted-foreground">
+                        {valorAnterior !== null && valorAnterior !== undefined
+                          ? formatValue(valorAnterior, subFormat)
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium">
+                        {renderDeltaAbs(valorAtual, valorAnterior, subFormat, isInverted)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium">
+                        {renderDeltaPct(valorAtual, valorAnterior, isInverted)}
+                      </TableCell>
+                    </>
+                  )}
+                  <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+                  <TableCell className="text-right text-sm text-muted-foreground">-</TableCell>
+                </TableRow>
+              );
+            })}
             </Fragment>
           );
         })}
@@ -1091,6 +1156,7 @@ export default function GrowthOrcadoRealizado() {
     cliquesLinkBioFonte?: 'linktree_ga4' | 'instagram_profile_taps';
     cliquesPorLink?: Array<{ linkUrl: string; linkDomain: string; clicks: number }>;
     cliquesPorDominio?: Array<{ domain: string; clicks: number }>;
+    leadsPorOrigem?: Array<{ origem: string; label: string; leads: number; mqls: number; negocioGanho: number; receita: number }>;
     investimentoPago: number;
     hasConnection: boolean;
     snapshotCount: number;
