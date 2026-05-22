@@ -1,9 +1,9 @@
 # Handover — Integração GoHighLevel (GHL) no Cortex
 
 **Branch:** `feature/ghl-integracao`
-**Data:** 2026-05-22
-**Status:** Etapa 3 (investigação) concluída — pronto pra começar implementação
-**Escopo:** Relatórios de Email Marketing, WhatsApp Marketing e Tags da sublocation única da Turbo no GHL.
+**Data:** 2026-05-22 (sessão 3, atualização final)
+**Status:** Implementação completa (15 commits). Pendente abrir PR, deploy, cadastrar webhook GHL e validar BASE_TAG_MAP com Marketing.
+**Escopo:** Relatórios de Email Marketing, WhatsApp Marketing, Tags + dashboard avançado (Diagnóstico, Biblioteca, Calendário, Gerador IA) baseado em inteligência de domínio do estagiário Turbo.
 
 ## Sumário executivo dos findings
 
@@ -349,6 +349,45 @@ Resposta NÃO trouxe `nextPage` ou `startAfter` óbvios — só `total`. Prováv
 
 ---
 
+## 8.7 Expansão broadcast dashboard (sessão 3)
+
+Após a PR 1A (Email/WhatsApp/Tags), foram trazidas 4 abas adicionais do dashboard-broadcast do estagiário Turbo (ZIP de 2026-05-22). A inteligência de domínio foi convertida pra TypeScript em `shared/ghl-broadcast/`:
+
+| Helper | O que tem |
+|---|---|
+| `types.ts` | StatusMensagem, Servico, OfertaKey, PadraoKey, CategoriaBase, Alerta |
+| `benchmarks.ts` | BENCHMARKS_TURBO por canal × categoria (wpp 25-50%, email 4-12%), avaliarPerformance(), CLASSIFICACAO_TAILWIND |
+| `matriz-validacao.ts` | BASE_CATEGORIAS (18 bases), validarCombinacao() com 5 BLOCK + 6 WARN, COMPATIBILIDADE_BASE_{PADRAO,OFERTA} |
+| `regras-calendario.ts` | LIMITES_MENSAIS por base, validarCadencia() (janela 7d/14d/limite mensal) |
+| `base-tag-map.ts` | BASE_TAG_MAP: 18 bases nominais → filtros tagsAny/tagsAll/tagsNot das tags reais GHL |
+
+### Abas novas em `/ghl-marketing`
+
+| Aba | Endpoint | O que faz |
+|---|---|---|
+| **Diagnóstico** | `GET /api/ghl/diagnostico` | 18 queries paralelas (1 por base). Aplica benchmarks Turbo nos dados reais. Scatter chart volume × response rate, ranking de bases, insights automáticos |
+| **Biblioteca** | `GET /api/ghl/messages` + `:id` | Histórico read-only de `ghl_messages` com filtros (canal, direção, source, base via BASE_TAG_MAP, busca). Paginação 50/pg, modal de detalhes |
+| **Calendário** | `GET /api/ghl/calendar` | Grid mensal com broadcasts detectados (email campaigns + WA com >= 30 msgs/dia). Validação retroativa: badge âmbar se outro broadcast em 7d |
+| **Gerador IA** | `POST /api/ghl/copy/{analyze,generate}` + `GET top-performers` | Claude haiku-4-5. Analisar copy retorna score 0-100 + critérios + sugestão. Gerar retorna 3 variações usando exemplos reais do banco (msgs com mais respostas em 48h) |
+
+### Service
+
+- `server/services/ghlCopyAi.ts` — wrapper Anthropic SDK com prompts adaptados do estagiário. Modelo `claude-haiku-4-5-20251001`. Usa `ANTHROPIC_API_KEY` que já existe no `.env`.
+- `buscarTopPerformers()` — SQL agregando msgs WA outbound de `workflow/bulk/campaign` com replies em 48h, ordenando por replies desc.
+
+### Decisões fechadas
+
+1. Biblioteca = só histórico read-only (sem CRUD de planejamento). Não foi criada tabela `ghl_planned_broadcasts`.
+2. Calendário mostra envios reais, sem planejamento.
+3. IA usa ANTHROPIC_API_KEY existente. Modelo haiku-4-5 (rápido, barato).
+4. Tudo em `/ghl-marketing`, não páginas separadas.
+
+### Limitações conhecidas
+
+1. Diagnóstico usa response rate como proxy de open rate (sem webhook ainda).
+2. `BASE_TAG_MAP` é best-effort do snapshot 182 tags de 2026-05-22. Precisa validação da equipe de Marketing — bases podem trazer 0 contatos se tags reais tiverem nome diferente.
+3. Calendário detecta WA broadcasts por heurística (>=30 msgs/dia outbound workflow/bulk). Pode falhar com volumes menores.
+
 ## 9. Checklist pra retomar
 
 - [x] Ichino gerou o PIT no GHL e copiou o token
@@ -357,10 +396,15 @@ Resposta NÃO trouxe `nextPage` ou `startAfter` óbvios — só `total`. Prováv
 - [x] Confirmado: Email open/click só via webhook (decisão na 8.1)
 - [x] **Decisão (2026-05-22)**: webhook implementado na PR 1 → Open/Click/Bounce desde o início
 - [x] **Decisão (2026-05-22)**: sync de TODOS os sources (workflow + bulk + manual + api) com coluna `source` preservada. Filtros aplicados em queries/frontend, não no sync. Default de "WhatsApp Marketing" nas visualizações = `source IN ('workflow','bulk')`, mas dashboard terá filtro flexível.
-- [ ] Schema Drizzle implementado (`shared/schema/ghl.ts`)
-- [ ] Cliente GHL com throttle (`server/services/ghl-client.ts`)
-- [ ] Script de backfill (`scripts/ghl-backfill.ts`)
-- [ ] Endpoint `POST /api/webhooks/ghl` (se webhook na PR 1)
-- [ ] Jobs de sync no scheduler (hourly + daily snapshot de tags)
-- [ ] Dashboard `/ghl-marketing` com dark/light mode
-- [ ] PR aberto contra `main`
+- [x] Schema das 7 tabelas em `cortex_core.ghl_*` (Drizzle + SQL aplicado)
+- [x] Cliente GHL com throttle (`server/services/goHighLevelSync.ts`)
+- [x] Script de backfill (`scripts/ghl-backfill.ts`) — rodado: 48k contatos, 4.1k WA conversations, 43.5k messages, 191 campaigns, 182 tags
+- [x] Endpoint `POST /webhooks/ghl` (sem auth, dedup por event_id) — testado com payload sintético
+- [x] Jobs de sync no scheduler (hourly delta + daily tags snapshot às 00:10)
+- [x] Dashboard `/ghl-marketing` com 7 abas + dark/light mode
+- [x] Helpers do dashboard-broadcast (estagiário) em `shared/ghl-broadcast/`
+- [x] Abas Diagnóstico + Biblioteca + Calendário + Gerador IA (Claude haiku-4-5)
+- [ ] **PR aberta contra `main`** ← próximo passo
+- [ ] Deploy em prod (Replit)
+- [ ] Cadastrar webhook GHL (`/webhooks/ghl`) em Automations → Workflows (ver §8.1)
+- [ ] Validar `BASE_TAG_MAP` com equipe de Marketing — refinar tags por base
