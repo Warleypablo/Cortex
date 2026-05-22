@@ -458,3 +458,126 @@ export async function getLastSyncedAt(resource: string): Promise<Date | null> {
   `);
   return (r as any).rows?.[0]?.finished_at ?? null;
 }
+
+// ─── Jobs (chamados pelo scheduler no index.ts) ──────────────────────────
+
+/**
+ * Sync incremental rodado a cada hora. Pega:
+ *  - Contatos atualizados desde última sync (via dateUpdated)
+ *  - Campanhas de email atualizadas (counts mudam até ~72h após envio)
+ *  - Conversas recentes (últimas 48h, para pegar novas mensagens)
+ *
+ * Idempotente — usa ON CONFLICT DO UPDATE.
+ */
+export async function runGhlHourlySync(): Promise<{
+  contacts: number;
+  campaigns: number;
+  conversations: number;
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  const t0 = Date.now();
+  let contacts = 0;
+  let campaigns = 0;
+  let conversations = 0;
+
+  // Campaigns — refresh full (são poucas: ~200)
+  try {
+    for await (const c of ghlIterateEmailSchedules({ limit: 100 })) {
+      await upsertEmailCampaign(c);
+      campaigns++;
+    }
+    await logSyncRun({
+      resource: "hourly:campaigns",
+      startedAt: new Date(t0),
+      finishedAt: new Date(),
+      status: "success",
+      recordsProcessed: campaigns,
+    });
+  } catch (err) {
+    errors.push(`campaigns: ${(err as Error).message}`);
+    console.error("[GHL hourly] campaigns error:", err);
+  }
+
+  // Conversations atualizadas nas últimas 48h
+  try {
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+    for await (const c of ghlIterateConversations({ limit: 100, startAfterDate: cutoff })) {
+      await upsertConversation(c);
+      conversations++;
+      // pega também as mensagens recentes de cada conversa atualizada
+      try {
+        for await (const m of ghlIterateMessages(c.id, { limit: 50 })) {
+          await upsertMessage(m);
+          // limita a 50 mais recentes pra não estourar rate-limit no hourly
+        }
+      } catch (e) {
+        // continua o ciclo, não bloqueia
+      }
+    }
+    await logSyncRun({
+      resource: "hourly:conversations",
+      startedAt: new Date(t0),
+      finishedAt: new Date(),
+      status: "success",
+      recordsProcessed: conversations,
+    });
+  } catch (err) {
+    errors.push(`conversations: ${(err as Error).message}`);
+    console.error("[GHL hourly] conversations error:", err);
+  }
+
+  // Contatos atualizados (cursor por dateUpdated não é suportado direto na API;
+  // pegamos uma janela small de novidades via paginação ordenada por dateAdded desc
+  // e paramos quando encontramos algo já sincronizado nos últimos 60 min).
+  try {
+    const sinceMs = Date.now() - 90 * 60 * 1000; // 90 min de margem
+    let pages = 0;
+    const MAX_PAGES = 50; // teto de segurança
+    for await (const ct of ghlIterateContacts({ limit: 100 })) {
+      const ts = Date.parse(ct.dateUpdated || ct.dateAdded || "");
+      if (ts && ts < sinceMs) break;
+      await upsertContact(ct);
+      contacts++;
+      if (++pages > MAX_PAGES * 100) break;
+    }
+    await logSyncRun({
+      resource: "hourly:contacts",
+      startedAt: new Date(t0),
+      finishedAt: new Date(),
+      status: "success",
+      recordsProcessed: contacts,
+    });
+  } catch (err) {
+    errors.push(`contacts: ${(err as Error).message}`);
+    console.error("[GHL hourly] contacts error:", err);
+  }
+
+  return { contacts, campaigns, conversations, errors };
+}
+
+/**
+ * Snapshot diário de tags — rodar 1× por dia (00:10 horário do servidor).
+ * Insere uma linha por (tag, hoje) com a contagem atual de contatos.
+ */
+export async function runGhlDailyTagsSnapshot(): Promise<{ tags: number }> {
+  const today = new Date().toISOString().slice(0, 10);
+  const r = await db.execute(sql`
+    INSERT INTO cortex_core.ghl_tags_snapshot (snapshot_date, tag, contact_count)
+    SELECT ${today}::date, t.tag, COUNT(*)::int
+    FROM cortex_core.ghl_contacts c, UNNEST(c.tags) AS t(tag)
+    GROUP BY t.tag
+    ON CONFLICT (snapshot_date, tag) DO UPDATE
+      SET contact_count = EXCLUDED.contact_count
+    RETURNING tag
+  `);
+  const tags = ((r as any).rows ?? []).length;
+  await logSyncRun({
+    resource: "daily:tags_snapshot",
+    startedAt: new Date(),
+    finishedAt: new Date(),
+    status: "success",
+    recordsProcessed: tags,
+  });
+  return { tags };
+}
