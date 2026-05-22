@@ -94,6 +94,7 @@ interface AdsMetrics {
   videoHold: number;
   connectRate: number;
   visualizacoesPagina: number;
+  sessoes: number;
   leads: number;
   mqls: number;
   cpl: number;
@@ -349,6 +350,7 @@ const DEFAULT_ORCADO_ADS = {
   videoHook: 0,
   videoHold: 0,
   visualizacoesPagina: 0,
+  sessoes: 0,
   taxaConversaoPagina: 0,
   connectRate: 0,
   leads: 0,
@@ -361,7 +363,7 @@ const DEFAULT_ORCADO_ADS = {
 // Platform-specific defaults for Aprofundado view
 const DEFAULT_ORCADO_META_ADS = {
   investimento: 0, cpm: 0, ctr: 0, videoHook: 0, videoHold: 0, videoP75: 0, videoP100: 0,
-  visualizacoesPagina: 0, taxaConversaoPagina: 0, connectRate: 0,
+  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
   // Funnel
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
@@ -374,7 +376,7 @@ const DEFAULT_ORCADO_META_ADS = {
 
 const DEFAULT_ORCADO_GOOGLE_ADS = {
   investimento: 0, cpm: 0, ctr: 0,
-  visualizacoesPagina: 0, taxaConversaoPagina: 0, connectRate: 0,
+  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
   // Funnel
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
@@ -1066,6 +1068,7 @@ export default function GrowthOrcadoRealizado() {
     investimento: number; impressoes: number; alcance: number; frequencia: number;
     cpm: number; ctr: number; videoHook: number; videoHold: number;
     videoP75: number; videoP100: number; visualizacoesPagina: number; connectRate: number;
+    sessoes: number;
   }
 
   interface GoogleAdsDetailMetrics {
@@ -1073,6 +1076,7 @@ export default function GrowthOrcadoRealizado() {
     cpm: number; cpc: number; ctr: number;
     visualizacoesPagina: number; connectRate: number;
     conversoes: number; valorConversoes: number; custoConversao: number;
+    sessoes: number;
   }
 
   interface InstagramDetailMetrics {
@@ -1374,6 +1378,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'video_hold', name: 'Vídeo Hold', type: 'formula', orcado: ORCADO_ADS.videoHold, realizado: data.videoHold ?? null, percentual: calcPercentual(ORCADO_ADS.videoHold, data.videoHold), format: 'percent' },
       { id: 'ctr', name: 'CTR', type: 'manual', orcado: ORCADO_ADS.ctr, realizado: data.ctr ?? null, percentual: calcPercentual(ORCADO_ADS.ctr, data.ctr), format: 'percent' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
+      { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
       { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0), format: 'percent' },
       { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
@@ -1426,6 +1431,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
       { id: 'meta_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
+      { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
       { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
@@ -1455,6 +1461,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'gads_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
       { id: 'gads_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
       { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
+      { id: 'gads_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
       { id: 'gads_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
       { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
@@ -2249,7 +2256,7 @@ export default function GrowthOrcadoRealizado() {
       </div>
 
       {/* Tabs de Seção + Filtros */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 w-fit">
           {([
             { key: 'consolidado', label: 'Consolidado' },
