@@ -406,6 +406,83 @@ async function listMessages(req: Request, res: Response) {
 }
 
 /**
+ * GET /api/ghl/calendar?from=&to=
+ *
+ * Detecta "broadcasts" para calendário editorial:
+ *  - Email: usa ghl_email_campaigns no período (broadcasts são objetos oficiais).
+ *  - WhatsApp: agrega ghl_messages outbound source IN (workflow,bulk,campaign) por
+ *    (data, source). Dias com >= 30 mensagens são considerados broadcasts detectados.
+ *
+ * Retorna lista única ordenada por data com tipo distinto pra UI agrupar.
+ */
+async function getCalendar(req: Request, res: Response) {
+  try {
+    const { from, to } = parsePeriod(req);
+
+    // Email broadcasts — campanhas oficiais
+    const emailRes = await db.execute(sql`
+      SELECT
+        id, name, subject,
+        COALESCE(scheduled_at, date_added) AS date,
+        campaign_type, status,
+        total_count, success_count, failed_count
+      FROM cortex_core.ghl_email_campaigns
+      WHERE COALESCE(scheduled_at, date_added) BETWEEN ${from} AND ${to}
+      ORDER BY COALESCE(scheduled_at, date_added) DESC NULLS LAST
+    `);
+    const emailBroadcasts = ((emailRes as any).rows ?? []).map((r: any) => ({
+      kind: "email_campaign" as const,
+      id: r.id,
+      date: r.date,
+      name: r.name,
+      subject: r.subject,
+      campaign_type: r.campaign_type,
+      status: r.status,
+      total_count: r.total_count,
+      success_count: r.success_count,
+      failed_count: r.failed_count,
+    }));
+
+    // WhatsApp broadcasts detectados: agrupa por dia × source
+    const waRes = await db.execute(sql`
+      SELECT
+        DATE_TRUNC('day', date_added)::date AS date,
+        source,
+        COUNT(*)::int AS messages,
+        COUNT(DISTINCT contact_id)::int AS contacts_reached
+      FROM cortex_core.ghl_messages
+      WHERE message_type = 'TYPE_WHATSAPP'
+        AND direction = 'outbound'
+        AND source IN ('workflow', 'bulk', 'campaign')
+        AND date_added BETWEEN ${from} AND ${to}
+      GROUP BY DATE_TRUNC('day', date_added)::date, source
+      HAVING COUNT(*) >= 30
+      ORDER BY date DESC
+    `);
+    const waBroadcasts = ((waRes as any).rows ?? []).map((r: any) => ({
+      kind: "wa_broadcast" as const,
+      id: `wa-${r.date.toISOString?.()?.slice(0, 10) ?? r.date}-${r.source}`,
+      date: r.date,
+      source: r.source,
+      messages: r.messages,
+      contacts_reached: r.contacts_reached,
+    }));
+
+    // Agrupado por data
+    const all = [...emailBroadcasts, ...waBroadcasts].sort((a, b) => {
+      const da = new Date(a.date).getTime();
+      const db_ = new Date(b.date).getTime();
+      return db_ - da;
+    });
+
+    res.json({ period: { from, to }, broadcasts: all, counts: { email: emailBroadcasts.length, whatsapp: waBroadcasts.length } });
+  } catch (err: any) {
+    console.error("[GHL] calendar error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
  * GET /api/ghl/messages/:id — detalhe completo (body inteiro).
  */
 async function getMessageDetail(req: Request, res: Response) {
@@ -476,4 +553,5 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/diagnostico", getDiagnostico);
   app.get("/api/ghl/messages", listMessages);
   app.get("/api/ghl/messages/:id", getMessageDetail);
+  app.get("/api/ghl/calendar", getCalendar);
 }

@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths } from "date-fns";
 import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -843,6 +844,234 @@ function DetailLoader({ messageId }: { messageId: string }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
+// Tab: Calendário Editorial
+// ────────────────────────────────────────────────────────────────────────
+
+type Broadcast =
+  | {
+      kind: "email_campaign";
+      id: string;
+      date: string;
+      name: string | null;
+      subject: string | null;
+      campaign_type: string | null;
+      status: string | null;
+      total_count: number | null;
+      success_count: number | null;
+      failed_count: number | null;
+    }
+  | {
+      kind: "wa_broadcast";
+      id: string;
+      date: string;
+      source: string;
+      messages: number;
+      contacts_reached: number;
+    };
+
+function CalendarioTab() {
+  // Calendário tem sua própria seleção de mês — não usa o range do header
+  const [monthCursor, setMonthCursor] = useState(new Date());
+  const monthStart = startOfMonth(monthCursor);
+  const monthEnd = endOfMonth(monthCursor);
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const days = eachDayOfInterval({ start: gridStart, end: gridEnd });
+
+  const apiFrom = format(monthStart, "yyyy-MM-dd");
+  const apiTo = format(monthEnd, "yyyy-MM-dd");
+
+  const { data, isLoading, error } = useQuery<{ broadcasts: Broadcast[]; counts: { email: number; whatsapp: number } }>({
+    queryKey: ["/api/ghl/calendar", apiFrom, apiTo],
+    queryFn: () => fetchJson(`/api/ghl/calendar?from=${apiFrom}&to=${apiTo}`),
+  });
+
+  // Index broadcasts por dia (chave YYYY-MM-DD)
+  const broadcastsByDay = useMemo(() => {
+    const map = new Map<string, Broadcast[]>();
+    for (const b of data?.broadcasts ?? []) {
+      const dayKey = format(new Date(b.date), "yyyy-MM-dd");
+      const arr = map.get(dayKey) ?? [];
+      arr.push(b);
+      map.set(dayKey, arr);
+    }
+    return map;
+  }, [data]);
+
+  // Detecção retroativa de violação de cadência (mesmo "tipo de envio" 2× em 7 dias)
+  const cadenceWarnings = useMemo(() => {
+    const warnings = new Map<string, string[]>(); // dayKey → mensagens
+    const dailyList = Array.from(broadcastsByDay.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    for (let i = 0; i < dailyList.length; i++) {
+      const [dayKey, broadcasts] = dailyList[i];
+      const dayDate = new Date(dayKey);
+      const sevenDaysAgo = new Date(dayDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      // Procura outro dia com broadcast nos últimos 7 dias
+      for (let j = 0; j < i; j++) {
+        const [prevDay] = dailyList[j];
+        const prevDate = new Date(prevDay);
+        if (prevDate >= sevenDaysAgo) {
+          const list = warnings.get(dayKey) ?? [];
+          if (!list.length) {
+            list.push(`Outro broadcast em ${format(prevDate, "dd/MM", { locale: ptBR })} (regra Turbo: mín 7 dias entre disparos)`);
+          }
+          warnings.set(dayKey, list);
+          break;
+        }
+      }
+    }
+    return warnings;
+  }, [broadcastsByDay]);
+
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const selectedBroadcasts = selectedDay ? broadcastsByDay.get(selectedDay) ?? [] : [];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row justify-between items-center">
+          <CardTitle className="text-base capitalize">
+            {format(monthCursor, "MMMM yyyy", { locale: ptBR })}
+          </CardTitle>
+          <div className="flex gap-2">
+            <button onClick={() => setMonthCursor((m) => addMonths(m, -1))} className="px-3 py-1 hover:bg-muted rounded text-sm flex items-center gap-1">
+              <ChevronLeft className="w-4 h-4" /> Mês anterior
+            </button>
+            <button onClick={() => setMonthCursor(new Date())} className="px-3 py-1 hover:bg-muted rounded text-sm">Hoje</button>
+            <button onClick={() => setMonthCursor((m) => addMonths(m, 1))} className="px-3 py-1 hover:bg-muted rounded text-sm flex items-center gap-1">
+              Próximo <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isLoading && <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Carregando broadcasts...</div>}
+          {error && <div className="text-destructive">Erro: {(error as Error).message}</div>}
+
+          {data && (
+            <>
+              <div className="text-xs text-muted-foreground mb-3">
+                {data.counts.email} broadcast(s) de email · {data.counts.whatsapp} broadcast(s) de WhatsApp detectados (dias com ≥30 mensagens outbound workflow/bulk/campaign)
+              </div>
+
+              {/* Grid 7 dias × 6 semanas */}
+              <div className="grid grid-cols-7 gap-1 text-xs">
+                {["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"].map((d) => (
+                  <div key={d} className="text-center font-medium text-muted-foreground py-1">{d}</div>
+                ))}
+                {days.map((d) => {
+                  const dayKey = format(d, "yyyy-MM-dd");
+                  const inMonth = isSameMonth(d, monthCursor);
+                  const isToday = isSameDay(d, new Date());
+                  const dayBroadcasts = broadcastsByDay.get(dayKey) ?? [];
+                  const hasEmail = dayBroadcasts.some((b) => b.kind === "email_campaign");
+                  const hasWa = dayBroadcasts.some((b) => b.kind === "wa_broadcast");
+                  const warning = cadenceWarnings.get(dayKey);
+                  return (
+                    <button
+                      key={dayKey}
+                      onClick={() => dayBroadcasts.length > 0 && setSelectedDay(dayKey)}
+                      disabled={dayBroadcasts.length === 0}
+                      className={cn(
+                        "border rounded p-2 min-h-[88px] text-left flex flex-col gap-1 transition-colors",
+                        inMonth ? "bg-card" : "bg-muted/20 opacity-60",
+                        isToday && "ring-2 ring-blue-500",
+                        dayBroadcasts.length > 0 && "hover:bg-muted/40 cursor-pointer",
+                        dayBroadcasts.length === 0 && "cursor-default",
+                      )}
+                      title={warning?.join(", ")}
+                    >
+                      <div className={cn("text-xs font-medium", isToday && "text-blue-600 dark:text-blue-400")}>{format(d, "d")}</div>
+                      {dayBroadcasts.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-auto">
+                          {hasEmail && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-50 dark:bg-blue-950/40 border-blue-300">
+                              <Mail className="w-2.5 h-2.5 mr-0.5" />
+                              {dayBroadcasts.filter((b) => b.kind === "email_campaign").length}
+                            </Badge>
+                          )}
+                          {hasWa && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300">
+                              <MessageCircle className="w-2.5 h-2.5 mr-0.5" />
+                              {dayBroadcasts.filter((b) => b.kind === "wa_broadcast").length}
+                            </Badge>
+                          )}
+                          {warning && warning.length > 0 && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-amber-700 dark:text-amber-300">
+                              <AlertCircle className="w-2.5 h-2.5" />
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modal de detalhes do dia */}
+      {selectedDay && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setSelectedDay(null)}>
+          <Card className="max-w-2xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <CardHeader className="flex flex-row justify-between items-start">
+              <div>
+                <CardTitle className="text-base">{format(new Date(selectedDay), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</CardTitle>
+                <div className="text-sm text-muted-foreground mt-1">{selectedBroadcasts.length} broadcast(s) neste dia</div>
+                {cadenceWarnings.get(selectedDay) && (
+                  <div className="mt-2 text-xs text-amber-700 dark:text-amber-300 inline-flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" /> {cadenceWarnings.get(selectedDay)!.join(", ")}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setSelectedDay(null)} className="p-1 hover:bg-muted rounded"><X className="w-4 h-4" /></button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {selectedBroadcasts.map((b) => (
+                <div key={b.id} className="border rounded p-3">
+                  {b.kind === "email_campaign" ? (
+                    <div>
+                      <div className="flex justify-between gap-3 items-start">
+                        <div>
+                          <Badge variant="outline" className="text-xs"><Mail className="w-3 h-3 mr-1" /> Email</Badge>
+                          <div className="font-medium mt-1">{b.name ?? "Sem nome"}</div>
+                          {b.subject && <div className="text-sm text-muted-foreground">{b.subject}</div>}
+                        </div>
+                        <Badge variant="outline" className="text-xs">{b.campaign_type ?? "—"}</Badge>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 mt-3 text-sm">
+                        <div><span className="text-muted-foreground">Enviado:</span> <strong>{fmtInt(b.total_count)}</strong></div>
+                        <div><span className="text-muted-foreground">Entregue:</span> <strong>{fmtInt(b.success_count)}</strong> ({fmtPct(b.success_count ?? 0, b.total_count ?? 0)})</div>
+                        <div><span className="text-muted-foreground">Falhou:</span> <strong>{fmtInt(b.failed_count)}</strong></div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex justify-between gap-3 items-start">
+                        <div>
+                          <Badge variant="outline" className="text-xs"><MessageCircle className="w-3 h-3 mr-1" /> WhatsApp</Badge>
+                          <div className="font-medium mt-1">Broadcast detectado · source: <Badge variant="outline" className="ml-1 text-xs">{b.source}</Badge></div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                        <div><span className="text-muted-foreground">Mensagens:</span> <strong>{fmtInt(b.messages)}</strong></div>
+                        <div><span className="text-muted-foreground">Contatos alcançados:</span> <strong>{fmtInt(b.contacts_reached)}</strong></div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
 // Page
 // ────────────────────────────────────────────────────────────────────────
 
@@ -900,6 +1129,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="biblioteca" data-testid="tab-biblioteca">
             <BookOpen className="w-4 h-4 mr-2" /> Biblioteca
           </TabsTrigger>
+          <TabsTrigger value="calendario" data-testid="tab-calendario">
+            <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="email" className="mt-6">
@@ -916,6 +1148,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="biblioteca" className="mt-6">
           <BibliotecaTab from={from} to={to} />
+        </TabsContent>
+        <TabsContent value="calendario" className="mt-6">
+          <CalendarioTab />
         </TabsContent>
       </Tabs>
     </div>
