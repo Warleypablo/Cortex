@@ -70,6 +70,7 @@ export interface AdsMetrics {
   videoHold: number;
   connectRate: number;
   visualizacoesPagina: number;
+  sessoes: number;
   leads: number;
   mqls: number;
   cpl: number;
@@ -216,6 +217,7 @@ export const DEFAULT_ORCADO_ADS = {
   videoHook: 0,
   videoHold: 0,
   visualizacoesPagina: 0,
+  sessoes: 0,
   taxaConversaoPagina: 0,
   connectRate: 0,
   leads: 0,
@@ -227,7 +229,7 @@ export const DEFAULT_ORCADO_ADS = {
 
 export const DEFAULT_ORCADO_META_ADS = {
   investimento: 0, cpm: 0, ctr: 0, videoHook: 0, videoHold: 0, videoP75: 0, videoP100: 0,
-  visualizacoesPagina: 0, taxaConversaoPagina: 0, connectRate: 0,
+  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
@@ -239,7 +241,7 @@ export const DEFAULT_ORCADO_META_ADS = {
 
 export const DEFAULT_ORCADO_GOOGLE_ADS = {
   investimento: 0, cpm: 0, ctr: 0,
-  visualizacoesPagina: 0, taxaConversaoPagina: 0, connectRate: 0,
+  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
@@ -335,6 +337,7 @@ export const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }>
   video_hook: { segment: 'ads', key: 'videoHook' },
   video_hold: { segment: 'ads', key: 'videoHold' },
   visualizacoes_pagina: { segment: 'ads', key: 'visualizacoesPagina' },
+  sessoes: { segment: 'ads', key: 'sessoes' },
   taxa_conversao_pagina: { segment: 'ads', key: 'taxaConversaoPagina' },
   connect_rate: { segment: 'ads', key: 'connectRate' },
   leads: { segment: 'ads', key: 'leads' },
@@ -343,9 +346,9 @@ export const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }>
   cpmql: { segment: 'ads', key: 'cpmql' },
   perc_mqls: { segment: 'ads', key: 'percMqls' },
   // Meta Ads (platform-specific)
-  ...Object.fromEntries(['investimento','cpm','ctr','videoHook','videoHold','videoP75','videoP100','visualizacoesPagina','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`meta_${k}`, { segment: 'meta_ads', key: k }])),
+  ...Object.fromEntries(['investimento','cpm','ctr','videoHook','videoHold','videoP75','videoP100','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`meta_${k}`, { segment: 'meta_ads', key: k }])),
   // Google Ads (platform-specific)
-  ...Object.fromEntries(['investimento','cpm','ctr','visualizacoesPagina','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`gads_${k}`, { segment: 'google_ads', key: k }])),
+  ...Object.fromEntries(['investimento','cpm','ctr','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`gads_${k}`, { segment: 'google_ads', key: k }])),
   // Instagram (platform-specific)
   ...Object.fromEntries(['comecaramSeguir','deixaramSeguir','percPerdaSeguidores','deltaSeguidores','totalSeguidores','percCrescimentoSeguidores','visualizacoesTotais','percVisualizacoesOrganicas','visualizacoesOrganicas','percVisualizacoesPagas','visualizacoesPagas','alcanceTotal','alcanceOrganico','alcancePago','frequenciaAlcance','ctrAlcanceVisitas','visitasPerfil','percEngajamento','interacoes','ctrAlcanceCliques','ctrVisitasCliques','cliquesLinkBio','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`ig_${k}`, { segment: 'instagram', key: k }])),
   // YouTube (platform-specific)
@@ -450,6 +453,7 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: '_header_marketing', name: 'Marketing', format: 'number', isSubHeader: true },
       { id: 'investimento', name: 'Investimento', format: 'currency' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', format: 'number' },
+      { id: 'sessoes', name: 'Sessões', format: 'number' },
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', format: 'percent' },
       { id: 'connect_rate', name: 'Connect Rate', format: 'percent' },
       { id: 'leads', name: 'Leads', format: 'number' },
@@ -496,6 +500,7 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'meta_ctr', name: 'CTR', format: 'percent', tier: 1 },
       { id: 'meta_connectRate', name: 'Connect Rate', format: 'percent', tier: 1 },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', format: 'number', tier: 2 },
+      { id: 'meta_sessoes', name: 'Sessões', format: 'number', tier: 2 },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página', format: 'percent', tier: 1 },
       { id: 'meta_leads', name: 'Leads', format: 'number', tier: 2 },
       { id: 'meta_cpl', name: 'CPL', format: 'currency', tier: 2 },
@@ -522,6 +527,7 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'gads_ctr', name: 'CTR', format: 'percent', tier: 1 },
       { id: 'gads_connectRate', name: 'Connect Rate', format: 'percent', tier: 1 },
       { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', format: 'number', tier: 2 },
+      { id: 'gads_sessoes', name: 'Sessões', format: 'number', tier: 2 },
       { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', format: 'percent', tier: 1 },
       { id: 'gads_leads', name: 'Leads', format: 'number', tier: 2 },
       { id: 'gads_cpl', name: 'CPL', format: 'currency', tier: 2 },

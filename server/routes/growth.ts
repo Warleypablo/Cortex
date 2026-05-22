@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
+import { getSessionsByPlatform } from "../services/ga4Sessions";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
@@ -2522,17 +2523,40 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.log("[api] Google Ads query error in orcado-realizado/ads (may not have data):", googleError);
       }
 
+      // Cliques de saída consolidados: Meta outbound_clicks + Google clicks
+      // (Google clicks são cliques no anúncio que levam à LP — equivalente a outbound).
+      if (includeGoogle) {
+        cliquesSaida += googleCliques;
+      }
+
       // Combine Meta + Google
       const investimento = metaInvestimento + googleInvestimento;
       const impressoes = metaImpressoes + googleImpressoes;
       const cliques = metaCliques + googleCliques;
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
-      const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
+      // CTR consolidado: cliques totais / impressões totais (não cliques_saida Meta-only)
+      const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
 
       // CPS = Custo por Sessão (Investimento / Visualizações de Página)
       const cps = visualizacoesPagina > 0 ? investimento / visualizacoesPagina : 0;
-      // Connect Rate = Visualizações de Página / Cliques de Saída
+      // Connect Rate = Visualizações de Página / Cliques de Saída (Meta Pixel only — semântica preservada)
       const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
+
+      // Sessões (GA4) — métrica universal de chegada na LP cobrindo Meta + Google + orgânico.
+      // Filtro de funil aplicado via sessionCampaignName contains [NomeFunil].
+      const ga4 = await getSessionsByPlatform(
+        new Date(startDate),
+        new Date(endDate),
+        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+      );
+      let sessoes = 0;
+      if (includeMeta && includeGoogle) {
+        sessoes = ga4.total;
+      } else if (includeMeta) {
+        sessoes = ga4.byPlatform.meta_ads;
+      } else if (includeGoogle) {
+        sessoes = ga4.byPlatform.google_ads;
+      }
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
       const contagem = (req.query.contagem as string) || 'contrato';
@@ -2591,6 +2615,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPagina;
+      const sessoesExposto = onlyInstagram ? 0 : sessoes;
       const cpl = onlyInstagram ? 0 : (leads > 0 ? investimento / leads : 0);
       const cpmql = onlyInstagram ? 0 : (mqls > 0 ? investimento / mqls : 0);
       const percMqls = leads > 0 ? (mqls / leads) : 0;
@@ -2605,6 +2630,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cps: cpsExposto,
         connectRate: connectRateExposto,
         visualizacoesPagina: visualizacoesPaginaExposto,
+        sessoes: sessoesExposto,
+        sessoesAvailable: ga4.available,
         leads,
         mqls,
         cpl,
@@ -2640,6 +2667,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           investimento: 0, impressoes: 0, alcance: 0, frequencia: 0,
           cpm: 0, ctr: 0, videoHook: null, videoHold: null,
           visualizacoesPagina: 0, connectRate: 0,
+          sessoes: 0, sessoesAvailable: false,
         });
       }
 
@@ -2708,6 +2736,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const videoHook = impressoes > 0 && video3Sec > 0 ? (video3Sec / impressoes) * 100 : null;
       const videoHold = impressoes > 0 && videoThruplay > 0 ? (videoThruplay / impressoes) * 100 : null;
 
+      const ga4 = await getSessionsByPlatform(
+        new Date(startDate),
+        new Date(endDate),
+        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+      );
+      const sessoes = ga4.byPlatform.meta_ads;
+
       res.json({
         investimento,
         impressoes,
@@ -2719,6 +2754,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         videoHold,
         visualizacoesPagina,
         connectRate,
+        sessoes,
+        sessoesAvailable: ga4.available,
       });
     } catch (error) {
       console.error("[api] Error fetching Meta Ads metrics:", error);
@@ -2753,6 +2790,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cpm: 0, cpc: 0, ctr: 0,
         visualizacoesPagina: 0, connectRate: 0,
         conversoes: 0, valorConversoes: 0, custoConversao: 0,
+        sessoes: 0, sessoesAvailable: false,
       };
       if (!includeGoogle || hasFunilFilter) {
         return res.json(zeroResponse);
@@ -2806,6 +2844,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
       const custoConversao = conversoes > 0 ? (investimento / conversoes) : 0;
 
+      // Sessões GA4 do tráfego Google (sessionSource=google + sessionMedium=cpc)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.google_ads;
+
       res.json({
         investimento,
         impressoes,
@@ -2818,6 +2860,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         conversoes,
         valorConversoes,
         custoConversao,
+        sessoes,
+        sessoesAvailable: ga4.available,
       });
     } catch (error) {
       console.error("[api] Error fetching Google Ads metrics:", error);

@@ -58,6 +58,7 @@ interface AdsData {
   ctr: number;
   connectRate: number;
   visualizacoesPagina: number;
+  sessoes: number;
   leads: number;
   mqls: number;
   cpl: number;
@@ -248,6 +249,9 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "ads_visualizacoes_pagina", name: "Visualizações de Página", format: "number", section: "marketing",
     realizado: ({ ads }) => ads?.visualizacoesPagina ?? null,
     orcado: (b) => b.marketing?.visualizacoesPagina ?? null },
+  { id: "ads_sessoes", name: "Sessões", format: "number", section: "marketing",
+    realizado: ({ ads }) => ads?.sessoes ?? null,
+    orcado: (b) => b.marketing?.sessoes ?? null },
   { id: "ads_taxa_conversao_pagina", name: "Tx Conversão da Página", format: "percent", section: "marketing",
     realizado: ({ ads }) => {
       if (!ads) return null;
