@@ -20,9 +20,7 @@ const ALLOWED_EDITOR_EMAILS = new Set([
 
 type Platform = "meta" | "google";
 
-// Google Ads sync está travado em 2025-11. Esconder da UI até sync voltar.
-// Backend continua preparado — basta alternar para true quando o sync estiver ok.
-const SHOW_GOOGLE = false;
+const SHOW_GOOGLE = true;
 
 interface Campanha {
   platform: Platform;
